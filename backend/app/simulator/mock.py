@@ -49,6 +49,7 @@ _SCENARIO_FACTOR: dict[str, float] = {
     "payload_changed": 1.30,
     "battery_degraded": 1.25,
     "actuator_delay": 1.55,
+    "actuator_failure": 2.25,
     "custom": 1.15,
 }
 
@@ -173,6 +174,7 @@ class MockSimulatorAdapter(SimulatorAdapter):
         kp = float(params.get("kp_xy", 1.0))
         kd = float(params.get("kd_xy", 0.2))
         ki = float(params.get("ki_xy", 0.05))
+        vel_limit = float(params.get("vel_limit", 5.0))
         accel_limit = float(params.get("accel_limit", 4.0))
         disturbance = float(params.get("disturbance_rejection", 0.5))
         vehicle_profile = dict(ctx.job_config.vehicle_profile or {})
@@ -187,6 +189,7 @@ class MockSimulatorAdapter(SimulatorAdapter):
             abs(kp - 1.2) * 0.30
             + abs(kd - 0.30) * 0.20
             + abs(ki - 0.05) * 0.50
+            + abs(vel_limit - 6.0) * 0.015
             + max(0.0, 3.5 - accel_limit) * 0.05
             + (1.0 - _clamp(disturbance, 0.0, 1.0)) * 0.10
             + catalog_penalty
@@ -271,6 +274,9 @@ class MockSimulatorAdapter(SimulatorAdapter):
                 )
             except (TypeError, ValueError):
                 actuator_delay_penalty = 0.1
+        actuator_failure_penalty = (
+            0.75 if ctx.scenario_type == "actuator_failure" else 0.0
+        )
         turbulence_penalty = 0.0
         if ctx.scenario_type == "turbulence":
             try:
@@ -281,6 +287,37 @@ class MockSimulatorAdapter(SimulatorAdapter):
                 )
             except (TypeError, ValueError):
                 turbulence_penalty = 0.075
+        scenario_control_penalty = 0.0
+        if ctx.scenario_type == "wind_perturbed":
+            scenario_control_penalty = (1.0 - _clamp(disturbance, 0.0, 1.0)) * 0.12
+        elif ctx.scenario_type == "combined_perturbed":
+            scenario_control_penalty = (
+                (1.0 - _clamp(disturbance, 0.0, 1.0)) * 0.18
+                + max(0.0, 4.0 - accel_limit) * 0.06
+            )
+        elif ctx.scenario_type == "turbulence":
+            scenario_control_penalty = (
+                (1.0 - _clamp(disturbance, 0.0, 1.0)) * 0.16
+                + abs(kd - 0.35) * 0.10
+            )
+        elif ctx.scenario_type == "gps_dropout":
+            scenario_control_penalty = (
+                abs(kd - 0.38) * 0.15 + max(0.0, kp - 1.10) * 0.10
+            )
+        elif ctx.scenario_type == "payload_changed":
+            scenario_control_penalty = max(0.0, 4.5 - accel_limit) * 0.06
+        elif ctx.scenario_type == "battery_degraded":
+            scenario_control_penalty = max(0.0, vel_limit - 5.5) * 0.04
+        elif ctx.scenario_type == "actuator_delay":
+            scenario_control_penalty = (
+                max(0.0, kp - 1.05) * 0.18 + abs(kd - 0.32) * 0.08
+            )
+        elif ctx.scenario_type == "actuator_failure":
+            scenario_control_penalty = (
+                max(0.0, kp - 0.95) * 0.25
+                + abs(kd - 0.40) * 0.15
+                + max(0.0, 0.75 - disturbance) * 0.30
+            )
 
         rng = random.Random(  # noqa: S311 - deterministic simulator noise
             ctx.seed * 31 + sum(ord(c) for c in ctx.scenario_type)
@@ -295,7 +332,9 @@ class MockSimulatorAdapter(SimulatorAdapter):
             + dropout_rate * 0.20
             + obstacle_count * 0.005
             + actuator_delay_penalty
+            + actuator_failure_penalty
             + turbulence_penalty
+            + scenario_control_penalty
             + jitter,
         )
         max_error = rmse * 2.1 + rng.uniform(0.0, 0.15)
@@ -333,13 +372,15 @@ class MockSimulatorAdapter(SimulatorAdapter):
             "dropout_rate": round(dropout_rate, 4),
             "battery_initial_percent": round(battery_initial_percent, 2),
             "payload_kg": round(payload_kg, 3),
-            "mock_landscape_schema": "dronedream.mock.synthetic.v1",
+            "mock_landscape_schema": "dronedream.mock.synthetic.v2",
             "physical_fidelity": False,
             "catalog_parameter_count": len(catalog_contributions),
             "catalog_parameter_penalty": round(catalog_penalty, 6),
             "catalog_parameter_contributions": catalog_contributions,
             "actuator_delay_penalty": round(actuator_delay_penalty, 4),
+            "actuator_failure_penalty": round(actuator_failure_penalty, 4),
             "turbulence_penalty": round(turbulence_penalty, 4),
+            "scenario_control_penalty": round(scenario_control_penalty, 6),
             "advanced_scenario_summary": {
                 "has_advanced": bool(advanced_cfg),
                 "gust_enabled": bool(isinstance(gusts, dict) and gusts.get("enabled")),

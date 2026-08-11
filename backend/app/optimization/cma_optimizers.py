@@ -25,9 +25,17 @@ from numpy.typing import NDArray
 
 from app.optimization.domain import SearchSpace
 from app.optimization.experimental_types import (
+    OPTIMIZER_LEARNING_OBSERVATION_ROLES,
     ExperimentalProposal,
     OptimizerObservation,
     OptimizerRequest,
+    canonical_optimizer_seed_value,
+)
+from app.optimization.outcome_contract import (
+    OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT,
+)
+from app.optimization.proposal_provenance import (
+    verified_observation_source_membership,
 )
 
 FloatArray = NDArray[np.float64]
@@ -150,7 +158,9 @@ class _CohortRecord:
     @property
     def complete(self) -> bool:
         return self.persisted_count == self.population_size and all(
-            item.completed for item in self.positions.values()
+            item.completed
+            and item.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
+            for item in self.positions.values()
         )
 
 
@@ -202,18 +212,28 @@ def _observation_seed_payload(item: OptimizerObservation) -> dict[str, Any]:
     """Canonical observation content independent of database-generated IDs."""
 
     return {
-        "generation": item.generation_index,
-        "unit": list(item.unit_vector),
-        "parameters": item.parameters,
-        "loss": item.loss,
-        "objectives": item.objectives,
-        "objective_directions": item.objective_directions,
-        "feasible": item.feasible,
-        "failure_rate": item.failure_rate,
-        "constraints": item.constraints,
-        "strategy": item.optimizer_strategy,
-        "effective_fidelity": item.fidelity,
-        "requested_fidelity": item.requested_fidelity,
+        str(key): value
+        for key, value in canonical_optimizer_seed_value(
+            {
+                "generation": item.generation_index,
+                "unit": list(item.unit_vector),
+                "parameters": item.parameters,
+                "loss": item.loss,
+                "objectives": item.objectives,
+                "objective_directions": item.objective_directions,
+                "feasible": item.feasible,
+                "failure_rate": item.failure_rate,
+                "constraints": item.constraints,
+                "strategy": item.optimizer_strategy,
+                "effective_fidelity": item.fidelity,
+                "requested_fidelity": item.requested_fidelity,
+                **(
+                    {"role": item.role}
+                    if item.role != "objective"
+                    else {}
+                ),
+            }
+        ).items()
     }
 
 
@@ -313,7 +333,7 @@ def _canonical_seed(
         "extra": extra or {},
     }
     encoded = json.dumps(
-        payload,
+        canonical_optimizer_seed_value(payload),
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
@@ -392,7 +412,11 @@ def _soft_feasibility_target(observation: OptimizerObservation) -> float:
 
 
 def _is_effectively_feasible(observation: OptimizerObservation) -> bool:
-    return observation.feasible and observation.failure_rate < 0.5
+    return (
+        observation.feasible
+        and observation.failure_rate
+        < OPTIMIZER_LEARNING_FAILURE_RATE_LIMIT
+    )
 
 
 def _rank_key(point: _TrainingPoint) -> tuple[float, float, float, tuple[float, ...]]:
@@ -412,6 +436,12 @@ def _rank_key(point: _TrainingPoint) -> tuple[float, float, float, tuple[float, 
 
 
 def _strategy_matches(observation: OptimizerObservation, strategy: str) -> bool:
+    verified_membership = verified_observation_source_membership(
+        observation,
+        strategy,
+    )
+    if verified_membership is not None:
+        return verified_membership
     value = observation.optimizer_strategy or ""
     return value == strategy or value.endswith(f":{strategy}") or strategy in value.split("/")
 
@@ -422,7 +452,7 @@ def _full_fidelity_observations(
     return tuple(
         item
         for item in observations
-        if item.requested_fidelity >= 1.0 - 1e-9
+        if item.requested_fidelity >= 1.0 - 1e-9 and item.fidelity >= 1.0 - 1e-9
     )
 
 
@@ -497,7 +527,11 @@ def _legacy_generation_cohorts(
         sorted(grouped[generation], key=_rank_key)
         for generation in sorted(grouped)
         if len(grouped[generation]) == population_size
-        and all(point.observation.completed for point in grouped[generation])
+        and all(
+            point.observation.completed
+            and point.observation.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
+            for point in grouped[generation]
+        )
     ]
 
 
@@ -556,6 +590,25 @@ def _inverse_sqrt(covariance: FloatArray) -> FloatArray:
     return np.asarray((eigenvectors * inverse) @ eigenvectors.T, dtype=np.float64)
 
 
+def _symmetric_sqrt(covariance: FloatArray) -> FloatArray:
+    """Return the unique symmetric positive-definite covariance square root.
+
+    ``eigenvectors @ diag(sqrt(eigenvalues))`` is a valid sampling factor, but
+    it is not unique when eigenvalues repeat. BLAS/LAPACK implementations may
+    choose different orthonormal bases for the same degenerate eigenspace,
+    rotating an otherwise identical seeded normal sample into a different
+    candidate. The principal symmetric square root is invariant to that basis
+    choice and therefore keeps seeded CMA proposals portable across supported
+    CPUs and Python runners.
+    """
+
+    stable = _stabilize_covariance(covariance)
+    eigenvalues, eigenvectors = np.linalg.eigh(stable)
+    roots = np.sqrt(np.maximum(eigenvalues, _MIN_EIGENVALUE))
+    transform = (eigenvectors * roots) @ eigenvectors.T
+    return np.asarray((transform + transform.T) * 0.5, dtype=np.float64)
+
+
 def _initial_state(
     search_space: SearchSpace,
     warm_points: Sequence[_TrainingPoint],
@@ -578,6 +631,7 @@ def _initial_state(
         point
         for point in ranked
         if point.observation.loss is not None
+        and point.observation.role == "objective"
         and math.isfinite(point.observation.loss)
         and _is_effectively_feasible(point.observation)
     ]
@@ -734,6 +788,7 @@ def reconstruct_cma_state(
         point
         for point in points
         if not _strategy_matches(point.observation, strategy)
+        and point.observation.role == "objective"
         and _is_effectively_feasible(point.observation)
         and (
             first_own_generation is None
@@ -849,9 +904,7 @@ def _sample_projected_pool(
     if dimensions == 0:
         empty = np.empty(0, dtype=np.float64)
         return [(search_space.baseline(), empty, empty, 0.0)]
-    covariance = _stabilize_covariance(state.covariance)
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
-    transform = eigenvectors @ np.diag(np.sqrt(np.maximum(eigenvalues, _MIN_EIGENVALUE)))
+    transform = _symmetric_sqrt(state.covariance)
     seen = _history_keys(search_space, observations)
     pool: list[tuple[dict[str, float], FloatArray, FloatArray, float]] = []
     attempts = 0
@@ -859,7 +912,10 @@ def _sample_projected_pool(
     while len(pool) < requested and attempts < max_attempts:
         standard = rng.standard_normal(dimensions)
         raw = state.mean + state.sigma * (transform @ standard)
-        reflected = _reflect_unit(raw)
+        reflected = np.asarray(
+            canonical_optimizer_seed_value(_reflect_unit(raw).tolist()),
+            dtype=np.float64,
+        )
         attempts += 1
         try:
             parameters = search_space.from_unit_vector(reflected.tolist())
@@ -978,6 +1034,7 @@ def _surrogate_models(
         point
         for point in _training_points(search_space, observations)
         if point.observation.completed
+        and point.observation.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
     ]
     feasibility_source_count = len(points)
     objective_points = [
@@ -987,6 +1044,7 @@ def _surrogate_models(
             observations if objective_observations is None else objective_observations,
         )
         if point.observation.completed
+        and point.observation.role == "objective"
     ]
     successful = [
         point
@@ -1345,7 +1403,11 @@ def _restart_boundaries(
         for generation_index in sorted(by_generation):
             population_size = bipop_restart_plan(restart_index, dimensions).population_size
             cohort = by_generation[generation_index]
-            if len(cohort) != population_size or not all(item.completed for item in cohort):
+            if len(cohort) != population_size or not all(
+                item.completed
+                and item.role in OPTIMIZER_LEARNING_OBSERVATION_ROLES
+                for item in cohort
+            ):
                 continue
             cohorts.append((restart_index, generation_index, cohort))
 

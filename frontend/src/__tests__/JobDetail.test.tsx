@@ -1,10 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { JobDetail } from "../pages/JobDetail";
 import { apiClient } from "../api/client";
+import * as cloudModelAccess from "../features/settings/cloudModelAccess";
 import type { Artifact, Job, JobReport, TrialSummary } from "../types/api";
 
 const PHASE8_DEFAULTS = {
@@ -25,6 +26,7 @@ const PHASE8_DEFAULTS = {
 function makeJob(overrides: Partial<Job>): Job {
   const base: Job = {
     id: "job_test_1",
+    control_version: 1,
     track_type: "circle",
     reference_track: null,
     start_point: { x: 0, y: 0 },
@@ -93,6 +95,8 @@ function makeReport(): JobReport {
       accel_limit: 4.0,
       disturbance_rejection: 0.5,
     },
+    winner_evidence_id: "sha256:winner-evidence",
+    winner_freeze_receipt_id: "wfr_test",
     report_status: "READY",
     created_at: "2026-04-22T09:05:00Z",
     updated_at: "2026-04-22T09:05:00Z",
@@ -175,6 +179,50 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     );
   });
 
+  it("labels a no-usable-candidate report as diagnostic instead of a recommendation", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimization_outcome: "no_usable_candidate",
+      best_candidate_id: null,
+    });
+    const report = makeReport();
+    report.best_candidate_id = "cand_baseline";
+    report.best_parameters = { MPC_XY_P: 0.95 };
+    report.winner_evidence_id = null;
+    report.winner_freeze_receipt_id = null;
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(report);
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText("Diagnostic parameters")).toBeVisible();
+    expect(screen.getByText("No validated winner")).toBeVisible();
+    expect(screen.getByText(/not a validated recommendation/i)).toBeVisible();
+    expect(screen.getByText(/no candidate passed the acceptance and evidence gates/i)).toBeVisible();
+    expect(screen.queryByText("best-so-far summary text")).toBeNull();
+    expect(screen.queryByText("Baseline winner")).toBeNull();
+  });
+
+  it("keeps a selected mock result readable without a real-simulator freeze receipt", async () => {
+    const job = makeJob({ simulator_backend_requested: "mock" });
+    const report = makeReport();
+    report.winner_evidence_id = null;
+    report.winner_freeze_receipt_id = null;
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(report);
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText("Best parameters")).toBeVisible();
+    expect(screen.getByText("Optimizer winner")).toBeVisible();
+    expect(screen.getByText("best-so-far summary text")).toBeVisible();
+    expect(screen.queryByText("No validated winner")).toBeNull();
+  });
+
   it("surfaces worst-case max error and incomplete holdout evidence", async () => {
     const job = makeJob({ status: "COMPLETED" });
     const report = makeReport();
@@ -222,6 +270,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: true,
         candidate_generation_index: 2,
+        failure_code: null,
+        failure_reason: null,
       },
       {
         id: "tri_heur_1",
@@ -236,6 +286,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: false,
         candidate_generation_index: 1,
+        failure_code: null,
+        failure_reason: null,
       },
     ];
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
@@ -251,6 +303,47 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     expect(screen.getByText("Best")).toBeInTheDocument();
     // The llm_optimizer row is NOT mislabeled as Baseline.
     expect(screen.queryByText(/Baseline$/)).toBeNull();
+  });
+
+  it("opens a completed passing trial for the best candidate before a failed one", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    const common = {
+      candidate_id: "cand_best",
+      seed: 1,
+      scenario_type: "nominal" as const,
+      candidate_label: "best",
+      candidate_source_type: "optimizer" as const,
+      candidate_is_baseline: false,
+      candidate_is_best: true,
+      candidate_generation_index: 1,
+      failure_code: null,
+      failure_reason: null,
+    };
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([
+      {
+        ...common,
+        id: "trial_failed_first",
+        status: "FAILED",
+        score: null,
+        pass_flag: null,
+      },
+      {
+        ...common,
+        id: "trial_completed_pass",
+        status: "COMPLETED",
+        score: 0.2,
+        pass_flag: true,
+      },
+    ]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByRole("link", {
+      name: "Open best trial replay",
+    })).toHaveAttribute("href", "/trials/trial_completed_pass");
   });
 
   it("labels cma_es optimizer rows as 'CMA-ES Gen N'", async () => {
@@ -269,6 +362,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: false,
         candidate_generation_index: 2,
+        failure_code: null,
+        failure_reason: null,
       },
     ];
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
@@ -301,6 +396,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: false,
         candidate_generation_index: 2,
+        failure_code: null,
+        failure_reason: null,
       },
     ];
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
@@ -335,6 +432,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: true,
         candidate_is_best: false,
         candidate_generation_index: 0,
+        failure_code: null,
+        failure_reason: null,
       },
       {
         id: "tri_fail",
@@ -352,6 +451,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: true,
         candidate_generation_index: 1,
+        failure_code: null,
+        failure_reason: null,
       },
       {
         id: "tri_nometric",
@@ -366,6 +467,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: false,
         candidate_generation_index: 1,
+        failure_code: "SIMULATION_FAILED",
+        failure_reason: "Simulator refused the trial.",
       },
     ];
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
@@ -406,8 +509,125 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("rerun for gpt asks for a fresh OpenAI key and stays gpt-based", async () => {
-    const job = makeJob({ status: "COMPLETED", optimizer_strategy: "gpt" });
+  it("creates a bounded continuation child only after explicit confirmation and a fresh managed grant", async () => {
+    const budget = {
+      additional_generation_cap: 4,
+      additional_trial_cap: 80,
+      additional_provider_turn_cap: 16,
+      additional_time_budget_seconds: 3600,
+    };
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "llm_harness",
+      llm_access_mode: "platform",
+      llm_provider: "dronedream",
+      completion_policy: "first_qualified_stop",
+      job_kind: "primary",
+      first_qualified_candidate_id: "cand_best",
+      first_qualified_at: "2026-04-22T09:04:30Z",
+      continue_exploration_requested: false,
+      exploration_budget: budget,
+      provider_turns_attempted: 5,
+      provider_turns_succeeded: 5,
+      provider_turn_cap: 32,
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    vi.spyOn(cloudModelAccess, "issueManagedModelGrant").mockResolvedValue({
+      access_mode: "platform",
+      grant: `ddg_${"B".repeat(48)}`,
+      scope: "job",
+      expires_at: "2026-07-29T12:00:00Z",
+      max_calls: 16,
+      gateway_base_url: "https://gateway.example.test",
+      managed_model: "DroneDream Managed",
+      usage: {
+        plan: {
+          id: "free", name: "Free", monthly_price_cny_fen: 0,
+          included_ai_credits: 20, capability_set: "core-v1",
+        },
+        period: {
+          starts_at: "2026-07-01T00:00:00Z",
+          ends_at: "2026-08-01T00:00:00Z",
+        },
+        usage: {
+          reserved_ai_credits: 0, consumed_ai_credits: 0,
+          remaining_ai_credits: 20, request_count: 0,
+          input_tokens: 0, output_tokens: 0, total_tokens: 0,
+          estimated_request_count: 0, credit_policy_version: 1,
+        },
+        recent_requests: [],
+      },
+    });
+    const continueSpy = vi.spyOn(apiClient, "continueExploration").mockResolvedValue({
+      ...job,
+      id: "job_child",
+      job_kind: "continue_exploration",
+      continuation_parent_job_id: job.id,
+    });
+
+    renderWithJob(job.id);
+    fireEvent.click(await screen.findByRole("button", { name: /Continue exploring/i }));
+    const dialog = screen.getByRole("dialog", { name: /Confirm a separate exploration job/i });
+    expect(within(dialog).getByLabelText(/Extra generations/i)).toBeDisabled();
+    const confirm = within(dialog).getByRole("button", { name: /Confirm and start exploration/i });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(within(dialog).getByLabelText(/I understand the additional limits/i));
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(continueSpy).toHaveBeenCalledWith(
+      job.id,
+      job.control_version,
+      {
+        budget,
+        llm: {
+          access_mode: "platform",
+          provider: "dronedream",
+          api_key: null,
+          platform_grant: `ddg_${"B".repeat(48)}`,
+          model: null,
+          base_url: null,
+        },
+      },
+    ));
+    expect(cloudModelAccess.issueManagedModelGrant).toHaveBeenCalledWith("job", job.id);
+  });
+
+  it("keeps the parent first-qualified result reachable from an exploration child", async () => {
+    const job = makeJob({
+      id: "job_child",
+      job_kind: "continue_exploration",
+      continuation_parent_job_id: "job_parent",
+      completion_policy: "exploration_budget_stop",
+      optimization_outcome: "exploration_no_improvement",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(await screen.findAllByText("Best validated after exploration")).not.toHaveLength(0);
+    expect(screen.getByRole("link", { name: /Open first-qualified result/i })).toHaveAttribute(
+      "href", "/jobs/job_parent",
+    );
+    expect(
+      screen.getAllByText(/parent first-qualified result remains authoritative/i)[0],
+    ).toBeVisible();
+  });
+
+  it("rerun for a BYOK job preserves its provider, model, and endpoint", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "gpt",
+      llm_access_mode: "byok",
+      llm_provider: "deepseek",
+      llm_base_url: "https://api.deepseek.com/v1",
+      openai_model: "deepseek-chat",
+    });
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
     vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
     vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
@@ -415,16 +635,152 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     const rerunSpy = vi
       .spyOn(apiClient, "rerunJob")
       .mockResolvedValue({ ...job, id: "job_rerun_1" });
-    vi.spyOn(window, "prompt").mockReturnValue("sk-rerun");
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("fresh-key");
 
     renderWithJob(job.id);
 
     fireEvent.click(await screen.findByRole("button", { name: /Rerun/i }));
     await waitFor(() =>
       expect(rerunSpy).toHaveBeenCalledWith(job.id, {
-        openai: { api_key: "sk-rerun", model: null },
+        llm: {
+          access_mode: "byok",
+          provider: "deepseek",
+          api_key: "fresh-key",
+          platform_grant: null,
+          model: "deepseek-chat",
+          base_url: "https://api.deepseek.com/v1",
+        },
       }),
     );
+    expect(promptSpy).toHaveBeenCalledWith(
+      expect.stringContaining("deepseek"),
+    );
+  });
+
+  it("rerun for managed access requests a fresh scoped grant without prompting", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "llm_harness",
+      llm_access_mode: "platform",
+      llm_provider: "dronedream",
+      llm_base_url: "https://gateway.example.test",
+      openai_model: "DroneDream Managed",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    const rerunSpy = vi
+      .spyOn(apiClient, "rerunJob")
+      .mockResolvedValue({ ...job, id: "job_rerun_managed" });
+    const promptSpy = vi.spyOn(window, "prompt");
+    vi.spyOn(cloudModelAccess, "issueManagedModelGrant").mockResolvedValue({
+      access_mode: "platform",
+      grant: `ddg_${"A".repeat(48)}`,
+      scope: "job",
+      expires_at: "2026-07-29T12:00:00Z",
+      max_calls: 1,
+      gateway_base_url: "https://gateway.example.test",
+      managed_model: "DroneDream Managed",
+      usage: {
+        plan: {
+          id: "free",
+          name: "Free",
+          monthly_price_cny_fen: 0,
+          included_ai_credits: 10,
+          capability_set: "core-v1",
+        },
+        period: {
+          starts_at: "2026-07-01T00:00:00Z",
+          ends_at: "2026-08-01T00:00:00Z",
+        },
+        usage: {
+          reserved_ai_credits: 0,
+          consumed_ai_credits: 0,
+          remaining_ai_credits: 10,
+          request_count: 0,
+          input_tokens: 0,
+          output_tokens: 0,
+          total_tokens: 0,
+          estimated_request_count: 0,
+          credit_policy_version: 1,
+        },
+        recent_requests: [],
+      },
+    });
+
+    renderWithJob(job.id);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Rerun/i }));
+    await waitFor(() =>
+      expect(rerunSpy).toHaveBeenCalledWith(job.id, {
+        llm: {
+          access_mode: "platform",
+          provider: "dronedream",
+          api_key: null,
+          platform_grant: `ddg_${"A".repeat(48)}`,
+          model: null,
+          base_url: null,
+        },
+      }),
+    );
+    expect(promptSpy).not.toHaveBeenCalled();
+  });
+
+  it("coalesces duplicate rerun requests while the first request is pending", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "heuristic",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    let resolveRerun: ((value: Job) => void) | null = null;
+    const rerunSpy = vi.spyOn(apiClient, "rerunJob").mockImplementation(
+      () => new Promise((resolve) => {
+        resolveRerun = resolve;
+      }),
+    );
+
+    renderWithJob(job.id);
+    const rerun = await screen.findByRole("button", { name: /Rerun/i });
+    act(() => {
+      rerun.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      rerun.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await waitFor(() => expect(rerunSpy).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      resolveRerun?.({ ...job, id: "job_rerun_once" });
+    });
+  });
+
+  it("coalesces duplicate cancel requests while the first request is pending", async () => {
+    const job = makeJob({
+      status: "RUNNING",
+      completed_at: null,
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    let resolveCancel: ((value: Job) => void) | null = null;
+    const cancelSpy = vi.spyOn(apiClient, "cancelJob").mockImplementation(
+      () => new Promise((resolve) => {
+        resolveCancel = resolve;
+      }),
+    );
+
+    renderWithJob(job.id);
+    const cancel = await screen.findByRole("button", { name: /^Cancel$/i });
+    act(() => {
+      cancel.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      cancel.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await waitFor(() => expect(cancelSpy).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      resolveCancel?.({ ...job, status: "CANCELLED" });
+    });
   });
 
   it("renders artifact cards for long paths with grouped sections", async () => {
@@ -494,5 +850,24 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     renderWithJob(job.id);
     await screen.findByText(/Baseline vs Optimized comparison/i);
     expect(screen.queryByRole("button", { name: /download pdf report/i })).toBeNull();
+  });
+
+  it("performs one final trials and candidates refresh for a terminal job", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    const trialsSpy = vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    const candidatesSpy = vi.spyOn(apiClient, "listJobCandidates").mockResolvedValue({
+      items: [],
+      pareto_candidate_ids: [],
+      recommendations: {},
+      objective_directions: {},
+    });
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    await waitFor(() => expect(trialsSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(candidatesSpy).toHaveBeenCalledTimes(2));
   });
 });

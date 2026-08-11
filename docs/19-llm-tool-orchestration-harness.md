@@ -1,9 +1,9 @@
 # LLM Tool-Orchestrated Optimization Harness
 
-Status: approved target design; compatibility execution slice implemented, hardened target gated<br>
+Status: approved target design; Evidence 2.9 bounded multi-tool planning, execution, cost memory, offline equal-budget evaluation, and current-version online provider freeze implemented<br>
 Audience: backend, optimization, simulation, security, evaluation, and course-review stakeholders<br>
 Scope: DroneDream's automated PX4/Gazebo tuning loop<br>
-Last reviewed: 2026-07-24
+Last reviewed: 2026-07-29
 
 ## 1. Executive decision
 
@@ -694,7 +694,33 @@ The snapshot builder has a fixed token-independent byte budget. It uses:
 The trace records omitted sections so a small prompt cannot masquerade as complete
 evidence.
 
-### 8.3 Current Trial-to-evidence audit
+### 8.3 Product assistant context and retention boundary
+
+The conversational experiment assistant uses a separate, lower-authority context
+contract from the autonomous Harness snapshot. Imported reference content is not
+concatenated into the user's instruction. It enters one authenticated draft-only
+request as at most four typed chunks, with a 4,000-byte frontend limit per file,
+an 8,000-byte aggregate limit, and an exact SHA-256 for every chunk. The backend
+recomputes every hash, rejects duplicate chunk identities and excess context, and
+labels the context `request_only`. The response contains only a content-bound
+receipt with byte and chunk counts; it does not echo the imported text.
+
+This boundary is deliberately not a document database or a persistent vector
+index. DroneDream does not store imported content in the experiment draft,
+cross-Job memory, or server database. The selected model provider still receives
+the content for that request and remains subject to its own data policy; the
+application must not describe local non-persistence as a provider-side deletion
+guarantee.
+
+Raw assistant messages remain available in `sessionStorage` for same-tab recovery
+only. Persistent browser drafts retain the form, bounded cumulative summary, and
+field provenance, but replace the message list with an empty list. Saving, explicit
+exit persistence, workspace rename, and restoration all enforce the same
+transformation, and loading a legacy v3 draft scrubs any previously persisted raw
+messages. The API rejects an added `raw_chat_history` field rather than accepting a
+second, unbounded history channel.
+
+### 8.4 Current Trial-to-evidence audit
 
 The current repository is materially stronger than a thin “simulator returned a
 number” prototype:
@@ -720,20 +746,25 @@ contract. The code audit found the following gaps:
 | --- | --- |
 | `trial_result.v1` may omit all identity fields | a legacy result can be accepted without proving which Trial, Candidate, seed, or attempt produced it |
 | `final_error` defaults to `0.0` and several flags default to `false` when absent | absence can become a deceptively good observation rather than a schema failure |
-| the result supplies already-computed metrics and `pass_flag` | the external runner is allowed to assert both the measurement and its verdict |
-| telemetry has `x/y/z/t` but no mandatory unit, coordinate-frame, time-base, source-log digest, or extraction revision | finite values can still be semantically incomparable or transformed incorrectly |
-| RMSE is `sqrt(sum(error²) / sample_count)` | irregular or selectively dense sampling changes the weight of a time interval |
-| strictly increasing timestamps have no maximum-gap, expected-duration, or dropout-coverage requirement | a short or sparse trace can remain numerically valid |
-| an `all_samples_fallback` evaluation window can still produce ordinary metrics | failure to identify the intended flight interval is annotation rather than evidence ineligibility |
+| the result supplies already-computed metrics and `pass_flag` | addressed for the bundled PX4 path by Outcome Contract 2.15: evaluation window, core geometry, crash/instability, directed progress, scenario-effect readiness, pass, and composite score are independently compiled from retained evidence |
+| telemetry has `x/y/z/t` but no mandatory unit, coordinate-frame, time-base, source-log digest, or extraction revision | addressed for bundled PX4 results by `dronedream.telemetry.v2`; Outcome Contract 2.16 additionally retains and re-hashes the exact local-wrapper ULog bytes |
+| RMSE is `sqrt(sum(error²) / sample_count)` | addressed by trapezoidal time-weighted RMSE in the bundled PX4 metric compiler |
+| strictly increasing timestamps have no maximum-gap, expected-duration, or dropout-coverage requirement | addressed by content-addressed sampling evidence, maximum-gap, and minimum-coverage gates |
+| an `all_samples_fallback` evaluation window can still produce ordinary metrics | addressed for physical runs; only explicitly synthetic telemetry may use the labeled synthetic all-samples window |
 | `overshoot_count` counts local peaks in absolute track error over a fixed `0.25 m` prominence | this is a tracking-error peak count, not yet a controller-overshoot measurand |
-| all non-completed Trials count as candidate failures | adapter, port, storage, worker, and database failures can penalize controller parameters |
-| the external simulator can return an arbitrary cleaned failure-code string | an untrusted producer can influence retry/evidence classification |
-| only the latest Trial state and one `trial_metrics` row are relationally retained | retries, rejected outputs, verifier failures, and accepted-attempt provenance are not an immutable attempt ledger |
-| artifact storage metadata records path and size but not a mandatory content digest or attempt identity | replay cannot prove which bytes a metric used |
+| all non-completed Trials count as candidate failures | addressed by Outcome Contract 2.17 for numerical ranking and GPT prompt feedback; nonphysical outcomes still block completeness and acceptance |
+| the external simulator can return an arbitrary cleaned failure-code string | addressed by Outcome Contract 2.17: producer codes are bounded diagnostics under the canonical `UNVERIFIED_SIMULATOR_FAILURE` class |
+| Outcome Contract compiler 2.10 stores append-only physical-attempt claims/outcomes and one immutable accepted-attempt pointer | addressed for current v3 aggregation |
+| Trial context was reconstructed after the claim commit from mutable Candidate, scenario, and Job rows | addressed by Outcome Contract 2.19 and claim receipt v3: one deep claim-time snapshot builds the simulator context and binds Candidate source/generation/metadata plus advanced scenario configuration; pre-launch and terminal row-locked checks reject `INPUT_EVIDENCE_DRIFT`, while historical v1/v2 projections remain exact |
+| a persisted Trial payload could differ from the frozen Scenario Suite before its first claim, a coordinated rewrite could change both rows, and generation-offset seeds were resolved only against generation zero | addressed by Outcome Contract 2.20: dispatch and execution share one canonical payload builder; the pre-simulator gate rechecks the creation-time Outcome Contract, reconstructs the generation-specific authorized matrix, and rejects coordinated Job/Trial rewrites as `OUTCOME_CONTRACT_DRIFT` or individual case, seed, role, weight, source, generation, advanced-configuration, and fidelity divergence as `SCENARIO_CONTRACT_DRIFT` |
+| simultaneous workers could collide on the oldest Trial and conditional-update losers returned idle even when later queue rows remained | addressed by Execution Claim Gate 1.1: PostgreSQL uses `FOR UPDATE SKIP LOCKED`, all dialects retain the atomic status/lease update, and bounded collision retries continue to the next eligible row; eight-worker single-Trial and eight-Trial pool races prove one physical execution per Trial and unique claim/outcome evidence |
+| one large Job could place all of its pending Trials ahead of a later small Job | addressed for the current simulation lane by Execution Scheduling Gate 1.0: choose the least-served eligible Job under a short PostgreSQL Job-row lock, retain FIFO within the Job, and prove alternating service across two runnable Jobs; per-user weighting, priority classes, normalized costs, and admission remain hosted-runtime work |
+| direct-GPT feedback grouped matched Trials only by `scenario_type` | addressed by Prompt Schema 2.3: same-type configured cases receive stable provider-safe aliases and retain separate weight, allowlisted configuration, metric, and failure summaries in frozen suite order; raw case IDs and holdout cases remain sealed |
+| Outcome Contract compilers 2.8-2.20 bind retained Artifact bytes, accepted-attempt identity and frozen input, authoritative Scenario Suite dispatch, PX4 telemetry semantics and raw ULog bytes, independently derived evaluation windows, core geometry, outcome verdict, score, trusted external-failure classification, and verified model-feedback reads through Trial and Candidate evidence | addressed for the bundled local PX4 path and current v3 aggregation; SQL/object-store atomic publication and operational WORM controls remain separate boundaries |
 | configured holdout runs are dispatched for each Candidate, and holdout pass is part of Candidate publishability | the “holdout” influences selection and is therefore a validation set, not an untouched final test |
 | legacy aggregation initially mixes all metrics and only the modern objective path replaces key fields with training values | compatibility paths remain too easy to use as if they had the same isolation guarantees |
-| rate parsing clamps values into `[0, 1]` | corrupted persisted evidence can be silently normalized instead of stopping the decision |
-| completed metrics are rounded before durable aggregation | display precision and evidence precision are conflated |
+| rate parsing previously clamped values into `[0, 1]` | addressed: acceptance now rejects non-finite or out-of-range persisted pass/completion rates as `invalid_rate_evidence` instead of normalizing corrupted evidence |
+| completed compatibility metrics are rounded for display/report projections | addressed by Evidence Precision Gate 1.0: `TrialMetric` persists validated adapter/verifier values, while modern Candidate evidence and Selection Key retain unrounded objective, constraint, promotion, and loss values; a display-tie regression proves four-decimal equality cannot change canonical rank |
 
 The target therefore treats **evidence compilation** as a first-class trusted stage,
 not as a few additional fields on `TrialMetric`.
@@ -1093,17 +1124,22 @@ demonstrates the distinction:
 - `real_cli.py` exports `DRONEDREAM_TRIAL_SEED`;
 - `px4_gazebo_runner.py` validates it and forwards `PX4_TRIAL_SEED`;
 - deterministic dry-run telemetry uses `random.Random(seed)`;
-- the bundled `local_px4_launch_wrapper.py` never reads `PX4_TRIAL_SEED`, does not
-  launch Gazebo with `gz sim --seed`, and emits no seed-effect readback; and
-- the bundled scenario-effect capability contract can physically apply only static
-  obstacles. Wind, gust, sensor noise/degradation, probabilistic GPS dropout,
-  battery state/sag, payload mass, and actuator delay fail closed as
+- the bundled `local_px4_launch_wrapper.py` still does not launch Gazebo with
+  `gz sim --seed`, so it cannot claim global simulator-randomness control;
+- constant scalar wind uses the Trial execution identity to derive a
+  repeatable compass bearing, while explicitly directional job wind does not
+  depend on a random generator; and
+- the bundled scenario-effect capability contract can physically apply static
+  obstacles and constant horizontal wind for the `x500` family. Gust,
+  turbulence, sensor noise/degradation, probabilistic GPS dropout, battery
+  state/sag, payload mass, and actuator delay fail closed as
   `requires_runtime_extension`.
 
-Consequently, current real PX4/Gazebo Trials may record an intended seed but must not
-claim that the seed controls physics, wind, sensor noise, PX4 scheduling, or the
-offboard executor. An environment variable inherited by a child process is only
-transport evidence.
+Consequently, current real PX4/Gazebo Trials may claim only the exact constant
+wind vector proved by `wind_info` and the runtime SDF. They must not claim that
+the seed controls global physics, sensor noise, PX4 scheduling, or the offboard
+executor. An environment variable inherited by a child process is only
+transport evidence unless a named mechanism and read-back bind it to behavior.
 
 #### 8.9.1 Closed randomness domains
 
@@ -1187,13 +1223,19 @@ bytes and world bytes are hashed because changing a noise distribution while ret
 the same integer is a different treatment.
 
 Wind evidence is similarly physical rather than declarative. Gazebo's official
-`WindEffects` system adds filtered, sinusoidal, and noise terms and publishes
-ground-truth wind on `/world/{world_name}/wind_info`:
+`WindEffects` system publishes ground-truth wind on
+`/world/{world_name}/wind_info`:
 [Gazebo WindEffects API](https://gazebosim.org/api/sim/9/classgz_1_1sim_1_1systems_1_1WindEffects.html).
-A supported adapter hashes the world/plugin configuration, sets the derived wind
-stream before the server starts, and retains bounded `wind_info` observations across
-the evaluation interval. A service acknowledgement that merely changed a requested
-mean is insufficient when the stochastic realization itself matters.
+The bundled constant-wind adapter hashes its Trial-local world/model overlay,
+enables WindMode on the `x500_base/base_link` source template, publishes the
+compiled ENU vector, requires an exact `wind_info` read-back, and retains the
+expanded generated SDF that proves the exact spawned instance (for example
+`x500_0/base_link`) has WindMode. This is sufficient for the named constant
+treatment in the isolated Trial, but not for future gust or turbulent
+treatments. Those stochastic treatments must additionally retain bounded
+observations across the evaluation interval and prove their seed binding. A
+service acknowledgement that merely changed a requested mean is insufficient
+when the stochastic realization itself matters.
 
 Probabilistic dropout is compiled into a finite event schedule before simulation where
 possible. The compiler uses `scenario.dropout`, persists the schedule hash and event
@@ -1277,10 +1319,11 @@ as a hierarchical structure with distinct sources of variation:
 [NIST two-level nested design](https://www.itl.nist.gov/div898/handbook/mpc/section5/mpc5321.htm).
 Flattening all rows first changes the question being answered.
 
-#### 8.10.1 Current objective-pipeline audit
+#### 8.10.1 Baseline objective-pipeline audit
 
-The current advanced path is deterministic and tested, but its semantics are not yet
-strong enough to be the evidence boundary of an autonomous Harness:
+The following table captured the advanced path before Outcome Contract V1 and
+Selection Key 1.0. Addressed rows are retained as regression requirements; the
+remaining rows continue to define the next contract revisions:
 
 | Current behavior | Why it is insufficient |
 | --- | --- |
@@ -1288,20 +1331,20 @@ strong enough to be the evidence boundary of an autonomous Harness:
 | the UI emits fixed normalizations `1`, `10`, `5`, and `1` for RMSE, completion time, overshoot count, and pass flag | these are undocumented scale constants, not a versioned physical or statistical contract; changing track duration or scenario suite changes their meaning |
 | one global `robust_aggregation` is applied to every objective | RMSE, binary pass, duration, energy, and worst excursion need not share the same estimand or risk operator |
 | result constraints always use the worst completed sample | this ignores configured scenario weights and cannot express a universal safety assertion, a chance constraint, a case-level threshold, and an aspiration target as different policies |
-| completed seed rows are flattened and receive `case_weight / dispatched_seed_count` | a missing seed contributes no metric mass, and the remaining weights are renormalized by the aggregator; the result is a conditional-on-observed-metrics estimand mixed with a separate failure penalty |
+| completed seed rows were flattened and received `case_weight / dispatched_seed_count` | Outcome Contract compiler 1.2 now applies the declared within-case estimator to usable replicates and then applies each case's full frozen weight across the suite; a dispatched case with no usable metric fails scalar objective construction instead of renormalizing surviving cases |
 | `failed_trial` is added as a weighted rate penalty | the coefficient is not derived from the objective unit or a declared composite outcome, so changing it changes the optimization problem |
-| hard infeasibility adds `1_000_000 + 1_000 × total_violation` | a large constant is not a proof of feasibility-first ordering; objective magnitudes, negative maximize losses, or future metrics can violate the intended precedence |
+| the prior path added `1_000_000 + 1_000 × total_violation` for hard infeasibility | replaced by Selection Key 1.0; this row remains as the regression that the new contract must never reintroduce |
 | violation is divided by `max(1, abs(threshold))` | thresholds below one use absolute units while larger thresholds use relative units; a zero threshold silently selects a scale of one |
-| `constraint_values` is keyed only by metric name | multiple lower/upper/equality contracts for one metric can overwrite observed values even though violation keys differ |
+| the prior `constraint_values` map was keyed only by metric name | replaced by full metric/operator/threshold IDs so multiple bounds retain separate observations |
 | `target` creates a one-sided hinge and zero loss after the aspiration is met | this is valid only if satisficing is intended; otherwise distinct Pareto-superior candidates become tied with no declared secondary rule |
-| constrained MOBO and the SAAS-inspired tool fit every objective and also fit scalar loss | acquisition then mixes both representations at fixed `70/30` or `65/35`, which can count the same evidence twice |
-| Bayesian objective utilities rescale each metric by its observed min/max span | the tradeoff surface changes whenever a new extreme appears; a nearly flat noisy auxiliary metric can acquire disproportionate influence |
-| random scalarizations do not consume the user's configured weights | the algorithm explores its own Pareto tradeoffs while scalar loss separately embeds user weights, leaving no single auditable interpretation of preference |
+| constrained MOBO, multi-fidelity MOBO, TuRBO, and the SAAS-inspired tool previously mixed objective-vector EI with derivative scalar-loss EI | Outcome Contract compiler 1.1 selects exactly one representation per call: complete joint objective vectors for Bayesian multi-objective acquisition, declared scalar loss as its fallback, and scalar loss only for TuRBO/CMA-family state |
+| Bayesian objective utilities previously rescaled each metric by its observed min/max span | Outcome Contract compiler 1.6 passes the frozen Job normalization scale into every production Bayesian vector model; observed extrema no longer change relative objective scale |
+| random scalarizations previously ignored the user's configured weights | Outcome Contract compiler 1.6 uses one fixed configured weight vector for production Bayesian acquisition; requests without a Job preference contract retain an explicitly labeled deterministic benchmark fallback only |
 | CMA-family tools consume only scalar loss | the same Job therefore means a Pareto-vector problem to one tool and a weighted single-objective problem to another |
-| optimizer feasibility additionally requires `failure_rate < 0.5` | `0.5` is a hidden decision threshold, not a field in the frozen Job contract |
-| acceptance reads compatibility RMSE and max-error fields | RMSE is an unweighted completed-trial mean rounded to four decimals, max error is a rounded worst sample, pass rate is case-weighted, while tool ranking may use another robust operator |
+| optimizer feasibility additionally requires `failure_rate < 0.5` | the threshold remains a compatibility policy, but is now one named constant serialized into Outcome Contract V1 rather than four hidden literals |
+| acceptance previously read rounded compatibility RMSE and max-error fields | Outcome Contract compiler 1.3 adds one versioned unrounded promotion projection: hierarchical fixed-suite mean RMSE, worst usable-seed max error, and dispatched-seed case-weighted pass/completion rates |
 | holdout promotion requires every holdout Trial to complete and pass | this can be a defensible release rule, but it is currently separate from `min_pass_rate`, objective constraints, and the reported estimand |
-| a derived `score` may be selected with any of its component metrics | without a metric-dependency graph, RMSE, duration, failure terms, and their composite can be counted twice |
+| a derived `score` could be selected with one of its component metrics | addressed for the current registry by Metric Dependency Gate 1.0: `score` is exclusive from every other objective, known reliability aliases are mutually exclusive, and the public Job-create path rejects overlap as `INVALID_OUTCOME_CONTRACT`; a complete component DAG is still required before admitting future composite metrics |
 
 The problem is not merely that some constants are imperfect. There are currently
 several different optimization problems: the UI profile, robust evaluator, public
@@ -1614,7 +1657,8 @@ Every tool revision declares exactly one `objective_representation`:
 
 A tool call never receives both `objective_vector` and a scalar loss derived from the
 same metrics unless the scalar is a separately registered, non-overlapping outcome.
-This removes the current 70/30 and 65/35 double use. User preference weights belong
+Outcome Contract compiler 1.1 removes the former 70/30 and 65/35 double use.
+User preference weights belong
 either in the scalar-preference compiler or in a documented Pareto recommendation
 step—not in both.
 
@@ -1801,18 +1845,18 @@ is an engineering heuristic:
 
 | Current behavior | Harness risk |
 | --- | --- |
-| ownership is inferred from `optimizer_strategy` string equality/suffix/substrings and the first matching child wins | renamed/composite strategies can be misattributed; relational multi-source provenance is not the reward identity |
-| reward eligibility defaults from optimizer metadata and excludes only named Halton fallback | a stale/mutated metadata envelope can change credit; seeded-random fallback and future fallbacks need a closed source-role policy |
-| “comparable” means completed, requested full fidelity, metadata-eligible | accepted evidence, effective fidelity, scenario coverage, outcome-contract hash, validation role, and application/verifier integrity are not part of comparability |
-| feasibility requires `feasible` and `failure_rate < 0.5` | repeats the hidden threshold rejected by the outcome contract |
-| one best loss per generation is retained | discards batch cost, allocation count, uncertainty, failures, and non-best contributions; larger batches get more chances to win |
-| the common baseline is the earliest generation's best loss among all matching observations | it is not a randomized/common Candidate evaluated under every tool; tools entering later inherit a selectively improved baseline |
-| improvement is divided by `max(abs(baseline), abs(best))` | the reward scale changes with observed outcomes and may not represent a meaningful engineering difference |
+| modern ownership is verified from `dronedream.optimizer-source-evidence/v2`, bound to strategy, generation, parameter and ordered-search-space SHA-256, requested/effective fidelity, closed source roles, one child-local `learning_owner`, and exact-source shares; optimizer history independently derives fidelity from the dispatched training Trial rows | the implemented content-addressed envelope plus Trial/Candidate/source agreement closes mutable string/boolean attribution, search-space/fidelity double ledgers, fallback learning, and ambiguous multi-source state ownership; a future relational action ledger is still needed to retain rejected and cross-batch routing opportunities |
+| modern reward eligibility is derived from the closed roles `native_optimizer`, `emergency_fallback`, `projected_baseline`, and `unsupported_generator` | emergency and unknown generators now fail closed; legacy unsealed rows retain compatibility inference and remain explicitly distinguishable |
+| “comparable” means completed, requested and effective full fidelity, metadata-eligible, with finite feasible loss | validation role, incurred work, and a relationally immutable application/verifier identity are not part of comparability |
+| feasibility requires `feasible` and `failure_rate < 0.5` | the compatibility boundary is now one named constant sealed into Outcome Contract V1; calibration and cost-sensitive replacement remain future work |
+| each child receives at most its best attributed reward once per generation | removes additive batch-size credit, but still discards batch cost, uncertainty, failures, and non-best contributions; larger batches retain more chances to produce the one winner |
+| reward compares with the global comparable full-fidelity incumbent frozen before the generation | removes stale-baseline credit for late tools, but the incumbent is observational rather than a randomized/common Candidate evaluated under every tool |
+| positive loss reduction is divided by one fixed normalized preference-loss unit and bounded to `[0, 1]` | scale and bound are now versioned in Outcome Contract 2.1, but practical calibration, incurred cost, and delay remain absent |
 | “recent” means the second half of a tool's observed generations | calendar/generation delay, unequal exposure, restarts, and regime changes are conflated |
 | the score uses coefficients `1.7`, `1.1`, `0.25`, `0.65`, and cold-start `0.35` | these are unregistered product choices, not calibrated bandit confidence bounds |
 | exploration denominator counts eligible Candidate observations while improvement keeps one best per generation | the exposure unit and reward unit do not match |
 | lower-fidelity observations are excluded from allocation statistics | screening value, promotion quality, and cost savings are not credited despite a comment implying a safety signal |
-| a duplicate projected vector keeps only one source; higher requested fidelity can replace the earlier proposal | credit depends on iteration and replacement order; agreement between tools is lost |
+| exact same-batch parameter/fidelity collisions retain unique child sources and equal shares; fidelity replacement preserves excluded provenance | historical/cross-batch collisions disappear before an append-only action ledger can reconcile them |
 | a projected child proposal remains child-owned | a materially changed vector could reward a tool for a Candidate it did not propose |
 | an unavailable child receives an ineligible fallback and remains at zero eligible observations | cold-start coverage can repeatedly spend slots on a broken tool unless availability is a separate state |
 | spare capacity is assigned to the highest heuristic score but filled by reward-ineligible fallback | planned allocation, actual source, incurred cost, and observed reward diverge |
@@ -1967,7 +2011,10 @@ source_share = 1 / count(eligible_exact_sources)
 ```
 
 The deterministic primary source remains useful for display and foreign-key
-compatibility, but does not receive all reward. If two calls from the same tool emit the
+compatibility and is sealed as the one `learning_owner` permitted to update
+child-local CMA/TuRBO state, but it does not receive all reward. Other exact
+native sources keep their fractional attribution without consuming metadata
+that belongs to a different child. If two calls from the same tool emit the
 same Candidate, its duplicate calls do not multiply the tool's total share. A future
 causal or Shapley-style scheme would require counterfactual evidence and is not claimed.
 
@@ -2413,11 +2460,17 @@ attached to downstream reports.
 
 Each adapter receives both global observations and tool-owned state observations.
 Global observations may train a surrogate or feasibility model. Trust-region,
-cohort, restart, and child-reward state uses relational proposal provenance, not
-substring matching on a legacy `optimizer_strategy` string. During migration, the
-adapter can verify the old string against the new relation, but disagreement is an
-integrity error. Fallback candidates and projected-baseline candidates remain visible
-as evidence while being ineligible for optimizer reward or state updates.
+cohort, restart, and child-reward state uses verified content-addressed proposal
+provenance, not substring matching on a legacy `optimizer_strategy` string.
+The current `dronedream.optimizer-source-evidence/v2` envelope binds strategy,
+generation, projected parameters, the ordered parameter-domain contract,
+requested/effective fidelity, closed source roles, and reward shares. Its
+single `learning_owner` separates child-local state updates from multi-source
+reward; its hash is in turn frozen by Candidate receipt v2. During migration, legacy
+unsealed rows retain the compatibility normalizer, while any modern missing or
+divergent envelope is quarantined. Fallback candidates and projected-baseline
+candidates remain visible as evidence while being ineligible for optimizer
+reward or state updates.
 
 The plan validator permits at most one call per tool ID in a generation. Repeated
 entries are rejected rather than executed with overlapping seeds or CMA cohort
@@ -3544,13 +3597,14 @@ resume.
 The current runtime does not use Valkey as a durable task broker. Valkey publishes
 worker presence; SQL Job and Trial rows are the actual queue of record. Each current
 tick starts up to ten queued Jobs, each initialization can insert a generation of
-Trials, the same process then executes at most one globally oldest pending Trial, and
-only afterward attempts finalization. This creates three concrete risks:
+Trials, the same process then executes at most one fairly selected pending Trial, and
+only afterward attempts finalization. Execution Scheduling Gate 1.0 now chooses the
+least-served eligible Job and its oldest Trial, closing the immediate large-Job
+monopolization defect. Two broader risks remain:
 
 1. Job initialization can create pending work faster than one local simulator consumes
    it;
-2. one large, older Job can place many older Trial rows ahead of a small, newer Job;
-3. slow provider, proposal, aggregation, or report work in one polling loop can cause
+2. slow provider, proposal, aggregation, or report work in one polling loop can cause
    head-of-line blocking for unrelated stages.
 
 The target keeps SQL as the canonical durable queue and uses Valkey only for
@@ -3635,8 +3689,15 @@ Budget reservation and capacity reservation are different:
 #### 13.7.3 Fairness and starvation resistance
 
 Global oldest-row FIFO is insufficient. It lets a large Job monopolize the simulator
-because all its generation rows may precede another Job. The scheduler uses a
-versioned two-level policy:
+because all its generation rows may precede another Job. The implemented desktop-scale
+policy, Execution Scheduling Gate 1.0, orders eligible Jobs by total physical claims,
+uses deterministic Job FIFO for ties, and then preserves Trial FIFO inside the selected
+Job. PostgreSQL locks the selected Job row with `SKIP LOCKED` only through the claim
+transaction; the Trial conditional update and attempt fence remain the execution
+authority. This provides deterministic least-served per-Job progress without a schema
+migration and is covered by a two-Job alternating-service regression.
+
+The hosted-runtime target extends that base with a versioned two-level policy:
 
 1. select an eligible priority class fixed by trusted product/evaluation policy, never
    by prompt text;
@@ -4240,6 +4301,13 @@ request waits/coalesces or returns the committed result. Changed bytes with the 
 key fail `409`; an abandoned `in_progress` row is reconciled against domain state
 before it can be retried and is never treated as permission to repeat an external
 effect.
+
+The current desktop-scale implementation is the strict subset
+`(user_id, idempotency_key_hash)` plus finite operation, canonical request hash,
+status, exact JSON response, response status, resource type/ID, and timestamps.
+It deliberately survives Job deletion and process restart. The broader
+principal/tenant/route schema, expected-state binding, reconciliation states,
+retention counters, and hosted deployment metadata remain target work.
 
 The table is principal-owned for authorization/retention but deliberately does not
 cascade with a deleted Job: a short-lived tombstone must still answer an exact retry
@@ -5177,73 +5245,66 @@ zero-retention or training opt-out mode is verified, unsupported, or unknown.
 
 #### 17.3.4 Desktop API caller authentication
 
-The current packaged-desktop path has a security boundary that CORS does not close:
+The packaged-desktop path now has two independent authentication layers:
 
-- `runtime/config/runtime.env.default` sets `APP_ENV=desktop` and
-  `AUTH_MODE=disabled`;
-- `get_current_user()` consequently provisions/returns the same
-  `default@drone-dream.local` identity for every request;
-- Uvicorn listens on `127.0.0.1:8000`, and the WebView calls that address directly;
-- the production CSP and CORS configuration use explicit local origins, which is good
-  browser hardening, but a non-browser client can omit/forge `Origin`; moreover, a
-  browser can send some "simple" state-changing requests even when it cannot read the
-  CORS response;
-- `/api/v1/capabilities` currently has no user dependency, while Job, Trial, Batch, and
-  Artifact routes do call `get_current_user`; in disabled mode that distinction does
-  not authenticate the caller.
+- `runtime/config/runtime.env.default` sets `APP_ENV=desktop`,
+  `AUTH_MODE=oidc_jwt`, and `DESKTOP_BRIDGE_REQUIRED=true`;
+- OIDC authenticates the Supabase account by issuer and subject; desktop configuration
+  validation rejects anonymous auth and refuses to start without a canonical Runtime
+  identity and the bridge requirement;
+- the WebView no longer calls `127.0.0.1:8000` for JSON, Artifact, or CSV traffic.
+  `frontend/src/api/client.ts` routes those calls through the finite
+  `desktop_api_request` Tauri command, while browser development retains its ordinary
+  authenticated HTTP client;
+- Rust accepts only `GET`, `POST`, `PATCH`, or `DELETE`, a relative `/api/v1/` path, an
+  optional JSON body, one access token, and one of three response media types. It
+  rejects arbitrary URLs, headers, methods, traversal, control characters, request
+  bodies above 2 MiB, and responses above 64 MiB;
+- the production CSP has no local API HTTP `connect-src` or image source. Exact local
+  viewer WebSocket/frame permissions remain separate from private API authority.
 
 OWASP explicitly warns that `Origin` can be spoofed outside a browser and that CORS
 does not replace application access control. Tauri likewise describes CSP as impact
 reduction for WebView vulnerabilities and capabilities as the IPC authority boundary,
 not as authentication for a separate loopback HTTP service. Therefore
-`AUTH_MODE=disabled + bind(127.0.0.1)` is a development convenience, not a production
-desktop authentication design.
+`AUTH_MODE=disabled + bind(127.0.0.1)` remains a development convenience, not a
+production desktop design. Bridge v2 preserves OIDC as the user identity and adds
+proof of desktop possession instead of inventing a second user. Rust reads neither the
+stored application secret nor a reusable bridge token into JavaScript. A fixed
+shell-free WSL command derives a domain-separated HMAC key inside the signed Runtime
+from `APP_SECRET_KEY`, verifies that the environment Runtime ID matches the signed
+manifest, and returns only the derived key to the native process.
 
-The packaged target is **not** "put a long-lived bearer token in JavaScript." It is:
+Each application launch owns a random UUID session ID. Every request receives a fresh
+UUID nonce and integer timestamp; the HMAC covers protocol version, Runtime ID, session
+ID, timestamp, nonce, method, exact raw path/query, SHA-256 of the body, SHA-256 of
+the Authorization header, and the optional mutation idempotency key. The API verifies
+the signature in constant time, enforces a
+30-second clock window, recomputes both digests, compares the Runtime ID, and inserts
+the nonce into `desktop_bridge_nonces` before route execution. The primary key makes
+parallel or later reuse a durable `409 DESKTOP_BRIDGE_REPLAY`, including across API
+process restarts until bounded expiry cleanup.
 
-1. `AUTH_MODE=desktop_bridge` is mandatory whenever `APP_ENV=desktop`; configuration
-   validation rejects `desktop + disabled`, `desktop + demo_token`, and any direct
-   WebView credential mode. `disabled` remains available only in explicitly named,
-   isolated test/development profiles.
-2. The state-changing and private `/api/v1` application surface does not listen on a
-   Windows-visible TCP port. Uvicorn or a small internal ASGI broker listens on a
-   pathname Unix-domain socket owned by the API service, with mode, owner, type, and
-   peer-credential checks.
-3. Tauri Rust launches one fixed, long-lived
-   `dronedream-desktop-api-bridge` process in the dedicated distribution without a
-   shell. Rust and the bridge exchange bounded canonical frames over inherited
-   anonymous stdin/stdout; the bridge alone connects to the API socket under a
-   dedicated client UID/cgroup.
-4. The WebView calls narrow typed Tauri commands. It never receives the API session
-   key, an Authorization header, an arbitrary backend URL, a generic header map, a
-   filesystem path, or a generic "fetch this" capability. Rust maps a finite
-   `route_id` plus typed DTO to the canonical bridge frame and performs the request.
-5. Artifact/CSV downloads use separate bounded Tauri commands that stream a
-   user-authorized artifact to an application-owned temporary file or save dialog.
-   They do not hand an unauthenticated download URL or bearer token to an `<a>` element.
-6. Direct `connect-src http://127.0.0.1:8000` and API image sources are removed from
-   the packaged production CSP after migration. Development web builds retain a
-   separately configured bearer/OIDC HTTP client; the noVNC/Gazebo viewer, if enabled,
-   receives an exact Runtime-derived origin and a sandboxed frame policy rather than
-   inheriting a wildcard local-port API exception.
+Job and Batch create/update/rerun/cancel/delete routes now use a durable
+`api_idempotency_records` receipt. A canonical UUID is generated once per logical
+frontend action, reused for one ambiguous transport retry, and bound into Bridge v2.
+If the application stops before receiving a definitive response, a bounded 30-minute
+pending-action record retains only the SHA-256 method/path/body fingerprint, UUID, and
+creation time. It stores no request body, bearer token, or provider credential, and is
+removed after a valid success or structured failure.
+The server persists only the UUID's SHA-256. The receipt, canonical request hash, exact safe response,
+and domain mutation commit together; exact retries replay the result and changed
+operation/body reuse fails `409 IDEMPOTENCY_CONFLICT`.
 
-Rust creates a random 256-bit launch key and 128-bit session ID only after the signed
-Runtime, API socket, bridge executable, and Harness manifest have passed readiness.
-The bridge registers the session over a separate fixed registration operation. The API
-keeps the key only in a bounded in-memory registry containing:
-
-- protocol and key version;
-- session ID and Runtime installation-owner principal;
-- Tauri launch ID, Runtime ID, Harness manifest digest, and bridge service identity;
-- creation, last-use, idle-expiry, and absolute-expiry times;
-- revocation state and bounded replay/idempotency-cache accounting.
-
-The Runtime installation has one stable random `desktop_owner_id`; it becomes
-`(identity_provider=urn:dronedream:desktop, external_subject=desktop_owner_id)` in the
-existing user model. It is not a secret, email, Runtime build ID, provider session
-reference, or authorization token. Session authentication proves the launch; the
-installation owner provides stable local data ownership across launches. Neither value
-is accepted from a WebView body.
+The current bridge still forwards from native Rust to an authenticated loopback
+listener and returns bounded bytes through IPC. Moving that last hop to a
+permission-restricted Runtime UDS, adding response MACs, expected-state versions, and
+native streaming save dialogs remain target work. The implemented claim is therefore
+protection against
+direct WebView HTTP, hostile web origins, accidental arbitrary clients, stale proofs,
+changed bodies/tokens, wrong Runtime services, and request replay. It does not claim to
+isolate DroneDream from malware already controlling the same Windows account, WSL
+root, or the Tauri process.
 
 The desktop API launch key is distinct from the provider-gateway launch key. Separate
 HKDF context labels, protocol versions, sockets, service identities, and revocation
@@ -5253,7 +5314,9 @@ gateway; the orchestration service still uses Section 17.3.2's provider-call bou
 
 #### 17.3.5 Request proof, replay, and response binding
 
-Every desktop bridge request uses a closed frame rather than raw HTTP:
+Bridge v2 implements the request-side subset plus transaction-bound Job/Batch mutation
+coalescing described above. The remaining UDS/response-binding target uses the
+following closed frame rather than exposing raw HTTP:
 
 ```text
 DesktopApiRequestV1 {
@@ -6857,10 +6920,10 @@ check; Runtime checks occur only in the launcher or after the explicit Settings
 | Current area | Reuse | Required change |
 | --- | --- | --- |
 | `backend/app/schemas.py` | parameter, scenario, acceptance, and provider validation | split orchestration mode from fixed algorithm; add plan/evidence/tool schemas plus a closed `OptimizationOutcomeContractV1` whose metric IDs, estimators, risk measures, constraints, transforms, scalarizations, references, missingness, and selection policies are registry enums rather than executable client expressions |
-| `backend/app/services/jobs.py` and `backend/app/routers/jobs.py` | strict create/rerun validation, user-scoped nested routes, bounded Job serialization, compatibility aliases | add versioned orchestration object, legacy conflict detection, redacted summaries, cursor-paginated decision/provenance/event reads, transport-injected one-time session-reference exchange, expected-state/idempotency requirements, and non-secret Job-binding rules |
-| `backend/app/auth.py`, `backend/app/main.py`, `runtime/config/runtime.env.default`, and API routers | OIDC issuer/subject identity, asymmetric algorithm allowlist, required `exp`/`iss`/`sub`/`aud`, exact CORS origins, and route-level user dependencies | replace packaged `AUTH_MODE=disabled` with mandatory `desktop_bridge`; move private `/api/v1` off loopback TCP; add launch/session request-proof verification, durable mutation idempotency, operation/state authorization, authenticated capabilities/readiness, hosted token profiles, and tenant/role policy before multi-tenant use |
-| `desktop/src-tauri/src/lib.rs`, `desktop/src-tauri/capabilities/default.json`, `desktop/src-tauri/tauri.conf.json`, and `frontend/src/api/client.ts` | fixed Rust commands, main-window capability, restrictive script CSP, and typed frontend API surface | add a long-lived fixed desktop API bridge and typed Rust API/download commands; keep keys/references outside JavaScript; remove generic direct WebView fetch/download URLs and production API `connect-src`; narrow global Tauri exposure and noVNC frame origin |
-| `backend/app/orchestration/aggregation.py` and `acceptance.py` | generation completion, seed/case denominators, training-field preference, and continuation boundary | replace exclusive GPT/CMA/experimental continuation branches with one dispatcher and one outcome-contract compiler; aggregate replicates within scenario before fixed population weights; emit immutable `CandidateOutcomeEvidenceV1`; use one lexicographic feasibility/risk/preference key for optimizer ranking, acceptance, validation promotion, winner freeze, and reports; remove hidden `failure_rate < 0.5`, million-scale penalties, pre-ranking rounding, surviving-row weight renormalization, and alternate acceptance arithmetic |
+| `backend/app/services/jobs.py` and `backend/app/routers/jobs.py` | strict create/rerun validation, user-scoped nested routes, bounded Job serialization, compatibility aliases, and atomic exact-response idempotency for Job/Batch mutations | add versioned orchestration object, legacy conflict detection, redacted summaries, cursor-paginated decision/provenance/event reads, transport-injected one-time session-reference exchange, expected-state requirements, and non-secret Job-binding rules |
+| `backend/app/auth.py`, `backend/app/desktop_bridge.py`, `backend/app/api_idempotency.py`, `backend/app/main.py`, `runtime/config/runtime.env.default`, and API routers | OIDC issuer/subject identity, asymmetric algorithm allowlist, required `exp`/`iss`/`sub`/`aud`, mandatory Bridge v2, Runtime/session/body/token/idempotency-bound request HMAC, durable nonce consumption, transaction-bound mutation result coalescing, exact CORS origins, and route-level user dependencies | move the native-to-API hop from authenticated loopback to Runtime UDS; add response binding, expected-state authorization, authenticated capabilities/readiness, hosted token profiles, and tenant/role policy before multi-tenant use |
+| `desktop/src-tauri/src/desktop_api_bridge.rs`, `desktop/src-tauri/src/lib.rs`, `desktop/src-tauri/tauri.conf.json`, and `frontend/src/api/client.ts` | finite native API bridge, shell-free Runtime key derivation, bounded method/path/body/media contract, JSON/Artifact/CSV routing outside WebView fetch, production CSP without local API HTTP sources, and one exact-key retry for covered mutations | replace generic relative paths with generated route DTOs; stream large downloads through native save dialogs; add response MAC; narrow global Tauri exposure and noVNC frame origin |
+| `backend/app/orchestration/aggregation.py` and `acceptance.py` | generation completion, case-weighted reliability denominators, hierarchical usable-replicate means before fixed case weights, seed-level worst constraints, training-field preference, continuation boundary, and a content-addressed search-role Candidate outcome compatibility projection consumed by ranking/acceptance/optimizer learning | replace exclusive GPT/CMA/experimental continuation branches with one dispatcher; migrate the embedded projection into an append-only `CandidateOutcomeEvidenceV1` ledger; finish one shared projection for validation promotion, portfolio reward, winner freeze, and reports; remove pre-ranking rounding and alternate acceptance arithmetic |
 | `backend/app/orchestration/job_manager.py` | candidate/trial creation and generation dispatch | add atomic decision-linked batch dispatch and idempotency; replace duplicate-Candidate infrastructure retry with an exact logical-Trial retry that creates an immutable physical-attempt row |
 | `backend/app/orchestration/runner.py` | short-lived per-stage sessions and polling lifecycle | split bounded lane pollers; add admission, per-user/Job fair scheduling, queue deadlines/backoff, capacity-before-running claims, drain/recovery, and paused/cancelled/unresolved fences |
 | `backend/app/orchestration/trial_executor.py` | renewable Trial leases and `(trial, worker, attempt)` result fencing | recheck owning Job eligibility; persist one immutable row per physical attempt and content-addressed artifacts; invoke the signed secretless telemetry/metric verifier; accept at most one envelope by lease/capacity/input hash CAS; retain rejected/superseded attempt provenance |
@@ -6877,8 +6940,8 @@ check; Runtime checks occur only in the launcher or after the explicit Settings
 | `frontend/src/router.tsx`, `AppShell.tsx`, `DesktopSetup.tsx`, and i18n/styles | desktop readiness route, sidebar shell, Dashboard/manual experiment entry, bilingual UI | make the minimal conversation page the ready workspace default; retain Dashboard and manual five-step creation as equal paths; add configured-model selection, concise usage display, and a click-only microphone control with accessible active/stop/error states |
 | new `backend/app/routers/experiment_assistant.py`, schemas, registry compiler, and provider gateway adapter | strict FastAPI envelopes, provider SDK, field and parameter validation | accept bounded conversation turns, call only a configured compatible model, parse `ConversationExperimentPatchV1`, compile registered conversions, recompute missing/conflicts server-side, return accepted/rejected patches, and never create a Job or accept model-authored executable fields |
 | `backend/app/optimization/experimental_types.py` and `backend/app/orchestration/experimental_optimizer.py` | frozen bounded observations/requests, deterministic ordering, parameter projection, direction-aware constraints, pending visibility, and objective/feasibility separation | replace overloaded optional-loss/completed/failure-rate adapter input with the closed tagged observation algebra and separate pending reservations; pass exactly one declared objective representation per call; prohibit simultaneous objective-vector plus derivative scalar-loss utility; fail new rows on missing evidence/provenance; exclude infrastructure/evidence failures; keep legacy coercions in explicitly legacy-only snapshots |
-| `backend/app/optimization/bayesian_optimizers.py`, `cma_optimizers.py`, and their adapter boundaries | six implemented numerical search families, deterministic seeds/fallbacks, bounded domains, constraints, and optimizer-native state | bind every entry point to a signed tool-objective adapter declaring accepted estimand/risk/constraint/tag semantics; remove adaptive observed-range preference normalization and unregistered random scalarization; require fixed transform/reference inputs from the Job contract; block tools that cannot represent the requested contract rather than approximating it silently |
-| `backend/app/optimization/portfolio_optimizer.py` | child statistics, allocations, provenance, deterministic fallbacks | expose child algorithms through pure versioned adapters; keep portfolio as an honestly named heuristic baseline/fallback; replace string ownership, hidden feasibility, moving-baseline reward, hand-weighted pseudo-UCB, order-dependent duplicates, and endless unavailable-child cold start with immutable routing opportunities, closed availability/circuits, policy-reserved exposure, exact multi-source attribution, signed `PortfolioRewardContractV1`, complete incurred-cost accounting, and delayed append-only rewards computed from Candidate envelopes |
+| `backend/app/optimization/bayesian_optimizers.py`, `cma_optimizers.py`, and their adapter boundaries | six implemented numerical search families, deterministic seeds/fallbacks, bounded domains, constraints, optimizer-native state, and Job-bound Bayesian weights/scales with incomplete-vector fallback | bind every entry point to a signed tool-objective adapter declaring accepted estimand/risk/constraint/tag semantics; add fixed Pareto/reference inputs where required; block tools that cannot represent the requested contract rather than approximating it silently |
+| `backend/app/optimization/portfolio_optimizer.py` | child statistics, allocations, deterministic fallbacks, exact same-batch multi-source attribution, and fixed-scale reward against the pre-generation incumbent | expose child algorithms through pure versioned adapters; keep portfolio as an honestly named heuristic baseline/fallback; replace string ownership, metadata-backed eligibility, hand-weighted pseudo-UCB, and endless unavailable-child cold start with immutable routing opportunities, closed availability/circuits, policy-reserved exposure, a signed reward/cost/delay contract, complete incurred-cost accounting, and delayed append-only rewards computed from Candidate envelopes |
 | current in-worker optimizer calls, `runtime/systemd/dronedream-worker.service`, and `docker-compose.yml` | trusted optimizer implementations, service sandbox precedent, and simulator process-tree tests | add a separate proposal-tool executor/broker, per-call child isolation, Linux systemd/cgroup and hosted-container limits, local framed IPC, BLAS-thread controls, and containment conformance tests |
 | `backend/app/models.py` | jobs, candidates, trials, one metrics row, secrets, append-only events | add decision, model-attempt, tool-call, evidence, candidate-source, immutable `candidate_outcome_evidence`, immutable `trial_execution_attempts`, artifact digest, registered metric provenance, Runtime dependency/circuit state, and Runtime-capacity tables plus outcome-contract bindings, relational provenance, scenario/replicate cells, winner-freeze/final-test commitments, readiness/backoff, and scheduler fields |
 | `backend/app/config.py`, worker presence, and capability endpoints | bounded lease/heartbeat settings and advisory local-host concurrency warning | add release-bounded lane capacities, queue/admission ceilings, fixed fairness classes, Runtime-slot health, and explicit separation between Valkey wakeups/liveness and SQL queue truth |
@@ -6898,7 +6961,7 @@ controlled Harness pilot:
 | --- | --- |
 | one model turn using strict `submit_generation_plan`; no model-observe-tool-result loop | Version 2 inspect-and-select, nested model tools, free-form code/shell, self-modifying prompts, and autonomous Job creation |
 | one frozen scalar-preference outcome profile with registered metrics, fixed suite/replicate estimand, feasibility-first constraints, and deterministic ties | arbitrary user metric expressions, runtime-defined reward functions, unconstrained multi-objective contracts, and online changes to weights/targets/risk |
-| at least two conformance-passing scalar adapters—initially TuRBO and surrogate CMA-ES—plus fixed-algorithm and current deterministic-portfolio baselines | any adapter that still mixes a Pareto vector with a derivative scalar loss; multi-fidelity, SAAS-inspired, or other tools until their exact adapter contract passes |
+| at least two conformance-passing scalar adapters—initially TuRBO and surrogate CMA-ES—plus fixed-algorithm and current deterministic-portfolio baselines; all Bayesian adapters now enforce one objective representation per call | multi-fidelity, SAAS-inspired, or other tools until the rest of their exact adapter contract passes; any future adapter that reintroduces a Pareto vector plus derivative scalar loss |
 | one local desktop deployment profile, one bounded proposal-tool child at a time, and one local SITL execution slot | hosted multi-tenant scheduling, remote third-party tools, dynamic worker registration, and live hardware flight |
 | immutable decision/model/tool/snapshot/source/outcome/reward/attempt ledgers; signed Runtime manifest; content-addressed evidence; exact replay labels | reconstructing missing legacy provenance, importing legacy portfolio scores as reward, or claiming bitwise replay when a dependency only supports tolerance replay |
 | deterministic reserved exploration, exact proposal-source attribution, complete cost accounting, and descriptive delayed reward ledgers | adaptive online bandit updates, provider-token “propensities,” IPS/DR/SWITCH claims, or causal tool-ranking claims |
@@ -7062,7 +7125,8 @@ verifier.
 
 ### Phase 3: provider gateway and shadow mode
 
-- replace packaged `AUTH_MODE=disabled` before enabling any Harness endpoint;
+- retain the implemented packaged OIDC plus mandatory launch-bound desktop request
+  proof; anonymous desktop auth and direct WebView API HTTP are already rejected;
 - extract `ExperimentFieldRegistryV1` from the five-step builder and generate the
   provider schema, draft normalizer, localized field catalog, and request compiler
   from it; add a draft migration that preserves current session drafts without
@@ -7074,13 +7138,13 @@ verifier.
 - remove the current API-key `sessionStorage` path before enabling conversation
   provider calls; use process-memory credentials only for an explicitly development
   profile and the desktop credential bridge for packaged production;
-- implement the fixed long-lived Tauri Rust -> stdio bridge -> Runtime UDS path,
-  in-memory launch session registry, canonical request/response proof, typed route
-  commands, durable mutation idempotency, expected-state checks, and per-operation
+- migrate the implemented finite Tauri Rust bridge from authenticated loopback to a
+  fixed stdio/Runtime UDS path; add response proof, generated route DTOs, durable
+  mutation idempotency/result coalescing, expected-state checks, and per-operation
   ownership authorization;
-- remove packaged WebView direct `/api/v1` fetch/download paths and production API
-  `connect-src`; preserve only a minimal rate-limited liveness probe or move readiness
-  behind the bridge;
+- keep the implemented removal of packaged WebView `/api/v1` fetch/download traffic
+  and production API HTTP `connect-src`; move any remaining readiness transport behind
+  the native boundary;
 - prove hostile-origin/simple-request/DNS-rebinding/browser, missing/wrong MAC,
   replay/changed-body, stale-state, lost-response/restart, foreign-user/child-ID, wrong
   worker-token, bridge death, Runtime change, and CSP/capability negative cases;
@@ -7577,12 +7641,14 @@ execution.
 
 ### 27.11 Desktop bridge authentication is not a Windows sandbox
 
-Removing the private loopback API and keeping launch keys out of JavaScript closes a
-real browser/accidental-client/replay class. It does not turn the current full-trust
-NSIS process and user-owned WSL distribution into mutually isolated security
-principals. The same Windows account can launch the distribution as `root`; malware in
-that account may also inspect/inject Tauri, replace the bridge/Runtime, or drive
-authorized WebView commands.
+Removing direct WebView API HTTP, keeping bridge keys out of JavaScript, and requiring
+a launch-bound HMAC plus durable one-use nonce closes a real
+browser/accidental-client/replay class even while bridge v2's native last hop remains
+loopback. Replacing that hop with a Runtime UDS will further narrow exposure; neither
+design turns the current full-trust NSIS process and user-owned WSL distribution into
+mutually isolated security principals. The same Windows account can launch the
+distribution as `root`; malware in that account may also inspect/inject Tauri, replace
+the bridge/Runtime, or drive authorized WebView commands.
 
 The initial product is therefore a single-user local engineering application, not a
 hostile-code execution boundary. AppContainer/package identity plus a separately
@@ -7935,13 +8001,13 @@ so later edits do not reintroduce them:
 | executor-IPC audit | “authenticated Unix socket” did not identify the peer credential, socket ownership, replay key, framed-message rules, resource-limit authority, result binding, or safe snapshot transfer, so a local process/path race could spoof work or consume resources | require a pathname socket with service ACLs and kernel peer credentials, distinct UIDs/cgroups, one-request canonical frames, nonce/attempt/input/result hashes, hard broker ceilings, sealed descriptors or no-link beneath-root resolution, and durable parent CAS |
 | provider-gateway authorization audit | a non-secret “credential reference” and “authenticated worker” did not define registration versus call identities, replay behavior, or whether the database-free gateway could truly know reservation/cancellation state | split registration and call sockets, add Tauri-held launch MAC and kernel peer checks, exchange session references into Job-bound IDs, consume request-bound attempt tuples once, keep keys and egress isolated, and explicitly leave database-state truth with worker transactions unless an independent hosted grant service is added |
 | Harness supply-chain audit | release signatures and source-commit fields did not prove which registry, prompt, compiler, policy, adapter, gateway, executor, dependency, and tool bytes each Job actually executed; a mutable updater could also replace code beneath an active Job or replay old metadata | add a CI-produced signed closed-file Harness runtime manifest, independent build/SBOM provenance, startup integrity and cross-process digest agreement, content-addressed side-by-side slots, Job pinning, historical retention, and TUF-grade rollback/freeze/mix-and-match/revocation handling before unattended Runtime updates |
-| queue/backpressure audit | the current DB-polling worker starts up to ten Jobs, can materialize their Trials, then runs one globally oldest Trial and finalizes in the same loop; Valkey is only presence, so adding provider/tool work would create queue debt, starvation, and head-of-line blocking | retain SQL as the only durable queue; split bounded work lanes; add load-tested admission, fair per-user/Job scheduling, queue deadlines, transient capacity leases, one real-SITL slot until allocator proof, delayed retry without held leases, typed terminal work, fixed lock order, and overload/drain/Valkey-loss tests |
-| desktop API/auth audit | the packaged Runtime sets `AUTH_MODE=disabled`; direct WebView fetches reach a loopback API where every caller becomes the same default user, while CORS/CSP were being mistaken for caller authentication | remove private desktop `/api/v1` from loopback TCP; add a typed Tauri Rust/stdio/UDS bridge, launch-bound request proof, durable mutation idempotency, state/owner/action authorization, hosted token profiles, and explicit negative tests |
+| queue/backpressure audit | Execution Scheduling Gate 1.0 replaces global oldest-Trial FIFO with deterministic least-served Job selection plus per-Job Trial FIFO, while Execution Claim Gate 1.1 supplies `SKIP LOCKED`, bounded collision recovery, and attempt fencing; the same DB-polling loop can still materialize up to ten Jobs and combines simulation with finalization, while Valkey remains presence only | current desktop-scale inter-Job starvation is addressed; retain SQL as the only durable queue, then split bounded work lanes and add load-tested admission, per-user weights/priority classes, queue deadlines, transient capacity leases, one real-SITL slot until allocator proof, delayed retry without held leases, typed terminal work, fixed lock order, and overload/drain/Valkey-loss tests before hosted-scale claims |
+| desktop API/auth audit | the packaged Runtime now uses Supabase OIDC plus mandatory Bridge v2; JSON/Artifact/CSV calls leave the WebView through a finite Tauri command, production CSP blocks API HTTP, request HMAC binds Runtime/session/time/nonce/method/raw path/body/token/idempotency, a durable nonce ledger rejects proof replay, and covered Job/Batch mutations atomically persist exact-response idempotency receipts; direct native-to-API loopback, response binding, expected-state policy, generic route strings, bounded in-memory downloads, and a real installed-Runtime hostile-client campaign remain open | move the native hop to fixed stdio/Runtime UDS, generate closed route DTOs, add response MAC plus state/action authorization and native streaming, then run the installed Windows/WSL hostile-origin/arbitrary-client/restart corpus before claiming the full target boundary |
 | Windows/WSL trust-boundary audit | the earlier gateway/bridge wording implied Linux UIDs, socket ACLs, and a Tauri-held launch MAC could distinguish every local process, but the same Windows account can launch the distribution as `root` and can potentially control Tauri | narrow the V1 claim to web-origin/accidental-client/replay/wrong-Runtime-service protection; group hostile same-user/WSL-root/Tauri/host compromise as residual risk; require package identity/AppContainer plus a separately signed broker before claiming that stronger isolation |
 | Trial-evidence integrity audit | current v1 results can omit execution identity; missing metrics/flags gain favorable defaults; the runner authors metrics/pass; telemetry lacks mandatory unit/frame/time/extractor binding; sample-count RMSE is sampling-density sensitive; infrastructure failures penalize parameters; retries lack immutable attempt lineage/artifact digests; and per-Candidate “holdout” use leaks it into selection | require v3 attempt envelopes, content-addressed source artifacts, an immutable physical-attempt ledger, explicit NEU/SI/monotonic-time/coverage contracts, a signed secretless time-weighted metric verifier, closed outcome taxonomy, exact logical-Trial retry with infrastructure exclusion, registered metrics without defaults/clamping, and disjoint search/validation/sealed-final-test materialization |
-| optimizer-observation audit | the current frozen `OptimizerObservation` usefully separates optional objective loss from feasibility, but `completed`, optional `loss`, `feasible`, aggregate `failure_rate`, and pending rows still overload domain failure, infrastructure loss, censoring, and reservation; none of the six numerical cores implements right-censored learning | define objective/constraint/right-censored tagged observations plus separate pending reservations; exclude infrastructure/evidence/cancelled/superseded records; declare accepted tags and state-update behavior per signed adapter; initially mark right-censoring unsupported for all six rather than fabricating a finite loss |
-| objective/estimand/selection audit | current schemas admit free metric names; one global aggregation mode flattens scenario/seed rows; missing rows change effective weights; hard infeasibility uses million-scale penalties; feasibility includes a hidden `failure_rate < 0.5`; constrained multi-objective adapters can fit both objective vectors and derivative scalar loss; observed min/max ranges and random scalarizations move preferences; and acceptance recomputes rounded metrics differently from tool ranking | add immutable `OptimizationOutcomeContractV1`, registered metric DAG, nested case/replicate estimand, explicit non-success/missingness/risk/constraint algebra, fixed transforms/scalarization/Pareto references, exactly one objective representation per ToolCall, immutable `CandidateOutcomeEvidenceV1`, lexicographic feasibility-first selection, and one shared projection for optimizer rank, reward, acceptance, promotion, winner freeze, report, and replay |
-| portfolio credit and policy-evaluation audit | current ownership uses strategy-string matching; reward keeps the best loss per generation against a selectively observed baseline; moving scales, hidden feasibility, hand coefficients, candidate-count exploration, and metadata eligibility are called UCB-style; duplicate/replacement order erases sources; invalid/fallback/cost exposure does not align with reward; and an unavailable child can remain permanently cold and repeatedly consume coverage | label the current algorithm as a deterministic heuristic baseline; add immutable routing opportunities/actions, closed availability/circuits, deterministic reserved exploration and maximum share, exact order-independent multi-source provenance, signed bounded reward/cost/delay contract, append-only reward events, action-probability provenance, OPE fail-closed gates, and end-to-end blocked randomized routing-policy evaluation |
+| optimizer-observation audit | the current frozen `OptimizerObservation` separates optional objective loss from feasibility, and compiler 1.9 now computes a closed Trial taxonomy plus an optimizer-learning rate that excludes infrastructure, cancellation, and invalid evidence while treating unknowns conservatively; the adapter still compresses domain/unknown outcomes into one rate, and `completed`, optional `loss`, pending reservations, and all six numerical cores lack explicit tagged/right-censored learning | carry the verified taxonomy into signed per-tool adapters as objective/constraint/right-censored tags plus separate pending reservations; declare accepted tags and state-update behavior per adapter; initially mark right-censoring unsupported rather than fabricating a finite loss |
+| objective/estimand/selection audit | Outcome Contract compiler 2.10 and Selection Key 1.0 now remove the hidden failure threshold, hard-penalty shortcut, multi-bound observation overwrite, simultaneous objective-vector/scalar-loss acquisition, flat seed estimator, surviving-row case-weight drift, rounded acceptance decisions, implicit adapter raw metrics, known reliability/composite overlap, observed-range Bayesian scaling, production random scalarization, whole-case omission during reduced-fidelity screening, infrastructure-to-parameter failure conflation, same-batch exact-action source erasure, moving portfolio baselines, outcome-dependent reward scaling, Candidate ID/generation/parameter replay, post-aggregation Trial mutation, retained-artifact byte drift, and unbound physical retries at aggregation/report publication; immutable claim/outcome rows and the one-time accepted-attempt pointer bind Candidate parameters, Job/scenario inputs, fencing identity, terminal taxonomy, metrics, and artifact receipts into v3 training/report projections, with holdout excluded from adaptive evidence and included only in report evidence; Candidate projections remain embedded in mutable aggregate JSON rather than an append-only relational Candidate ledger, and the registry still lacks a complete component DAG and fixed Pareto references | retain the registered-metric contract, dependency guards, hierarchical estimator, closed failure taxonomy, case-stratified fidelity, versioned promotion projection, one-representation rule, fixed Job weights/scales, physical-attempt/Trial/artifact/Candidate-bound verified projections, exact-action source shares, fixed-scale pre-generation reward, and shared lexicographic key; complete right-censoring/risk algebra, the metric DAG, Pareto references, a relational immutable Candidate-evidence ledger, and one shared projection for portfolio reward, validation promotion, winner freeze, report, and replay |
+| portfolio credit and policy-evaluation audit | same-batch exact actions preserve unique child sources with shares summing to one; same-tool duplicates collapse, fidelity supersession removes displaced reward, emergency fallback stays ineligible, and each child receives at most its best shared, bounded, fixed-scale improvement over the pre-generation incumbent once per generation; historical collisions are still dropped before an append-only action record exists, while hand coefficients, candidate-count exploration, incomplete cost/delay attribution, and metadata-backed eligibility remain a deterministic heuristic rather than a validated UCB/OPE policy | label the current algorithm as a deterministic heuristic baseline; add immutable routing opportunities/actions, closed availability/circuits, deterministic reserved exploration and maximum share, historical/cross-batch source reconciliation, a signed cost/delay extension, append-only reward events, action-probability provenance, OPE fail-closed gates, and end-to-end blocked randomized routing-policy evaluation |
 | seed-effect and repeatability audit | the Trial seed reaches the outer runner and controls synthetic dry-run noise, but the bundled real launcher never consumes `PX4_TRIAL_SEED`, never owns Gazebo's official `--seed` startup, and emits no seed binding; only static obstacles are physically supported while wind/noise/dropout/battery/payload requests fail closed; requested speed is not achieved-speed evidence | separate orchestration/tool/scenario/physics/plugin domains; derive named substreams; require component/version/configuration-bound delivery/readback and realized-effect artifacts; classify repeatability honestly; record simulation/wall/host nuisance factors; allow common-random pairing only for identical accepted binding manifests; add same/different/disconnected-substream A/A gates |
 | PX4 parameter-contract audit | legacy/version aliases collapse into current `r2`; one mostly shared hand catalog and moving documentation links do not bind exact firmware bytes; Git HEAD does not prove the launched binary; concrete validation can omit a dependency; binary-float projection re-anchors the grid at `search_min`; upstream increment, transport legality, and safety envelope are conflated; `disarmed` is not enforced; sequential live writes are not atomic; shared SITL storage isolation is unproved | add content-addressed firmware-build bundles and component-metadata reconciliation; separate transport/experiment/envelope domains; use exact grid indices and float32 wire identity; require a closed complete-vector constraint graph; prefer per-attempt clean-start storage and full baseline/final snapshots; independently verify state/readback/application evidence; disable live writes in Version 1 |
 
@@ -8055,6 +8121,769 @@ In particular, passing the current optimizer tests confirms current behavior; it
 not validate hierarchical estimands, fixed objective semantics, cross-adapter rank
 consistency, or unified acceptance/selection. Those schemas, tables, gateway,
 compilers, verifiers, and evaluation campaign remain unimplemented.
+
+### 30.2 Evidence-v2 context and routing diagnostics on 2026-07-26
+
+The compatibility Harness now uses a closed, versioned
+`HarnessEvidenceSnapshot` instead of constructing an untyped prompt dictionary in
+the decision module. This is an incremental implementation step toward the target
+control plane, not a claim that the immutable evidence-v3 or decision-ledger design
+is complete.
+
+The implemented evidence compiler:
+
+- exposes remaining generations and Trials, per-Candidate Trial cost, parameter
+  dimension, objective/constraint counts, and trusted catalog parameter names;
+- derives `full_trials_per_candidate` and `remaining_full_candidate_capacity`
+  through the same validated `ScenarioSuiteConfig` plus `scenario_matrix()` path
+  used by the dispatcher, including enabled training and holdout seed rows;
+- summarizes training and validation scenario/replicate counts without sending
+  scenario IDs, seeds, arbitrary case configuration, or sealed-test material;
+- computes completed/incomplete/feasible Candidate counts, optimizer-learning
+  failure rate, baseline-relative improvement, per-generation best score, and
+  trailing stagnation;
+- exposes only trusted training-side scalar loss, optimizer-learning failure
+  rate, feasibility observation coverage, completed Candidate rate, and
+  best-to-runner-up score gaps;
+- derives provider-visible Trial counts from the closed outcome taxonomy, so
+  infrastructure, cancellation, invalid evidence, and holdout outcomes remain
+  authoritative completion/acceptance failures without contaminating tool
+  routing or parameter-region learning;
+- never exposes holdout status, feasibility, objective/constraint values, error
+  text, or validation metrics to the adaptive router, preserving the validation
+  firewall across generations;
+- computes stagnation over the full history but bounds the provider-visible trend to
+  the first generation plus the latest 31 generations, keeping context size constant
+  for long-running Jobs;
+- preserves bounded optimizer memory through per-tool Candidate, feasibility,
+  failure, best-score, and last-generation statistics derived from trusted metadata;
+- reads at most eight recent `harness_tool_execution_result` rows through a bounded
+  SQL query and exposes only registered tool IDs, closed execution/fallback enums,
+  generation numbers, and dispatched counts, so the next decision can react to
+  zero-dispatch, exhausted-search, budget, and deterministic-fallback outcomes;
+- selects at most twelve provider-visible Candidates while reserving representation
+  for the baseline, strongest historical evidence, and the latest generations;
+- rejects mappings, strings, labels, free-form diagnostics, proposal rationale,
+  errors, Candidate IDs, parameter values, arbitrary JSON, and mixed numeric/text
+  metric arrays at the prompt boundary;
+- uses `evidence_schema_version=2.4` and `tool_registry_version=2.1` in capability
+  discovery and decision/tool-execution events; and
+- derives a per-snapshot eligible-tool manifest from explicit minimum
+  preconditions for dimension, constraints/objectives, scenario replication,
+  scored/feasible evidence, generation, and stagnation. The strict response
+  schema contains only that subset, and local validation independently rejects
+  a registered but context-ineligible tool.
+
+The Harness dispatcher now performs a deterministic feasibility preflight before
+contacting a provider. If the next generation exceeds `max_iterations`, or the
+remaining Trial budget cannot materialize one complete Candidate under the configured
+scenario matrix, it records `harness_decision_skipped` and returns the terminal
+dispatch status without spending a model request.
+
+`build_decision_messages()` is now a pure production function shared by live routing
+and offline evaluation. The repository includes a 24-case, eight-category
+development corpus covering cold start, local progress, stagnation, constraint
+pressure, high dimension, tight budget, failure recovery, and mixed tool history.
+`backend/scripts/evaluate_harness_router.py` validates that corpus, can emit the exact
+secretless production messages, and grades a complete case-to-tool prediction file.
+It also reports every constant-tool baseline and the uniform-random expectation,
+then measures supplied predictions against both without using case categories or
+grader rationale. In corpus v1 the random expectation is 23.4375%, while the best
+constant policy (`optimizer_portfolio`) reaches 58.3333% (14/24); therefore raw
+accuracy alone is not sufficient evidence that a router uses the supplied signals.
+Evaluation Report 1.1 adds a deterministic development qualification gate: at
+least 75% overall, at least 15 percentage points above the best constant policy,
+and at least two of three cases passed in every category. These thresholds only
+decide whether a router is worth advancing to the frozen simulator campaign.
+Prediction Artifact 1.0 replaces the unaudited bare case-to-tool JSON map. A
+gradeable artifact must bind the canonical corpus SHA-256, the exact production
+prompt-suite SHA-256, Evidence/Tool/Prompt versions, provider, model snapshot,
+sampling configuration, every selected tool, and its bounded rationale. The
+loader rejects stale versions, mismatched hashes, missing/extra cases, or an
+unstructured prediction file before grading.
+`backend/scripts/run_harness_routing_campaign.py` executes all cases against an
+online provider with the exact production messages and per-case eligible-tool
+schema. Credentials are environment-only; provider exception bodies are not
+persisted; any request or validation failure aborts before output. Only a
+complete locally validated Artifact is atomically linked into its final path,
+and an existing frozen output cannot be replaced.
+Tests prove that case IDs, acceptable answers, grader rationale, scenario IDs,
+scenario configuration, seeds, and injected text do not enter those messages.
+Byte-invariance tests additionally prove that changing only untrusted display names,
+Candidate labels/reasons/parameter values, scenario IDs/seed values/configuration,
+event rationale/errors, or rejected metrics leaves the exact production messages
+unchanged, while changing a trusted measured score changes the messages. A synthetic
+1,001-Candidate history test keeps twelve Candidate rows, 32 trend rows, and a
+production user message below the minimum configured 32 KiB prompt limit.
+The execution-memory query deliberately avoids loading the mutable SQLAlchemy
+`job.events` relationship, preventing a same-transaction relationship cache from
+hiding decision events written later in the turn.
+
+For provider calls, `harness_decision_started` now persists the complete bounded,
+provider-safe Evidence 2.4 snapshot and context-eligible Tool Manifest 2.1 alongside
+their SHA-256 values, the production prompt SHA-256, Prompt Template 1.1, and Decision
+Trace 1.1 versions. `verify_harness_decision_trace()` validates the closed evidence
+schema, rebuilds the exact production messages from the persisted snapshot and
+manifest, independently recompiles the eligible tool set, and checks all three
+hashes. Tests demonstrate that a one-field evidence
+mutation invalidates both the evidence and prompt hashes. This supplies
+same-version reproducibility and accidental-corruption detection; it is not a
+signature, append-only log, or proof against an actor who can rewrite the mutable
+event row and every hash.
+The read-only `scripts.verify_harness_decision_traces` command applies that
+reconstruction to exported raw payloads, JSON arrays, or JSONL event envelopes
+without database or provider access. It ignores unrelated event types in a full
+export, emits bounded identifiers/failure codes/hashes instead of replaying the
+evidence packet into CI logs, and exits nonzero for a missing, invalid, corrupted,
+or current-version-incompatible trace.
+
+This corpus is deliberately a development diagnostic, not the confirmatory
+simulator campaign in Section 22. It detects prompt/tool discrimination regressions
+and enables matched model comparisons, but it does not prove that an LLM router beats
+the deterministic portfolio. Frozen provider/model artifacts, blocked simulator campaigns,
+the locked test bank, immutable decision/model/tool ledgers, and evidence-v3 remain
+required before that stronger claim.
+
+The older direct `gpt` parameter proposer now uses Prompt Schema 2.3. Its
+feedback path already excluded holdout Trial rows; it now also compiles the scenario
+suite so that only training scenario enums, counts, weights, and allowlisted numeric
+Runtime inputs are visible. Stable `training_case_N` aliases keep same-type
+cases with different configurations or weights separate in the scenario
+contract and verified feedback, while raw case IDs remain sealed. Holdout cases
+expose counts only—not types, IDs, seeds,
+weights, configuration, outcomes, or metrics. Vehicle identity is reduced to
+catalog-backed categories, objective/constraint names are restricted to supported
+Trial metrics or stable `custom_*` aliases, and Candidate IDs/labels, arbitrary
+aggregate mappings, unrecognized scenario keys, and unknown failure-code strings
+are excluded. Capabilities report `prompt_schema_version=2.3` for this path;
+nonphysical Trial outcomes are also excluded from parameter-learning counts and
+scenario failure feedback.
+
+Prompt Schema 2.3 and the Harness Evidence 2.4 compiler now share
+`compile_candidate_feedback()`. Modern Candidate feedback is admitted only
+after the current Candidate identity, generation, parameters, and canonical
+training Trial rows reproduce its content-addressed outcome evidence. Scores,
+feasibility, aggregate metrics, and optimizer-learning counts are derived from
+that verified projection rather than mutable compatibility columns. Any
+divergence is labeled `quarantined` in the direct proposer and contributes no
+score, metric, scenario feedback, or synthetic failure penalty to either model
+path. Pre-evidence Candidates remain available only as explicit
+`legacy_unsealed` migration data.
+
+This hardening does not make the direct proposer equivalent to `llm_harness`: it
+still proposes numeric parameters and therefore retains more model authority. The
+closed-tool Harness plus deterministic optimizer adapters remains the preferred
+architecture for continued moat development.
+
+Outcome Contract V1 is now implemented as the first executable slice of Section
+8.10. Job creation and rerun compile a content-addressed
+`dronedream.optimization-outcome/v1` artifact that binds objective, constraint,
+scenario/seed/weight, failure, acceptance, holdout, metric-registry, and selection
+semantics. It is persisted in the Job event stream, advanced Candidate aggregates
+carry its ID, and the reproducibility manifest carries the full contract.
+The narrow legacy adapter labels `legacy_scenario_aliases_v1` and hashes the
+original persisted suite before mapping recognized historical aliases, so report
+export compatibility cannot silently rewrite old experimental intent.
+Before Candidate ranking, final aggregation recompiles the contract and refuses
+to proceed when its ID differs from the recorded creation event, turning
+post-dispatch configuration drift into an explicit terminal failure.
+Selection Key 1.0 replaces the `1_000_000 + 1_000 × violation` ranking shortcut
+with a shared lexicographic order: evidence completeness, hard feasibility, hard
+violation, training failure rate, objective-plus-soft-constraint loss, and a
+stable tiebreak. `scalar_loss` excludes hard-constraint penalties, preventing the
+experimental feasibility model from counting the same hard failure twice; CMA
+centering consumes the same selection key. The previously repeated
+`failure_rate < 0.5` learning rule is now one versioned constant recorded in the
+failure policy, and constraint observations use their full
+metric/operator/threshold ID so lower and upper bounds cannot overwrite each
+other. Outcome Contract compiler 1.1 additionally forbids objective
+double-counting: each numerical call selects one auditable representation,
+records it in proposal metadata, and never blends raw objective-vector EI with
+the scalar loss derived from the same evidence. Bayesian multi-objective tools
+use the vector only when a complete joint incumbent exists, otherwise they
+fall back to scalar loss; TuRBO and CMA-family state remain scalar-loss-only.
+The compatibility score remains for
+existing API/report consumers but is no longer the authority for hard feasibility.
+
+Outcome Contract compiler 1.2 replaces the flat completed-seed estimator with
+`within_case_estimator_then_fixed_suite`. Mean mode uses a within-case mean and
+fixed case-weighted mean; worst mode uses within-case and across-case worst;
+CVaR and percentile act within each case before a fixed case-weighted mean.
+Each dispatched case therefore retains its full configured population weight,
+while the case-weighted failure rate remains a separate reliability term. A
+dispatched case with no usable metric cannot produce a scalar objective,
+preventing surviving cases from silently absorbing its weight. Constraint
+observations remain worst-usable-seed values, so a dangerous replicate cannot
+be hidden by the case aggregate.
+
+Outcome Contract compiler 1.3 adds
+`dronedream.acceptance-projection/v1`. Promotion thresholds consume unrounded
+hierarchical mean RMSE, unrounded worst-usable-seed maximum error, and
+case-weighted pass/completion rates whose denominators include every dispatched
+seed. Rounded `rmse` and `max_error_worst` fields remain display/report
+compatibility values but no longer decide threshold boundaries.
+
+Outcome Contract compiler 1.4 changes metric admission to
+`registered_metrics_only`. Adapter `raw_metric_json` remains visible as report
+evidence, but a numeric key cannot become an objective or constraint until its
+source, unit, value kind, and semantics are added to the reviewed registry.
+Job creation compiles this contract before persisting a Job or encrypted
+provider secret and returns `INVALID_OUTCOME_CONTRACT` for an unknown metric.
+
+Outcome Contract compiler 1.5 adds
+`reject_known_alias_complement_and_composite_overlap`. The adapter-defined
+composite `score` is exclusive until its component DAG is registered, and the
+reliability aliases/complements `completion_rate`, `failure_rate`, and
+`failed_trial_rate` cannot be combined as independent objectives or redundant
+constraints. The dependency policy is included in the metric-registry hash.
+
+Outcome Contract compiler 1.6 binds each Job's objective weights and
+normalization scales to the Bayesian optimizer request. Production constrained
+MOBO, multi-fidelity MOBO, and SAAS acquisition use that single fixed
+preference vector and fixed scales; they no longer infer preference scaling
+from observed ranges or draw new scalarization weights. The request rejects
+mismatched weight/scale metric sets, and a partial observed vector cannot
+silently remove an objective: it falls back to declared scalar loss or
+exploration. Proposal metadata exposes the selected policy and exact inputs.
+
+Outcome Contract compiler 1.7 adds the first executable
+`dronedream.candidate-outcome-evidence/v1` slice. Aggregation canonically binds
+the search-role objective/constraint values, Selection Key, acceptance
+projection, candidate parameter hash, exact training-Trial evidence hash, and
+holdout projection hash into one content-addressed payload. Ranking,
+publishability, iterative acceptance, and numerical optimizer observations
+prefer this projection and fail closed when its schema/hash or bound holdout
+does not verify. Legacy aggregates without the field remain readable. This is
+explicitly a migration-safe embedded compatibility layer, not yet the target
+append-only relational evidence table or the final unified portfolio
+projection.
+
+Outcome Contract compiler 1.8 seals reduced-fidelity case coverage. Screening
+first selects one deterministic replicate from every configured training case
+and only then adds further replicates round-robin. Its optimizer-facing
+effective fidelity is recomputed from the actual selected training matrix, so
+nominal 0.25 coverage may honestly become a larger fraction when four or more
+scenario cases must all remain represented. Holdout runs are never pulled into
+reduced screening and still require a full-verification request.
+
+Outcome Contract compiler 1.9 introduces
+`dronedream.trial-outcome-taxonomy/v1`. Domain failures (`TIMEOUT`,
+`SIMULATION_FAILED`, and `UNSTABLE_CANDIDATE`) plus unknown failure codes enter
+optimizer learning, with unknowns deliberately conservative. Adapter/process,
+artifact, and result-persistence failures are classified as infrastructure;
+cancellation and invalid Candidate evidence are separate. Those nonphysical
+outcomes are excluded only from the parameter-safety learning rate. They still
+remain in dispatched denominators, block evidence completeness and public
+promotion, preserve cost, and are bound into Candidate outcome evidence.
+
+Outcome Contract compiler 2.0 introduced same-batch source attribution. The
+current implementation upgrades it to `dronedream.portfolio-sources/v2` and
+seals the projection in `dronedream.optimizer-source-evidence/v2`. Exact
+same-batch actions retain every unique
+child optimizer that independently proposed the parameter/fidelity identity,
+with equal reward shares summing to one; repeated proposals from one child
+collapse to one source. Lower-fidelity or superseded sources remain auditable
+but receive no reward, as do emergency fallbacks, projected baselines, and
+unsupported generators. If a fallback arrives before an exact native
+collision, the native proposal becomes the state-carrying envelope so
+`learning_owner` and the child-local CMA/TuRBO reconstruction state remain
+coherent. Source roles, strategy, generation, projected parameter SHA-256, and
+reward shares are content-addressed. The search-space digest additionally binds
+PX4 version, catalog version, vehicle type, airframe, and safe-bound policy.
+Modern history recomputes the generation-specific configured training
+case/seed matrix and the deterministic requested-fidelity subset, then requires
+the exact Trial set and actual coverage to match Trial labels, Candidate
+metadata, and the source envelope. Missing, duplicated, or divergent evidence
+fails closed before portfolio state reconstruction; Candidate receipt v2
+freezes source identity, provenance-required state, and the complete optimizer
+metadata hash. Portfolio statistics consume those fractional shares. The
+current implementation
+remains an explicit deterministic heuristic: it does not yet persist rejected
+historical collisions, complete incurred cost/delay, randomized action
+propensities, or an append-only routing/reward ledger.
+
+Outcome Contract compiler 2.1 adds
+`fixed_scale_pre_generation_incumbent_v1`. Every full-fidelity child reward is
+the positive reduction from the globally comparable incumbent as it stood
+before that generation, divided by one fixed normalized preference-loss unit.
+The result is bounded to `[0, 1]`, exact-source shares are applied, and only the
+best attributed reward for one child in one generation is retained. This
+prevents a late tool from receiving credit for an already-obsolete baseline,
+prevents same-generation batch size from summing rewards, and prevents observed
+extrema from redefining reward scale. The portfolio score still contains
+explicit hand coefficients and candidate-count exploration, so it remains an
+honestly labeled deterministic heuristic rather than calibrated UCB.
+
+Outcome Contract compiler 2.2 adds the
+`candidate_id_generation_parameter_sha256` context-binding rule. Acceptance,
+public recommendation, and optimizer-learning paths no longer accept a
+self-consistent evidence blob in isolation: they also compare its Candidate
+ID, generation, and parameter hash with the current Candidate row. Copying
+evidence between rows or changing parameters after aggregation therefore
+produces an empty authoritative projection and fails closed. The evidence
+still resides inside mutable aggregate JSON, and current Trial rows are not
+yet independently re-hashed at every read boundary.
+
+Outcome Contract compiler 2.3 adds
+`canonical_training_trial_rows_sha256`. A shared canonicalizer records each
+training Trial's ID, status, seed, scenario identity/config, failure code, and
+accepted metric fields in deterministic order. Acceptance, publishability, and
+optimizer learning regenerate that snapshot from the current Candidate
+relationship and require its hash to match the evidence. Editing Trial metrics
+or execution identity after aggregation therefore fails closed. This embedded
+compatibility layer still does not replace immutable physical-attempt and
+artifact-digest tables.
+
+Outcome Contract compiler 2.4 adds
+`dronedream.candidate-report-evidence/v1` and
+`all_candidate_trial_rows_sha256`. Report-facing RMSE, maximum-error,
+overshoot, completion-time, score, and reliability fields are compiled into a
+content-addressed projection linked to the verified Candidate outcome evidence.
+The report envelope also hashes every current Trial row for that Candidate,
+including holdout rows; holdout evidence remains unavailable to adaptive
+proposal and routing paths. JobReport, real-runtime candidate summaries,
+reproducibility manifests, and PDF reports ignore mutable compatibility values
+and consume this projection. A Candidate/Trial/projection mismatch refuses the
+affected report or artifact instead of silently exporting divergent results.
+Legacy aggregates remain readable. The envelope is still an embedded migration
+layer, not the target append-only physical-attempt, artifact-digest, winner,
+and routing-evidence ledger.
+
+Outcome Contract compiler 2.5 adds
+`dronedream.winner-selection-evidence/v1`. The finalization boundary now
+content-addresses the full aggregated Candidate set rather than trusting only
+`best_candidate_id`, `rank_in_job`, and `is_best`. Each decision binds the
+Candidate identity, generation, baseline role, publishability disposition,
+Selection Key 1.0 tuple when finite, Candidate outcome/report evidence IDs,
+and deterministic rank. The verifier recomputes the ordering with the frozen
+optimizer-before-baseline, generation, and Candidate-ID tie-break and then
+matches it back to current Candidate/Trial-bound projections before reports are
+persisted. The evidence is stored with JobReport and propagated into terminal
+events, real-runtime report JSON, reproducibility manifests, and PDF summaries;
+the public report API exposes its ID. Modern evidence-bound reports reject
+missing, tampered, incomplete, or winner-mismatched envelopes. Legacy reports
+remain readable. This is a verifiable current-state winner receipt, not yet an
+atomic append-only `WINNER_FROZEN` transition or sealed final-test service.
+
+Outcome Contract compiler 2.6 adds an insert-once
+`dronedream.winner-freeze-receipt/v1` persistence boundary. A modern Job may
+create one receipt only while it owns `FINALIZING`; unique Job and evidence-ID
+constraints prevent a second row, and idempotent re-entry requires the same
+verified envelope and scalar bindings. JobReport stores the receipt foreign
+key, terminal events carry the receipt ID, and the report API,
+reproducibility manifest, real-runtime report JSON, and PDF generator
+independently reverify receipt content, baseline, winner, and Job identity.
+Direct row mutation therefore causes a fail-closed read rather than silently
+changing the published winner. Legacy reports remain nullable. The receipt and
+terminal state use one database transaction, but privileged out-of-band SQL is
+detected rather than physically forbidden, file artifacts are not committed
+atomically with SQL, and the sealed final-test service remains future work.
+
+Outcome Contract compiler 2.7 adds
+`database_reject_update_delete_v1`. SQLite development/test databases and the
+Alembic migration install update/delete rejection triggers on
+`winner_freeze_receipts`; PostgreSQL receives an equivalent PL/pgSQL trigger.
+The migration fails explicitly on unsupported production dialects. Automated
+tests show that ordinary SQLAlchemy update and delete attempts abort at the
+database boundary, and separately remove a SQLite trigger to demonstrate that
+the content-addressed report reader still detects a privileged bypass. This
+provides defense in depth, not protection against a database owner who can
+drop triggers; production must keep migration ownership separate from the
+application role and audit privileged DDL.
+
+Outcome Contract compiler 2.8 adds
+`dronedream.artifact-digest-receipt/v1`,
+`sha256-v1`, and `verify_bound_bytes_before_stream_v1`. Newly retained real
+Trial artifacts and generated Job artifacts receive one content-addressed
+receipt that binds Artifact identity, polymorphic owner, type, storage-path
+hash, content hash, and byte count. Trial storage keys include the physical
+attempt and source digest; a repeated attempt therefore cannot silently replace
+different bytes. Deterministic report JSON/text/PDF generation verifies an
+existing object before treating regeneration as an idempotent retry, and
+canonical UTC timestamps eliminate SQLite timezone round-trip drift.
+Digest-bound local and S3-compatible downloads read and hash bytes before
+returning them; a bound S3 object is never redirected around the verifier.
+SQLite/PostgreSQL receipt mutation guards and independent read-time
+reverification provide defense in depth. Receipt updates and ordinary deletes
+fail, while explicit Job deletion and retention cleanup use a
+transaction-scoped, foreign-key-cascaded authorization so immutable evidence
+cannot hold user data hostage. Legacy mock/unbound Artifacts remain readable.
+
+This is not an atomic object-store/database commit or an operational WORM
+guarantee. Storage-owner deletion/replacement, a database owner dropping
+triggers, object versioning/retention, and role-separation controls remain
+deployment concerns.
+
+Outcome Contract compiler 2.9 adds
+`trial_artifact_receipt_set_sha256_v1`. Canonical Trial v2 rows now contain a
+validated, deterministically ordered
+`dronedream.trial-artifact-evidence/v1` projection. For every retained real
+Trial artifact the projection binds the immutable digest-receipt identity,
+Artifact/Trial ownership, type, MIME type, content SHA-256, exact byte count,
+and storage-path SHA-256. Aggregation streams and re-hashes local or
+S3-compatible bytes before compiling the evidence; report publication repeats
+the byte verification before freezing/exporting the winner. A missing receipt,
+storage mutation, metadata mutation, removed/added Artifact row, or Artifact
+from another Candidate fails closed. Historical synthetic `mock://` rows have
+no bytes by design and are explicitly bound as `mock-metadata-only`, never
+promoted to sealed evidence.
+
+`dronedream.candidate-outcome-evidence/v2` hashes only the training Trial v2
+rows and exposes sealed/metadata-only counts. Adaptive consumers therefore do
+not gain holdout Artifact visibility.
+`dronedream.candidate-report-evidence/v2` separately hashes all Candidate
+Trial v2 rows, including holdout, and remains linked to the verified search
+outcome evidence ID. v1 envelopes retain their original parser and digest
+semantics, while new aggregation emits v2. The embedded compatibility layer
+now binds retained Artifact bytes through Trial, Candidate outcome, winner
+selection, and final report. Immutable physical-attempt lineage, a relational
+append-only Candidate evidence table, and atomic object-store/SQL publication
+remain future work.
+
+Outcome Contract compiler 2.10 adds an immutable physical-execution ledger.
+`dronedream.trial-execution-attempt-claim/v1` binds one claim to its logical
+Trial/Candidate/Job, attempt count, backend, hashed worker and lease identity,
+parameter vector, scenario/seed, Job configuration, and claim time.
+`dronedream.trial-execution-attempt-outcome/v1` then closes that claim exactly
+once as accepted terminal evidence or `SUPERSEDED`; accepted outcomes bind the
+metric snapshot and Trial artifact-evidence hash. The logical Trial stores one
+immutable accepted-attempt pointer. Fencing rejects stale persistence, reclaim
+closes older open claims, cancellation closes the owned open claim, and normal
+updates/deletes/pointer replacement are rejected by SQLite/PostgreSQL guards.
+Explicit terminal Job deletion uses a transaction-scoped authorization row.
+
+`dronedream.trial-outcome-evidence/v3` embeds the verified
+`dronedream.trial-accepted-attempt-evidence/v1` projection beside artifact
+evidence. `dronedream.candidate-outcome-evidence/v3` hashes only training Trial
+v3 rows; `dronedream.candidate-report-evidence/v3` separately hashes every
+Trial v3 row, including holdout. Current aggregation, winner selection, report
+publication, and replay therefore fail closed on a missing/open/superseded or
+mismatched accepted attempt, changed input, changed metric, or changed
+artifact. v1/v2 readers remain available for historical evidence.
+
+This does not make the Candidate envelope itself relationally append-only,
+make SQL/object storage atomic, prevent a database owner from dropping guards,
+or independently verify simulator-authored telemetry semantics. Those remain
+the next evidence and operational boundaries.
+
+Outcome Contract compiler 2.11 makes the current Candidate envelope
+relationally append-only. The current writer emits
+`dronedream.candidate-evidence-receipt/v2`, while v1 remains readable for
+migration but cannot be appended to or automatically upgraded without a
+controlled migration. Each v2 receipt binds the full canonical aggregate and
+optimizer metadata hashes, Candidate/Job/generation/parameter identity,
+`source_type`, the optimizer-source-evidence-required state, linked
+v3 outcome and report evidence, both Trial-evidence hashes, accepted-attempt
+counts, a monotonic revision, and the previous receipt ID. Critical readers
+recompute and verify the complete chain and require the current mutable
+compatibility aggregate, source identity, provenance-required state, and
+optimizer metadata to equal the newest sealed receipt.
+
+An irreversible `evidence_ledger_required` Candidate flag prevents a caller
+from deleting both JSON evidence and the JSON “required” markers to recover a
+legacy permissive path. Aggregation turns the flag on, migration backfills it
+for existing v3 evidence, and SQLite/PostgreSQL reject true-to-false updates.
+The same database boundary rejects changes to `source_type` or
+`optimizer_metadata_json` after the gate turns on.
+Upgraded v3 evidence without a relational receipt therefore fails closed until
+trusted reaggregation creates one. Receipt updates and ordinary deletes fail.
+Explicit terminal Job deletion creates transaction-scoped authorizations for
+Candidate receipts and the winner-freeze receipt, so evidence immutability does
+not make user data undeletable.
+
+At compiler 2.11, the remaining boundary was narrower: a database owner could
+still disable database guards, SQL/object storage publication was not atomic,
+operational WORM/role-separation policy was external, and simulator telemetry
+still needed independent unit/frame/time/source-log semantic verification.
+
+Outcome Contract compiler 2.12 adds content-addressed PX4 telemetry-semantic
+evidence for units, coordinate frame, time origin, normalized samples, source
+bytes, extraction revision, and sampling quality. Physical telemetry must have
+a valid timed interval and satisfy frozen gap/coverage rules. RMSE becomes
+trapezoidally time-weighted, and `real_cli` independently reloads and verifies
+the retained telemetry/reference evidence before accepting a bundled result.
+
+Outcome Contract compiler 2.13 adds content-addressed PX4 core-metric evidence.
+The backend repeats the bounded ordered three-dimensional track projection and
+recomputes evaluation/full-log RMSE, maximum error, duration, endpoint error,
+tracking-error peak count, sampling, and maximum-error sample from retained
+bytes rather than runner-authored values.
+
+Outcome Contract compiler 2.14 freezes the evaluation policy and independently
+derives the evaluation window from retained telemetry, reference track, and
+optional offboard timing. Offboard timing is only a broad candidate; the
+backend repeats consecutive altitude-and-near-track entry plus landing trim.
+Policy drift, timing/reference mutation, favorable index substitution, or
+nested evidence mutation invalidates the complete Trial.
+
+Outcome Contract compiler 2.15 adds content-addressed PX4 outcome policy and
+evidence. The backend independently recompiles crash and altitude collapse,
+position-speed and track-error instability, continuous directed arc coverage,
+backward travel, projection discontinuities, start/endpoint reachability,
+scenario-effect readiness, pass, and the frozen score components. It binds the
+trusted Trial scenario-effect request to the single retained request artifact
+and validates optional executor evidence. Runner-authored flags, progress,
+scenario hashes, score, policy, or nested evidence cannot override the backend
+result. A complete desktop adapter-to-bundled-runner dry-run regression covers
+the production handoff. Remaining evidence boundaries are raw-source retention,
+atomic SQL/object publication, operational WORM/role separation, and carrying
+the closed domain/infrastructure taxonomy through every adapter and optimizer
+learning path.
+
+Outcome Contract compiler 2.16 retains the raw PX4 source used by the bundled
+local wrapper. It snapshots the selected ULog into the Trial directory before
+extraction, publishes the snapshot as a `px4_ulog` Artifact, and independently
+streams it through SHA-256 at the backend boundary. The retained byte count and
+digest must equal the telemetry origin provenance. Empty, missing, duplicate,
+oversized, mutated, wrong-MIME, unexpected, or cross-Trial origin artifacts
+invalidate the complete Trial. This closes raw-source replay for the bundled
+ULog path; atomic SQL/object publication and operational WORM controls remain
+deployment work.
+
+Outcome Contract compiler 2.17 removes the last producer-selected failure-code
+path from the external CLI adapter. Missing, malformed, identity-mismatched,
+non-boolean, inconsistent-success, or evidence-invalid results become
+`INVALID_SIMULATOR_RESULT`. Any external `success=false` claim becomes
+`UNVERIFIED_SIMULATOR_FAILURE`; its bounded claimed code and reason remain
+diagnostic only. The adapter's own process deadline uses
+`SIMULATOR_EXECUTION_TIMEOUT`, an infrastructure class, rather than the trusted
+domain `TIMEOUT`.
+
+The closed taxonomy now also drives all implemented parameter-learning paths.
+Infrastructure, cancellation, and invalid evidence still block completeness
+and public acceptance, but do not add the failed-Trial ranking penalty and are
+omitted from GPT scenario feedback. Prompt schema 2.1 recomputes its denominator,
+completion/pass rates, and failure codes from optimizer-learning Trial classes,
+so an external producer cannot poison the LLM optimizer through a side channel.
+
+Outcome Contract compiler 3.0 adds a report-only generalization receipt after
+the validation matrix completes. The content-addressed
+`dronedream.validation-generalization-evidence/v1` projection binds the
+Scenario Suite, labels the actual seed/configuration/scenario-type shift, and
+computes direction-aware training-to-validation gaps for every registered
+objective plus scalar loss. Missing, incomplete, or errored validation never
+emits a partial quantitative conclusion; failed validation remains
+non-qualifying even when its diagnostic gaps are complete. Qualification also
+requires the configured validation replicate count, actual Trial count, and
+completed Trial count to match exactly, preventing a truncated validation
+matrix from being mislabeled as a pass.
+
+This receipt cannot enter the model prompt, decision memory, optimizer
+observations, Candidate ranking, or adaptive tool allocation. A paired
+regression changes validation outcomes from excellent to failed while
+requiring the training score and Candidate selection to remain identical. The
+only authorized consumers are reporting and the existing promotion gate.
+Accordingly, the evidence can support only the named shift in the configured
+simulation campaign. It is neither a sealed final test nor real-flight or
+open-world generalization evidence.
+
+The immutable `scenario-generalization-mock-v1.json` campaign now supplies a
+concrete mixed-shift instance of this contract. The optimizer selects from 61
+Candidates using five training cases only. A later report-only matrix contains
+five changed configurations of known scenario types and five scenario types
+absent from training, with disjoint validation seeds. The receipt qualifies
+`mixed_shift_robustness`, records the actual train-to-validation degradation,
+and remains explicitly `physical_fidelity=false`. A regression replaces the
+validation evaluator with a failure sentinel while running the training-only
+optimizer, proving that no validation call is available at selection time.
+
+Current frozen evidence validation:
+
+```text
+python backend/scripts/export_technical_report_evidence_v10.py --check
+
+schema: dronedream.technical-report-evidence.v10
+software subject: 97492448c36bef240e468a0cd53c3ba198cb6aae
+evidence freeze: a1f091f2edf1ae43233cd01e483bc3990c9aa279
+sources: 39
+online provider freeze: Evidence 2.8, Tool Manifest 2.1,
+Prompt Template 1.7, 23/24 qualified
+current runtime planning contract: Evidence 2.9
+multi-tool offline budget parity: 3/3 blocks; provider/network calls: 0/0
+advanced-physics bundled effects: 9/9 verified; all-performance-success: false
+focused compatibility: 70 passed
+focused tamper suite: 7 passed
+release_ready: false
+```
+
+The v10 focused receipt at
+`artifacts/test-runs/technical-report-evidence-v10-9749244/test-receipt.json`
+binds both JUnit logs to software subject
+`97492448c36bef240e468a0cd53c3ba198cb6aae`. It records 70/70 compatibility
+checks and 7/7 focused tamper checks, with internal receipt SHA-256
+`b9407556588e5c0a65d3e93f22e29d0fdd8fd4bb57f1b5cb1c890f94c7b9d98d`.
+It deliberately does not claim to replace a current-head full-suite receipt.
+The latest exact-commit full-suite receipt carried through the immutable v9
+base is 1,204/1,204 plus a 28-test supplement at
+`c1222c9215e01a56351f6588af0d2b8694bca831`; it is historical-source evidence
+only. Current-source full regression, Windows Rust, and report/PDF gates remain
+not included, so no release-readiness claim follows.
+
+The archived Evidence 2.4 / Prompt Template 1.1 freeze remains a historical
+24/24 result, but current loaders reject it. Evidence 2.7 preserves subsequent
+`gpt-4.1-2025-04-14` results of 19/24 and 21/24 under Prompt 1.5 plus 24/24
+under Prompt 1.6 rather than selecting only the best. The spread demonstrates
+provider stochasticity.
+
+The current retained online Artifact is Evidence 2.9 / Prompt Template 1.7. It
+uses the same 24-case development corpus, passes 23/24 and all declared
+qualification thresholds, and preserves
+`tight_budget_expensive_matrix` as the single failure. Its file SHA-256 is
+`11c5de7e208cb9b3e1263943ff8086bd919a57753948a9fd0db0ffd48e621ed1`;
+its manifest canonical-payload SHA-256 is
+`ea4c6242fe01c56f088d4042772dba763378d94d011f0c550c35ec862638ea7a`.
+The authorized batch made 24 provider calls with zero retries from exact source
+`d36ef166f985f761ab9e733753f61237950049da` and is frozen at
+`d49353925ce074e3cb71508ee21cd2abfcee79cf`. Evidence 2.8 remains an immutable
+historical freeze. The unpaired online runs are not a causal prompt-lift
+estimate, proof of multi-tool benefit, or proof of lower simulator loss.
+Campaign and evaluator CLIs pin the selected worktree's `backend/` import root
+and fail closed against neighbouring checkout contamination. Every future real
+campaign remains subject to the separate per-batch API approval gate.
+
+### 30.15 Evidence 2.5 observed-outcome reflection
+
+The implemented reflection slice binds each recent, already-verified Harness
+decision/result chain to its exact optimizer Candidate generation. A cohort is
+accepted only when its size matches the dispatch receipt and every Candidate
+has a current v2 evidence-ledger receipt plus verified training feedback. The
+provider receives bounded counts, training-side scores, the pre/post incumbent,
+and observed improvement. It never receives private identifiers, seeds,
+failure prose, evidence hashes, or holdout measurements.
+
+This memory is an observation, not a reward. It does not claim that the LLM or
+selected optimizer caused a change, and portfolio outcomes are not reassigned
+to child tools. Missing, legacy, incomplete, count-mismatched, or drifted
+evidence makes the entire outcome `unavailable`; zero-dispatch results are
+`not_applicable`. Prompt Template 1.2 requires reflection on verified numeric
+cohorts while explicitly forbidding causal or child-credit inference.
+
+### 30.16 Evidence 2.6 scenario-profile context
+
+The routing snapshot now describes each enabled training case with an anonymous
+ordinal alias, trusted scenario type, replicate count, normalized weight share,
+and a scenario-specific allowlist of bounded numeric perturbations. It also
+reports replicate range, maximum weight concentration, effective weighted case
+count, and a closed job-wide environment summary. This lets the planner compare
+simulation cost and training heterogeneity instead of seeing only aggregate
+case counts.
+
+The compiler does not expose arbitrary scenario JSON, IDs, seeds, labels,
+instructions, out-of-range values, or incompatible perturbation keys. Holdout
+details remain sealed; only validation case and replicate counts contribute to
+cost. Current Prompt Template 1.6 explicitly prohibits inferring validation
+types, conditions, or results. Paired tests require two jobs with identical
+training inputs and counts but different holdout IDs, types, seeds, weights,
+and configs to produce identical provider-visible scenario evidence.
+
+### 30.17 Evidence 2.7 one-generation receding plan
+
+The evidence compiler now turns verified budget, search, and observational
+memory into one closed planning record before any model call. Its phase is one
+of `exploration`, `recovery`, `refinement`, `diversification`,
+`verification`, or `balanced`; its batch policy is one of `conservative`,
+`balanced`, or `broad`. The record binds a one-generation horizon, mandates
+replanning after the cohort, and carries a short closed reason-code tuple.
+
+Planning authority remains deterministic. Final capacity has priority over
+every adaptive signal; verified high domain-failure rates have priority over
+exploration and improvement; sparse history and missing feasibility trigger
+exploration; stagnation triggers diversification; verified progress permits
+refinement. Trusted dispatch converts the policy to a locally safe Candidate
+count and never permits the provider to enlarge it. The decision and execution
+events must agree on phase and policy, and the execution's planned count must
+cover the dispatched count before that record may enter future memory.
+
+Prompt Template 1.6 exposes the bounded plan but explicitly forbids a later
+open-loop schedule. Decision Trace 1.3 hashes the complete plan with the
+provider-safe snapshot and exact prompt. Unit and integration regressions cover
+all six phases, phase-policy mismatch, safe cohort sizing, real dispatch
+propagation, privacy/context limits, and plan-field tampering. The offline
+component campaign changed from 764 to 554 persisted synthetic Trials after
+this policy entered production, but that difference is protocol behavior on a
+mock landscape—not causal evidence of optimizer quality, physical performance,
+or user benefit.
+
+The executable tool surface is now stricter than capability eligibility alone.
+`selectable_harness_tools` intersects the capability-compatible registry with
+the search roles authorized for the current phase, and that exact tuple drives
+the provider schema, manifest, response validator, persisted started trace, and
+offline verifier. Verification also forces `required_fidelity=1.0` for every
+reduced-fidelity-capable strategy even when earlier full-matrix evidence exists.
+These are trusted dispatch contracts, not model instructions, and regressions
+cover every phase exclusion plus the pre-dispatch fidelity floor.
+
+### 30.18 Reflection causal-contract and long-horizon stress evidence
+
+The first Evidence 2.7 component campaign was insufficient to isolate several
+important reflection states: it stopped after two generations, its no-memory
+and no-reflection arms were behaviorally identical, and its five changed rows
+did not establish a general benefit. Two separate deterministic protocols now
+make those limits measurable instead of interpreting absence as success.
+
+The reflection-trigger protocol directly removes only the verified
+`observed_outcome` from otherwise matched decision memory, then invokes the
+production plan compiler, capability gate, phase-role tool intersection, and
+frozen local selector. Six named cases cover high cost without improvement,
+failure concentration, search-space exhaustion, phase transition,
+recovery-to-re-exploration, and tool-eligibility change. Across seven steps,
+four change phase, selectable tool surface, and selected tool. Trusted
+search-summary stagnation is an intentional no-observed-difference control.
+Search-space exhaustion has no dispatched cohort, so reflection cannot be
+intervened on and the case is explicitly inconclusive. The canonical artifact
+hash is
+`cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38`.
+
+The long-horizon outcome stress uses the same five seed blocks and four arms
+with a common four-generation, 120-Trial ceiling. It persists 1,588 synthetic
+Trials across 20 Jobs, with complete evidence, zero network calls, and no real
+credential. The primary no-reflection intervention activates in 5/5 blocks and
+changes both tool sequence and frozen outcome in 5/5. Those causal protocol
+differences do not imply a quality benefit: paired holdout signs favor full
+AURORA in one block and no-reflection in four. Realized Trial signs favor full
+AURORA in three blocks and no-reflection in two; the comparison-minus-full
+aggregate is `+44`, but the direction is not consistent. The canonical
+artifact hash is
+`6da3544651ee56428b6e78f1613fd520c46b789dc3e7f9d44fc8be153dd9f5b3`.
+
+Both protocols are deterministic Mock evidence. The long-horizon design is
+pilot-informed and non-confirmatory. Neither protocol permits a generalized
+quality or cost claim, LLM superiority, PX4/Gazebo or physical performance,
+sim-to-real transfer, flight safety, or user benefit.
+
+### 30.19 Bundled advanced-physics and v10 evidence closures
+
+The bundled launcher now has a verified request/evidence path for nine physical
+effect categories: steady wind, obstacles, gust/turbulence, bounded sensor
+noise, payload mass/inertia, actuator first-order delay, deterministic GPS
+dropout, battery initial state/voltage sag, and hard actuator failure.
+`advanced-physics-closure-v2` exact-byte verifies four retained real
+PX4/Gazebo evidence roles and recompiles the live capability contract to
+`requires_runtime_extension=[]`.
+
+This closes the **effect-application** gap, not the comparative-performance
+gap. Five categories have every retained performance trial passing. GPS noise
+retains a readiness boundary; dropout/battery retains verified transitions but
+a false policy verdict; hard actuator failure retains failed- and healthy-rotor
+joint-state evidence but no trusted scoring window. The closure therefore
+permits only the enumerated application/read-back statements. It does not prove
+universal controller robustness, Harness benefit, sim-to-real transfer,
+real-aircraft behavior, or safety. The manifest file SHA-256 is
+`5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3`.
+
+The software-owned `dronedream.technical-report-evidence.v10` bundle then
+re-verifies the immutable v9 lineage and adds three separate evidence classes:
+the qualified 23/24 Evidence 2.8 online development routing freeze, the
+Evidence 2.9 offline multi-tool budget/accounting freeze, and the nine-category
+advanced-physics closure. Its 39-source inventory explicitly retains the
+554-Trial component ablation. Bundle subject, freeze, file SHA-256, and internal
+SHA-256 are respectively
+`97492448c36bef240e468a0cd53c3ba198cb6aae`,
+`a1f091f2edf1ae43233cd01e483bc3990c9aa279`,
+`27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89`,
+and
+`df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b`.
+It explicitly reports `release_ready=false`.
 
 ## 31. Reference index
 
@@ -8181,3 +9010,81 @@ Primary and official references used for this design:
 - [NumPy: Parallel random generation and independent child streams](https://numpy.org/doc/stable/reference/random/parallel.html)
 - [NumPy: `SeedSequence` reproducible entropy and spawn contract](https://numpy.org/doc/stable/reference/random/bit_generators/generated/numpy.random.SeedSequence.html)
 - [NIST/SEMATECH: Blocking of factorial experiments](https://www.itl.nist.gov/div898/handbook/pri/section3/pri3333.htm)
+
+## 32. Evidence 2.8 cross-Job experience boundary
+
+The production Harness now retrieves prior experience only as versioned,
+structured, revocable evidence. It never concatenates historical Job text into
+the provider prompt. Materialization requires a terminal source Job and a
+complete verified decision/cohort reflection. Retrieval then enforces exact
+authenticated ownership, a distinct source Job, exact structural task-family
+binding, current contract versions, the 90-day retention window, revocation
+state, and recomputation of the internal source receipt.
+
+The provider sees at most six anonymous observations. Each contains only the
+tool, deterministic phase/batch policy, dispatched/planned counts, the closed
+observed-outcome structure, and a safe training/environment scenario-similarity
+rank. It sees no database identifiers, timestamps, model prose, parameter
+values, scenario IDs, seeds, validation/holdout profiles, credentials, or
+simulator errors. Similarity orders compatible records and makes no transfer or
+physical-fidelity claim. Evidence 2.8 and Prompt 1.7 explicitly call all
+same-Job and cross-Job outcomes observational rather than causal.
+
+The deterministic `harness-cross-job-memory-contract-v1` evaluation is 10/10
+over two positive retrieval fixtures and eight isolation/lifecycle negatives,
+with zero provider, network, or simulator calls and zero provider-identifier
+leaks. It establishes the enumerated software-contract behavior only. The
+554-Trial Evidence 2.7 component freeze remains historical evidence; it is not
+evidence for the new memory channel. Neither the Evidence 2.8 nor the current
+Evidence 2.9 / Prompt 1.7 provider freeze is a cross-Job-memory evaluation.
+Evidence 2.9 now closes current-contract online-routing qualification on the
+frozen 24-case development corpus, but the offline memory and equal-budget
+dispatcher studies do not replace a causal optimization-benefit study.
+
+## 33. Evidence 2.9 multi-tool plan and accounting boundary
+
+The production `llm_harness` dispatcher now accepts one closed generation plan
+instead of reducing every turn to one optimizer name. The immutable opportunity
+contains candidate capacity, remaining Trials, per-tool allocation ceilings,
+parallel-safety declarations, and generation latency/CPU ceilings. Local code
+validates and canonically recompiles the provider JSON, derives the plan hash and
+call identities, and rejects any plan that exceeds the Trial, candidate, call,
+latency, CPU, eligibility, or stop policy.
+
+Pure numerical calls are prepared before execution. Parallel-safe calls may run
+concurrently; the optimizer portfolio remains serial. Each call enforces its
+actual wall and CPU envelope, and an exception or overrun yields no proposal.
+One optional revision turn can select only anonymous proposal references already
+returned by those tools. Candidate/Trial creation happens only after a final
+lease fence. The provider never receives parameter values and never receives a
+callable simulator, database, shell, filesystem, or credential.
+
+Evidence 2.9 adds `generation_plan_history` to the next provider snapshot. The
+compiler requires a unique, ordered chain of plan start, accepted or
+deterministic-fallback plan, canonical compiled-plan hash, revision start and
+accepted/fallback decision when applicable, and one final execution result. It
+recompiles the stored plan against the exact opportunity and checks every tool
+ledger row and cost total. Missing companions, duplicates, generation replay,
+hash/version drift, selected-reference drift, and accounting drift exclude the
+whole generation. The projection contains aggregate source/status/count/cost
+facts only; all opaque IDs, proposal references, parameters, model prose,
+credentials, and raw errors are removed.
+
+The offline `harness-multi-tool-budget-evaluation-v1` protocol gives direct
+portfolio and scripted multi-tool arms identical `max_iterations` and
+`max_total_trials`, uses `MockSimulatorAdapter`, records realized Trial use and
+the live plan/revision/tool wall and CPU receipts, and blocks all socket
+connections. Scripted schema-valid decisions are not real model calls.
+Consequently this evaluation can support dispatcher, provenance, concurrency,
+and accounting claims only. It cannot support LLM-quality, optimizer-superiority,
+PX4/Gazebo, real-flight, or causal-benefit claims. The separately approved
+Evidence 2.9 online campaign qualifies routing on the frozen 24-case development
+corpus but does not change those multi-tool or offline-study claim boundaries.
+Every future real model batch remains subject to a new per-run API approval.
+
+The frozen offline result contains three seed blocks, six arm runs, configured
+budget parity in 3/3 blocks, six verified scripted generations, multi-tool
+execution in 3/3 blocks, 12 schema-valid local decision calls, and zero real
+provider/network calls or credentials. It is consumed by v10 from software
+subject `136a1e3293efa6e53f3648e21fa8f7c6b5158d6f` and evidence freeze
+`15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8`.

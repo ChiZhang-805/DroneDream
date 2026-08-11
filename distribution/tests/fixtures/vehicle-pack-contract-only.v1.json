@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-vehicle-pack",
+  "packId": "fixture-x500-contract",
+  "packVersion": "1.0.0",
+  "displayName": {
+    "en": "Fixture X500 contract",
+    "zh-CN": "X500 合同测试夹具"
+  },
+  "manufacturer": "DroneDream test fixture",
+  "vehicleClass": "multicopter-research",
+  "availabilityRegions": ["cn", "global"],
+  "supportedEditions": ["sim", "lab"],
+  "validationStatus": "contract-only",
+  "validationTier": "contract-only",
+  "autopilot": {
+    "family": "px4",
+    "adapterStatus": "integrated-contract",
+    "supportedFirmwareVersions": ["v1.16.0"]
+  },
+  "controllers": [],
+  "components": {
+    "sim": {
+      "status": "external",
+      "sourceIds": ["px4-autopilot", "px4-gazebo-models"],
+      "artifacts": []
+    },
+    "hardware": {
+      "status": "planned",
+      "sourceIds": [],
+      "artifacts": []
+    },
+    "sensors": {
+      "status": "planned",
+      "sourceIds": [],
+      "artifacts": []
+    },
+    "validation": {
+      "status": "planned",
+      "sourceIds": [],
+      "artifacts": []
+    }
+  },
+  "safety": {
+    "capabilityPolicySha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903",
+    "frontendIsAuthority": false,
+    "hardwareActionsRequireValidatedTier": true,
+    "parameterBounds": [
+      {"name": "MPC_XY_P", "minimum": 0.6, "maximum": 1.3, "unit": "ratio"}
+    ]
+  },
+  "sourceBindings": [
+    {
+      "sourceId": "px4-autopilot",
+      "pinSha256": "739e8d3844614a4d9689a88a7dff38badcdb9882a30a1bc8c0662c764ac2eded"
+    },
+    {
+      "sourceId": "px4-gazebo-models",
+      "pinSha256": "75523378c442857286b355649aaae31565e1a322cb04d34465da12e865bfed42"
+    }
+  ],
+  "licenses": [
+    {
+      "id": "px4-bsd-3-clause",
+      "spdxExpression": "BSD-3-Clause",
+      "noticePath": "licenses/PX4-BSD-3-Clause.txt",
+      "redistribution": "not-distributed"
+    }
+  ],
+  "integrity": {
+    "canonicalization": "RFC8785-JCS",
+    "payloadSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "signature": {
+      "state": "not-issued",
+      "algorithm": "Ed25519",
+      "keyId": null,
+      "detachedSignatureSha256": null
+    }
+  },
+  "knownGaps": [
+    "Synthetic contract fixture only; it is not a distributable or validated Vehicle Pack."
+  ]
+}

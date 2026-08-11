@@ -1,0 +1,7 @@
+Connection using udp:// is deprecated, please use udpin:// or udpout:// (cli_arg.cpp:28)
+Connection using udp:// is deprecated, please use udpin:// or udpout:// (cli_arg.cpp:28)
+Received ack for not-existing command: 176! Ignoring... (mavlink_command_sender.cpp:304)
+Received ack for not-existing command: 176! Ignoring... (mavlink_command_sender.cpp:304)
+make: *** [Makefile:232: px4_sitl] Terminated
+[local_px4_launch_wrapper] Sent SIGTERM to PX4 process group
+[local_px4_launch_wrapper] Real mode failure: invalid boolean telemetry value: np.int8(0)

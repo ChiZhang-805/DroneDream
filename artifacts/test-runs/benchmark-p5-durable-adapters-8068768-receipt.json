@@ -1,0 +1,160 @@
+{
+  "schema_id": "dronedream.benchmark-p5-durable-adapters-receipt/v1",
+  "receipt_id": "benchmark-p5-durable-adapters-8068768",
+  "generated_at_utc": "2026-08-05T02:42:40.9464576Z",
+  "execution_subject": {
+    "repository_commit": "8068768db827316758b713468a27aad4365e0340",
+    "repository_tree": "a5317ec06e116d156dc1cc7d2e45bd9f80f3d57c",
+    "branch": "codex/software",
+    "upstream": "origin/codex/software",
+    "upstream_commit_before_evidence": "8068768db827316758b713468a27aad4365e0340",
+    "worktree_clean_before_evidence": true,
+    "ahead": 0,
+    "behind": 0,
+    "evidence_commit": null,
+    "evidence_commit_semantics": "This receipt is committed after the execution subject and must not be treated as tested source."
+  },
+  "protocol": {
+    "path": "Z:\\DroneDream\\work\\DRONEDREAM_MODEL_HARNESS_BENCHMARK_PROTOCOL.md",
+    "sha256": "734bb6b42ec25ffc92bd9f15bb6fa27bc3482b4ce0841ce9aa3b080eafb8caee"
+  },
+  "resource_class": "GREEN",
+  "source_closure": {
+    "commit": "8068768db827316758b713468a27aad4365e0340",
+    "summary": "Implement the immutable P5 filesystem checkpoint store and narrow desktop local-API adapter behind the previously frozen execution protocols, using only temporary/fake test transports.",
+    "files": [
+      {
+        "path": "backend/app/benchmarking/physical_stability_checkpoint.py",
+        "sha256": "ce2824fef60224d88f7f6be568b04269987a8464be51141ef8fa1ec1363aaa44"
+      },
+      {
+        "path": "backend/tests/test_benchmark_physical_stability_bridge.py",
+        "sha256": "887a515629c80e0ee2fd1ec9ac91d896be86f8a8a089a90475cd809fbb80aa2e"
+      },
+      {
+        "path": "desktop/scripts/p5-desktop-api-adapter.cjs",
+        "sha256": "102e3461cc2ce750eca18e1bd523c1aa28b9a75852bcfb4501892f2b380216ba"
+      },
+      {
+        "path": "desktop/scripts/p5-desktop-api-adapter.test.cjs",
+        "sha256": "b859b6f1926c17940de4edd08c10893be67d089782f79820bb8a01f3e33c9389"
+      }
+    ],
+    "previous_job_bridge": {
+      "source_commit": "f1b73addb193cb7d3295efd289e469eca82ef99b",
+      "evidence_commit": "62e26404c4d5f3f8b813bb8dd1130dd8754f52fb",
+      "receipt_sha256": "51c4d09932ea85064bc28c3bca1ac66a1b89de9d90900d401819438de974ef86",
+      "relationship": "The earlier receipt remains exact evidence for payload compilation and protocol-only bridge behavior; this source adds the concrete durable and desktop adapters."
+    }
+  },
+  "durable_checkpoint_contract": {
+    "schema_id": "dronedream.physical-stability-checkpoint/v1",
+    "maximum_checkpoints": 18,
+    "properties": [
+      "Every transition is serialized as canonical UTF-8 JSON with its ledger, transition-record, predecessor, and checkpoint hashes.",
+      "The first checkpoint must continue the separately configured authorized initial-ledger SHA and must be dispatch_attempted before external I/O.",
+      "Every later transition must continue the exact durable ledger and preserve the authorization identity.",
+      "Publication uses an exclusive temporary file, file fsync, and a no-replace hard-link; a mutable latest pointer is never written.",
+      "Unexpected paths, symlinks, multi-link files, sequence gaps, duplicate sequences, noncanonical bytes, tampering, replay, path escape, and mismatched authorization fail closed.",
+      "Crash-left temporary files are ignored only when they are ordinary hidden .tmp files; they can never become part of the verified checkpoint chain."
+    ]
+  },
+  "desktop_adapter_contract": {
+    "properties": [
+      "The module performs no I/O when imported and accepts only an injected desktop WebView page.",
+      "CDP connection is restricted to explicit HTTP loopback and requires exactly one tauri.localhost WebView.",
+      "The only mutating route is POST /api/v1/jobs with a frozen P5 idempotency-key format and a content hash that recomputes.",
+      "The only read routes are the authenticated session and exact Job, Trial, artifact, and report endpoints needed for P5 evidence collection.",
+      "The cloud access token is read and consumed only inside the WebView evaluate callback and is never returned to Node.",
+      "Job creation revalidates the exact installed Engine Pack ID/source and rejects unsupported, stale, or update-required status before POST.",
+      "Non-2xx, missing session, non-JSON, malformed base64, invalid UTF-8, oversized response, missing data envelope, invalid identifiers, and sensitive response fields fail closed."
+    ]
+  },
+  "preserved_failure": {
+    "stage": "first focused durable-checkpoint run",
+    "result": "3 failed, 7 passed; Node 6 passed; Ruff and Mypy passed",
+    "root_cause": "The strict nested ledger/transition models were converted to ordinary JSON lists and datetime strings, then parsed through Python-object validation instead of Pydantic's JSON input semantics.",
+    "fix": "Construction now retains already validated nested model objects; immutable recovery uses model_validate_json so JSON arrays and ISO-8601 datetimes are decoded without weakening strict Python-object validation.",
+    "expectations_weakened": false,
+    "external_io_or_online_rerun": false
+  },
+  "verification": [
+    {
+      "name": "P5 preregistration, assessment, bridge/checkpoint, and execution ledger",
+      "command": "python -m pytest tests/test_benchmark_physical_stability.py tests/test_benchmark_physical_stability_assessment.py tests/test_benchmark_physical_stability_bridge.py tests/test_benchmark_physical_stability_execution.py -q",
+      "result": "passed",
+      "passed": 33,
+      "failed": 0,
+      "duration_seconds": 3.74
+    },
+    {
+      "name": "P5 desktop adapter and prior physical-calibration script",
+      "command": "node --test scripts/run-prefinal-physical-calibration.test.cjs scripts/p5-desktop-api-adapter.test.cjs",
+      "result": "passed",
+      "passed": 11,
+      "failed": 0,
+      "duration_seconds": 0.1012898
+    },
+    {
+      "name": "changed-source Ruff",
+      "result": "passed",
+      "summary": "All checks passed!"
+    },
+    {
+      "name": "new checkpoint-module Mypy",
+      "result": "passed",
+      "summary": "Success: no issues found in 1 source file"
+    },
+    {
+      "name": "Node syntax check",
+      "result": "passed"
+    },
+    {
+      "name": "git diff check",
+      "result": "passed"
+    },
+    {
+      "name": "changed-scope sensitive-literal scan",
+      "result": "passed",
+      "sensitive_values_found": 0
+    }
+  ],
+  "prior_full_suite_context": {
+    "source_commit": "f1b73addb193cb7d3295efd289e469eca82ef99b",
+    "result": "1966 passed in 1913.67s",
+    "current_exact": false,
+    "limitation": "The full backend suite predates this isolated adapter commit. Current-exact coverage for this closure is the 33-test P5 suite plus static checks and the 11 desktop-script tests; the historical full result is not relabeled."
+  },
+  "execution_boundaries": {
+    "filesystem_checkpoint_writes_outside_pytest_temp": 0,
+    "desktop_connections": 0,
+    "desktop_or_job_api_requests": 0,
+    "physical_trials_attempted": 0,
+    "px4_runs": 0,
+    "gazebo_runs": 0,
+    "provider_logical_turns": 0,
+    "provider_network_requests": 0,
+    "api_keys_read": false,
+    "account_credentials_read": false,
+    "headed_browser_runs": 0,
+    "global_mouse_moved": false,
+    "runtime_installations_or_migrations": 0,
+    "engine_pack_builds_or_activations": 0,
+    "production_deployments": 0,
+    "website_or_technical_report_writes": 0
+  },
+  "remaining_boundaries": {
+    "final_runner_orchestration": "not_implemented",
+    "terminal_api_evidence_collector": "not_implemented_for_p5_bundle",
+    "manual_unobserved_dispatch_reconciliation": "contract_only",
+    "actual_composite_inventory_binding": "not_generated_for_this_source",
+    "active_engine_pack_alignment": "not_reverified_in_this_closure",
+    "red_window_authorization": "not_issued",
+    "physical_stability_execution": "not_run",
+    "pilot_scenario_selection": "not_ready",
+    "p6_provider_approval_request": "not_ready",
+    "next_green_closure": "Implement the final source-bound runner orchestration and terminal evidence collector entirely against fake desktop/API fixtures, retaining the no-replay checkpoint semantics.",
+    "next_red_prerequisite": "Only after runner/current-exact gates are frozen may total source/desktop/Runtime/Engine Pack provenance be reverified and a user-confirmed RED window be requested."
+  },
+  "scope_claim": "This receipt proves the concrete P5 checkpoint and desktop local-API adapters are fail-closed under temporary/fake tests. It does not prove an installed desktop connection, authenticated account, active Engine Pack alignment, or any PX4/Gazebo Trial."
+}

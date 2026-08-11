@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-upstream-source-inventory",
+  "auditDate": "2026-08-04",
+  "policy": {
+    "mutableReferencesForbidden": true,
+    "copyRequiresLicenseReview": true,
+    "validationLabelsAreEvidenceBound": true
+  },
+  "sources": [
+    {
+      "id": "ubuntu-noble-base",
+      "project": "Ubuntu 24.04 Noble amd64 base image",
+      "officialRepository": "https://hub.docker.com/_/ubuntu",
+      "integrationStatus": "current",
+      "integrationMode": "apt-metapackage",
+      "distributionMode": "runtime-bundled",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "oci-digest",
+        "value": "ubuntu:24.04@sha256:52df9b1ee71626e0088f7d400d5c6b5f7bb916f8f0c82b474289a4ece6cf3faf",
+        "authority": "runtime/pins.env:UBUNTU_BASE_IMAGE"
+      },
+      "licenseConclusion": "NOASSERTION",
+      "declaredLicenses": ["package-specific"],
+      "licenseEvidence": [
+        {
+          "url": "https://launchpad.net/ubuntu/noble",
+          "scope": "Distribution source index; each installed binary package retains its own license and copyright record."
+        }
+      ],
+      "noticeObligations": [
+        "Retain the generated apt package lock for every released Runtime Base.",
+        "Retain package-specific /usr/share/doc/*/copyright files in the exported rootfs."
+      ],
+      "validationTier": "legal-review-required",
+      "validationNotes": [
+        "A Linux distribution has no single SPDX license conclusion; release compliance is closure-specific."
+      ]
+    },
+    {
+      "id": "px4-autopilot",
+      "project": "PX4 Autopilot",
+      "officialRepository": "https://github.com/PX4/PX4-Autopilot",
+      "integrationStatus": "current",
+      "integrationMode": "compiled-at-runtime-build",
+      "distributionMode": "runtime-bundled",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "tag-and-commit",
+        "value": "v1.16.0",
+        "commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+        "authority": "runtime/pins.env:PX4_VERSION,PX4_GIT_COMMIT"
+      },
+      "licenseConclusion": "BSD-3-Clause",
+      "declaredLicenses": ["BSD-3-Clause"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/PX4/PX4-Autopilot/6ea3539157ca358c70a515878b77077af7d4611d/LICENSE",
+          "sha256": "4f486239f62804b2190ff52b3005f087cf1033342012152e6383bdad6b891cc4",
+          "scope": "Pinned top-level repository license; submodules and assets require their own review."
+        }
+      ],
+      "noticeObligations": [
+        "Retain the pinned top-level license and all applicable submodule or asset notices.",
+        "Do not use the PX4 trademark to imply upstream endorsement."
+      ],
+      "validationTier": "integrated-contract",
+      "validationNotes": [
+        "The current Runtime Base build and smoke contracts target PX4 SITL, not real-airframe validation.",
+        "The runtime is intentionally pinned to v1.16.0 even though newer upstream releases exist."
+      ]
+    },
+    {
+      "id": "px4-gazebo-models",
+      "project": "PX4 Gazebo Models",
+      "officialRepository": "https://github.com/PX4/PX4-gazebo-models",
+      "integrationStatus": "transitive",
+      "integrationMode": "px4-submodule",
+      "distributionMode": "runtime-transitive",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "commit",
+        "value": "PX4 v1.16.0 Tools/simulation/gz submodule",
+        "commit": "e05f4312d3f28aa621157610584a4870406cb6d3",
+        "authority": "PX4-Autopilot@6ea3539157ca358c70a515878b77077af7d4611d git tree"
+      },
+      "licenseConclusion": "BSD-3-Clause",
+      "declaredLicenses": ["BSD-3-Clause"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/PX4/PX4-gazebo-models/e05f4312d3f28aa621157610584a4870406cb6d3/LICENSE",
+          "sha256": "5fcb2a52fc0390cc8c7eccaa0cde9316c810f38811efb357e1ede7858e26e289",
+          "scope": "Exact submodule license selected by the pinned PX4 runtime source."
+        }
+      ],
+      "noticeObligations": [
+        "Retain the BSD notice for distributed models and review model-specific assets before adding new Vehicle Packs."
+      ],
+      "validationTier": "integrated-contract",
+      "validationNotes": [
+        "Only model/world combinations covered by a frozen simulator receipt may be labelled validated."
+      ]
+    },
+    {
+      "id": "gazebo-harmonic",
+      "project": "Gazebo Harmonic collection",
+      "officialRepository": "https://github.com/gazebosim/gz-sim",
+      "integrationStatus": "current",
+      "integrationMode": "apt-metapackage",
+      "distributionMode": "runtime-bundled",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "apt-version",
+        "value": "gz-harmonic=1.0.0-1~noble",
+        "authority": "runtime/pins.env:GAZEBO_METAPACKAGE,GAZEBO_METAPACKAGE_VERSION"
+      },
+      "auditedUpstreamCommit": "d91b31acb52555dc7acf1ba5aa81fd7383dd1f7c",
+      "licenseConclusion": "NOASSERTION",
+      "declaredLicenses": ["Apache-2.0", "component-specific"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/gazebosim/gz-sim/d91b31acb52555dc7acf1ba5aa81fd7383dd1f7c/LICENSE",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+          "scope": "Repository-level gz-sim8 license evidence; not a substitute for the installed apt closure."
+        },
+        {
+          "url": "https://gazebosim.org/docs/harmonic/install_ubuntu_src/",
+          "scope": "Official collection source instructions; exact release binaries are identified by apt-packages.lock."
+        }
+      ],
+      "noticeObligations": [
+        "Retain the generated apt lock and every package-specific copyright file.",
+        "Do not infer one license for the entire Harmonic metapackage from the gz-sim repository license."
+      ],
+      "validationTier": "legal-review-required",
+      "validationNotes": [
+        "Harmonic is a collection of separately versioned packages; release review must use the observed apt closure."
+      ]
+    },
+    {
+      "id": "mavsdk-python",
+      "project": "MAVSDK Python",
+      "officialRepository": "https://github.com/mavlink/MAVSDK-Python",
+      "integrationStatus": "current",
+      "integrationMode": "python-package",
+      "distributionMode": "runtime-bundled",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "tag-and-commit",
+        "value": "3.15.3",
+        "commit": "ac45ab36ae357eae2daa216af782d8f1dc647841",
+        "authority": "runtime/pins.env:MAVSDK_VERSION and runtime/locks/python-requirements.lock"
+      },
+      "licenseConclusion": "BSD-3-Clause",
+      "declaredLicenses": ["BSD-3-Clause"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/mavlink/MAVSDK-Python/ac45ab36ae357eae2daa216af782d8f1dc647841/LICENSE.txt",
+          "sha256": "2e373f427edf94ffd33fdda4d055989605257c6880026496b06d04890394bd12",
+          "scope": "Exact source tag license for the pinned Python distribution version."
+        }
+      ],
+      "noticeObligations": [
+        "Retain the BSD copyright, conditions, and disclaimer with binary distributions."
+      ],
+      "validationTier": "integrated-contract",
+      "validationNotes": [
+        "MAVSDK is the high-level MAVLink boundary; it does not authorize real-flight capabilities by itself."
+      ]
+    },
+    {
+      "id": "pyulog",
+      "project": "pyulog",
+      "officialRepository": "https://github.com/PX4/pyulog",
+      "integrationStatus": "current",
+      "integrationMode": "python-package",
+      "distributionMode": "runtime-bundled",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "tag-and-commit",
+        "value": "v1.2.3",
+        "commit": "3cf17793f14709713ab297d3743314c658874068",
+        "authority": "runtime/pins.env:PYULOG_VERSION and runtime/locks/python-requirements.lock"
+      },
+      "licenseConclusion": "BSD-3-Clause",
+      "declaredLicenses": ["BSD-3-Clause"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/PX4/pyulog/3cf17793f14709713ab297d3743314c658874068/LICENSE.md",
+          "sha256": "8539de58b5d03b70a9e90deab40f1f68a29e09844b75538e5c6d834850790cf6",
+          "scope": "Exact source tag license for the pinned Python distribution version."
+        }
+      ],
+      "noticeObligations": [
+        "Retain the BSD copyright, conditions, and disclaimer with binary distributions."
+      ],
+      "validationTier": "integrated-contract",
+      "validationNotes": [
+        "ULog parsing is evidence support, not an autopilot or real-flight authority."
+      ]
+    },
+    {
+      "id": "valkey",
+      "project": "Valkey",
+      "officialRepository": "https://github.com/valkey-io/valkey",
+      "integrationStatus": "current",
+      "integrationMode": "compiled-at-runtime-build",
+      "distributionMode": "runtime-bundled",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "tag-and-commit",
+        "value": "8.1.4",
+        "commit": "5f4bae3ea10174a7c872cc099c953b0e91afa93a",
+        "authority": "runtime/pins.env:VALKEY_VERSION,VALKEY_GIT_COMMIT"
+      },
+      "licenseConclusion": "BSD-3-Clause",
+      "declaredLicenses": ["BSD-3-Clause"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/valkey-io/valkey/5f4bae3ea10174a7c872cc099c953b0e91afa93a/COPYING",
+          "sha256": "1a53dca3aab7ce048e91e77b03c0342f3075366f9dede8ec4d19d0cf229e12a0",
+          "scope": "Pinned COPYING file containing the applicable BSD grants."
+        }
+      ],
+      "noticeObligations": [
+        "Ship the exact COPYING file beside and inside every Runtime Base release."
+      ],
+      "validationTier": "integrated-contract",
+      "validationNotes": [
+        "The Runtime Base builds and version-checks Valkey from the pinned commit."
+      ]
+    },
+    {
+      "id": "qgroundcontrol",
+      "project": "QGroundControl",
+      "officialRepository": "https://github.com/mavlink/qgroundcontrol",
+      "integrationStatus": "evaluated",
+      "integrationMode": "external-launch-only",
+      "distributionMode": "not-distributed",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "tag-and-commit",
+        "value": "v5.0.8",
+        "commit": "e0816c957602789200ae5ba0af45217f0f2f1db4",
+        "authority": "E0 official-source audit; no QGroundControl binary is currently bundled"
+      },
+      "licenseConclusion": "Apache-2.0 OR GPL-3.0-only",
+      "declaredLicenses": ["Apache-2.0", "GPL-3.0-only"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/mavlink/qgroundcontrol/e0816c957602789200ae5ba0af45217f0f2f1db4/LICENSE-APACHE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "scope": "Apache license option at the audited stable tag."
+        },
+        {
+          "url": "https://raw.githubusercontent.com/mavlink/qgroundcontrol/e0816c957602789200ae5ba0af45217f0f2f1db4/LICENSE-GPL",
+          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+          "scope": "GPL license option at the audited stable tag."
+        }
+      ],
+      "noticeObligations": [
+        "Use external launch, deep links, or configuration export only until a per-file and binary-distribution review is complete."
+      ],
+      "validationTier": "external-integration-reviewed",
+      "validationNotes": [
+        "No QGroundControl source or binary is copied into DroneDream in E0."
+      ]
+    },
+    {
+      "id": "ardupilot",
+      "project": "ArduPilot",
+      "officialRepository": "https://github.com/ArduPilot/ardupilot",
+      "integrationStatus": "planned",
+      "integrationMode": "contract-only",
+      "distributionMode": "not-distributed",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "commit",
+        "value": "audited upstream snapshot",
+        "commit": "e57b8a47d3cc3b50ad3d9242e69a38c43e0c99a5",
+        "authority": "E0 official-source audit; not a shipped or validated DroneDream dependency"
+      },
+      "licenseConclusion": "GPL-3.0-only",
+      "declaredLicenses": ["GPL-3.0-only"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/ArduPilot/ardupilot/e57b8a47d3cc3b50ad3d9242e69a38c43e0c99a5/COPYING.txt",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+          "scope": "Top-level license at the audited commit."
+        }
+      ],
+      "noticeObligations": [
+        "Do not statically incorporate or redistribute ArduPilot in the commercial core without a separate compliance design and source-offer review."
+      ],
+      "validationTier": "contract-only",
+      "validationNotes": [
+        "An autopilot adapter schema may be designed, but no ArduPilot execution capability may be advertised yet."
+      ]
+    },
+    {
+      "id": "ardupilot-gazebo",
+      "project": "ArduPilot Gazebo Plugin",
+      "officialRepository": "https://github.com/ArduPilot/ardupilot_gazebo",
+      "integrationStatus": "planned",
+      "integrationMode": "contract-only",
+      "distributionMode": "not-distributed",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "commit",
+        "value": "audited upstream snapshot",
+        "commit": "082a0fe231f6e63bc8d1598f1cba461d9e2ea7f5",
+        "authority": "E0 official-source audit; not a shipped or validated DroneDream dependency"
+      },
+      "licenseConclusion": "LGPL-3.0-only",
+      "declaredLicenses": ["LGPL-3.0-only"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/ArduPilot/ardupilot_gazebo/082a0fe231f6e63bc8d1598f1cba461d9e2ea7f5/LICENSE.md",
+          "sha256": "1a45b1d0a8603dfe2cfc644f9dab970b1762f92babe2aac6eb2f5d4572c4a680",
+          "scope": "Top-level LGPL license at the audited commit."
+        }
+      ],
+      "noticeObligations": [
+        "Keep the plugin dynamically separated and complete a redistribution and relinking review before bundling."
+      ],
+      "validationTier": "contract-only",
+      "validationNotes": [
+        "The official plugin supports Gazebo Harmonic, but no DroneDream ArduPilot simulator path has been implemented or validated."
+      ]
+    },
+    {
+      "id": "crazyflie-firmware",
+      "project": "Crazyflie Firmware",
+      "officialRepository": "https://github.com/bitcraze/crazyflie-firmware",
+      "integrationStatus": "planned",
+      "integrationMode": "contract-only",
+      "distributionMode": "not-distributed",
+      "copiedIntoRepository": false,
+      "pin": {
+        "kind": "commit",
+        "value": "audited upstream snapshot",
+        "commit": "5d287434b21b9b4fd3577c51e4d90bb4c54a5145",
+        "authority": "E0 official-source audit; not a shipped or validated DroneDream dependency"
+      },
+      "licenseConclusion": "NOASSERTION",
+      "declaredLicenses": ["GPL-3.0-only", "LGPL-3.0-only"],
+      "licenseEvidence": [
+        {
+          "url": "https://raw.githubusercontent.com/bitcraze/crazyflie-firmware/5d287434b21b9b4fd3577c51e4d90bb4c54a5145/LICENSE.txt",
+          "sha256": "c53a65c2fd561c87eaabf1072ef5dcab8653042bc15308465f52413585eb6271",
+          "scope": "The root license file contains GPL-3.0 text, while the official README states LGPL-3.0; this conflict is intentionally unresolved."
+        }
+      ],
+      "noticeObligations": [
+        "Complete an upstream clarification and per-file license review before distributing firmware or adapter code."
+      ],
+      "validationTier": "legal-review-required",
+      "validationNotes": [
+        "Crazyflie is a separate autopilot and transport family, not a PX4 Vehicle Pack.",
+        "Only a future contract-only adapter may be declared until licensing and hardware validation are complete."
+      ]
+    }
+  ]
+}

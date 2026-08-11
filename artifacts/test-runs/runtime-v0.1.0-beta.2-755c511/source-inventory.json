@@ -1,0 +1,118 @@
+{
+  "schema_version": "dronedream.runtime-source-inventory.v1",
+  "generated_at": "2026-07-29T05:03:02Z",
+  "subject_commit": "755c511539fe561207ca38ff5079f471a4110896",
+  "subject_tree": "26d97180dbc5d5db353bafee293181ae8299919a",
+  "subject_commit_authored_at": "2026-07-29T08:11:04+08:00",
+  "subject_commit_committed_at": "2026-07-29T08:11:04+08:00",
+  "subject_summary": "docs(harness): align engineering evidence with v10",
+  "clean_detached_staging": {
+    "path": "/home/chi/dronedream-release-staging/runtime-v0.1.0-beta.2-755c511-v3",
+    "head_matches_subject": true,
+    "tracked_or_untracked_changes": 0,
+    "git_diff_check": "passed"
+  },
+  "full_tree": {
+    "tracked_files": 1162,
+    "ls_tree_transcript_bytes": 142185,
+    "ls_tree_transcript_sha256": "fd438676ddcc077f29f986dd07080c8b4aa99863cc7aa8f783fca834ae607274"
+  },
+  "runtime_scope": {
+    "runtime_files": 40,
+    "backend_files": 296,
+    "worker_files": 5,
+    "simulator_script_files": 6
+  },
+  "critical_blobs": [
+    {
+      "path": "runtime/Dockerfile",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "31c4993d506bf8fb0c8469de88dd8bda69e17f12"
+    },
+    {
+      "path": "runtime/pins.env",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "250e199eb6bdcff92348040961b43e211b51ba48"
+    },
+    {
+      "path": "runtime/locks/python-requirements.lock",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "636e6ff38efe76f2646fd55cbd9b84cc18d6c69a"
+    },
+    {
+      "path": "runtime/release-public-keys.json",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "416e973316c80f5242007fa523bafd06d8dd5bdc"
+    },
+    {
+      "path": "runtime/tools/runtime_manifest.py",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "ee103a9a90bbf5f5ece99e659b89ff6e89c5cb7e"
+    },
+    {
+      "path": "runtime/tools/runtime_release.py",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "de24057f83552bc66589a435ff18778fd88db065"
+    },
+    {
+      "path": "runtime/build-rootfs.sh",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "095f6e9f6ddb7c5fa16abc1e74c7f87c2a90388c"
+    },
+    {
+      "path": "runtime/smoke-image.sh",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "e88a10353fde3ab1c647a7e34623af77c6463ba4"
+    },
+    {
+      "path": "runtime/export-rootfs.sh",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "0537e7bda97cfdc9ed27ff56b580d67e9746264c"
+    },
+    {
+      "path": "backend/pyproject.toml",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "505c5d026c1f6de48c50a1b48946b052a77cbe40"
+    },
+    {
+      "path": "worker/pyproject.toml",
+      "mode": "100644",
+      "type": "blob",
+      "object_id": "537be0100ebb4638273ec39c8c56d29fa2179e5f"
+    },
+    {
+      "path": "scripts/simulators/px4_gazebo_runner.py",
+      "mode": "100755",
+      "type": "blob",
+      "object_id": "c095cf669dfcdf9d7934c44ef4039b67faa5cfe2"
+    }
+  ],
+  "embedded_component_pins": {
+    "runtime_version": "0.1.0",
+    "ubuntu_image": "ubuntu:24.04@sha256:52df9b1ee71626e0088f7d400d5c6b5f7bb916f8f0c82b474289a4ece6cf3faf",
+    "ubuntu_index_digest": "sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90",
+    "px4_version": "v1.16.0",
+    "px4_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "gazebo": "harmonic@1.0.0-1~noble",
+    "gazebo_apt_key_sha256": "15d0300460e0c9c0efb21fa9770c0bf228988a07d71c4fac985c2161954a25a4",
+    "valkey_version": "8.1.4",
+    "valkey_commit": "5f4bae3ea10174a7c872cc099c953b0e91afa93a",
+    "python_version": "3.12",
+    "mavsdk_version": "3.15.3",
+    "pyulog_version": "1.2.3",
+    "pins_sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5",
+    "python_requirements_sha256": "b980831bf81726181aa7a951038ec652e44f868144383c2747a6857b6d421607"
+  },
+  "online_provider_calls": 0,
+  "openai_api_key_read_or_used": false
+}

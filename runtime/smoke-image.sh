@@ -60,6 +60,9 @@ checks=(
   python_imports
   valkey_ping
   api_worker_heartbeat
+  # Forward delivery gate. This remains an additional schema-v1 smoke check so
+  # historical promoted manifests stay verifiable by the current toolchain.
+  account_session_api
   real_cli_dry_run
   px4_gazebo_headless
   parameter_readback
@@ -80,7 +83,7 @@ for check in "${checks[@]}"; do
     --pipe
     --collect
     "--unit=$unit"
-    --working-directory=/opt/dronedream/source
+    --working-directory=/opt/dronedream/engine/current
   )
   for property in "${sandbox_properties[@]}"; do
     systemd_args+=(--property "$property")

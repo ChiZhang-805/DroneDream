@@ -1,0 +1,58 @@
+{
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "pytest": "9.1.0",
+    "python": "3.13.0"
+  },
+  "focused_checks": [
+    {
+      "command": "python -m pytest backend\\tests\\test_technical_report_evidence_v10.py -q --junitxml=artifacts\\test-runs\\technical-report-evidence-v10-9749244\\focused-tests.xml",
+      "duration_seconds": 15.981,
+      "finished_at": "2026-07-28T23:56:28.1522379Z",
+      "log": {
+        "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/focused-tests.xml",
+        "sha256": "fc0a5b0a7fb9e0560643c9a18eefb22f852c225808f4d99b4d52ec3983e20a04",
+        "size_bytes": 1255
+      },
+      "result": {
+        "failed": 0,
+        "passed": 7,
+        "status": "passed"
+      },
+      "started_at": "2026-07-28T23:56:12.1705050Z",
+      "working_directory": "Z:\\DroneDream-worktrees\\aurora-20260728"
+    }
+  ],
+  "full_suite": {
+    "command": "python -m pytest backend\\tests\\test_technical_report_evidence_v10.py backend\\tests\\test_technical_report_evidence.py backend\\tests\\test_harness_multi_tool_budget_evaluation.py backend\\tests\\test_harness_routing_campaign.py backend\\tests\\test_harness_routing_evaluation.py backend\\tests\\test_harness_routing_freezes.py backend\\tests\\test_harness_routing_holdout.py backend\\tests\\test_advanced_physics_closure_evidence.py backend\\tests\\test_advanced_physics_evidence.py backend\\tests\\test_physical_campaign_evidence.py -q --junitxml=artifacts\\test-runs\\technical-report-evidence-v10-9749244\\compatibility-tests.xml",
+    "duration_seconds": 30.391,
+    "finished_at": "2026-07-28T23:56:42.5466415Z",
+    "log": {
+      "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/compatibility-tests.xml",
+      "sha256": "ec375b944d0203441cdc7d4af1b3f01b6c648bba19165b98c128bdb58ba795e6",
+      "size_bytes": 10098
+    },
+    "result": {
+      "failed": 0,
+      "passed": 70,
+      "status": "passed"
+    },
+    "started_at": "2026-07-28T23:56:12.1663126Z",
+    "tested_state": {
+      "base_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+      "exact_final_commit_run": false,
+      "kind": "pre_commit_worktree"
+    },
+    "working_directory": "Z:\\DroneDream-worktrees\\aurora-20260728"
+  },
+  "generated_at": "2026-07-28T23:56:58Z",
+  "receipt_sha256": "b9407556588e5c0a65d3e93f22e29d0fdd8fd4bb57f1b5cb1c890f94c7b9d98d",
+  "schema_version": "dronedream.test-run-receipt.v2",
+  "source_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+  "validation_bridge": {
+    "focused_rerun_performed": true,
+    "focused_rerun_required": true,
+    "full_suite_rerun_performed": false,
+    "reason": "Source code and tests match source_commit; worktree differences at run time were only generated v10 evidence artifacts and the recursive exact-byte .gitattributes rule. The 70-test compatibility suite and 7-test focused tamper suite both ran after the code commit."
+  }
+}

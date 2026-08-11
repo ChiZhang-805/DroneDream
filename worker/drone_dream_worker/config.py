@@ -6,6 +6,8 @@ from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 
 
 class WorkerSettings(BaseSettings):
@@ -22,6 +24,15 @@ class WorkerSettings(BaseSettings):
     database_url: str = Field(default="sqlite:///./drone_dream.db")
     worker_poll_interval_seconds: float = Field(default=1.0, ge=0.05)
     worker_log_level: str = Field(default="info")
+
+
+def database_log_label(database_url: str) -> str:
+    """Render a database URL for logs without exposing its password."""
+
+    try:
+        return make_url(database_url).render_as_string(hide_password=True)
+    except ArgumentError:
+        return "<invalid database URL>"
 
 
 @lru_cache(maxsize=1)

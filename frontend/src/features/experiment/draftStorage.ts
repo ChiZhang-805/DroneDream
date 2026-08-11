@@ -69,18 +69,6 @@ function workspaceDraftKey(workspaceId?: string | null): string {
   return `${EXPERIMENT_WORKSPACE_DRAFT_PREFIX}${workspaceId}`;
 }
 
-function discardPersistedDrafts(): void {
-  const storage = safePersistentStorage();
-  if (!storage) return;
-  try {
-    storage.removeItem(EXPERIMENT_DRAFT_KEY);
-    storage.removeItem(V2_EXPERIMENT_DRAFT_KEY);
-    storage.removeItem(LEGACY_EXPERIMENT_DRAFT_KEY);
-  } catch {
-    // A denied persistent store must not block the current app session.
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -178,6 +166,49 @@ function normalizeConversationState(
   };
 }
 
+function persistentSafeDraft(raw: string): string | null {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isRecord(parsed) || !isRecord(parsed.form)) return null;
+  const conversation = normalizeConversationState(parsed.conversation);
+  return JSON.stringify({
+    ...parsed,
+    form: redactDraftSecrets(parsed.form),
+    ...(parsed.schema_version === 3
+      ? {
+          conversation: conversation
+            ? { ...conversation, messages: [] }
+            : null,
+        }
+      : {}),
+  });
+}
+
+function scrubPersistentDraftMessages(storage: Storage | null): void {
+  if (!storage) return;
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (
+        key === EXPERIMENT_DRAFT_KEY ||
+        key === V2_EXPERIMENT_DRAFT_KEY ||
+        key === LEGACY_EXPERIMENT_DRAFT_KEY ||
+        key?.startsWith(EXPERIMENT_WORKSPACE_DRAFT_PREFIX)
+      ) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) {
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+      const safe = persistentSafeDraft(raw);
+      if (safe !== null && safe !== raw) storage.setItem(key, safe);
+    }
+  } catch {
+    // Optional draft storage must never block loading a current-session draft.
+  }
+}
+
 function parseDraftEnvelope<TForm, TSelections>(
   raw: string,
   schemaVersion: 1 | 2 | 3,
@@ -224,18 +255,33 @@ export function loadExperimentDraft<TForm, TSelections>(
 ):
   | ExperimentDraftEnvelope<TForm, TSelections>
   | null {
-  discardPersistedDrafts();
   const storage = safeDraftStorage();
   if (!storage) return null;
   try {
-    const currentRaw = storage.getItem(workspaceDraftKey(workspaceId));
+    const persistentStorage = safePersistentStorage();
+    scrubPersistentDraftMessages(persistentStorage);
+    const currentKey = workspaceDraftKey(workspaceId);
+    let currentRaw = storage.getItem(currentKey);
+    if (currentRaw === null) {
+      currentRaw = persistentStorage?.getItem(currentKey) ?? null;
+      if (currentRaw !== null) {
+        try {
+          storage.setItem(currentKey, currentRaw);
+        } catch {
+          // A readable persistent draft can still be restored without mirroring it.
+        }
+      }
+    }
     if (currentRaw !== null) {
       const current = parseDraftEnvelope(currentRaw, 3, schema.maxActiveStep, schema);
       return current ? { schema_version: 3, ...current } : null;
     }
     if (workspaceId) return null;
 
-    const v2Raw = storage.getItem(V2_EXPERIMENT_DRAFT_KEY);
+    const v2Raw =
+      storage.getItem(V2_EXPERIMENT_DRAFT_KEY) ??
+      persistentStorage?.getItem(V2_EXPERIMENT_DRAFT_KEY) ??
+      null;
     if (v2Raw !== null) {
       const v2 = parseDraftEnvelope(v2Raw, 2, schema.maxActiveStep, schema);
       if (!v2) return null;
@@ -244,12 +290,23 @@ export function loadExperimentDraft<TForm, TSelections>(
         ...v2,
         conversation: null,
       };
-      storage.setItem(EXPERIMENT_DRAFT_KEY, JSON.stringify(migrated));
-      storage.removeItem(V2_EXPERIMENT_DRAFT_KEY);
+      const serialized = JSON.stringify(migrated);
+      for (const destination of [storage, persistentStorage]) {
+        if (!destination) continue;
+        try {
+          destination.setItem(EXPERIMENT_DRAFT_KEY, serialized);
+          destination.removeItem(V2_EXPERIMENT_DRAFT_KEY);
+        } catch {
+          // Keep the source draft in that storage when migration cannot commit.
+        }
+      }
       return migrated;
     }
 
-    const legacyRaw = storage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY);
+    const legacyRaw =
+      storage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY) ??
+      persistentStorage?.getItem(LEGACY_EXPERIMENT_DRAFT_KEY) ??
+      null;
     if (legacyRaw === null) return null;
     const legacy = parseDraftEnvelope(
       legacyRaw,
@@ -265,16 +322,15 @@ export function loadExperimentDraft<TForm, TSelections>(
       completed_steps: [],
       conversation: null,
     };
-    try {
-      storage.setItem(EXPERIMENT_DRAFT_KEY, JSON.stringify(migrated));
-    } catch {
-      // Preserve the readable legacy draft if v2 storage is unavailable.
-      return migrated;
-    }
-    try {
-      storage.removeItem(LEGACY_EXPERIMENT_DRAFT_KEY);
-    } catch {
-      // The valid v2 draft takes precedence on the next load.
+    const serialized = JSON.stringify(migrated);
+    for (const destination of [storage, persistentStorage]) {
+      if (!destination) continue;
+      try {
+        destination.setItem(EXPERIMENT_DRAFT_KEY, serialized);
+        destination.removeItem(LEGACY_EXPERIMENT_DRAFT_KEY);
+      } catch {
+        // Preserve the source draft in that storage when migration cannot commit.
+      }
     }
     return migrated;
   } catch {
@@ -291,7 +347,6 @@ export function saveExperimentDraft<TForm, TSelections>(
   },
   workspaceId?: string | null,
 ): string | null {
-  discardPersistedDrafts();
   const storage = safeDraftStorage();
   if (!storage) return null;
   const savedAt = new Date().toISOString();
@@ -313,12 +368,27 @@ export function saveExperimentDraft<TForm, TSelections>(
       conversation: conversation ?? null,
       ...(workspaceId ? { workspace_id: workspaceId } : {}),
     });
+    const persistentSerialized = persistentSafeDraft(serialized);
+    if (persistentSerialized === null) return null;
     storage.setItem(currentKey, serialized);
+    try {
+      safePersistentStorage()?.setItem(currentKey, persistentSerialized);
+    } catch {
+      // Session storage remains the immediate fallback when persistence is denied.
+    }
     if (workspaceId) {
       // The workspace-scoped key is canonical. This alias preserves the most
       // recently active draft for legacy routes and older installs without
       // allowing one experiment to overwrite another.
       storage.setItem(EXPERIMENT_DRAFT_KEY, serialized);
+      try {
+        safePersistentStorage()?.setItem(
+          EXPERIMENT_DRAFT_KEY,
+          persistentSerialized,
+        );
+      } catch {
+        // The canonical workspace draft remains available in this session.
+      }
     }
     if (!workspaceId) {
       try {
@@ -361,38 +431,47 @@ export function renameExperimentDraft(
   workspaceId: string,
   displayName: string,
 ): boolean {
-  const storage = safeDraftStorage();
-  if (!storage) return false;
-  try {
-    const key = workspaceDraftKey(workspaceId);
-    const raw = storage.getItem(key);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw) as unknown;
-    if (!isRecord(parsed) || !isRecord(parsed.form)) return false;
-    const renamed = JSON.stringify({
-      ...parsed,
-      saved_at: new Date().toISOString(),
-      form: {
-        ...parsed.form,
-        display_name: displayName.trim().slice(0, 255),
-        llm_api_key: "",
-      },
-    });
-    storage.setItem(key, renamed);
-    const activeDraft = storage.getItem(EXPERIMENT_DRAFT_KEY);
-    if (activeDraft) {
-      const activeParsed = JSON.parse(activeDraft) as unknown;
-      if (
-        isRecord(activeParsed)
-        && activeParsed.workspace_id === workspaceId
-      ) {
-        storage.setItem(EXPERIMENT_DRAFT_KEY, renamed);
+  const key = workspaceDraftKey(workspaceId);
+  let renamedAny = false;
+  const persistentStorage = safePersistentStorage();
+  for (const [storage, persistent] of [
+    [safeDraftStorage(), false],
+    [persistentStorage, true],
+  ] as const) {
+    if (!storage) continue;
+    try {
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as unknown;
+      if (!isRecord(parsed) || !isRecord(parsed.form)) continue;
+      const renamedRaw = JSON.stringify({
+        ...parsed,
+        saved_at: new Date().toISOString(),
+        form: {
+          ...parsed.form,
+          display_name: displayName.trim().slice(0, 255),
+          llm_api_key: "",
+        },
+      });
+      const renamed = persistent ? persistentSafeDraft(renamedRaw) : renamedRaw;
+      if (renamed === null) continue;
+      storage.setItem(key, renamed);
+      const activeDraft = storage.getItem(EXPERIMENT_DRAFT_KEY);
+      if (activeDraft) {
+        const activeParsed = JSON.parse(activeDraft) as unknown;
+        if (
+          isRecord(activeParsed)
+          && activeParsed.workspace_id === workspaceId
+        ) {
+          storage.setItem(EXPERIMENT_DRAFT_KEY, renamed);
+        }
       }
+      renamedAny = true;
+    } catch {
+      // Keep trying the other storage backend.
     }
-    return true;
-  } catch {
-    return false;
   }
+  return renamedAny;
 }
 
 export function clearAllExperimentDrafts(): void {
@@ -417,25 +496,67 @@ export function clearAllExperimentDrafts(): void {
 }
 
 export function hasExperimentDraft(workspaceId?: string | null): boolean {
-  const storage = safeDraftStorage();
-  if (!storage) return false;
-  try {
-    if (workspaceId) {
-      return storage.getItem(workspaceDraftKey(workspaceId)) !== null;
-    }
-    if (
-      storage.getItem(EXPERIMENT_DRAFT_KEY) !== null ||
-      storage.getItem(V2_EXPERIMENT_DRAFT_KEY) !== null ||
-      storage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY) !== null
-    ) {
-      return true;
-    }
-    for (let index = 0; index < storage.length; index += 1) {
-      if (storage.key(index)?.startsWith(EXPERIMENT_WORKSPACE_DRAFT_PREFIX)) {
+  for (const storage of [safeDraftStorage(), safePersistentStorage()]) {
+    if (!storage) continue;
+    try {
+      if (workspaceId) {
+        if (storage.getItem(workspaceDraftKey(workspaceId)) !== null) return true;
+        continue;
+      }
+      if (
+        storage.getItem(EXPERIMENT_DRAFT_KEY) !== null ||
+        storage.getItem(V2_EXPERIMENT_DRAFT_KEY) !== null ||
+        storage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY) !== null
+      ) {
         return true;
       }
+      for (let index = 0; index < storage.length; index += 1) {
+        if (storage.key(index)?.startsWith(EXPERIMENT_WORKSPACE_DRAFT_PREFIX)) {
+          return true;
+        }
+      }
+    } catch {
+      // Try the other storage backend before reporting no draft.
     }
-    return false;
+  }
+  return false;
+}
+
+export function persistExperimentDraftsForExit(): boolean {
+  const source = safeDraftStorage();
+  const destination = safePersistentStorage();
+  if (!source || !destination) return !hasExperimentDraft();
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < source.length; index += 1) {
+      const key = source.key(index);
+      if (
+        key === EXPERIMENT_DRAFT_KEY ||
+        key === V2_EXPERIMENT_DRAFT_KEY ||
+        key === LEGACY_EXPERIMENT_DRAFT_KEY ||
+        key?.startsWith(EXPERIMENT_WORKSPACE_DRAFT_PREFIX)
+      ) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) {
+      const raw = source.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as unknown;
+      if (
+        !isRecord(parsed) ||
+        (parsed.schema_version !== 1 &&
+          parsed.schema_version !== 2 &&
+          parsed.schema_version !== 3) ||
+        !isRecord(parsed.form)
+      ) {
+        return false;
+      }
+      const safe = persistentSafeDraft(raw);
+      if (safe === null) return false;
+      destination.setItem(key, safe);
+    }
+    return true;
   } catch {
     return false;
   }

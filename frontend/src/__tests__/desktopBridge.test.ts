@@ -2,10 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   autoStartInstallerRuntime,
+  beginBrowserAuth,
+  cancelBrowserAuth,
+  clearBrowserAuthVault,
   cancelRuntimeInstall,
+  desktopApiRequest,
+  desktopDownloadArtifact,
   DesktopCommandContractError,
   DesktopRuntimeUnavailableError,
   discardInstallerRuntimeIntent,
+  ensureAppUpdateIdle,
+  getEnginePackStatus,
   getInstallerRuntimeIntent,
   getRuntimeInstallProgress,
   getRuntimeInstallPlan,
@@ -13,8 +20,12 @@ import {
   probeRuntimeStatus,
   probeSystemPrerequisites,
   repairRuntime,
+  restoreBrowserAuthVault,
+  installEmbeddedEnginePack,
   startRuntime,
   startRuntimeInstall,
+  stopRuntimeForExit,
+  validateDistributionPlan,
 } from "../desktop/bridge";
 
 const prerequisiteReport = {
@@ -51,6 +62,19 @@ const runtimeReport = {
     detail: null,
   })),
   diagnostics: [],
+};
+
+const browserAuthSession = {
+  protocolVersion: "desktop-browser-auth-pkce-v1",
+  editionId: "universal",
+  authClientId: "dronedream-desktop-universal",
+  accessToken: "header.payload.signature",
+  refreshToken: "refresh-token-value",
+  attemptIdHash: "a".repeat(64),
+  stateHash: "b".repeat(64),
+  subjectHash: "c".repeat(64),
+  issuedAt: "2026-08-05T08:00:00Z",
+  completedAt: "2026-08-05T08:00:01Z",
 };
 
 const installPlan = {
@@ -122,6 +146,52 @@ const installSnapshot = {
   updatedAt: "2026-07-12T10:00:00Z",
 };
 
+const distributionSelection = {
+  schemaVersion: 1 as const,
+  editionId: "sim",
+  region: "global",
+  vehiclePackId: "px4-gazebo-x500-reference",
+  controllerKey: null,
+  optionalModules: [],
+};
+
+const distributionPlan = {
+  schemaVersion: 1,
+  kind: "dronedream-distribution-plan-validation",
+  planVersion: "1.0.0",
+  productDisplayVersion: "1.0.0",
+  sourceCommit: "a".repeat(40),
+  sourceTreeClean: true,
+  planSha256: "b".repeat(64),
+  selection: distributionSelection,
+  catalog: {
+    registryManifestSha256: "c".repeat(64),
+    capabilityPolicySha256: "d".repeat(64),
+    editionManifestSha256: "e".repeat(64),
+    vehiclePackManifestSha256: "f".repeat(64),
+    vehiclePackPayloadSha256: "1".repeat(64),
+    vehiclePackSignatureState: "missing",
+    validationTier: "contract-only",
+  },
+  requiredModules: ["desktop-core", "runtime-simulation"],
+  optionalModules: [],
+  capabilities: {
+    defaultDecision: "deny",
+    frontendIsAuthority: false,
+    enabledOrConditioned: ["simulation.execute"],
+    denied: ["hardware.arm", "hardware.flight", "hardware.parameter.write"],
+  },
+  rollback: { status: "missing", reference: null },
+  blockers: [
+    "native-apply-not-implemented",
+    "rollback-reference-required",
+    "vehicle-pack-signature-not-verified",
+    "vehicle-pack-unvalidated",
+  ],
+  canApply: false,
+  executionAuthorized: false,
+};
+
 describe("desktop bridge", () => {
   it("stays unavailable in a normal browser", async () => {
     expect(isDesktopRuntime()).toBe(false);
@@ -152,6 +222,250 @@ describe("desktop bridge", () => {
       "get_runtime_install_plan",
       { targetRoot: "E:\\DroneDream" },
     );
+  });
+
+  it("validates the browser-auth command without exposing returned tokens", async () => {
+    const session = browserAuthSession;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "begin_browser_auth") return session;
+      if (command === "cancel_browser_auth") return true;
+      if (command === "clear_browser_auth_vault") return true;
+      if (command === "restore_browser_auth_vault") return session;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(beginBrowserAuth({
+      locale: "zh-CN",
+    })).resolves.toEqual(session);
+    await expect(cancelBrowserAuth()).resolves.toBe(true);
+    await expect(clearBrowserAuthVault()).resolves.toBe(true);
+    await expect(restoreBrowserAuthVault()).resolves.toEqual(session);
+    expect(invoke).toHaveBeenNthCalledWith(1, "begin_browser_auth", {
+      request: {
+        locale: "zh-CN",
+      },
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, "cancel_browser_auth", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(3, "clear_browser_auth_vault", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(4, "restore_browser_auth_vault", undefined);
+  });
+
+  it("routes a source-bound distribution preview and preserves every native deny", async () => {
+    const invoke = vi.fn(async () => distributionPlan);
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).resolves.toMatchObject({
+      sourceCommit: "a".repeat(40),
+      sourceTreeClean: true,
+      planSha256: "b".repeat(64),
+      canApply: false,
+      executionAuthorized: false,
+      capabilities: {
+        defaultDecision: "deny",
+        frontendIsAuthority: false,
+      },
+    });
+    expect(invoke).toHaveBeenCalledWith("validate_distribution_plan", {
+      request: {
+        selection: distributionSelection,
+        rollbackReference: null,
+      },
+    });
+  });
+
+  it("fails closed when a distribution plan drifts or claims apply authority", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({ ...distributionPlan, canApply: true });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "validate_distribution_plan",
+    });
+
+    invoke.mockResolvedValueOnce({
+      ...distributionPlan,
+      selection: { ...distributionSelection, region: "cn" },
+    });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).rejects.toThrow(/must exactly match/i);
+
+    invoke.mockResolvedValueOnce({
+      ...distributionPlan,
+      blockers: ["rollback-reference-required"],
+    });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).rejects.toThrow(/native apply implementation blocker/i);
+
+    invoke.mockResolvedValueOnce({
+      ...distributionPlan,
+      sourceTreeClean: false,
+    });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).rejects.toThrow(/source tree state/i);
+
+    invoke.mockResolvedValueOnce({
+      ...distributionPlan,
+      sourceTreeClean: false,
+      blockers: [...distributionPlan.blockers, "source-tree-dirty-at-build"],
+    });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).resolves.toMatchObject({
+      sourceTreeClean: false,
+      canApply: false,
+    });
+  });
+
+  it("validates Engine Pack identities and routes the idle preflight", async () => {
+    const status = {
+      supported: true,
+      updateRequired: true,
+      embeddedPackId: `sha256:${"1".repeat(64)}`,
+      embeddedSourceCommit: "2".repeat(40),
+      installedPackId: `sha256:${"3".repeat(64)}`,
+      installedSourceCommit: "4".repeat(40),
+      message: null,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "ensure_app_update_idle") return null;
+      if (command === "get_engine_pack_status") return status;
+      if (command === "install_embedded_engine_pack") {
+        return { ...status, updateRequired: false };
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(ensureAppUpdateIdle()).resolves.toBeUndefined();
+    await expect(getEnginePackStatus()).resolves.toEqual(status);
+    await expect(installEmbeddedEnginePack()).resolves.toMatchObject({
+      updateRequired: false,
+    });
+    expect(invoke.mock.calls.map(([command]) => command)).toEqual([
+      "ensure_app_update_idle",
+      "get_engine_pack_status",
+      "install_embedded_engine_pack",
+    ]);
+
+    invoke.mockResolvedValueOnce({
+      ...status,
+      embeddedPackId: "sha256:not-a-digest",
+    });
+    await expect(getEnginePackStatus()).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "get_engine_pack_status",
+    });
+  });
+
+  it("rejects malformed browser-auth tokens at the native boundary", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      ...browserAuthSession,
+      accessToken: "valid-token",
+      refreshToken: "secret refresh token",
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const error = await beginBrowserAuth({
+      locale: "en",
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(DesktopCommandContractError);
+    expect(String(error)).not.toContain("secret refresh token");
+  });
+
+  it("validates the bounded native API response contract", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      status: 200,
+      contentType: "application/json",
+      bodyBase64: btoa('{"success":true}'),
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(desktopApiRequest({
+      method: "GET",
+      path: "/api/v1/session",
+      accessToken: "account-token",
+    })).resolves.toMatchObject({ status: 200 });
+    expect(invoke).toHaveBeenCalledWith("desktop_api_request", {
+      request: {
+        method: "GET",
+        path: "/api/v1/session",
+        accessToken: "account-token",
+      },
+    });
+
+    invoke.mockResolvedValueOnce({
+      status: 200,
+      contentType: "application/json",
+      bodyBase64: "not base64",
+    });
+    await expect(desktopApiRequest({
+      method: "GET",
+      path: "/api/v1/session",
+    })).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "desktop_api_request",
+    });
+  });
+
+  it("validates the native streaming-download response contract", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      savedPath: "C:\\Users\\pilot\\Downloads\\telemetry.ulg",
+      bytes: 70 * 1024 * 1024,
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(desktopDownloadArtifact({
+      artifactId: "art_large_1",
+      filename: "telemetry.ulg",
+      accessToken: "account-token",
+    })).resolves.toEqual({
+      savedPath: "C:\\Users\\pilot\\Downloads\\telemetry.ulg",
+      bytes: 70 * 1024 * 1024,
+    });
+    expect(invoke).toHaveBeenCalledWith("desktop_download_artifact", {
+      request: {
+        artifactId: "art_large_1",
+        filename: "telemetry.ulg",
+        accessToken: "account-token",
+      },
+    });
+
+    invoke.mockResolvedValueOnce({ savedPath: "", bytes: -1 });
+    await expect(desktopDownloadArtifact({
+      artifactId: "art_large_1",
+      filename: "telemetry.ulg",
+    })).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "desktop_download_artifact",
+    });
+  });
+
+  it("accepts only the native unit response for runtime exit termination", async () => {
+    const invoke = vi.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ stopped: true });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(stopRuntimeForExit()).resolves.toBeUndefined();
+    await expect(stopRuntimeForExit()).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "stop_runtime_for_exit",
+    });
   });
 
   it("rejects malformed native responses at the trust boundary", async () => {

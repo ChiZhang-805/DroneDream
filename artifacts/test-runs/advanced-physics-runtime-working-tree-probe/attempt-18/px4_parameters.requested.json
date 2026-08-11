@@ -1,0 +1,17 @@
+{
+  "captured_at": "2026-07-28T22:45:05.367258+00:00",
+  "catalog_version": "dronedream.px4.multicopter.2026-07-r2",
+  "context": {
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-runtime-working-tree-probe",
+    "trial_id": "advanced-physics-runtime-exact-commit-dropout-battery-seed-52001-attempt-18"
+  },
+  "kind": "requested",
+  "px4_version": "v1.16",
+  "schema_version": "dronedream.px4_parameter_evidence.v1",
+  "status": "ok",
+  "transport": "environment",
+  "values": {
+    "MPC_XY_P": 0.95
+  }
+}

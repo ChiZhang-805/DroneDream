@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/edition-execution-gate-policy.v1.json",
+  "title": "DroneDream edition execution gate policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "policyId",
+    "policyVersion",
+    "defaultDecision",
+    "frontendIsAuthority",
+    "hardwareActionHandlersImplemented",
+    "capabilityPolicy",
+    "requiredDecisionLayers",
+    "contextBinding",
+    "receiptPolicy",
+    "qualificationPolicy",
+    "structuredEvidence",
+    "editionBoundaries",
+    "compatibilityBindings",
+    "quorum",
+    "fakeIssuerPolicy",
+    "auditPolicy"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-edition-execution-gate-policy"},
+    "policyId": {"const": "edition-execution-gate"},
+    "policyVersion": {"const": "1.0.0"},
+    "defaultDecision": {"const": "deny"},
+    "frontendIsAuthority": {"const": false},
+    "hardwareActionHandlersImplemented": {"const": false},
+    "capabilityPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policyId", "policyVersion", "sha256"],
+      "properties": {
+        "policyId": {"const": "core-capabilities"},
+        "policyVersion": {"const": "1.0.0"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "requiredDecisionLayers": {"const": ["native", "backend", "runtime"]},
+    "contextBinding": {"$ref": "#/$defs/contextBinding"},
+    "receiptPolicy": {"$ref": "#/$defs/receiptPolicy"},
+    "qualificationPolicy": {"$ref": "#/$defs/qualificationPolicy"},
+    "structuredEvidence": {"$ref": "#/$defs/structuredEvidence"},
+    "editionBoundaries": {"$ref": "#/$defs/editionBoundaries"},
+    "compatibilityBindings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/kebabIdentifier"}
+    },
+    "quorum": {"$ref": "#/$defs/quorum"},
+    "fakeIssuerPolicy": {"$ref": "#/$defs/fakeIssuerPolicy"},
+    "auditPolicy": {"$ref": "#/$defs/auditPolicy"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "kebabIdentifier": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "dottedIdentifier": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "nonEmptyStringArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "contextBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalization", "hashAlgorithm", "unknownFieldsDecision", "requiredFields"],
+      "properties": {
+        "canonicalization": {"const": "RFC8785-JCS"},
+        "hashAlgorithm": {"const": "SHA-256"},
+        "unknownFieldsDecision": {"const": "deny"},
+        "requiredFields": {"$ref": "#/$defs/nonEmptyStringArray"}
+      }
+    },
+    "receiptPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "appendOnlyAudit",
+        "oneTimeConsumption",
+        "attemptRecordedBeforeDecision",
+        "denyPrecedence",
+        "maximumRequestTtlSeconds",
+        "maximumOperatorChallengeTtlSeconds",
+        "replayDecision",
+        "expiredDecision",
+        "crossContextDecision"
+      ],
+      "properties": {
+        "appendOnlyAudit": {"const": true},
+        "oneTimeConsumption": {"const": true},
+        "attemptRecordedBeforeDecision": {"const": true},
+        "denyPrecedence": {"const": ["failed", "deny", "indeterminate", "missing", "allow"]},
+        "maximumRequestTtlSeconds": {"type": "integer", "minimum": 1, "maximum": 300},
+        "maximumOperatorChallengeTtlSeconds": {"type": "integer", "minimum": 1, "maximum": 120},
+        "replayDecision": {"const": "deny"},
+        "expiredDecision": {"const": "deny"},
+        "crossContextDecision": {"const": "deny"}
+      }
+    },
+    "qualificationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "optimizationCandidateReceiptIsHardwareAuthority",
+        "requiresIndependentHoldout",
+        "requiredBindings",
+        "acceptedLevels"
+      ],
+      "properties": {
+        "optimizationCandidateReceiptIsHardwareAuthority": {"const": false},
+        "requiresIndependentHoldout": {"const": true},
+        "requiredBindings": {"$ref": "#/$defs/nonEmptyStringArray"},
+        "acceptedLevels": {"const": ["sim", "hitl"]}
+      }
+    },
+    "structuredEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requiredReceiptTypes",
+        "operatorConfirmationMode",
+        "booleanConfirmationForbidden",
+        "allReceiptsBindAuthorizationRequest"
+      ],
+      "properties": {
+        "requiredReceiptTypes": {"$ref": "#/$defs/nonEmptyStringArray"},
+        "operatorConfirmationMode": {"const": "short-lived-challenge"},
+        "booleanConfirmationForbidden": {"const": true},
+        "allReceiptsBindAuthorizationRequest": {"const": true}
+      }
+    },
+    "editionBoundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "simDeniedActions",
+        "fieldDeniedActions",
+        "hardwareActionsRequireValidatedSignedPack",
+        "zeroValidatedPackDecision"
+      ],
+      "properties": {
+        "simDeniedActions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/dottedIdentifier"}
+        },
+        "fieldDeniedActions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/dottedIdentifier"}
+        },
+        "hardwareActionsRequireValidatedSignedPack": {"const": true},
+        "zeroValidatedPackDecision": {"const": "deny"}
+      }
+    },
+    "quorum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requiredLayers",
+        "allLayersMustAllow",
+        "canonicalContextHashMustMatch",
+        "canonicalDecisionHashesRequired",
+        "lateAllowCannotOverrideTerminalNonAllow",
+        "frontendReceiptAccepted"
+      ],
+      "properties": {
+        "requiredLayers": {"const": ["native", "backend", "runtime"]},
+        "allLayersMustAllow": {"const": true},
+        "canonicalContextHashMustMatch": {"const": true},
+        "canonicalDecisionHashesRequired": {"const": true},
+        "lateAllowCannotOverrideTerminalNonAllow": {"const": true},
+        "frontendReceiptAccepted": {"const": false}
+      }
+    },
+    "fakeIssuerPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowedEnvironment", "issuerPrefix", "productionDecision"],
+      "properties": {
+        "allowedEnvironment": {"const": "test"},
+        "issuerPrefix": {"const": "test-fixture:"},
+        "productionDecision": {"const": "deny"}
+      }
+    },
+    "auditPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["forbiddenFields", "requiredFields"],
+      "properties": {
+        "forbiddenFields": {"$ref": "#/$defs/nonEmptyStringArray"},
+        "requiredFields": {"$ref": "#/$defs/nonEmptyStringArray"}
+      }
+    }
+  }
+}

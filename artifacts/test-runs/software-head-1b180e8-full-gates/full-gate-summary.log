@@ -1,0 +1,93 @@
+DroneDream software full-gate summary
+subject_commit=1b180e8f1d1ad5a8d4ac87d7e95081df06e73aae
+branch=codex/software
+generated_at=2026-07-29T05:47:16.872Z
+openai_api_key_policy=environment variable removed before test commands; no real OpenAI API calls
+
+[repository_static_quality]
+status=passed
+repository_hygiene=1224 files; 900 text; 349 JSON; 5 TOML; 51 Markdown; 62 local links
+ruff_default=passed
+ruff_security=passed
+ruff_format=passed
+mypy_backend=114 source files passed
+mypy_worker=3 source files passed
+compileall=passed
+
+[focused_regression_initial]
+status=failed
+command=python -m pytest -q backend/tests/test_artifact_cleanup.py backend/tests/test_artifacts_api.py backend/tests/test_experimental_optimizer_orchestration.py backend/tests/test_generalization_evidence.py backend/tests/test_harness_ablation.py backend/tests/test_harness_component_ablation.py backend/tests/test_optimization_core.py backend/tests/test_orchestration.py backend/tests/test_outcome_artifact_evidence.py backend/tests/test_outcome_taxonomy.py backend/tests/test_phase8_iterative_loop.py backend/tests/test_phase8_llm_proposer.py backend/tests/test_provider_feedback.py backend/tests/test_local_px4_launch_wrapper.py backend/tests/test_px4_gazebo_runner.py backend/tests/test_px4_offboard_track_executor.py backend/tests/test_report_entitlements.py backend/tests/test_report_generator.py backend/tests/test_technical_report_evidence.py backend/tests/test_technical_report_evidence_v10.py backend/tests/test_repository_hygiene.py
+result=477 passed; 5 failed; 415.03 seconds
+failure_class=test-design error
+failure_detail=the five new unsafe gateway URL cases were already rejected by Settings construction before reaching the service-layer assertion
+resolution=tests now prove both Settings rejection and service fail-closed behavior through a deliberately bypassed model construct
+
+[focused_regression_final]
+status=passed
+command=python -m pytest -q backend/tests/test_report_entitlements.py backend/tests/test_repository_hygiene.py
+result=15 passed; 0 failed; 0.08 seconds
+
+[backend_full]
+status=passed
+working_directory=backend
+command=python -m pytest -q
+result=1291 passed; 0 failed; 835.36 seconds
+executor_wall_seconds=848.7
+
+[frontend_core]
+status=passed
+dependency_audit=frontend policy audit passed; desktop npm audit found 0 vulnerabilities
+lint=passed
+typecheck=passed
+tests=50 files; 320 passed; 0 failed; 32.20 seconds
+production_build=passed; 1968 modules; non-failing 776.55 kB chunk-size warning retained
+history_layout=desktop-en, desktop-zh, mobile-en, mobile-zh all passed
+history_measurements_path=artifacts/test-runs/history-responsive-overflow/after/measurements.json
+history_measurements_sha256=ab535a5f16677a53a5baa74d598b39b90f1e8e65b15cc948ec04a312e743e515
+scope_exclusion=website-owned site build and site visual audit were not run by the software line
+
+[runtime_static_contract]
+status=passed
+ruff_default=passed
+ruff_security=passed
+ruff_format=passed
+compileall=passed
+manifest_config_validation=passed
+tests=48 total; 44 passed; 4 skipped
+skip_reason=secure ULog deletion cases are intentionally POSIX/WSL-only on this Windows host
+
+[desktop_rust_msvc]
+status=environment_failed
+cargo_fmt=passed
+cargo_clippy=not_completed
+cargo_test=not_started
+failure=MSVC linker link.exe is not installed on this host
+
+[desktop_rust_gnullvm]
+status=passed
+toolchain=rustc 1.97.0; x86_64-pc-windows-gnullvm
+rustflags=-C target-feature=+crt-static
+cargo_clippy=passed for all targets with warnings denied
+cargo_test=101 passed; 0 failed; 1 ignored
+ignored_reason=requires an installed, owned DroneDreamRuntime keepalive target
+warning=clang-22 reported unused -no-pie during test linking; non-failing
+
+[desktop_contracts]
+status=passed
+nsis_template=pinned Tauri 2.11.4 template and DroneDream anchors verified
+desktop_version=1.0.0 verified
+release_source_policy=1224 tracked files; 390 npm packages; 532 external Rust packages verified
+
+[dependency_audits]
+frontend=passed; no applicable high or critical advisories under the repository policy
+desktop_npm=passed; 0 vulnerabilities
+cargo_audit=passed; 0 vulnerabilities; 17 allowed warnings retained
+cargo_warning_classes=unmaintained GTK3/UNIC crates and glib RUSTSEC-2024-0429 unsound warning in the cross-platform lock graph
+pip_audit=environment_failed
+pip_audit_failure=python environment lacked pip_audit; one-shot isolated pip-audit 2.10.1 installation produced no output and hung, so it was terminated and the temporary venv was removed
+
+[release_and_network]
+installer_rebuild_performed=false
+runtime_rebuild_performed=false
+upload_or_deployment_performed=false
+openai_api_calls=0

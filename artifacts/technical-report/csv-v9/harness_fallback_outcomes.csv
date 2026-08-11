@@ -1,0 +1,16 @@
+block_id,seed_block,arm,provider_calls,network_calls,candidate_count,trial_count,dispatched_trials,winner_candidate_key,holdout_loss,failure_count,evidence_completeness_rate,exact_match_to_direct_portfolio
+1,1100,direct_portfolio,0,0,10,39,39,g02-c09,0.8247,0,1.0,True
+1,1100,provider_error_fallback,2,0,10,39,39,g02-c09,0.8247,0,1.0,True
+1,1100,invalid_response_fallback,2,0,10,39,39,g02-c09,0.8247,0,1.0,True
+2,2200,direct_portfolio,0,0,10,38,38,g01-c06,0.9468,0,1.0,True
+2,2200,provider_error_fallback,2,0,10,38,38,g01-c06,0.9468,0,1.0,True
+2,2200,invalid_response_fallback,2,0,10,38,38,g01-c06,0.9468,0,1.0,True
+3,3300,direct_portfolio,0,0,10,39,39,g00-c00,1.0052,0,1.0,True
+3,3300,provider_error_fallback,2,0,10,39,39,g00-c00,1.0052,0,1.0,True
+3,3300,invalid_response_fallback,2,0,10,39,39,g00-c00,1.0052,0,1.0,True
+4,4400,direct_portfolio,0,0,10,38,38,g01-c06,0.9707,0,1.0,True
+4,4400,provider_error_fallback,2,0,10,38,38,g01-c06,0.9707,0,1.0,True
+4,4400,invalid_response_fallback,2,0,10,38,38,g01-c06,0.9707,0,1.0,True
+5,5500,direct_portfolio,0,0,10,39,39,g01-c01,1.036,0,1.0,True
+5,5500,provider_error_fallback,2,0,10,39,39,g01-c01,1.036,0,1.0,True
+5,5500,invalid_response_fallback,2,0,10,39,39,g01-c01,1.036,0,1.0,True

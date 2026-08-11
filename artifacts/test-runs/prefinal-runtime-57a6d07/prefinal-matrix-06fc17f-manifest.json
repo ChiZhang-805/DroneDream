@@ -1,0 +1,250 @@
+{
+  "schemaVersion": "dronedream.prefinal-runtime-matrix-manifest.v1",
+  "generatedAt": "2026-08-03T00:01:17.391Z",
+  "executionSubject": "06fc17fc0e42e9521f6cc85aa4435e39944d001d",
+  "evidenceRunnerCommit": "027c99d20084c7a3673cd26025116c20d7248e45",
+  "branch": "codex/software",
+  "executionMode": {
+    "optimizerStrategy": "heuristic",
+    "maximumIterations": 1,
+    "trialsPerCandidate": 1,
+    "candidatesPerJob": 2,
+    "modelProviderCalls": 0,
+    "onlineModelUsed": false,
+    "credentialPolicy": "OPENAI_API_KEY and HARNESS_ROUTING_API_KEY were removed from every runner child process; neither credential was read or used"
+  },
+  "frozenPayloads": {
+    "path": "C:/Users/zju20/AppData/Local/Temp/dronedream-eab2485-campaign/payloads.json",
+    "bytes": 34448,
+    "sha256": "03aba818bc98b01f8e70e86da8a68d474439ebb400f306d41cabd331b3998004",
+    "payloadCount": 8,
+    "executionOverlay": "The runner replaces llm_harness with heuristic and clears llm/openai configuration before submitting each payload"
+  },
+  "enginePack": {
+    "packId": "sha256:3306e99bd31907a4efaed05988d766b55629ab7c9e35eb1df0906a522d70d25f",
+    "sourceCommit": "06fc17fc0e42e9521f6cc85aa4435e39944d001d",
+    "archive": {
+      "filename": "DroneDreamEnginePack.tar.gz",
+      "bytes": 635484,
+      "sha256": "ca7e371019deb875b5c7700ca268971700c69a5123e01c3f7d4cb9d00f107535"
+    },
+    "manifest": {
+      "filename": "engine-pack-manifest.json",
+      "bytes": 22608,
+      "sha256": "5ba53cf2d37893a6b821286c24226c9911d833118e68c92d07a94560d741bb91"
+    },
+    "bundle": {
+      "filename": "engine-pack-bundle.json",
+      "bytes": 494,
+      "sha256": "dff353b3fd3d9c82e5f8bf40fb3876f5da99a11d0987d883a9a8c1e84cda6288"
+    },
+    "deterministicRebuildByteParity": true,
+    "runtimeId": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+    "runtimeVersion": "0.1.0",
+    "px4Commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "gazeboVersion": "harmonic@1.0.0-1~noble",
+    "previousPackId": "sha256:e323a9f1ecddcd17108df6b89b37ac59ef03e013139f29063aad6d78362d803f"
+  },
+  "summary": {
+    "jobs": 8,
+    "completedJobs": 8,
+    "readyReports": 8,
+    "successfulOptimizationOutcomes": 2,
+    "noUsableCandidateOutcomes": 6,
+    "trials": 16,
+    "completedTrials": 15,
+    "failedTrials": 1,
+    "passingTrials": 3,
+    "failedTrialCodes": {
+      "UNVERIFIED_SIMULATOR_FAILURE": 1
+    }
+  },
+  "checks": {
+    "receiptSourceAndPackBindings": "8/8 exact",
+    "trialRuntimeManifestBindings": "16/16 exact",
+    "trialFirmwareBindings": "16/16 verified",
+    "completedTrialRequiredArtifactSets": "15/15 complete",
+    "failedTrialRequiredArtifactSets": "1/1 complete",
+    "verifiedAppliedScenarioEffectContracts": 15,
+    "scenarioEffectContractsTerminatedWithFailedTrial": 1,
+    "unsupportedScenarioEffects": 0,
+    "pendingScenarioEffects": 0,
+    "missingRequiredArtifacts": 0,
+    "credentialScan": {
+      "filesScanned": 9,
+      "matches": 0,
+      "scope": "eight receipts plus frozen payload corpus",
+      "categories": [
+        "OpenAI-style secret tokens",
+        "credential environment variable names",
+        "authorization or bearer values",
+        "password fields",
+        "email addresses"
+      ]
+    }
+  },
+  "actuatorLinkRegression": {
+    "preservedFailure": {
+      "jobId": "job_c9f0d848b1a6",
+      "trialId": "tri_509c0d193507",
+      "ulogSha256": "972d087cc68d7e285ec2c259e36ec6e603c1d73bd4fdd7af369b4d11246083ab",
+      "diagnosis": "PX4 remained armed in Offboard with sustained thrust and four active motors while Gazebo ground truth remained stationary"
+    },
+    "fixedSubjectRerun": {
+      "jobId": "job_2fb41ebf43ae",
+      "completedTrials": 2,
+      "internalActuatorLinkRetries": 0,
+      "infrastructureFailureReproduced": false,
+      "optimizationOutcome": "no_usable_candidate"
+    }
+  },
+  "receipts": [
+    {
+      "file": "matrix-01-06fc17f-receipt.json",
+      "bytes": 12921,
+      "sha256": "4a4f2b42bc19855021906001eed0e06b268f193bc64531f878e5f9682cc44f56",
+      "startedAt": "2026-08-02T23:38:43.907Z",
+      "completedAt": "2026-08-02T23:40:45.902Z",
+      "payloadIndex": 0,
+      "variant": "original",
+      "jobId": "job_d5bed1b5e909",
+      "status": "COMPLETED",
+      "outcome": "success",
+      "reportStatus": "READY",
+      "trials": 2,
+      "completedTrials": 2,
+      "failedTrials": 0,
+      "passingTrials": 2
+    },
+    {
+      "file": "matrix-02-06fc17f-flyable-non-gps-receipt.json",
+      "bytes": 14038,
+      "sha256": "d8765081302cae4bc007efbf2ddee9318e797d052a09b31959504e22bc5443f2",
+      "startedAt": "2026-08-02T23:41:24.153Z",
+      "completedAt": "2026-08-02T23:43:41.191Z",
+      "payloadIndex": 1,
+      "variant": "flyable-non-gps",
+      "jobId": "job_3aadb2c673a6",
+      "status": "COMPLETED",
+      "outcome": "success",
+      "reportStatus": "READY",
+      "trials": 2,
+      "completedTrials": 1,
+      "failedTrials": 1,
+      "passingTrials": 1,
+      "failedTrialCodes": [
+        "UNVERIFIED_SIMULATOR_FAILURE"
+      ]
+    },
+    {
+      "file": "matrix-03-06fc17f-receipt.json",
+      "bytes": 12843,
+      "sha256": "6ced59080df1f45c6ba00f21c79ae9d68fb6c78bb8f3012bb9ceb985de8c0a8f",
+      "startedAt": "2026-08-02T23:34:12.146Z",
+      "completedAt": "2026-08-02T23:36:46.488Z",
+      "payloadIndex": 2,
+      "variant": "original",
+      "jobId": "job_2fb41ebf43ae",
+      "status": "COMPLETED",
+      "outcome": "no_usable_candidate",
+      "reportStatus": "READY",
+      "trials": 2,
+      "completedTrials": 2,
+      "failedTrials": 0,
+      "passingTrials": 0
+    },
+    {
+      "file": "matrix-04-06fc17f-receipt.json",
+      "bytes": 12849,
+      "sha256": "a7b917f04cf0e596ab42efbc179a1872133a844020e3338e66a5e39ee95fd631",
+      "startedAt": "2026-08-02T23:44:54.246Z",
+      "completedAt": "2026-08-02T23:47:36.625Z",
+      "payloadIndex": 3,
+      "variant": "original",
+      "jobId": "job_6ad4f6af0f6c",
+      "status": "COMPLETED",
+      "outcome": "no_usable_candidate",
+      "reportStatus": "READY",
+      "trials": 2,
+      "completedTrials": 2,
+      "failedTrials": 0,
+      "passingTrials": 0
+    },
+    {
+      "file": "matrix-05-06fc17f-safe-high-preset-receipt.json",
+      "bytes": 13149,
+      "sha256": "01a1b03d4fdce1ff4517d71bd44bf5da18345b6d1ed626f253561e723ab9063f",
+      "startedAt": "2026-08-02T23:48:11.503Z",
+      "completedAt": "2026-08-02T23:50:44.057Z",
+      "payloadIndex": 4,
+      "variant": "safe-high-preset",
+      "jobId": "job_4ed7ac556d54",
+      "status": "COMPLETED",
+      "outcome": "no_usable_candidate",
+      "reportStatus": "READY",
+      "trials": 2,
+      "completedTrials": 2,
+      "failedTrials": 0,
+      "passingTrials": 0
+    },
+    {
+      "file": "matrix-06-06fc17f-receipt.json",
+      "bytes": 12839,
+      "sha256": "3182bf03c415dca170aab64ccba198a4b6c9d59b36ea2214faaadb439bf02a66",
+      "startedAt": "2026-08-02T23:51:23.172Z",
+      "completedAt": "2026-08-02T23:54:00.881Z",
+      "payloadIndex": 5,
+      "variant": "original",
+      "jobId": "job_7d8dcb8fc243",
+      "status": "COMPLETED",
+      "outcome": "no_usable_candidate",
+      "reportStatus": "READY",
+      "trials": 2,
+      "completedTrials": 2,
+      "failedTrials": 0,
+      "passingTrials": 0
+    },
+    {
+      "file": "matrix-07-06fc17f-flyable-non-gps-receipt.json",
+      "bytes": 13205,
+      "sha256": "16cc861c27b52463c0c4388457fb730eadac8ff6b8f678b6e346a6c3e435bd4d",
+      "startedAt": "2026-08-02T23:54:42.269Z",
+      "completedAt": "2026-08-02T23:57:19.566Z",
+      "payloadIndex": 6,
+      "variant": "flyable-non-gps",
+      "jobId": "job_c987378975c2",
+      "status": "COMPLETED",
+      "outcome": "no_usable_candidate",
+      "reportStatus": "READY",
+      "trials": 2,
+      "completedTrials": 2,
+      "failedTrials": 0,
+      "passingTrials": 0
+    },
+    {
+      "file": "matrix-08-06fc17f-flyable-contract-aligned-receipt.json",
+      "bytes": 13475,
+      "sha256": "69c4fc03c800f27d50f79c31f3b221453c31988dde6a197311b4cd7efaf3dfa0",
+      "startedAt": "2026-08-02T23:57:53.934Z",
+      "completedAt": "2026-08-03T00:01:17.391Z",
+      "payloadIndex": 7,
+      "variant": "flyable-contract-aligned",
+      "jobId": "job_b267261ebabc",
+      "status": "COMPLETED",
+      "outcome": "no_usable_candidate",
+      "reportStatus": "READY",
+      "trials": 2,
+      "completedTrials": 2,
+      "failedTrials": 0,
+      "passingTrials": 0
+    }
+  ],
+  "claimBoundaries": [
+    "This matrix verifies execution closure, provenance, failure preservation, and bounded result rendering; it is not a final optimizer-quality benchmark.",
+    "A one-iteration heuristic budget cannot establish algorithm superiority or convergence.",
+    "The original continuous-GNSS-noise failures remain preserved; flyable variants set GNSS drift to zero while retaining other declared effects.",
+    "The combined-wind variant aligns steady-wind and gust directions to the currently verified Gazebo WindEffects contract and records both directions.",
+    "The single failed trial was not retried as an actuator-link stall because it selected vertical-lift parameters, requested payload/battery effects, reached only 0.65 maximum thrust, and activated only two motors above threshold.",
+    "The extreme combined-stress course completed but produced large errors and remains an explicit negative result."
+  ]
+}

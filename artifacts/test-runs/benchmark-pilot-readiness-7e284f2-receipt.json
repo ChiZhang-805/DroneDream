@@ -1,0 +1,156 @@
+{
+  "schema_id": "dronedream.benchmark-pilot-readiness-verification-receipt/v1",
+  "receipt_id": "benchmark-pilot-readiness-7e284f2",
+  "generated_at_utc": "2026-08-05T05:33:55.429Z",
+  "execution_subject": {
+    "repository_commit": "7e284f274cf30a53b86f440b8ed4084b56d88fd6",
+    "repository_tree": "09fd182a6ba881b4086696a7452ba0530d79a69b",
+    "branch": "codex/software",
+    "upstream": "origin/codex/software",
+    "upstream_commit_before_evidence": "7e284f274cf30a53b86f440b8ed4084b56d88fd6",
+    "worktree_clean_before_evidence": true,
+    "evidence_commit": null,
+    "evidence_commit_semantics": "This receipt is committed after the tested source and must not be treated as the readiness implementation or an execution source."
+  },
+  "protocol": {
+    "path": "Z:/DroneDream/work/DRONEDREAM_MODEL_HARNESS_BENCHMARK_PROTOCOL.md",
+    "sha256": "734bb6b42ec25ffc92bd9f15bb6fa27bc3482b4ce0841ce9aa3b080eafb8caee"
+  },
+  "scope": {
+    "resource_state": "GREEN",
+    "closure": "source-bound-fail-closed-provider-pilot-readiness-assessor",
+    "ready_status_semantics": "ready_for_batch_approval_only",
+    "execution_authorized": false,
+    "separate_provider_batch_approval_required": true,
+    "provider_calls": 0,
+    "api_key_read": false,
+    "account_credentials_read": false,
+    "wsl_started": false,
+    "px4_started": false,
+    "gazebo_started": false,
+    "physical_trials_attempted": 0,
+    "installer_or_runtime_mutation": false,
+    "website_or_technical_report_writes": 0
+  },
+  "source_files": [
+    {
+      "path": "backend/app/benchmarking/pilot_readiness.py",
+      "sha256": "2f11e78d3bcf685b7645a203b63aa0328c033798dc2fe25fb90809805a01d4e9",
+      "bytes": 12253
+    },
+    {
+      "path": "backend/tests/test_benchmark_pilot_readiness.py",
+      "sha256": "a9e817f5578b3217ccb193e50fed7f51c21cea14368ab39a65e86d78dbb53360",
+      "bytes": 10106
+    }
+  ],
+  "contract": {
+    "observation_schema": "dronedream.benchmark-pilot-readiness-observation/v1",
+    "gate_receipt_schema": "dronedream.benchmark-pilot-gate-receipt/v1",
+    "result_schema": "dronedream.benchmark-pilot-readiness/v1",
+    "policy_version": "pilot-readiness-fail-closed-v1",
+    "required_gates": [
+      "campaign-coordinator",
+      "sealed-qualification",
+      "provider-accounting",
+      "statistical-preregistration",
+      "composite-inventory",
+      "current-exact-quality",
+      "physical-stability",
+      "final-scenario-freeze"
+    ],
+    "cross_bindings": [
+      "all gate receipts bind the exact repository subject",
+      "campaign gate binds the exact campaign manifest hash",
+      "method inventory and LLM policy hashes bind current server registries",
+      "composite gate binds the exact composite verification receipt",
+      "physical assessment binds the verified composite inventory and exact assessment hash",
+      "physical stability pass requires exactly 60 zero-provider trials",
+      "final scenario gate binds the exact final scenario manifest hash",
+      "blocked or unregistered required arms fail closed",
+      "successful assessment never authorizes execution"
+    ]
+  },
+  "preserved_failures": [
+    {
+      "stage": "first focused readiness test run",
+      "result": "5 failed",
+      "root_cause": "The fixture attempted to hash a Python datetime without JSON normalization and used an abbreviated physical scenario eligibility enum.",
+      "fix": "Normalize the timestamp to RFC3339 JSON for binding and use the production eligible_for_final_freeze enum without changing gate semantics."
+    },
+    {
+      "stage": "second focused readiness test run",
+      "result": "2 failed, 3 passed",
+      "root_cause": "The repository-wide Identifier type intentionally rejects colon-delimited contextual blocker codes.",
+      "fix": "Add a readiness-local bounded blocker-code type that preserves exact gate and adapter context without weakening global identifiers."
+    },
+    {
+      "stage": "pre-commit cross-binding review",
+      "result": "design gap found before commit",
+      "root_cause": "Individually valid receipts could have been assembled without proving they referred to the same campaign, composite inventory, physical assessment, and final scenario manifest.",
+      "fix": "Require explicit hash bindings across all four objects and add a negative scenario-manifest mismatch test."
+    },
+    {
+      "stage": "source metadata collection",
+      "result": "one read-only command failed",
+      "root_cause": "PowerShell interpreted HEAD^{tree} instead of passing it literally to git rev-parse.",
+      "fix": "Use git show -s --format=%T HEAD; no repository or filesystem mutation occurred."
+    }
+  ],
+  "verification": [
+    {
+      "name": "focused readiness contract",
+      "command": "python -m pytest -q backend/tests/test_benchmark_pilot_readiness.py",
+      "result": "passed",
+      "passed": 6,
+      "failed": 0
+    },
+    {
+      "name": "readiness plus method, LLM, composite, and P5 assessment regression",
+      "command": "python -m pytest -q backend/tests/test_benchmark_pilot_readiness.py backend/tests/test_benchmark_method_inventory.py backend/tests/test_benchmark_llm_arm_contracts.py backend/tests/test_benchmark_llm_fixture_runtime.py backend/tests/test_benchmark_composite_inventory.py backend/tests/test_benchmark_composite_inventory_observation.py backend/tests/test_benchmark_physical_stability.py backend/tests/test_benchmark_physical_stability_assessment.py",
+      "result": "passed",
+      "passed": 81,
+      "failed": 0,
+      "duration_seconds": 1.33
+    },
+    {
+      "name": "Ruff",
+      "result": "passed"
+    },
+    {
+      "name": "Mypy with backend configuration",
+      "result": "passed",
+      "checked_source_files": 1
+    },
+    {
+      "name": "git diff check",
+      "result": "passed"
+    }
+  ],
+  "current_fail_closed_audit": {
+    "formal_pilot_ready": false,
+    "readiness_observation_frozen": false,
+    "physical_stability_execution": "not_run",
+    "final_scenario_freeze": "not_ready",
+    "current_exact_full_gate_after_readiness_source": "not_run",
+    "blocked_method_count": 10,
+    "blocked_method_ids": [
+      "bipop_cma_es/v1",
+      "optuna_tpe/v1",
+      "reference_turbo/v1",
+      "reference_scbo/v1",
+      "hebo/v1",
+      "llm_direct/v1",
+      "llm_react/v1",
+      "llambo_uav/v1",
+      "dronedream_fixed_two_turn/v1",
+      "dronedream_adaptive_1_4/v1"
+    ],
+    "scope_claim": "This receipt proves the readiness assessor and its fail-closed negative cases at the exact source. It does not prove any blocked method is implemented, that the 60-trial P5 matrix ran, that final scenarios are frozen, that current exact full gates passed, or that any provider batch is approved."
+  },
+  "next_steps": [
+    "Continue P1 method/provider execution adapters one reviewable arm at a time without promoting blocked methods prematurely.",
+    "After offline method and current-exact gates close, request a separately confirmed RED window for the source-aligned 60-trial zero-provider physical stability matrix.",
+    "Only after a frozen final scenario manifest and a ready assessment may the software line submit an exact provider batch purpose, scale, token, and cost request."
+  ]
+}

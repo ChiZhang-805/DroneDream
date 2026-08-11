@@ -1,0 +1,7 @@
+SOURCE_COMMIT=3f6cb1d81833e7fb10b4e39220825ddfc0624da2
+STAGE=pytest_wrapper_before_collection
+EXIT_CODE=4
+TESTS_COLLECTED=0
+REASON=The initial JUnit output argument retained an uninterpolated wrapper path instead of a valid filesystem path.
+PRODUCT_SOURCE_CHANGED=false
+FOLLOW_UP=The wrapper argument was corrected; the first real full suite then ran 1388 passed / 1 failed, followed by 5/5 focused passes and an unchanged-source authoritative 1389/1389 full pass.

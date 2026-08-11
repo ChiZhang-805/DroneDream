@@ -1,0 +1,263 @@
+{
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-actuator-failure-working-tree-probe",
+    "seed": 62001,
+    "trial_id": "advanced-physics-actuator-failure-exact-793f020-seed-62001-attempt-1"
+  },
+  "firmware_identity": {
+    "error": null,
+    "observed_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "observed_source": "git_head",
+    "px4_autopilot_dir": "/opt/PX4-Autopilot",
+    "requested_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "status": "verified"
+  },
+  "px4_version": "v1.16",
+  "scenario_effect_contract": {
+    "application_mode": "real_physics",
+    "applied_effects": [
+      "scenario_type.actuator_failure"
+    ],
+    "capabilities": [
+      {
+        "capability": {
+          "reason": "Gazebo generated runtime SDF exactly matched the request-bound x500 physical profile for scenario_type.actuator_failure",
+          "status": "available"
+        },
+        "effect_id": "scenario_type.actuator_failure",
+        "evidence": {
+          "compiled_sdf_profile": {
+            "actuator_failure": {
+              "effect_ids": [
+                "scenario_type.actuator_failure"
+              ],
+              "failure_mode": "stuck_stopped_at_launch",
+              "failure_start": "launch",
+              "joint_state_topic": "/dronedream/actuator_failure/joint_state",
+              "joint_state_update_rate_hz": 20.0,
+              "max_failed_motor_abs_velocity_rad_s": 0.05,
+              "max_rot_velocity_rad_s": 0.0,
+              "min_healthy_motor_abs_velocity_rad_s": 1.0,
+              "target_joint_name": "rotor_2_joint",
+              "target_motor_number": 2
+            },
+            "requested_effect_ids": [
+              "scenario_type.actuator_failure"
+            ],
+            "vehicle_family": "x500"
+          },
+          "compiled_wind": null,
+          "requested_value_sha256": "6d5fafaa58959c0d08d798adfab0b839ca647f7e520cabcf73bec0615135abea",
+          "verification": {
+            "method": "trial_local_sdf_generated_world_plus_gazebo_joint_state",
+            "observations": [
+              {
+                "kind": "artifact",
+                "sha256": "697a7c3beb38cd4b802e3b0f8074090e6823360313849dc59f8c900c117a14b8",
+                "source": "/world/default/generate_world_sdf",
+                "value": {
+                  "applied_sdf_profile": {
+                    "actuator_failure": {
+                      "failure_mode": "stuck_stopped_at_launch",
+                      "failure_start": "launch",
+                      "joint_state_publisher": {
+                        "filename": "gz-sim-joint-state-publisher-system",
+                        "joint_names": [
+                          "rotor_0_joint",
+                          "rotor_1_joint",
+                          "rotor_2_joint",
+                          "rotor_3_joint"
+                        ],
+                        "name": "gz::sim::systems::JointStatePublisher",
+                        "topic": "/dronedream/actuator_failure/joint_state",
+                        "update_rate_hz": 20.0
+                      },
+                      "max_failed_motor_abs_velocity_rad_s": 0.05,
+                      "min_healthy_motor_abs_velocity_rad_s": 1.0,
+                      "motors": [
+                        {
+                          "failed": false,
+                          "final_max_rot_velocity_rad_s": 1000.0,
+                          "joint_name": "rotor_0_joint",
+                          "motor_number": 0,
+                          "original_max_rot_velocity_rad_s": 1000.0
+                        },
+                        {
+                          "failed": false,
+                          "final_max_rot_velocity_rad_s": 1000.0,
+                          "joint_name": "rotor_1_joint",
+                          "motor_number": 1,
+                          "original_max_rot_velocity_rad_s": 1000.0
+                        },
+                        {
+                          "failed": true,
+                          "final_max_rot_velocity_rad_s": 0.0,
+                          "joint_name": "rotor_2_joint",
+                          "motor_number": 2,
+                          "original_max_rot_velocity_rad_s": 1000.0
+                        },
+                        {
+                          "failed": false,
+                          "final_max_rot_velocity_rad_s": 1000.0,
+                          "joint_name": "rotor_3_joint",
+                          "motor_number": 3,
+                          "original_max_rot_velocity_rad_s": 1000.0
+                        }
+                      ],
+                      "target_joint_name": "rotor_2_joint",
+                      "target_motor_number": 2
+                    }
+                  },
+                  "enable_wind": false,
+                  "link_name": "base_link",
+                  "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/generated_world.sdf",
+                  "sdf_sha256": "d30f9900a484c273c28adc34e43f9bc0e0ad2a004e913c87107801349d10d293",
+                  "source_vehicle_model": "x500_base",
+                  "vehicle_model": "x500_0",
+                  "verified_profile_sections": [
+                    "actuator_failure"
+                  ]
+                }
+              },
+              {
+                "kind": "artifact",
+                "source": "trial_overlay/world_sdf",
+                "value": {
+                  "linear_velocity_mps": null,
+                  "materialized_px4_system_plugins": [],
+                  "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/worlds/default.sdf",
+                  "px4_server_config": {
+                    "path": "/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/server.config",
+                    "sha256": "60871c73e32ecde05e008aaf995e1b9c09906ca3dacb143c595522c68d399172"
+                  },
+                  "sha256": "328ca6386e0cee6024e4077305a214882417fb06581f86e811884babbb7e1bb7",
+                  "wind_effects_plugin": null
+                }
+              },
+              {
+                "kind": "artifact",
+                "source": "trial_overlay/x500_base_model_sdf",
+                "value": {
+                  "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/models/x500_base/model.sdf",
+                  "sanitized_classic_material_scripts": 4,
+                  "sha256": "e27a8c31e8c2dc6c27269c969ba60480fa16066a51ddb1df73cf3ddfcb8fdb9e",
+                  "wind_enabled_link": null
+                }
+              },
+              {
+                "kind": "artifact",
+                "source": "trial_overlay/x500_model_sdf",
+                "value": {
+                  "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/models/x500/model.sdf",
+                  "sha256": "5413d20f0134ee42c8d48321c2adaa49625b8e8d7c4f06e2a4351fd6f7dee417"
+                }
+              },
+              {
+                "kind": "artifact",
+                "source": "trial_overlay/px4_gz_env",
+                "value": {
+                  "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/px4_rootfs/gz_env.sh",
+                  "rootfs_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/px4_rootfs",
+                  "sha256": "ba67e16a5fe3975001404b7720c1cbf378e78e75978484744bb989f61195a7c7",
+                  "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+                }
+              },
+              {
+                "kind": "readback",
+                "sha256": "ce03ba35176d9dfbce045bacbb7d8f67bbaab5e4bfdfd2106facf00153efd222",
+                "source": "/dronedream/actuator_failure/joint_state",
+                "value": {
+                  "failure_mode": "stuck_stopped_at_launch",
+                  "failure_start": "launch",
+                  "hard_stop_verified": true,
+                  "healthy_joint_max_abs_velocity_rad_s": {
+                    "rotor_0_joint": 99.999999999726,
+                    "rotor_1_joint": 100.000000000577,
+                    "rotor_3_joint": 100.000000000771
+                  },
+                  "healthy_motion_verified": true,
+                  "healthy_sample_counts": {
+                    "rotor_0_joint": 653,
+                    "rotor_1_joint": 653,
+                    "rotor_3_joint": 653
+                  },
+                  "max_failed_motor_abs_velocity_rad_s": 0.05,
+                  "min_healthy_motor_abs_velocity_rad_s": 1.0,
+                  "raw_log_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/actuator_failure_joint_state.log",
+                  "raw_log_sha256": "f927dbb6561e912a80ae69e368cc65e14a5427640e5e83f8b933838e38e08e10",
+                  "target_joint_name": "rotor_2_joint",
+                  "target_max_abs_velocity_rad_s": 8.93786e-07,
+                  "target_motor_number": 2,
+                  "target_sample_count": 641
+                }
+              }
+            ],
+            "status": "verified"
+          }
+        },
+        "mechanism": "sdformat_actuator_hard_stop",
+        "status": "applied"
+      }
+    ],
+    "evidence_schema_version": "dronedream.scenario_effect_evidence.v1",
+    "failed_effects": [],
+    "pending_effects": [],
+    "request_schema_version": "dronedream.scenario_effect_request.v1",
+    "request_sha256": "7fda866d8eb6bfccecf00b1bcb9ac0c78c3993783b7bf3160554c4a4dc247a8a",
+    "requested_effect_details": [
+      {
+        "capability": {
+          "reason": "the bundled launcher hard-clamps one deterministic x500 motor to zero maximum rotational velocity in Trial-local SDF, verifies generated runtime SDF, and requires Gazebo joint-state proof that the failed rotor remains stopped while at least one healthy rotor turns",
+          "status": "available"
+        },
+        "effect_id": "scenario_type.actuator_failure",
+        "launcher_input": {
+          "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+          "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+        },
+        "mechanism": "sdformat_actuator_hard_stop",
+        "requested_value": {
+          "config": {
+            "failure_mode": "stuck_stopped_at_launch",
+            "motor_number": 2
+          },
+          "scenario_type": "actuator_failure"
+        },
+        "source": "scenario_type"
+      }
+    ],
+    "requested_effects": [
+      "scenario_type.actuator_failure"
+    ],
+    "unsupported_effects": [],
+    "unverified_passthrough_enabled": false,
+    "verification_status": "verified_applied"
+  },
+  "scenario_effect_evidence": {
+    "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_effects.applied.json",
+    "required": true,
+    "schema_version": "dronedream.scenario_effect_evidence.v1",
+    "verification_status": "verified_applied"
+  },
+  "scenario_effect_request": {
+    "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_effects.request.json",
+    "request_sha256": "7fda866d8eb6bfccecf00b1bcb9ac0c78c3993783b7bf3160554c4a4dc247a8a",
+    "schema_version": "dronedream.scenario_effect_request.v1"
+  },
+  "schema_version": "dronedream.simulator_runtime_manifest.v1",
+  "simulator": {
+    "airframe": "x500",
+    "headless": true,
+    "instance_id": 0,
+    "simulation_speed_factor": 1.0,
+    "simulator_model": "x500",
+    "world": "default"
+  },
+  "timeout": {
+    "base_1x_seconds": 900,
+    "effective_seconds": 900.0,
+    "slow_simulation_multiplier_cap": 10.0
+  }
+}

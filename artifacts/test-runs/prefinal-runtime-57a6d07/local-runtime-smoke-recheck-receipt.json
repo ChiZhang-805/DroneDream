@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "dronedream.prefinal-runtime-smoke.v1",
+  "executionSubject": "2d5c0e5864021ef129359b0f303bdba092bd4928",
+  "enginePackId": "sha256:5ced4e533701d2416f71c7735688bf0cfb1cd4ef3f8404df74065b96a2079d09",
+  "enginePackArchiveSha256": "a7624ac1cc7b29e704782b08a6686cec4077dbc7607517c394701862d8ee4804",
+  "startedAt": "2026-08-02T18:59:10.949Z",
+  "completedAt": "2026-08-02T19:01:19.058Z",
+  "modelProviderCalls": 0,
+  "displayName": "Pre-final runtime smoke - calm vertical takeoff and hover",
+  "jobId": "job_756cd4a5bfc3",
+  "status": "COMPLETED",
+  "progress": {
+    "completed_trials": 2,
+    "total_trials": 2,
+    "current_phase": "completed"
+  },
+  "latestError": null,
+  "harnessEvents": 0,
+  "trials": [
+    {
+      "id": "tri_4910763f7eeb",
+      "status": "COMPLETED",
+      "failureCode": null,
+      "metrics": null
+    },
+    {
+      "id": "tri_7ff26a9d38c4",
+      "status": "COMPLETED",
+      "failureCode": null,
+      "metrics": null
+    }
+  ],
+  "bestCandidateId": "cand_efbc298c963e",
+  "optimizationOutcome": "success",
+  "report": {
+    "status": "READY",
+    "bestCandidateId": "cand_efbc298c963e",
+    "winnerEvidenceId": "sha256:acb0070629ab188be777418e227eff6cf7b12003dcc30b4f7e100adee1084615",
+    "winnerFreezeReceiptId": "wfr_a402ec2e45a7"
+  }
+}

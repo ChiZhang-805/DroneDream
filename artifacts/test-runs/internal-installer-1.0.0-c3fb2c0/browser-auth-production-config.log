@@ -1,0 +1,10 @@
+COMMAND=npm --prefix desktop run verify:browser-auth-config
+START_UTC=2026-07-31T06:35:35.6839837Z
+
+> drone-dream-desktop@1.0.0 verify:browser-auth-config
+> node scripts/verify-browser-auth-config.mjs
+
+Desktop browser-auth public configuration verified.
+
+EXIT_CODE=0
+END_UTC=2026-07-31T06:35:36.9626803Z

@@ -1,0 +1,68 @@
+{
+    "schema_version":  "dronedream.internal-test-installer-publication-handoff.v5",
+    "generated_at":  "2026-08-01T00:13:27Z",
+    "source_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+    "branch":  "codex/software",
+    "owner_override":  {
+                           "internal_test":  true,
+                           "version_must_remain":  "1.0.0",
+                           "authenticode_required":  false,
+                           "replace_existing_1_0_0_bytes":  true,
+                           "software_line_upload_authorized":  false
+                       },
+    "release":  {
+                    "version":  "1.0.0",
+                    "release_tag":  "signpath-candidate-v1.0.0",
+                    "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+                    "checksum_file_name":  "DroneDream_1.0.0_x64-setup.exe.sha256",
+                    "bytes":  10313264,
+                    "sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+                    "authenticode_status":  "NotSigned",
+                    "pe_certificate_table_file_offset":  0,
+                    "pe_certificate_table_size":  0,
+                    "tauri_updater_signature_valid":  true,
+                    "tauri_signature_file_sha256":  "9506775db6a8f62bb973f1dcee5e558424a47124723dccf2b6b9aa62b1c9f05e"
+                },
+    "publication_contract":  {
+                                 "single_authoritative_installer_for_both_origins":  true,
+                                 "rebuild_per_origin":  false,
+                                 "upload_or_deployment_performed":  false,
+                                 "github_release_download_url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+                                 "github_release_checksum_url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe.sha256",
+                                 "mirror_download_path":  "/downloads/DroneDream_1.0.0_x64-setup.exe",
+                                 "mirror_checksum_path":  "/downloads/DroneDream_1.0.0_x64-setup.exe.sha256",
+                                 "website_latest":  "website-latest.json",
+                                 "website_pages_release":  "website-pages-release.json",
+                                 "tauri_updater_manifest":  "tauri-latest.json",
+                                 "tauri_updater_signature":  "DroneDream_1.0.0_x64-setup.exe.sig"
+                             },
+    "delivery_boundary":  {
+                              "desktop_subject_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+                              "runtime_subject_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+                              "fresh_full_stack_runtime_delivery_ready":  true,
+                              "existing_beta1_migration_authorized":  false,
+                              "evidence":  "runtime-delivery-boundary.json"
+                          },
+    "supersession":  {
+                         "supersedes_c3fb2c0_a642b0fc":  true,
+                         "supersedes_755c511_9f44f798":  true,
+                         "supersedes_15603c6_b913e328":  true,
+                         "supersedes_8102ffe_f35c7aad":  true,
+                         "new_exe_is_authoritative_desktop_installer":  true
+                     },
+    "build":  {
+                  "command":  "npm --prefix desktop run build:llvm",
+                  "pipeline_exit_code":  0,
+                  "nsis_bundle_count":  1,
+                  "second_nsis_attempt_performed":  false,
+                  "updater_signer_fix_96cd879_in_lineage":  true
+              },
+    "handoff":  {
+                    "authoritative_directory":  "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\internal-installer-1.0.0-3f6cb1d",
+                    "single_authoritative_exe":  true,
+                    "release_receipt":  "release-receipt.json",
+                    "handoff_manifest":  "handoff-manifest.json",
+                    "upload_performed":  false,
+                    "deployment_performed":  false
+                }
+}

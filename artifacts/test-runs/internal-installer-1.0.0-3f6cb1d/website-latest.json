@@ -1,0 +1,11 @@
+{
+    "version":  "1.0.0",
+    "fileName":  "DroneDream_1.0.0_x64-setup.exe",
+    "downloadUrl":  "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+    "checksumUrl":  "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe.sha256",
+    "sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+    "sizeBytes":  10313264,
+    "publishedAt":  "2026-08-01",
+    "authenticodeStatus":  "NotSigned",
+    "internalTest":  true
+}

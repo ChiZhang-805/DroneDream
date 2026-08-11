@@ -73,13 +73,14 @@ back to desktop-only.
 After the user confirms the installer once, NSIS copies the desktop program
 and writes a version-bound, current-user-protected Runtime choice. A successful
 fresh install-all or custom-Runtime install launches DroneDream exactly once;
-the ordinary finish-page Run callback is suppressed so it cannot open a second
-copy. If Windows cannot start that process, the protected choice remains for
-the next manual launch. The setup page first renders the exact confirmed target
-and read-only plan, then automatically downloads, verifies, imports, starts,
-and health-checks `DroneDreamRuntime`. The in-app Runtime button is not part of
-the normal first-install path; it is retained for a safe retry,
-post-cancellation continuation, or repair.
+the standard finish-page Run action owns that launch, and no separate
+post-install callback opens a second copy. If Windows cannot start that process,
+the protected choice remains for the next manual launch. The setup page first
+renders the exact confirmed target and read-only plan, then automatically
+downloads, verifies, imports, starts, and health-checks
+`DroneDreamRuntime`. The in-app Runtime button is not part of the normal
+first-install path; it is retained for a safe retry, post-cancellation
+continuation, or repair.
 
 The desktop install itself is per-user and does not request elevation. If WSL2
 must be enabled, Runtime setup may show a separate Windows UAC prompt for
@@ -174,7 +175,7 @@ const install = await window.__TAURI__.core.invoke(
     request: {
       targetRoot: "E:\\DroneDream",
       releaseManifestUrl:
-        "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.1/runtime-release.json",
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/runtime-release.json",
     },
   },
 );

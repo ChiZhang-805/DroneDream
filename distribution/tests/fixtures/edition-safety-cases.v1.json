@@ -1,0 +1,334 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-safety-test-fixture-set",
+  "fixtureVersion": "1.0.0",
+  "baseRequest": {
+    "schemaVersion": 1,
+    "kind": "dronedream-edition-authorization-request",
+    "authorizationRequestId": "authreq:e5-fixture-001",
+    "actor": {
+      "accountId": "account:e5-fixture",
+      "actorId": "actor:e5-fixture"
+    },
+    "deviceHardwareIdentity": {
+      "deviceId": "device:e5-fixture",
+      "hardwareIdentityHash": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "vehicle": {
+      "vehicleId": "vehicle:e5-fixture",
+      "packId": "holybro-s500-v2-pixhawk6c",
+      "packManifestSha256": "02ba34bccd6656e6d20e8022a94db1976b9e4a849757e0f9d78927a72883ba0d",
+      "controllerId": "Holybro:Pixhawk6C",
+      "firmwareFamily": "px4",
+      "firmwareVersion": "v1.16.0",
+      "firmwareIdentityHash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "dynamicsConfigHash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "sensorConfigHash": "6666666666666666666666666666666666666666666666666666666666666666",
+      "payloadConfigHash": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    "parameterCandidateHash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "compositeInventoryHash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "policy": {
+      "capabilityPolicyId": "core-capabilities",
+      "capabilityPolicyVersion": "1.0.0",
+      "capabilityPolicySha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903",
+      "executionGatePolicyId": "edition-execution-gate",
+      "executionGatePolicyVersion": "1.0.0",
+      "executionGatePolicySha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456",
+      "editionManifestSha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356"
+    },
+    "source": {
+      "repositoryCommit": "1111111111111111111111111111111111111111",
+      "enginePackManifestSha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "runtimeBaseManifestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "editionId": "lab",
+    "action": "hardware.parameter.write",
+    "targetKind": "real-hardware",
+    "issuedAt": "2026-08-05T00:00:00Z",
+    "expiresAt": "2026-08-05T00:05:00Z",
+    "nonce": "nonce:e5-request-001",
+    "sequence": 1,
+    "evidenceReceipts": [
+      {
+        "schemaVersion": 1,
+        "kind": "dronedream-structured-safety-evidence-receipt",
+        "receiptType": "trusted-qualification",
+        "receiptId": "receipt:e5-01",
+        "authorizationRequestId": "authreq:e5-fixture-001",
+        "contextHash": "57b3828f8206e2ca91e45eabd8cad6e1b98c125cffbed90abe232a746f3a5293",
+        "issuer": "test-fixture:e5-backend",
+        "issuerLayer": "backend",
+        "status": "pass",
+        "issuedAt": "2026-08-05T00:00:01Z",
+        "expiresAt": "2026-08-05T00:04:59Z",
+        "nonce": "nonce:e5-01",
+        "sequence": 1,
+        "evidenceHash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "qualificationLevel": "sim",
+        "bindings": [
+          {
+            "name": "parameterCandidateHash",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          {
+            "name": "scenarioContractHash",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          {
+            "name": "vehicleDynamicsConfigHash",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+          },
+          {
+            "name": "sensorConfigHash",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "name": "payloadConfigHash",
+            "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          {
+            "name": "holdoutContractHash",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        ],
+        "oneTime": true,
+        "consumptionState": "unconsumed"
+      },
+      {
+        "schemaVersion": 1,
+        "kind": "dronedream-structured-safety-evidence-receipt",
+        "receiptType": "parameter-snapshot",
+        "receiptId": "receipt:e5-02",
+        "authorizationRequestId": "authreq:e5-fixture-001",
+        "contextHash": "57b3828f8206e2ca91e45eabd8cad6e1b98c125cffbed90abe232a746f3a5293",
+        "issuer": "test-fixture:e5-runtime",
+        "issuerLayer": "runtime",
+        "status": "pass",
+        "issuedAt": "2026-08-05T00:00:01Z",
+        "expiresAt": "2026-08-05T00:04:59Z",
+        "nonce": "nonce:e5-02",
+        "sequence": 2,
+        "evidenceHash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "qualificationLevel": "none",
+        "bindings": [
+          {
+            "name": "snapshotHash",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          }
+        ],
+        "oneTime": true,
+        "consumptionState": "unconsumed"
+      },
+      {
+        "schemaVersion": 1,
+        "kind": "dronedream-structured-safety-evidence-receipt",
+        "receiptType": "transaction-rollback",
+        "receiptId": "receipt:e5-03",
+        "authorizationRequestId": "authreq:e5-fixture-001",
+        "contextHash": "57b3828f8206e2ca91e45eabd8cad6e1b98c125cffbed90abe232a746f3a5293",
+        "issuer": "test-fixture:e5-runtime",
+        "issuerLayer": "runtime",
+        "status": "pass",
+        "issuedAt": "2026-08-05T00:00:01Z",
+        "expiresAt": "2026-08-05T00:04:59Z",
+        "nonce": "nonce:e5-03",
+        "sequence": 3,
+        "evidenceHash": "3333333333333333333333333333333333333333333333333333333333333333",
+        "qualificationLevel": "none",
+        "bindings": [
+          {
+            "name": "rollbackTargetHash",
+            "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "oneTime": true,
+        "consumptionState": "unconsumed"
+      },
+      {
+        "schemaVersion": 1,
+        "kind": "dronedream-structured-safety-evidence-receipt",
+        "receiptType": "operator-confirmation",
+        "receiptId": "receipt:e5-04",
+        "authorizationRequestId": "authreq:e5-fixture-001",
+        "contextHash": "57b3828f8206e2ca91e45eabd8cad6e1b98c125cffbed90abe232a746f3a5293",
+        "issuer": "test-fixture:e5-operator",
+        "issuerLayer": "operator",
+        "status": "pass",
+        "issuedAt": "2026-08-05T00:00:01Z",
+        "expiresAt": "2026-08-05T00:02:00Z",
+        "nonce": "nonce:e5-04",
+        "sequence": 4,
+        "evidenceHash": "4444444444444444444444444444444444444444444444444444444444444444",
+        "qualificationLevel": "none",
+        "bindings": [
+          {
+            "name": "challengeHash",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "oneTime": true,
+        "consumptionState": "unconsumed"
+      },
+      {
+        "schemaVersion": 1,
+        "kind": "dronedream-structured-safety-evidence-receipt",
+        "receiptType": "preflight",
+        "receiptId": "receipt:e5-05",
+        "authorizationRequestId": "authreq:e5-fixture-001",
+        "contextHash": "57b3828f8206e2ca91e45eabd8cad6e1b98c125cffbed90abe232a746f3a5293",
+        "issuer": "test-fixture:e5-runtime",
+        "issuerLayer": "runtime",
+        "status": "pass",
+        "issuedAt": "2026-08-05T00:00:01Z",
+        "expiresAt": "2026-08-05T00:04:59Z",
+        "nonce": "nonce:e5-05",
+        "sequence": 5,
+        "evidenceHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "qualificationLevel": "none",
+        "bindings": [
+          {
+            "name": "preflightHash",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+          }
+        ],
+        "oneTime": true,
+        "consumptionState": "unconsumed"
+      },
+      {
+        "schemaVersion": 1,
+        "kind": "dronedream-structured-safety-evidence-receipt",
+        "receiptType": "safety-zone",
+        "receiptId": "receipt:e5-06",
+        "authorizationRequestId": "authreq:e5-fixture-001",
+        "contextHash": "57b3828f8206e2ca91e45eabd8cad6e1b98c125cffbed90abe232a746f3a5293",
+        "issuer": "test-fixture:e5-backend",
+        "issuerLayer": "backend",
+        "status": "pass",
+        "issuedAt": "2026-08-05T00:00:01Z",
+        "expiresAt": "2026-08-05T00:04:59Z",
+        "nonce": "nonce:e5-06",
+        "sequence": 6,
+        "evidenceHash": "6666666666666666666666666666666666666666666666666666666666666666",
+        "qualificationLevel": "none",
+        "bindings": [
+          {
+            "name": "safetyZoneHash",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          }
+        ],
+        "oneTime": true,
+        "consumptionState": "unconsumed"
+      },
+      {
+        "schemaVersion": 1,
+        "kind": "dronedream-structured-safety-evidence-receipt",
+        "receiptType": "control-takeover",
+        "receiptId": "receipt:e5-07",
+        "authorizationRequestId": "authreq:e5-fixture-001",
+        "contextHash": "57b3828f8206e2ca91e45eabd8cad6e1b98c125cffbed90abe232a746f3a5293",
+        "issuer": "test-fixture:e5-native",
+        "issuerLayer": "native",
+        "status": "pass",
+        "issuedAt": "2026-08-05T00:00:01Z",
+        "expiresAt": "2026-08-05T00:04:59Z",
+        "nonce": "nonce:e5-07",
+        "sequence": 7,
+        "evidenceHash": "7777777777777777777777777777777777777777777777777777777777777777",
+        "qualificationLevel": "none",
+        "bindings": [
+          {
+            "name": "takeoverPathHash",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "oneTime": true,
+        "consumptionState": "unconsumed"
+      },
+      {
+        "schemaVersion": 1,
+        "kind": "dronedream-structured-safety-evidence-receipt",
+        "receiptType": "emergency-stop",
+        "receiptId": "receipt:e5-08",
+        "authorizationRequestId": "authreq:e5-fixture-001",
+        "contextHash": "57b3828f8206e2ca91e45eabd8cad6e1b98c125cffbed90abe232a746f3a5293",
+        "issuer": "test-fixture:e5-native",
+        "issuerLayer": "native",
+        "status": "pass",
+        "issuedAt": "2026-08-05T00:00:01Z",
+        "expiresAt": "2026-08-05T00:04:59Z",
+        "nonce": "nonce:e5-08",
+        "sequence": 8,
+        "evidenceHash": "8888888888888888888888888888888888888888888888888888888888888888",
+        "qualificationLevel": "none",
+        "bindings": [
+          {
+            "name": "emergencyStopPathHash",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+          }
+        ],
+        "oneTime": true,
+        "consumptionState": "unconsumed"
+      }
+    ],
+    "issuer": "test-fixture:e5-request",
+    "testOnly": true
+  },
+  "negativeCases": [
+    {
+      "id": "cross-request-receipt",
+      "mutation": "evidence.authorizationRequestId",
+      "expectedReasonCode": "receipt.request.crossed"
+    },
+    {
+      "id": "cross-device-layer-splice",
+      "mutation": "deviceHardwareIdentity.hardwareIdentityHash",
+      "expectedReasonCode": "quorum.context.mismatch"
+    },
+    {
+      "id": "cross-parameter-layer-splice",
+      "mutation": "parameterCandidateHash",
+      "expectedReasonCode": "quorum.context.mismatch"
+    },
+    {
+      "id": "expired-request",
+      "mutation": "expiresAt",
+      "expectedReasonCode": "request.expired"
+    },
+    {
+      "id": "duplicate-consumption",
+      "mutation": "consumptionState",
+      "expectedReasonCode": "receipt.replayed"
+    },
+    {
+      "id": "missing-emergency-stop",
+      "mutation": "evidenceReceipts",
+      "expectedReasonCode": "evidence.incomplete"
+    },
+    {
+      "id": "fake-issuer-in-production",
+      "mutation": "issuer",
+      "expectedReasonCode": "issuer.fake.production"
+    },
+    {
+      "id": "unknown-field",
+      "mutation": "unexpected",
+      "expectedReasonCode": "schema.unknown-field"
+    },
+    {
+      "id": "qualification-holdout-missing",
+      "mutation": "bindings.holdoutContractHash",
+      "expectedReasonCode": "qualification.binding.missing"
+    },
+    {
+      "id": "operator-boolean-substitute",
+      "mutation": "operatorConfirmed",
+      "expectedReasonCode": "operator.challenge.required"
+    },
+    {
+      "id": "layer-deny-precedence",
+      "mutation": "layerDecision.decision",
+      "expectedReasonCode": "quorum.layer.non-allow"
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "schema_version": "dronedream.internal-installer-local-install-receipt.v1",
+  "generated_at": "2026-08-01T16:48:33Z",
+  "subject": {
+    "branch": "codex/software",
+    "commit": "3bd83fef599d72122488d1b841e1bd70919b7ae3",
+    "clean_and_equal_to_upstream_before_build": true
+  },
+  "product_changes": {
+    "ece498_official_course_url": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+    "ece498_desktop_external_open_failure_is_visible": true,
+    "fixed_scenario_sidebar_route": "/scenarios",
+    "fixed_scenario_template_keys": [
+      "hover-basics@1",
+      "first-circle@1",
+      "light-wind-circle@1",
+      "wind-sensor-circle@1"
+    ],
+    "difficulty_levels": [
+      "simple",
+      "medium"
+    ],
+    "scenario_selection_only_prefills_a_new_unnamed_draft": true,
+    "scenario_selection_never_creates_or_starts_a_job": true,
+    "named_workspace_resume_takes_precedence_over_query_prefill": true
+  },
+  "installer": {
+    "version": "1.0.0",
+    "file_name": "DroneDream_1.0.0_x64-setup.exe",
+    "relative_handoff_path": "artifacts/test-runs/internal-installer-1.0.0-3bd83fe/DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 10972856,
+    "sha256": "57f5ac12ec78b6667bc99e60e8e53ccfa02a525aa479ade6df585a32643b4ba4",
+    "checksum_file_sha256": "39886404f433d90b202bf1359302af12dcfa32b2052fe35c6129c0d1f9223bdf",
+    "tauri_signature_file_sha256": "24db8827925264b99e1eef0cbea1318a817ac335cea5b6a3e8ef5c08af955160",
+    "tauri_latest_json_sha256": "f74ba146ecf7b6b0ead34de843f30f4daacdb87ad1c10000140bb9cb2ee27e2e",
+    "authenticode_status": "NotSigned",
+    "pe_certificate_table_offset": 0,
+    "pe_certificate_table_size": 0,
+    "owner_approved_unsigned_internal_test_build": true,
+    "tauri_payload_signature_valid": true,
+    "tauri_trusted_comment_signature_valid": true,
+    "tauri_configured_key_id_matches": true,
+    "updater_manifest_version": "1.0.0",
+    "updater_manifest_build_number": 406,
+    "updater_manifest_source_commit": "3bd83fef599d72122488d1b841e1bd70919b7ae3",
+    "nsis_bundles_created": 1,
+    "second_nsis_build_performed": false,
+    "prebuild_configuration_failure_produced_an_installer": false,
+    "loopback_http_status": 200,
+    "loopback_download_byte_parity": true,
+    "git_ignored": true,
+    "uploaded_or_deployed": false
+  },
+  "local_install": {
+    "installer_exit_code": 0,
+    "install_mode": "silent-current-user-in-place-replacement",
+    "installed_executable": "C:/Users/zju20/AppData/Local/DroneDream/drone-dream-desktop.exe",
+    "installed_bytes": 24237056,
+    "installed_file_version": "1.0.0",
+    "installed_product_version": "1.0.0",
+    "previous_installed_sha256": "d231d6db2ea7f0419d37d7664e5b1a2a4a2aab7cb235d56c0eb6fc367e7a335b",
+    "installed_sha256": "0c79369260c55460e1994f01cc821f61c2464fd62043b390768bb887265f9b8d",
+    "old_bytes_replaced": true,
+    "registry_display_version": "1.0.0",
+    "desktop_shortcut_target": "C:/Users/zju20/AppData/Local/DroneDream/drone-dream-desktop.exe",
+    "desktop_shortcut_icon": "C:/Users/zju20/AppData/Local/DroneDream/icons/DroneDream.ico,0",
+    "launch_smoke_alive_after_seconds": 5,
+    "launch_smoke_main_window_created": true,
+    "launch_smoke_exit_code": 0,
+    "wsl_distro_list_unchanged": true,
+    "existing_dronedream_runtime_unregistered_or_overwritten": false,
+    "px4_or_gazebo_reinstalled": false
+  },
+  "validation": {
+    "frontend_owned_suite": "61 files / 391 tests passed",
+    "frontend_focused_suite": "5 files / 62 tests passed",
+    "frontend_typecheck": "passed",
+    "frontend_lint_quiet": "passed",
+    "frontend_production_build": "passed",
+    "desktop_browser_auth_contract": "passed: 3 layouts, 3 exact callbacks, 1 cancellation, no token URL leakage",
+    "software_ui_layout": "passed: EN and zh-CN at 1440x1000 and 390x844",
+    "backend_full_suite": "1389 passed in 1143.54 seconds",
+    "rust_fixed_gnullvm_fmt": "passed",
+    "rust_fixed_gnullvm_clippy": "passed",
+    "rust_fixed_gnullvm_tests": "116 passed, 0 failed, 1 ignored",
+    "dependency_audits": "passed: frontend policy and desktop zero vulnerabilities",
+    "release_source_policy": "passed: 1472 tracked files, 390 npm packages, 532 Rust packages",
+    "nsis_languages": "passed: English 1033 and Simplified Chinese 2052",
+    "installer_path_guard": "passed",
+    "webview2_contract": "passed",
+    "compiled_official_course_url": true,
+    "compiled_fixed_scenario_route": true,
+    "compiled_browser_auth_callback_contract": true
+  },
+  "known_residuals": [
+    "The site-owned PublicSite billing expectation is newer on codex/website; software-owned frontend tests pass and no website-owned file was modified.",
+    "The repository checker rejects UTF-8 BOMs in eight frozen historical installer receipts; those evidence bytes were not rewritten.",
+    "Vite reports a non-failing large-chunk advisory and clang reports a non-failing unused -no-pie advisory.",
+    "One installed-runtime keepalive integration test remains intentionally ignored.",
+    "The installer remains Authenticode NotSigned under the owner-approved internal-test rule; its separate Tauri updater signature verifies correctly."
+  ],
+  "security_and_ownership": {
+    "openai_api_key_read_or_used": false,
+    "website_files_modified": false,
+    "technical_report_files_modified": false,
+    "existing_runtime_data_deleted": false
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-benchmark-p4-statistics-verification-receipt",
+  "generatedAt": "2026-08-04T22:06:58Z",
+  "subjectCommit": "8b6e6349ffaaffcaf219c7804c6c7998df6ea8cf",
+  "branch": "codex/software",
+  "resourceClass": "GREEN",
+  "scope": {
+    "phase": "P4",
+    "readOnlyEvaluator": true,
+    "providerCalls": 0,
+    "px4Runs": 0,
+    "gazeboRuns": 0,
+    "pilotExecuted": false,
+    "finalExperimentExecuted": false,
+    "technicalReportUpdated": false
+  },
+  "contracts": {
+    "statisticsContractSha256": "5899e09b61ead6c364ee8cc7d850b5d6638ced1a0f07e0c4ec7c883e9b6b112e",
+    "primaryArm": "dronedream_adaptive_1_4/v1",
+    "primaryComparator": "optimizer_portfolio/v1",
+    "externalSecondaryControls": [
+      "reference_scbo/v1",
+      "hebo/v1"
+    ],
+    "pilotBlockRule": "blinded-12-or-20-v1",
+    "normalRightCensoringState": "budget_exhausted",
+    "engineeringFailures": "competing-terminal-events-and-still-in-success-denominator",
+    "pairedBootstrapUnit": "paired-outer-block-with-scenarios-aggregated-within-block",
+    "manualTableEditingAllowed": false,
+    "outputOverwriteAllowed": false
+  },
+  "sourceFiles": [
+    {
+      "path": "backend/app/benchmarking/__init__.py",
+      "bytes": 1107,
+      "sha256": "740162f0a817fd4a0015328e5d9b878f046c037ec33ab5761d41350c2890af57"
+    },
+    {
+      "path": "backend/app/benchmarking/statistics.py",
+      "bytes": 39650,
+      "sha256": "e9d517f4aa6942cbe36083b7936db8d6a57337aa571e8ebea561610cdef1fefa"
+    },
+    {
+      "path": "backend/scripts/evaluate_benchmark_statistics.py",
+      "bytes": 2642,
+      "sha256": "bec381355d40c7308d1c70b35c900bed2676b3427aea0ea40b0b717b147b12e4"
+    },
+    {
+      "path": "backend/tests/test_benchmark_statistics.py",
+      "bytes": 12304,
+      "sha256": "70b3d22be5ae781b97a76d4b8ee0f2454d66c6e223f2308869c20e6d25b96007"
+    },
+    {
+      "path": "backend/tests/test_campaign_script_entrypoints.py",
+      "bytes": 1124,
+      "sha256": "26b5c2f77e63b558a0eaa21bf0a64d3df3e23fb6db39c4d323fbf0a671d830b7"
+    }
+  ],
+  "checks": [
+    {
+      "name": "statistics-focused",
+      "command": "pytest -q backend/tests/test_benchmark_statistics.py",
+      "result": "pass",
+      "passed": 5
+    },
+    {
+      "name": "benchmark-qualification-provider-related-regression",
+      "command": "pytest -q backend/tests/test_benchmark_campaign_contracts.py backend/tests/test_benchmark_method_inventory.py backend/tests/test_benchmark_proposal_adapters.py backend/tests/test_benchmark_llm_arm_contracts.py backend/tests/test_benchmark_llm_fixture_runtime.py backend/tests/test_benchmark_offline_matrix.py backend/tests/test_candidate_qualification_contract.py backend/tests/test_qualification_state_machine.py backend/tests/test_qualification_receipts.py backend/tests/test_qualification_coordinator.py backend/tests/test_provider_request_accounting.py backend/tests/test_campaign_script_entrypoints.py backend/tests/test_benchmark_statistics.py",
+      "result": "pass",
+      "passed": 167,
+      "durationSeconds": 48.17
+    },
+    {
+      "name": "ruff-format-and-lint",
+      "result": "pass"
+    },
+    {
+      "name": "strict-mypy",
+      "command": "mypy --strict --ignore-missing-imports backend/app/benchmarking/statistics.py backend/scripts/evaluate_benchmark_statistics.py",
+      "result": "pass"
+    },
+    {
+      "name": "git-diff-check",
+      "result": "pass"
+    }
+  ],
+  "negativeCoverage": [
+    "pilot-arm-identity-and-ranking-hidden",
+    "incomplete-or-expanded-paired-grid-rejected",
+    "simulator-crn-drift-rejected",
+    "arm-version-drift-rejected",
+    "paired-provider-seed-drift-rejected",
+    "traditional-arm-provider-work-rejected",
+    "trial-logical-turn-and-network-request-accounting-conserved",
+    "engineering-failures-retained-in-denominator",
+    "only-normal-budget-exhaustion-right-censored",
+    "first-qualified-requires-complete-valid-holdout-evidence",
+    "bootstrap-resamples-outer-blocks-not-scenario-cells",
+    "strict-generated-output-schema-revalidation",
+    "exact-input-byte-sha-binding",
+    "frozen-output-overwrite-rejected"
+  ],
+  "notExecuted": [
+    "OpenAI, DeepSeek, or any provider API",
+    "PX4 or Gazebo",
+    "pilot benchmark campaign",
+    "final benchmark campaign",
+    "installation, Runtime migration, deployment, or release",
+    "technical-report evidence integration"
+  ],
+  "remainingWork": [
+    "P5 current-exact full quality gates",
+    "P5 zero-provider physical scenario baseline stability gate",
+    "P6 exact pilot preregistration and separately approved provider budget"
+  ]
+}

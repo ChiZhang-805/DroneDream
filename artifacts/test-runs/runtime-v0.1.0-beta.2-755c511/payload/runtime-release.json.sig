@@ -1,0 +1,1 @@
+{"algorithm":"Ed25519","keyId":"ed25519:7839a33eb8451e26c0e03ec65857e0caef7af8df70e9ddde3430a681b3f0d8c1","manifestSha256":"e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9","schemaVersion":1,"signature":"3umluLHOJx+u+NZ77BWzy5xDCxwswfj/AWbQpCJFPc3X97EGofhhOWH2hoGh+XY87iXWJ5W4kWIrcYpXpllCAQ=="}

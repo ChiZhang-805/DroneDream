@@ -1,0 +1,102 @@
+{
+  "schema_version": "dronedream.internal-test-installer-source-binding.v1",
+  "generated_at": "2026-07-28T18:15:55Z",
+  "source_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+  "upstream_commit_at_build": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+  "previous_installer_source_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+  "evidence_2_9_commits": [
+    "b3d36f5f4d8e9a080d7184bfc4ea5798791284a2",
+    "74b6172ee1fd28fff998e4810ccfb0e90f52884b",
+    "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+    "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8"
+  ],
+  "evidence_contract": {
+    "schema_version": "2.9",
+    "artifact_internal_sha256": "e5c27308a9be35a276ce845e872e186e613f5421c459bcddec726a461e480ef3",
+    "manifest_internal_sha256": "3c49e2b96b3fffdd92383d6b978d4679f16e012e2a4a43e1c50b8b8a402aca72",
+    "formal_evaluation_source_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+    "frozen_evidence_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8"
+  },
+  "critical_files": [
+    {
+      "path": "backend/app/orchestration/decision_harness.py",
+      "git_blob": "a214dbc5d4690ec09065b57184bb8d493be5ed7d",
+      "bytes": 75787,
+      "sha256": "5e3ddd29d83960e6c286e46d11abfee376c594aa22e7fc97282b93130e635020"
+    },
+    {
+      "path": "backend/app/orchestration/harness_budget_planner.py",
+      "git_blob": "95fe6ee983ea2b769cef35b59fd17e5fe111095d",
+      "bytes": 38643,
+      "sha256": "6b0be7bedf74540882394db5be012fb11964686f8b5eb0f0b3b71bcfbe267ae8"
+    },
+    {
+      "path": "backend/app/orchestration/harness_context.py",
+      "git_blob": "4cecdb66e194015d998ff0c2d54d6a61a6ee1f25",
+      "bytes": 79565,
+      "sha256": "a60080e3814210e36385c732b726f16568d7ce104daa2b8fbc12d539cb1e4d65"
+    },
+    {
+      "path": "backend/app/orchestration/harness_multi_tool_budget_evaluation.py",
+      "git_blob": "5eca52e0fdec83f98b4115392f0bcbd5993ed72a",
+      "bytes": 19387,
+      "sha256": "d255a037839b2f0acfdfa5350494d190556206ade61b4271fa09ff745d678115"
+    },
+    {
+      "path": "backend/app/orchestration/job_manager.py",
+      "git_blob": "6d11692a025bc0eaa07b47364a19505edfc64338",
+      "bytes": 75408,
+      "sha256": "d6fdea5416ce15c4a5e6b5566cd942f98636dab4399f17cf118cb177ab69b951"
+    },
+    {
+      "path": "backend/scripts/evaluate_harness_multi_tool_budget.py",
+      "git_blob": "222b0ef5243593c713465272d1d10d3fcc34301b",
+      "bytes": 9675,
+      "sha256": "fd1e4e017109d39000ce8fb91738779d0e0e7c7efb7a9111a9f4db6aaae23cdb"
+    },
+    {
+      "path": "backend/tests/test_harness_budget_planner.py",
+      "git_blob": "341812cb1fcfa6ad6a3cefc2cea0097424dbb803",
+      "bytes": 13538,
+      "sha256": "879873f6a936a4dc1497c6df6e6bb1b50f330e2d2de668e08f1ff3dae244473f"
+    },
+    {
+      "path": "backend/tests/test_harness_multi_tool_budget_evaluation.py",
+      "git_blob": "4e55461809f03705ca32406e105ea2a0decea0fa",
+      "bytes": 5037,
+      "sha256": "bdcb4bedc0d45f3d8832ff8cb6adfcfa8e4e8681e648b832fc07bdb4f4bc7eb1"
+    },
+    {
+      "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.json",
+      "git_blob": "3a16d2dd05ce8fa9f444ce4eaa52fadc1f0aede2",
+      "bytes": 21751,
+      "sha256": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d"
+    },
+    {
+      "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.manifest.json",
+      "git_blob": "f7b6b56e859dc3fd2b219e908f0f46faac9bb4f5",
+      "bytes": 1284,
+      "sha256": "db78d1c8c99938608dc27116138d3eef15788cd6da4461d0f530db7f9369226d"
+    },
+    {
+      "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.sha256",
+      "git_blob": "1b3b2e5d758b172eff98c04ae3eade10cb40ed32",
+      "bytes": 341,
+      "sha256": "127fd33e78489c58ee20a936a63e38c4c8dc18e235bb97a66fcd8332d0faf350"
+    },
+    {
+      "path": "artifacts/test-runs/harness-multi-tool-budget-evaluation-v1-generation-receipt.json",
+      "git_blob": "c85276ba1c539b2a6c4757587f5de49727242f39",
+      "bytes": 2469,
+      "sha256": "611783c9388bfda9b21a47e02ab3e8147eec96a7219202859cdc97b63198b6da"
+    }
+  ],
+  "delta_from_previous_installer_source": {
+    "changed_path_count": 58,
+    "changed_paths_sha256": "da50b8ffecbbc9939f7b8520ed7e84d5dd689913b6910fa4b879aaf6e796ab94",
+    "frontend_source_changed": false,
+    "desktop_source_changed": false,
+    "backend_source_changed": true
+  },
+  "claim_boundary": "This binding proves that the exact clean release-source inventory contains the Evidence 2.9 implementation, tests, evaluator, and frozen evidence. The Windows NSIS installer bundles the desktop/frontend application; this source binding does not claim that raw backend Python source is embedded byte-for-byte inside the NSIS payload."
+}

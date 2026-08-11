@@ -1,0 +1,151 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "telemetry_json",
+      "display_name": "Telemetry",
+      "file_size_bytes": 2354906,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/telemetry.json"
+    },
+    {
+      "artifact_type": "reference_track_json",
+      "display_name": "Reference Track",
+      "file_size_bytes": 32498,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/reference_track.json"
+    },
+    {
+      "artifact_type": "scenario_config_json",
+      "display_name": "Scenario Configuration",
+      "file_size_bytes": 362,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_config.json"
+    },
+    {
+      "artifact_type": "scenario_effect_request_json",
+      "display_name": "Scenario Effect Request",
+      "file_size_bytes": 1347,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_effects.request.json"
+    },
+    {
+      "artifact_type": "scenario_effect_evidence_json",
+      "display_name": "Scenario Effect Evidence",
+      "file_size_bytes": 9197,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_effects.applied.json"
+    },
+    {
+      "artifact_type": "controller_parameters_json",
+      "display_name": "Controller Parameters",
+      "file_size_bytes": 125,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/controller_params.json"
+    },
+    {
+      "artifact_type": "px4_parameters_input_json",
+      "display_name": "PX4 Parameter Input",
+      "file_size_bytes": 22,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/px4_parameters.input.json"
+    },
+    {
+      "artifact_type": "simulator_launch_config_json",
+      "display_name": "Simulator Launch Configuration",
+      "file_size_bytes": 15521,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/launch_config.json"
+    },
+    {
+      "artifact_type": "simulator_runtime_manifest_json",
+      "display_name": "Simulator Runtime Manifest",
+      "file_size_bytes": 12306,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/simulator_runtime_manifest.json"
+    },
+    {
+      "artifact_type": "trajectory_json",
+      "display_name": "Trajectory Samples",
+      "file_size_bytes": 917651,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/trajectory.json"
+    },
+    {
+      "artifact_type": "px4_ulog",
+      "display_name": "Retained PX4 ULog",
+      "file_size_bytes": 17259641,
+      "mime_type": "application/octet-stream",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/px4_source.ulg"
+    },
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 299,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/runner.log"
+    },
+    {
+      "artifact_type": "simulator_stdout",
+      "display_name": "Simulator stdout",
+      "file_size_bytes": 5669,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/stdout.log"
+    },
+    {
+      "artifact_type": "simulator_stderr",
+      "display_name": "Simulator stderr",
+      "file_size_bytes": 417,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/stderr.log"
+    },
+    {
+      "artifact_type": "offboard_executor_log",
+      "display_name": "Offboard Executor Log",
+      "file_size_bytes": 276,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/offboard_executor.log"
+    },
+    {
+      "artifact_type": "offboard_timing_json",
+      "display_name": "Offboard Timing",
+      "file_size_bytes": 279,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/offboard_timing.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Requested",
+      "file_size_bytes": 537,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/px4_parameters.requested.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Before",
+      "file_size_bytes": 555,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/px4_parameters.before.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Applied",
+      "file_size_bytes": 616,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/px4_parameters.applied.json"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-actuator-failure-working-tree-probe",
+    "seed": 62001,
+    "trial_id": "advanced-physics-actuator-failure-exact-793f020-seed-62001-attempt-1"
+  },
+  "failure": {
+    "code": "SIMULATION_FAILED",
+    "reason": "trusted evaluation window could not be established from offboard timing or telemetry"
+  },
+  "log_excerpt": "px4_gazebo_runner simulation failure: trusted evaluation window could not be established from offboard timing or telemetry",
+  "schema_version": "dronedream.trial_result.v2",
+  "success": false
+}

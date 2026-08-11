@@ -1,0 +1,153 @@
+{
+  "schema_id": "dronedream.benchmark-p5-job-bridge-receipt/v1",
+  "receipt_id": "benchmark-p5-job-bridge-f1b73ad",
+  "generated_at_utc": "2026-08-05T02:21:07.5974201Z",
+  "execution_subject": {
+    "repository_commit": "f1b73addb193cb7d3295efd289e469eca82ef99b",
+    "repository_tree": "0f3bd1d6029adbe1350c6d1bd12638b609602b25",
+    "branch": "codex/software",
+    "upstream": "origin/codex/software",
+    "upstream_commit_before_evidence": "f1b73addb193cb7d3295efd289e469eca82ef99b",
+    "worktree_clean_before_evidence": true,
+    "ahead": 0,
+    "behind": 0,
+    "evidence_commit": null,
+    "evidence_commit_semantics": "This receipt is committed after the execution subject and must not be treated as tested source."
+  },
+  "protocol": {
+    "path": "Z:\\DroneDream\\work\\DRONEDREAM_MODEL_HARNESS_BENCHMARK_PROTOCOL.md",
+    "sha256": "734bb6b42ec25ffc92bd9f15bb6fa27bc3482b4ce0841ce9aa3b080eafb8caee"
+  },
+  "resource_class": "YELLOW",
+  "source_closure": {
+    "commit": "f1b73addb193cb7d3295efd289e469eca82ef99b",
+    "summary": "Compile six complete source-bound P5 JobCreateRequest payloads and connect them to the immutable execution ledger through checkpoint and fake-transport protocols without external I/O.",
+    "files": [
+      {
+        "path": "backend/app/benchmarking/physical_stability.py",
+        "sha256": "8c00c026964957567e1b0c9e192c176463deb99a183b6fdc8121793fffbe165b"
+      },
+      {
+        "path": "backend/app/benchmarking/physical_stability_bridge.py",
+        "sha256": "6938e7ac2eac0ceb5dd14bbe3f615e3955ea762f9f217dfef906420b3faf9364"
+      },
+      {
+        "path": "backend/tests/test_benchmark_physical_stability_bridge.py",
+        "sha256": "a88a12b851f9bf19354d3af4b904d8a0d4d50472e8d757d8b642dc63aba06beb"
+      }
+    ],
+    "previous_execution_gate": {
+      "source_commit": "4f5b5a859827c87b184f36c68d8c48a592e3c4ae",
+      "evidence_commit": "a0178478e1e8ccba0a71cb9e7228ce26162a29b1",
+      "receipt_sha256": "d31dd44abf3bfc95e4c122734db95aebd2c94a739007a2c408b373e2a783823b",
+      "relationship": "The earlier authorization/ledger receipt remains exact evidence for its own source; this later source adds executable payload and transport-independent bridge contracts."
+    }
+  },
+  "execution_bundle_contract": {
+    "schema_id": "dronedream.physical-stability-execution-bundle/v1",
+    "terminal_observation_schema_id": "dronedream.physical-stability-terminal-observation/v1",
+    "properties": [
+      "Six complete JobCreateRequest payloads are reconstructed from the content-addressed source registry and validated against the frozen manifest before hashing.",
+      "Each Job contains one preregistered scenario, ten CRN seeds, real_cli, optimizer_strategy=none, zero provider turns/requests/retries, and no provider credentials.",
+      "The bundle binds source, manifest, trial plan, composite inventory, JobCreateRequest schema, six deterministic idempotency keys, six request hashes, and all sixty planned Trial input/effect hashes.",
+      "A checkpoint store must durably persist dispatch_attempted before the injected transport may issue one create call.",
+      "A checkpoint failure prevents I/O; a crash after durable dispatch but before Job observation requires manual read-only reconciliation and cannot automatically replay POST.",
+      "Terminal observations bind actual Job/Trial IDs to planned ordinal, seed, scenario type, fixed baseline candidate, input contract, effect request, required effect readbacks, parameter readback, telemetry, metrics, artifact inventory, and artifact content hashes.",
+      "Failed, timeout, cancelled, and indeterminate work remains in the ten-Trial denominator and cannot be overwritten by a completed claim."
+    ]
+  },
+  "preserved_failure": {
+    "stage": "first focused P5 Job bridge run",
+    "result": "2 failed, 22 passed; Ruff reported 4 line-length findings",
+    "root_causes": [
+      "Two negative tests converted strict tuple fields into lists, causing validation to stop at container type before reaching the intended payload-hash and missing-evidence assertions.",
+      "Four new source lines exceeded the repository's 100-character Ruff limit."
+    ],
+    "fix": "Keep the negative fixtures structurally valid tuples so they reach the intended security assertions, and wrap the four long lines without changing behavior.",
+    "expectations_weakened": false,
+    "external_io_or_rerun": false
+  },
+  "verification": [
+    {
+      "name": "P5 bridge plus preregistration, assessment, execution ledger, and campaign coordinator",
+      "command": "python -m pytest -q tests/test_benchmark_physical_stability_bridge.py tests/test_benchmark_physical_stability.py tests/test_benchmark_physical_stability_assessment.py tests/test_benchmark_physical_stability_execution.py tests/test_benchmark_campaign_contracts.py",
+      "result": "passed",
+      "passed": 47,
+      "failed": 0,
+      "duration_seconds": 38.06
+    },
+    {
+      "name": "Job API, repository hygiene, schema hardening, and secrets regression",
+      "command": "python -m pytest -q tests/test_jobs_api.py tests/test_repository_hygiene.py tests/test_schema_hardening.py tests/test_secrets.py",
+      "result": "passed",
+      "passed": 94,
+      "failed": 0,
+      "duration_seconds": 133.12
+    },
+    {
+      "name": "changed-source Ruff",
+      "result": "passed",
+      "summary": "All checks passed!"
+    },
+    {
+      "name": "changed-source Mypy",
+      "result": "passed",
+      "summary": "Success: no issues found in 2 source files"
+    },
+    {
+      "name": "changed-source compileall",
+      "result": "passed"
+    },
+    {
+      "name": "current-exact backend full suite",
+      "command": "C:\\Users\\zju20\\Documents\\Codex\\2026-07-25\\files-mentioned-by-the-user-drone\\work\\py311-ci-repro\\python.exe -m pytest",
+      "working_directory": "backend",
+      "result": "passed",
+      "passed": 1966,
+      "failed": 0,
+      "duration_seconds": 1913.67,
+      "stdout_summary": "1966 passed in 1913.67s (0:31:53)",
+      "raw_log_persisted": false,
+      "raw_log_sha256": null,
+      "raw_log_limitation": "The full terminal stream was observed through the existing process session but not redirected to a durable file; no raw-log hash or exact process start timestamp is claimed."
+    },
+    {
+      "name": "git diff check",
+      "result": "passed"
+    },
+    {
+      "name": "changed-scope sensitive-literal scan",
+      "result": "passed",
+      "sensitive_values_found": 0
+    }
+  ],
+  "execution_boundaries": {
+    "physical_trials_attempted": 0,
+    "desktop_or_job_api_requests": 0,
+    "px4_runs": 0,
+    "gazebo_runs": 0,
+    "provider_logical_turns": 0,
+    "provider_network_requests": 0,
+    "api_keys_read": false,
+    "account_credentials_read": false,
+    "headed_browser_runs": 0,
+    "global_mouse_moved": false,
+    "runtime_installations_or_migrations": 0,
+    "engine_pack_builds_or_activations": 0,
+    "production_deployments": 0,
+    "website_or_technical_report_writes": 0
+  },
+  "remaining_boundaries": {
+    "production_tauri_local_api_adapter": "not_implemented",
+    "durable_filesystem_checkpoint_adapter": "not_implemented",
+    "manual_unobserved_dispatch_reconciliation": "contract_only",
+    "actual_composite_inventory_binding": "not_generated_for_this_source",
+    "active_engine_pack_alignment": "not_reverified_in_this_closure",
+    "physical_stability_execution": "not_run",
+    "pilot_scenario_selection": "not_ready",
+    "p6_provider_approval_request": "not_ready",
+    "next_green_closure": "Implement the production Tauri/local-API and atomic checkpoint adapters behind the reviewed protocols, with a fully fake desktop/API harness and no real external I/O.",
+    "next_red_prerequisite": "After production adapters and current-exact gates are frozen, obtain a user-confirmed RED window before any Engine Pack alignment or physical execution."
+  },
+  "scope_claim": "This receipt proves complete P5 Job payload compilation and transport-independent resumable bridge behavior under offline tests. It does not prove a production desktop/local-API adapter exists or that any physical Trial ran."
+}

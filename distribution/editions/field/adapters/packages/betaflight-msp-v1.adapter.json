@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-adapter-package",
+  "adapterId": "betaflight-msp-v1",
+  "version": "1.0.0",
+  "editionId": "field",
+  "protocol": {
+    "family": "MultiWii Serial Protocol",
+    "dialect": "MSP v1 framing for Betaflight and compatible firmware",
+    "versions": [1],
+    "engine": "multiwii_serial_protocol-0.1.1",
+    "transportPolicy": "offline-captured-frame-only"
+  },
+  "capabilities": {
+    "deviceDiscovery": "unavailable",
+    "telemetryRead": "read-only",
+    "parameterRead": "quorum-required",
+    "parameterWrite": "quorum-required",
+    "arm": "quorum-required",
+    "flight": "quorum-required",
+    "autonomousTuning": "quorum-required"
+  },
+  "safety": {
+    "executableCode": false,
+    "installationGrantsAuthority": false,
+    "discoveryGrantsAuthority": false,
+    "zeroValidatedPackDecision": "deny"
+  },
+  "license": {
+    "protocolSpecification": "Betaflight MSP",
+    "parser": "MIT OR Apache-2.0",
+    "packageContent": "DroneDream-1.0"
+  }
+}

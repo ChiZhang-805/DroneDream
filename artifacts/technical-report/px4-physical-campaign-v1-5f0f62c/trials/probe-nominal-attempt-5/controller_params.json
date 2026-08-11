@@ -1,0 +1,8 @@
+{
+  "accel_limit": 4.0,
+  "disturbance_rejection": 0.5,
+  "kd_xy": 0.2,
+  "ki_xy": 0.05,
+  "kp_xy": 1.0,
+  "vel_limit": 5.0
+}

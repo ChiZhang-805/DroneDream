@@ -16,6 +16,9 @@ class CandidateEvaluation:
     violations: dict[str, float]
     feasible: bool
     total_violation: float
+    hard_constraint_violation: float
+    preference_loss: float
+    soft_constraint_penalty: float
     scalar_loss: float
     sample_count: int
 
@@ -23,9 +26,14 @@ class CandidateEvaluation:
 def _validated_values(values: Sequence[float]) -> list[float]:
     if not values:
         raise ValueError("at least one sample is required")
+    if any(
+        isinstance(value, bool) or not isinstance(value, int | float)
+        for value in values
+    ):
+        raise ValueError("metric samples must be finite numbers")
     result = [float(value) for value in values]
     if not all(math.isfinite(value) for value in result):
-        raise ValueError("metric samples must be finite")
+        raise ValueError("metric samples must be finite numbers")
     return result
 
 
@@ -34,21 +42,22 @@ def _validated_weights(count: int, weights: Sequence[float] | None) -> list[floa
         return [1.0] * count
     if len(weights) != count:
         raise ValueError("sample weights must match sample count")
+    if any(
+        isinstance(weight, bool) or not isinstance(weight, int | float)
+        for weight in weights
+    ):
+        raise ValueError("sample weights must be finite numbers and > 0")
     result = [float(weight) for weight in weights]
     if not all(math.isfinite(weight) and weight > 0 for weight in result):
-        raise ValueError("sample weights must be finite and > 0")
+        raise ValueError("sample weights must be finite numbers and > 0")
     return result
 
 
 def _weighted_mean(values: Sequence[float], weights: Sequence[float]) -> float:
-    return sum(value * weight for value, weight in zip(values, weights, strict=True)) / sum(
-        weights
-    )
+    return sum(value * weight for value, weight in zip(values, weights, strict=True)) / sum(weights)
 
 
-def _weighted_quantile(
-    values: Sequence[float], weights: Sequence[float], quantile: float
-) -> float:
+def _weighted_quantile(values: Sequence[float], weights: Sequence[float], quantile: float) -> float:
     ordered = sorted(zip(values, weights, strict=True), key=lambda item: item[0])
     threshold = max(0.0, min(1.0, quantile)) * sum(weights)
     cumulative = 0.0
@@ -66,9 +75,7 @@ def _weighted_tail_mean(
     fraction: float,
     highest: bool,
 ) -> float:
-    ordered = sorted(
-        zip(values, weights, strict=True), key=lambda item: item[0], reverse=highest
-    )
+    ordered = sorted(zip(values, weights, strict=True), key=lambda item: item[0], reverse=highest)
     target_weight = fraction * sum(weights)
     remaining = target_weight
     weighted_sum = 0.0
@@ -120,9 +127,7 @@ def aggregate_metric(
     raise ValueError(f"unsupported robust aggregation mode: {mode}")
 
 
-def _constraint_observed(
-    values: Sequence[float], constraint: ConstraintSpec
-) -> float:
+def _constraint_observed(values: Sequence[float], constraint: ConstraintSpec) -> float:
     samples = _validated_values(values)
     if constraint.operator in {"lt", "lte"}:
         return max(samples)
@@ -146,11 +151,18 @@ def _constraint_violation(value: float, constraint: ConstraintSpec) -> float:
     return raw / max(1.0, abs(threshold))
 
 
+def _constraint_key(constraint: ConstraintSpec) -> str:
+    return (
+        f"{constraint.metric}:{constraint.operator}:{constraint.threshold:g}"
+    )
+
+
 def _objective_value(
     samples: Sequence[Mapping[str, float]],
     objective: ObjectiveSpec,
     config: ObjectiveConfig,
     weights: Sequence[float] | None,
+    mode: str,
 ) -> float:
     try:
         values = [sample[objective.metric] for sample in samples]
@@ -159,7 +171,7 @@ def _objective_value(
     return aggregate_metric(
         values,
         direction=objective.direction,
-        mode=config.robust_aggregation,
+        mode=mode,
         weights=weights,
         cvar_alpha=config.cvar_alpha,
         percentile=config.percentile,
@@ -171,17 +183,31 @@ def evaluate_candidate(
     config: ObjectiveConfig,
     *,
     sample_weights: Sequence[float] | None = None,
+    constraint_samples: Sequence[Mapping[str, float]] | None = None,
+    objective_aggregation_mode: str | None = None,
 ) -> CandidateEvaluation:
     """Evaluate a candidate consistently across objectives and scenarios."""
 
     if not samples:
         raise ValueError("candidate evaluation requires at least one metric sample")
     _validated_weights(len(samples), sample_weights)
+    effective_constraint_samples = (
+        samples if constraint_samples is None else constraint_samples
+    )
+    if not effective_constraint_samples:
+        raise ValueError("constraint evaluation requires at least one metric sample")
     objectives: dict[str, float] = {}
-    scalar_loss = 0.0
+    preference_loss = 0.0
     total_objective_weight = sum(objective.weight for objective in config.objectives)
+    aggregation_mode = objective_aggregation_mode or config.robust_aggregation
     for objective in config.objectives:
-        value = _objective_value(samples, objective, config, sample_weights)
+        value = _objective_value(
+            samples,
+            objective,
+            config,
+            sample_weights,
+            aggregation_mode,
+        )
         objectives[objective.metric] = value
         if objective.target is None:
             oriented = value if objective.direction == "minimize" else -value
@@ -192,28 +218,38 @@ def evaluate_candidate(
             oriented = max(0.0, value - objective.target)
         else:
             oriented = max(0.0, objective.target - value)
-        scalar_loss += (
-            objective.weight / total_objective_weight
-        ) * oriented / objective.normalization
+        preference_loss += (
+            (objective.weight / total_objective_weight) * oriented / objective.normalization
+        )
 
     constraint_values: dict[str, float] = {}
     violations: dict[str, float] = {}
     hard_violation = False
     total_violation = 0.0
+    hard_constraint_violation = 0.0
+    soft_constraint_penalty = 0.0
     for constraint in config.constraints:
         try:
-            values = [sample[constraint.metric] for sample in samples]
+            values = [
+                sample[constraint.metric]
+                for sample in effective_constraint_samples
+            ]
         except KeyError as exc:
             raise ValueError(f"missing constraint metric: {constraint.metric}") from exc
         observed = _constraint_observed(values, constraint)
         violation = _constraint_violation(observed, constraint)
-        constraint_values[constraint.metric] = observed
+        key = _constraint_key(constraint)
+        constraint_values[key] = observed
         if violation > 0:
-            key = f"{constraint.metric}:{constraint.operator}:{constraint.threshold:g}"
             violations[key] = violation
             total_violation += violation
-            hard_violation = hard_violation or constraint.hard
-            scalar_loss += constraint.penalty * violation
+            if constraint.hard:
+                hard_violation = True
+                hard_constraint_violation += violation
+            else:
+                soft_constraint_penalty += constraint.penalty * violation
+
+    scalar_loss = preference_loss + soft_constraint_penalty
 
     return CandidateEvaluation(
         objectives=objectives,
@@ -221,6 +257,9 @@ def evaluate_candidate(
         violations=violations,
         feasible=not hard_violation,
         total_violation=total_violation,
+        hard_constraint_violation=hard_constraint_violation,
+        preference_loss=preference_loss,
+        soft_constraint_penalty=soft_constraint_penalty,
         scalar_loss=scalar_loss,
         sample_count=len(samples),
     )

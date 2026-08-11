@@ -13,9 +13,13 @@ never returned to callers or included in any persisted payload.
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import logging
 import math
+import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
@@ -26,10 +30,44 @@ from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
 from app.optimization.domain import ParameterDomain, SearchSpace
+from app.optimization.outcome_taxonomy import (
+    classify_trial_outcome,
+    is_optimizer_learning_failure,
+    is_optimizer_learning_outcome,
+)
+from app.optimization.scenarios import resolve_scenario_case
 from app.orchestration import constants
 from app.orchestration.acceptance import AcceptanceCriteria
+from app.orchestration.cognitive_budget import (
+    CognitiveTurnAttempt,
+    begin_cognitive_turn,
+    cancel_cognitive_turn_if_job_terminal,
+    empty_tool_outputs_sha256,
+    finish_cognitive_turn,
+    recover_existing_cognitive_turn,
+)
 from app.orchestration.events import record_event
 from app.orchestration.parameter_constraints import validator_for_job
+from app.orchestration.provider_feedback import compile_candidate_feedback
+from app.orchestration.provider_request_accounting import (
+    BoundProviderRequestAccountant,
+    ProviderRequestAttempt,
+    ProviderUsage,
+    RequestKind,
+    provider_request_outcome_pending,
+    unavailable_price_snapshot,
+)
+from app.parameters import (
+    SUPPORTED_PX4_VERSIONS,
+    SUPPORTED_TRIAL_METRICS,
+    SUPPORTED_VEHICLE_TYPES,
+    classify_airframe,
+)
+from app.simulator.base import (
+    FAILURE_SIMULATION,
+    FAILURE_TIMEOUT,
+    FAILURE_UNSTABLE,
+)
 
 logger = logging.getLogger("drone_dream.orchestration.llm")
 
@@ -40,19 +78,56 @@ _MIN_PROPOSALS = 1
 _MAX_RESPONSE_NODES = 10_000
 _MAX_RESPONSE_DEPTH = 16
 _MAX_PROMPT_CANDIDATES = 8
+LLM_PROPOSER_PROMPT_SCHEMA_VERSION = "2.3"
 _PROMPT_AGGREGATE_KEYS = (
     "rmse",
     "max_error",
+    "max_error_worst",
     "overshoot_count",
     "completion_time",
     "aggregated_score",
-    "objective_values",
-    "constraint_values",
-    "constraint_violations",
+    "scalar_loss",
     "feasible",
-    "total_violation",
+    "total_constraint_violation",
+    "optimizer_learning_failure_rate",
+)
+_SAFE_SCENARIO_CONFIG_KEYS = frozenset(
+    {
+        "wind_mps",
+        "dropout_rate",
+        "mass_payload_kg",
+        "delay_ms",
+        "intensity",
+    }
+)
+_SAFE_OPTIMIZER_FAILURE_CODES = frozenset(
+    {
+        FAILURE_TIMEOUT,
+        FAILURE_SIMULATION,
+        FAILURE_UNSTABLE,
+    }
+)
+_SAFE_OBJECTIVE_METRICS = frozenset(
+    {
+        *SUPPORTED_TRIAL_METRICS,
+        "completion_rate",
+        "failed_trial_rate",
+        "failure_rate",
+        "pass_rate",
+    }
 )
 _INVALID_PROMPT_VALUE = object()
+
+
+def _canonical_sha256(value: object) -> str:
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _is_unsupported_response_format_error(exc: Exception) -> bool:
@@ -66,8 +141,7 @@ def _is_unsupported_response_format_error(exc: Exception) -> bool:
         return False
     message = str(exc).lower()
     return "response_format" in message and any(
-        marker in message
-        for marker in ("unsupported", "not supported", "unknown", "unrecognized")
+        marker in message for marker in ("unsupported", "not supported", "unknown", "unrecognized")
     )
 
 
@@ -86,6 +160,13 @@ def _safe_nonnegative_int(value: Any, *, default: int = 0) -> int:
     numeric = _finite_number(value)
     if numeric is None or numeric < 0 or not numeric.is_integer():
         return default
+    return int(numeric)
+
+
+def _optional_nonnegative_int(value: Any) -> int | None:
+    numeric = _finite_number(value)
+    if numeric is None or numeric < 0 or not numeric.is_integer():
+        return None
     return int(numeric)
 
 
@@ -146,8 +227,7 @@ class LlmProposerResult:
 class OpenAIClientLike(Protocol):
     """Narrow protocol satisfied by the real ``openai.OpenAI`` client and tests."""
 
-    def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
-        ...
+    def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]: ...
 
 
 class OpenAIJsonClient:
@@ -169,13 +249,55 @@ class OpenAIJsonClient:
         timeout_seconds: float = 60.0,
         max_retries: int = 1,
         max_response_bytes: int = 1_000_000,
+        temperature: float | None = None,
+        top_p: float | None = None,
+        seed: int | None = None,
+        price_snapshot: schemas.ProviderPriceSnapshot | None = None,
+        request_accountant: BoundProviderRequestAccountant | None = None,
     ) -> None:
+        if temperature is not None and (
+            isinstance(temperature, bool)
+            or not isinstance(temperature, (int, float))
+            or not math.isfinite(float(temperature))
+            or not 0.0 <= float(temperature) <= 2.0
+        ):
+            raise ValueError("temperature must be a finite number between 0 and 2")
+        if top_p is not None and (
+            isinstance(top_p, bool)
+            or not isinstance(top_p, (int, float))
+            or not math.isfinite(float(top_p))
+            or not 0.0 < float(top_p) <= 1.0
+        ):
+            raise ValueError("top_p must be a finite number greater than 0 and at most 1")
+        if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
+            raise ValueError("seed must be an integer")
+        if (
+            isinstance(max_retries, bool)
+            or not isinstance(max_retries, int)
+            or not 0 <= max_retries <= 5
+        ):
+            raise ValueError("max_retries must be an integer between 0 and 5")
         self._api_key = api_key
         self._proposal_schema = proposal_schema
         self._base_url = base_url
         self._timeout_seconds = timeout_seconds
         self._max_retries = max_retries
         self._max_response_bytes = max_response_bytes
+        self._temperature = None if temperature is None else float(temperature)
+        self._top_p = None if top_p is None else float(top_p)
+        self._seed = seed
+        self._price_snapshot = price_snapshot or unavailable_price_snapshot()
+        self._request_accountant = request_accountant
+
+    def with_request_accountant(
+        self,
+        accountant: BoundProviderRequestAccountant,
+    ) -> OpenAIJsonClient:
+        """Return an isolated client view bound to one durable cognitive turn."""
+
+        bound = copy.copy(self)
+        bound._request_accountant = accountant
+        return bound
 
     def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
         try:
@@ -189,7 +311,10 @@ class OpenAIJsonClient:
         client_kwargs: dict[str, Any] = {
             "api_key": self._api_key,
             "timeout": self._timeout_seconds,
-            "max_retries": self._max_retries,
+            # SDK retries are intentionally disabled because they obscure the
+            # number of actual HTTP requests. Product retries are explicit
+            # below and each receives its own durable receipt.
+            "max_retries": 0,
         }
         if self._base_url:
             client_kwargs["base_url"] = self._base_url
@@ -209,26 +334,123 @@ class OpenAIJsonClient:
                     "strict": True,
                 },
             }
+
+        def request_body(*, include_response_format: bool) -> dict[str, Any]:
+            body: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+            }
+            for name, value in (
+                ("temperature", self._temperature),
+                ("top_p", self._top_p),
+                ("seed", self._seed),
+            ):
+                if value is not None:
+                    body[name] = value
+            if include_response_format:
+                body["response_format"] = response_format
+            return body
+
+        retries_used = 0
+
+        def explicit_request(
+            *,
+            include_response_format: bool,
+            initial_kind: RequestKind,
+        ) -> Any:
+            nonlocal retries_used
+            body = request_body(include_response_format=include_response_format)
+            accountant = self._request_accountant
+            # Exact retries reuse one idempotency key. The compatibility body
+            # is a distinct request and therefore receives a distinct key.
+            idempotency_key = f"dd-{uuid.uuid4()}"
+            request_kind = initial_kind
+            while True:
+                accounting_attempt: ProviderRequestAttempt | None = None
+                if accountant is not None:
+                    accounting_attempt = accountant.begin(
+                        request_kind=request_kind,
+                        model_snapshot=model,
+                        api_surface="chat_completions",
+                        base_url=self._base_url or "https://api.openai.com/v1",
+                        temperature=self._temperature,
+                        top_p=self._top_p,
+                        provider_seed=self._seed,
+                        response_schema_sha256=_canonical_sha256(
+                            self._proposal_schema
+                        ),
+                        prompt_sha256=hashlib.sha256(
+                            f"{system}\n{user}".encode()
+                        ).hexdigest(),
+                        request_body=body,
+                        price_snapshot=self._price_snapshot,
+                    )
+                started_ns = time.perf_counter_ns()
+                try:
+                    chat = client.chat.completions.create(
+                        **body,
+                        extra_headers={"Idempotency-Key": idempotency_key},
+                    )
+                except Exception as exc:
+                    latency_ms = max(0, (time.perf_counter_ns() - started_ns) // 1_000_000)
+                    unsupported = _is_unsupported_response_format_error(exc)
+                    if accounting_attempt is not None and accountant is not None:
+                        accountant.fail(
+                            accounting_attempt,
+                            latency_ms=latency_ms,
+                            error_code=(
+                                "unsupported_response_format"
+                                if unsupported
+                                else "provider_request_failed"
+                            ),
+                        )
+                    if unsupported or retries_used >= self._max_retries:
+                        raise
+                    retries_used += 1
+                    request_kind = "retry"
+                    continue
+
+                content = chat.choices[0].message.content or "{}"
+                usage = getattr(chat, "usage", None)
+                if accounting_attempt is not None and accountant is not None:
+                    accountant.succeed(
+                        accounting_attempt,
+                        response_content=content,
+                        usage=ProviderUsage(
+                            input_tokens=_optional_nonnegative_int(
+                                getattr(usage, "prompt_tokens", None)
+                            ),
+                            output_tokens=_optional_nonnegative_int(
+                                getattr(usage, "completion_tokens", None)
+                            ),
+                            total_tokens=_optional_nonnegative_int(
+                                getattr(usage, "total_tokens", None)
+                            ),
+                        ),
+                        latency_ms=max(
+                            0,
+                            (time.perf_counter_ns() - started_ns) // 1_000_000,
+                        ),
+                    )
+                return chat
+
         try:
-            chat = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                response_format=response_format,
+            chat = explicit_request(
+                include_response_format=True,
+                initial_kind="primary",
             )
         except Exception as exc:
             if not self._base_url or not _is_unsupported_response_format_error(exc):
                 raise
             # Some OpenAI-compatible providers accept chat completions but not
             # response_format. The prompt and local validator remain strict.
-            chat = client.chat.completions.create(
-                model=model,
-                messages=messages,
+            chat = explicit_request(
+                include_response_format=False,
+                initial_kind="compatibility_fallback",
             )
         content = chat.choices[0].message.content or "{}"
         if len(content.encode("utf-8")) > self._max_response_bytes:
-            raise RuntimeError(
-                f"LLM response exceeds {self._max_response_bytes} byte limit"
-            )
+            raise RuntimeError(f"LLM response exceeds {self._max_response_bytes} byte limit")
         try:
             return json.loads(  # type: ignore[no-any-return]
                 content,
@@ -238,7 +460,29 @@ class OpenAIJsonClient:
             raise RuntimeError(f"OpenAI returned non-JSON content: {exc}") from exc
 
 
+def bind_provider_request_accounting(
+    client: OpenAIClientLike,
+    db: Session,
+    job: models.Job,
+    *,
+    cognitive_turn_receipt_id: str,
+) -> OpenAIClientLike:
+    """Bind the real adapter to a turn; fake/local clients remain unchanged."""
+
+    if not isinstance(client, OpenAIJsonClient):
+        return client
+    return client.with_request_accountant(
+        BoundProviderRequestAccountant(
+            db,
+            job,
+            cognitive_turn_receipt_id=cognitive_turn_receipt_id,
+            provider=job.llm_provider or "openai",
+        )
+    )
+
+
 # --- JSON schema used for structured outputs ---------------------------
+
 
 def _proposal_schema(search_space: SearchSpace) -> dict[str, Any]:
     parameter_properties: dict[str, Any] = {}
@@ -313,9 +557,7 @@ def _search_space_for_job(job: models.Job) -> SearchSpace:
     )
 
 
-def _sanitize(
-    parameters: dict[str, Any], search_space: SearchSpace
-) -> dict[str, float] | None:
+def _sanitize(parameters: dict[str, Any], search_space: SearchSpace) -> dict[str, float] | None:
     parameter_keys = {domain.name for domain in search_space.domains}
     if set(parameters) != parameter_keys:
         return None
@@ -347,8 +589,7 @@ def _is_safe_response_tree(value: Any) -> bool:
             return all(visit(item, depth + 1) for item in node)
         if isinstance(node, dict):
             return all(
-                isinstance(key, str) and visit(item, depth + 1)
-                for key, item in node.items()
+                isinstance(key, str) and visit(item, depth + 1) for key, item in node.items()
             )
         return False
 
@@ -379,11 +620,18 @@ def load_job_api_key(db: Session, job: models.Job) -> str | None:
         # Flush before returning so another code path in this transaction
         # cannot accidentally reuse an expired credential.
         db.flush()
+    expected_secret_provider = (
+        "dronedream_gateway" if job.llm_provider == "dronedream" else "openai"
+    )
     secret = next(
         (
             s
             for s in sorted(job.secrets, key=lambda s: s.created_at, reverse=True)
-            if s.provider == "openai" and s.deleted_at is None and s.encrypted_api_key
+            if (
+                s.provider == expected_secret_provider
+                and s.deleted_at is None
+                and s.encrypted_api_key
+            )
         ),
         None,
     )
@@ -400,16 +648,135 @@ def load_job_api_key(db: Session, job: models.Job) -> str | None:
 _load_api_key = load_job_api_key
 
 
+def _compile_vehicle_profile(job: models.Job) -> dict[str, Any]:
+    profile = schemas.VehicleProfileConfig(**(job.vehicle_profile_json or {}))
+    try:
+        airframe_family = classify_airframe(profile.airframe)
+    except ValueError:
+        airframe_family = "custom_multicopter"
+    return {
+        "px4_version": (
+            profile.px4_version
+            if profile.px4_version in SUPPORTED_PX4_VERSIONS
+            else "custom_px4_version"
+        ),
+        "firmware_commit": profile.firmware_commit,
+        "vehicle_type": (
+            profile.vehicle_type
+            if profile.vehicle_type in SUPPORTED_VEHICLE_TYPES
+            else "custom_vehicle_type"
+        ),
+        "airframe_family": airframe_family,
+        "simulator_model_kind": (
+            "gazebo_px4" if profile.simulator_model.startswith("gz_") else "custom"
+        ),
+        "world_kind": "default" if profile.world == "default" else "custom",
+        "headless": profile.headless,
+        "simulation_speed_factor": profile.simulation_speed_factor,
+        "instance_id": profile.instance_id,
+    }
+
+
+def _compile_objective_contract(job: models.Job) -> dict[str, Any]:
+    config = schemas.ObjectiveConfig(**(job.objective_config_json or {}))
+    objectives = [
+        {
+            "metric": (
+                objective.metric
+                if objective.metric in _SAFE_OBJECTIVE_METRICS
+                else f"custom_objective_{index + 1}"
+            ),
+            "direction": objective.direction,
+            "weight": objective.weight,
+            "normalization": objective.normalization,
+            "target": objective.target,
+        }
+        for index, objective in enumerate(config.objectives)
+    ]
+    constraints = [
+        {
+            "metric": (
+                constraint.metric
+                if constraint.metric in _SAFE_OBJECTIVE_METRICS
+                else f"custom_constraint_{index + 1}"
+            ),
+            "operator": constraint.operator,
+            "threshold": constraint.threshold,
+            "hard": constraint.hard,
+            "penalty": constraint.penalty,
+        }
+        for index, constraint in enumerate(config.constraints)
+    ]
+    return {
+        "objectives": objectives,
+        "constraints": constraints,
+        "robust_aggregation": config.robust_aggregation,
+        "cvar_alpha": config.cvar_alpha,
+        "percentile": config.percentile,
+    }
+
+
+def _compile_scenario_contract(
+    job: models.Job,
+    *,
+    compact: bool = False,
+) -> dict[str, Any]:
+    suite = schemas.ScenarioSuiteConfig(**(job.scenario_suite_json or {}))
+    training_cases = [case for case in suite.cases if case.enabled and not case.holdout]
+    holdout_cases = [case for case in suite.cases if case.enabled and case.holdout]
+    training_aliases = {
+        case.id: f"training_case_{index + 1}" for index, case in enumerate(training_cases)
+    }
+    training_type_counts: dict[str, int] = {}
+    for case in training_cases:
+        training_type_counts[case.scenario_type] = (
+            training_type_counts.get(case.scenario_type, 0) + 1
+        )
+    payload: dict[str, Any] = {
+        "schema_version": "1.0",
+        "common_random_numbers": suite.common_random_numbers,
+        "training_case_count": len(training_cases),
+        "training_replicate_count": sum(len(case.seeds) for case in training_cases),
+        "training_type_counts": dict(sorted(training_type_counts.items())),
+        "holdout_case_count": len(holdout_cases),
+        "holdout_replicate_count": sum(len(case.seeds) for case in holdout_cases),
+    }
+    if compact:
+        return payload
+    payload["training_cases"] = [
+        {
+            "case_alias": training_aliases[case.id],
+            "scenario_type": case.scenario_type,
+            "seed_count": len(case.seeds),
+            "weight": case.weight,
+            "config": {
+                key: numeric
+                for key in sorted(_SAFE_SCENARIO_CONFIG_KEYS)
+                if (numeric := _finite_number(case.config.get(key))) is not None
+            },
+        }
+        for case in training_cases
+    ]
+    return payload
+
+
 def _build_prompt(
     job: models.Job,
     criteria: AcceptanceCriteria,
     candidates: list[models.CandidateParameterSet],
     search_space: SearchSpace,
 ) -> tuple[str, str, dict[str, Any]]:
+    scenario_suite = schemas.ScenarioSuiteConfig(**(job.scenario_suite_json or {}))
+    training_cases = [case for case in scenario_suite.cases if case.enabled and not case.holdout]
+    training_case_aliases = {
+        case.id: f"training_case_{index + 1}" for index, case in enumerate(training_cases)
+    }
     system = (
         "You are an expert drone-control tuning assistant. Your job is to "
         "propose only the user-selected PX4 control parameters that improve "
         "simulator metrics under the configured scenario matrix and constraints. "
+        "Treat each scenario case alias as a distinct experimental condition; "
+        "never merge cases solely because they share a scenario_type. "
         "You must return only structured JSON conforming to the "
         "provided schema — no free-form text."
     )
@@ -426,19 +793,26 @@ def _build_prompt(
         }
         for domain in search_space.domains
     }
+    feedback_by_id = {
+        candidate.id: compile_candidate_feedback(
+            candidate,
+            scenario_suite=scenario_suite,
+        )
+        for candidate in candidates
+    }
 
     selected_history: dict[str, models.CandidateParameterSet] = {}
     for candidate in candidates:
         if candidate.is_baseline:
             selected_history[candidate.id] = candidate
     for candidate in sorted(
-        (
-            item
-            for item in candidates
-            if _finite_number(item.aggregated_score) is not None
-        ),
+        (item for item in candidates if feedback_by_id[item.id].score is not None),
         key=lambda item: (
-            item.aggregated_score if item.aggregated_score is not None else float("inf"),
+            (
+                feedback_by_id[item.id].score
+                if feedback_by_id[item.id].score is not None
+                else float("inf")
+            ),
             item.generation_index,
         ),
     )[:2]:
@@ -458,30 +832,122 @@ def _build_prompt(
         selected_history.values(),
         key=lambda c: (c.generation_index, not c.is_baseline, c.id),
     ):
-        agg = cand.aggregated_metric_json or {}
-        trial_count = _safe_nonnegative_int(
-            agg.get("training_trial_count", cand.trial_count or 0)
-        )
-        completed_trial_count = min(
-            trial_count,
-            _safe_nonnegative_int(
-                agg.get(
-                    "training_completed_trial_count",
-                    cand.completed_trial_count or 0,
-                )
-            ),
-        )
-        passing_trial_count = min(
-            completed_trial_count,
-            _safe_nonnegative_int(
-            agg.get(
-                "training_passing_trial_count", agg.get("passing_trial_count", 0)
+        feedback = feedback_by_id[cand.id]
+        agg = feedback.aggregate
+        trial_count = 0
+        completed_trial_count = 0
+        failed_trial_count = 0
+        passing_trial_count = 0
+        scenario_feedback: dict[str, dict[str, Any]] = {}
+        trusted_trials = (
+            sorted(
+                cand.trials,
+                key=lambda trial: (
+                    trial.scenario_type,
+                    trial.seed,
+                    trial.id,
+                ),
             )
-            ),
+            if feedback.usable
+            else ()
         )
-        completion_rate = (
-            (completed_trial_count / trial_count) if trial_count > 0 else 0.0
-        )
+        for trial in trusted_trials:
+            resolution = resolve_scenario_case(
+                scenario_suite,
+                scenario_type=trial.scenario_type,
+                scenario_config=trial.scenario_config_json,
+                seed=trial.seed,
+            )
+            if not resolution.matched or resolution.case is None or resolution.case.holdout:
+                continue
+            scenario_case = resolution.case
+            case_alias = training_case_aliases.get(scenario_case.id)
+            if case_alias is None:
+                continue
+            metric = trial.metric
+            rmse = _finite_number(metric.rmse) if metric is not None else None
+            max_error = _finite_number(metric.max_error) if metric is not None else None
+            completion_time = _finite_number(metric.completion_time) if metric is not None else None
+            usable_metric = (
+                trial.status == "COMPLETED"
+                and metric is not None
+                and rmse is not None
+                and max_error is not None
+                and completion_time is not None
+            )
+            outcome_class = classify_trial_outcome(
+                status=trial.status,
+                failure_code=trial.failure_code,
+                usable_metric=usable_metric,
+            )
+            if not is_optimizer_learning_outcome(outcome_class):
+                continue
+            trial_count += 1
+            bucket = scenario_feedback.setdefault(
+                scenario_case.id,
+                {
+                    "case_alias": case_alias,
+                    "scenario_type": scenario_case.scenario_type,
+                    "weight": scenario_case.weight,
+                    "configured_seed_count": len(scenario_case.seeds),
+                    "config": {
+                        key: numeric
+                        for key in sorted(_SAFE_SCENARIO_CONFIG_KEYS)
+                        if (numeric := _finite_number(scenario_case.config.get(key))) is not None
+                    },
+                    "trial_count": 0,
+                    "completed_count": 0,
+                    "passing_count": 0,
+                    "rmse_sum": 0.0,
+                    "max_error_sum": 0.0,
+                    "completion_time_sum": 0.0,
+                    "failure_codes": {},
+                },
+            )
+            bucket["trial_count"] += 1
+            if outcome_class == "success" and metric is not None:
+                if rmse is None or max_error is None or completion_time is None:
+                    raise RuntimeError(
+                        "successful optimizer-learning outcome lost its usable metrics"
+                    )
+                completed_trial_count += 1
+                passing_trial_count += int(metric.pass_flag)
+                bucket["completed_count"] += 1
+                bucket["passing_count"] += int(metric.pass_flag)
+                bucket["rmse_sum"] += rmse
+                bucket["max_error_sum"] += max_error
+                bucket["completion_time_sum"] += completion_time
+            elif is_optimizer_learning_failure(outcome_class):
+                failed_trial_count += 1
+                codes = bucket["failure_codes"]
+                failure_code = (
+                    trial.failure_code
+                    if trial.failure_code in _SAFE_OPTIMIZER_FAILURE_CODES
+                    else "OTHER"
+                )
+                codes[failure_code] = int(codes.get(failure_code, 0)) + 1
+        compact_feedback: list[dict[str, Any]] = []
+        for scenario_case in training_cases:
+            case_bucket = scenario_feedback.get(scenario_case.id)
+            if case_bucket is None:
+                continue
+            completed_count = int(case_bucket.pop("completed_count"))
+            rmse_sum = float(case_bucket.pop("rmse_sum"))
+            max_error_sum = float(case_bucket.pop("max_error_sum"))
+            completion_sum = float(case_bucket.pop("completion_time_sum"))
+            case_bucket["failure_codes"] = dict(sorted(case_bucket["failure_codes"].items()))
+            case_bucket["completed_count"] = completed_count
+            case_bucket["mean_rmse"] = (
+                round(rmse_sum / completed_count, 6) if completed_count else None
+            )
+            case_bucket["mean_max_error"] = (
+                round(max_error_sum / completed_count, 6) if completed_count else None
+            )
+            case_bucket["mean_completion_time"] = (
+                round(completion_sum / completed_count, 6) if completed_count else None
+            )
+            compact_feedback.append(case_bucket)
+        completion_rate = completed_trial_count / trial_count if trial_count > 0 else 0.0
         prompt_aggregate: dict[str, Any] = {}
         for key in _PROMPT_AGGREGATE_KEYS:
             if key not in agg:
@@ -493,95 +959,31 @@ def _build_prompt(
             {
                 "trial_count": trial_count,
                 "completed_trial_count": completed_trial_count,
-                "failed_trial_count": min(
-                    trial_count,
-                    _safe_nonnegative_int(
-                        agg.get(
-                            "training_failed_trial_count",
-                            cand.failed_trial_count or 0,
-                        )
-                    ),
-                ),
+                "failed_trial_count": failed_trial_count,
                 "passing_trial_count": passing_trial_count,
+                "optimizer_learning_failure_rate": (
+                    round(failed_trial_count / trial_count, 8) if trial_count > 0 else 0.0
+                ),
             }
         )
-        for key in (
-            "training_trial_count",
-            "training_completed_trial_count",
-            "training_failed_trial_count",
-            "training_passing_trial_count",
-        ):
-            prompt_aggregate.pop(key, None)
-        scenario_feedback: dict[str, dict[str, Any]] = {}
-        for trial in sorted(cand.trials, key=lambda t: (t.created_at, t.id)):
-            if bool((trial.scenario_config_json or {}).get("holdout")):
-                continue
-            metric = trial.metric
-            bucket = scenario_feedback.setdefault(
-                trial.scenario_type,
-                {
-                    "scenario_type": trial.scenario_type,
-                    "trial_count": 0,
-                    "completed_count": 0,
-                    "passing_count": 0,
-                    "rmse_sum": 0.0,
-                    "max_error_sum": 0.0,
-                    "completion_time_sum": 0.0,
-                    "failure_codes": {},
-                },
-            )
-            bucket["trial_count"] += 1
-            if metric is not None:
-                rmse = _finite_number(metric.rmse)
-                max_error = _finite_number(metric.max_error)
-                completion_time = _finite_number(metric.completion_time)
-                if rmse is None or max_error is None or completion_time is None:
-                    continue
-                bucket["completed_count"] += 1
-                bucket["passing_count"] += int(metric.pass_flag)
-                bucket["rmse_sum"] += rmse
-                bucket["max_error_sum"] += max_error
-                bucket["completion_time_sum"] += completion_time
-            elif trial.failure_code:
-                codes = bucket["failure_codes"]
-                codes[trial.failure_code] = int(codes.get(trial.failure_code, 0)) + 1
-        compact_feedback: list[dict[str, Any]] = []
-        for bucket in scenario_feedback.values():
-            completed_count = int(bucket.pop("completed_count"))
-            rmse_sum = float(bucket.pop("rmse_sum"))
-            max_error_sum = float(bucket.pop("max_error_sum"))
-            completion_sum = float(bucket.pop("completion_time_sum"))
-            bucket["completed_count"] = completed_count
-            bucket["mean_rmse"] = (
-                round(rmse_sum / completed_count, 6) if completed_count else None
-            )
-            bucket["mean_max_error"] = (
-                round(max_error_sum / completed_count, 6)
-                if completed_count
-                else None
-            )
-            bucket["mean_completion_time"] = (
-                round(completion_sum / completed_count, 6)
-                if completed_count
-                else None
-            )
-            compact_feedback.append(bucket)
         prior.append(
             {
-                "candidate_id": cand.id,
-                "label": cand.label,
                 "generation_index": cand.generation_index,
+                "source_type": (
+                    cand.source_type
+                    if cand.source_type in {"baseline", "optimizer", "llm_optimizer"}
+                    else "unknown"
+                ),
+                "feedback_status": feedback.feedback_status,
                 "parameters": {
                     key: value
                     for key, value in (cand.parameter_json or {}).items()
                     if key in domain_names and _finite_number(value) is not None
                 },
                 "aggregated_metrics": prompt_aggregate,
-                "aggregated_score": _finite_number(cand.aggregated_score),
+                "aggregated_score": feedback.score,
                 "pass_rate": (
-                    round((passing_trial_count / trial_count), 4)
-                    if trial_count > 0
-                    else 0.0
+                    round((passing_trial_count / trial_count), 4) if trial_count > 0 else 0.0
                 ),
                 "completion_rate": round(completion_rate, 4),
                 "passing_trial_count": passing_trial_count,
@@ -592,6 +994,7 @@ def _build_prompt(
         )
 
     user_payload = {
+        "prompt_schema_version": LLM_PROPOSER_PROMPT_SCHEMA_VERSION,
         "objective_profile": job.objective_profile,
         "simulator_backend": job.simulator_backend_requested,
         "track_type": job.track_type,
@@ -608,12 +1011,12 @@ def _build_prompt(
             "target_max_error": criteria.target_max_error,
             "min_pass_rate": criteria.min_pass_rate,
         },
-        "vehicle_profile": _safe_prompt_value(dict(job.vehicle_profile_json or {})),
+        "vehicle_profile": _compile_vehicle_profile(job),
         "parameter_catalog_version": job.parameter_catalog_version,
         "parameter_domains": parameter_domains,
         "baseline_parameters": search_space.baseline(),
-        "objective_config": _safe_prompt_value(dict(job.objective_config_json or {})),
-        "scenario_suite": _safe_prompt_value(dict(job.scenario_suite_json or {})),
+        "objective_config": _compile_objective_contract(job),
+        "scenario_suite": _compile_scenario_contract(job),
         "previous_candidates": prior,
         "current_generation": job.current_generation,
         "max_iterations": job.max_iterations,
@@ -639,11 +1042,7 @@ def _build_prompt(
     encoded = serialize()
     while len(encoded.encode("utf-8")) > settings.llm_max_prompt_bytes:
         removable_index = next(
-            (
-                index
-                for index, item in enumerate(prior)
-                if not bool(item.get("is_baseline"))
-            ),
+            (index for index, item in enumerate(prior) if not bool(item.get("is_baseline"))),
             None,
         )
         if removable_index is None:
@@ -651,34 +1050,16 @@ def _build_prompt(
         prior.pop(removable_index)
         encoded = serialize()
     if len(encoded.encode("utf-8")) > settings.llm_max_prompt_bytes:
-        suite = job.scenario_suite_json or {}
-        cases = suite.get("cases", []) if isinstance(suite, dict) else []
-        user_payload["scenario_suite"] = {
-            "common_random_numbers": bool(
-                suite.get("common_random_numbers", True)
-                if isinstance(suite, dict)
-                else True
-            ),
-            "cases": [
-                {
-                    "id": case.get("id"),
-                    "scenario_type": case.get("scenario_type"),
-                    "seed_count": len(case.get("seeds", [])),
-                    "weight": case.get("weight"),
-                    "enabled": case.get("enabled"),
-                    "holdout": case.get("holdout"),
-                }
-                for case in cases
-                if isinstance(case, dict)
-            ],
-        }
+        user_payload["scenario_suite"] = _compile_scenario_contract(
+            job,
+            compact=True,
+        )
         scenario_suite_compacted = True
         encoded = serialize()
     prompt_bytes = len(encoded.encode("utf-8"))
     if prompt_bytes > settings.llm_max_prompt_bytes:
         raise RuntimeError(
-            f"LLM prompt exceeds {settings.llm_max_prompt_bytes} byte limit "
-            "after safe compaction"
+            f"LLM prompt exceeds {settings.llm_max_prompt_bytes} byte limit after safe compaction"
         )
     prompt_metadata = {
         "history_total": len(candidates),
@@ -742,7 +1123,7 @@ def propose_candidates(
             proposal_schema=_proposal_schema(search_space),
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
-            max_retries=settings.llm_max_retries,
+            max_retries=job.provider_max_retries,
             max_response_bytes=settings.llm_max_response_bytes,
         )
 
@@ -758,37 +1139,110 @@ def propose_candidates(
         },
     )
 
+    attempt: CognitiveTurnAttempt | None = None
     try:
         system, user, prompt_metadata = _build_prompt(
             job, criteria, list(job.candidates), search_space
         )
-        if (
-            prompt_metadata["history_omitted"]
-            or prompt_metadata["scenario_suite_compacted"]
-        ):
+        if prompt_metadata["history_omitted"] or prompt_metadata["scenario_suite_compacted"]:
             record_event(db, job.id, "llm_prompt_compacted", prompt_metadata)
+        generation = job.current_generation + 1
+        turn_state = recover_existing_cognitive_turn(
+            db,
+            job,
+            generation_index=generation,
+            turn_index=1,
+        )
+        if turn_state != "new":
+            reason = (
+                "provider_turn_pending"
+                if turn_state == "pending"
+                else "provider_turn_consumed"
+            )
+            record_event(
+                db,
+                job.id,
+                "llm_proposal_failed",
+                {"reason": reason, "model": chosen_model},
+            )
+            return LlmProposerResult(error=reason, model=chosen_model)
+        proposal_schema = _proposal_schema(search_space)
+        attempt = begin_cognitive_turn(
+            db,
+            job,
+            generation_index=generation,
+            turn_index=1,
+            turn_role="plan",
+            trigger_reasons=("direct_single_turn_proposal",),
+            model_snapshot=chosen_model,
+            prompt_sha256=hashlib.sha256(f"{system}\n{user}".encode()).hexdigest(),
+            evidence_sha256=hashlib.sha256(user.encode()).hexdigest(),
+            schema_sha256=_canonical_sha256(proposal_schema),
+            tool_outputs_sha256=empty_tool_outputs_sha256(),
+        )
+        effective_client = bind_provider_request_accounting(
+            effective_client,
+            db,
+            job,
+            cognitive_turn_receipt_id=attempt.receipt_id,
+        )
         raw = effective_client.generate(model=chosen_model, system=system, user=user)
     except Exception as exc:  # OpenAI client failure, network, etc.
+        pending_request = bool(
+            attempt is not None
+            and provider_request_outcome_pending(
+                db,
+                cognitive_turn_receipt_id=attempt.receipt_id,
+            )
+        )
+        if attempt is not None and not pending_request:
+            finish_cognitive_turn(
+                db,
+                job,
+                attempt,
+                status="provider_failed",
+                error_code="client_error",
+            )
         error_type = type(exc).__name__
         logger.warning(
             "LLM proposer call failed for job %s (error_type=%s)",
             job.id,
             error_type,
         )
+        failure_reason = (
+            "provider_request_outcome_pending"
+            if pending_request
+            else "client_error"
+        )
         record_event(
             db,
             job.id,
             "llm_proposal_failed",
             {
-                "reason": "client_error",
+                "reason": failure_reason,
                 "error_type": error_type[:128],
                 "model": chosen_model,
             },
         )
-        return LlmProposerResult(error="client_error", model=chosen_model)
+        return LlmProposerResult(error=failure_reason, model=chosen_model)
 
+    if attempt is None:  # pragma: no cover - defensive static narrowing
+        raise RuntimeError("Cognitive turn attempt is missing after provider success")
+    terminal_status = cancel_cognitive_turn_if_job_terminal(db, job, attempt)
+    if terminal_status is not None:
+        return LlmProposerResult(
+            error=f"job_{terminal_status.lower()}_during_provider_turn",
+            model=chosen_model,
+        )
     proposals = _validate_response(raw, search_space)
     if not proposals:
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="invalid_schema",
+            error_code="invalid_response",
+        )
         record_event(
             db,
             job.id,
@@ -817,6 +1271,13 @@ def propose_candidates(
             for proposal in proposals
         ]
     }
+    finish_cognitive_turn(
+        db,
+        job,
+        attempt,
+        status="succeeded",
+        response=persisted_response,
+    )
     return LlmProposerResult(
         proposals=proposals,
         raw_response=persisted_response,
@@ -824,14 +1285,8 @@ def propose_candidates(
     )
 
 
-def _validate_response(
-    raw: dict[str, Any] | None, search_space: SearchSpace
-) -> list[LlmProposal]:
-    if (
-        not isinstance(raw, dict)
-        or set(raw) != {"proposals"}
-        or not _is_safe_response_tree(raw)
-    ):
+def _validate_response(raw: dict[str, Any] | None, search_space: SearchSpace) -> list[LlmProposal]:
+    if not isinstance(raw, dict) or set(raw) != {"proposals"} or not _is_safe_response_tree(raw):
         return []
     proposals_raw = raw.get("proposals")
     if (
@@ -883,10 +1338,12 @@ def job_secrets_env_model() -> str | None:
 
 
 __all__ = [
+    "LLM_PROPOSER_PROMPT_SCHEMA_VERSION",
     "LlmProposal",
     "LlmProposerResult",
     "OpenAIJsonClient",
     "OpenAIClientLike",
+    "bind_provider_request_accounting",
     "load_job_api_key",
     "propose_candidates",
 ]

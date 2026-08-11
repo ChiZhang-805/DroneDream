@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-installer-lifecycle-failure-receipt",
+  "recordedAt": "2026-08-06T02:59:28.0796637Z",
+  "executionSubject": "a1aeaf01ebb7aa3e33883346b0b225db0962adfc",
+  "lifecycleToolHead": "8949e2310777297b2cbed7734601e957626d4db5",
+  "branch": "codex/software",
+  "resourceClass": "RED",
+  "redExecutionCount": 1,
+  "artifact": {
+    "fileName": "DroneDream-Universal-1.0.0.exe",
+    "bytes": 11650239,
+    "sha256": "815c9fe5990242e90e3377850b3797c06409005cdb0148f14be6f402cf9154ff",
+    "authenticodeStatus": "NotSigned",
+    "buildCount": 1
+  },
+  "outcome": "fresh_install_passed_update_failed_closed",
+  "lifecycle": {
+    "freshInstall": "pass",
+    "freshInstallMode": "install-app-only",
+    "freshInstallShortcuts": "suppressed-by-NS",
+    "freshInstallValidatedVehiclePackCount": 0,
+    "freshInstallHardwareActionDecision": "deny",
+    "sameVersionInPlaceUpdate": "failed-exit-code-2",
+    "uninstall": "not-reached-in-primary-flow",
+    "shortcut": "not-reached",
+    "locales": "not-reached",
+    "webView2": "existing-runtime-usable-and-unchanged"
+  },
+  "failure": {
+    "stage": "same-version-in-place-update",
+    "exitCode": 2,
+    "message": "The protocol-2 NSIS update path failed after successful fresh installation.",
+    "rootCause": "DroneDreamRevalidateRuntimeQuiesce completed its existing-binary checks but had no successful return, so execution fell through to dronedream_revalidate_without_binary and unconditionally returned error.",
+    "sourcePath": "desktop/src-tauri/nsis/runtime-mode.nsh",
+    "sourceFunction": "DroneDreamRevalidateRuntimeQuiesce",
+    "requiredFix": "Return ok after successful existing-binary revalidation while retaining fail-closed error when the binary disappears."
+  },
+  "sourceLifecycleReceipt": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\handoffs\\universal-1.0.0-a1aeaf0-candidate\\universal-lifecycle-verification.json",
+    "bytes": 11047,
+    "sha256": "36831c91df29c8c130dd4199baca95b7db2593f130da01aef9e39c9e6250d084"
+  },
+  "recovery": {
+    "isolatedUniversalUninstallerSucceeded": true,
+    "staleTestQuiesceRecoveredByNativeCommand": true,
+    "universalInstallDirectoryExistsAfter": false,
+    "universalUninstallRegistrationExistsAfter": false,
+    "universalProductRegistrationExistsAfter": false,
+    "universalDesktopShortcutExistsAfter": false,
+    "universalStartMenuShortcutExistsAfter": false,
+    "droneDreamProcessCountAfter": 0,
+    "existingDroneDreamApplicationPreserved": true,
+    "runtimeCreatedOrMigrated": false
+  },
+  "releaseDecision": {
+    "releaseReady": false,
+    "websiteTransferAllowed": false,
+    "artifactMayBeRelabeled": false,
+    "artifactMayBeRebuiltWithoutNewAuthorization": false,
+    "nextRequirement": "Commit and verify the quiesce revalidation fix, freeze a new exact product source, then request one new bounded YELLOW build."
+  },
+  "credentialBoundary": {
+    "modelApiKeysRead": false,
+    "accountCredentialsRead": false,
+    "runtimeSigningPrivateKeyRead": false
+  }
+}

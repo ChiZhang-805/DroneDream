@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
+GIT_TIMEOUT_SECONDS = 30
 IGNORED_PARTS = {
     ".git",
     ".mypy_cache",
@@ -64,12 +65,29 @@ TEXT_NAMES = {
 }
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 SECRET_PATTERNS = {
-    "PEM private key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    "PEM private key": re.compile(
+        r"-----BEGIN (?:(?:RSA|EC|DSA|OPENSSH|ENCRYPTED) )?PRIVATE KEY-----"
+        r"\s*[A-Za-z0-9+/=]{32,}"
+    ),
     "Alibaba Cloud AccessKey": re.compile(r"\bLTAI[A-Za-z0-9]{12,}\b"),
     "AWS access key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "GitHub token": re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b"),
     "OpenAI API key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b"),
 }
+SAFE_SECRET_TEST_SENTINELS = {
+    "OpenAI API key": frozenset({"sk-contract-persistence-test"}),
+}
+
+
+def probable_secret_names(text: str) -> list[str]:
+    """Return secret classes with at least one non-sentinel match."""
+
+    result: list[str] = []
+    for secret_name, pattern in SECRET_PATTERNS.items():
+        sentinels = SAFE_SECRET_TEST_SENTINELS.get(secret_name, frozenset())
+        if any(match.group(0) not in sentinels for match in pattern.finditer(text)):
+            result.append(secret_name)
+    return result
 
 
 def project_files() -> list[Path]:
@@ -81,6 +99,7 @@ def project_files() -> list[Path]:
         cwd=ROOT,
         check=True,
         capture_output=True,
+        timeout=GIT_TIMEOUT_SECONDS,
     )
     paths = [Path(raw.decode("utf-8")) for raw in result.stdout.split(b"\0") if raw]
     return [
@@ -92,6 +111,12 @@ def project_files() -> list[Path]:
 
 def is_text(path: Path) -> bool:
     return path.suffix.lower() in TEXT_SUFFIXES or path.name in TEXT_NAMES
+
+
+def read_utf8_text(path: Path) -> str:
+    """Read UTF-8 project text while accepting an optional leading BOM."""
+
+    return path.read_text(encoding="utf-8-sig", errors="strict")
 
 
 def markdown_target(raw_target: str) -> str | None:
@@ -132,7 +157,7 @@ def main() -> int:
             continue
         text_files += 1
         try:
-            text = absolute_path.read_text(encoding="utf-8", errors="strict")
+            text = read_utf8_text(absolute_path)
         except UnicodeDecodeError as exc:
             errors.append(f"{relative_path}: invalid UTF-8 ({exc})")
             continue
@@ -140,9 +165,8 @@ def main() -> int:
             errors.append(f"{relative_path}: contains a Unicode replacement character")
         if "\x00" in text:
             errors.append(f"{relative_path}: contains a NUL byte")
-        for secret_name, pattern in SECRET_PATTERNS.items():
-            if pattern.search(text):
-                errors.append(f"{relative_path}: contains a probable {secret_name}")
+        for secret_name in probable_secret_names(text):
+            errors.append(f"{relative_path}: contains a probable {secret_name}")
 
         if relative_path.suffix.lower() == ".json":
             json_files += 1

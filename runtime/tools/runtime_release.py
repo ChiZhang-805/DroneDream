@@ -27,6 +27,15 @@ from pathlib import Path
 from typing import Any, BinaryIO
 from urllib.parse import quote, unquote, urlsplit
 
+TOOLS_DIRECTORY = Path(__file__).resolve().parent
+if str(TOOLS_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIRECTORY))
+
+from runtime_manifest import (  # noqa: E402
+    ManifestError as RuntimeManifestError,
+)
+from runtime_manifest import validate_manifest as validate_runtime_manifest  # noqa: E402
+
 try:
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives import serialization
@@ -35,7 +44,7 @@ try:
         Ed25519PublicKey,
     )
 except ImportError:  # pragma: no cover - exercised by the CLI error path.
-    InvalidSignature = None  # type: ignore[assignment]
+    InvalidSignature = None  # type: ignore[assignment,misc]
     serialization = None  # type: ignore[assignment]
     Ed25519PrivateKey = None  # type: ignore[assignment,misc]
     Ed25519PublicKey = None  # type: ignore[assignment,misc]
@@ -197,8 +206,10 @@ def read_regular_bytes(path: Path, label: str) -> bytes:
 def _write_new(path: Path, content: bytes, mode: int = 0o644) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor: int | None = None
+    created = False
     try:
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+        created = True
         with os.fdopen(descriptor, "wb") as stream:
             descriptor = None
             stream.write(content)
@@ -206,6 +217,13 @@ def _write_new(path: Path, content: bytes, mode: int = 0o644) -> None:
             os.fsync(stream.fileno())
     except FileExistsError as exc:
         raise ReleaseError(f"refusing to overwrite existing file: {path}") from exc
+    except Exception:
+        if descriptor is not None:
+            os.close(descriptor)
+            descriptor = None
+        if created:
+            path.unlink(missing_ok=True)
+        raise
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -286,7 +304,8 @@ def _rfc3339(value: Any, label: str) -> str:
         parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except ValueError as exc:
         raise ReleaseError(f"{label} must be an RFC3339 timestamp") from exc
-    if parsed.utcoffset() is None or parsed.utcoffset().total_seconds() != 0:
+    offset = parsed.utcoffset()
+    if offset is None or offset.total_seconds() != 0:
         raise ReleaseError(f"{label} must use UTC")
     return value
 
@@ -547,7 +566,7 @@ def key_id_for_public_key(raw_public_key: bytes) -> str:
     return "ed25519:" + hashlib.sha256(raw_public_key).hexdigest()
 
 
-def _public_entry(private_key: Any) -> dict[str, Any]:
+def _public_entry(private_key: Any) -> dict[str, str]:
     _require_crypto()
     raw = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.Raw,
@@ -606,6 +625,10 @@ def _load_private_key_from_environment(variable: str) -> Any:
 def _validate_promoted_runtime_manifest(manifest: Any, smoke_report: Any) -> None:
     if not isinstance(manifest, dict) or not isinstance(smoke_report, dict):
         raise ReleaseError("runtime manifest and smoke report must be objects")
+    try:
+        validate_runtime_manifest(manifest, require_smoke_passed=True)
+    except RuntimeManifestError as exc:
+        raise ReleaseError(f"embedded runtime manifest is invalid: {exc}") from exc
     if manifest.get("schemaVersion") != 1:
         raise ReleaseError("unsupported embedded runtime manifest schema")
     _canonical_uuid(manifest.get("runtimeId"), "embedded runtimeId")
@@ -626,7 +649,7 @@ def _validate_promoted_runtime_manifest(manifest: Any, smoke_report: Any) -> Non
     embedded_report = manifest.get("smokeReport")
     if not isinstance(embedded_report, dict) or embedded_report.get("passed") is not True:
         raise ReleaseError("embedded smoke report is missing or failed")
-    for field in ("runtimeId", "imageId", "passed", "mode", "checks"):
+    for field in ("runtimeId", "imageId", "passed", "mode", "completedAt", "checks"):
         if embedded_report.get(field) != smoke_report.get(field):
             raise ReleaseError(f"smoke report differs from promoted manifest: {field}")
     checks = smoke_report.get("checks")
@@ -648,13 +671,7 @@ def _validate_promoted_runtime_manifest(manifest: Any, smoke_report: Any) -> Non
         raise ReleaseError("smoke report is missing required checks")
 
 
-def extract_embedded_manifest(rootfs: Path, output: Path) -> None:
-    """Copy only the validated embedded manifest from a rootfs tar.
-
-    This is a recovery path for an otherwise valid export whose sidecar was
-    not retained. It never extracts arbitrary archive paths.
-    """
-
+def _read_embedded_manifest(rootfs: Path) -> bytes:
     _regular_file(rootfs, "rootfs")
     content: bytes | None = None
     try:
@@ -679,6 +696,17 @@ def extract_embedded_manifest(rootfs: Path, output: Path) -> None:
     if not isinstance(manifest, dict) or not isinstance(manifest.get("smokeReport"), dict):
         raise ReleaseError("embedded runtime manifest has no smoke evidence")
     _validate_promoted_runtime_manifest(manifest, manifest["smokeReport"])
+    return content
+
+
+def extract_embedded_manifest(rootfs: Path, output: Path) -> None:
+    """Copy only the validated embedded manifest from a rootfs tar.
+
+    This is a recovery path for an otherwise valid export whose sidecar was
+    not retained. It never extracts arbitrary archive paths.
+    """
+
+    content = _read_embedded_manifest(rootfs)
     _write_new(output, content)
 
 
@@ -719,6 +747,9 @@ def package_release(
     embedded_manifest = load_json_bytes(embedded_manifest_bytes, str(runtime_manifest_path))
     smoke_report = load_json_bytes(smoke_report_bytes, str(smoke_report_path))
     _validate_promoted_runtime_manifest(embedded_manifest, smoke_report)
+    rootfs_manifest_bytes = _read_embedded_manifest(rootfs)
+    if rootfs_manifest_bytes != embedded_manifest_bytes:
+        raise ReleaseError("rootfs embedded manifest does not match its promoted sidecar")
     base = _base_url(base_url)
     build_time = _normalize_rfc3339(build_timestamp, "build timestamp")
     completed_at = _normalize_rfc3339(smoke_report.get("completedAt"), "smoke completedAt")
@@ -873,12 +904,19 @@ def sign_manifest(manifest_path: Path, private_key_env: str, public_output: Path
     }
     validate_signature_envelope(envelope)
     signature_path = Path(str(manifest_path) + SIGNATURE_SUFFIX)
-    _write_canonical_new(signature_path, envelope)
-    if public_output is not None:
-        _write_canonical_new(
-            public_output,
-            {"schemaVersion": KEYRING_SCHEMA_VERSION, "keys": [entry]},
-        )
+    signature_created = False
+    try:
+        _write_canonical_new(signature_path, envelope)
+        signature_created = True
+        if public_output is not None:
+            _write_canonical_new(
+                public_output,
+                {"schemaVersion": KEYRING_SCHEMA_VERSION, "keys": [entry]},
+            )
+    except Exception:
+        if signature_created:
+            signature_path.unlink(missing_ok=True)
+        raise
     return signature_path
 
 
@@ -892,8 +930,7 @@ def verify_signature(
     raw_manifest = read_regular_bytes(manifest_path, "release manifest")
     if len(raw_manifest) > MAX_JSON_BYTES:
         raise ReleaseError(f"release manifest exceeds {MAX_JSON_BYTES} bytes")
-    manifest = load_json_bytes(raw_manifest, str(manifest_path))
-    validate_release_manifest(manifest)
+    manifest = validate_release_manifest(load_json_bytes(raw_manifest, str(manifest_path)))
     if raw_manifest != canonical_bytes(manifest):
         raise ReleaseError("release manifest is not canonical JSON")
     raw_envelope = read_regular_bytes(signature_path, "release signature")

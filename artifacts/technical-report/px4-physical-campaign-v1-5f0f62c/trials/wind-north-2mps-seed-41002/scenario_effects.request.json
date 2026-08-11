@@ -1,0 +1,33 @@
+{
+  "effects": [
+    {
+      "capability": {
+        "reason": "the bundled launcher generates a Trial-local Gazebo WindEffects world/model overlay, verifies /world/<world>/wind_info, and inspects generated runtime SDF",
+        "status": "available"
+      },
+      "effect_id": "job_config.wind",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "gazebo_wind_effects",
+      "requested_value": {
+        "east": 0.0,
+        "north": 2.0,
+        "south": 0.0,
+        "west": 0.0
+      },
+      "source": "job_config.wind"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-86273db6",
+    "seed": 41002,
+    "trial_id": "px4-wind-north-2mps-seed-41002"
+  },
+  "request_sha256": "831fb434c7b9c1de63f8c5b5905962d3c28a666b9c73299c4c8fe052e231da84",
+  "scenario_type": "nominal",
+  "schema_version": "dronedream.scenario_effect_request.v1"
+}

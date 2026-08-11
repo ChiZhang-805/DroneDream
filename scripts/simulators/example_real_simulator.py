@@ -57,7 +57,7 @@ def _require_object(value: object, *, label: str) -> dict[str, Any]:
     return value
 
 
-def _finite_float(value: object, *, label: str) -> float:
+def _finite_float(value: Any, *, label: str) -> float:
     if isinstance(value, bool):
         raise ExampleSimulatorError(f"{label} must be a finite number")
     try:
@@ -167,6 +167,7 @@ def _compute_metrics(payload: dict[str, Any]) -> dict[str, Any]:
     # for wrapper authors who prefer the flat shape. This reference
     # implementation prefers ``job_config`` and falls back to top-level.
     raw_job = payload.get("job_config")
+    job: dict[str, Any]
     if raw_job is None:
         job = {
             k: payload[k]

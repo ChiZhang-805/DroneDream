@@ -1,0 +1,4 @@
+block_id,seed_block,configured_budget_equal,direct_realized_trials,scripted_realized_trials,scripted_minus_direct_trial_delta,scripted_decision_calls,scripted_multi_tool_generations
+1,7100,True,38,32,-6,4,1
+2,8200,True,38,32,-6,4,1
+3,9300,True,39,32,-7,4,1

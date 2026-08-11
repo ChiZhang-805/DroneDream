@@ -1,0 +1,11 @@
+case_id,shift_class,baseline_validation_loss,selected_validation_loss,absolute_improvement,relative_improvement_rate
+validation-nominal-obstacles,configuration_shift,0.969,0.7467,0.22229999999999994,0.2294117647058823
+validation-noise-heavy,configuration_shift,1.1734,0.8843,0.2891,0.24637804670189195
+validation-wind-gust,configuration_shift,1.5693,1.1616,0.40769999999999995,0.2597973618810935
+validation-turbulence-high,configuration_shift,1.8141,1.3194,0.49470000000000014,0.2726972052257318
+validation-payload-heavy,configuration_shift,1.2044,0.8727,0.3316999999999999,0.2754068415808701
+validation-combined-novel,scenario_type_shift,1.7214,1.1933,0.5281,0.306785174857674
+validation-gps-dropout-novel,scenario_type_shift,1.5058,1.154,0.3518000000000001,0.2336299641386639
+validation-battery-novel,scenario_type_shift,1.1066,0.857,0.24960000000000004,0.22555575637086575
+validation-actuator-delay-novel,scenario_type_shift,1.6068,1.2891,0.3177000000000001,0.19772218073188952
+validation-custom-novel,scenario_type_shift,1.0834,0.8276,0.2557999999999999,0.23610854716632818

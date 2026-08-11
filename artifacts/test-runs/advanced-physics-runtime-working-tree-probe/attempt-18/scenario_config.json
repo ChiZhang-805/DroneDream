@@ -1,0 +1,22 @@
+{
+  "advanced_scenario_config": {
+    "battery": {
+      "initial_percent": 90.0,
+      "voltage_sag": true
+    },
+    "sensor_degradation": {
+      "dropout_rate": 0.2
+    }
+  },
+  "scenario_config": {},
+  "scenario_type": "nominal",
+  "schema_version": "dronedream.scenario_config.v1",
+  "seed": 52001,
+  "sensor_noise_level": "medium",
+  "wind": {
+    "east": 0.0,
+    "north": 0.0,
+    "south": 0.0,
+    "west": 0.0
+  }
+}

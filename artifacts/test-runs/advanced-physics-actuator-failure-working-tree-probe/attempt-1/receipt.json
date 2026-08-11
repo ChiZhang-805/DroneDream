@@ -1,0 +1,277 @@
+{
+  "schema_version": "dronedream.advanced-physics-actuator-failure-receipt/v1",
+  "generated_at": "2026-07-28T23:19:36.2851876Z",
+  "subject_commit": "793f02089413f2baa8ea78387cd1e9e078f02b83",
+  "source_inventory_sha256": "a08133e3e68b79197eac53c96c362f3613fc03de9f582ca3b3bdc7ccbb48e98a",
+  "source_inventory": {
+    "backend/app/simulator/scenario_effects.py": "5c8cec8634c90f5bf240841c4b4b947c4577b41ece0598709324577f21e8968e",
+    "scripts/simulators/local_px4_launch_wrapper.py": "5d0a14548acec0c7075ea0de31edfc468e8c4b9597d61d8b11e35a366f90f0c7",
+    "scripts/simulators/px4_gazebo_runner.py": "8e4357b8831ceadb919d548285fc9a9ff101e2a218f4d24b51d79447cbe4e230",
+    "scripts/simulators/px4_offboard_track_executor.py": "e6b4d3000597f0499465f0346124971735f95033991aa61d6cf15e416f81b104"
+  },
+  "physical_run": {
+    "command": "wsl.exe -d DroneDreamRuntime -- bash /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/run-probe.sh",
+    "frozen_probe_script": {
+      "repository_path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/probe-command.sh",
+      "bytes": 5697,
+      "sha256": "b87d8ece9fe16455b4234e3d56059e3318dd417647dcedb45d49b65b17c57b34",
+      "byte_identical_to_executed_script": true
+    },
+    "started_at_utc": "2026-07-28T23:14:50Z",
+    "ended_at_utc": "2026-07-28T23:16:12Z",
+    "duration_seconds": 82,
+    "runner_exit_code": 0,
+    "acceptance_exit_code": 0,
+    "trial_success": false,
+    "physical_effect_verified": true,
+    "preexisting_process_count": 0,
+    "residual_process_count": 0,
+    "openai_api_key_used": false,
+    "environment": {
+      "runtime": "DroneDreamRuntime",
+      "platform": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "python_version": "3.12.3",
+      "gazebo_sim_version": "8.14.0",
+      "gazebo_transport_version": "13.5.0",
+      "px4_version": "v1.16",
+      "px4_firmware_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+      "vehicle": "x500",
+      "world": "default",
+      "headless": true
+    }
+  },
+  "preflight_failure_preserved": {
+    "attempt": 0,
+    "exit_code": 66,
+    "phase": "before_px4_launch",
+    "reason": "WSL git could not resolve the Windows worktree .git pointer",
+    "px4_or_gazebo_started": false,
+    "residual_process_count": 0,
+    "disposition": "The probe was corrected to use the Windows-verified exact subject commit; no simulation result was overwritten."
+  },
+  "requested_effect": {
+    "effect_id": "scenario_type.actuator_failure",
+    "failure_mode": "stuck_stopped_at_launch",
+    "target_motor_number": 2,
+    "target_joint_name": "rotor_2_joint"
+  },
+  "effect_result": {
+    "verification_status": "verified_applied",
+    "verification_method": "trial_local_sdf_generated_world_plus_gazebo_joint_state",
+    "generated_world_sdf": {
+      "sha256": "d30f9900a484c273c28adc34e43f9bc0e0ad2a004e913c87107801349d10d293",
+      "motor_max_rot_velocity_rad_s": {
+        "0": 1000.0,
+        "1": 1000.0,
+        "2": 0.0,
+        "3": 1000.0
+      },
+      "verified_profile_sections": [
+        "actuator_failure"
+      ],
+      "joint_state_topic": "/dronedream/actuator_failure/joint_state",
+      "joint_state_update_rate_hz": 20.0
+    },
+    "gazebo_joint_state": {
+      "raw_log_sha256": "f927dbb6561e912a80ae69e368cc65e14a5427640e5e83f8b933838e38e08e10",
+      "target_sample_count": 641,
+      "target_max_abs_velocity_rad_s": 0.000000893786,
+      "max_failed_motor_abs_velocity_rad_s": 0.05,
+      "hard_stop_verified": true,
+      "healthy_sample_counts": {
+        "rotor_0_joint": 653,
+        "rotor_1_joint": 653,
+        "rotor_3_joint": 653
+      },
+      "healthy_joint_max_abs_velocity_rad_s": {
+        "rotor_0_joint": 99.999999999726,
+        "rotor_1_joint": 100.000000000577,
+        "rotor_3_joint": 100.000000000771
+      },
+      "min_healthy_motor_abs_velocity_rad_s": 1.0,
+      "healthy_motion_verified": true
+    }
+  },
+  "trial_outcome": {
+    "success": false,
+    "failure_code": "SIMULATION_FAILED",
+    "reason": "trusted evaluation window could not be established from offboard timing or telemetry",
+    "offboard_executor_exit": "completed successfully",
+    "interpretation": "The requested hard motor failure was physically verified. The single-motor-disabled vehicle did not establish a trusted evaluation window, so no score or pass result is claimed."
+  },
+  "focused_test_receipt": {
+    "command": "python -m pytest backend/tests/test_local_px4_launch_wrapper.py backend/tests/test_scenario_effects.py backend/tests/test_capabilities.py backend/tests/test_simulator_adapter.py -q --junitxml=artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/focused-tests.xml",
+    "source_commit": "793f02089413f2baa8ea78387cd1e9e078f02b83",
+    "started_at_utc": "2026-07-28T23:17:38.0532688Z",
+    "ended_at_utc": "2026-07-28T23:18:07.8951726Z",
+    "duration_seconds": 29.842,
+    "tests": 138,
+    "passed": 138,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "platform": "Windows-11-10.0.26200",
+    "python_version": "3.13.0",
+    "openai_api_key_used": false,
+    "junit_xml": {
+      "bytes": 19249,
+      "sha256": "65e027756f66e7fe7df4ccdc2e172bf821be9fbd104b71ac5199eee939a924d5"
+    }
+  },
+  "runtime_mechanism_sources": [
+    {
+      "component": "Gazebo MulticopterMotorModel",
+      "version_family": "gz-sim8",
+      "source": "https://raw.githubusercontent.com/gazebosim/gz-sim/gz-sim8/src/systems/multicopter_motor_model/MulticopterMotorModel.cc",
+      "relevance": "maxRotVelocity bounds the commanded joint velocity inside the motor model"
+    },
+    {
+      "component": "Gazebo JointStatePublisher",
+      "version_family": "gz-sim8",
+      "source": "https://raw.githubusercontent.com/gazebosim/gz-sim/gz-sim8/src/systems/joint_state_publisher/JointStatePublisher.cc",
+      "relevance": "publishes the selected rotor joint velocity for physical readback"
+    }
+  ],
+  "artifacts": {
+    "trial-input.json": {
+      "bytes": 1674,
+      "sha256": "2d5e661a84c387fa20f7cef7898b4b116d7872cfab10aab683f7e8e2abe00588"
+    },
+    "probe-command.sh": {
+      "bytes": 5697,
+      "sha256": "b87d8ece9fe16455b4234e3d56059e3318dd417647dcedb45d49b65b17c57b34"
+    },
+    "controller_params.json": {
+      "bytes": 125,
+      "sha256": "ce71a107de732f88e899a7eeaf5ace2f00e197341f9da1e64624ed43209dd4de"
+    },
+    "controller_params.used.json": {
+      "bytes": 125,
+      "sha256": "ce71a107de732f88e899a7eeaf5ace2f00e197341f9da1e64624ed43209dd4de"
+    },
+    "reference_track.json": {
+      "bytes": 32498,
+      "sha256": "678f710c17c9e7943b09cb6e71ceea6fdd13fdf02741e7fbf2a3e3536333f717"
+    },
+    "reference_track.used.json": {
+      "bytes": 32498,
+      "sha256": "678f710c17c9e7943b09cb6e71ceea6fdd13fdf02741e7fbf2a3e3536333f717"
+    },
+    "scenario_config.json": {
+      "bytes": 362,
+      "sha256": "d7e922ec17daf5be51a500ebe1dd14a355ac80a5a90c858452045fbd18abf8b6"
+    },
+    "px4_parameters.input.json": {
+      "bytes": 22,
+      "sha256": "4a72af455487a5073edb960cad7633d2c7782396dbf06342ef2e1408ebac32c5"
+    },
+    "source-inventory.sha256": {
+      "bytes": 443,
+      "sha256": "a08133e3e68b79197eac53c96c362f3613fc03de9f582ca3b3bdc7ccbb48e98a"
+    },
+    "execution-window.json": {
+      "bytes": 556,
+      "sha256": "f95f280d96484dba042013e436606b13f7d9c440ce70abf2f2c86d0ec643390d"
+    },
+    "preflight-failure-attempt-0.json": {
+      "bytes": 671,
+      "sha256": "72471490aa92fb132ea01fb941557c2c8dbd3f4cb77d480fa9fc14c00a97df2d"
+    },
+    "scenario_effects.request.json": {
+      "bytes": 1347,
+      "sha256": "d8b6d4ffe77c7934d5274105276641e19320a33b1ea79677c70de251cb554c11"
+    },
+    "scenario_effects.applied.json": {
+      "bytes": 9197,
+      "sha256": "8995d7b926c2745018a68159ef370e309c4b19370cbf1abca0b0e49c693d6458"
+    },
+    "simulator_runtime_manifest.json": {
+      "bytes": 12306,
+      "sha256": "245c4e47632cc12d649c8e4662cf8614a3b8eb51e7acd8ee64c42466c6543648"
+    },
+    "trial-result.json": {
+      "bytes": 7291,
+      "sha256": "8d8f28c1e09f7695e831da9cbae3c7ea545ab4e1f59f9b9ffbf3a8a29ed43e75"
+    },
+    "scenario_runtime/generated_world.sdf": {
+      "bytes": 34178,
+      "sha256": "d30f9900a484c273c28adc34e43f9bc0e0ad2a004e913c87107801349d10d293"
+    },
+    "scenario_runtime/models/x500/model.sdf": {
+      "bytes": 3787,
+      "sha256": "5413d20f0134ee42c8d48321c2adaa49625b8e8d7c4f06e2a4351fd6f7dee417"
+    },
+    "scenario_runtime/models/x500_base/model.sdf": {
+      "bytes": 16920,
+      "sha256": "e27a8c31e8c2dc6c27269c969ba60480fa16066a51ddb1df73cf3ddfcb8fdb9e"
+    },
+    "scenario_runtime/worlds/default.sdf": {
+      "bytes": 2783,
+      "sha256": "328ca6386e0cee6024e4077305a214882417fb06581f86e811884babbb7e1bb7"
+    },
+    "scenario_runtime/px4_rootfs/gz_env.sh": {
+      "bytes": 1260,
+      "sha256": "ba67e16a5fe3975001404b7720c1cbf378e78e75978484744bb989f61195a7c7"
+    },
+    "actuator_failure_joint_state.log": {
+      "bytes": 1016672,
+      "sha256": "f927dbb6561e912a80ae69e368cc65e14a5427640e5e83f8b933838e38e08e10"
+    },
+    "actuator_failure_joint_state.stderr.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "px4_source.ulg": {
+      "bytes": 17259641,
+      "sha256": "fd01f02f7a97ee8ad3650e9687a6aa07a1197f46b76b19c1146fbe913f513f76"
+    },
+    "telemetry.json": {
+      "bytes": 2354906,
+      "sha256": "fa63b11a442aa6faff669f55567fd5ccc2cc39fd1dbdc661a18ca6d3aae66f05"
+    },
+    "trajectory.json": {
+      "bytes": 917651,
+      "sha256": "1cfd4ad654f5bcb02af2f362d68e75cd2f287482f8c23ed0f8ea0861790ad737"
+    },
+    "offboard_timing.json": {
+      "bytes": 279,
+      "sha256": "6704a787879f96534bb2aea84b429e34623a8ce5c4800271fa94ac7fcd477e07"
+    },
+    "offboard_executor.log": {
+      "bytes": 276,
+      "sha256": "e3ac63b6f3d99ca0bd0233b2b22d0a36f04f8e69c641668f1bf91dddf319a5fe"
+    },
+    "runner.log": {
+      "bytes": 299,
+      "sha256": "6862129a68287f91331e58c3a30d4ead3618f3fd2d775338b0f022c9cd35f6b0"
+    },
+    "stdout.log": {
+      "bytes": 5669,
+      "sha256": "ff4e1824f937eb65e424a3719ef8b86f51e2309f6f45af2d1cd3a130a8b7684a"
+    },
+    "stderr.log": {
+      "bytes": 417,
+      "sha256": "f08b5dc35a969855272b59d575c2ed9c4867e284823a79a52765034e7e1b52b2"
+    },
+    "launch_config.json": {
+      "bytes": 15521,
+      "sha256": "7b88bcd1cf5ec4002435b0fa5e141e97d9500911f8e875503962c12e00f31437"
+    },
+    "focused-tests.xml": {
+      "bytes": 19249,
+      "sha256": "65e027756f66e7fe7df4ccdc2e172bf821be9fbd104b71ac5199eee939a924d5"
+    },
+    "px4_parameters.requested.json": {
+      "bytes": 537,
+      "sha256": "c4cd7b9de226f42d2a570d591fd6dfca56d049a0f3357cc48b3b02ca9233a3d0"
+    },
+    "px4_parameters.before.json": {
+      "bytes": 555,
+      "sha256": "672dd53d55fc42b4a60f6527d59c0783676397b3c8272b20faa0b470d3434fdf"
+    },
+    "px4_parameters.applied.json": {
+      "bytes": 616,
+      "sha256": "852a5b1df45f21aa1407a3eaf8c8cbeb06f30e52812b20320b7b207e5e265b1d"
+    }
+  }
+}

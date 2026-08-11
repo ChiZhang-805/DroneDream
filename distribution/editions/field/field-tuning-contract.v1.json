@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-tuning-contract",
+  "contractVersion": "1.1.0",
+  "editionId": "field",
+  "executionDomain": "real-hardware",
+  "simulationAllowed": false,
+  "model": {
+    "role": "propose-candidates-and-experiment-strategy",
+    "directHardwareAuthority": false,
+    "receives": [
+      "structured-objective",
+      "bounded-parameter-domain",
+      "prior-trial-evidence",
+      "failure-taxonomy",
+      "telemetry-summary"
+    ]
+  },
+  "harness": {
+    "role": "bounded-execution-evidence-qualification-and-rollback",
+    "phases": [
+      "snapshot",
+      "candidate-validation",
+      "operator-confirmation",
+      "controlled-trial",
+      "telemetry-capture",
+      "scoring",
+      "failure-classification",
+      "reflection",
+      "qualification",
+      "independent-holdout",
+      "publish-or-rollback"
+    ],
+    "failClosed": true,
+    "candidateWritesAreTransactional": true,
+    "independentHoldoutRequired": true,
+    "jobBinding": [
+      "source-commit",
+      "vehicle-pack",
+      "controller-and-firmware",
+      "protocol-observation-receipt",
+      "parameter-snapshot",
+      "objective-and-iteration-budget"
+    ],
+    "preQuorumBudgets": {
+      "hardwareTrials": 0,
+      "parameterWrites": 0,
+      "providerRequests": 0
+    }
+  },
+  "authority": {
+    "frontendGrantsAuthority": false,
+    "modelGrantsAuthority": false,
+    "requiredLayers": ["native", "backend", "runtime", "operator"],
+    "zeroValidatedPackDecision": "deny",
+    "deviceDiscoveryGrantsAuthority": false
+  },
+  "requiredSafetyEvidence": [
+    "validated-vehicle-pack",
+    "controller-and-firmware-match",
+    "protocol-observation-receipt",
+    "parameter-snapshot",
+    "transaction-rollback",
+    "operator-confirmation",
+    "preflight",
+    "safety-zone",
+    "control-takeover",
+    "emergency-stop"
+  ],
+  "demo": {
+    "executionMode": "fixture-only-no-device-io",
+    "hardwareEvidenceValid": false,
+    "hardwareAuthority": false
+  }
+}

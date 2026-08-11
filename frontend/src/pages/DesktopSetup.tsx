@@ -1,11 +1,25 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
+import { apiClient } from "../api/client";
 import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
+import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
 import {
   autoStartInstallerRuntime,
+  beginBrowserAuth,
+  clearBrowserAuthVault,
+  restoreBrowserAuthVault,
+  cancelBrowserAuth,
   cancelRuntimeInstall,
   discardInstallerRuntimeIntent,
   getInstallerRuntimeIntent,
@@ -32,15 +46,29 @@ import type {
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useOptionalAuth } from "../features/auth/AuthContext";
-import { OPEN_ACCOUNT_DIALOG_EVENT } from "../features/auth/events";
+import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
+import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
+import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
+  claimDesktopRuntimeLifetime,
   clearRuntimeAutoStartFailure,
   isOverallDesktopReady,
   isRuntimeConfirmedMissing,
   isRuntimeFullyReady,
   MINIMUM_MEMORY_BYTES,
 } from "../desktop/readiness";
+import {
+  runtimeSessionContractFailure,
+  verifyRuntimeSessionContract,
+} from "../desktop/runtimeSessionContract";
+import {
+  getDesktopStartupGateSession,
+  setDesktopStartupGateState,
+  subscribeDesktopStartupGate,
+  verifyDesktopStartupGate,
+} from "../desktop/startupGate";
+import { useAppUpdaterState } from "../desktop/updaterContext";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 
@@ -277,8 +305,15 @@ function runtimeHealthFailureCopy(code: string | undefined): LauncherFailureCopy
 }
 
 export function DesktopSetup() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const navigate = useNavigate();
   const auth = useOptionalAuth();
+  const updater = useAppUpdaterState();
+  const startupGate = useSyncExternalStore(
+    subscribeDesktopStartupGate,
+    getDesktopStartupGateSession,
+    getDesktopStartupGateSession,
+  );
   const [searchParams] = useSearchParams();
   const runtimeAccess = useDesktopRuntimeAccess();
   const { refresh: refreshRuntimeAccess } = runtimeAccess;
@@ -291,6 +326,7 @@ export function DesktopSetup() {
   const installerDiscardRequested = useRef(false);
   const installerDiscardSucceeded = useRef(false);
   const componentMounted = useRef(false);
+  const browserAuthActive = useRef(false);
   const selectedDriveRef = useRef("");
   const [state, setState] = useState<ProbeState>(() => ({
     ...INITIAL_STATE,
@@ -311,6 +347,12 @@ export function DesktopSetup() {
   const [installerAttempt, setInstallerAttempt] = useState(0);
   const [dismissedLauncherError, setDismissedLauncherError] = useState("");
   const [launcherErrorExpanded, setLauncherErrorExpanded] = useState(false);
+  const [browserAuthStatus, setBrowserAuthStatus] = useState<
+    "idle" | "waiting" | "adopting"
+  >("idle");
+  const [browserAuthCompletedForLaunch, setBrowserAuthCompletedForLaunch] =
+    useState(false);
+  const [browserAuthError, setBrowserAuthError] = useState<string | null>(null);
   const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
   const installActive = isActiveInstall(installState.snapshot);
   const receiptCleanupPending =
@@ -333,20 +375,65 @@ export function DesktopSetup() {
     state.prerequisitesFresh &&
     state.runtimeFresh &&
     isOverallDesktopReady(state.prerequisites, state.runtime);
-  const accountReady = !auth?.configured || Boolean(auth.account);
-  const workspaceReady =
+  const runtimeSessionFailure = runtimeSessionContractFailure(state.runtime);
+  const runtimeSessionFailureKey: TranslationKey | null =
+    runtimeSessionFailure === "runtime_session_api_missing"
+      ? "launcher.runtimeSessionApiMissing"
+      : runtimeSessionFailure === "runtime_session_api_unavailable"
+        ? "launcher.runtimeSessionApiUnavailable"
+        : null;
+  const signedInAccount =
+    auth?.configured && !auth.loading ? auth.account : null;
+  const startupGateReady =
+    !desktopAvailable ||
+    (browserAuthCompletedForLaunch &&
+      startupGate.status === "ready" &&
+      Boolean(signedInAccount) &&
+      startupGate.accountId === signedInAccount?.id);
+  const updaterBusy =
+    updater.status === "checking" ||
+    updater.status === "downloading" ||
+    updater.status === "installing" ||
+    updater.status === "reconcilingEngine";
+  const updaterBlocksWorkspace =
+    updaterBusy ||
+    updater.status === "available" ||
+    updater.status === "engineError" ||
+    updater.status === "runtimeBaseRequired";
+  const localChecksReady =
     localRuntimeReady &&
-    accountReady &&
     !state.loading &&
     !installerHandoffState.checking &&
     (!runtimeAccess.desktopRuntime ||
       (runtimeAccess.status === "ready" && !runtimeAccess.isChecking));
-  const workspaceChecking =
+  const workspaceReady =
+    localChecksReady &&
+    browserAuthCompletedForLaunch &&
+    Boolean(signedInAccount) &&
+    startupGateReady &&
+    !updaterBlocksWorkspace;
+  const environmentChecking =
     state.loading ||
     installerHandoffState.checking ||
     runtimeAccess.isChecking ||
     runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
+  const accountVerificationInProgress =
+    browserAuthCompletedForLaunch &&
+    Boolean(
+      (auth?.configured && auth.loading) ||
+      startupGate.status === "checking",
+    );
+  const postSignInBlocked =
+    browserAuthCompletedForLaunch && startupGate.status === "blocked";
+  const startupGateFailureKey: TranslationKey =
+    startupGate.failureCode === "runtimeSessionApiMissing"
+      ? "launcher.runtimeSessionApiMissing"
+      : startupGate.failureCode === "accountIdentityMismatch"
+        ? "launcher.accountIdentityMismatch"
+        : "launcher.accountVerificationFailed";
+  const environmentBlocked =
+    localRuntimeReady && !localChecksReady && !environmentChecking;
   const installerHandoffNeedsAttention = Boolean(
     installerHandoffState.commandError ||
     installerHandoffState.autoStartUncertain ||
@@ -357,7 +444,6 @@ export function DesktopSetup() {
   );
   const launcherErrorDetails = [
     ...state.issues.map((issue) => `${issue.command}: ${issue.message}`),
-    runtimeCommandError,
     installState.commandError,
     installState.snapshot?.error
       ? `${installState.snapshot.error.code}: ${installState.snapshot.error.message}`
@@ -382,7 +468,9 @@ export function DesktopSetup() {
       state.runtime?.installed &&
       state.runtime.running &&
       !isRuntimeFullyReady(state.runtime)
-      ? state.runtime.diagnostics.join("\n") || t("desktop.runtimeNeedsRepair")
+      ? runtimeSessionFailureKey
+        ? t(runtimeSessionFailureKey)
+        : state.runtime.diagnostics.join("\n") || t("desktop.runtimeNeedsRepair")
       : null,
     installState.snapshot?.phase === "completed" &&
       state.prerequisitesFresh &&
@@ -410,8 +498,115 @@ export function DesktopSetup() {
     componentMounted.current = true;
     return () => {
       componentMounted.current = false;
+      if (browserAuthActive.current) {
+        void cancelBrowserAuth().catch(() => undefined);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (!desktopAvailable) return;
+    // Account state is deliberately a second stage. It must never participate
+    // in the environment percentage or run before the user selects the single
+    // browser sign-in action shown at 100%.
+    if (!localChecksReady || !browserAuthCompletedForLaunch) return;
+    if (
+      updater.status === "checking" ||
+      updater.status === "downloading" ||
+      updater.status === "installing" ||
+      updater.status === "reconcilingEngine"
+    ) {
+      setDesktopStartupGateState("checking", {
+        accountId: signedInAccount?.id ?? null,
+      });
+      return;
+    }
+    if (
+      updater.status === "available" ||
+      updater.status === "engineError" ||
+      updater.status === "runtimeBaseRequired"
+    ) {
+      setDesktopStartupGateState("blocked", {
+        accountId: signedInAccount?.id ?? null,
+        error: updater.error ??
+          `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
+        failureCode: "updateRequired",
+      });
+      return;
+    }
+    if (!signedInAccount) return;
+    void verifyDesktopStartupGate(
+      signedInAccount.id,
+      () => apiClient.verifyAuthenticatedSession(),
+    );
+  }, [
+    browserAuthCompletedForLaunch,
+    desktopAvailable,
+    localChecksReady,
+    signedInAccount,
+    updater.availableVersion,
+    updater.error,
+    updater.status,
+  ]);
+
+  useEffect(() => {
+    if (
+      workspaceReady &&
+      auth?.configured &&
+      auth.account &&
+      browserAuthStatus === "idle"
+    ) {
+      navigate("/assistant", { replace: true });
+    }
+  }, [
+    auth?.account,
+    auth?.configured,
+    browserAuthStatus,
+    navigate,
+    workspaceReady,
+  ]);
+
+  const startBrowserSignIn = useCallback(async () => {
+    if (!localChecksReady || browserAuthStatus !== "idle") return;
+    const configuration = browserAuthConfiguration();
+    if (!configuration) {
+      setBrowserAuthError(t("launcher.browserAuthNotConfigured"));
+      return;
+    }
+    setBrowserAuthError(null);
+    activateDesktopAuthSession();
+    setBrowserAuthCompletedForLaunch(false);
+    setDesktopStartupGateState("idle");
+    setBrowserAuthStatus("waiting");
+    browserAuthActive.current = true;
+    let sessionIssued = false;
+    try {
+      const session = await restoreBrowserAuthVault() ?? await beginBrowserAuth({ locale });
+      sessionIssued = true;
+      if (!componentMounted.current) return;
+      setBrowserAuthStatus("adopting");
+      await adoptBrowserAuthSession(session);
+      if (componentMounted.current) {
+        setBrowserAuthCompletedForLaunch(true);
+        setBrowserAuthStatus("idle");
+      }
+    } catch (error) {
+      if (sessionIssued) {
+        // Native persists only this edition's refresh grant before returning
+        // the session. If the WebView refuses that session, do not leave a
+        // credential that would be retried on the next explicit sign-in.
+        await clearBrowserAuthVault().catch(() => false);
+      }
+      if (!componentMounted.current) return;
+      setBrowserAuthStatus("idle");
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/cancelled/iu.test(message)) {
+        setBrowserAuthError(t("launcher.browserAuthFailed"));
+      }
+    } finally {
+      browserAuthActive.current = false;
+    }
+  }, [browserAuthStatus, localChecksReady, locale, t]);
 
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
@@ -427,7 +622,7 @@ export function DesktopSetup() {
 
     const [prerequisites, runtime] = await Promise.allSettled([
       probeSystemPrerequisitesWithStartupGrace(),
-      probeRuntimeStatus(),
+      probeRuntimeStatus().then(verifyRuntimeSessionContract),
     ]);
     if (requestId.current !== currentRequest) return;
 
@@ -435,7 +630,10 @@ export function DesktopSetup() {
     // check, including transitions from ready to stopped or uncertain. The
     // access provider performs its own fail-closed probe, so stale local
     // reports are never promoted into global readiness.
-    void refreshRuntimeAccess();
+    // The launcher owns an explicit Start runtime action. Its passive status
+    // synchronization must never race that action by starting Runtime in the
+    // background.
+    void refreshRuntimeAccess({ autoStart: false });
 
     const probeIssues: ProbeIssue[] = [];
     if (prerequisites.status === "rejected") {
@@ -659,7 +857,15 @@ export function DesktopSetup() {
     setRuntimeCommandError(null);
     setRuntimeCommandBusy(true);
     try {
-      const runtime = action === "start" ? await startRuntime() : await repairRuntime();
+      const nativeRuntime = action === "start" ? await startRuntime() : await repairRuntime();
+      claimDesktopRuntimeLifetime(nativeRuntime);
+      const runtime = await verifyRuntimeSessionContract(nativeRuntime);
+      const sessionFailure = runtimeSessionContractFailure(runtime);
+      if (sessionFailure) {
+        setRuntimeCommandError(
+          `${action === "start" ? "start_runtime" : "repair_runtime"}: ${sessionFailure}`,
+        );
+      }
       if (isRuntimeFullyReady(runtime)) clearRuntimeAutoStartFailure();
       setState((current) => ({
         ...current,
@@ -667,7 +873,10 @@ export function DesktopSetup() {
         runtimeFresh: true,
         issues: replaceIssues(current.issues, ["runtime"], []),
       }));
-      await refreshRuntimeAccess();
+      // The command above is the one authoritative start/repair attempt. The
+      // follow-up refresh observes its result and must not dispatch a second
+      // maintenance command if the first status probe is briefly stale.
+      await refreshRuntimeAccess({ autoStart: false });
     } catch (error) {
       setRuntimeCommandError(
         `${action === "start" ? "start_runtime" : "repair_runtime"}: ${errorMessage(error)}`,
@@ -1032,24 +1241,6 @@ export function DesktopSetup() {
     !installerHandoffState.commandError &&
     !installerHandoffState.discardResult,
   );
-  useEffect(() => {
-    if (!desktopAvailable || installActive) return;
-    const refreshWhenFocused = () => {
-      void refresh(
-        automaticStartPending
-          ? installerIntent?.targetRoot ?? undefined
-          : undefined,
-      );
-    };
-    window.addEventListener("focus", refreshWhenFocused);
-    return () => window.removeEventListener("focus", refreshWhenFocused);
-  }, [
-    automaticStartPending,
-    desktopAvailable,
-    installActive,
-    installerIntent?.targetRoot,
-    refresh,
-  ]);
   const retryInstallerHandoff = useCallback(() => {
     if (installerHandoffState.autoStarting) return;
     installerIntentPromise.current = null;
@@ -1171,29 +1362,113 @@ export function DesktopSetup() {
       >
         <RuntimeLauncherHero
           snapshot={installState.snapshot}
+          localReady={localChecksReady}
           ready={workspaceReady}
-          checking={workspaceChecking}
+          checking={environmentChecking}
+          gateBlocked={
+            environmentBlocked ||
+            runtimeSessionFailure !== null ||
+            (localChecksReady &&
+              (postSignInBlocked || updaterBlocksWorkspace))
+          }
+          accountRequired={
+            localChecksReady &&
+            !workspaceReady &&
+            !postSignInBlocked &&
+            !updaterBlocksWorkspace
+          }
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
           onCancel={() => void cancelInstall()}
         />
 
-        {localRuntimeReady && !accountReady ? (
+        {postSignInBlocked &&
+        !updaterBlocksWorkspace ? (
+          <Alert tone="warning" title={t("launcher.accountVerificationBlocked")}>
+            <p>{t(startupGateFailureKey)}</p>
+          </Alert>
+        ) : null}
+
+        {runtimeSessionFailureKey ? (
+          <Alert tone="warning" title={t("launcher.runtimeSessionApiTitle")}>
+            <p>{t(runtimeSessionFailureKey)}</p>
+          </Alert>
+        ) : null}
+
+        {runtimeCommandError ? (
+          <Alert tone="warning" title={t("desktop.runtimeActionFailed")}>
+            <code>{runtimeCommandError}</code>
+          </Alert>
+        ) : null}
+
+        {updater.status === "available" ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
               className="btn btn-primary launcher-primary-action"
-              onClick={() =>
-                window.dispatchEvent(new Event(OPEN_ACCOUNT_DIALOG_EVENT))}
+              onClick={() => void updater.installAvailableUpdate()}
             >
-              {t("launcher.signIn")}
+              {updater.error
+                ? t("updater.sidebarDeferred")
+                : t("updater.available", {
+                    version: updater.availableVersion ?? "",
+                  })}
             </button>
           </div>
-        ) : workspaceReady ? (
+        ) : updater.status === "engineError" ? (
           <div className="launcher-ready-actions">
-            <Link to="/assistant" className="btn btn-primary launcher-primary-action">
-              {t("launcher.openWorkspace")}
-            </Link>
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void updater.reconcileEnginePack()}
+            >
+              {t("updater.sidebarRetry")}
+            </button>
+          </div>
+        ) : updater.status === "runtimeBaseRequired" ? (
+          <Alert tone="warning" title={t("launcher.runtimeSessionApiTitle")}>
+            <p>{t("updater.runtimeBaseRequired")}</p>
+          </Alert>
+        ) : runtimeSessionFailureKey ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void refresh()}
+            >
+              {t("launcher.retryChecks")}
+            </button>
+          </div>
+        ) : localChecksReady && !workspaceReady ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              disabled={
+                browserAuthStatus !== "idle" ||
+                accountVerificationInProgress
+              }
+              onClick={() => void startBrowserSignIn()}
+            >
+              {browserAuthStatus === "waiting"
+                ? t("launcher.browserAuthWaiting")
+                : browserAuthStatus === "adopting"
+                  ? t("launcher.browserAuthAdopting")
+                  : accountVerificationInProgress
+                    ? t("launcher.browserAuthAdopting")
+                  : t("launcher.signIn")}
+            </button>
+          </div>
+        ) : workspaceReady ? null : localRuntimeReady &&
+          environmentChecking ? null : localRuntimeReady ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void refreshRuntimeAccess()}
+            >
+              {t("launcher.retryChecks")}
+            </button>
           </div>
         ) : (
           <>
@@ -1244,6 +1519,12 @@ export function DesktopSetup() {
             ) : null}
           </>
         )}
+
+        {browserAuthError ? (
+          <Alert tone="danger" title={t("launcher.browserAuthErrorTitle")}>
+            <p>{browserAuthError}</p>
+          </Alert>
+        ) : null}
 
         {requestedFeatureLabel && !workspaceReady ? (
           <span className="sr-only">
@@ -1405,6 +1686,8 @@ export function DesktopSetup() {
           </button>
         ) : null}
       </header>
+
+      {!desktopAvailable ? <DistributionSetupPanel variant="setup" /> : null}
 
       {requestedFeatureLabel && !localRuntimeReady ? (
         <Alert tone="warning" title={t("runtimeGate.redirectTitle")}>
@@ -2116,7 +2399,7 @@ function RuntimeOverview({
               />
               <div>
                 <strong>{translatedComponentLabel(t, component.id, component.label)}</strong>
-                <span>{component.detail || component.version || "—"}</span>
+                <span>{translatedComponentDetail(t, component.detail) || component.version || "—"}</span>
               </div>
               <div className="desktop-component-badges">
                 <span className={`desktop-status-badge desktop-status-${component.status}`}>
@@ -2287,15 +2570,21 @@ const LAUNCHER_STATUS_KEYS: Record<RuntimeInstallPhase, TranslationKey> = {
 
 function RuntimeLauncherHero({
   snapshot,
+  localReady,
   ready,
   checking,
+  gateBlocked,
+  accountRequired,
   automaticStartPending,
   commandBusy,
   onCancel,
 }: {
   snapshot: RuntimeInstallSnapshot | null;
+  localReady: boolean;
   ready: boolean;
   checking: boolean;
+  gateBlocked: boolean;
+  accountRequired: boolean;
   automaticStartPending: boolean;
   commandBusy: boolean;
   onCancel: () => void;
@@ -2306,11 +2595,15 @@ function RuntimeLauncherHero({
   const total = snapshot?.bytesTotal ?? null;
   const downloaded = snapshot?.bytesDownloaded ?? 0;
   const measuredPercent = runtimeInstallPercent(downloaded, total);
-  const percent = ready
+  const percent = localReady
     ? 100
     : measuredPercent !== null
       ? Math.min(measuredPercent, 99)
-      : checking || automaticStartPending || phase === "completed"
+      : checking ||
+          gateBlocked ||
+          accountRequired ||
+          automaticStartPending ||
+          phase === "completed"
         ? 99
         : null;
   const status = ready
@@ -2319,6 +2612,10 @@ function RuntimeLauncherHero({
       ? t("launcher.status.pausing")
       : commandBusy
         ? t("launcher.status.queued")
+      : gateBlocked
+        ? t("launcher.status.blocked")
+      : accountRequired
+        ? t("launcher.status.signIn")
       : phase === "completed"
         ? t("launcher.status.healthChecking")
       : (checking || automaticStartPending) && phase === "idle"
@@ -2326,10 +2623,10 @@ function RuntimeLauncherHero({
         : t(LAUNCHER_STATUS_KEYS[phase]);
 
   return (
-    <div className={`launcher-hero launcher-hero-${ready ? "ready" : phase}`}>
+    <div className={`launcher-hero launcher-hero-${localReady ? "ready" : phase}`}>
       <div className="launcher-hero-visual">
         <Suspense fallback={<DroneSceneLoadingFallback />}>
-          <DroneLaunchScene active={active || ready} progress={percent} />
+          <DroneLaunchScene active={active || localReady} progress={percent} />
         </Suspense>
       </div>
 
@@ -2337,7 +2634,7 @@ function RuntimeLauncherHero({
         <div
           className={`launcher-progress-track${percent === null && (active || checking) ? " indeterminate" : ""}`}
           role="progressbar"
-          aria-label={t("desktop.downloadProgress")}
+          aria-label={t("launcher.progressLabel")}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent ?? undefined}
@@ -2858,6 +3155,13 @@ const COMPONENT_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   "local-backend": "desktop.componentLabel.backend",
   px4: "desktop.componentLabel.px4",
   gazebo: "desktop.componentLabel.gazebo",
+  "account-session-api": "desktop.componentLabel.accountSessionApi",
+};
+
+const COMPONENT_DETAIL_KEYS: Partial<Record<string, TranslationKey>> = {
+  runtime_session_api_ready: "desktop.componentDetail.accountSessionApiReady",
+  runtime_session_api_missing: "launcher.runtimeSessionApiMissing",
+  runtime_session_api_unavailable: "launcher.runtimeSessionApiUnavailable",
 };
 
 function translatedComponentLabel(
@@ -2867,6 +3171,15 @@ function translatedComponentLabel(
 ): string {
   const key = COMPONENT_LABEL_KEYS[id];
   return key ? t(key) : fallback;
+}
+
+function translatedComponentDetail(
+  t: (key: TranslationKey) => string,
+  detail: string | null | undefined,
+): string | null | undefined {
+  if (!detail) return detail;
+  const key = COMPONENT_DETAIL_KEYS[detail];
+  return key ? t(key) : detail;
 }
 
 const STEP_TEXT_KEYS: Partial<

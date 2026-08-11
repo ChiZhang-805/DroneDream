@@ -1,0 +1,130 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "reference_track_json",
+      "display_name": "Reference Track",
+      "file_size_bytes": 32498,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/reference_track.json"
+    },
+    {
+      "artifact_type": "scenario_config_json",
+      "display_name": "Scenario Configuration",
+      "file_size_bytes": 281,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/scenario_config.json"
+    },
+    {
+      "artifact_type": "scenario_effect_request_json",
+      "display_name": "Scenario Effect Request",
+      "file_size_bytes": 422,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/scenario_effects.request.json"
+    },
+    {
+      "artifact_type": "controller_parameters_json",
+      "display_name": "Controller Parameters",
+      "file_size_bytes": 125,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/controller_params.json"
+    },
+    {
+      "artifact_type": "px4_parameters_input_json",
+      "display_name": "PX4 Parameter Input",
+      "file_size_bytes": 22,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/px4_parameters.input.json"
+    },
+    {
+      "artifact_type": "simulator_launch_config_json",
+      "display_name": "Simulator Launch Configuration",
+      "file_size_bytes": 5216,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/launch_config.json"
+    },
+    {
+      "artifact_type": "simulator_runtime_manifest_json",
+      "display_name": "Simulator Runtime Manifest",
+      "file_size_bytes": 2023,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/simulator_runtime_manifest.json"
+    },
+    {
+      "artifact_type": "px4_ulog",
+      "display_name": "Retained PX4 ULog",
+      "file_size_bytes": 16229308,
+      "mime_type": "application/octet-stream",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/px4_source.ulg"
+    },
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 282,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/runner.log"
+    },
+    {
+      "artifact_type": "simulator_stdout",
+      "display_name": "Simulator stdout",
+      "file_size_bytes": 2079254,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/stdout.log"
+    },
+    {
+      "artifact_type": "simulator_stderr",
+      "display_name": "Simulator stderr",
+      "file_size_bytes": 553,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/stderr.log"
+    },
+    {
+      "artifact_type": "offboard_executor_log",
+      "display_name": "Offboard Executor Log",
+      "file_size_bytes": 253,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/offboard_executor.log"
+    },
+    {
+      "artifact_type": "offboard_timing_json",
+      "display_name": "Offboard Timing",
+      "file_size_bytes": 284,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/offboard_timing.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Requested",
+      "file_size_bytes": 484,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/px4_parameters.requested.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Before",
+      "file_size_bytes": 502,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/px4_parameters.before.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Applied",
+      "file_size_bytes": 563,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4/px4_parameters.applied.json"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 4,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-95c3367",
+    "seed": 41001,
+    "trial_id": "px4-probe-nominal-seed-41001-attempt-4"
+  },
+  "failure": {
+    "code": "SIMULATION_FAILED",
+    "reason": "lower-level launcher exited with code 1"
+  },
+  "log_excerpt": "lower-level launcher exited with code 1",
+  "schema_version": "dronedream.trial_result.v2",
+  "success": false
+}

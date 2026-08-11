@@ -1,0 +1,14 @@
+{
+  "advanced_scenario_config": {},
+  "scenario_config": {},
+  "scenario_type": "nominal",
+  "schema_version": "dronedream.scenario_config.v1",
+  "seed": 41002,
+  "sensor_noise_level": "medium",
+  "wind": {
+    "east": 0.0,
+    "north": 2.0,
+    "south": 0.0,
+    "west": 0.0
+  }
+}

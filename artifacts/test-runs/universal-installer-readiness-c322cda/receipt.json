@@ -1,0 +1,175 @@
+{
+  "schema_id": "dronedream.universal-installer-readiness-receipt/v1",
+  "receipt_id": "universal-installer-readiness-c322cda",
+  "generated_at_utc": "2026-08-06T06:51:18.889Z",
+  "execution_subject": {
+    "repository_commit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+    "repository_tree": "29f0621a97920c5def522454f2ee5065f99c7552",
+    "branch": "codex/software",
+    "upstream": "origin/codex/software",
+    "upstream_commit_before_evidence": "c322cda1c968d15b09e8ac93364f885777b619e8",
+    "worktree_clean_before_evidence": true,
+    "ahead": 0,
+    "behind": 0,
+    "evidence_commit": null,
+    "evidence_commit_semantics": "This receipt is committed after the execution subject and must not be treated as the product source."
+  },
+  "resource_class": "GREEN",
+  "source_closure": {
+    "summary": "Bind the Universal installer, Engine Pack, lifecycle verifier, browser-auth identity, Runtime/update family, and Website handoff to one fail-closed desktop contract set without building or installing an EXE.",
+    "files": [
+      {
+        "path": "desktop/scripts/build-universal-installer.ps1",
+        "sha256": "d3089d8e97ce98a0b3023e934f61074d056a3fc9019cee152c7ac127d41f547c"
+      },
+      {
+        "path": "desktop/scripts/verify-universal-installer-lifecycle.ps1",
+        "sha256": "313a0b54c2983cd301a6d1878dfadda24b5ac2f27d268d8a12d40ad170bb40ac"
+      },
+      {
+        "path": "desktop/src-tauri/build.rs",
+        "sha256": "cb6df99581e8aab3d08d79dcc75f4ebb386e6178f7687f4633298c85f2e5e8a6"
+      },
+      {
+        "path": "desktop/src-tauri/tauri.universal.conf.json",
+        "sha256": "a045a4af29ffdbe9235df258f8da542c0b3fa34f197e0d888ca7378cfaee594f"
+      },
+      {
+        "path": "distribution/build-profiles/universal-1.0.0.v1.json",
+        "sha256": "e9149a922ca71672e1cce6905d967cafc7b1d00439705eb416baebb5784f8cb5"
+      },
+      {
+        "path": "distribution/desktop/edition-browser-auth.v1.json",
+        "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345"
+      },
+      {
+        "path": "distribution/tests/test_universal_installer_contract.py",
+        "sha256": "76c91fd8143d7a0042c38eea65fb2ae187479b506a5cb160fbf7f30cb0b23dce"
+      },
+      {
+        "path": "distribution/universal/release/website-exact-exe-handoff.v1.json",
+        "sha256": "9357e6dccbf840cccabb7cd0023c156dbe0722665d2f30594df4a099807581fb"
+      },
+      {
+        "path": "engine-pack/tests/test_engine_pack.py",
+        "sha256": "34664986f6236a4d9388187ef1012734bb6f6d7a3ea29e12ee2a632ef4f0064c"
+      },
+      {
+        "path": "engine-pack/tools/engine_pack.py",
+        "sha256": "21ae883bee775369bc4b057138f702bb4bf677d7040d1c053c1e61d10051cb31"
+      }
+    ]
+  },
+  "contract_bindings": {
+    "artifact_file_name": "DroneDream-Universal-1.0.0.exe",
+    "engine_pack_profile": "unified-sim-lab",
+    "engine_pack_file_count": 238,
+    "coexistence_sha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
+    "browser_auth_sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+    "runtime_update_families_sha256": "79f421b8ec81a746b7b7ae4df7702d18d3df08e76e89ccbf9e6937e22306ce32",
+    "app_auth_client_id": "dronedream-desktop-universal",
+    "provider_oauth_client_id_source": "external registered public build configuration",
+    "provider_oauth_client_id_receipt_policy": "record SHA-256 only; never persist the raw value in the build receipt",
+    "sim_and_field_profiles_exclude_unified_desktop_contract_payload": true,
+    "validated_vehicle_pack_count": 0,
+    "hardware_action_decision": "deny",
+    "release_ready_before_lifecycle_and_exact_browser_auth_receipts": false
+  },
+  "verification": [
+    {
+      "name": "current exact distribution contract suite",
+      "command": "python -m pytest distribution\\tests -q",
+      "result": "passed",
+      "passed": 177,
+      "subtests_passed": 15,
+      "failed": 0,
+      "duration_seconds": 1.42
+    },
+    {
+      "name": "current exact Engine Pack suite",
+      "command": "python -m pytest engine-pack\\tests -q",
+      "result": "passed",
+      "passed": 30,
+      "subtests_passed": 4,
+      "failed": 0,
+      "duration_seconds": 46.83
+    },
+    {
+      "name": "desktop release-source policy",
+      "command": "npm.cmd --prefix desktop run verify:release-source",
+      "result": "passed",
+      "tracked_files": 1843,
+      "npm_packages": 390,
+      "external_rust_packages": 532
+    },
+    {
+      "name": "Universal clean plan-only preflight",
+      "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File desktop\\scripts\\build-universal-installer.ps1",
+      "result": "passed",
+      "source_commit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+      "build_invoked": false,
+      "provider_oauth_client_id": "external-registered-public-config-required",
+      "release_ready_before_both_receipts": false
+    },
+    {
+      "name": "Rust formatting",
+      "command": "cargo fmt --manifest-path desktop\\src-tauri\\Cargo.toml -- --check",
+      "result": "passed"
+    },
+    {
+      "name": "git diff check and exact clean upstream",
+      "result": "passed",
+      "ahead": 0,
+      "behind": 0
+    }
+  ],
+  "preserved_failure_lineage": [
+    {
+      "stage": "first expanded installer contract run",
+      "result": "13 failed, 37 passed",
+      "root_causes": [
+        "The unified-sim-lab Engine Pack omitted the three desktop coexistence, browser-auth, and Runtime/update audit contracts.",
+        "The browser-auth contract still bound an earlier coexistence-contract SHA after the coexistence registry evolved."
+      ],
+      "fix": "Added an exact three-file allowlist only to unified-sim-lab, preserved Sim-only and Field exclusions, and rebound browser auth to the current coexistence bytes."
+    },
+    {
+      "stage": "OAuth identity review",
+      "result": "design correction before commit",
+      "root_cause": "An intermediate edit incorrectly treated DroneDream's stable edition authClientId as identical to the provider-issued public OAuth client ID.",
+      "fix": "Restored the mandatory external registered provider client ID, kept the edition identity separate, and record only the provider client ID SHA in build evidence."
+    },
+    {
+      "stage": "first Rust format check",
+      "result": "failed",
+      "root_cause": "One temporary build.rs expression was not rustfmt-normalized.",
+      "fix": "Ran the canonical formatter and verified cargo fmt --check on the final source."
+    }
+  ],
+  "execution_boundaries": {
+    "installer_builds": 0,
+    "installer_installations": 0,
+    "runtime_installations_or_migrations": 0,
+    "provider_logical_turns": 0,
+    "provider_network_requests": 0,
+    "api_keys_read": false,
+    "account_credentials_read": false,
+    "oauth_client_id_read_for_plan_only": false,
+    "px4_runs": 0,
+    "gazebo_runs": 0,
+    "headed_browser_runs": 0,
+    "global_mouse_moved": false,
+    "production_deployments": 0,
+    "website_or_technical_report_writes": 0
+  },
+  "remaining_gates": {
+    "readiness_state": "ready_for_single_yellow_build_request",
+    "single_yellow_tauri_nsis_build": "not_run",
+    "registered_public_oauth_client_configuration": "required_at_build_time",
+    "updater_signing_private_key": "required_at_build_time",
+    "isolated_installer_lifecycle": "not_run_red",
+    "exact_headed_browser_auth_roundtrip": "not_run_red",
+    "release_ready": false
+  },
+  "scope_claim": "This receipt proves that the exact Universal source is internally consistent and ready to request one bounded build. It does not prove that an EXE exists, installs, logs in through the real browser flow, or is release-ready."
+}

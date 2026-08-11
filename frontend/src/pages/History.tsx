@@ -34,6 +34,7 @@ import { fetchAllHistoryJobs } from "../features/history/fetchAllHistoryJobs";
 type Translator = ReturnType<typeof useI18n>["t"];
 
 const TRACK_LABELS: Record<TrackType, TranslationKey> = {
+  hover: "wizard.track.hover",
   circle: "wizard.track.circle",
   u_turn: "wizard.track.uTurn",
   lemniscate: "wizard.track.lemniscate",
@@ -75,7 +76,11 @@ function buildColumns(t: Translator): Column<Job>[] {
     key: "id",
     header: t("history.jobId"),
     render: (j) => (
-      <Link to={`/jobs/${j.id}`}>
+      <Link
+        className="history-job-id-link"
+        title={j.id}
+        to={`/jobs/${j.id}`}
+      >
         <code>{j.id}</code>
       </Link>
     ),
@@ -134,6 +139,8 @@ export function History() {
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const savingNameIdsRef = useRef<Set<string>>(new Set());
+  const deletingRef = useRef(false);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const deleteDialogRef = useRef<HTMLDivElement>(null);
   const columns = useMemo(() => buildColumns(t), [t]);
@@ -179,14 +186,22 @@ export function History() {
   }, [deleteTarget, isDeleting]);
 
   async function saveName(job: Job, rawName: string) {
+    if (savingNameIdsRef.current.has(job.id)) return;
+    savingNameIdsRef.current.add(job.id);
     const nextName = rawName.trim();
     setSaveError(null);
     try {
-      await apiClient.updateJob(job.id, { display_name: nextName === "" ? null : nextName });
+      await apiClient.updateJob(
+        job.id,
+        { display_name: nextName === "" ? null : nextName },
+        job.control_version,
+      );
       setEditingId(null);
       await query.refetch();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : t("history.saveFailed"));
+    } finally {
+      savingNameIdsRef.current.delete(job.id);
     }
   }
 
@@ -213,11 +228,15 @@ export function History() {
   }, [allJobs, backendFilter, objectiveFilter, optimizerFilter, queryFilter, statusFilter, trackFilter]);
   const canCompare = selectedIds.length >= 2 && selectedIds.length <= 10;
   async function confirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deletingRef.current) return;
+    deletingRef.current = true;
     setDeleteError(null);
     setIsDeleting(true);
     try {
-      await apiClient.deleteJob(deleteTarget.id);
+      await apiClient.deleteJob(
+        deleteTarget.id,
+        deleteTarget.control_version,
+      );
       setSelectedIds((prev) => prev.filter((id) => id !== deleteTarget.id));
       if (editingId === deleteTarget.id) setEditingId(null);
       setEditingNames((prev) => {
@@ -231,6 +250,7 @@ export function History() {
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : t("history.deleteFailed"));
     } finally {
+      deletingRef.current = false;
       setIsDeleting(false);
     }
   }
@@ -382,12 +402,12 @@ export function History() {
         </div>
       </SectionCard>
 
-      <SectionCard title={t("history.jobs")}>
-        {saveError ? <ErrorState description={saveError} /> : null}
-        <div className="history-jobs-toolbar">
+      <SectionCard
+        title={t("history.jobs")}
+        actions={(
           <button
             type="button"
-            className="btn"
+            className="btn history-compare-button"
             disabled={!canCompare}
             onClick={() =>
               navigate(`/compare?job_ids=${encodeURIComponent(selectedIds.join(","))}`)
@@ -395,7 +415,9 @@ export function History() {
           >
             {t("history.compareSelected", { count: selectedIds.length })}
           </button>
-        </div>
+        )}
+      >
+        {saveError ? <ErrorState description={saveError} /> : null}
         {query.isLoading ? (
           <Loading label={t("history.loading")} />
         ) : query.isError ? (

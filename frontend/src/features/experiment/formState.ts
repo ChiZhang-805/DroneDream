@@ -70,9 +70,15 @@ export interface ExperimentFormState {
   max_iterations: string;
   trials_per_candidate: string;
   max_total_trials: string;
+  continue_exploration_after_qualified: boolean;
+  exploration_additional_generations: string;
+  exploration_additional_trials: string;
+  exploration_additional_provider_turns: string;
+  exploration_additional_time_minutes: string;
   target_rmse: string;
   target_max_error: string;
   min_pass_rate: string;
+  llm_access_mode: "platform" | "byok";
   llm_provider: string;
   llm_api_key: string;
   llm_model: string;
@@ -146,9 +152,15 @@ export const EXPERIMENT_FORM_DEFAULTS: ExperimentFormState = {
   max_iterations: "12",
   trials_per_candidate: "3",
   max_total_trials: "220",
+  continue_exploration_after_qualified: false,
+  exploration_additional_generations: "4",
+  exploration_additional_trials: "80",
+  exploration_additional_provider_turns: "16",
+  exploration_additional_time_minutes: "60",
   target_rmse: "0.5",
   target_max_error: "",
   min_pass_rate: "0.8",
+  llm_access_mode: "platform",
   llm_provider: "openai",
   llm_api_key: "",
   llm_model: "",
@@ -187,6 +199,7 @@ const DRAFT_ENUM_VALUES: Partial<
   robust_aggregation: ["mean", "worst", "cvar", "percentile"],
   simulator_backend: SIMULATOR_BACKENDS,
   optimizer_strategy: OPTIMIZER_STRATEGIES,
+  llm_access_mode: ["platform", "byok"],
   llm_provider: ["openai", "qwen", "deepseek", "custom"],
   scenario_preset: ["nominal", "wind", "sensor", "stress"],
 };

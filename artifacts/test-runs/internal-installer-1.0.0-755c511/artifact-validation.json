@@ -1,0 +1,29 @@
+{
+    "schema_version":  "dronedream.internal-test-installer-artifact-validation.v2",
+    "generated_at":  "2026-07-29T01:02:08Z",
+    "source_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+    "artifact":  {
+                     "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+                     "bytes":  10387042,
+                     "sha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+                     "checksum_declared":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+                     "checksum_matches":  true,
+                     "pe_format":  "PE32",
+                     "pe_certificate_table_file_offset":  0,
+                     "pe_certificate_table_size":  0,
+                     "has_pe_certificate_table":  false,
+                     "authenticode_status":  "NotSigned",
+                     "authenticode_valid":  false,
+                     "not_signed_is_owner_accepted_internal_test_fact":  true
+                 },
+    "tauri_updater_signature":  {
+                                    "valid":  true,
+                                    "verification_method":  "minisign-verify 0.2.5 streaming verification after decoding the Tauri outer Base64 envelope",
+                                    "algorithm":  "ED",
+                                    "key_id_matches_configured_public_key":  true,
+                                    "payload_sha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+                                    "trusted_comment_and_global_signature_valid":  true,
+                                    "signature_file_sha256":  "0406f72c46f44da494e29621b815b190d43698f1f700c63df14e95d66431230a"
+                                },
+    "claim_boundary":  "Unsigned Authenticode is an owner-approved internal-test fact; Tauri updater signature validity is independent."
+}

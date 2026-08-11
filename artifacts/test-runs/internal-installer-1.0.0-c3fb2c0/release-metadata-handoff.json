@@ -1,0 +1,77 @@
+{
+    "schema_version":  "dronedream.internal-test-installer-publication-handoff.v4",
+    "generated_at":  "2026-07-31T07:34:01Z",
+    "source_commit":  "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "branch":  "codex/software",
+    "owner_override":  {
+                           "internal_test":  true,
+                           "version_must_remain":  "1.0.0",
+                           "authenticode_required":  false,
+                           "replace_existing_1_0_0_bytes":  true,
+                           "software_line_upload_authorized":  false
+                       },
+    "release":  {
+                    "version":  "1.0.0",
+                    "release_tag":  "signpath-candidate-v1.0.0",
+                    "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+                    "checksum_file_name":  "DroneDream_1.0.0_x64-setup.exe.sha256",
+                    "bytes":  10331399,
+                    "sha256":  "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+                    "authenticode_status":  "NotSigned",
+                    "pe_certificate_table_file_offset":  0,
+                    "pe_certificate_table_size":  0,
+                    "tauri_updater_signature_valid":  true,
+                    "tauri_signature_file_sha256":  "4d992ca27c3a42aabe411cb4123335ac608afbe62ec839ef7c3466fa14e12129"
+                },
+    "publication_contract":  {
+                                 "single_authoritative_installer_for_both_origins":  true,
+                                 "rebuild_per_origin":  false,
+                                 "upload_or_deployment_performed":  false,
+                                 "github_release_download_url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+                                 "github_release_checksum_url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe.sha256",
+                                 "mirror_download_path":  "/downloads/DroneDream_1.0.0_x64-setup.exe",
+                                 "mirror_checksum_path":  "/downloads/DroneDream_1.0.0_x64-setup.exe.sha256",
+                                 "website_latest":  "website-latest.json",
+                                 "website_pages_release":  "website-pages-release.json",
+                                 "tauri_updater_manifest":  "tauri-latest.json",
+                                 "tauri_updater_signature":  "DroneDream_1.0.0_x64-setup.exe.sig"
+                             },
+    "delivery_boundary":  {
+                              "desktop_subject_commit":  "c3fb2c0ad5f4009659c661d89945433e524d358e",
+                              "runtime_subject_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+                              "fresh_full_stack_runtime_delivery_ready":  true,
+                              "evidence":  "runtime-delivery-boundary.json"
+                          },
+    "supersession":  {
+                         "supersedes_755c511_9f44f798":  true,
+                         "supersedes_15603c6_b913e328":  true,
+                         "supersedes_8102ffe_f35c7aad":  true,
+                         "new_exe_is_authoritative_desktop_installer":  true
+                     },
+    "build_recovery":  {
+                           "nsis_bundle_count":  1,
+                           "initial_pipeline_exit_code":  1,
+                           "failure_after_bundle":  "PowerShell empty updater-password argument expansion",
+                           "existing_exe_signed_without_rebuild":  true,
+                           "source_script_not_modified_after_subject_freeze":  true,
+                           "evidence":  [
+                                            "build-attempt.json",
+                                            "build.log",
+                                            "updater-signing-recovery.log",
+                                            "updater-signature-verification.json"
+                                        ]
+                       },
+    "rollback":  {
+                     "previous_authoritative_source":  "755c511539fe561207ca38ff5079f471a4110896",
+                     "previous_authoritative_sha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+                     "previous_authoritative_bytes":  10387042
+                 },
+    "handoff":  {
+                    "authoritative_directory":  "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\internal-installer-1.0.0-c3fb2c0",
+                    "single_authoritative_exe":  true,
+                    "release_receipt":  "release-receipt.json",
+                    "handoff_manifest":  "handoff-manifest.json",
+                    "upload_performed":  false,
+                    "deployment_performed":  false
+                }
+}

@@ -1,0 +1,107 @@
+{
+    "schema_version":  "dronedream.internal-test-installer-release-receipt.v6",
+    "generated_at":  "2026-08-01T00:13:27Z",
+    "subject_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+    "subject_branch":  "codex/software",
+    "subject_was_clean_and_equal_to_upstream_before_build":  true,
+    "version":  "1.0.0",
+    "artifact":  {
+                     "absolute_path":  "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\internal-installer-1.0.0-3f6cb1d\\DroneDream_1.0.0_x64-setup.exe",
+                     "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+                     "bytes":  10313264,
+                     "sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+                     "authenticode_status":  "NotSigned",
+                     "pe_certificate_table_offset":  0,
+                     "pe_certificate_table_size":  0,
+                     "owner_accepted_unsigned_internal_test_fact":  true,
+                     "git_ignored_and_not_committed":  true
+                 },
+    "build":  {
+                  "command":  "npm --prefix desktop run build:llvm",
+                  "started_at":  "2026-07-31T23:59:16.5217180+00:00",
+                  "ended_at":  "2026-08-01T00:00:24.8998088+00:00",
+                  "duration_seconds":  68.38,
+                  "pipeline_exit_code":  0,
+                  "nsis_attempts":  1,
+                  "nsis_bundles_created":  1,
+                  "second_nsis_attempt_performed":  false
+              },
+    "tauri_updater":  {
+                          "signature_file":  "DroneDream_1.0.0_x64-setup.exe.sig",
+                          "signature_file_bytes":  420,
+                          "signature_file_sha256":  "9506775db6a8f62bb973f1dcee5e558424a47124723dccf2b6b9aa62b1c9f05e",
+                          "payload_signature_valid":  true,
+                          "trusted_comment_signature_valid":  true,
+                          "configured_key_id_matches":  true,
+                          "manifest_signature_matches_file":  true
+                      },
+    "validation":  {
+                       "release_source_policy":  "pass: 1363 tracked files, 390 npm packages, 532 external Rust packages",
+                       "frontend_software_scope":  "60 files / 380 tests passed",
+                       "backend_authoritative_final":  "1389 passed",
+                       "backend_first_full_attempt":  "1388 passed / 1 Windows timing-sensitive heartbeat observation failed",
+                       "backend_focused_isolation":  "5 of 5 passed",
+                       "rust":  "112 passed, 0 failed, 1 ignored",
+                       "production_frontend":  "pass",
+                       "browser_auth_edge":  "pass",
+                       "browser_session_404_compatibility":  "pass",
+                       "ece498_external_link":  "pass",
+                       "fixed_nsis_template":  "pass",
+                       "webview2":  "pass",
+                       "static_gnullvm_runtime":  "pass",
+                       "english_installer":  "pass",
+                       "simplified_chinese_installer":  "pass",
+                       "default_application_path_guard":  "pass",
+                       "desktop_shortcut_contract":  "pass",
+                       "loopback_http_status":  200,
+                       "loopback_download_byte_parity":  true,
+                       "version_surfaces_all_1_0_0":  true,
+                       "product_source_binding_sha256":  "650952a5faf9549b291e6a6e579740d8e4a0d4b6621ea8332c44ea14a433c262"
+                   },
+    "delivery_boundary":  {
+                              "desktop_and_frontend_subject":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+                              "backend_px4_gazebo_runtime_subject":  "755c511539fe561207ca38ff5079f471a4110896",
+                              "runtime_tag":  "runtime-v0.1.0-beta.2",
+                              "runtime_archive_bytes":  6141118464,
+                              "runtime_archive_sha256":  "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+                              "runtime_manifest_signature_valid":  true,
+                              "account_session_api_contract_present":  true,
+                              "fresh_full_stack_runtime_delivery_ready":  true,
+                              "existing_beta1_migration_authorized":  false
+                          },
+    "publication":  {
+                        "upload_performed":  false,
+                        "deployment_performed":  false,
+                        "github_release_modified":  false,
+                        "aliyun_modified":  false,
+                        "website_modified":  false,
+                        "same_exact_exe_required_at_all_public_origins":  true
+                    },
+    "supersedes":  [
+                       {
+                           "source":  "c3fb2c0ad5f4009659c661d89945433e524d358e",
+                           "sha256":  "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672"
+                       },
+                       {
+                           "source":  "755c511539fe561207ca38ff5079f471a4110896",
+                           "sha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b"
+                       },
+                       {
+                           "source":  "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+                           "sha256_prefix":  "b913e328"
+                       },
+                       {
+                           "source":  "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+                           "sha256_prefix":  "f35c7aad"
+                       }
+                   ],
+    "known_residuals":  [
+                            "The first backend full-suite attempt observed one Windows timing-sensitive heartbeat expiry equality; the test passed 5 focused runs and the authoritative second full suite passed 1389/1389 without a source change.",
+                            "One PublicSite test remains cross-line because codex/software intentionally lacks later website billing-checkout behavior; software-owned frontend tests pass 380/380.",
+                            "Vite reports a non-failing large-chunk advisory and clang reports a non-failing unused -no-pie advisory.",
+                            "This machine still has an older beta1/source-2cab652 Runtime. Migration was not authorized, so it remains correctly blocked and was not unregistered or overwritten.",
+                            "Authenticode is NotSigned and the PE certificate table is empty, as explicitly allowed for this internal-test build. The separate Tauri updater signature is valid."
+                        ],
+    "openai_api_key_read_or_used":  false,
+    "release_handoff_ready":  true
+}

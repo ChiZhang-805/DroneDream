@@ -1,0 +1,882 @@
+{
+  "schema_version": 1,
+  "subject_commit": "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+  "subject_dirty": false,
+  "branch": "codex/software",
+  "browser": "Microsoft Edge (Playwright msedge channel)",
+  "api_mode": "offline 503 fixture; no API key, backend write, or user photo",
+  "generated_at": "2026-07-31T23:55:57.525Z",
+  "cases": [
+    {
+      "case": {
+        "id": "desktop-en",
+        "locale": "en",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 819.53125,
+          "right": 993.609375,
+          "top": 611.671875,
+          "bottom": 649.65625,
+          "width": 174.078125
+        },
+        "refresh": {
+          "left": 870.765625,
+          "right": 993.609375,
+          "top": 788.578125,
+          "bottom": 820.953125,
+          "width": 122.84375
+        },
+        "period": {
+          "left": 446.390625,
+          "right": 858.765625,
+          "top": 795.640625,
+          "bottom": 813.875,
+          "width": 412.375
+        },
+        "footer": {
+          "left": 446.390625,
+          "right": 993.609375,
+          "top": 788.578125,
+          "bottom": 820.953125,
+          "width": 547.21875
+        },
+        "usage": {
+          "left": 431,
+          "right": 1009,
+          "top": 591.40625,
+          "bottom": 879.359375,
+          "width": 578
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-en-settings.png",
+          "sha256": "cf55e3e5e0c0607ec3e5330c1cc80e37faf6949f9dedcc12c9b9b6a17f72c15c"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 672,
+          "height": 491.453125
+        },
+        "viewport": {
+          "width": 304,
+          "height": 304
+        },
+        "preview": {
+          "width": 72,
+          "height": 72
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-en-avatar-crop.png",
+          "sha256": "55bb1d50ff74e58b9b379db90af712ad15663ac6d3b5d76d95600c49cb2bc147"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-en-ece498-external-entry.png",
+          "sha256": "700f9ac2a15c20a35a6950d7aa41ee82128b68852f2b4a773a8c9fb8ad67cdad"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 510.1875,
+            "right": 662.71875,
+            "top": 117.734375,
+            "bottom": 155.484375,
+            "width": 152.53125
+          },
+          "actions": {
+            "left": 1279.03125,
+            "right": 1434.203125,
+            "top": 117.734375,
+            "bottom": 155.484375,
+            "width": 155.171875
+          },
+          "visual": {
+            "left": 37.796875,
+            "right": 662.71875,
+            "top": 163.484375,
+            "bottom": 950.203125,
+            "width": 624.921875
+          },
+          "data": {
+            "left": 670.390625,
+            "right": 1434.203125,
+            "top": 163.484375,
+            "bottom": 950.203125,
+            "width": 763.8125
+          },
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-en-track-editor.png",
+            "sha256": "13dfb9815a69cdd574c51df3af9e4ded5c9f2caadfdd7f57e8270d3861573413"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 763,
+            "scrollHeight": 763,
+            "overflowY": "auto",
+            "bottom": 935.6875
+          },
+          "lastGroupBottom": 925.890625,
+          "selects": [
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            }
+          ],
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-en-scenario.png",
+            "sha256": "d51495c0f1ca05990438ca01dac6b7128649999261073aedfde7b84d71e13d56"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 1111,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 363,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-en-parameter-wheel.png",
+            "sha256": "f4df1e03a9788df581c3fa536835f29ef7ff2c7ddaac6d457d6815e964dc2313"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": true,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-en-workspace-pinned.png",
+          "sha256": "89102b983b29d721ac502239b23bfd7ec5dc4d68dd6286f07a3afdab037bb6b3"
+        },
+        "dragPreviewImage": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-en-workspace-drag-preview.png",
+          "sha256": "4bbb17f5aef752a938fb2661e6be9dc7e60c86c116ca365df30cd5708b9568cb"
+        }
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "desktop-zh",
+        "locale": "zh-CN",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 906.8125,
+          "right": 993.609375,
+          "top": 608.03125,
+          "bottom": 646.015625,
+          "width": 86.796875
+        },
+        "refresh": {
+          "left": 906.8125,
+          "right": 993.609375,
+          "top": 784.9375,
+          "bottom": 820.3125,
+          "width": 86.796875
+        },
+        "period": {
+          "left": 446.390625,
+          "right": 894.8125,
+          "top": 793.5,
+          "bottom": 811.734375,
+          "width": 448.421875
+        },
+        "footer": {
+          "left": 446.390625,
+          "right": 993.609375,
+          "top": 784.9375,
+          "bottom": 820.3125,
+          "width": 547.21875
+        },
+        "usage": {
+          "left": 431,
+          "right": 1009,
+          "top": 587.765625,
+          "bottom": 878.71875,
+          "width": 578
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-zh-settings.png",
+          "sha256": "9d9998fa258e7a920f922c6c975b845a1cfbfc2ffb4737aaff55bfadcfd5a3c0"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 672,
+          "height": 494.453125
+        },
+        "viewport": {
+          "width": 304,
+          "height": 304
+        },
+        "preview": {
+          "width": 72,
+          "height": 72
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-zh-avatar-crop.png",
+          "sha256": "ce5c61767082333f21e1bb43ee8188ffd789ef9f2038e37b1db0a45a81966011"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-zh-ece498-external-entry.png",
+          "sha256": "60bcaadc8f1fd5eed6aa7ecbca9f89040478bba4f5db42b5d9049a79654e9dc5"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 510.1875,
+            "right": 662.71875,
+            "top": 117.734375,
+            "bottom": 155.484375,
+            "width": 152.53125
+          },
+          "actions": {
+            "left": 1279.03125,
+            "right": 1434.203125,
+            "top": 117.734375,
+            "bottom": 155.484375,
+            "width": 155.171875
+          },
+          "visual": {
+            "left": 37.796875,
+            "right": 662.71875,
+            "top": 163.484375,
+            "bottom": 950.203125,
+            "width": 624.921875
+          },
+          "data": {
+            "left": 670.390625,
+            "right": 1434.203125,
+            "top": 163.484375,
+            "bottom": 950.203125,
+            "width": 763.8125
+          },
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-zh-track-editor.png",
+            "sha256": "6b592c1cc90fb8847167286750d603423b193d043bd2e69154db5f30ac2a3e3f"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 763,
+            "scrollHeight": 763,
+            "overflowY": "auto",
+            "bottom": 935.125
+          },
+          "lastGroupBottom": 925.328125,
+          "selects": [
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            }
+          ],
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-zh-scenario.png",
+            "sha256": "343fb9c162dea158d0b0b3e5548ed41850bd67e9aefc80cd3efae2047250c819"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 1111,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 363,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-zh-parameter-wheel.png",
+            "sha256": "9d1701bb6c458f8011381ab0004a2cb04117a0e986ea8f5dd59fb8dc00be5e38"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": true,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-zh-workspace-pinned.png",
+          "sha256": "9f087a3d3a4c9e05fe3df82b3ae86934082a27e770e71189ffa38f3e20dce7ba"
+        },
+        "dragPreviewImage": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/desktop-zh-workspace-drag-preview.png",
+          "sha256": "9f23c19d70891e85a9e3ce9da9c359481fec4af9286c9c8a99422e0aa41ffcaa"
+        }
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "mobile-en",
+        "locale": "en",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 159.53125,
+          "right": 333.609375,
+          "top": 417.390625,
+          "bottom": 455.375,
+          "width": 174.078125
+        },
+        "refresh": {
+          "left": 210.765625,
+          "right": 333.609375,
+          "top": 638.578125,
+          "bottom": 670.953125,
+          "width": 122.84375
+        },
+        "period": {
+          "left": 56.390625,
+          "right": 198.765625,
+          "top": 636.53125,
+          "bottom": 673,
+          "width": 142.375
+        },
+        "footer": {
+          "left": 56.390625,
+          "right": 333.609375,
+          "top": 636.53125,
+          "bottom": 673,
+          "width": 277.21875
+        },
+        "usage": {
+          "left": 41,
+          "right": 349,
+          "top": 397.125,
+          "bottom": 763.875,
+          "width": 308
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-en-settings.png",
+          "sha256": "bfd4ab14e158fba0ab19c495f69ecf35d3f063beb16f17655bbc3e240024d99f"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 378.8125,
+          "height": 550.78125
+        },
+        "viewport": {
+          "width": 256,
+          "height": 256
+        },
+        "preview": {
+          "width": 57.59375,
+          "height": 57.59375
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-en-avatar-crop.png",
+          "sha256": "c0a7c43db6af2ba92608761b3b22ba948df6b106978833ffd338cd77516b05b7"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-en-ece498-external-entry.png",
+          "sha256": "1707a15b5e9b21fd69db0208f85f6f439363ef0b9482425ca335b50bcec3f643"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 89.5625,
+            "bottom": 127.3125,
+            "width": 341.625
+          },
+          "actions": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 134.5,
+            "bottom": 168.5,
+            "width": 341.625
+          },
+          "visual": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 175.6875,
+            "bottom": 549.703125,
+            "width": 341.625
+          },
+          "data": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 556.890625,
+            "bottom": 826.203125,
+            "width": 341.625
+          },
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-en-track-editor.png",
+            "sha256": "f929eed50545fafed727ce3e157d9298911636bdfc80d6c88458543b3affa9c7"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 472,
+            "scrollHeight": 1638,
+            "overflowY": "auto",
+            "bottom": 780.8125
+          },
+          "lastGroupBottom": 1937.1875,
+          "selects": [
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            }
+          ],
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-en-scenario.png",
+            "sha256": "afc91d4f14e867b48eefa5ff8fffdba6b5ca1e10ce27ab9f39338392c7e834a9"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 318,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 1157,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-en-parameter-wheel.png",
+            "sha256": "207f44f9c6685a8cf3fc2dde589142b6c9acf68340d0e3d9df1a99a8a54f8e08"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": false,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-en-workspace-pinned.png",
+          "sha256": "f6501ddd97960a4b42cfa597115ff79f7ca16fc36c80f98bb864c5252cc4485d"
+        },
+        "dragPreviewImage": null
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "mobile-zh",
+        "locale": "zh-CN",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 246.8125,
+          "right": 333.609375,
+          "top": 459.09375,
+          "bottom": 497.078125,
+          "width": 86.796875
+        },
+        "refresh": {
+          "left": 246.8125,
+          "right": 333.609375,
+          "top": 654.234375,
+          "bottom": 689.609375,
+          "width": 86.796875
+        },
+        "period": {
+          "left": 56.390625,
+          "right": 234.8125,
+          "top": 662.796875,
+          "bottom": 681.03125,
+          "width": 178.421875
+        },
+        "footer": {
+          "left": 56.390625,
+          "right": 333.609375,
+          "top": 654.234375,
+          "bottom": 689.609375,
+          "width": 277.21875
+        },
+        "usage": {
+          "left": 41,
+          "right": 349,
+          "top": 438.828125,
+          "bottom": 764.25,
+          "width": 308
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-zh-settings.png",
+          "sha256": "c4853965c68556243c697f2468073060c21c0e98e182639bb86a6dee1a492cca"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 378.8125,
+          "height": 553.78125
+        },
+        "viewport": {
+          "width": 256,
+          "height": 256
+        },
+        "preview": {
+          "width": 57.59375,
+          "height": 57.59375
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-zh-avatar-crop.png",
+          "sha256": "c462eb12bd3a3fcd52b65226b67b2694e4b6e2ba2898589a6f643273a2e4a853"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "image": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-zh-ece498-external-entry.png",
+          "sha256": "91ed36705c34f527857d5fc471ced1af28d0cd66f97ff8f6b3805b1b20e44b21"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 89.5625,
+            "bottom": 127.3125,
+            "width": 341.625
+          },
+          "actions": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 134.5,
+            "bottom": 168.5,
+            "width": 341.625
+          },
+          "visual": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 175.6875,
+            "bottom": 549.703125,
+            "width": 341.625
+          },
+          "data": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 556.890625,
+            "bottom": 826.203125,
+            "width": 341.625
+          },
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-zh-track-editor.png",
+            "sha256": "8a08fa0ac9dcd469fe2c3399b4069089b8fec0158176dc019c5a416522a113bc"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 470,
+            "scrollHeight": 1619,
+            "overflowY": "auto",
+            "bottom": 778.65625
+          },
+          "lastGroupBottom": 1917.5,
+          "selects": [
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            }
+          ],
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-zh-scenario.png",
+            "sha256": "d8de62301fddd5ee0acfd89db39c1ad7b1e91638117b7f0e64f443e930b8d7b6"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 318,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 1157,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-zh-parameter-wheel.png",
+            "sha256": "638b53db1288c34fb5d4eac8f052f63f98c6eea0a562abe330af08ce67271cb9"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": false,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/internal-installer-1.0.0-3f6cb1d/frontend-validation/software-ui/mobile-zh-workspace-pinned.png",
+          "sha256": "ef035e423123b0f41df0ac5fb98a1253a6af4176b742a2d54d76a5d0d1ada43d"
+        },
+        "dragPreviewImage": null
+      },
+      "pageErrors": [],
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

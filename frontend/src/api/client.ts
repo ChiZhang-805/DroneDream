@@ -1,13 +1,27 @@
 // HTTP client for the DroneDream /api/v1 backend. It owns envelope parsing,
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
-import { isDesktopRuntime } from "../desktop/bridge";
-import { getDesktopReadinessSession } from "../desktop/readiness";
+import {
+  desktopApiRequest,
+  desktopDownloadArtifact,
+  isDesktopRuntime,
+} from "../desktop/bridge";
+import {
+  FetchDeadlineError,
+  FetchResponseSizeError,
+  fetchWithDeadline,
+} from "./fetchWithDeadline";
+import {
+  ensureDesktopRuntimeLiveness,
+  getDesktopReadinessSession,
+} from "../desktop/readiness";
+import { getDesktopStartupGateSession } from "../desktop/startupGate";
 import { getAuthAccessToken } from "../features/auth/authTokenStore";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import type {
   ApiEnvelope,
   Artifact,
+  AuthenticatedSessionResponse,
   BackendCapabilitiesResponse,
   BatchCreateRequest,
   BatchJob,
@@ -17,8 +31,10 @@ import type {
   DeleteJobResponse,
   ExperimentAssistantTurnRequest,
   ExperimentAssistantTurnResponse,
+  DeleteUserExperiencePreferencesResponse,
   JobUpdateRequest,
   JobRerunRequest,
+  ContinueExplorationRequest,
   JobReport,
   PaginatedBatchJobs,
   JobStatus,
@@ -27,6 +43,9 @@ import type {
   OptimizationHistory,
   Trial,
   TrialSummary,
+  UserExperiencePreferences,
+  UserExperiencePreferencesMutation,
+  UserExperiencePreferencesUpdate,
 } from "../types/api";
 
 export class ApiClientError extends Error {
@@ -55,13 +74,20 @@ const API_BASE_URL: string =
   "http://127.0.0.1:8000";
 const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
+const BROWSER_REQUEST_TIMEOUT_MS = 120_000;
+const BROWSER_API_RESPONSE_MAX_BYTES = 64 * 1024 * 1024;
+const BROWSER_ARTIFACT_RESPONSE_MAX_BYTES = 256 * 1024 * 1024;
 
 function authHeaders(): Record<string, string> {
-  const accessToken = getAuthAccessToken() ?? DEMO_AUTH_TOKEN;
+  const accessToken = currentAccessToken();
   if (!accessToken) {
     return {};
   }
   return { Authorization: `Bearer ${accessToken}` };
+}
+
+function currentAccessToken(): string | null {
+  return getAuthAccessToken() ?? DEMO_AUTH_TOKEN ?? null;
 }
 
 export function artifactDownloadUrl(artifactId: string): string {
@@ -73,24 +99,137 @@ async function triggerBrowserDownload(
   filename: string,
 ): Promise<void> {
   const objectUrl = URL.createObjectURL(content);
+  const link = document.createElement("a");
   try {
-    const link = document.createElement("a");
     link.href = objectUrl;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
   } finally {
-    URL.revokeObjectURL(objectUrl);
+    link.remove();
+    // Firefox and embedded WebViews may not have consumed the object URL when
+    // click() returns. Revoke it on the next task so the download can start,
+    // while still guaranteeing bounded resource cleanup.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
   }
+}
+
+interface RequestPolicy {
+  requireRuntimeLiveness?: boolean;
+  idempotentMutation?: boolean;
+}
+
+interface PendingMutation {
+  fingerprint: string;
+  idempotencyKey: string;
+  createdAt: number;
+}
+
+const PENDING_MUTATIONS_STORAGE_KEY =
+  "dronedream.api.pending-mutations.v1";
+const PENDING_MUTATION_TTL_MS = 30 * 60 * 1000;
+const MAX_PENDING_MUTATIONS = 16;
+const CANONICAL_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function loadPendingMutations(now = Date.now()): PendingMutation[] {
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(PENDING_MUTATIONS_STORAGE_KEY) ?? "[]",
+    ) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((value): value is PendingMutation => {
+        if (!value || typeof value !== "object") return false;
+        const candidate = value as Partial<PendingMutation>;
+        return (
+          typeof candidate.fingerprint === "string" &&
+          /^[0-9a-f]{64}$/.test(candidate.fingerprint) &&
+          typeof candidate.idempotencyKey === "string" &&
+          CANONICAL_UUID.test(candidate.idempotencyKey) &&
+          typeof candidate.createdAt === "number" &&
+          Number.isFinite(candidate.createdAt) &&
+          candidate.createdAt <= now &&
+          now - candidate.createdAt <= PENDING_MUTATION_TTL_MS
+        );
+      })
+      .slice(-MAX_PENDING_MUTATIONS);
+  } catch {
+    return [];
+  }
+}
+
+function savePendingMutations(entries: PendingMutation[]): void {
+  try {
+    if (entries.length === 0) {
+      localStorage.removeItem(PENDING_MUTATIONS_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(
+      PENDING_MUTATIONS_STORAGE_KEY,
+      JSON.stringify(entries.slice(-MAX_PENDING_MUTATIONS)),
+    );
+  } catch {
+    // Storage can be unavailable under restrictive WebView policies. The
+    // in-call exact retry remains safe even without restart persistence.
+  }
+}
+
+async function mutationFingerprint(
+  path: string,
+  init: RequestInit | undefined,
+): Promise<string | null> {
+  if (!crypto.subtle) return null;
+  const method = (init?.method ?? "GET").toUpperCase();
+  const body = typeof init?.body === "string" ? init.body : "";
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${method}\n${path}\n${body}`),
+  );
+  return Array.from(new Uint8Array(digest), (value) =>
+    value.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+async function preparePendingMutation(
+  path: string,
+  init: RequestInit | undefined,
+): Promise<PendingMutation> {
+  const fingerprint = await mutationFingerprint(path, init);
+  const now = Date.now();
+  const existing = loadPendingMutations(now);
+  if (fingerprint) {
+    const match = existing.find(
+      (entry) => entry.fingerprint === fingerprint,
+    );
+    if (match) return match;
+  }
+  const created: PendingMutation = {
+    fingerprint: fingerprint ?? "0".repeat(64),
+    idempotencyKey: crypto.randomUUID(),
+    createdAt: now,
+  };
+  if (fingerprint) savePendingMutations([...existing, created]);
+  return created;
+}
+
+function clearPendingMutation(pending: PendingMutation | null): void {
+  if (!pending || pending.fingerprint === "0".repeat(64)) return;
+  savePendingMutations(
+    loadPendingMutations().filter(
+      (entry) =>
+        entry.fingerprint !== pending.fingerprint ||
+        entry.idempotencyKey !== pending.idempotencyKey,
+    ),
+  );
 }
 
 async function request<T>(
   path: string,
   init?: RequestInit,
-  requireRuntimeLiveness = false,
+  policy: RequestPolicy = {},
 ): Promise<T> {
-  if (isDesktopRuntime() && requireRuntimeLiveness) {
+  if (isDesktopRuntime() && policy.requireRuntimeLiveness) {
     const readiness = getDesktopReadinessSession()?.snapshot;
     if (!readiness?.ready) {
       throw new ApiClientError(
@@ -98,34 +237,101 @@ async function request<T>(
         "The local DroneDream runtime has not been approved for this session. Open Settings and click Check environment before starting an experiment.",
       );
     }
+    const startupGate = getDesktopStartupGateSession();
+    if (startupGate.status !== "ready") {
+      throw new ApiClientError(
+        "DESKTOP_STARTUP_GATE_NOT_READY",
+        "The startup checks have not approved this account and runtime session.",
+      );
+    }
+    try {
+      const live = await ensureDesktopRuntimeLiveness({ autoStart: true });
+      if (!live.ready) {
+        throw new ApiClientError(
+          "DESKTOP_RUNTIME_NOT_READY",
+          "The local DroneDream runtime stopped responding before the experiment started.",
+        );
+      }
+    } catch (error) {
+      if (error instanceof ApiClientError) throw error;
+      throw new ApiClientError(
+        "DESKTOP_RUNTIME_NOT_READY",
+        error instanceof Error
+          ? error.message
+          : "The local DroneDream runtime could not be verified.",
+      );
+    }
   }
 
+  const pendingMutation = policy.idempotentMutation
+    ? await preparePendingMutation(path, init)
+    : null;
+  const idempotencyKey = pendingMutation?.idempotencyKey ?? null;
+  const send = () =>
+    transportRequest(path, init, "application/json", idempotencyKey);
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        ...authHeaders(),
-        ...(init?.headers ?? {}),
-      },
-    });
+    response = await send();
   } catch (networkError) {
-    throw new ApiClientError(
-      "NETWORK_ERROR",
-      networkError instanceof Error
-        ? networkError.message
-        : "Failed to reach the API.",
-      null,
-      0,
-    );
+    if (networkError instanceof FetchResponseSizeError) {
+      throw new ApiClientError(
+        "RESPONSE_TOO_LARGE",
+        networkError.message,
+        null,
+        networkError.httpStatus,
+      );
+    }
+    // A transport failure can occur after the Runtime committed the action but
+    // before its response reached the WebView. Retrying once is safe only for
+    // endpoints whose durable backend receipt binds this exact key and body.
+    if (idempotencyKey) {
+      try {
+        response = await send();
+      } catch (retryError) {
+        if (retryError instanceof FetchResponseSizeError) {
+          throw new ApiClientError(
+            "RESPONSE_TOO_LARGE",
+            retryError.message,
+            null,
+            retryError.httpStatus,
+          );
+        }
+        throw new ApiClientError(
+          "NETWORK_ERROR",
+          retryError instanceof Error
+            ? retryError.message
+            : "Failed to reach the API after a safe retry.",
+          null,
+          0,
+        );
+      }
+    } else {
+      throw new ApiClientError(
+        "NETWORK_ERROR",
+        networkError instanceof Error
+          ? networkError.message
+          : "Failed to reach the API.",
+        null,
+        0,
+      );
+    }
   }
 
   let envelope: ApiEnvelope<T>;
   try {
     envelope = (await response.json()) as ApiEnvelope<T>;
-  } catch {
+  } catch (error) {
+    if (error instanceof FetchDeadlineError) {
+      throw new ApiClientError("NETWORK_ERROR", error.message, null, 0);
+    }
+    if (error instanceof FetchResponseSizeError) {
+      throw new ApiClientError(
+        "RESPONSE_TOO_LARGE",
+        error.message,
+        null,
+        response.status,
+      );
+    }
     throw new ApiClientError(
       "INTERNAL_ERROR",
       `Unexpected non-JSON response (HTTP ${response.status})`,
@@ -138,7 +344,11 @@ async function request<T>(
   // malformed backend must not turn a 4xx/5xx response into a successful
   // mutation merely by returning a body with `success: true`.
   if (response.ok && envelope.success === true) {
+    clearPendingMutation(pendingMutation);
     return envelope.data;
+  }
+  if (!response.ok && envelope.success === false) {
+    clearPendingMutation(pendingMutation);
   }
   const error = envelope?.error;
   throw new ApiClientError(
@@ -147,6 +357,69 @@ async function request<T>(
     error?.details ?? null,
     response.status,
   );
+}
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function transportRequest(
+  path: string,
+  init?: RequestInit,
+  accept: "application/json" | "application/octet-stream" | "text/csv" =
+    "application/json",
+  idempotencyKey: string | null = null,
+): Promise<Response> {
+  if (!isDesktopRuntime()) {
+    return fetchWithDeadline(
+      `${API_BASE_URL}/api/v1${path}`,
+      {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: accept,
+          ...authHeaders(),
+          ...(init?.headers ?? {}),
+          ...(idempotencyKey
+            ? { "Idempotency-Key": idempotencyKey }
+            : {}),
+        },
+      },
+      BROWSER_REQUEST_TIMEOUT_MS,
+      accept === "application/octet-stream"
+        ? BROWSER_ARTIFACT_RESPONSE_MAX_BYTES
+        : BROWSER_API_RESPONSE_MAX_BYTES,
+    );
+  }
+
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (!["GET", "POST", "PATCH", "DELETE"].includes(method)) {
+    throw new Error(`Unsupported desktop API method: ${method}`);
+  }
+  if (init?.body != null && typeof init.body !== "string") {
+    throw new Error("Desktop API request bodies must be JSON strings.");
+  }
+  const bridged = await desktopApiRequest({
+    method: method as "GET" | "POST" | "PATCH" | "DELETE",
+    path: `/api/v1${path}`,
+    body: (init?.body as string | undefined) ?? null,
+    accessToken: currentAccessToken(),
+    accept,
+    idempotencyKey,
+  });
+  const decoded = decodeBase64(bridged.bodyBase64);
+  const bodyBuffer = Uint8Array.from(decoded).buffer;
+  return new Response(bodyBuffer, {
+    status: bridged.status,
+    headers: bridged.contentType
+      ? { "Content-Type": bridged.contentType }
+      : undefined,
+  });
 }
 
 function buildQuery(params: Record<string, string | number | undefined>): string {
@@ -160,6 +433,10 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async verifyAuthenticatedSession(): Promise<AuthenticatedSessionResponse> {
+    return request<AuthenticatedSessionResponse>("/session");
+  },
+
   async compileExperimentAssistantTurn(
     req: ExperimentAssistantTurnRequest,
   ): Promise<ExperimentAssistantTurnResponse> {
@@ -167,6 +444,25 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(req),
     });
+  },
+
+  async getUserExperiencePreferences(): Promise<UserExperiencePreferences> {
+    return request<UserExperiencePreferences>("/preferences/experience");
+  },
+
+  async updateUserExperiencePreferences(
+    req: UserExperiencePreferencesUpdate,
+  ): Promise<UserExperiencePreferencesMutation> {
+    return request<UserExperiencePreferencesMutation>("/preferences/experience", {
+      method: "PUT",
+      body: JSON.stringify(req),
+    }, { idempotentMutation: true });
+  },
+
+  async deleteUserExperiencePreferences(): Promise<DeleteUserExperiencePreferencesResponse> {
+    return request<DeleteUserExperiencePreferencesResponse>("/preferences/experience", {
+      method: "DELETE",
+    }, { idempotentMutation: true });
   },
 
   async getCapabilities(): Promise<BackendCapabilitiesResponse> {
@@ -182,7 +478,10 @@ export const apiClient = {
     return request<Job>("/jobs", {
       method: "POST",
       body: JSON.stringify(req),
-    }, true);
+    }, {
+      requireRuntimeLiveness: true,
+      idempotentMutation: true,
+    });
   },
 
   async listJobs(params?: {
@@ -210,16 +509,25 @@ export const apiClient = {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}`);
   },
 
-  async updateJob(jobId: string, req: JobUpdateRequest): Promise<Job> {
-    return request<Job>(`/jobs/${encodeURIComponent(jobId)}`, {
+  async updateJob(
+    jobId: string,
+    req: JobUpdateRequest,
+    controlVersion: number,
+  ): Promise<Job> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<Job>(`/jobs/${encodeURIComponent(jobId)}${qs}`, {
       method: "PATCH",
       body: JSON.stringify(req),
-    });
+    }, { idempotentMutation: true });
   },
-  async deleteJob(jobId: string): Promise<DeleteJobResponse> {
-    return request<DeleteJobResponse>(`/jobs/${encodeURIComponent(jobId)}`, {
+  async deleteJob(
+    jobId: string,
+    controlVersion: number,
+  ): Promise<DeleteJobResponse> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<DeleteJobResponse>(`/jobs/${encodeURIComponent(jobId)}${qs}`, {
       method: "DELETE",
-    });
+    }, { idempotentMutation: true });
   },
 
   async listJobTrials(jobId: string): Promise<TrialSummary[]> {
@@ -278,15 +586,41 @@ export const apiClient = {
   },
 
   async downloadArtifact(artifactId: string, filename?: string): Promise<void> {
-    const url = artifactDownloadUrl(artifactId);
+    if (isDesktopRuntime()) {
+      try {
+        await desktopDownloadArtifact({
+          artifactId,
+          filename: filename ?? `artifact-${artifactId}`,
+          accessToken: currentAccessToken(),
+        });
+        return;
+      } catch (networkError) {
+        throw new ApiClientError(
+          "ARTIFACT_DOWNLOAD_FAILED",
+          networkError instanceof Error
+            ? networkError.message
+            : "Failed to save the artifact.",
+          null,
+          0,
+        );
+      }
+    }
     let response: Response;
     try {
-      response = await fetch(url, {
-        headers: {
-          ...authHeaders(),
-        },
-      });
+      response = await transportRequest(
+        `/artifacts/${encodeURIComponent(artifactId)}/download`,
+        undefined,
+        "application/octet-stream",
+      );
     } catch (networkError) {
+      if (networkError instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "ARTIFACT_TOO_LARGE",
+          networkError.message,
+          null,
+          networkError.httpStatus,
+        );
+      }
       throw new ApiClientError(
         "NETWORK_ERROR",
         networkError instanceof Error
@@ -306,23 +640,41 @@ export const apiClient = {
       );
     }
 
-    await triggerBrowserDownload(
-      await response.blob(),
-      filename ?? `artifact-${artifactId}`,
-    );
+    try {
+      await triggerBrowserDownload(
+        await response.blob(),
+        filename ?? `artifact-${artifactId}`,
+      );
+    } catch (error) {
+      if (error instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "ARTIFACT_TOO_LARGE",
+          error.message,
+          null,
+          response.status,
+        );
+      }
+      throw error;
+    }
   },
 
   async fetchArtifactJson<T>(artifactId: string): Promise<T> {
-    const url = artifactDownloadUrl(artifactId);
     let response: Response;
     try {
-      response = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          ...authHeaders(),
-        },
-      });
+      response = await transportRequest(
+        `/artifacts/${encodeURIComponent(artifactId)}/download`,
+        undefined,
+        "application/json",
+      );
     } catch (networkError) {
+      if (networkError instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "ARTIFACT_TOO_LARGE",
+          networkError.message,
+          null,
+          networkError.httpStatus,
+        );
+      }
       throw new ApiClientError(
         "NETWORK_ERROR",
         networkError instanceof Error
@@ -342,7 +694,20 @@ export const apiClient = {
       );
     }
 
-    const payloadText = await response.text();
+    let payloadText: string;
+    try {
+      payloadText = await response.text();
+    } catch (error) {
+      if (error instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "ARTIFACT_TOO_LARGE",
+          error.message,
+          null,
+          response.status,
+        );
+      }
+      throw error;
+    }
     try {
       return JSON.parse(payloadText) as T;
     } catch {
@@ -355,17 +720,40 @@ export const apiClient = {
     }
   },
 
-  async cancelJob(jobId: string): Promise<Job> {
-    return request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel`, {
+  async cancelJob(jobId: string, controlVersion: number): Promise<Job> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel${qs}`, {
       method: "POST",
-    });
+    }, { idempotentMutation: true });
   },
 
   async rerunJob(jobId: string, req?: JobRerunRequest): Promise<Job> {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/rerun`, {
       method: "POST",
       body: JSON.stringify(req ?? {}),
-    }, true);
+    }, {
+      requireRuntimeLiveness: true,
+      idempotentMutation: true,
+    });
+  },
+
+  async continueExploration(
+    jobId: string,
+    controlVersion: number,
+    req: ContinueExplorationRequest,
+  ): Promise<Job> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<Job>(
+      `/jobs/${encodeURIComponent(jobId)}/continue-exploration${qs}`,
+      {
+        method: "POST",
+        body: JSON.stringify(req),
+      },
+      {
+        requireRuntimeLiveness: true,
+        idempotentMutation: true,
+      },
+    );
   },
 
   async compareJobs(jobIds: string[]): Promise<JobCompareResponse> {
@@ -383,10 +771,21 @@ export const apiClient = {
   async downloadCompareJobsCsv(jobIds: string[]): Promise<void> {
     let response: Response;
     try {
-      response = await fetch(this.compareJobsCsvUrl(jobIds), {
-        headers: { ...authHeaders() },
-      });
+      const joined = encodeURIComponent(jobIds.join(","));
+      response = await transportRequest(
+        `/jobs/compare.csv?job_ids=${joined}`,
+        undefined,
+        "text/csv",
+      );
     } catch (networkError) {
+      if (networkError instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "COMPARE_CSV_TOO_LARGE",
+          networkError.message,
+          null,
+          networkError.httpStatus,
+        );
+      }
       throw new ApiClientError(
         "NETWORK_ERROR",
         networkError instanceof Error
@@ -404,17 +803,32 @@ export const apiClient = {
         response.status,
       );
     }
-    await triggerBrowserDownload(
-      await response.blob(),
-      `job-compare-${jobIds.join("_")}.csv`,
-    );
+    try {
+      await triggerBrowserDownload(
+        await response.blob(),
+        `job-compare-${jobIds.join("_")}.csv`,
+      );
+    } catch (error) {
+      if (error instanceof FetchResponseSizeError) {
+        throw new ApiClientError(
+          "COMPARE_CSV_TOO_LARGE",
+          error.message,
+          null,
+          response.status,
+        );
+      }
+      throw error;
+    }
   },
 
   async createBatch(req: BatchCreateRequest): Promise<BatchJob> {
     return request<BatchJob>("/batches", {
       method: "POST",
       body: JSON.stringify(req),
-    }, true);
+    }, {
+      requireRuntimeLiveness: true,
+      idempotentMutation: true,
+    });
   },
 
   async listBatches(params?: {
@@ -436,10 +850,14 @@ export const apiClient = {
     return request<Job[]>(`/batches/${encodeURIComponent(batchId)}/jobs`);
   },
 
-  async cancelBatch(batchId: string): Promise<BatchJob> {
-    return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}/cancel`, {
+  async cancelBatch(
+    batchId: string,
+    controlVersion: number,
+  ): Promise<BatchJob> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}/cancel${qs}`, {
       method: "POST",
-    });
+    }, { idempotentMutation: true });
   },
 };
 

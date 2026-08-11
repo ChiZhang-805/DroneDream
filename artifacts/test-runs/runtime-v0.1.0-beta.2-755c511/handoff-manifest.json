@@ -1,0 +1,182 @@
+{
+  "schema_version": "dronedream.runtime-release-handoff-manifest.v1",
+  "generated_at": "2026-07-29T05:03:02Z",
+  "source_commit": "755c511539fe561207ca38ff5079f471a4110896",
+  "runtime_tag": "runtime-v0.1.0-beta.2",
+  "runtime_id": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+  "artifact_policy": {
+    "single_authoritative_runtime_payload": true,
+    "payload_is_local_handoff_only": true,
+    "publication_lines_must_not_rebuild": true,
+    "publication_lines_must_upload_exact_listed_bytes": true,
+    "upload_performed": false,
+    "deployment_performed": false,
+    "local_runtime_handoff_ready": true,
+    "desktop_installer_ready": true,
+    "public_full_stack_runtime_ready": false,
+    "public_readiness_requires_upload_and_public_fresh_install_verification": true
+  },
+  "desktop_installer_binding": {
+    "subject_commit": "755c511539fe561207ca38ff5079f471a4110896",
+    "file_name": "DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 10387042,
+    "sha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "compiled_runtime_manifest_url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/runtime-release.json",
+    "compiled_trust_key_id": "ed25519:7839a33eb8451e26c0e03ec65857e0caef7af8df70e9ddde3430a681b3f0d8c1"
+  },
+  "rootfs": {
+    "filename": "DroneDreamRuntime-0.1.0-amd64.tar",
+    "bytes": 6141118464,
+    "sha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+    "published_as_four_uncompressed_parts": true
+  },
+  "release_manifest": {
+    "path": "payload/runtime-release.json",
+    "bytes": 2207,
+    "sha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9"
+  },
+  "release_signature": {
+    "path": "payload/runtime-release.json.sig",
+    "bytes": 311,
+    "sha256": "db2465888c4b2dcb694c4503c6b995a6c534c2f040ddd886f601438d69c02c90",
+    "algorithm": "Ed25519",
+    "key_id": "ed25519:7839a33eb8451e26c0e03ec65857e0caef7af8df70e9ddde3430a681b3f0d8c1",
+    "verified": true
+  },
+  "release_receipt_sha256": "a98276eae3da686fa552086dc19ac7009b0a75f82c3c3ca3192075e51abd41f6",
+  "source_inventory_sha256": "7a33abdaa7c46d4b8430b3abf275a70cf72f601b0e3b6242a2937f356fa53bc0",
+  "fresh_import_receipt_sha256": "66a5968b69cb72bd5495ff1aa8a2943fccbff6c6acb5c9b45f096c1f84d3940b",
+  "handoff_verification_sha256": "f3d7affb71a5dffac97046f0e0b0b980466535829158bd63a7d67d4ffb3cad8e",
+  "files": [
+    {
+      "path": "fresh-import/dry-run-input.json",
+      "bytes": 779,
+      "sha256": "9b5037d64d10c66d90126a91f15cef560f2132d84e812c98881ad45e293ec924"
+    },
+    {
+      "path": "fresh-import/dry-run-output.json",
+      "bytes": 14308,
+      "sha256": "1482fce92c82850f763be5258d89342740e9fe5dd49bfd4e906c75ed79697088"
+    },
+    {
+      "path": "fresh-import/health-ready.json",
+      "bytes": 432,
+      "sha256": "b923dc0a076472b3fb71fdbb45daf85f2252e0ad39848af662edd43f25a44813"
+    },
+    {
+      "path": "fresh-import/parameter-readback.json",
+      "bytes": 105,
+      "sha256": "744e9bb60c8d802753327ac60dd1c40152536d1c3ad3a23ec88e12f4605f998e"
+    },
+    {
+      "path": "fresh-import-receipt.json",
+      "bytes": 4819,
+      "sha256": "66a5968b69cb72bd5495ff1aa8a2943fccbff6c6acb5c9b45f096c1f84d3940b"
+    },
+    {
+      "path": "handoff-verification.json",
+      "bytes": 1275,
+      "sha256": "f3d7affb71a5dffac97046f0e0b0b980466535829158bd63a7d67d4ffb3cad8e"
+    },
+    {
+      "path": "payload/DroneDream-LICENSE.txt",
+      "bytes": 1066,
+      "sha256": "b66d97d2d1a4bf9944cf2f1db961eb63596f131528063ae818a129c45baaf3fd"
+    },
+    {
+      "path": "payload/DroneDreamRuntime-0.1.0-amd64.tar.part0000",
+      "bytes": 1992294400,
+      "sha256": "dd0507b7296b61ab1a47261528845e69dd257039d3cefe6a85e0e8cd6cf4107c"
+    },
+    {
+      "path": "payload/DroneDreamRuntime-0.1.0-amd64.tar.part0001",
+      "bytes": 1992294400,
+      "sha256": "8404a19afc99a2e664c9635675893e23887dd07c2ee1bdf00afd92e356c6a49f"
+    },
+    {
+      "path": "payload/DroneDreamRuntime-0.1.0-amd64.tar.part0002",
+      "bytes": 1992294400,
+      "sha256": "6c788bed82db29d6d729c407f90b6f4ed28a45128926595e4c7b1a41ec132b59"
+    },
+    {
+      "path": "payload/DroneDreamRuntime-0.1.0-amd64.tar.part0003",
+      "bytes": 164235264,
+      "sha256": "2ad3fef1e2c1f52a092cd2a3daee4f76fdd929e426b8f399d8519e494b502a20"
+    },
+    {
+      "path": "payload/runtime-release.json",
+      "bytes": 2207,
+      "sha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9"
+    },
+    {
+      "path": "payload/runtime-release.json.sig",
+      "bytes": 311,
+      "sha256": "db2465888c4b2dcb694c4503c6b995a6c534c2f040ddd886f601438d69c02c90"
+    },
+    {
+      "path": "payload/smoke-report.json",
+      "bytes": 939,
+      "sha256": "62dec882ab976fefef4101ea8c7220e7a60c865865722b8042b57f0168c4c566"
+    },
+    {
+      "path": "payload/THIRD_PARTY_NOTICES.md",
+      "bytes": 4413,
+      "sha256": "fb41ce98b2e12e8b45918b547dd358f5178bf9e0a8fffc2932418a41882829b7"
+    },
+    {
+      "path": "payload/Valkey-COPYING.txt",
+      "bytes": 3091,
+      "sha256": "1a53dca3aab7ce048e91e77b03c0342f3075366f9dede8ec4d19d0cf229e12a0"
+    },
+    {
+      "path": "raw/build-rootfs-attempt1-timeout.log",
+      "bytes": 721639,
+      "sha256": "3deee664708a332164bf81aa09ae039fc24c7ccafe1d0683d07cc1ea0c4bec0f"
+    },
+    {
+      "path": "raw/build-rootfs-attempt2.log",
+      "bytes": 125135,
+      "sha256": "f868b78bb7a1412c284ed8243bbd73ee37f2886d3d1597d2aa642198f3e035a2"
+    },
+    {
+      "path": "raw/DroneDreamRuntime-0.1.0-amd64.tar.manifest.json",
+      "bytes": 2817,
+      "sha256": "87dc48cfa16cb0192efc60a7cef64933656464c52cd5fb8901dab9f007562ab1"
+    },
+    {
+      "path": "raw/DroneDreamRuntime-0.1.0-amd64.tar.sha256",
+      "bytes": 166,
+      "sha256": "f7e31225ca5b3aede3e6680d12dfa97babce6a8b87219aace0ea132a0eac63c8"
+    },
+    {
+      "path": "raw/export-rootfs.log",
+      "bytes": 128,
+      "sha256": "98919cddc7a2b0dee68515af6fbe8bd6883d808586cfd53a3f049e219b3da667"
+    },
+    {
+      "path": "raw/runtime-static-gates.log",
+      "bytes": 17086,
+      "sha256": "1348ac013521ce7fd37b30fa4e528f5856ac352683bb628692e5e4421e036a29"
+    },
+    {
+      "path": "raw/runtime-static-tests-python3.10-failed.log",
+      "bytes": 3417,
+      "sha256": "4e3ed3500cb354976104c62a24cf936829894c81ca70a5ebf18364542f818178"
+    },
+    {
+      "path": "raw/smoke-image.log",
+      "bytes": 399,
+      "sha256": "3154dbbeb1495818dec581627febf39365e784f78632064200a445d4d14093f0"
+    },
+    {
+      "path": "release-receipt.json",
+      "bytes": 7070,
+      "sha256": "a98276eae3da686fa552086dc19ac7009b0a75f82c3c3ca3192075e51abd41f6"
+    },
+    {
+      "path": "source-inventory.json",
+      "bytes": 3944,
+      "sha256": "7a33abdaa7c46d4b8430b3abf275a70cf72f601b0e3b6242a2937f356fa53bc0"
+    }
+  ]
+}

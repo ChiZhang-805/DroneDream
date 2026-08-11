@@ -1,0 +1,40 @@
+{
+  "schema_version": "dronedream.harness-multi-tool-budget-generation-receipt/v1",
+  "evidence_class": "offline_synthetic_mock_generation_receipt",
+  "failed_attempt": {
+    "source_commit": "74b6172ee1fd28fff998e4810ccfb0e90f52884b",
+    "working_directory": "Z:\\DroneDream-worktrees\\aurora-20260728",
+    "command": "python backend/scripts/evaluate_harness_multi_tool_budget.py --source-commit 74b6172ee1fd28fff998e4810ccfb0e90f52884b --generated-at 2026-07-28T17:53:02Z",
+    "exit_code": 1,
+    "error_type": "ModuleNotFoundError",
+    "error_message": "No module named 'app'",
+    "jobs_started": 0,
+    "provider_calls": 0,
+    "network_calls": 0,
+    "simulator_calls": 0,
+    "timestamp_retained": false,
+    "resolution": "The repository-root CLI now inserts the backend directory into sys.path before importing app modules; a regression test launches the CLI from the repository root."
+  },
+  "successful_attempt": {
+    "source_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+    "generated_at": "2026-07-28T17:53:02Z",
+    "working_directory": "Z:\\DroneDream-worktrees\\aurora-20260728",
+    "command": "python backend/scripts/evaluate_harness_multi_tool_budget.py --source-commit 136a1e3293efa6e53f3648e21fa8f7c6b5158d6f --generated-at 2026-07-28T17:53:02Z",
+    "exit_code": 0,
+    "artifact_path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.json",
+    "artifact_internal_sha256": "e5c27308a9be35a276ce845e872e186e613f5421c459bcddec726a461e480ef3",
+    "artifact_file_sha256": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d",
+    "manifest_internal_sha256": "3c49e2b96b3fffdd92383d6b978d4679f16e012e2a4a43e1c50b8b8a402aca72",
+    "manifest_file_sha256": "db78d1c8c99938608dc27116138d3eef15788cd6da4461d0f530db7f9369226d",
+    "csv_file_sha256": "3911632e6dfe61056dae58852f1e9723a4beb3b953468c9ecf70263610a206a3",
+    "provider_calls": 0,
+    "network_calls": 0,
+    "real_credentials_used": false,
+    "simulator_backend": "mock"
+  },
+  "verification": {
+    "command": "python backend/scripts/evaluate_harness_multi_tool_budget.py --check --source-commit 136a1e3293efa6e53f3648e21fa8f7c6b5158d6f --generated-at 2026-07-28T17:53:02Z",
+    "exit_code": 0
+  },
+  "claim_boundary": "This receipt proves an offline, source-bound MockSimulator generation and verification run. It does not prove LLM quality, optimizer superiority, physical fidelity, real-flight performance, or causal Harness benefit."
+}

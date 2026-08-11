@@ -1,0 +1,600 @@
+{
+    "schema_version":  "dronedream.internal-test-installer-handoff-manifest.v3",
+    "generated_at":  "2026-08-01T00:13:27Z",
+    "subject_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+    "subject_branch":  "codex/software",
+    "authoritative_directory":  "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\internal-installer-1.0.0-3f6cb1d",
+    "authoritative_installer":  {
+                                    "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+                                    "bytes":  10313264,
+                                    "sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8"
+                                },
+    "files":  [
+                  {
+                      "path":  "artifact-validation.json",
+                      "bytes":  1307,
+                      "sha256":  "cc7c5535bc351b6026c5a1c308a713e2d6b8f5cab41700940ca48beead8cb3e5",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/full-suite-attempt1.log",
+                      "bytes":  11582,
+                      "sha256":  "a45ffdbc055023a8a3fd342eb16780c941a58a9c6918ed8e78fd3334a0f75eaf",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/full-suite-attempt1.xml",
+                      "bytes":  195663,
+                      "sha256":  "eec9ca04aedaeb2b054424552d074aef51455d8aa7b997d385489caefed507b2",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/full-suite-final.log",
+                      "bytes":  3312,
+                      "sha256":  "971fe483ff966cf7cec2afde2321475f8c0907ff81bb2f46e0f8abdcbecf5147",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/full-suite-final.xml",
+                      "bytes":  191540,
+                      "sha256":  "21d866c795e6e289c4365dedc49c78076e5f94890856dd3075465c24ff35fb7f",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/full-suite-final-summary.log",
+                      "bytes":  272,
+                      "sha256":  "397bcfcfffb16308196b7bc58ae4b3c1242db7a82d0af992913d43422e6815f5",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/gate-summary.log",
+                      "bytes":  488,
+                      "sha256":  "343cc30768079a3abf94b16c141531b3fcb4cf7c3a1d23eede85b0e67a3beb71",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/heartbeat-focused-5x-summary.log",
+                      "bytes":  369,
+                      "sha256":  "10cd584b2129aa3129c913b97f77c4aaf9be9ee534e84fb82defdfba52cbc682",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/heartbeat-focused-run1.log",
+                      "bytes":  202,
+                      "sha256":  "922d62e04516d2a02d4eba3fd8cd4f981c54ef39094d856b0bcc2e5b70922e23",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/heartbeat-focused-run2.log",
+                      "bytes":  202,
+                      "sha256":  "341c3f1ca0020304dfa9e26eca262ba43fce41018c609fb4bd54079c961f9795",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/heartbeat-focused-run3.log",
+                      "bytes":  202,
+                      "sha256":  "e37440a49d27fc24479bc8d51039729a1fafd1017e90ba561e32f328f8124796",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/heartbeat-focused-run4.log",
+                      "bytes":  202,
+                      "sha256":  "a4ead40145eacdeddff6f75e3acd5bc680de4a5c396f116dfbd79d1300c41190",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/heartbeat-focused-run5.log",
+                      "bytes":  202,
+                      "sha256":  "da2693ddec26cc4a1fb6eb5f0edc1f233b4609c0144f639f6cf4c028bdf61d9d",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/mypy.log",
+                      "bytes":  94,
+                      "sha256":  "0a96a1638f67c8db7fcc1650ca607c550e99f43cde1ca5311c7935730ea244e2",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/preflight-junit-argument-failed.log",
+                      "bytes":  465,
+                      "sha256":  "a79cbd5d418ca79a0be749c00507d7029dac0688e3bd0895385a6d91178dcf31",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "backend-validation/ruff.log",
+                      "bytes":  42,
+                      "sha256":  "af352a86840ad0af3d37ea0d9197f868363a6dac6b1c2ef5d2722f6b41d2d9af",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "build.log",
+                      "bytes":  17086,
+                      "sha256":  "9b788f8f39063c9bca9d0e6349edb2e7d6a993fb417500b9a6e6acd72443f054",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "build-attempt.json",
+                      "bytes":  1322,
+                      "sha256":  "652d9b8d9c8a1fa68d500655259eadac36042e9ec479d5a7007cd8247cfd2107",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "desktop-preflight/desktop-version.log",
+                      "bytes":  70,
+                      "sha256":  "27f4b035d7ada5f4cac6c633e0e126924a87496de66e1479ad880bf5563df9ae",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "desktop-preflight/gate-summary.log",
+                      "bytes":  274,
+                      "sha256":  "bbb968d6677437ec272bf7eacfe426c84bf808928c9a196ea5713957b99c1f74",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "desktop-preflight/nsis-template.log",
+                      "bytes":  138,
+                      "sha256":  "7bc2dcc9f64287dee41f6684e4ac440b16117e4012ca356965d480ffea83802a",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "desktop-preflight/release-source-policy.log",
+                      "bytes":  408,
+                      "sha256":  "4379406445c2b09fbf66a7d7984b31c7e887a78d4a9005892e68bbeb9b66aec4",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "desktop-preflight/updater-signing-contract.log",
+                      "bytes":  760,
+                      "sha256":  "1c4bd044004adf608b58e17a0f6056b621dd37156da70953353569478d6d9796",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "download-smoke.json",
+                      "bytes":  483,
+                      "sha256":  "93882a1aedb0372eeade73059004ed103693eef8f1cbfde7095d6977d4e2142a",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "DroneDream_1.0.0_x64-setup.exe",
+                      "bytes":  10313264,
+                      "sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+                      "authoritative_installer":  true
+                  },
+                  {
+                      "path":  "DroneDream_1.0.0_x64-setup.exe.sha256",
+                      "bytes":  98,
+                      "sha256":  "d2c198f2a9907d3ce007d6a54136a7ce381c4bb90c21f0530a629ce3e4ababc5",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "DroneDream_1.0.0_x64-setup.exe.sig",
+                      "bytes":  420,
+                      "sha256":  "9506775db6a8f62bb973f1dcee5e558424a47124723dccf2b6b9aa62b1c9f05e",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/browser-auth/en-login-1440x900.png",
+                      "bytes":  56378,
+                      "sha256":  "95971376b5e32680fc0ba979918c77501a24fb5f4890270c184bca90982a90de",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/browser-auth/en-reset-1440x900.png",
+                      "bytes":  59406,
+                      "sha256":  "2eda47f86d932ee40218d574c1dd0d9d915edf2ef5c6bc0e0612c4651be4ce0b",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/browser-auth/measurements.json",
+                      "bytes":  2178,
+                      "sha256":  "6c4b07c9a83f6a0d41d7742c27ce167e7b649a8fc6a8b5a112defd51b6aba9c2",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/browser-auth/zh-register-390x844.png",
+                      "bytes":  47431,
+                      "sha256":  "60dcd40d6678effbf9f19b25991b7f75a67e33fb0bba91bed408c63c20120256",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/browser-auth-edge.log",
+                      "bytes":  700,
+                      "sha256":  "716e1c536c6545eba48b8d1affc0b0e98463d17576a2355ec9bc1d6655d0f277",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/gate-summary.log",
+                      "bytes":  571,
+                      "sha256":  "73a2d12e6f1b1af2f05143780ce7a2aa033734814757dbd0808e3e1e9ba01caf",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/lint.log",
+                      "bytes":  104,
+                      "sha256":  "0a0909db1fb8b2a2edb14bdc5a7992cbb6d02839f44caf6fdd98bd1d27c4afed",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/production-build.log",
+                      "bytes":  8668,
+                      "sha256":  "f4d578c32ccfa76fe6d8cc535a700baab2c42d3cb1e9ead2c925804197d8763d",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/production-build-final.log",
+                      "bytes":  10064,
+                      "sha256":  "07f6292b8f8f5e09a2236f8a6efd08734c182f48b65aaa7207910108c88c5829",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/public-site-isolation.log",
+                      "bytes":  19078,
+                      "sha256":  "bbe6a23034e07179df6d3c3564f1680463d5bf94902bebaec90264df44b24afb",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-tests.log",
+                      "bytes":  518,
+                      "sha256":  "22c575f6b84e96bce37ad24c7386117bbb792213390d62ba70f8dcab522a9e94",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-en-avatar-crop.png",
+                      "bytes":  106688,
+                      "sha256":  "55bb1d50ff74e58b9b379db90af712ad15663ac6d3b5d76d95600c49cb2bc147",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-en-ece498-external-entry.png",
+                      "bytes":  208257,
+                      "sha256":  "700f9ac2a15c20a35a6950d7aa41ee82128b68852f2b4a773a8c9fb8ad67cdad",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-en-parameter-wheel.png",
+                      "bytes":  355153,
+                      "sha256":  "f4df1e03a9788df581c3fa536835f29ef7ff2c7ddaac6d457d6815e964dc2313",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-en-scenario.png",
+                      "bytes":  157226,
+                      "sha256":  "d51495c0f1ca05990438ca01dac6b7128649999261073aedfde7b84d71e13d56",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-en-settings.png",
+                      "bytes":  204688,
+                      "sha256":  "cf55e3e5e0c0607ec3e5330c1cc80e37faf6949f9dedcc12c9b9b6a17f72c15c",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-en-track-editor.png",
+                      "bytes":  54944,
+                      "sha256":  "13dfb9815a69cdd574c51df3af9e4ded5c9f2caadfdd7f57e8270d3861573413",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-en-workspace-drag-preview.png",
+                      "bytes":  160846,
+                      "sha256":  "4bbb17f5aef752a938fb2661e6be9dc7e60c86c116ca365df30cd5708b9568cb",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-en-workspace-pinned.png",
+                      "bytes":  159046,
+                      "sha256":  "89102b983b29d721ac502239b23bfd7ec5dc4d68dd6286f07a3afdab037bb6b3",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-zh-avatar-crop.png",
+                      "bytes":  102198,
+                      "sha256":  "ce5c61767082333f21e1bb43ee8188ffd789ef9f2038e37b1db0a45a81966011",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-zh-ece498-external-entry.png",
+                      "bytes":  209014,
+                      "sha256":  "60bcaadc8f1fd5eed6aa7ecbca9f89040478bba4f5db42b5d9049a79654e9dc5",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-zh-parameter-wheel.png",
+                      "bytes":  347352,
+                      "sha256":  "9d1701bb6c458f8011381ab0004a2cb04117a0e986ea8f5dd59fb8dc00be5e38",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-zh-scenario.png",
+                      "bytes":  163572,
+                      "sha256":  "343fb9c162dea158d0b0b3e5548ed41850bd67e9aefc80cd3efae2047250c819",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-zh-settings.png",
+                      "bytes":  196108,
+                      "sha256":  "9d9998fa258e7a920f922c6c975b845a1cfbfc2ffb4737aaff55bfadcfd5a3c0",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-zh-track-editor.png",
+                      "bytes":  55441,
+                      "sha256":  "6b592c1cc90fb8847167286750d603423b193d043bd2e69154db5f30ac2a3e3f",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-zh-workspace-drag-preview.png",
+                      "bytes":  170643,
+                      "sha256":  "9f23c19d70891e85a9e3ce9da9c359481fec4af9286c9c8a99422e0aa41ffcaa",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/desktop-zh-workspace-pinned.png",
+                      "bytes":  168941,
+                      "sha256":  "9f087a3d3a4c9e05fe3df82b3ae86934082a27e770e71189ffa38f3e20dce7ba",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-en-avatar-crop.png",
+                      "bytes":  60628,
+                      "sha256":  "c0a7c43db6af2ba92608761b3b22ba948df6b106978833ffd338cd77516b05b7",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-en-ece498-external-entry.png",
+                      "bytes":  75153,
+                      "sha256":  "1707a15b5e9b21fd69db0208f85f6f439363ef0b9482425ca335b50bcec3f643",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-en-parameter-wheel.png",
+                      "bytes":  117271,
+                      "sha256":  "207f44f9c6685a8cf3fc2dde589142b6c9acf68340d0e3d9df1a99a8a54f8e08",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-en-scenario.png",
+                      "bytes":  82428,
+                      "sha256":  "afc91d4f14e867b48eefa5ff8fffdba6b5ca1e10ce27ab9f39338392c7e834a9",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-en-settings.png",
+                      "bytes":  72288,
+                      "sha256":  "bfd4ab14e158fba0ab19c495f69ecf35d3f063beb16f17655bbc3e240024d99f",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-en-track-editor.png",
+                      "bytes":  23822,
+                      "sha256":  "f929eed50545fafed727ce3e157d9298911636bdfc80d6c88458543b3affa9c7",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-en-workspace-pinned.png",
+                      "bytes":  79723,
+                      "sha256":  "f6501ddd97960a4b42cfa597115ff79f7ca16fc36c80f98bb864c5252cc4485d",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-zh-avatar-crop.png",
+                      "bytes":  62804,
+                      "sha256":  "c462eb12bd3a3fcd52b65226b67b2694e4b6e2ba2898589a6f643273a2e4a853",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-zh-ece498-external-entry.png",
+                      "bytes":  74254,
+                      "sha256":  "91ed36705c34f527857d5fc471ced1af28d0cd66f97ff8f6b3805b1b20e44b21",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-zh-parameter-wheel.png",
+                      "bytes":  117096,
+                      "sha256":  "638b53db1288c34fb5d4eac8f052f63f98c6eea0a562abe330af08ce67271cb9",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-zh-scenario.png",
+                      "bytes":  84880,
+                      "sha256":  "d8de62301fddd5ee0acfd89db39c1ad7b1e91638117b7f0e64f443e930b8d7b6",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-zh-settings.png",
+                      "bytes":  78912,
+                      "sha256":  "c4853965c68556243c697f2468073060c21c0e98e182639bb86a6dee1a492cca",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-zh-track-editor.png",
+                      "bytes":  24945,
+                      "sha256":  "8a08fa0ac9dcd469fe2c3399b4069089b8fec0158176dc019c5a416522a113bc",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/mobile-zh-workspace-pinned.png",
+                      "bytes":  85908,
+                      "sha256":  "ef035e423123b0f41df0ac5fb98a1253a6af4176b742a2d54d76a5d0d1ada43d",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui/software-ui-layout-receipt.json",
+                      "bytes":  28027,
+                      "sha256":  "8a2ccfd10c417246498041390a8bfc708a3133d92ca6dc35173c1660d1e780bf",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/software-ui-edge.log",
+                      "bytes":  1086,
+                      "sha256":  "303a8af60cc6ccd5ac2e5810bd39f6904d5f186948ceae2c3071c3a8824ef919",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "frontend-validation/typecheck.log",
+                      "bytes":  128,
+                      "sha256":  "70b3c3927615afdf5f5a277b682ce10528f9baed352029eb1ad9b1146db47acd",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "generate-handoff.ps1",
+                      "bytes":  26891,
+                      "sha256":  "70103c71270bd6545ce9bf4b7eef442194ebcf95501b4b357bf988a440804153",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "loopback-server-state.log",
+                      "bytes":  71,
+                      "sha256":  "636008222b4473a9ad6bba306ae8e9abbe1a7949bf9a7a743db214fd15f5147a",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "product-source-binding.json",
+                      "bytes":  33183,
+                      "sha256":  "650952a5faf9549b291e6a6e579740d8e4a0d4b6621ea8332c44ea14a433c262",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "release-metadata-handoff.json",
+                      "bytes":  4316,
+                      "sha256":  "c62055a2f8c63a3b952047a422e482d5b0494b1c8cd286a4defea80965affdd4",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "release-receipt.json",
+                      "bytes":  6950,
+                      "sha256":  "7303532c3c6bb0ab6c9f1cb4b6e0f497c6cec9853fbaceb48cbc661284c907fe",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "release-receipt.json.sha256",
+                      "bytes":  87,
+                      "sha256":  "bde003a5b3a3b2db0851866cf3fd4278839a142cdcc9e46427ebb9fc16890230",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "release-source-inventory.json",
+                      "bytes":  179069,
+                      "sha256":  "c4fb12abaee44ce51910c2be85f0ed2ed62143c742b266024f85eed5da731479",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "release-source-policy-final.log",
+                      "bytes":  200,
+                      "sha256":  "8183e87c091bd829468a90de52ac97b4b53df615f298ea9dd627c71bee1b2b1f",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "runtime-contract/gate-summary.log",
+                      "bytes":  29,
+                      "sha256":  "280df451246c672545a7f2336b9fd6349d915a8c418b58c636d889b58226f3d8",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "runtime-contract/installed-runtime-readonly.log",
+                      "bytes":  669,
+                      "sha256":  "b8eb96fe9d3a97bb254a2c6a748c7317f4ed4702fa8545c5aa9ff0696f77b079",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "runtime-contract/public-beta2-contract.log",
+                      "bytes":  641,
+                      "sha256":  "6e5b3017e88b569df8f22781661491f5c6feff2df6914313e85002e27da8fbb2",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "runtime-contract/public-beta2-contract-invocation-failed.log",
+                      "bytes":  148,
+                      "sha256":  "80924d78adadd1877c050f5e464928baf55a80e9ee3f71ab1cfeb1eff8451fa9",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "runtime-contract/runtime-tests.log",
+                      "bytes":  236,
+                      "sha256":  "c6438053f55bfc0633ef4c9297a583847b2931162abd8b1b311a70f670622df4",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "runtime-delivery-boundary.json",
+                      "bytes":  2675,
+                      "sha256":  "423065ad036575c992bd35e0eb22807a40a7efb6ca911b4da3d1a2f6fb2271f0",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "rust-validation/clippy.log",
+                      "bytes":  1036,
+                      "sha256":  "84f69e3ec14d37660bccc4424dd8ea7e9432795ba0f83698728c4ad9dd29273d",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "rust-validation/fmt.log",
+                      "bytes":  0,
+                      "sha256":  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "rust-validation/gate-summary.log",
+                      "bytes":  276,
+                      "sha256":  "73ab7ef645a2b505159bd7b293a94a8cf5d3128c5a5f716c7c2ef37beafbcd94",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "rust-validation/tests.log",
+                      "bytes":  24068,
+                      "sha256":  "5d16de4d4972fc4a3d31e0741a97b94fdcc468443c3eb8561875e319f391076f",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "tauri-latest.build.json",
+                      "bytes":  903,
+                      "sha256":  "87ea43486837fe487c0b69abba20b59803b0985287ba22f130786c0a7ec27228",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "tauri-latest.json",
+                      "bytes":  954,
+                      "sha256":  "d25a0075c26acbe19df88cc8bc203d8519cc32ed939b97669ef84e1e7d582024",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "updater-signature-verification.json",
+                      "bytes":  811,
+                      "sha256":  "5d6b9240b89001b10b42221477667242f5c12c145807705f489c3490ecd5145a",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "updater-signature-verification.log",
+                      "bytes":  350,
+                      "sha256":  "49dcf325a1aa6fb560056b7914c0e3ac05a2d2b60b2a21a8cc7355bf0a72b030",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "validation-anomalies.json",
+                      "bytes":  2649,
+                      "sha256":  "233d1f8f74199356772b7dd559728aa895c79e56bb1b31e696d6fd4a1acc5dbe",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "verify-updater-signature.rs",
+                      "bytes":  1003,
+                      "sha256":  "663a8a938049eebaa271e8e3f56bb01f4e86301d247f09f1499feccbb5a5317e",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "website-latest.json",
+                      "bytes":  590,
+                      "sha256":  "e69f556308593c22ca1be7ef4da8688d80aa80c205710e80e659e1f98ae326fe",
+                      "authoritative_installer":  false
+                  },
+                  {
+                      "path":  "website-pages-release.json",
+                      "bytes":  348,
+                      "sha256":  "5587086eb37cccd1a2c3c69aa4837b4a826722b359dcf7119a9007f7d9b63574",
+                      "authoritative_installer":  false
+                  }
+              ],
+    "file_count":  97,
+    "all_files_hashed":  true,
+    "upload_performed":  false,
+    "deployment_performed":  false
+}

@@ -9,6 +9,16 @@ describe("GazeboLivePanel", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it.each([
+    "javascript:alert('unsafe')",
+    "data:text/html,<script>alert('unsafe')</script>",
+    "https://user:password@example.com/vnc.html",
+    "not a valid viewer URL",
+  ])("does not render an unsafe viewer URL: %s", (viewerUrl) => {
+    const { container } = render(<GazeboLivePanel viewerUrl={viewerUrl} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("renders iframe and warning text when URL is provided", () => {
     render(
       <GazeboLivePanel viewerUrl="https://example.com/vnc.html?autoconnect=1" />,

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/engine-pack-profile.v1.json",
+  "title": "DroneDream Engine Pack profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "profileId",
+    "profileVersion",
+    "includesLargeSimulator",
+    "hardwarePayloadAllowed",
+    "allowedEditionIds",
+    "allowedVehiclePackIds",
+    "sourceRoots",
+    "excludedSourcePaths",
+    "directPayloadPaths",
+    "sourceMappings",
+    "forbiddenPayloadPaths",
+    "forbiddenPayloadPrefixes"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-engine-pack-profile"},
+    "profileId": {"const": "sim-only"},
+    "profileVersion": {"const": "1.0.0"},
+    "includesLargeSimulator": {"const": true},
+    "hardwarePayloadAllowed": {"const": false},
+    "allowedEditionIds": {"const": ["sim"]},
+    "allowedVehiclePackIds": {"const": ["px4-gazebo-x500-reference"]},
+    "sourceRoots": {"$ref": "#/$defs/pathList"},
+    "excludedSourcePaths": {"$ref": "#/$defs/pathList"},
+    "directPayloadPaths": {"$ref": "#/$defs/pathList"},
+    "sourceMappings": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["payloadPath", "sourcePath", "sourceSha256"],
+        "properties": {
+          "payloadPath": {"$ref": "#/$defs/safePath"},
+          "sourcePath": {"$ref": "#/$defs/safePath"},
+          "sourceSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "forbiddenPayloadPaths": {"$ref": "#/$defs/pathList"},
+    "forbiddenPayloadPrefixes": {"$ref": "#/$defs/pathList"}
+  },
+  "$defs": {
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+    },
+    "pathList": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/safePath"},
+      "uniqueItems": true
+    }
+  }
+}

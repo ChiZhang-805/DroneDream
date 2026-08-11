@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
-import { isDesktopRuntime } from "./bridge";
+import {
+  ensureAppUpdateIdle,
+  getEnginePackStatus,
+  installEmbeddedEnginePack,
+  isDesktopRuntime,
+  type EnginePackStatus,
+} from "./bridge";
 
 export type AppUpdateStatus =
   | "checking"
@@ -10,6 +16,10 @@ export type AppUpdateStatus =
   | "available"
   | "downloading"
   | "installing"
+  | "reconcilingEngine"
+  | "engineUpdateDeferred"
+  | "engineError"
+  | "runtimeBaseRequired"
   | "error";
 
 interface AppUpdateState {
@@ -17,6 +27,7 @@ interface AppUpdateState {
   availableVersion: string | null;
   progress: number | null;
   error: string | null;
+  enginePack: EnginePackStatus | null;
 }
 
 const CURRENT_STATE: AppUpdateState = {
@@ -24,29 +35,94 @@ const CURRENT_STATE: AppUpdateState = {
   availableVersion: null,
   progress: null,
   error: null,
+  enginePack: null,
 };
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isActiveExperimentDeferral(message: string): boolean {
+  return message.includes("waiting for active experiments to finish");
+}
 
 export function useAppUpdater() {
   const desktopRuntime = isDesktopRuntime();
   const updateRef = useRef<Update | null>(null);
+  const checkGenerationRef = useRef(0);
+  const installInFlightRef = useRef(false);
   const [state, setState] = useState<AppUpdateState>(() => (
     desktopRuntime && import.meta.env.MODE !== "test"
       ? { ...CURRENT_STATE, status: "checking" }
       : CURRENT_STATE
   ));
 
+  const reconcileEnginePack = useCallback(async (generation?: number) => {
+    if (!desktopRuntime || import.meta.env.MODE === "test") return;
+    setState((current) => ({
+      ...current,
+      status: "reconcilingEngine",
+      progress: null,
+      error: null,
+    }));
+    try {
+      const observed = await getEnginePackStatus();
+      if (generation !== undefined && generation !== checkGenerationRef.current) return;
+      if (!observed.supported) {
+        setState({
+          status: "runtimeBaseRequired",
+          availableVersion: null,
+          progress: null,
+          error: observed.message,
+          enginePack: observed,
+        });
+        return;
+      }
+      if (!observed.updateRequired) {
+        setState({ ...CURRENT_STATE, enginePack: observed });
+        return;
+      }
+      const installed = await installEmbeddedEnginePack();
+      if (generation !== undefined && generation !== checkGenerationRef.current) return;
+      setState({ ...CURRENT_STATE, enginePack: installed });
+    } catch (error) {
+      if (generation !== undefined && generation !== checkGenerationRef.current) return;
+      const message = errorMessage(error);
+      setState((current) => ({
+        ...current,
+        status: isActiveExperimentDeferral(message)
+          ? "engineUpdateDeferred"
+          : "engineError",
+        progress: null,
+        error: message,
+      }));
+    }
+  }, [desktopRuntime]);
+
   const checkForUpdates = useCallback(async () => {
     if (!desktopRuntime || import.meta.env.MODE === "test") {
       setState(CURRENT_STATE);
       return;
     }
+    if (installInFlightRef.current) return;
+    const generation = ++checkGenerationRef.current;
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
     try {
-      await updateRef.current?.close();
-      const update = await check({ timeout: 15_000 });
+      const previousUpdate = updateRef.current;
+      updateRef.current = null;
+      await previousUpdate?.close();
+      if (generation !== checkGenerationRef.current) return;
+      const update = await check({
+        timeout: 15_000,
+        allowDowngrades: false,
+      });
+      if (generation !== checkGenerationRef.current) {
+        await update?.close();
+        return;
+      }
       updateRef.current = update;
       if (!update) {
-        setState(CURRENT_STATE);
+        await reconcileEnginePack(generation);
         return;
       }
       setState({
@@ -54,24 +130,33 @@ export function useAppUpdater() {
         availableVersion: update.version,
         progress: null,
         error: null,
+        enginePack: null,
       });
     } catch (error) {
+      if (generation !== checkGenerationRef.current) return;
       setState({
         status: "error",
         availableVersion: null,
         progress: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage(error),
+        enginePack: null,
       });
     }
-  }, [desktopRuntime]);
+  }, [desktopRuntime, reconcileEnginePack]);
 
   const installAvailableUpdate = useCallback(async () => {
     const update = updateRef.current;
-    if (!update || state.status !== "available") return;
+    if (
+      !update
+      || state.status !== "available"
+      || installInFlightRef.current
+    ) return;
+    installInFlightRef.current = true;
     let downloaded = 0;
     let contentLength = 0;
     setState((current) => ({ ...current, status: "downloading", progress: 0, error: null }));
     try {
+      await ensureAppUpdateIdle();
       await update.downloadAndInstall((event) => {
         if (event.event === "Started") {
           contentLength = event.data.contentLength ?? 0;
@@ -94,14 +179,17 @@ export function useAppUpdater() {
         ...current,
         status: "available",
         progress: null,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage(error),
       }));
+    } finally {
+      installInFlightRef.current = false;
     }
   }, [state.status]);
 
   useEffect(() => {
     void checkForUpdates();
     return () => {
+      checkGenerationRef.current += 1;
       void updateRef.current?.close();
       updateRef.current = null;
     };
@@ -112,5 +200,6 @@ export function useAppUpdater() {
     desktopRuntime,
     checkForUpdates,
     installAvailableUpdate,
+    reconcileEnginePack,
   };
 }

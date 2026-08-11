@@ -1,0 +1,169 @@
+{
+  "schema_version": "dronedream.runtime-release-handoff-receipt.v1",
+  "generated_at": "2026-07-29T05:03:02Z",
+  "claim_boundary": "Exact 755c511 local Runtime build, real PX4/Gazebo smoke, promoted WSL2 rootfs export, signed beta.2 payload, independent verify/reassemble, and fresh-import validation only. No tag, GitHub Release, website, server, DNS, TLS, or public asset was modified.",
+  "source": {
+    "branch": "codex/software",
+    "commit": "755c511539fe561207ca38ff5079f471a4110896",
+    "tree": "26d97180dbc5d5db353bafee293181ae8299919a",
+    "source_inventory": "source-inventory.json",
+    "clean_detached_staging": true
+  },
+  "runtime": {
+    "tag": "runtime-v0.1.0-beta.2",
+    "version": "0.1.0",
+    "runtime_id": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+    "architecture": "x86_64",
+    "wsl_version": 2
+  },
+  "static_contract": {
+    "python_3_10_attempt": {
+      "result": "failed",
+      "cause": "WSL system Python 3.10 does not provide the required stdlib tomllib module.",
+      "product_failure": false,
+      "log": "raw/runtime-static-tests-python3.10-failed.log"
+    },
+    "release_interpreter": "Python 3.13.13",
+    "unit_tests": "47 passed, 0 failed, 1 skipped out of 48",
+    "skip": "unsupported_ulog_dirfd_platform_fails_closed is skipped because secure POSIX dirfd support is available",
+    "validate_config_exit_code": 0,
+    "shell_syntax_exit_code": 0,
+    "log": "raw/runtime-static-gates.log"
+  },
+  "build": {
+    "image": "dronedream/runtime:0.1.0-beta.2-755c511",
+    "image_id": "sha256:046ab326c5ef363bbf97c9835dde82a4e71490ea1c6a60f0be76e0c312005d18",
+    "image_created": "2026-07-29T02:32:42.139509399Z",
+    "image_size_bytes": 2868711928,
+    "platform": "linux/amd64",
+    "attempts": [
+      {
+        "attempt": 1,
+        "result": "executor_timeout",
+        "duration_seconds": 3604,
+        "target_image_created": false,
+        "last_layer": "Valkey 8.1.4 compilation",
+        "log": "raw/build-rootfs-attempt1-timeout.log",
+        "log_bytes": 721639,
+        "log_sha256": "3deee664708a332164bf81aa09ae039fc24c7ccafe1d0683d07cc1ea0c4bec0f"
+      },
+      {
+        "attempt": 2,
+        "result": "passed_from_preserved_buildkit_cache",
+        "duration_seconds": 668.3,
+        "target_image_created": true,
+        "log": "raw/build-rootfs-attempt2.log",
+        "log_bytes": 125135,
+        "log_sha256": "f868b78bb7a1412c284ed8243bbd73ee37f2886d3d1597d2aa642198f3e035a2"
+      }
+    ],
+    "embedded_source_commit_matches": true,
+    "embedded_backend_commit_matches": true,
+    "embedded_worker_commit_matches": true
+  },
+  "image_smoke": {
+    "result": "passed",
+    "duration_seconds": 25.1,
+    "report": "payload/smoke-report.json",
+    "report_bytes": 939,
+    "report_sha256": "62dec882ab976fefef4101ea8c7220e7a60c865865722b8042b57f0168c4c566",
+    "image_id_matches": true,
+    "runtime_id_matches": true,
+    "checks": {
+      "component_versions": true,
+      "python_imports": true,
+      "valkey_ping": true,
+      "api_worker_heartbeat": true,
+      "real_cli_dry_run": true,
+      "px4_gazebo_headless": true,
+      "parameter_readback": true
+    },
+    "log": "raw/smoke-image.log",
+    "log_sha256": "3154dbbeb1495818dec581627febf39365e784f78632064200a445d4d14093f0"
+  },
+  "rootfs": {
+    "filename": "DroneDreamRuntime-0.1.0-amd64.tar",
+    "bytes": 6141118464,
+    "sha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+    "hard_limit_bytes": 12884901888,
+    "within_hard_limit": true,
+    "promoted_manifest": "raw/DroneDreamRuntime-0.1.0-amd64.tar.manifest.json",
+    "promoted_manifest_sha256": "87dc48cfa16cb0192efc60a7cef64933656464c52cd5fb8901dab9f007562ab1",
+    "export_log": "raw/export-rootfs.log",
+    "export_log_sha256": "98919cddc7a2b0dee68515af6fbe8bd6883d808586cfd53a3f049e219b3da667",
+    "original_tar_retained_in_wsl_staging_only": true,
+    "reassembled_tar_retained_in_wsl_staging_only": true,
+    "full_tar_copied_to_git_worktree": false
+  },
+  "packaging": {
+    "initial_timestamp_attempt": {
+      "result": "rejected_before_output",
+      "input": "2026-07-29T10:32:42.139509399+08:00",
+      "message": "build timestamp must be an RFC3339 UTC timestamp ending in Z",
+      "output_directory_created": false
+    },
+    "canonical_build_timestamp": "2026-07-29T02:32:42.139509399Z",
+    "base_url": "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2",
+    "compression": "none",
+    "part_size_bytes": 1992294400,
+    "part_count": 4,
+    "parts": [
+      {
+        "filename": "DroneDreamRuntime-0.1.0-amd64.tar.part0000",
+        "bytes": 1992294400,
+        "sha256": "dd0507b7296b61ab1a47261528845e69dd257039d3cefe6a85e0e8cd6cf4107c"
+      },
+      {
+        "filename": "DroneDreamRuntime-0.1.0-amd64.tar.part0001",
+        "bytes": 1992294400,
+        "sha256": "8404a19afc99a2e664c9635675893e23887dd07c2ee1bdf00afd92e356c6a49f"
+      },
+      {
+        "filename": "DroneDreamRuntime-0.1.0-amd64.tar.part0002",
+        "bytes": 1992294400,
+        "sha256": "6c788bed82db29d6d729c407f90b6f4ed28a45128926595e4c7b1a41ec132b59"
+      },
+      {
+        "filename": "DroneDreamRuntime-0.1.0-amd64.tar.part0003",
+        "bytes": 164235264,
+        "sha256": "2ad3fef1e2c1f52a092cd2a3daee4f76fdd929e426b8f399d8519e494b502a20"
+      }
+    ]
+  },
+  "signature": {
+    "algorithm": "Ed25519",
+    "key_id": "ed25519:7839a33eb8451e26c0e03ec65857e0caef7af8df70e9ddde3430a681b3f0d8c1",
+    "private_key_matches_installer_trust_anchor": true,
+    "private_key_material_logged": false,
+    "manifest": "payload/runtime-release.json",
+    "manifest_bytes": 2207,
+    "manifest_sha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+    "signature": "payload/runtime-release.json.sig",
+    "signature_bytes": 311,
+    "signature_sha256": "db2465888c4b2dcb694c4503c6b995a6c534c2f040ddd886f601438d69c02c90",
+    "signature_valid": true
+  },
+  "independent_validation": {
+    "staging_payload_verify": "passed",
+    "reassemble": "passed",
+    "reassembled_bytes": 6141118464,
+    "reassembled_sha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+    "final_windows_handoff_payload_verify": "passed",
+    "fresh_import": "passed with one retained root diagnostic identity failure and one unrelated generic WSL unit failure",
+    "fresh_import_receipt": "fresh-import-receipt.json"
+  },
+  "delivery": {
+    "authoritative_directory": "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\runtime-v0.1.0-beta.2-755c511",
+    "runtime_handoff_ready": true,
+    "desktop_installer_ready": true,
+    "public_runtime_manifest_status_before_handoff": 404,
+    "public_full_stack_runtime_ready": false,
+    "public_full_stack_requires_release_line_upload_and_public_fresh_install_verification": true,
+    "upload_performed": false,
+    "deployment_performed": false,
+    "publication_lines_must_use_these_exact_part_bytes": true,
+    "publication_lines_must_not_rebuild": true
+  },
+  "online_provider_calls": 0,
+  "openai_api_key_read_or_used": false
+}

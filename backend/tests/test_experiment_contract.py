@@ -105,6 +105,32 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
     detail = client.get(f"/api/v1/jobs/{created['id']}").json()["data"]
     assert detail["parameter_space"] == created["parameter_space"]
     assert detail["scenario_suite"] == created["scenario_suite"]
+    contract_event = next(
+        event
+        for event in detail["recent_events"]
+        if event["event_type"] == "optimization_outcome_contract_compiled"
+    )
+    contract = contract_event["payload"]
+    assert contract["schema_id"] == "dronedream.optimization-outcome/v1"
+    assert contract["contract_id"].startswith("sha256:")
+    assert contract["domain_failure_policy"] == {
+        "failed_trial_treatment": "separate_rate_penalty",
+        "failed_trial_weight_decimal": "1.5",
+        "optimizer_learning_failure_rate_operator": "lt",
+        "optimizer_learning_failure_rate_limit_decimal": "0.5",
+        "hard_constraint_penalty_in_scalar_loss": False,
+        "soft_constraint_penalty_in_scalar_loss": True,
+        "trial_outcome_taxonomy_schema": (
+            "dronedream.trial-outcome-taxonomy/v1"
+        ),
+        "optimizer_learning_outcome_policy": (
+            "verified_domain_failures_only_excluding_nonphysical_outcomes"
+        ),
+        "unknown_failure_policy": "quarantined_nonlearning_failure",
+        "acceptance_non_success_policy": (
+            "all_non_successes_remain_in_denominator"
+        ),
+    }
 
     history_response = client.get(f"/api/v1/jobs/{created['id']}/candidates")
     assert history_response.status_code == 200, history_response.text
@@ -123,6 +149,13 @@ def test_advanced_experiment_round_trips_and_reruns(client: TestClient) -> None:
     assert rerun["objective_config"] == created["objective_config"]
     assert rerun["scenario_suite"] == created["scenario_suite"]
     assert rerun["vehicle_profile"] == created["vehicle_profile"]
+    rerun_detail = client.get(f"/api/v1/jobs/{rerun['id']}").json()["data"]
+    rerun_contract = next(
+        event["payload"]
+        for event in rerun_detail["recent_events"]
+        if event["event_type"] == "optimization_outcome_contract_compiled"
+    )
+    assert rerun_contract["contract_id"] == contract["contract_id"]
 
 
 def test_legacy_job_receives_safe_advanced_defaults(client: TestClient) -> None:
@@ -157,3 +190,49 @@ def test_job_create_revalidates_parameter_catalog_server_side(client: TestClient
     response = client.post("/api/v1/jobs", json=payload)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_PARAMETER_SPACE"
+
+
+def test_job_create_rejects_unregistered_raw_optimization_metric(
+    client: TestClient,
+) -> None:
+    payload = _advanced_job_payload()
+    payload["objective_config"] = {
+        "objectives": [
+            {
+                "metric": "custom_energy",
+                "direction": "minimize",
+            }
+        ]
+    }
+
+    response = client.post("/api/v1/jobs", json=payload)
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_OUTCOME_CONTRACT"
+    assert "unregistered optimization metric: custom_energy" in error["message"]
+
+
+def test_job_create_rejects_composite_score_with_component_objective(
+    client: TestClient,
+) -> None:
+    payload = _advanced_job_payload()
+    payload["objective_config"] = {
+        "objectives": [
+            {
+                "metric": "score",
+                "direction": "minimize",
+            },
+            {
+                "metric": "rmse",
+                "direction": "minimize",
+            },
+        ]
+    }
+
+    response = client.post("/api/v1/jobs", json=payload)
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_OUTCOME_CONTRACT"
+    assert "composite objective metric score cannot be combined" in error["message"]

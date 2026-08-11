@@ -1,0 +1,2109 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "telemetry_json",
+      "display_name": "Telemetry",
+      "file_size_bytes": 2253176,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/telemetry.json"
+    },
+    {
+      "artifact_type": "reference_track_json",
+      "display_name": "Reference Track",
+      "file_size_bytes": 32498,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/reference_track.json"
+    },
+    {
+      "artifact_type": "scenario_config_json",
+      "display_name": "Scenario Configuration",
+      "file_size_bytes": 589,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_config.json"
+    },
+    {
+      "artifact_type": "scenario_effect_request_json",
+      "display_name": "Scenario Effect Request",
+      "file_size_bytes": 3635,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_effects.request.json"
+    },
+    {
+      "artifact_type": "scenario_effect_evidence_json",
+      "display_name": "Scenario Effect Evidence",
+      "file_size_bytes": 66276,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_effects.applied.json"
+    },
+    {
+      "artifact_type": "controller_parameters_json",
+      "display_name": "Controller Parameters",
+      "file_size_bytes": 125,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/controller_params.json"
+    },
+    {
+      "artifact_type": "px4_parameters_input_json",
+      "display_name": "PX4 Parameter Input",
+      "file_size_bytes": 22,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/px4_parameters.input.json"
+    },
+    {
+      "artifact_type": "simulator_launch_config_json",
+      "display_name": "Simulator Launch Configuration",
+      "file_size_bytes": 78625,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/launch_config.json"
+    },
+    {
+      "artifact_type": "simulator_runtime_manifest_json",
+      "display_name": "Simulator Runtime Manifest",
+      "file_size_bytes": 75086,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/simulator_runtime_manifest.json"
+    },
+    {
+      "artifact_type": "trajectory_json",
+      "display_name": "Trajectory Samples",
+      "file_size_bytes": 872439,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/trajectory.json"
+    },
+    {
+      "artifact_type": "px4_ulog",
+      "display_name": "Retained PX4 ULog",
+      "file_size_bytes": 16452016,
+      "mime_type": "application/octet-stream",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/px4_source.ulg"
+    },
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 201,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/runner.log"
+    },
+    {
+      "artifact_type": "simulator_stdout",
+      "display_name": "Simulator stdout",
+      "file_size_bytes": 5421,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/stdout.log"
+    },
+    {
+      "artifact_type": "simulator_stderr",
+      "display_name": "Simulator stderr",
+      "file_size_bytes": 417,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/stderr.log"
+    },
+    {
+      "artifact_type": "offboard_executor_log",
+      "display_name": "Offboard Executor Log",
+      "file_size_bytes": 276,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/offboard_executor.log"
+    },
+    {
+      "artifact_type": "offboard_timing_json",
+      "display_name": "Offboard Timing",
+      "file_size_bytes": 285,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/offboard_timing.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Requested",
+      "file_size_bytes": 514,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/px4_parameters.requested.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Before",
+      "file_size_bytes": 532,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/px4_parameters.before.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Applied",
+      "file_size_bytes": 593,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/px4_parameters.applied.json"
+    }
+  ],
+  "backend": "px4_gazebo",
+  "execution_identity": {
+    "attempt_count": 4,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-real-px4-26b957e",
+    "seed": 42001,
+    "trial_id": "advanced-physics-exact-26b957e-five-effects-seed-42001-attempt-4"
+  },
+  "log_excerpt": "px4_gazebo_runner mode=real trial=advanced-physics-exact-26b957e-five-effects-seed-42001-attempt-4 rmse=0.37141 score=2.170025",
+  "metrics": {
+    "completion_time": 20.976,
+    "crash_flag": false,
+    "final_error": 1.558275,
+    "instability_flag": false,
+    "max_error": 1.499631,
+    "overshoot_count": 0,
+    "pass_flag": true,
+    "raw_metric_json": {
+      "advanced_scenario_summary": {
+        "applied_effects": [
+          "battery.mass_payload_kg",
+          "scenario_type.actuator_delay",
+          "sensor_degradation.baro_noise_m",
+          "sensor_degradation.imu_noise_scale",
+          "wind_gusts"
+        ],
+        "capabilities": [
+          {
+            "capability": {
+              "reason": "Gazebo generated runtime SDF exactly matched the request-bound x500 physical profile for battery.mass_payload_kg",
+              "status": "available"
+            },
+            "effect_id": "battery.mass_payload_kg",
+            "evidence": {
+              "compiled_sdf_profile": {
+                "actuator_dynamics": {
+                  "effect_ids": [
+                    "scenario_type.actuator_delay"
+                  ],
+                  "model": "first_order_motor_response",
+                  "motor_numbers": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  "requested_delay_ms": 30.0,
+                  "time_constant_down_s": 0.03,
+                  "time_constant_up_s": 0.03
+                },
+                "payload": {
+                  "assumption": "centered_uniform_cuboid",
+                  "center_m": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "dimensions_m": {
+                    "x": 0.2,
+                    "y": 0.2,
+                    "z": 0.1
+                  },
+                  "effect_ids": [
+                    "battery.mass_payload_kg"
+                  ],
+                  "inertia_increment_kg_m2": {
+                    "ixx": 0.000416666666667,
+                    "iyy": 0.000416666666667,
+                    "izz": 0.000666666666667
+                  },
+                  "mass_kg": 0.1
+                },
+                "requested_effect_ids": [
+                  "battery.mass_payload_kg",
+                  "scenario_type.actuator_delay",
+                  "sensor_degradation.baro_noise_m",
+                  "sensor_degradation.imu_noise_scale",
+                  "wind_gusts"
+                ],
+                "sensor_noise": {
+                  "barometer_altitude_stddev_m": 0.01,
+                  "barometer_pressure_pa_per_altitude_m": 12.0,
+                  "barometer_pressure_stddev_pa": 0.12,
+                  "effect_ids": [
+                    "sensor_degradation.baro_noise_m",
+                    "sensor_degradation.imu_noise_scale"
+                  ],
+                  "gps_position_stddev_m": 0.0,
+                  "imu_noise_scale": 1.01,
+                  "preset": null
+                },
+                "vehicle_family": "x500",
+                "wind_gust": {
+                  "direction_deg_clockwise_from_north": 90.0,
+                  "effect_ids": [
+                    "wind_gusts"
+                  ],
+                  "horizontal_magnitude_sine_amplitude_percent": 1.0,
+                  "mean_linear_velocity_mps": {
+                    "x": 0.25,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "mean_magnitude_mps": 0.25,
+                  "peak_magnitude_mps": 0.5,
+                  "period_s": 8.0,
+                  "range_mps": [
+                    0.0,
+                    0.5
+                  ],
+                  "time_for_rise_s": 1.0
+                }
+              },
+              "compiled_wind": null,
+              "requested_value_sha256": "14be4b45f18e0d8c67b4f719b5144eee88497e413709d11d85b096d8e2346310",
+              "verification": {
+                "method": "trial_local_sdf_and_generated_world_sdf",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "14184332b44bbe66870b52b854c0217d71ce488c63109155482cb1170fa71eed",
+                    "source": "/world/default/wind_info",
+                    "value": {
+                      "enable_wind": true,
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "sha256": "ac588ca16bdcc5977f656dbf5252be01f14f0a86844a0cc7285ec6da68bb0fd8",
+                    "source": "/world/default/generate_world_sdf",
+                    "value": {
+                      "applied_sdf_profile": {
+                        "actuator_dynamics": {
+                          "model": "first_order_motor_response",
+                          "motors": [
+                            {
+                              "motor_number": 0,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 1,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 2,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 3,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            }
+                          ],
+                          "requested_delay_ms": 30.0
+                        },
+                        "payload": {
+                          "final_inertia_kg_m2": {
+                            "ixx": 0.02208333333333367,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02208333333333367,
+                            "iyz": 0.0,
+                            "izz": 0.04066666666666701
+                          },
+                          "final_mass_kg": 2.1,
+                          "original_inertia_kg_m2": {
+                            "ixx": 0.02166666666666667,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02166666666666667,
+                            "iyz": 0.0,
+                            "izz": 0.04000000000000001
+                          },
+                          "original_mass_kg": 2.0,
+                          "payload_assumption": "centered_uniform_cuboid",
+                          "payload_center_m": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "payload_dimensions_m": {
+                            "x": 0.2,
+                            "y": 0.2,
+                            "z": 0.1
+                          },
+                          "payload_mass_kg": 0.1
+                        },
+                        "sensor_noise": {
+                          "barometer_pressure_stddev_pa": 0.12,
+                          "gps_position_stddev_m": 0.0,
+                          "imu_stddev": {
+                            "angular_velocity.x": 0.000881391246,
+                            "angular_velocity.y": 0.000881391246,
+                            "angular_velocity.z": 0.000881391246,
+                            "linear_acceleration.x": 0.0064337,
+                            "linear_acceleration.y": 0.0064337,
+                            "linear_acceleration.z": 0.0069286
+                          }
+                        },
+                        "wind_gust": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      },
+                      "enable_wind": true,
+                      "link_name": "base_link",
+                      "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/generated_world.sdf",
+                      "sdf_sha256": "f1eceed5480262dde1201eb5472ffa86f05c95609b106e8f7631250b2d11c4da",
+                      "source_vehicle_model": "x500_base",
+                      "vehicle_model": "x500_0",
+                      "verified_profile_sections": [
+                        "sensor_noise",
+                        "payload",
+                        "actuator_dynamics",
+                        "wind_gust"
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/world_sdf",
+                    "value": {
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      },
+                      "materialized_px4_system_plugins": [
+                        {
+                          "filename": "gz-sim-physics-system",
+                          "name": "gz::sim::systems::Physics"
+                        },
+                        {
+                          "filename": "gz-sim-user-commands-system",
+                          "name": "gz::sim::systems::UserCommands"
+                        },
+                        {
+                          "filename": "gz-sim-scene-broadcaster-system",
+                          "name": "gz::sim::systems::SceneBroadcaster"
+                        },
+                        {
+                          "filename": "gz-sim-contact-system",
+                          "name": "gz::sim::systems::Contact"
+                        },
+                        {
+                          "filename": "gz-sim-imu-system",
+                          "name": "gz::sim::systems::Imu"
+                        },
+                        {
+                          "filename": "gz-sim-air-pressure-system",
+                          "name": "gz::sim::systems::AirPressure"
+                        },
+                        {
+                          "filename": "gz-sim-air-speed-system",
+                          "name": "gz::sim::systems::AirSpeed"
+                        },
+                        {
+                          "filename": "gz-sim-apply-link-wrench-system",
+                          "name": "gz::sim::systems::ApplyLinkWrench"
+                        },
+                        {
+                          "filename": "gz-sim-navsat-system",
+                          "name": "gz::sim::systems::NavSat"
+                        },
+                        {
+                          "filename": "gz-sim-magnetometer-system",
+                          "name": "gz::sim::systems::Magnetometer"
+                        },
+                        {
+                          "filename": "gz-sim-sensors-system",
+                          "name": "gz::sim::systems::Sensors"
+                        },
+                        {
+                          "filename": "libOpticalFlowSystem.so",
+                          "name": "custom::OpticalFlowSystem"
+                        },
+                        {
+                          "filename": "libGstCameraSystem.so",
+                          "name": "custom::GstCameraSystem"
+                        }
+                      ],
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/worlds/default.sdf",
+                      "px4_server_config": {
+                        "path": "/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/server.config",
+                        "sha256": "60871c73e32ecde05e008aaf995e1b9c09906ca3dacb143c595522c68d399172"
+                      },
+                      "sha256": "0250d139e52d9713b4e2ff375d1b5e6a69ae08c543e655eb3901eb6d589cac62",
+                      "wind_effects_plugin": {
+                        "filename": "gz-sim-wind-effects-system",
+                        "name": "gz::sim::systems::WindEffects",
+                        "profile": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_base_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500_base/model.sdf",
+                      "sanitized_classic_material_scripts": 4,
+                      "sha256": "dc3b999d04ed3f8967ffcf3ee96dc44b53c08b5cce36eefe1c96c379d4cb8cff",
+                      "wind_enabled_link": "x500_base/base_link"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500/model.sdf",
+                      "sha256": "62a022d383535feac9efcd9f0c4ff34cc6c09b3a7f99f083d737571dc411f84e"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/px4_gz_env",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs/gz_env.sh",
+                      "rootfs_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs",
+                      "sha256": "8857b2c83d1b2a07caffaa66d34939fa9f71961a7c0cfe0ffea1def69232b93d",
+                      "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "sdformat_model_inertial",
+            "status": "applied"
+          },
+          {
+            "capability": {
+              "reason": "Gazebo generated runtime SDF exactly matched the request-bound x500 physical profile for scenario_type.actuator_delay",
+              "status": "available"
+            },
+            "effect_id": "scenario_type.actuator_delay",
+            "evidence": {
+              "compiled_sdf_profile": {
+                "actuator_dynamics": {
+                  "effect_ids": [
+                    "scenario_type.actuator_delay"
+                  ],
+                  "model": "first_order_motor_response",
+                  "motor_numbers": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  "requested_delay_ms": 30.0,
+                  "time_constant_down_s": 0.03,
+                  "time_constant_up_s": 0.03
+                },
+                "payload": {
+                  "assumption": "centered_uniform_cuboid",
+                  "center_m": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "dimensions_m": {
+                    "x": 0.2,
+                    "y": 0.2,
+                    "z": 0.1
+                  },
+                  "effect_ids": [
+                    "battery.mass_payload_kg"
+                  ],
+                  "inertia_increment_kg_m2": {
+                    "ixx": 0.000416666666667,
+                    "iyy": 0.000416666666667,
+                    "izz": 0.000666666666667
+                  },
+                  "mass_kg": 0.1
+                },
+                "requested_effect_ids": [
+                  "battery.mass_payload_kg",
+                  "scenario_type.actuator_delay",
+                  "sensor_degradation.baro_noise_m",
+                  "sensor_degradation.imu_noise_scale",
+                  "wind_gusts"
+                ],
+                "sensor_noise": {
+                  "barometer_altitude_stddev_m": 0.01,
+                  "barometer_pressure_pa_per_altitude_m": 12.0,
+                  "barometer_pressure_stddev_pa": 0.12,
+                  "effect_ids": [
+                    "sensor_degradation.baro_noise_m",
+                    "sensor_degradation.imu_noise_scale"
+                  ],
+                  "gps_position_stddev_m": 0.0,
+                  "imu_noise_scale": 1.01,
+                  "preset": null
+                },
+                "vehicle_family": "x500",
+                "wind_gust": {
+                  "direction_deg_clockwise_from_north": 90.0,
+                  "effect_ids": [
+                    "wind_gusts"
+                  ],
+                  "horizontal_magnitude_sine_amplitude_percent": 1.0,
+                  "mean_linear_velocity_mps": {
+                    "x": 0.25,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "mean_magnitude_mps": 0.25,
+                  "peak_magnitude_mps": 0.5,
+                  "period_s": 8.0,
+                  "range_mps": [
+                    0.0,
+                    0.5
+                  ],
+                  "time_for_rise_s": 1.0
+                }
+              },
+              "compiled_wind": null,
+              "requested_value_sha256": "fe85583b561a82916b1830f1afbc7872506da71911999e5a64edc8c4ff067ee3",
+              "verification": {
+                "method": "trial_local_sdf_and_generated_world_sdf",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "14184332b44bbe66870b52b854c0217d71ce488c63109155482cb1170fa71eed",
+                    "source": "/world/default/wind_info",
+                    "value": {
+                      "enable_wind": true,
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "sha256": "ac588ca16bdcc5977f656dbf5252be01f14f0a86844a0cc7285ec6da68bb0fd8",
+                    "source": "/world/default/generate_world_sdf",
+                    "value": {
+                      "applied_sdf_profile": {
+                        "actuator_dynamics": {
+                          "model": "first_order_motor_response",
+                          "motors": [
+                            {
+                              "motor_number": 0,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 1,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 2,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 3,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            }
+                          ],
+                          "requested_delay_ms": 30.0
+                        },
+                        "payload": {
+                          "final_inertia_kg_m2": {
+                            "ixx": 0.02208333333333367,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02208333333333367,
+                            "iyz": 0.0,
+                            "izz": 0.04066666666666701
+                          },
+                          "final_mass_kg": 2.1,
+                          "original_inertia_kg_m2": {
+                            "ixx": 0.02166666666666667,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02166666666666667,
+                            "iyz": 0.0,
+                            "izz": 0.04000000000000001
+                          },
+                          "original_mass_kg": 2.0,
+                          "payload_assumption": "centered_uniform_cuboid",
+                          "payload_center_m": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "payload_dimensions_m": {
+                            "x": 0.2,
+                            "y": 0.2,
+                            "z": 0.1
+                          },
+                          "payload_mass_kg": 0.1
+                        },
+                        "sensor_noise": {
+                          "barometer_pressure_stddev_pa": 0.12,
+                          "gps_position_stddev_m": 0.0,
+                          "imu_stddev": {
+                            "angular_velocity.x": 0.000881391246,
+                            "angular_velocity.y": 0.000881391246,
+                            "angular_velocity.z": 0.000881391246,
+                            "linear_acceleration.x": 0.0064337,
+                            "linear_acceleration.y": 0.0064337,
+                            "linear_acceleration.z": 0.0069286
+                          }
+                        },
+                        "wind_gust": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      },
+                      "enable_wind": true,
+                      "link_name": "base_link",
+                      "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/generated_world.sdf",
+                      "sdf_sha256": "f1eceed5480262dde1201eb5472ffa86f05c95609b106e8f7631250b2d11c4da",
+                      "source_vehicle_model": "x500_base",
+                      "vehicle_model": "x500_0",
+                      "verified_profile_sections": [
+                        "sensor_noise",
+                        "payload",
+                        "actuator_dynamics",
+                        "wind_gust"
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/world_sdf",
+                    "value": {
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      },
+                      "materialized_px4_system_plugins": [
+                        {
+                          "filename": "gz-sim-physics-system",
+                          "name": "gz::sim::systems::Physics"
+                        },
+                        {
+                          "filename": "gz-sim-user-commands-system",
+                          "name": "gz::sim::systems::UserCommands"
+                        },
+                        {
+                          "filename": "gz-sim-scene-broadcaster-system",
+                          "name": "gz::sim::systems::SceneBroadcaster"
+                        },
+                        {
+                          "filename": "gz-sim-contact-system",
+                          "name": "gz::sim::systems::Contact"
+                        },
+                        {
+                          "filename": "gz-sim-imu-system",
+                          "name": "gz::sim::systems::Imu"
+                        },
+                        {
+                          "filename": "gz-sim-air-pressure-system",
+                          "name": "gz::sim::systems::AirPressure"
+                        },
+                        {
+                          "filename": "gz-sim-air-speed-system",
+                          "name": "gz::sim::systems::AirSpeed"
+                        },
+                        {
+                          "filename": "gz-sim-apply-link-wrench-system",
+                          "name": "gz::sim::systems::ApplyLinkWrench"
+                        },
+                        {
+                          "filename": "gz-sim-navsat-system",
+                          "name": "gz::sim::systems::NavSat"
+                        },
+                        {
+                          "filename": "gz-sim-magnetometer-system",
+                          "name": "gz::sim::systems::Magnetometer"
+                        },
+                        {
+                          "filename": "gz-sim-sensors-system",
+                          "name": "gz::sim::systems::Sensors"
+                        },
+                        {
+                          "filename": "libOpticalFlowSystem.so",
+                          "name": "custom::OpticalFlowSystem"
+                        },
+                        {
+                          "filename": "libGstCameraSystem.so",
+                          "name": "custom::GstCameraSystem"
+                        }
+                      ],
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/worlds/default.sdf",
+                      "px4_server_config": {
+                        "path": "/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/server.config",
+                        "sha256": "60871c73e32ecde05e008aaf995e1b9c09906ca3dacb143c595522c68d399172"
+                      },
+                      "sha256": "0250d139e52d9713b4e2ff375d1b5e6a69ae08c543e655eb3901eb6d589cac62",
+                      "wind_effects_plugin": {
+                        "filename": "gz-sim-wind-effects-system",
+                        "name": "gz::sim::systems::WindEffects",
+                        "profile": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_base_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500_base/model.sdf",
+                      "sanitized_classic_material_scripts": 4,
+                      "sha256": "dc3b999d04ed3f8967ffcf3ee96dc44b53c08b5cce36eefe1c96c379d4cb8cff",
+                      "wind_enabled_link": "x500_base/base_link"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500/model.sdf",
+                      "sha256": "62a022d383535feac9efcd9f0c4ff34cc6c09b3a7f99f083d737571dc411f84e"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/px4_gz_env",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs/gz_env.sh",
+                      "rootfs_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs",
+                      "sha256": "8857b2c83d1b2a07caffaa66d34939fa9f71961a7c0cfe0ffea1def69232b93d",
+                      "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "sdformat_actuator_dynamics",
+            "status": "applied"
+          },
+          {
+            "capability": {
+              "reason": "Gazebo generated runtime SDF exactly matched the request-bound x500 physical profile for sensor_degradation.baro_noise_m",
+              "status": "available"
+            },
+            "effect_id": "sensor_degradation.baro_noise_m",
+            "evidence": {
+              "compiled_sdf_profile": {
+                "actuator_dynamics": {
+                  "effect_ids": [
+                    "scenario_type.actuator_delay"
+                  ],
+                  "model": "first_order_motor_response",
+                  "motor_numbers": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  "requested_delay_ms": 30.0,
+                  "time_constant_down_s": 0.03,
+                  "time_constant_up_s": 0.03
+                },
+                "payload": {
+                  "assumption": "centered_uniform_cuboid",
+                  "center_m": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "dimensions_m": {
+                    "x": 0.2,
+                    "y": 0.2,
+                    "z": 0.1
+                  },
+                  "effect_ids": [
+                    "battery.mass_payload_kg"
+                  ],
+                  "inertia_increment_kg_m2": {
+                    "ixx": 0.000416666666667,
+                    "iyy": 0.000416666666667,
+                    "izz": 0.000666666666667
+                  },
+                  "mass_kg": 0.1
+                },
+                "requested_effect_ids": [
+                  "battery.mass_payload_kg",
+                  "scenario_type.actuator_delay",
+                  "sensor_degradation.baro_noise_m",
+                  "sensor_degradation.imu_noise_scale",
+                  "wind_gusts"
+                ],
+                "sensor_noise": {
+                  "barometer_altitude_stddev_m": 0.01,
+                  "barometer_pressure_pa_per_altitude_m": 12.0,
+                  "barometer_pressure_stddev_pa": 0.12,
+                  "effect_ids": [
+                    "sensor_degradation.baro_noise_m",
+                    "sensor_degradation.imu_noise_scale"
+                  ],
+                  "gps_position_stddev_m": 0.0,
+                  "imu_noise_scale": 1.01,
+                  "preset": null
+                },
+                "vehicle_family": "x500",
+                "wind_gust": {
+                  "direction_deg_clockwise_from_north": 90.0,
+                  "effect_ids": [
+                    "wind_gusts"
+                  ],
+                  "horizontal_magnitude_sine_amplitude_percent": 1.0,
+                  "mean_linear_velocity_mps": {
+                    "x": 0.25,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "mean_magnitude_mps": 0.25,
+                  "peak_magnitude_mps": 0.5,
+                  "period_s": 8.0,
+                  "range_mps": [
+                    0.0,
+                    0.5
+                  ],
+                  "time_for_rise_s": 1.0
+                }
+              },
+              "compiled_wind": null,
+              "requested_value_sha256": "312b95ee5a344d2f7a16ad817ff70788980da6e30b9bb04b651d53847abd476f",
+              "verification": {
+                "method": "trial_local_sdf_and_generated_world_sdf",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "14184332b44bbe66870b52b854c0217d71ce488c63109155482cb1170fa71eed",
+                    "source": "/world/default/wind_info",
+                    "value": {
+                      "enable_wind": true,
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "sha256": "ac588ca16bdcc5977f656dbf5252be01f14f0a86844a0cc7285ec6da68bb0fd8",
+                    "source": "/world/default/generate_world_sdf",
+                    "value": {
+                      "applied_sdf_profile": {
+                        "actuator_dynamics": {
+                          "model": "first_order_motor_response",
+                          "motors": [
+                            {
+                              "motor_number": 0,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 1,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 2,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 3,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            }
+                          ],
+                          "requested_delay_ms": 30.0
+                        },
+                        "payload": {
+                          "final_inertia_kg_m2": {
+                            "ixx": 0.02208333333333367,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02208333333333367,
+                            "iyz": 0.0,
+                            "izz": 0.04066666666666701
+                          },
+                          "final_mass_kg": 2.1,
+                          "original_inertia_kg_m2": {
+                            "ixx": 0.02166666666666667,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02166666666666667,
+                            "iyz": 0.0,
+                            "izz": 0.04000000000000001
+                          },
+                          "original_mass_kg": 2.0,
+                          "payload_assumption": "centered_uniform_cuboid",
+                          "payload_center_m": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "payload_dimensions_m": {
+                            "x": 0.2,
+                            "y": 0.2,
+                            "z": 0.1
+                          },
+                          "payload_mass_kg": 0.1
+                        },
+                        "sensor_noise": {
+                          "barometer_pressure_stddev_pa": 0.12,
+                          "gps_position_stddev_m": 0.0,
+                          "imu_stddev": {
+                            "angular_velocity.x": 0.000881391246,
+                            "angular_velocity.y": 0.000881391246,
+                            "angular_velocity.z": 0.000881391246,
+                            "linear_acceleration.x": 0.0064337,
+                            "linear_acceleration.y": 0.0064337,
+                            "linear_acceleration.z": 0.0069286
+                          }
+                        },
+                        "wind_gust": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      },
+                      "enable_wind": true,
+                      "link_name": "base_link",
+                      "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/generated_world.sdf",
+                      "sdf_sha256": "f1eceed5480262dde1201eb5472ffa86f05c95609b106e8f7631250b2d11c4da",
+                      "source_vehicle_model": "x500_base",
+                      "vehicle_model": "x500_0",
+                      "verified_profile_sections": [
+                        "sensor_noise",
+                        "payload",
+                        "actuator_dynamics",
+                        "wind_gust"
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/world_sdf",
+                    "value": {
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      },
+                      "materialized_px4_system_plugins": [
+                        {
+                          "filename": "gz-sim-physics-system",
+                          "name": "gz::sim::systems::Physics"
+                        },
+                        {
+                          "filename": "gz-sim-user-commands-system",
+                          "name": "gz::sim::systems::UserCommands"
+                        },
+                        {
+                          "filename": "gz-sim-scene-broadcaster-system",
+                          "name": "gz::sim::systems::SceneBroadcaster"
+                        },
+                        {
+                          "filename": "gz-sim-contact-system",
+                          "name": "gz::sim::systems::Contact"
+                        },
+                        {
+                          "filename": "gz-sim-imu-system",
+                          "name": "gz::sim::systems::Imu"
+                        },
+                        {
+                          "filename": "gz-sim-air-pressure-system",
+                          "name": "gz::sim::systems::AirPressure"
+                        },
+                        {
+                          "filename": "gz-sim-air-speed-system",
+                          "name": "gz::sim::systems::AirSpeed"
+                        },
+                        {
+                          "filename": "gz-sim-apply-link-wrench-system",
+                          "name": "gz::sim::systems::ApplyLinkWrench"
+                        },
+                        {
+                          "filename": "gz-sim-navsat-system",
+                          "name": "gz::sim::systems::NavSat"
+                        },
+                        {
+                          "filename": "gz-sim-magnetometer-system",
+                          "name": "gz::sim::systems::Magnetometer"
+                        },
+                        {
+                          "filename": "gz-sim-sensors-system",
+                          "name": "gz::sim::systems::Sensors"
+                        },
+                        {
+                          "filename": "libOpticalFlowSystem.so",
+                          "name": "custom::OpticalFlowSystem"
+                        },
+                        {
+                          "filename": "libGstCameraSystem.so",
+                          "name": "custom::GstCameraSystem"
+                        }
+                      ],
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/worlds/default.sdf",
+                      "px4_server_config": {
+                        "path": "/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/server.config",
+                        "sha256": "60871c73e32ecde05e008aaf995e1b9c09906ca3dacb143c595522c68d399172"
+                      },
+                      "sha256": "0250d139e52d9713b4e2ff375d1b5e6a69ae08c543e655eb3901eb6d589cac62",
+                      "wind_effects_plugin": {
+                        "filename": "gz-sim-wind-effects-system",
+                        "name": "gz::sim::systems::WindEffects",
+                        "profile": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_base_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500_base/model.sdf",
+                      "sanitized_classic_material_scripts": 4,
+                      "sha256": "dc3b999d04ed3f8967ffcf3ee96dc44b53c08b5cce36eefe1c96c379d4cb8cff",
+                      "wind_enabled_link": "x500_base/base_link"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500/model.sdf",
+                      "sha256": "62a022d383535feac9efcd9f0c4ff34cc6c09b3a7f99f083d737571dc411f84e"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/px4_gz_env",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs/gz_env.sh",
+                      "rootfs_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs",
+                      "sha256": "8857b2c83d1b2a07caffaa66d34939fa9f71961a7c0cfe0ffea1def69232b93d",
+                      "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "sdformat_sensor_noise",
+            "status": "applied"
+          },
+          {
+            "capability": {
+              "reason": "Gazebo generated runtime SDF exactly matched the request-bound x500 physical profile for sensor_degradation.imu_noise_scale",
+              "status": "available"
+            },
+            "effect_id": "sensor_degradation.imu_noise_scale",
+            "evidence": {
+              "compiled_sdf_profile": {
+                "actuator_dynamics": {
+                  "effect_ids": [
+                    "scenario_type.actuator_delay"
+                  ],
+                  "model": "first_order_motor_response",
+                  "motor_numbers": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  "requested_delay_ms": 30.0,
+                  "time_constant_down_s": 0.03,
+                  "time_constant_up_s": 0.03
+                },
+                "payload": {
+                  "assumption": "centered_uniform_cuboid",
+                  "center_m": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "dimensions_m": {
+                    "x": 0.2,
+                    "y": 0.2,
+                    "z": 0.1
+                  },
+                  "effect_ids": [
+                    "battery.mass_payload_kg"
+                  ],
+                  "inertia_increment_kg_m2": {
+                    "ixx": 0.000416666666667,
+                    "iyy": 0.000416666666667,
+                    "izz": 0.000666666666667
+                  },
+                  "mass_kg": 0.1
+                },
+                "requested_effect_ids": [
+                  "battery.mass_payload_kg",
+                  "scenario_type.actuator_delay",
+                  "sensor_degradation.baro_noise_m",
+                  "sensor_degradation.imu_noise_scale",
+                  "wind_gusts"
+                ],
+                "sensor_noise": {
+                  "barometer_altitude_stddev_m": 0.01,
+                  "barometer_pressure_pa_per_altitude_m": 12.0,
+                  "barometer_pressure_stddev_pa": 0.12,
+                  "effect_ids": [
+                    "sensor_degradation.baro_noise_m",
+                    "sensor_degradation.imu_noise_scale"
+                  ],
+                  "gps_position_stddev_m": 0.0,
+                  "imu_noise_scale": 1.01,
+                  "preset": null
+                },
+                "vehicle_family": "x500",
+                "wind_gust": {
+                  "direction_deg_clockwise_from_north": 90.0,
+                  "effect_ids": [
+                    "wind_gusts"
+                  ],
+                  "horizontal_magnitude_sine_amplitude_percent": 1.0,
+                  "mean_linear_velocity_mps": {
+                    "x": 0.25,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "mean_magnitude_mps": 0.25,
+                  "peak_magnitude_mps": 0.5,
+                  "period_s": 8.0,
+                  "range_mps": [
+                    0.0,
+                    0.5
+                  ],
+                  "time_for_rise_s": 1.0
+                }
+              },
+              "compiled_wind": null,
+              "requested_value_sha256": "cb5d2011975d7a70e93f7cf9d2934fc752c4f1c5013a80cd34b8d2deb5ded6b0",
+              "verification": {
+                "method": "trial_local_sdf_and_generated_world_sdf",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "14184332b44bbe66870b52b854c0217d71ce488c63109155482cb1170fa71eed",
+                    "source": "/world/default/wind_info",
+                    "value": {
+                      "enable_wind": true,
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "sha256": "ac588ca16bdcc5977f656dbf5252be01f14f0a86844a0cc7285ec6da68bb0fd8",
+                    "source": "/world/default/generate_world_sdf",
+                    "value": {
+                      "applied_sdf_profile": {
+                        "actuator_dynamics": {
+                          "model": "first_order_motor_response",
+                          "motors": [
+                            {
+                              "motor_number": 0,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 1,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 2,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 3,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            }
+                          ],
+                          "requested_delay_ms": 30.0
+                        },
+                        "payload": {
+                          "final_inertia_kg_m2": {
+                            "ixx": 0.02208333333333367,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02208333333333367,
+                            "iyz": 0.0,
+                            "izz": 0.04066666666666701
+                          },
+                          "final_mass_kg": 2.1,
+                          "original_inertia_kg_m2": {
+                            "ixx": 0.02166666666666667,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02166666666666667,
+                            "iyz": 0.0,
+                            "izz": 0.04000000000000001
+                          },
+                          "original_mass_kg": 2.0,
+                          "payload_assumption": "centered_uniform_cuboid",
+                          "payload_center_m": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "payload_dimensions_m": {
+                            "x": 0.2,
+                            "y": 0.2,
+                            "z": 0.1
+                          },
+                          "payload_mass_kg": 0.1
+                        },
+                        "sensor_noise": {
+                          "barometer_pressure_stddev_pa": 0.12,
+                          "gps_position_stddev_m": 0.0,
+                          "imu_stddev": {
+                            "angular_velocity.x": 0.000881391246,
+                            "angular_velocity.y": 0.000881391246,
+                            "angular_velocity.z": 0.000881391246,
+                            "linear_acceleration.x": 0.0064337,
+                            "linear_acceleration.y": 0.0064337,
+                            "linear_acceleration.z": 0.0069286
+                          }
+                        },
+                        "wind_gust": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      },
+                      "enable_wind": true,
+                      "link_name": "base_link",
+                      "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/generated_world.sdf",
+                      "sdf_sha256": "f1eceed5480262dde1201eb5472ffa86f05c95609b106e8f7631250b2d11c4da",
+                      "source_vehicle_model": "x500_base",
+                      "vehicle_model": "x500_0",
+                      "verified_profile_sections": [
+                        "sensor_noise",
+                        "payload",
+                        "actuator_dynamics",
+                        "wind_gust"
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/world_sdf",
+                    "value": {
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      },
+                      "materialized_px4_system_plugins": [
+                        {
+                          "filename": "gz-sim-physics-system",
+                          "name": "gz::sim::systems::Physics"
+                        },
+                        {
+                          "filename": "gz-sim-user-commands-system",
+                          "name": "gz::sim::systems::UserCommands"
+                        },
+                        {
+                          "filename": "gz-sim-scene-broadcaster-system",
+                          "name": "gz::sim::systems::SceneBroadcaster"
+                        },
+                        {
+                          "filename": "gz-sim-contact-system",
+                          "name": "gz::sim::systems::Contact"
+                        },
+                        {
+                          "filename": "gz-sim-imu-system",
+                          "name": "gz::sim::systems::Imu"
+                        },
+                        {
+                          "filename": "gz-sim-air-pressure-system",
+                          "name": "gz::sim::systems::AirPressure"
+                        },
+                        {
+                          "filename": "gz-sim-air-speed-system",
+                          "name": "gz::sim::systems::AirSpeed"
+                        },
+                        {
+                          "filename": "gz-sim-apply-link-wrench-system",
+                          "name": "gz::sim::systems::ApplyLinkWrench"
+                        },
+                        {
+                          "filename": "gz-sim-navsat-system",
+                          "name": "gz::sim::systems::NavSat"
+                        },
+                        {
+                          "filename": "gz-sim-magnetometer-system",
+                          "name": "gz::sim::systems::Magnetometer"
+                        },
+                        {
+                          "filename": "gz-sim-sensors-system",
+                          "name": "gz::sim::systems::Sensors"
+                        },
+                        {
+                          "filename": "libOpticalFlowSystem.so",
+                          "name": "custom::OpticalFlowSystem"
+                        },
+                        {
+                          "filename": "libGstCameraSystem.so",
+                          "name": "custom::GstCameraSystem"
+                        }
+                      ],
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/worlds/default.sdf",
+                      "px4_server_config": {
+                        "path": "/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/server.config",
+                        "sha256": "60871c73e32ecde05e008aaf995e1b9c09906ca3dacb143c595522c68d399172"
+                      },
+                      "sha256": "0250d139e52d9713b4e2ff375d1b5e6a69ae08c543e655eb3901eb6d589cac62",
+                      "wind_effects_plugin": {
+                        "filename": "gz-sim-wind-effects-system",
+                        "name": "gz::sim::systems::WindEffects",
+                        "profile": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_base_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500_base/model.sdf",
+                      "sanitized_classic_material_scripts": 4,
+                      "sha256": "dc3b999d04ed3f8967ffcf3ee96dc44b53c08b5cce36eefe1c96c379d4cb8cff",
+                      "wind_enabled_link": "x500_base/base_link"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500/model.sdf",
+                      "sha256": "62a022d383535feac9efcd9f0c4ff34cc6c09b3a7f99f083d737571dc411f84e"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/px4_gz_env",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs/gz_env.sh",
+                      "rootfs_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs",
+                      "sha256": "8857b2c83d1b2a07caffaa66d34939fa9f71961a7c0cfe0ffea1def69232b93d",
+                      "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "sdformat_sensor_noise",
+            "status": "applied"
+          },
+          {
+            "capability": {
+              "reason": "Gazebo generated runtime SDF exactly matched the request-bound x500 physical profile for wind_gusts",
+              "status": "available"
+            },
+            "effect_id": "wind_gusts",
+            "evidence": {
+              "compiled_sdf_profile": {
+                "actuator_dynamics": {
+                  "effect_ids": [
+                    "scenario_type.actuator_delay"
+                  ],
+                  "model": "first_order_motor_response",
+                  "motor_numbers": [
+                    0,
+                    1,
+                    2,
+                    3
+                  ],
+                  "requested_delay_ms": 30.0,
+                  "time_constant_down_s": 0.03,
+                  "time_constant_up_s": 0.03
+                },
+                "payload": {
+                  "assumption": "centered_uniform_cuboid",
+                  "center_m": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "dimensions_m": {
+                    "x": 0.2,
+                    "y": 0.2,
+                    "z": 0.1
+                  },
+                  "effect_ids": [
+                    "battery.mass_payload_kg"
+                  ],
+                  "inertia_increment_kg_m2": {
+                    "ixx": 0.000416666666667,
+                    "iyy": 0.000416666666667,
+                    "izz": 0.000666666666667
+                  },
+                  "mass_kg": 0.1
+                },
+                "requested_effect_ids": [
+                  "battery.mass_payload_kg",
+                  "scenario_type.actuator_delay",
+                  "sensor_degradation.baro_noise_m",
+                  "sensor_degradation.imu_noise_scale",
+                  "wind_gusts"
+                ],
+                "sensor_noise": {
+                  "barometer_altitude_stddev_m": 0.01,
+                  "barometer_pressure_pa_per_altitude_m": 12.0,
+                  "barometer_pressure_stddev_pa": 0.12,
+                  "effect_ids": [
+                    "sensor_degradation.baro_noise_m",
+                    "sensor_degradation.imu_noise_scale"
+                  ],
+                  "gps_position_stddev_m": 0.0,
+                  "imu_noise_scale": 1.01,
+                  "preset": null
+                },
+                "vehicle_family": "x500",
+                "wind_gust": {
+                  "direction_deg_clockwise_from_north": 90.0,
+                  "effect_ids": [
+                    "wind_gusts"
+                  ],
+                  "horizontal_magnitude_sine_amplitude_percent": 1.0,
+                  "mean_linear_velocity_mps": {
+                    "x": 0.25,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "mean_magnitude_mps": 0.25,
+                  "peak_magnitude_mps": 0.5,
+                  "period_s": 8.0,
+                  "range_mps": [
+                    0.0,
+                    0.5
+                  ],
+                  "time_for_rise_s": 1.0
+                }
+              },
+              "compiled_wind": null,
+              "requested_value_sha256": "3125896e4ffc67e1f2f7ee078fab6ff53c6edb89768994f426f981ea36bf4c05",
+              "verification": {
+                "method": "trial_local_sdf_and_generated_world_sdf",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "14184332b44bbe66870b52b854c0217d71ce488c63109155482cb1170fa71eed",
+                    "source": "/world/default/wind_info",
+                    "value": {
+                      "enable_wind": true,
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "sha256": "ac588ca16bdcc5977f656dbf5252be01f14f0a86844a0cc7285ec6da68bb0fd8",
+                    "source": "/world/default/generate_world_sdf",
+                    "value": {
+                      "applied_sdf_profile": {
+                        "actuator_dynamics": {
+                          "model": "first_order_motor_response",
+                          "motors": [
+                            {
+                              "motor_number": 0,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 1,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 2,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            },
+                            {
+                              "motor_number": 3,
+                              "time_constant_down_s": 0.03,
+                              "time_constant_up_s": 0.03
+                            }
+                          ],
+                          "requested_delay_ms": 30.0
+                        },
+                        "payload": {
+                          "final_inertia_kg_m2": {
+                            "ixx": 0.02208333333333367,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02208333333333367,
+                            "iyz": 0.0,
+                            "izz": 0.04066666666666701
+                          },
+                          "final_mass_kg": 2.1,
+                          "original_inertia_kg_m2": {
+                            "ixx": 0.02166666666666667,
+                            "ixy": 0.0,
+                            "ixz": 0.0,
+                            "iyy": 0.02166666666666667,
+                            "iyz": 0.0,
+                            "izz": 0.04000000000000001
+                          },
+                          "original_mass_kg": 2.0,
+                          "payload_assumption": "centered_uniform_cuboid",
+                          "payload_center_m": {
+                            "x": 0.0,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "payload_dimensions_m": {
+                            "x": 0.2,
+                            "y": 0.2,
+                            "z": 0.1
+                          },
+                          "payload_mass_kg": 0.1
+                        },
+                        "sensor_noise": {
+                          "barometer_pressure_stddev_pa": 0.12,
+                          "gps_position_stddev_m": 0.0,
+                          "imu_stddev": {
+                            "angular_velocity.x": 0.000881391246,
+                            "angular_velocity.y": 0.000881391246,
+                            "angular_velocity.z": 0.000881391246,
+                            "linear_acceleration.x": 0.0064337,
+                            "linear_acceleration.y": 0.0064337,
+                            "linear_acceleration.z": 0.0069286
+                          }
+                        },
+                        "wind_gust": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      },
+                      "enable_wind": true,
+                      "link_name": "base_link",
+                      "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/generated_world.sdf",
+                      "sdf_sha256": "f1eceed5480262dde1201eb5472ffa86f05c95609b106e8f7631250b2d11c4da",
+                      "source_vehicle_model": "x500_base",
+                      "vehicle_model": "x500_0",
+                      "verified_profile_sections": [
+                        "sensor_noise",
+                        "payload",
+                        "actuator_dynamics",
+                        "wind_gust"
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/world_sdf",
+                    "value": {
+                      "linear_velocity_mps": {
+                        "x": 0.25,
+                        "y": 0.0,
+                        "z": 0.0
+                      },
+                      "materialized_px4_system_plugins": [
+                        {
+                          "filename": "gz-sim-physics-system",
+                          "name": "gz::sim::systems::Physics"
+                        },
+                        {
+                          "filename": "gz-sim-user-commands-system",
+                          "name": "gz::sim::systems::UserCommands"
+                        },
+                        {
+                          "filename": "gz-sim-scene-broadcaster-system",
+                          "name": "gz::sim::systems::SceneBroadcaster"
+                        },
+                        {
+                          "filename": "gz-sim-contact-system",
+                          "name": "gz::sim::systems::Contact"
+                        },
+                        {
+                          "filename": "gz-sim-imu-system",
+                          "name": "gz::sim::systems::Imu"
+                        },
+                        {
+                          "filename": "gz-sim-air-pressure-system",
+                          "name": "gz::sim::systems::AirPressure"
+                        },
+                        {
+                          "filename": "gz-sim-air-speed-system",
+                          "name": "gz::sim::systems::AirSpeed"
+                        },
+                        {
+                          "filename": "gz-sim-apply-link-wrench-system",
+                          "name": "gz::sim::systems::ApplyLinkWrench"
+                        },
+                        {
+                          "filename": "gz-sim-navsat-system",
+                          "name": "gz::sim::systems::NavSat"
+                        },
+                        {
+                          "filename": "gz-sim-magnetometer-system",
+                          "name": "gz::sim::systems::Magnetometer"
+                        },
+                        {
+                          "filename": "gz-sim-sensors-system",
+                          "name": "gz::sim::systems::Sensors"
+                        },
+                        {
+                          "filename": "libOpticalFlowSystem.so",
+                          "name": "custom::OpticalFlowSystem"
+                        },
+                        {
+                          "filename": "libGstCameraSystem.so",
+                          "name": "custom::GstCameraSystem"
+                        }
+                      ],
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/worlds/default.sdf",
+                      "px4_server_config": {
+                        "path": "/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/server.config",
+                        "sha256": "60871c73e32ecde05e008aaf995e1b9c09906ca3dacb143c595522c68d399172"
+                      },
+                      "sha256": "0250d139e52d9713b4e2ff375d1b5e6a69ae08c543e655eb3901eb6d589cac62",
+                      "wind_effects_plugin": {
+                        "filename": "gz-sim-wind-effects-system",
+                        "name": "gz::sim::systems::WindEffects",
+                        "profile": {
+                          "amplitude_percent": 1.0,
+                          "mean_linear_velocity_mps": {
+                            "x": 0.25,
+                            "y": 0.0,
+                            "z": 0.0
+                          },
+                          "peak_magnitude_mps": 0.5,
+                          "period_s": 8.0,
+                          "range_mps": [
+                            0.0,
+                            0.5
+                          ],
+                          "time_for_rise_s": 1.0
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_base_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500_base/model.sdf",
+                      "sanitized_classic_material_scripts": 4,
+                      "sha256": "dc3b999d04ed3f8967ffcf3ee96dc44b53c08b5cce36eefe1c96c379d4cb8cff",
+                      "wind_enabled_link": "x500_base/base_link"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/x500_model_sdf",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/models/x500/model.sdf",
+                      "sha256": "62a022d383535feac9efcd9f0c4ff34cc6c09b3a7f99f083d737571dc411f84e"
+                    }
+                  },
+                  {
+                    "kind": "artifact",
+                    "source": "trial_overlay/px4_gz_env",
+                    "value": {
+                      "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs/gz_env.sh",
+                      "rootfs_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/success-five-effects-attempt-4/scenario_runtime/px4_rootfs",
+                      "sha256": "8857b2c83d1b2a07caffaa66d34939fa9f71961a7c0cfe0ffea1def69232b93d",
+                      "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "gazebo_wind_effects",
+            "status": "applied"
+          }
+        ],
+        "dropout_rate": 0.0,
+        "enabled": true,
+        "failed_effects": [],
+        "obstacle_count": 0,
+        "pending_effects": [],
+        "requested_effects": [
+          "battery.mass_payload_kg",
+          "scenario_type.actuator_delay",
+          "sensor_degradation.baro_noise_m",
+          "sensor_degradation.imu_noise_scale",
+          "wind_gusts"
+        ],
+        "unsupported_effects": [],
+        "unverified_passthrough_enabled": false,
+        "verification_status": "verified_applied",
+        "wind_gust_enabled": true
+      },
+      "airframe": "x500",
+      "coverage_basis": "union_of_traversed_polyline_arc_length",
+      "crash_reason": "none",
+      "evaluation_backward_distance_m": 0.008143,
+      "evaluation_directed_progress_fraction": 0.954699,
+      "evaluation_direction_valid": true,
+      "evaluation_end_index": 6900,
+      "evaluation_end_t": 55.2,
+      "evaluation_endpoint_reached": true,
+      "evaluation_max_error_sample": {
+        "error": 1.499631,
+        "reference_x": 4.998352,
+        "reference_y": -0.094431,
+        "reference_z": 3.0,
+        "t": 34.224,
+        "track_progress_m": 31.319886,
+        "x": 3.500008,
+        "y": -0.068277,
+        "z": 2.943668
+      },
+      "evaluation_max_z": 3.036714,
+      "evaluation_min_z": 2.899643,
+      "evaluation_policy": {
+        "altitude_entry_fraction": 0.9,
+        "collapse_altitude_fraction": 0.5,
+        "consecutive_samples": 5,
+        "minimum_track_coverage": 0.9,
+        "near_track_threshold_m": 1.5,
+        "pass_max_error_m": 2.0,
+        "pass_rmse_m": 0.75,
+        "policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "schema_id": "dronedream.px4-evaluation-policy/v1"
+      },
+      "evaluation_progress_contract_ok": true,
+      "evaluation_progress_discontinuity_count": 0,
+      "evaluation_sample_count": 2623,
+      "evaluation_sampling": {
+        "duration_s": 20.976,
+        "end_time_s": 55.2,
+        "max_gap_limit_s": 0.5,
+        "max_gap_s": 0.012,
+        "median_interval_s": 0.008,
+        "minimum_sampling_coverage": 0.8,
+        "sample_count": 2623,
+        "sampling_coverage": 1.0,
+        "start_time_s": 34.224
+      },
+      "evaluation_start_index": 4278,
+      "evaluation_start_reached": true,
+      "evaluation_start_reason": "altitude_and_near_track",
+      "evaluation_start_t": 34.224,
+      "evaluation_track_coverage": 0.954955,
+      "evaluation_trimmed_landing_samples": 0,
+      "evaluation_trimmed_takeoff_samples": 4278,
+      "evaluation_window_evidence": {
+        "end_index": 6900,
+        "evidence_id": "sha256:af8211019e6f0bf5eaee1493926dbce87213cdff034d3c5ee91bc13199296eb5",
+        "offboard_timing_sha256": "sha256:b75c17115111557344d424ee0875f6678bdd639ff7e2d30c9770ab52922dbb10",
+        "policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "raw_end_time_s": null,
+        "raw_source": "telemetry_derived",
+        "raw_start_time_s": null,
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "schema_id": "dronedream.px4-evaluation-window-evidence/v1",
+        "source": "telemetry_derived_refined",
+        "start_index": 4278,
+        "start_reason": "altitude_and_near_track",
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:16f9327f1137a48422945b1ccb6745a7b0738feca7a65d8911e676282ee46f46",
+        "trimmed_landing_samples": 0,
+        "trimmed_takeoff_samples": 4278,
+        "verifier_revision": "px4-evaluation-window-verifier-1.0"
+      },
+      "evaluation_window_raw_source": "telemetry_derived",
+      "evaluation_window_source": "telemetry_derived_refined",
+      "full_log_max_error": 5.832553,
+      "full_log_rmse": 4.283345,
+      "mode": "real",
+      "pass_thresholds": {
+        "max_error": 2.0,
+        "min_track_coverage": 0.9,
+        "rmse": 0.75
+      },
+      "px4_core_metric_evidence": {
+        "evaluation_duration_s": 20.976,
+        "evaluation_end_index": 6900,
+        "evaluation_end_time_s": 55.2,
+        "evaluation_max_error_sample": {
+          "error": 1.499631,
+          "reference_x": 4.998352,
+          "reference_y": -0.094431,
+          "reference_z": 3.0,
+          "t": 34.224,
+          "track_progress_m": 31.319886,
+          "x": 3.500008,
+          "y": -0.068277,
+          "z": 2.943668
+        },
+        "evaluation_sample_count": 2623,
+        "evaluation_sampling": {
+          "duration_s": 20.976,
+          "end_time_s": 55.2,
+          "max_gap_limit_s": 0.5,
+          "max_gap_s": 0.012,
+          "median_interval_s": 0.008,
+          "minimum_sampling_coverage": 0.8,
+          "sample_count": 2623,
+          "sampling_coverage": 1.0,
+          "start_time_s": 34.224
+        },
+        "evaluation_start_index": 4278,
+        "evaluation_start_time_s": 34.224,
+        "evidence_id": "sha256:cc2b96302ff83e383d19fda48efc2548b20d074ed4e0c1c0041f6c6c5fe2a1c4",
+        "final_error_m": 1.558275,
+        "full_log_max_error_m": 5.832553,
+        "full_log_rmse_m": 4.283345,
+        "max_error_m": 1.499631,
+        "overshoot_count": 0,
+        "projection_revision": "ordered-local-3d-segment-projection-1.0",
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "rmse_integration": "time_weighted_trapezoidal",
+        "rmse_m": 0.37141,
+        "schema_id": "dronedream.px4-core-metric-evidence/v1",
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:16f9327f1137a48422945b1ccb6745a7b0738feca7a65d8911e676282ee46f46",
+        "total_sample_count": 6901,
+        "verifier_revision": "px4-core-metric-verifier-1.0"
+      },
+      "px4_outcome_evidence": {
+        "applied_effects": [
+          "battery.mass_payload_kg",
+          "scenario_type.actuator_delay",
+          "sensor_degradation.baro_noise_m",
+          "sensor_degradation.imu_noise_scale",
+          "wind_gusts"
+        ],
+        "core_metric_evidence_id": "sha256:cc2b96302ff83e383d19fda48efc2548b20d074ed4e0c1c0041f6c6c5fe2a1c4",
+        "crash_flag": false,
+        "crash_reason": "none",
+        "crash_sample_index": null,
+        "evaluation_backward_distance_m": 0.008143,
+        "evaluation_directed_progress_fraction": 0.954699,
+        "evaluation_direction_valid": true,
+        "evaluation_endpoint_reached": true,
+        "evaluation_max_z_m": 3.036714,
+        "evaluation_min_z_m": 2.899643,
+        "evaluation_policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "evaluation_progress_contract_ok": true,
+        "evaluation_progress_discontinuity_count": 0,
+        "evaluation_start_reached": true,
+        "evaluation_track_coverage": 0.954955,
+        "evaluation_window_evidence_id": "sha256:af8211019e6f0bf5eaee1493926dbce87213cdff034d3c5ee91bc13199296eb5",
+        "evidence_id": "sha256:8b87527e9308de93942a530a9ba79468b9388a694c3ba9a03a80998cb0776b33",
+        "full_track_coverage": 0.954955,
+        "instability_first_sample_index": null,
+        "instability_flag": false,
+        "instability_reasons": [],
+        "maximum_observed_position_speed_mps": 3.597545,
+        "outcome_policy_id": "sha256:c99b693fd3a8f920b16604c77a96420c9859aa53b2ad44ffc8ed23b0c3559de1",
+        "pass_flag": true,
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "requested_effects": [
+          "battery.mass_payload_kg",
+          "scenario_type.actuator_delay",
+          "sensor_degradation.baro_noise_m",
+          "sensor_degradation.imu_noise_scale",
+          "wind_gusts"
+        ],
+        "scenario_effect_evidence_sha256": "sha256:298479e9d86eb3cff516c613283003001645f6b9972b2f594d9f1d5ba3605a0c",
+        "scenario_effect_request_sha256": "sha256:a16301ee7a3018bc9bfc1fd8a89a7b1b21307dfab857db84948f9b0ad5ca9cb1",
+        "scenario_effect_status": "verified_applied",
+        "scenario_effects_ready": true,
+        "schema_id": "dronedream.px4-outcome-evidence/v1",
+        "score": 2.170025,
+        "score_duration_component": 1.0488,
+        "score_max_error_component": 0.749815348219,
+        "score_penalty": 0.0,
+        "score_rmse_component": 0.371410097808,
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:16f9327f1137a48422945b1ccb6745a7b0738feca7a65d8911e676282ee46f46",
+        "timeout_flag": false,
+        "track_is_closed": true,
+        "track_length_3d_m": 31.414332,
+        "verifier_revision": "px4-outcome-verifier-1.0"
+      },
+      "px4_outcome_policy": {
+        "backward_tolerance_m": 0.1,
+        "backward_tolerance_track_fraction": 0.02,
+        "crash_penalty": 100.0,
+        "duration_score_weight": 0.05,
+        "endpoint_tolerance_m": 0.25,
+        "endpoint_tolerance_track_fraction": 0.01,
+        "evaluation_policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "instability_penalty": 80.0,
+        "max_error_score_weight": 0.5,
+        "maximum_position_speed_mps": 25.0,
+        "maximum_progress_step_fraction": 0.2,
+        "maximum_stable_track_error_m": 30.0,
+        "minimum_airborne_reference_altitude_m": 0.5,
+        "minimum_collapse_altitude_m": 0.2,
+        "minimum_progress_step_m": 0.25,
+        "policy_id": "sha256:c99b693fd3a8f920b16604c77a96420c9859aa53b2ad44ffc8ed23b0c3559de1",
+        "progress_offset_m": 0.1,
+        "progress_penalty": 20.0,
+        "progress_position_multiplier": 4.0,
+        "progress_revision": "directed-continuous-arc-coverage-1.0",
+        "schema_id": "dronedream.px4-outcome-policy/v1",
+        "score_revision": "rmse-plus-half-max-plus-duration-and-fixed-penalties-1.0",
+        "timeout_penalty": 120.0
+      },
+      "px4_version": "v1.16",
+      "raw_track_end_t": null,
+      "raw_track_start_t": null,
+      "rmse_integration": "time_weighted_trapezoidal",
+      "scenario_effect_evidence_sha256": "sha256:298479e9d86eb3cff516c613283003001645f6b9972b2f594d9f1d5ba3605a0c",
+      "scenario_effect_request_sha256": "sha256:a16301ee7a3018bc9bfc1fd8a89a7b1b21307dfab857db84948f9b0ad5ca9cb1",
+      "scenario_effect_status": "verified_applied",
+      "scenario_effects_ready": true,
+      "simulator": "px4_gazebo",
+      "simulator_model": "x500",
+      "telemetry_coordinate_frame": "dronedream_local_cartesian_z_up",
+      "telemetry_position_unit": "m",
+      "telemetry_sampling": {
+        "duration_s": 55.2,
+        "end_time_s": 55.2,
+        "max_gap_limit_s": 0.5,
+        "max_gap_s": 0.012,
+        "median_interval_s": 0.008,
+        "minimum_sampling_coverage": 0.8,
+        "sample_count": 6901,
+        "sampling_coverage": 1.0,
+        "start_time_s": 0.0
+      },
+      "telemetry_semantic_contract_id": "sha256:16f9327f1137a48422945b1ccb6745a7b0738feca7a65d8911e676282ee46f46",
+      "telemetry_source_sha256": "sha256:73c723db26f46427c18b5046644d0ed023491cb9e0ec0783370f2e00f64907bb",
+      "telemetry_time_unit": "s",
+      "telemetry_verifier_revision": "telemetry-semantic-verifier-1.0",
+      "total_sample_count": 6901,
+      "track_coverage": 0.954955,
+      "track_is_closed": true,
+      "track_length_3d_m": 31.414332,
+      "track_projection": "ordered_local_3d_segment_projection",
+      "track_projection_comparison_limit": 10000000,
+      "vehicle": "x500",
+      "world": "default"
+    },
+    "rmse": 0.37141,
+    "score": 2.170025,
+    "timeout_flag": false
+  },
+  "schema_version": "dronedream.trial_result.v2",
+  "success": true
+}

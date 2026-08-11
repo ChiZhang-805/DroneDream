@@ -251,7 +251,14 @@ Window selection order:
      reference-altitude threshold
 3. Telemetry-derived candidate/refinement with the same rules
 4. Altitude-only fallback (`N` consecutive samples above altitude threshold, then trimmed before landing)
-5. All-samples fallback (conservative behavior)
+5. All-samples fallback only for explicitly synthetic telemetry; a physical
+   run without a trusted window fails closed
+
+The runner records the chosen interval, but it is not authoritative. Before a
+successful bundled PX4 Trial is accepted, `real_cli` reloads the retained
+telemetry, reference track, and optional offboard timing, freezes the evaluation
+policy, and independently repeats the window derivation. The raw interval,
+policy, and content-addressed window evidence must match.
 
 - `rmse`: RMS tracking error over evaluation window
 - `max_error`: max tracking error over evaluation window
@@ -288,6 +295,16 @@ Window selection order:
   - full-log diagnostic fields (`full_log_rmse`, `full_log_max_error`)
   - `track_length_3d_m`, `track_projection`, and `coverage_basis`
 
+The runner computes these values for immediate execution feedback, but its
+verdict is not authoritative. Before acceptance, `real_cli` independently
+recomputes crash/collapse, instability, continuous directed progress, backward
+travel, projection discontinuities, start/endpoint reachability,
+scenario-effect readiness, pass, and each score component. The frozen
+`dronedream.px4-outcome-policy/v1`, content-addressed
+`dronedream.px4-outcome-evidence/v1`, raw fields, and top-level flags/score must
+all agree. Process or launcher timeouts remain failed Trials rather than
+successful metric-bearing outcomes.
+
 Coverage is the union of continuous, forward traversed polyline arc-length
 intervals, not the count of nearest waypoint indices. Subdividing the same
 geometric path into more points does not alter coverage. Reverse motion,
@@ -312,9 +329,32 @@ Current PX4/Gazebo integration status in this repository:
 - obstacle application is accepted only when Gazebo returns `data: true`, and
   evidence records the entity name, service, source index, and generated SDF
   SHA-256;
-- wind/gust, sensor/GPS degradation, battery, payload, actuator-delay, and
-  other advanced physical effects do not yet have bundled injection/readback
-  adapters; and
+- constant horizontal wind has a bundled source implementation for
+  `x500`, `x500_depth`, and `x500_vision`: the wrapper creates a Trial-local
+  model/world overlay, enables wind in the `x500_base/base_link` source
+  template, installs the official Gazebo `WindEffects` system, publishes the
+  compiled wind vector, verifies an exact `/world/{world}/wind_info` read-back,
+  and retains an expanded runtime-SDF artifact proving that the exact spawned
+  instance (for example `x500_0/base_link`) had link wind active;
+- job-configured cardinal wind is mapped to Gazebo's ENU world frame
+  (`x=east`, `y=north`, `z=up`). Scalar scenario wind receives a deterministic
+  compass bearing derived from the Trial execution identity; simultaneous
+  sources are vector-summed and rejected above the bundled 30 m/s limit;
+- the overlay is stored inside the Trial artifacts and never mutates the pinned
+  PX4 checkout. Source world/model bytes, overlay bytes, generated runtime SDF,
+  request binding, and exact applied vector are hashed or retained as evidence;
+- the wrapper launches PX4 with an explicit Trial rootfs and working directory,
+  excludes prior parameters/dataman/log/eeprom state, materializes the pinned
+  PX4 server systems into the custom world, and removes four obsolete
+  Gazebo-Classic material-script references from the Trial copy so expanded-SDF
+  evidence remains resolvable;
+- a dedicated WSL smoke using PX4 commit
+  `6ea3539157ca358c70a515878b77077af7d4611d` and Gazebo 8.14.0 completed with
+  `verified_applied` evidence for both cardinal job wind and scalar scenario
+  wind. The signed installer Runtime must still repeat this acceptance gate;
+- gust/turbulence, sensor/GPS degradation, battery, payload, actuator-delay,
+  unsupported vehicles, and other advanced physical effects do not yet have
+  bundled injection/readback adapters; and
 - requesting an unsupported effect fails fast with
   `UNSUPPORTED_SCENARIO_EFFECT` by default.
 
@@ -327,10 +367,10 @@ A site-specific custom simulator can implement these effects, but it must emit
 its own truthful applied-effect evidence rather than relying on the bundled
 runner's passthrough mode.
 
-The same fail-closed rule applies in real mode to non-`nominal`
-`scenario_type`, `scenario_config.wind_mps`, non-zero job wind, and non-default
-sensor-noise profiles unless every requested effect is applied and evidenced.
-Dry-run records supported fixture perturbations as
+The same fail-closed rule applies in real mode to every requested effect. A
+constant-wind request can pass only when its exact compiled vector and runtime
+WindMode evidence validate; any additional unsupported effect still prevents
+the Trial from passing. Dry-run records supported fixture perturbations as
 `application_mode=dry_run_surrogate`; it never labels them as real physics.
 
 ---
@@ -462,6 +502,16 @@ Coordinate assumption for first implementation:
 When `PX4_TELEMETRY_MODE=ulog`, the wrapper converts PX4 `.ulg` output to the
 runner `telemetry.json` schema after the launcher exits:
 
+- Before extraction, the selected ULog is copied atomically to
+  `<run_dir>/px4_source.ulg`. Extraction always reads that retained snapshot,
+  never the mutable PX4 log directory.
+- The runner publishes the snapshot as a `px4_ulog` Trial Artifact. `real_cli`
+  independently re-hashes it and verifies its nonzero byte count and SHA-256
+  against telemetry origin provenance.
+- The snapshot is limited to 1 GiB and must be a regular, non-symlink file
+  inside the current Trial directory. Missing, duplicate, mutated, cross-Trial,
+  or unexpected ULog evidence fails the Trial.
+
 - ULog selection:
   - if `PX4_ULOG_PATH` is set, that exact file is used
   - otherwise newest `*.ulg` is selected recursively under `PX4_ULOG_ROOT`
@@ -503,3 +553,35 @@ make px4_sitl gz_x500
 ```
 
 Do **not** commit PX4-Autopilot into DroneDream.
+
+## 14) Bounded simulator log evidence
+
+The real runner and local PX4 launcher normalize process streams before they
+reach persistent storage. The capture contract removes ANSI terminal control
+sequences, including sequences divided across read chunks, and collapses only
+pure `pxh>` carriage-return redraws. UTF-8 decoding is incremental, so a
+multi-byte character divided across chunks is not corrupted. Ordinary small
+UTF-8 logs, real diagnostic text, process exit codes, and launcher lifecycle
+lines retain their original byte semantics.
+
+Default retained-log limits are:
+
+- simulator stdout: 16 MiB;
+- simulator stderr: 8 MiB;
+- runner and lower-level launcher auxiliary streams: 2 MiB each.
+
+Every bounded log has a sibling `<name>.capture.json` using
+`dronedream.log_capture_receipt.v1`. The receipt records the raw bytes observed,
+normalized bytes observed, retained bytes, ANSI bytes/sequences removed, pure
+prompt redraws collapsed, UTF-8 replacement count, bytes dropped by the cap,
+the cap reason, observation completeness, retained-content SHA-256, and a
+bounded set of critical startup/error/exit lines. Collection continues after a
+cap is reached so counts and post-cap critical diagnostics remain visible; cap
+enforcement never changes a Trial exit code or converts a simulation failure
+into success.
+
+Receipts are additional optional artifacts. Evidence produced by earlier
+Engine Packs remains readable when no receipt exists; historical logs are not
+rewritten or retroactively normalized. The one permitted actuator-link launcher
+retry preserves both the first attempt's bounded logs and their matching
+receipts before starting attempt two.

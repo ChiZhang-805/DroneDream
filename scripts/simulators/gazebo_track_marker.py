@@ -111,9 +111,10 @@ def _parse_color(color: str) -> tuple[float, float, float, float]:
     if len(parts) != 4:
         raise TrackMarkerError("--color must contain exactly four floats: 'r g b a'")
     try:
-        values = tuple(float(p) for p in parts)
+        red, green, blue, alpha = (float(part) for part in parts)
     except ValueError:
         raise TrackMarkerError("--color must contain numeric floats") from None
+    values = (red, green, blue, alpha)
     if not all(math.isfinite(v) for v in values):
         raise TrackMarkerError("--color contains non-finite values")
     if not all(0.0 <= v <= 1.0 for v in values):

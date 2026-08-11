@@ -17,6 +17,8 @@ from __future__ import annotations
 import argparse
 import contextlib
 import csv
+import hashlib
+import io
 import json
 import math
 import os
@@ -32,6 +34,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Thread
 from typing import Any
 
 # The runner is intentionally executable as a standalone REAL_SIMULATOR_COMMAND.
@@ -49,6 +52,39 @@ from app.parameters import (  # noqa: E402 - path bootstrap must precede backend
     get_parameter,
     normalize_px4_version,
     validate_parameter_values,
+)
+from app.simulator.bounded_log_capture import (  # noqa: E402
+    DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+    DEFAULT_SIMULATOR_STDERR_CAP_BYTES,
+    DEFAULT_SIMULATOR_STDOUT_CAP_BYTES,
+    LOG_CAPTURE_SCHEMA_VERSION,
+    StreamingBoundedLogCapture,
+    append_bounded_log_text,
+    receipt_path_for,
+    write_bounded_log_bytes,
+)
+from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
+    ARTIFACT_NAME as ACTUATOR_LINK_HEALTH_NAME,
+)
+from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
+    DIAGNOSTIC_FAILURE_CODE as FAILURE_ACTUATOR_LINK_STALLED,
+)
+from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
+    TRANSIENT_RETRY_RECEIPT_NAME,
+    actuator_link_evidence_eligibility,
+    sha256_file,
+    validate_actuator_link_health_evidence,
+)
+from app.simulator.px4_metric_evidence import (  # noqa: E402 - see path bootstrap above
+    PX4_TELEMETRY_TIMING_TIME_BASE,
+    Px4CoreMetricEvidenceError,
+    compile_px4_core_metric_evidence,
+    compile_px4_evaluation_policy,
+    compile_px4_evaluation_window_evidence,
+    compile_px4_outcome_evidence,
+    require_px4_core_metric_binding,
+    require_px4_evaluation_window_binding,
+    require_px4_outcome_binding,
 )
 from app.simulator.px4_parameters import (  # noqa: E402 - see path bootstrap above
     APPLIED_EVIDENCE_NAME,
@@ -68,17 +104,34 @@ from app.simulator.scenario_effects import (  # noqa: E402 - see path bootstrap 
 from app.simulator.scenario_effects import (  # noqa: E402 - see path bootstrap above
     write_json_atomic as write_effect_json_atomic,
 )
+from app.simulator.telemetry_evidence import (  # noqa: E402 - see path bootstrap above
+    TELEMETRY_SCHEMA_V2,
+    TelemetrySemanticContractError,
+    compile_sampling_evidence,
+    compile_telemetry_semantic_contract,
+    require_sampling_quality,
+    verify_telemetry_semantic_contract,
+)
 
 FAILURE_ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
 FAILURE_TIMEOUT = "TIMEOUT"
 FAILURE_SIMULATION = "SIMULATION_FAILED"
 FAILURE_UNSUPPORTED_SCENARIO_EFFECT = "UNSUPPORTED_SCENARIO_EFFECT"
+_MAX_ACTUATOR_LINK_HEALTH_BYTES = 256 * 1024
 _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER = 10.0
+_PROCESS_GROUP_POLL_SECONDS = 0.2
+_PROCESS_GROUP_TERMINATE_GRACE_SECONDS = 2.0
 _MAX_TELEMETRY_BYTES = 16 * 1024 * 1024
 _MAX_TELEMETRY_SAMPLES = 50_000
 _MAX_TRIAL_INPUT_BYTES = 8 * 1024 * 1024
 _MAX_OFFBOARD_TIMING_BYTES = 1024 * 1024
+_MAX_LAUNCHER_FAILURE_BYTES = 64 * 1024
+_MAX_ENGINE_PACK_MANIFEST_BYTES = 8 * 1024 * 1024
+_MAX_ENGINE_PACK_STATE_BYTES = 64 * 1024
 _MAX_REFERENCE_TRACK_POINTS = 10_000
+_HOVER_DURATION_SECONDS = 10.0
+_HOVER_REFERENCE_SAMPLE_COUNT = 101
+_HOVER_MIN_EVALUATION_DURATION_SECONDS = 10.0
 _MAX_ID_LENGTH = 256
 _PROJECTION_BACKTRACK_SEGMENTS = 16
 _PROJECTION_FORWARD_SEGMENTS = 64
@@ -87,6 +140,61 @@ _PROJECTION_GLOBAL_RESCAN_DISTANCE_M = 2.0
 _PROJECTION_LOCAL_ERROR_FALLBACK_M = 5.0
 _MAX_PROJECTION_SEGMENT_COMPARISONS = 10_000_000
 _MAX_COVERAGE_PROGRESS_STEP_FRACTION = 0.2
+_LAUNCHER_PROCESS_STDOUT_NAME = "launcher_process_stdout.log"
+_LAUNCHER_PROCESS_STDERR_NAME = "launcher_process_stderr.log"
+
+_RUN_OUTPUT_NAMES = (
+    "runner.log",
+    "runner.log.capture.json",
+    "stdout.log",
+    "stdout.log.capture.json",
+    "stderr.log",
+    "stderr.log.capture.json",
+    _LAUNCHER_PROCESS_STDOUT_NAME,
+    f"{_LAUNCHER_PROCESS_STDOUT_NAME}.capture.json",
+    _LAUNCHER_PROCESS_STDERR_NAME,
+    f"{_LAUNCHER_PROCESS_STDERR_NAME}.capture.json",
+    "telemetry.json",
+    "telemetry.csv",
+    "trajectory.json",
+    "controller_params.json",
+    "px4_parameters.input.json",
+    "reference_track.json",
+    "scenario_config.json",
+    REQUEST_ARTIFACT_NAME,
+    EVIDENCE_ARTIFACT_NAME,
+    "launch_config.json",
+    "simulator_runtime_manifest.json",
+    "px4_source.ulg",
+    "offboard_executor.log",
+    "offboard_timing.json",
+    "launcher_failure.json",
+    ACTUATOR_LINK_HEALTH_NAME,
+    TRANSIENT_RETRY_RECEIPT_NAME,
+    "actuator_link_transient_attempt_1.ulg",
+    "actuator_link_transient_attempt_1.health.json",
+    "actuator_link_transient_attempt_1.offboard_timing.json",
+    "actuator_link_transient_attempt_1.offboard_executor.log",
+    "actuator_link_transient_attempt_1.launcher_failure.json",
+    "actuator_link_transient_attempt_1.stdout.log",
+    "actuator_link_transient_attempt_1.stdout.log.capture.json",
+    "actuator_link_transient_attempt_1.stderr.log",
+    "actuator_link_transient_attempt_1.stderr.log.capture.json",
+    "actuator_link_transient_attempt_1.telemetry.json",
+    "actuator_link_transient_attempt_1.px4_parameters.applied.json",
+    "actuator_link_transient_attempt_1.scenario_effects.applied.json",
+    "gui_stdout.log",
+    "gui_stdout.log.capture.json",
+    "gui_stderr.log",
+    "gui_stderr.log.capture.json",
+    "track_marker_stdout.log",
+    "track_marker_stdout.log.capture.json",
+    "track_marker_stderr.log",
+    "track_marker_stderr.log.capture.json",
+    REQUESTED_EVIDENCE_NAME,
+    BEFORE_EVIDENCE_NAME,
+    APPLIED_EVIDENCE_NAME,
+)
 
 _REQUIRED_PARAM_KEYS = (
     "kp_xy",
@@ -181,6 +289,7 @@ class TrackGeometry:
     segments: tuple[TrackSegment, ...]
     total_length: float
     closed: bool
+    stationary: bool = False
 
 
 @dataclass(frozen=True)
@@ -223,6 +332,10 @@ class UnsupportedScenarioEffectRunnerError(RunnerError):
 _SAFE_PROFILE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _REQUESTED_FIRMWARE_SHA = re.compile(r"^[0-9a-fA-F]{7,40}$")
 _OBSERVED_FIRMWARE_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
+_SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+_ENGINE_PACK_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
+_ENGINE_PACK_STATE_PATH = Path("/var/lib/dronedream/engine-pack-state.json")
+_ENGINE_PACK_ACTIVE_PATH = Path("/opt/dronedream/engine/current")
 
 
 def _profile_token(name: str, value: Any, *, default: str) -> str:
@@ -341,6 +454,205 @@ def _firmware_identity(requested_commit: str | None) -> dict[str, Any]:
         "status": status,
         "error": observation_error,
     }
+
+
+def _load_engine_identity_json(
+    path: Path,
+    *,
+    label: str,
+    max_bytes: int,
+) -> tuple[bytes, dict[str, Any]]:
+    size = _regular_file_size(path, label=label, required=True)
+    if size is None or size > max_bytes:
+        raise RunnerError(f"{label} exceeds the {max_bytes}-byte contract limit")
+    try:
+        with path.open("rb") as stream:
+            encoded = stream.read(max_bytes + 1)
+    except OSError as exc:
+        raise RunnerError(f"{label} could not be read") from exc
+    if len(encoded) > max_bytes:
+        raise RunnerError(f"{label} exceeds the {max_bytes}-byte contract limit")
+    try:
+        payload = json.loads(
+            encoded.decode("utf-8"),
+            parse_constant=_reject_nonfinite_json,
+        )
+    except (UnicodeError, json.JSONDecodeError, RecursionError, ValueError) as exc:
+        raise RunnerError(f"{label} is not valid bounded JSON") from exc
+    if not isinstance(payload, dict):
+        raise RunnerError(f"{label} must contain a JSON object")
+    return encoded, payload
+
+
+def _engine_pack_identity(
+    *,
+    manifest_path: Path | None = None,
+    state_path: Path = _ENGINE_PACK_STATE_PATH,
+    active_path: Path | None = None,
+) -> dict[str, Any]:
+    """Bind a trial to the immutable Engine Pack and its activation receipt.
+
+    Repository and CI runs legitimately have neither file and report an
+    explicit unmanaged identity. A managed Runtime must expose both files;
+    partial or mismatched state fails closed before PX4/Gazebo is launched.
+    """
+
+    if manifest_path is None:
+        payload_root = Path(__file__).resolve().parents[2]
+        manifest_path = payload_root / "engine-pack-manifest.json"
+        active_path = active_path or _ENGINE_PACK_ACTIVE_PATH
+
+    manifest_exists = manifest_path.exists()
+    state_exists = state_path.exists()
+    if not manifest_exists and not state_exists:
+        return {
+            "status": "unavailable",
+            "reason": "runner is not executing from a managed Engine Pack",
+        }
+    if manifest_exists != state_exists:
+        missing = "activation state" if manifest_exists else "Engine Pack manifest"
+        raise RunnerError(f"managed Engine Pack identity is incomplete: missing {missing}")
+
+    manifest_bytes, manifest = _load_engine_identity_json(
+        manifest_path,
+        label="Engine Pack manifest",
+        max_bytes=_MAX_ENGINE_PACK_MANIFEST_BYTES,
+    )
+    pack_id = manifest.get("packId")
+    source = manifest.get("source")
+    compatibility = manifest.get("runtimeCompatibility")
+    source_commit = source.get("gitCommit") if isinstance(source, dict) else None
+    source_date_epoch = source.get("sourceDateEpoch") if isinstance(source, dict) else None
+    if manifest.get("schemaVersion") != 1 or manifest.get("kind") != "dronedream-engine-pack":
+        raise RunnerError("Engine Pack manifest kind or schemaVersion is unsupported")
+    if manifest.get("engineApiVersion") != 1:
+        raise RunnerError("Engine Pack manifest engineApiVersion is unsupported")
+    if not isinstance(pack_id, str) or not _ENGINE_PACK_ID.fullmatch(pack_id):
+        raise RunnerError("Engine Pack manifest packId is invalid")
+    if not isinstance(source_commit, str) or not _OBSERVED_FIRMWARE_SHA.fullmatch(source_commit):
+        raise RunnerError("Engine Pack manifest source.gitCommit is invalid")
+    if (
+        isinstance(source_date_epoch, bool)
+        or not isinstance(source_date_epoch, int)
+        or source_date_epoch < 0
+    ):
+        raise RunnerError("Engine Pack manifest source.sourceDateEpoch is invalid")
+    if not isinstance(compatibility, dict):
+        raise RunnerError("Engine Pack manifest runtimeCompatibility is invalid")
+
+    px4_commit = compatibility.get("px4Commit")
+    dependency_lock = compatibility.get("dependencyLockSha256")
+    runtime_version = compatibility.get("runtimeVersion")
+    if not isinstance(px4_commit, str) or not _OBSERVED_FIRMWARE_SHA.fullmatch(px4_commit):
+        raise RunnerError("Engine Pack runtimeCompatibility.px4Commit is invalid")
+    if not isinstance(dependency_lock, str) or not _SHA256_HEX.fullmatch(dependency_lock):
+        raise RunnerError("Engine Pack runtimeCompatibility.dependencyLockSha256 is invalid")
+    if not isinstance(runtime_version, str) or not runtime_version.strip():
+        raise RunnerError("Engine Pack runtimeCompatibility.runtimeVersion is invalid")
+
+    try:
+        _, state = _load_engine_identity_json(
+            state_path,
+            label="Engine Pack activation state",
+            max_bytes=_MAX_ENGINE_PACK_STATE_BYTES,
+        )
+    except RunnerError as exc:
+        if not isinstance(exc.__cause__, PermissionError) or active_path is None:
+            raise
+        manager_state_binding = _active_engine_pack_binding(
+            active_path=active_path,
+            manifest_path=manifest_path,
+            pack_id=pack_id,
+        )
+    else:
+        archive_sha256 = state.get("archiveSha256")
+        state_runtime_version = state.get("runtimeVersion")
+        if state.get("schemaVersion") != 1:
+            raise RunnerError("Engine Pack activation state schemaVersion is unsupported")
+        if state.get("currentPackId") != pack_id:
+            raise RunnerError(
+                "Engine Pack activation state currentPackId does not match the manifest"
+            )
+        if state.get("sourceCommit") != source_commit:
+            raise RunnerError(
+                "Engine Pack activation state sourceCommit does not match the manifest"
+            )
+        if not isinstance(archive_sha256, str) or not _SHA256_HEX.fullmatch(archive_sha256):
+            raise RunnerError("Engine Pack activation state archiveSha256 is invalid")
+        if state_runtime_version != runtime_version:
+            raise RunnerError(
+                "Engine Pack activation state runtimeVersion does not match the manifest"
+            )
+        manager_state_binding = {
+            "status": "verified",
+            "activation_method": "manager_state",
+            "archive_sha256": archive_sha256,
+            "runtime_id": state.get("runtimeId"),
+            "runtime_version": state_runtime_version,
+        }
+
+    return {
+        "status": "verified",
+        "pack_id": pack_id,
+        "source_commit": source_commit,
+        "source_date_epoch": source_date_epoch,
+        "manifest_file": "engine-pack-manifest.json",
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "engine_api_version": 1,
+        "runtime_compatibility": {
+            "runtime_product_id": compatibility.get("runtimeProductId"),
+            "runtime_version": runtime_version,
+            "python_version": compatibility.get("pythonVersion"),
+            "px4_commit": px4_commit,
+            "gazebo_version": compatibility.get("gazeboVersion"),
+            "dependency_lock_sha256": dependency_lock,
+        },
+        "manager_state_binding": manager_state_binding,
+    }
+
+
+def _active_engine_pack_binding(
+    *,
+    active_path: Path,
+    manifest_path: Path,
+    pack_id: str,
+) -> dict[str, Any]:
+    """Verify the manager-owned active symlink without weakening state-file permissions."""
+
+    try:
+        if not active_path.is_symlink():
+            raise RunnerError("Engine Pack active path is not a manager-owned symbolic link")
+        active_release = active_path.resolve(strict=True)
+        manifest_release = manifest_path.resolve(strict=True).parent
+    except OSError as exc:
+        raise RunnerError("Engine Pack active symbolic link could not be resolved") from exc
+    expected_release_id = pack_id.removeprefix("sha256:")
+    if active_release != manifest_release or active_release.name != expected_release_id:
+        raise RunnerError("Engine Pack active symbolic link does not match the manifest packId")
+    return {
+        "status": "permission_restricted",
+        "activation_method": "active_symlink",
+        "active_release_id": expected_release_id,
+    }
+
+
+def _enforce_engine_pack_firmware_binding(
+    engine_pack_identity: dict[str, Any],
+    firmware_identity: dict[str, Any],
+) -> None:
+    if engine_pack_identity.get("status") != "verified":
+        return
+    compatibility = engine_pack_identity.get("runtime_compatibility")
+    expected = compatibility.get("px4_commit") if isinstance(compatibility, dict) else None
+    observed = firmware_identity.get("observed_commit")
+    if observed is None:
+        raise RunnerError(
+            "managed Engine Pack PX4 identity could not be bound to an observed firmware checkout"
+        )
+    if observed != expected:
+        raise RunnerError(
+            f"managed Engine Pack PX4 commit {expected} does not match observed firmware {observed}"
+        )
 
 
 def _enforce_firmware_identity(identity: dict[str, Any]) -> None:
@@ -511,6 +823,14 @@ def _load_env() -> RunnerEnv:
     timeout_seconds = _parse_int(os.environ.get("PX4_GAZEBO_TIMEOUT_SECONDS"), default=300)
     if timeout_seconds <= 0:
         raise ConfigurationRunnerError("PX4_GAZEBO_TIMEOUT_SECONDS must be greater than zero")
+    eval_consecutive_samples = _parse_int(
+        os.environ.get("PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES"),
+        default=5,
+    )
+    if eval_consecutive_samples <= 0:
+        raise ConfigurationRunnerError(
+            "PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES must be greater than zero"
+        )
     telemetry_format = (
         os.environ.get("PX4_GAZEBO_TELEMETRY_FORMAT", "json").strip().lower() or "json"
     )
@@ -540,10 +860,7 @@ def _load_env() -> RunnerEnv:
         eval_near_track_threshold_m=_parse_float(
             os.environ.get("PX4_GAZEBO_EVAL_NEAR_TRACK_THRESHOLD_M"), default=1.5
         ),
-        eval_consecutive_samples=max(
-            1,
-            _parse_int(os.environ.get("PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES"), default=5),
-        ),
+        eval_consecutive_samples=eval_consecutive_samples,
         eval_collapse_altitude_fraction=_parse_float(
             os.environ.get("PX4_GAZEBO_EVAL_COLLAPSE_ALTITUDE_FRACTION"), default=0.5
         ),
@@ -623,6 +940,23 @@ def _reject_nonfinite_json(value: str) -> None:
     raise ValueError(f"non-standard JSON numeric constant is forbidden: {value}")
 
 
+def _load_bounded_json(path: Path, *, label: str, max_bytes: int) -> object:
+    try:
+        with path.open("rb") as stream:
+            encoded = stream.read(max_bytes + 1)
+    except OSError as exc:
+        raise RunnerError(f"{label} could not be read") from exc
+    if len(encoded) > max_bytes:
+        raise RunnerError(f"{label} exceeds the JSON evidence limit")
+    try:
+        return json.loads(
+            encoded.decode("utf-8"),
+            parse_constant=_reject_nonfinite_json,
+        )
+    except (UnicodeError, json.JSONDecodeError, RecursionError, ValueError) as exc:
+        raise RunnerError(f"{label} is not valid bounded JSON") from exc
+
+
 def _safe_excerpt(text: str, *, limit: int = 1800) -> str:
     if len(text) <= limit:
         return text
@@ -648,6 +982,48 @@ def _regular_file_size(
     if not stat.S_ISREG(file_stat.st_mode):
         raise RunnerError(f"{label} must be a regular, non-symlink file")
     return file_stat.st_size
+
+
+def _lower_level_failure_reason(run_dir: Path, exit_code: int) -> str:
+    """Prefer the launcher's bounded structured failure over a bare exit code."""
+
+    generic_reason = f"lower-level launcher exited with code {exit_code}"
+    evidence_sources = (
+        (
+            run_dir / "offboard_timing.json",
+            "offboard timing failure evidence",
+            _MAX_OFFBOARD_TIMING_BYTES,
+        ),
+        (
+            run_dir / "launcher_failure.json",
+            "launcher failure evidence",
+            _MAX_LAUNCHER_FAILURE_BYTES,
+        ),
+    )
+    for evidence_path, label, byte_limit in evidence_sources:
+        try:
+            evidence_size = _regular_file_size(
+                evidence_path,
+                label=label,
+                required=False,
+            )
+            if evidence_size is None:
+                continue
+            loaded = _load_bounded_json(
+                evidence_path,
+                label=label,
+                max_bytes=byte_limit,
+            )
+        except RunnerError:
+            continue
+        if not isinstance(loaded, dict) or loaded.get("status") != "failed":
+            continue
+        failure = loaded.get("failure")
+        if not isinstance(failure, str) or not failure.strip():
+            continue
+        normalized_failure = " ".join(failure.split())
+        return f"{generic_reason}: {_safe_excerpt(normalized_failure, limit=1200)}"
+    return generic_reason
 
 
 def _load_trial_payload(path: Path) -> dict[str, Any]:
@@ -683,6 +1059,17 @@ def _require_effect_evidence_file(path: Path) -> None:
         raise ScenarioEffectContractError(str(exc)) from exc
     if size is None or size > MAX_EFFECT_CONTRACT_BYTES:
         raise ScenarioEffectContractError("scenario effect evidence file is missing or too large")
+
+
+def _numeric_float(value: Any, *, label: str) -> float:
+    """Normalize a JSON numeric field without treating booleans as 0/1."""
+
+    if isinstance(value, bool):
+        raise RunnerError(f"{label} must be numeric")
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise RunnerError(f"{label} must be numeric") from None
 
 
 def _validate_trial_input(
@@ -724,6 +1111,7 @@ def _validate_trial_input(
         "payload_changed",
         "battery_degraded",
         "actuator_delay",
+        "actuator_failure",
         "custom",
     }
     if scenario_type not in supported_scenarios:
@@ -771,33 +1159,34 @@ def _validate_trial_input(
     objective_profile = _cfg_value("objective_profile")
     reference_track_raw = _cfg_value("reference_track")
 
-    if track_type not in {"circle", "u_turn", "lemniscate", "custom"}:
-        raise RunnerError("track_type must be one of: circle, u_turn, lemniscate, custom")
+    if track_type not in {"hover", "circle", "u_turn", "lemniscate", "custom"}:
+        raise RunnerError("track_type must be one of: hover, circle, u_turn, lemniscate, custom")
     if not isinstance(start_point, dict):
         raise RunnerError("start_point must be an object with x/y")
 
-    try:
-        start_x = float(start_point.get("x"))
-        start_y = float(start_point.get("y"))
-        altitude = float(altitude_m)
-    except (TypeError, ValueError):
-        raise RunnerError("start_point.x/y and altitude_m must be numeric") from None
+    start_x_raw: Any = start_point.get("x")
+    start_y_raw: Any = start_point.get("y")
+    start_x = _numeric_float(start_x_raw, label="start_point.x/y and altitude_m")
+    start_y = _numeric_float(start_y_raw, label="start_point.x/y and altitude_m")
+    altitude = _numeric_float(altitude_m, label="start_point.x/y and altitude_m")
     if not all(math.isfinite(value) for value in (start_x, start_y, altitude)):
         raise RunnerError("start_point.x/y and altitude_m must be finite")
     if not 1.0 <= altitude <= 20.0:
         raise RunnerError("altitude_m must be between 1 and 20 meters")
+    if track_type == "hover" and (abs(start_x) > 1e-9 or abs(start_y) > 1e-9):
+        raise RunnerError("hover track requires start_point x=0 and y=0")
 
     if wind is not None and not isinstance(wind, dict):
         raise RunnerError("wind must be an object when provided")
     if wind is None:
         wind = {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0}
-    try:
-        normalized_wind = {
-            direction: float(wind.get(direction, 0.0))
-            for direction in ("north", "east", "south", "west")
-        }
-    except (TypeError, ValueError):
-        raise RunnerError("wind components must be numeric") from None
+    normalized_wind = {
+        direction: _numeric_float(
+            wind.get(direction, 0.0),
+            label="wind components",
+        )
+        for direction in ("north", "east", "south", "west")
+    }
     if not all(math.isfinite(value) for value in normalized_wind.values()):
         raise RunnerError("wind components must be finite")
     if any(not -10.0 <= value <= 10.0 for value in normalized_wind.values()):
@@ -829,24 +1218,30 @@ def _validate_trial_input(
         for idx, point in enumerate(reference_track_raw):
             if not isinstance(point, dict):
                 raise RunnerError(f"reference_track[{idx}] must be an object with x/y")
-            try:
-                x = float(point.get("x"))
-                y = float(point.get("y"))
-            except (TypeError, ValueError):
-                raise RunnerError(f"reference_track[{idx}].x/y must be numeric") from None
+            x_raw: Any = point.get("x")
+            y_raw: Any = point.get("y")
+            x = _numeric_float(x_raw, label=f"reference_track[{idx}].x/y")
+            y = _numeric_float(y_raw, label=f"reference_track[{idx}].x/y")
             z_raw = point.get("z")
-            try:
-                z = float(altitude if z_raw is None else z_raw)
-            except (TypeError, ValueError):
-                raise RunnerError(
-                    f"reference_track[{idx}].z must be numeric when provided"
-                ) from None
+            z = _numeric_float(
+                altitude if z_raw is None else z_raw,
+                label=f"reference_track[{idx}].z",
+            )
             if not all(math.isfinite(value) for value in (x, y, z)):
                 raise RunnerError(f"reference_track[{idx}] coordinates must be finite")
             normalized_points.append({"x": x, "y": y, "z": z})
         normalized_job_cfg["reference_track"] = normalized_points
     if track_type == "custom" and len(normalized_job_cfg["reference_track"]) < 2:
         raise RunnerError("custom track_type requires reference_track with at least 2 points")
+    if (
+        track_type == "hover"
+        and normalized_job_cfg["reference_track"]
+        and any(
+            abs(point["x"]) > 1e-9 or abs(point["y"]) > 1e-9 or abs(point["z"] - altitude) > 1e-9
+            for point in normalized_job_cfg["reference_track"]
+        )
+    ):
+        raise RunnerError("hover reference_track must remain at x=0, y=0 and altitude_m")
 
     params_value = payload.get("parameters")
     if params_value is not None and not isinstance(params_value, dict):
@@ -863,10 +1258,7 @@ def _validate_trial_input(
     }
     for key in _REQUIRED_PARAM_KEYS:
         value = params_raw.get(key, defaults[key])
-        try:
-            params[key] = float(value)
-        except (TypeError, ValueError):
-            raise RunnerError(f"parameters.{key} must be numeric") from None
+        params[key] = _numeric_float(value, label=f"parameters.{key}")
         if not math.isfinite(params[key]):
             raise RunnerError(f"parameters.{key} must be finite")
     if min(params["kp_xy"], params["kd_xy"], params["ki_xy"]) < 0:
@@ -1043,7 +1435,10 @@ def _make_reference_track(
     if track_type == "custom":
         return list(reference_track or [])
     points: list[dict[str, float]] = []
-    if track_type == "circle":
+    if track_type == "hover":
+        for _ in range(_HOVER_REFERENCE_SAMPLE_COUNT):
+            points.append({"x": 0.0, "y": 0.0, "z": altitude})
+    elif track_type == "circle":
         radius = 5.0
         n = 180
         for i in range(n + 1):
@@ -1112,6 +1507,7 @@ def _make_dry_run_telemetry(
         "payload_changed": 0.3,
         "battery_degraded": 0.35,
         "actuator_delay": 0.3,
+        "actuator_failure": 0.9,
         "custom": 0.2,
     }.get(meta["scenario_type"], 0.1)
     noise_penalty = {"low": 0.0, "medium": 0.05, "high": 0.12}.get(
@@ -1204,15 +1600,23 @@ def _normalize_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for idx, raw in enumerate(samples):
         try:
-            s = {
-                "t": float(raw["t"]),
-                "x": float(raw["x"]),
-                "y": float(raw["y"]),
-                "z": float(raw["z"]),
-                "vx": float(raw.get("vx", 0.0)),
-                "vy": float(raw.get("vy", 0.0)),
-                "vz": float(raw.get("vz", 0.0)),
-                "yaw": float(raw.get("yaw", 0.0)),
+            s: dict[str, Any] = {
+                "t": _numeric_float(raw["t"], label=f"telemetry sample {idx} field 't'"),
+                "x": _numeric_float(raw["x"], label=f"telemetry sample {idx} field 'x'"),
+                "y": _numeric_float(raw["y"], label=f"telemetry sample {idx} field 'y'"),
+                "z": _numeric_float(raw["z"], label=f"telemetry sample {idx} field 'z'"),
+                "vx": _numeric_float(
+                    raw.get("vx", 0.0), label=f"telemetry sample {idx} field 'vx'"
+                ),
+                "vy": _numeric_float(
+                    raw.get("vy", 0.0), label=f"telemetry sample {idx} field 'vy'"
+                ),
+                "vz": _numeric_float(
+                    raw.get("vz", 0.0), label=f"telemetry sample {idx} field 'vz'"
+                ),
+                "yaw": _numeric_float(
+                    raw.get("yaw", 0.0), label=f"telemetry sample {idx} field 'yaw'"
+                ),
                 "armed": _telemetry_bool(raw.get("armed", True), field="armed", sample_index=idx),
                 "mode": str(raw.get("mode", "unknown")),
                 "crashed": _telemetry_bool(
@@ -1260,12 +1664,50 @@ def _load_telemetry(path: Path, *, allow_csv: bool) -> dict[str, Any]:
             raise RunnerError(f"telemetry JSON is malformed: {exc}") from None
         if not isinstance(payload, dict) or not isinstance(payload.get("samples"), list):
             raise RunnerError("telemetry.json must contain an object with samples[]")
-        payload["samples"] = _normalize_samples(payload["samples"])
+        samples = _normalize_samples(payload["samples"])
         if payload.get("meta") is None:
-            payload["meta"] = {}
+            meta: dict[str, Any] = {}
         elif not isinstance(payload.get("meta"), dict):
             raise RunnerError("telemetry.meta must be an object when present")
-        return payload
+        else:
+            meta = dict(payload["meta"])
+        source = str(meta.get("source", "")).strip().lower()
+        mode = str(meta.get("mode", "")).strip().lower()
+        source_kind = (
+            "px4_ulog"
+            if source == "ulog"
+            else "runner_dry_run"
+            if mode in {"dry_run", "site_dry_run"}
+            else "launcher_json"
+        )
+        origin_provenance = {
+            key: meta.get(key)
+            for key in (
+                "origin_source_sha256",
+                "origin_source_byte_count",
+                "origin_extraction_revision",
+                "origin_coordinate_frame",
+                "coordinate_transform",
+            )
+            if meta.get(key) is not None
+        }
+        try:
+            contract = compile_telemetry_semantic_contract(
+                samples=samples,
+                source_bytes=encoded,
+                source_kind=source_kind,
+                extraction_revision=("px4-gazebo-runner-json-normalization-1.0"),
+                synthetic=source_kind == "runner_dry_run",
+                origin_provenance=origin_provenance,
+            )
+        except (TelemetrySemanticContractError, ValueError) as exc:
+            raise RunnerError(f"telemetry semantic contract failed: {exc}") from exc
+        return {
+            "schema_version": TELEMETRY_SCHEMA_V2,
+            "samples": samples,
+            "meta": meta,
+            "semantic_contract": contract.model_dump(mode="json"),
+        }
 
     csv_path = path.with_suffix(".csv")
     csv_size = (
@@ -1276,35 +1718,64 @@ def _load_telemetry(path: Path, *, allow_csv: bool) -> dict[str, Any]:
             raise RunnerError(
                 f"telemetry CSV exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
             )
-        samples: list[dict[str, Any]] = []
-        with csv_path.open("r", encoding="utf-8", newline="") as f:
-            reader = csv.DictReader(f)
-            for row_index, row in enumerate(reader):
-                if row_index >= _MAX_TELEMETRY_SAMPLES:
-                    raise RunnerError(
-                        f"telemetry exceeds the {_MAX_TELEMETRY_SAMPLES}-sample contract limit"
-                    )
-                samples.append(
-                    {
-                        "t": row.get("t", row.get("timestamp", 0.0)),
-                        "x": row.get("x", 0.0),
-                        "y": row.get("y", 0.0),
-                        "z": row.get("z", 0.0),
-                        "vx": row.get("vx", 0.0),
-                        "vy": row.get("vy", 0.0),
-                        "vz": row.get("vz", 0.0),
-                        "yaw": row.get("yaw", 0.0),
-                        "armed": row.get("armed", True),
-                        "mode": row.get("mode", "unknown"),
-                        "crashed": row.get("crashed", False),
-                    }
+        with csv_path.open("rb") as stream:
+            encoded = stream.read(_MAX_TELEMETRY_BYTES + 1)
+        if len(encoded) > _MAX_TELEMETRY_BYTES:
+            raise RunnerError(
+                f"telemetry CSV exceeds the {_MAX_TELEMETRY_BYTES}-byte contract limit"
+            )
+        try:
+            decoded = encoded.decode("utf-8")
+        except UnicodeError as exc:
+            raise RunnerError(f"telemetry CSV is not UTF-8: {exc}") from None
+        samples_raw: list[dict[str, Any]] = []
+        reader = csv.DictReader(io.StringIO(decoded, newline=""))
+        for row_index, row in enumerate(reader):
+            if row_index >= _MAX_TELEMETRY_SAMPLES:
+                raise RunnerError(
+                    f"telemetry exceeds the {_MAX_TELEMETRY_SAMPLES}-sample contract limit"
                 )
-        return {"samples": _normalize_samples(samples), "meta": {"format": "csv"}}
+            samples_raw.append(
+                {
+                    "t": row.get("t", row.get("timestamp", 0.0)),
+                    "x": row.get("x", 0.0),
+                    "y": row.get("y", 0.0),
+                    "z": row.get("z", 0.0),
+                    "vx": row.get("vx", 0.0),
+                    "vy": row.get("vy", 0.0),
+                    "vz": row.get("vz", 0.0),
+                    "yaw": row.get("yaw", 0.0),
+                    "armed": row.get("armed", True),
+                    "mode": row.get("mode", "unknown"),
+                    "crashed": row.get("crashed", False),
+                }
+            )
+        samples = _normalize_samples(samples_raw)
+        try:
+            contract = compile_telemetry_semantic_contract(
+                samples=samples,
+                source_bytes=encoded,
+                source_kind="launcher_csv",
+                extraction_revision=("px4-gazebo-runner-csv-normalization-1.0"),
+                synthetic=False,
+            )
+        except (TelemetrySemanticContractError, ValueError) as exc:
+            raise RunnerError(f"telemetry semantic contract failed: {exc}") from exc
+        return {
+            "schema_version": TELEMETRY_SCHEMA_V2,
+            "samples": samples,
+            "meta": {"format": "csv"},
+            "semantic_contract": contract.model_dump(mode="json"),
+        }
 
     raise RunnerError("telemetry output is missing")
 
 
-def _build_track_geometry(ref_points: list[dict[str, float]]) -> TrackGeometry:
+def _build_track_geometry(
+    ref_points: list[dict[str, float]],
+    *,
+    allow_stationary: bool = False,
+) -> TrackGeometry:
     if len(ref_points) < 2:
         raise RunnerError("reference track must contain at least two points")
     segments: list[TrackSegment] = []
@@ -1329,6 +1800,26 @@ def _build_track_geometry(ref_points: list[dict[str, float]]) -> TrackGeometry:
         )
         progress += length
     if not segments or progress <= 1e-12:
+        if allow_stationary and ref_points:
+            anchor = ref_points[0]
+            anchor_start = (
+                float(anchor["x"]),
+                float(anchor["y"]),
+                float(anchor["z"]),
+            )
+            return TrackGeometry(
+                segments=(
+                    TrackSegment(
+                        start=anchor_start,
+                        delta=(0.0, 0.0, 0.0),
+                        length=0.0,
+                        start_progress=0.0,
+                    ),
+                ),
+                total_length=0.0,
+                closed=True,
+                stationary=True,
+            )
         raise RunnerError("reference track must have non-zero three-dimensional length")
     first = ref_points[0]
     last = ref_points[-1]
@@ -1341,6 +1832,7 @@ def _build_track_geometry(ref_points: list[dict[str, float]]) -> TrackGeometry:
         segments=tuple(segments),
         total_length=progress,
         closed=endpoint_distance <= max(1e-6, progress * 1e-6),
+        stationary=False,
     )
 
 
@@ -1355,12 +1847,16 @@ def _project_sample_to_segment(
         float(sample["z"]) - segment.start[2],
     )
     length_squared = segment.length * segment.length
-    fraction = min(
-        1.0,
-        max(
-            0.0,
-            sum(offset[i] * segment.delta[i] for i in range(3)) / length_squared,
-        ),
+    fraction = (
+        0.0
+        if length_squared <= 1e-24
+        else min(
+            1.0,
+            max(
+                0.0,
+                sum(offset[i] * segment.delta[i] for i in range(3)) / length_squared,
+            ),
+        )
     )
     reference = tuple(segment.start[i] + fraction * segment.delta[i] for i in range(3))
     error = math.sqrt(
@@ -1530,6 +2026,41 @@ def _evaluate_track_progress(
     max_track_error: float,
 ) -> TrackProgressEvaluation:
     """Evaluate directed, continuous progress independent of waypoint density."""
+
+    if geometry.stationary:
+        in_tolerance = [projection.error <= max_track_error for projection in projections]
+        duration_seconds = (
+            max(0.0, float(samples[-1]["t"]) - float(samples[0]["t"])) if len(samples) >= 2 else 0.0
+        )
+        duration_fraction = min(
+            1.0,
+            duration_seconds / _HOVER_MIN_EVALUATION_DURATION_SECONDS,
+        )
+        in_tolerance_duration = 0.0
+        for index in range(1, len(samples)):
+            interval_seconds = float(samples[index]["t"]) - float(samples[index - 1]["t"])
+            if interval_seconds <= 0:
+                raise RunnerError("stationary hover coverage requires increasing timestamps")
+            in_tolerance_duration += (
+                0.5
+                * (float(in_tolerance[index - 1]) + float(in_tolerance[index]))
+                * interval_seconds
+            )
+        in_tolerance_fraction = (
+            min(1.0, in_tolerance_duration / duration_seconds)
+            if duration_seconds > 0
+            else float(bool(in_tolerance and in_tolerance[0]))
+        )
+        coverage = in_tolerance_fraction * duration_fraction
+        reached = 0.0 if any(in_tolerance) else None
+        return TrackProgressEvaluation(
+            coverage=coverage,
+            directed_progress_fraction=coverage,
+            backward_distance=0.0,
+            discontinuity_count=0,
+            start_progress=reached,
+            end_progress=reached,
+        )
 
     intervals: list[tuple[float, float]] = []
     previous: tuple[dict[str, Any], TrackProjection] | None = None
@@ -1721,6 +2252,11 @@ def _find_eval_window_from_timing(
     near_track_threshold: float,
     consecutive_samples: int,
 ) -> EvaluationWindow | None:
+    # Do not compare executor-relative timing values with PX4 ULog sample
+    # timestamps.  A producer must explicitly attest that both fields use the
+    # telemetry sample clock before they can delimit the evaluation window.
+    if timing.get("time_base") != PX4_TELEMETRY_TIMING_TIME_BASE:
+        return None
     start_t_raw = timing.get("track_start_t")
     end_t_raw = timing.get("track_end_t")
     if not isinstance(start_t_raw, (int, float)) or not isinstance(end_t_raw, (int, float)):
@@ -1838,6 +2374,26 @@ def _find_altitude_only_window(
     )
 
 
+def _time_weighted_rms(
+    values: list[float],
+    samples: list[dict[str, Any]],
+) -> float:
+    if not values or len(values) != len(samples):
+        raise RunnerError("time-weighted RMS requires one value per telemetry sample")
+    if len(values) == 1:
+        return abs(values[0])
+    duration = float(samples[-1]["t"]) - float(samples[0]["t"])
+    if duration <= 0:
+        raise RunnerError("time-weighted RMS requires a positive time interval")
+    integral = 0.0
+    for index in range(1, len(values)):
+        dt = float(samples[index]["t"]) - float(samples[index - 1]["t"])
+        if dt <= 0:
+            raise RunnerError("time-weighted RMS requires strictly increasing timestamps")
+        integral += 0.5 * (values[index - 1] ** 2 + values[index] ** 2) * dt
+    return math.sqrt(integral / duration)
+
+
 def _compute_metrics(
     telemetry: dict[str, Any],
     reference_track: list[dict[str, float]],
@@ -1850,7 +2406,15 @@ def _compute_metrics(
     scenario_effect_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     samples = telemetry["samples"]
-    track_geometry = _build_track_geometry(reference_track)
+    telemetry_contract = verify_telemetry_semantic_contract(telemetry)
+    if telemetry_contract is None:
+        raise RunnerError("telemetry semantic contract is missing or does not match samples")
+    synthetic_telemetry = dry_run or telemetry_contract.synthetic
+    stationary_hover = job_cfg.get("track_type") == "hover"
+    track_geometry = _build_track_geometry(
+        reference_track,
+        allow_stationary=stationary_hover,
+    )
     projections = _project_samples_to_track(samples, track_geometry)
     altitude_fraction = env.eval_altitude_fraction
     near_track_threshold = env.eval_near_track_threshold_m
@@ -1867,11 +2431,12 @@ def _compute_metrics(
                 label="offboard timing evidence",
                 required=False,
             )
-            if timing_size is None or timing_size > _MAX_OFFBOARD_TIMING_BYTES:
+            if timing_size is None:
                 raise RunnerError("offboard timing evidence is missing or too large")
-            loaded = json.loads(
-                offboard_timing_path.read_text(encoding="utf-8"),
-                parse_constant=_reject_nonfinite_json,
+            loaded = _load_bounded_json(
+                offboard_timing_path,
+                label="offboard timing evidence",
+                max_bytes=_MAX_OFFBOARD_TIMING_BYTES,
             )
             if isinstance(loaded, dict):
                 offboard_timing = loaded
@@ -1904,28 +2469,41 @@ def _compute_metrics(
             consecutive_samples=consecutive_samples,
         )
     if eval_window is None:
+        if not synthetic_telemetry:
+            raise RunnerError(
+                "trusted evaluation window could not be established from "
+                "offboard timing or telemetry"
+            )
         eval_window = EvaluationWindow(
             start_idx=0,
             end_idx=len(samples) - 1,
-            source="all_samples_fallback",
-            raw_source="all_samples_fallback",
+            source="synthetic_all_samples",
+            raw_source="synthetic_all_samples",
             raw_start_t=None,
             raw_end_t=None,
-            start_reason="all_samples_fallback",
+            start_reason="synthetic_all_samples",
             trimmed_takeoff_samples=0,
             trimmed_landing_samples=0,
         )
 
     evaluation_samples = samples[eval_window.start_idx : eval_window.end_idx + 1]
     evaluation_projections = projections[eval_window.start_idx : eval_window.end_idx + 1]
+    evaluation_sampling = compile_sampling_evidence(evaluation_samples)
+    try:
+        require_sampling_quality(
+            evaluation_sampling,
+            synthetic=synthetic_telemetry,
+        )
+    except TelemetrySemanticContractError as exc:
+        raise RunnerError(f"evaluation-window sampling failed: {exc}") from exc
 
     errors = [projection.error for projection in projections]
     eval_errors = [projection.error for projection in evaluation_projections]
 
-    rmse = math.sqrt(sum(e * e for e in eval_errors) / len(eval_errors))
+    rmse = _time_weighted_rms(eval_errors, evaluation_samples)
     max_error = max(eval_errors)
     max_error_idx = eval_errors.index(max_error)
-    completion_time = max(0.0, evaluation_samples[-1]["t"] - evaluation_samples[0]["t"])
+    completion_time = evaluation_sampling.duration_s
     final_ref = reference_track[-1]
     final_error = math.sqrt(
         (evaluation_samples[-1]["x"] - final_ref["x"]) ** 2
@@ -2083,7 +2661,8 @@ def _compute_metrics(
     obstacle_count = (
         len(advanced.get("obstacles", [])) if isinstance(advanced.get("obstacles"), list) else 0
     )
-    wind_gusts = advanced.get("wind_gusts") if isinstance(advanced.get("wind_gusts"), dict) else {}
+    wind_gusts_raw = advanced.get("wind_gusts")
+    wind_gusts: dict[str, Any] = wind_gusts_raw if isinstance(wind_gusts_raw, dict) else {}
     wind_gust_enabled_raw = wind_gusts.get("enabled", False)
     if not isinstance(wind_gust_enabled_raw, bool):
         raise RunnerError("advanced_scenario_config.wind_gusts.enabled must be boolean")
@@ -2124,10 +2703,25 @@ def _compute_metrics(
             "evaluation_progress_contract_ok": progress_contract_ok,
             "track_length_3d_m": round(track_geometry.total_length, 6),
             "track_is_closed": track_geometry.closed,
-            "track_projection": "ordered_local_3d_segment_projection",
+            "track_projection": (
+                "stationary_point_3d_projection"
+                if track_geometry.stationary
+                else "ordered_local_3d_segment_projection"
+            ),
             "track_projection_comparison_limit": _MAX_PROJECTION_SEGMENT_COMPARISONS,
-            "coverage_basis": "union_of_traversed_polyline_arc_length",
-            "full_log_rmse": round(math.sqrt(sum(e * e for e in errors) / len(errors)), 6),
+            "coverage_basis": (
+                "stationary_hover_time_weighted_trapezoidal_in_tolerance"
+                if track_geometry.stationary
+                else "union_of_traversed_polyline_arc_length"
+            ),
+            "track_mode": "stationary_hover" if track_geometry.stationary else "trajectory",
+            "hover_minimum_evaluation_duration_s": (
+                _HOVER_MIN_EVALUATION_DURATION_SECONDS if track_geometry.stationary else None
+            ),
+            "full_log_rmse": round(
+                _time_weighted_rms(errors, samples),
+                6,
+            ),
             "full_log_max_error": round(max(errors), 6),
             "pass_thresholds": {
                 "rmse": env.pass_rmse,
@@ -2148,8 +2742,19 @@ def _compute_metrics(
             ),
             "evaluation_start_t": round(float(evaluation_samples[0]["t"]), 6),
             "evaluation_end_t": round(float(evaluation_samples[-1]["t"]), 6),
+            "evaluation_start_index": eval_window.start_idx,
+            "evaluation_end_index": eval_window.end_idx,
             "evaluation_sample_count": len(evaluation_samples),
             "total_sample_count": total_sample_count,
+            "rmse_integration": "time_weighted_trapezoidal",
+            "telemetry_semantic_contract_id": (telemetry_contract.contract_id),
+            "telemetry_verifier_revision": (telemetry_contract.verifier_revision),
+            "telemetry_coordinate_frame": (telemetry_contract.coordinate_frame),
+            "telemetry_position_unit": telemetry_contract.position_unit,
+            "telemetry_time_unit": telemetry_contract.time_unit,
+            "telemetry_source_sha256": telemetry_contract.source_sha256,
+            "telemetry_sampling": (telemetry_contract.sampling.model_dump(mode="json")),
+            "evaluation_sampling": evaluation_sampling.model_dump(mode="json"),
             "evaluation_start_reason": eval_window.start_reason,
             "evaluation_trimmed_takeoff_samples": eval_window.trimmed_takeoff_samples,
             "evaluation_trimmed_landing_samples": eval_window.trimmed_landing_samples,
@@ -2288,30 +2893,95 @@ def _run_lower_level_launcher(
     timeout_seconds: float,
     launch_env: dict[str, str] | None = None,
 ) -> int:
-    with (
-        stdout_log.open("w", encoding="utf-8") as out,
-        stderr_log.open("w", encoding="utf-8") as err,
-    ):
-        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
+    # The lower-level wrapper owns stdout.log/stderr.log because it also owns
+    # the nested PX4 process. Reset the pair and their receipts for each launch
+    # attempt; the retry path preserves attempt 1 before invoking us again.
+    for path in (stdout_log, stderr_log):
+        path.unlink(missing_ok=True)
+        receipt_path_for(path).unlink(missing_ok=True)
+
+    def _argv_contains_path(path: Path) -> bool:
+        rendered = str(path)
+        return any(item == rendered or item.endswith("=" + rendered) for item in launch_argv)
+
+    child_owns_main_logs = _argv_contains_path(stdout_log) and _argv_contains_path(stderr_log)
+    launcher_stdout = (
+        stdout_log.parent / _LAUNCHER_PROCESS_STDOUT_NAME if child_owns_main_logs else stdout_log
+    )
+    launcher_stderr = (
+        stderr_log.parent / _LAUNCHER_PROCESS_STDERR_NAME if child_owns_main_logs else stderr_log
+    )
+    if child_owns_main_logs:
+        for path in (launcher_stdout, launcher_stderr):
+            path.unlink(missing_ok=True)
+            receipt_path_for(path).unlink(missing_ok=True)
+
+    stdout_capture = StreamingBoundedLogCapture(
+        launcher_stdout,
+        cap_bytes=(
+            DEFAULT_AUXILIARY_LOG_CAP_BYTES
+            if child_owns_main_logs
+            else DEFAULT_SIMULATOR_STDOUT_CAP_BYTES
+        ),
+        stream_name=("lower_level_launcher_stdout" if child_owns_main_logs else "simulator_stdout"),
+    )
+    try:
+        stderr_capture = StreamingBoundedLogCapture(
+            launcher_stderr,
+            cap_bytes=(
+                DEFAULT_AUXILIARY_LOG_CAP_BYTES
+                if child_owns_main_logs
+                else DEFAULT_SIMULATOR_STDERR_CAP_BYTES
+            ),
+            stream_name=(
+                "lower_level_launcher_stderr" if child_owns_main_logs else "simulator_stderr"
+            ),
+        )
+    except Exception:
+        stdout_capture.close(write_receipt=False)
+        raise
+    creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
+    proc: subprocess.Popen[bytes] | None = None
+    threads: tuple[Thread, Thread] | None = None
+    previous_signal_handlers: dict[signal.Signals, Any] = {}
+    try:
         proc = subprocess.Popen(  # noqa: S603
             launch_argv,
             cwd=str(cwd),
-            stdout=out,
-            stderr=err,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             start_new_session=os.name != "nt",
             creationflags=creationflags,
             env=launch_env,
         )
-        previous_signal_handlers: dict[int, Any] = {}
+        stdout_pipe = getattr(proc, "stdout", None)
+        stderr_pipe = getattr(proc, "stderr", None)
+        if stdout_pipe is not None and stderr_pipe is not None:
+            threads = (
+                Thread(
+                    target=stdout_capture.copy_from,
+                    args=(stdout_pipe,),
+                    name="launcher-stdout-capture",
+                    daemon=True,
+                ),
+                Thread(
+                    target=stderr_capture.copy_from,
+                    args=(stderr_pipe,),
+                    name="launcher-stderr-capture",
+                    daemon=True,
+                ),
+            )
+            for thread in threads:
+                thread.start()
 
         def _forward_shutdown(signum: int, _frame: Any) -> None:
-            _terminate_subprocess_tree(proc, force=True)
+            if proc is not None:
+                _terminate_subprocess_tree(proc, force=True)
             raise SystemExit(128 + signum)
 
         if os.name != "nt":
             for shutdown_signal in (signal.SIGINT, signal.SIGTERM):
-                previous_signal_handlers[int(shutdown_signal)] = signal.getsignal(shutdown_signal)
+                previous_signal_handlers[shutdown_signal] = signal.getsignal(shutdown_signal)
                 signal.signal(shutdown_signal, _forward_shutdown)
         try:
             return proc.wait(timeout=timeout_seconds)
@@ -2322,12 +2992,49 @@ def _run_lower_level_launcher(
             raise TimeoutRunnerError(
                 f"lower-level launcher timed out after {timeout_seconds:g}s"
             ) from exc
-        finally:
-            for shutdown_signal, previous_handler in previous_signal_handlers.items():
-                signal.signal(shutdown_signal, previous_handler)
+    finally:
+        for shutdown_signal, previous_handler in previous_signal_handlers.items():
+            signal.signal(shutdown_signal, previous_handler)
+        if os.name != "nt" and proc is not None:
+            _terminate_posix_process_group(proc.pid)
+        if threads is not None:
+            for thread, capture, pipe in (
+                (threads[0], stdout_capture, getattr(proc, "stdout", None)),
+                (threads[1], stderr_capture, getattr(proc, "stderr", None)),
+            ):
+                thread.join(timeout=5.0)
+                if thread.is_alive():
+                    capture.mark_observation_incomplete("capture_thread_did_not_finish")
+                    if pipe is not None:
+                        with contextlib.suppress(OSError):
+                            pipe.close()
+                    thread.join(timeout=1.0)
+        stdout_capture.close()
+        stderr_capture.close()
 
 
-def _terminate_subprocess_tree(proc: subprocess.Popen[str], *, force: bool) -> None:
+def _terminate_posix_process_group(process_group_id: int) -> None:
+    """Reap descendants that outlive a completed POSIX launcher parent."""
+
+    kill_process_group = getattr(os, "killpg", None)
+    if not callable(kill_process_group) or process_group_id <= 0:
+        return
+    try:
+        kill_process_group(process_group_id, signal.SIGTERM)
+    except OSError:
+        return
+    deadline = time.monotonic() + _PROCESS_GROUP_TERMINATE_GRACE_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            kill_process_group(process_group_id, 0)
+        except OSError:
+            return
+        time.sleep(_PROCESS_GROUP_POLL_SECONDS)
+    with contextlib.suppress(OSError):
+        kill_process_group(process_group_id, getattr(signal, "SIGKILL", 9))
+
+
+def _terminate_subprocess_tree(proc: subprocess.Popen[Any], *, force: bool) -> None:
     """Terminate a launcher safely on both POSIX and native Windows."""
 
     if proc.poll() is not None:
@@ -2347,8 +3054,14 @@ def _terminate_subprocess_tree(proc: subprocess.Popen[str], *, force: bool) -> N
             with contextlib.suppress(OSError):
                 proc.kill() if force else proc.terminate()
         return
+    kill_process_group = getattr(os, "killpg", None)
+    if not callable(kill_process_group):
+        with contextlib.suppress(OSError):
+            proc.kill() if force else proc.terminate()
+        return
+    kill_signal = getattr(signal, "SIGKILL", signal.SIGTERM) if force else signal.SIGTERM
     with contextlib.suppress(OSError):
-        os.killpg(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
+        kill_process_group(proc.pid, kill_signal)
 
 
 def _failure_result(
@@ -2407,6 +3120,12 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "application/json",
         ),
         _artifact_record(
+            run_dir / "px4_parameters.applied.json",
+            "px4_parameter_evidence_json",
+            "Verified PX4 Parameter Readback",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "launch_config.json",
             "simulator_launch_config_json",
             "Simulator Launch Configuration",
@@ -2424,12 +3143,60 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "Trajectory Samples",
             "application/json",
         ),
+        _artifact_record(
+            run_dir / "px4_source.ulg",
+            "px4_ulog",
+            "Retained PX4 ULog",
+            "application/octet-stream",
+        ),
         _artifact_record(run_dir / "runner.log", "worker_log", "Runner Log", "text/plain"),
+        _artifact_record(
+            receipt_path_for(run_dir / "runner.log"),
+            "log_capture_receipt_json",
+            "Runner Log Capture Receipt",
+            "application/json",
+        ),
         _artifact_record(
             run_dir / "stdout.log", "simulator_stdout", "Simulator stdout", "text/plain"
         ),
         _artifact_record(
+            receipt_path_for(run_dir / "stdout.log"),
+            "log_capture_receipt_json",
+            "Simulator stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "stderr.log", "simulator_stderr", "Simulator stderr", "text/plain"
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / "stderr.log"),
+            "log_capture_receipt_json",
+            "Simulator stderr Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / _LAUNCHER_PROCESS_STDOUT_NAME,
+            "launcher_process_stdout",
+            "Lower-level Launcher stdout",
+            "text/plain",
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / _LAUNCHER_PROCESS_STDOUT_NAME),
+            "log_capture_receipt_json",
+            "Lower-level Launcher stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / _LAUNCHER_PROCESS_STDERR_NAME,
+            "launcher_process_stderr",
+            "Lower-level Launcher stderr",
+            "text/plain",
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / _LAUNCHER_PROCESS_STDERR_NAME),
+            "log_capture_receipt_json",
+            "Lower-level Launcher stderr Capture Receipt",
+            "application/json",
         ),
         _artifact_record(
             run_dir / "offboard_executor.log",
@@ -2444,10 +3211,106 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "application/json",
         ),
         _artifact_record(
+            run_dir / "launcher_failure.json",
+            "launcher_failure_json",
+            "Launcher Failure",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / ACTUATOR_LINK_HEALTH_NAME,
+            "actuator_link_health_json",
+            "Actuator Link Health",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / TRANSIENT_RETRY_RECEIPT_NAME,
+            "sim_transient_retry_json",
+            "Simulator Transient Retry Receipt",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.ulg",
+            "sim_transient_px4_ulog",
+            "Transient Failure PX4 ULog",
+            "application/octet-stream",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.health.json",
+            "sim_transient_health_json",
+            "Transient Failure Actuator Link Health",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.offboard_timing.json",
+            "sim_transient_timing_json",
+            "Transient Failure Offboard Timing",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.offboard_executor.log",
+            "sim_transient_offboard_log",
+            "Transient Failure Offboard Executor Log",
+            "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.launcher_failure.json",
+            "sim_transient_launcher_json",
+            "Transient Failure Launcher Error",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.stdout.log",
+            "sim_transient_stdout",
+            "Transient Failure Simulator stdout",
+            "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.stdout.log.capture.json",
+            "log_capture_receipt_json",
+            "Transient Failure Simulator stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.stderr.log",
+            "sim_transient_stderr",
+            "Transient Failure Simulator stderr",
+            "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.stderr.log.capture.json",
+            "log_capture_receipt_json",
+            "Transient Failure Simulator stderr Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.telemetry.json",
+            "sim_transient_telemetry_json",
+            "Transient Failure Telemetry",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.px4_parameters.applied.json",
+            "sim_transient_px4_params_json",
+            "Transient Failure PX4 Parameters Applied",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.scenario_effects.applied.json",
+            "sim_transient_effects_json",
+            "Transient Failure Scenario Effects Applied",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "gui_stdout.log",
             "gazebo_gui_stdout_log",
             "Gazebo GUI stdout",
             "text/plain",
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / "gui_stdout.log"),
+            "log_capture_receipt_json",
+            "Gazebo GUI stdout Capture Receipt",
+            "application/json",
         ),
         _artifact_record(
             run_dir / "gui_stderr.log",
@@ -2456,16 +3319,34 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "text/plain",
         ),
         _artifact_record(
+            receipt_path_for(run_dir / "gui_stderr.log"),
+            "log_capture_receipt_json",
+            "Gazebo GUI stderr Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "track_marker_stdout.log",
             "gazebo_track_marker_stdout_log",
             "Gazebo Track Marker stdout",
             "text/plain",
         ),
         _artifact_record(
+            receipt_path_for(run_dir / "track_marker_stdout.log"),
+            "log_capture_receipt_json",
+            "Gazebo Track Marker stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "track_marker_stderr.log",
             "gazebo_track_marker_stderr_log",
             "Gazebo Track Marker stderr",
             "text/plain",
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / "track_marker_stderr.log"),
+            "log_capture_receipt_json",
+            "Gazebo Track Marker stderr Capture Receipt",
+            "application/json",
         ),
         _artifact_record(
             run_dir / REQUESTED_EVIDENCE_NAME,
@@ -2489,12 +3370,142 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
     return [r for r in records if r]
 
 
+def _require_fresh_run_directory(run_dir: Path) -> None:
+    """Fail closed instead of consuming output left by an earlier invocation."""
+
+    stale = sorted(
+        name
+        for name in _RUN_OUTPUT_NAMES
+        if (run_dir / name).exists() or (run_dir / name).is_symlink()
+    )
+    if stale:
+        raise RunnerError(
+            "runner output directory contains stale files from an earlier invocation; "
+            "start a new Trial attempt instead of reusing it: " + ", ".join(stale)
+        )
+
+
+def _execution_identity_from_meta(meta: dict[str, Any]) -> dict[str, object]:
+    return {
+        "trial_id": meta["trial_id"],
+        "job_id": meta["job_id"],
+        "candidate_id": meta["candidate_id"],
+        "seed": meta["seed"],
+        "attempt_count": meta["attempt_count"],
+    }
+
+
+def _verified_actuator_link_stall(
+    run_dir: Path,
+    *,
+    meta: dict[str, Any],
+    expected_eligibility: dict[str, Any],
+) -> dict[str, Any] | None:
+    health_path = run_dir / ACTUATOR_LINK_HEALTH_NAME
+    ulog_path = run_dir / "px4_source.ulg"
+    if not health_path.is_file() or not ulog_path.is_file():
+        return None
+    try:
+        health = _load_bounded_json(
+            health_path,
+            label="actuator-link health evidence",
+            max_bytes=_MAX_ACTUATOR_LINK_HEALTH_BYTES,
+        )
+        health = validate_actuator_link_health_evidence(
+            health,
+            expected_identity=_execution_identity_from_meta(meta),
+            expected_ulog_sha256=sha256_file(ulog_path),
+        )
+        if health.get("eligibility") != expected_eligibility:
+            return None
+        return health
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _preserve_actuator_link_failure_for_retry(
+    run_dir: Path,
+    *,
+    meta: dict[str, Any],
+    health: dict[str, Any],
+) -> dict[str, Any]:
+    receipt_path = run_dir / TRANSIENT_RETRY_RECEIPT_NAME
+    if receipt_path.exists():
+        raise RunnerError("actuator-link transient retry was already consumed")
+    moves = {
+        "px4_source.ulg": "actuator_link_transient_attempt_1.ulg",
+        ACTUATOR_LINK_HEALTH_NAME: "actuator_link_transient_attempt_1.health.json",
+        "offboard_timing.json": "actuator_link_transient_attempt_1.offboard_timing.json",
+        "offboard_executor.log": "actuator_link_transient_attempt_1.offboard_executor.log",
+        "launcher_failure.json": "actuator_link_transient_attempt_1.launcher_failure.json",
+        "stdout.log": "actuator_link_transient_attempt_1.stdout.log",
+        "stdout.log.capture.json": "actuator_link_transient_attempt_1.stdout.log.capture.json",
+        "stderr.log": "actuator_link_transient_attempt_1.stderr.log",
+        "stderr.log.capture.json": "actuator_link_transient_attempt_1.stderr.log.capture.json",
+        "telemetry.json": "actuator_link_transient_attempt_1.telemetry.json",
+        APPLIED_EVIDENCE_NAME: ("actuator_link_transient_attempt_1.px4_parameters.applied.json"),
+        EVIDENCE_ARTIFACT_NAME: ("actuator_link_transient_attempt_1.scenario_effects.applied.json"),
+    }
+    required_sources = {
+        "px4_source.ulg",
+        ACTUATOR_LINK_HEALTH_NAME,
+        "offboard_timing.json",
+        "stdout.log",
+        "stderr.log",
+    }
+    missing_required = sorted(
+        source_name
+        for source_name in required_sources
+        if not (run_dir / source_name).is_file() or (run_dir / source_name).is_symlink()
+    )
+    if missing_required:
+        raise RunnerError(
+            "actuator-link retry could not preserve its required failure evidence: "
+            + ", ".join(missing_required)
+        )
+    present_moves: list[tuple[Path, Path, str]] = []
+    for source_name, target_name in moves.items():
+        source = run_dir / source_name
+        if not source.exists():
+            continue
+        if not source.is_file() or source.is_symlink():
+            raise RunnerError(f"transient retry evidence is not a regular file: {source_name}")
+        target = run_dir / target_name
+        if target.exists() or target.is_symlink():
+            raise RunnerError(f"transient retry evidence already exists: {target_name}")
+        present_moves.append((source, target, target_name))
+
+    preserved: list[dict[str, object]] = []
+    for source, target, target_name in present_moves:
+        source.replace(target)
+        preserved.append(
+            {
+                "path": target_name,
+                "bytes": target.stat().st_size,
+                "sha256": sha256_file(target),
+            }
+        )
+    receipt = {
+        "schema_id": "dronedream.simulator-transient-retry/v1",
+        "execution_identity": _execution_identity_from_meta(meta),
+        "diagnostic_failure_code": FAILURE_ACTUATOR_LINK_STALLED,
+        "maximum_launcher_attempts": 2,
+        "retry_index": 1,
+        "first_attempt_health_ulog_sha256": health["ulog_sha256"],
+        "preserved_files": preserved,
+    }
+    _json_dump(receipt_path, receipt)
+    return receipt
+
+
 def _remove_success_raw_logs(run_dir: Path) -> None:
     """Honor KEEP_RAW_LOGS only after successful metric computation."""
 
     for name in (
         "stdout.log",
         "stderr.log",
+        _LAUNCHER_PROCESS_STDOUT_NAME,
+        _LAUNCHER_PROCESS_STDERR_NAME,
         "gui_stdout.log",
         "gui_stderr.log",
         "track_marker_stdout.log",
@@ -2584,9 +3595,27 @@ def run_once(input_path: Path, output_path: Path) -> int:
     scenario_effect_evidence_json = run_dir / EVIDENCE_ARTIFACT_NAME
     meta: dict[str, Any] | None = None
 
+    try:
+        _require_fresh_run_directory(run_dir)
+    except RunnerError as exc:
+        _json_dump(
+            output_path,
+            _failure_result(
+                str(exc),
+                FAILURE_SIMULATION,
+                [],
+                f"px4_gazebo_runner stale run directory: {exc}",
+            ),
+        )
+        return 0
+
     def log(msg: str) -> None:
-        with runner_log.open("a", encoding="utf-8") as f:
-            f.write(msg + "\n")
+        append_bounded_log_text(
+            runner_log,
+            msg + "\n",
+            cap_bytes=DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+            stream_name="runner_log",
+        )
 
     def write_result(result: dict[str, Any]) -> None:
         payload = dict(result)
@@ -2628,6 +3657,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             float(meta["simulation_speed_factor"]),
         )
         firmware_identity = _firmware_identity(meta.get("firmware_commit"))
+        engine_pack_identity = _engine_pack_identity()
         scenario_effect_request = meta["scenario_effect_request"]
         scenario_effect_contract = _scenario_effect_contract(
             meta.get("advanced_scenario_config"),
@@ -2638,6 +3668,30 @@ def run_once(input_path: Path, output_path: Path) -> int:
             dry_run=env.dry_run,
             allow_unverified_passthrough=env.allow_unverified_advanced_effects,
         )
+        log_capture_contract = {
+            "schema_version": LOG_CAPTURE_SCHEMA_VERSION,
+            "normalization": {
+                "ansi_control_sequences": "removed_streaming",
+                "pure_px4_prompt_redraws": "collapsed",
+                "utf8": "incremental_replace_invalid",
+            },
+            "caps_bytes": {
+                "simulator_stdout": DEFAULT_SIMULATOR_STDOUT_CAP_BYTES,
+                "simulator_stderr": DEFAULT_SIMULATOR_STDERR_CAP_BYTES,
+                "auxiliary_stream": DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+            },
+            "receipts": {
+                "stdout": str(receipt_path_for(stdout_log)),
+                "stderr": str(receipt_path_for(stderr_log)),
+                "runner": str(receipt_path_for(runner_log)),
+                "lower_level_launcher_stdout": str(
+                    receipt_path_for(run_dir / _LAUNCHER_PROCESS_STDOUT_NAME)
+                ),
+                "lower_level_launcher_stderr": str(
+                    receipt_path_for(run_dir / _LAUNCHER_PROCESS_STDERR_NAME)
+                ),
+            },
+        }
         runner_launch_config = {
             "vehicle": meta["vehicle"],
             "airframe": meta["airframe"],
@@ -2655,6 +3709,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             "advanced_scenario_config": meta.get("advanced_scenario_config", {}),
             "px4_version": meta["px4_version"],
             "firmware_identity": firmware_identity,
+            "engine_pack_identity": engine_pack_identity,
             "scenario_effect_contract": scenario_effect_contract,
             "scenario_effect_request": {
                 "path": str(scenario_effect_request_json),
@@ -2667,6 +3722,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             },
             "parameter_catalog_version": meta["parameter_catalog_version"],
             "px4_parameter_names": sorted(px4_params),
+            "log_capture": log_capture_contract,
         }
         write_effect_json_atomic(scenario_effect_request_json, scenario_effect_request)
         _json_dump(run_dir / "launch_config.json", runner_launch_config)
@@ -2683,6 +3739,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 },
                 "px4_version": meta["px4_version"],
                 "firmware_identity": firmware_identity,
+                "engine_pack_identity": engine_pack_identity,
                 "scenario_effect_contract": scenario_effect_contract,
                 "scenario_effect_request": {
                     "path": str(scenario_effect_request_json),
@@ -2693,6 +3750,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     "path": str(scenario_effect_evidence_json),
                     "required": bool(scenario_effect_request["effects"]),
                 },
+                "log_capture": log_capture_contract,
                 "simulator": {
                     "airframe": meta["airframe"],
                     "simulator_model": meta["simulator_model"],
@@ -2709,6 +3767,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             },
         )
         _enforce_firmware_identity(firmware_identity)
+        _enforce_engine_pack_firmware_binding(engine_pack_identity, firmware_identity)
         _enforce_scenario_effect_contract(scenario_effect_contract)
 
         reference_track = _make_reference_track(
@@ -2723,6 +3782,9 @@ def run_once(input_path: Path, output_path: Path) -> int:
             {
                 "schema_version": "dronedream.reference_track.v1",
                 "track_type": job_cfg["track_type"],
+                "hover_duration_s": (
+                    _HOVER_DURATION_SECONDS if job_cfg["track_type"] == "hover" else None
+                ),
                 "points": reference_track,
                 "reference_track": reference_track,
             },
@@ -2758,8 +3820,18 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 )
             telemetry = _make_dry_run_telemetry(reference_track, params, job_cfg, meta, env)
             _json_dump(telemetry_json, telemetry)
-            stdout_log.write_text("dry-run mode: no external launcher executed\n", encoding="utf-8")
-            stderr_log.write_text("", encoding="utf-8")
+            write_bounded_log_bytes(
+                stdout_log,
+                b"dry-run mode: no external launcher executed\n",
+                cap_bytes=DEFAULT_SIMULATOR_STDOUT_CAP_BYTES,
+                stream_name="simulator_stdout",
+            )
+            write_bounded_log_bytes(
+                stderr_log,
+                b"",
+                cap_bytes=DEFAULT_SIMULATOR_STDERR_CAP_BYTES,
+                stream_name="simulator_stderr",
+            )
             log("PX4_GAZEBO_DRY_RUN=true; generated deterministic fixture telemetry")
         else:
             if not env.launch_command:
@@ -2856,6 +3928,10 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     "PX4_TRIAL_PX4_VERSION": str(meta["px4_version"]),
                     "PX4_TRIAL_SEED": str(meta["seed"]),
                     "PX4_TRIAL_ATTEMPT": str(meta["attempt_count"]),
+                    # Launcher-attempt identity is independent from the backend
+                    # Trial retry counter. Never inherit a stale value from the
+                    # desktop or service environment.
+                    "PX4_TRIAL_LAUNCH_ATTEMPT": "1",
                     "PX4_TRIAL_SCENARIO_TYPE": str(meta["scenario_type"]),
                     "PX4_TRIAL_SCENARIO_CONFIG_PATH": str(scenario_config_json),
                     "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH": str(scenario_effect_request_json),
@@ -2899,6 +3975,11 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 f"effective={effective_launcher_timeout:g}s"
             )
             try:
+                actuator_link_eligibility = actuator_link_evidence_eligibility(
+                    vehicle=meta["simulator_model"] or meta["vehicle"],
+                    selected_parameters=px4_params,
+                    scenario_effect_request=scenario_effect_request,
+                )
                 exit_code = _run_lower_level_launcher(
                     launch_argv=argv,
                     cwd=cwd,
@@ -2907,6 +3988,33 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     timeout_seconds=effective_launcher_timeout,
                     launch_env=launch_env,
                 )
+                if exit_code != 0:
+                    actuator_link_health = _verified_actuator_link_stall(
+                        run_dir,
+                        meta=meta,
+                        expected_eligibility=actuator_link_eligibility,
+                    )
+                    if actuator_link_health is not None:
+                        retry_receipt = _preserve_actuator_link_failure_for_retry(
+                            run_dir,
+                            meta=meta,
+                            health=actuator_link_health,
+                        )
+                        runner_launch_config["transient_actuator_link_retry"] = retry_receipt
+                        log(
+                            "verified PX4-to-Gazebo actuator-link stall; preserving "
+                            "attempt-1 evidence and starting the one allowed launcher retry"
+                        )
+                        retry_env = dict(launch_env)
+                        retry_env["PX4_TRIAL_LAUNCH_ATTEMPT"] = "2"
+                        exit_code = _run_lower_level_launcher(
+                            launch_argv=argv,
+                            cwd=cwd,
+                            stdout_log=stdout_log,
+                            stderr_log=stderr_log,
+                            timeout_seconds=effective_launcher_timeout,
+                            launch_env=retry_env,
+                        )
             except TimeoutRunnerError as exc:
                 _merge_json_object(run_dir / "launch_config.json", runner_launch_config)
                 timeout_flag = True
@@ -2921,12 +4029,14 @@ def run_once(input_path: Path, output_path: Path) -> int:
             _merge_json_object(run_dir / "launch_config.json", runner_launch_config)
             log(f"launcher exit code: {exit_code}")
             if scenario_effect_request["effects"]:
+                effect_evidence_verified = False
                 try:
                     _require_effect_evidence_file(scenario_effect_evidence_json)
                     verified_effects = load_scenario_effect_evidence(
                         scenario_effect_evidence_json,
                         scenario_effect_request,
                     )
+                    effect_evidence_verified = True
                 except ScenarioEffectContractError as exc:
                     requested_effect_ids = list(scenario_effect_contract["requested_effects"])
                     verified_effects = {
@@ -2970,18 +4080,39 @@ def run_once(input_path: Path, output_path: Path) -> int:
                         "scenario_effect_evidence": evidence_manifest,
                     },
                 )
-                if scenario_effect_contract.get("failed_effects"):
+                if scenario_effect_contract.get("failed_effects") and (
+                    exit_code == 0 or effect_evidence_verified
+                ):
                     raise RunnerError(
                         "launcher failed to apply scenario effects: "
                         + ", ".join(scenario_effect_contract["failed_effects"])
                     )
-                _enforce_scenario_effect_contract(scenario_effect_contract)
+                # A launcher that exits successfully without the required
+                # evidence has violated the scenario contract. A launcher that
+                # explicitly and validly reports an unsupported effect should
+                # also retain that classification. Missing/invalid evidence
+                # after a non-zero launcher exit, however, is downstream of the
+                # launch failure and must not conceal the primary PX4/Gazebo
+                # connection or startup diagnostic.
+                if exit_code == 0 or effect_evidence_verified:
+                    _enforce_scenario_effect_contract(scenario_effect_contract)
             if exit_code != 0:
+                failure_reason = _lower_level_failure_reason(run_dir, exit_code)
+                final_actuator_link_health = _verified_actuator_link_stall(
+                    run_dir,
+                    meta=meta,
+                    expected_eligibility=actuator_link_eligibility,
+                )
+                failure_code = (
+                    FAILURE_ACTUATOR_LINK_STALLED
+                    if final_actuator_link_health is not None
+                    else FAILURE_SIMULATION
+                )
                 result = _failure_result(
-                    f"lower-level launcher exited with code {exit_code}",
-                    FAILURE_SIMULATION,
+                    failure_reason,
+                    failure_code,
                     _collect_artifacts(run_dir),
-                    f"lower-level launcher exited with code {exit_code}",
+                    failure_reason,
                 )
                 write_result(result)
                 return 0
@@ -2993,7 +4124,8 @@ def run_once(input_path: Path, output_path: Path) -> int:
         )
 
         telemetry = _load_telemetry(telemetry_json, allow_csv=env.allow_csv_telemetry)
-        telemetry.setdefault("schema_version", "dronedream.telemetry.v1")
+        if telemetry.get("schema_version") != TELEMETRY_SCHEMA_V2:
+            raise RunnerError("normalized telemetry did not produce the v2 semantic contract")
         telemetry.setdefault("meta", {})
         telemetry["meta"]["offboard_timing_path"] = str(run_dir / "offboard_timing.json")
         # Persist the normalized contract, not the launcher's potentially
@@ -3019,11 +4151,113 @@ def run_once(input_path: Path, output_path: Path) -> int:
             ),
             scenario_effect_contract=scenario_effect_contract,
         )
+        try:
+            reference_track_payload = {
+                "schema_version": "dronedream.reference_track.v1",
+                "track_type": job_cfg["track_type"],
+                "hover_duration_s": (
+                    _HOVER_DURATION_SECONDS if job_cfg["track_type"] == "hover" else None
+                ),
+                "reference_track": reference_track,
+            }
+            evaluation_policy = compile_px4_evaluation_policy(
+                pass_rmse_m=env.pass_rmse,
+                pass_max_error_m=env.pass_max_error,
+                minimum_track_coverage=env.min_track_coverage,
+                altitude_entry_fraction=env.eval_altitude_fraction,
+                near_track_threshold_m=(env.eval_near_track_threshold_m),
+                consecutive_samples=env.eval_consecutive_samples,
+                collapse_altitude_fraction=(env.eval_collapse_altitude_fraction),
+            )
+            offboard_timing_payload: object | None = None
+            offboard_timing_path = run_dir / "offboard_timing.json"
+            if offboard_timing_path.is_file():
+                try:
+                    loaded_timing = _load_bounded_json(
+                        offboard_timing_path,
+                        label="offboard timing evidence",
+                        max_bytes=_MAX_OFFBOARD_TIMING_BYTES,
+                    )
+                    if isinstance(loaded_timing, dict):
+                        offboard_timing_payload = loaded_timing
+                except RunnerError:
+                    offboard_timing_payload = None
+            evaluation_window_evidence = compile_px4_evaluation_window_evidence(
+                telemetry_payload=telemetry,
+                reference_track_payload=reference_track_payload,
+                offboard_timing_payload=offboard_timing_payload,
+                policy=evaluation_policy,
+            )
+            metrics["raw_metric_json"]["evaluation_policy"] = evaluation_policy.model_dump(
+                mode="json"
+            )
+            metrics["raw_metric_json"]["evaluation_window_evidence"] = (
+                evaluation_window_evidence.model_dump(mode="json")
+            )
+            require_px4_evaluation_window_binding(
+                metrics["raw_metric_json"],
+                policy=evaluation_policy,
+                evidence=evaluation_window_evidence,
+            )
+            core_metric_evidence = compile_px4_core_metric_evidence(
+                telemetry_payload=telemetry,
+                reference_track_payload=reference_track_payload,
+                evaluation_start_index=(evaluation_window_evidence.start_index),
+                evaluation_end_index=(evaluation_window_evidence.end_index),
+            )
+            metrics["raw_metric_json"]["px4_core_metric_evidence"] = (
+                core_metric_evidence.model_dump(mode="json")
+            )
+            require_px4_core_metric_binding(
+                metrics,
+                core_metric_evidence,
+            )
+            scenario_effect_evidence_payload: object | None = None
+            if scenario_effect_evidence_json.is_file():
+                try:
+                    scenario_effect_evidence_payload = _load_bounded_json(
+                        scenario_effect_evidence_json,
+                        label="scenario-effect evidence",
+                        max_bytes=MAX_EFFECT_CONTRACT_BYTES,
+                    )
+                except RunnerError:
+                    scenario_effect_evidence_payload = None
+            outcome_policy, outcome_evidence = compile_px4_outcome_evidence(
+                telemetry_payload=telemetry,
+                reference_track_payload=reference_track_payload,
+                evaluation_policy=evaluation_policy,
+                evaluation_window_evidence=(evaluation_window_evidence),
+                core_metric_evidence=core_metric_evidence,
+                scenario_effect_request_payload=(scenario_effect_request),
+                scenario_effect_evidence_payload=(scenario_effect_evidence_payload),
+            )
+            metrics["raw_metric_json"].update(
+                {
+                    "scenario_effects_ready": (outcome_evidence.scenario_effects_ready),
+                    "scenario_effect_status": (outcome_evidence.scenario_effect_status),
+                    "scenario_effect_request_sha256": (
+                        outcome_evidence.scenario_effect_request_sha256
+                    ),
+                    "scenario_effect_evidence_sha256": (
+                        outcome_evidence.scenario_effect_evidence_sha256
+                    ),
+                    "px4_outcome_policy": outcome_policy.model_dump(mode="json"),
+                    "px4_outcome_evidence": (outcome_evidence.model_dump(mode="json")),
+                }
+            )
+            require_px4_outcome_binding(
+                metrics,
+                policy=outcome_policy,
+                evidence=outcome_evidence,
+            )
+        except Px4CoreMetricEvidenceError as exc:
+            raise RunnerError(f"independent PX4 core-metric verification failed: {exc}") from exc
         if not env.keep_raw_logs:
             _remove_success_raw_logs(run_dir)
 
         result = {
             "success": True,
+            "backend": "px4_gazebo",
             "metrics": metrics,
             "artifacts": _collect_artifacts(run_dir),
             "log_excerpt": (

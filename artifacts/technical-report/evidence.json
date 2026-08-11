@@ -1,0 +1,1374 @@
+{
+  "backend_tests": {
+    "environment": {
+      "platform": "Microsoft Windows 11 家庭版 中文版 10.0.26200 build 26200",
+      "pytest": "9.1.0",
+      "python": "3.13.0"
+    },
+    "focused_checks": [
+      {
+        "command": "python -m pytest -q tests/test_generalization_evidence.py tests/test_harness_ablation.py tests/test_harness_component_ablation.py::test_committed_component_ablation_is_offline_matched_and_claim_bounded tests/test_harness_component_ablation.py::test_ablation_really_removes_memory_and_reflection_before_routing tests/test_harness_component_ablation.py::test_component_ablation_rejects_claim_or_metric_tamper tests/test_harness_component_ablation.py::test_component_ablation_files_and_check_mode_are_reproducible tests/test_harness_component_ablation.py::test_manifest_rejects_hash_tamper tests/test_harness_routing_campaign.py tests/test_harness_routing_evaluation.py tests/test_harness_routing_holdout.py tests/test_optimization_core.py::test_outcome_contract_is_content_addressed_and_seals_holdout_identity tests/test_orchestration.py::test_holdout_results_never_influence_candidate_selection tests/test_report_generator.py::test_build_job_report_lines_includes_new_sections tests/test_scenario_generalization_campaign.py tests/test_simulation_coverage_campaign.py tests/test_technical_report_evidence.py tests/test_test_run_receipt.py --junitxml=../artifacts/test-runs/aurora-final-focused-junit.xml",
+        "duration_seconds": 65.67,
+        "finished_at": "2026-07-28T04:57:47.155Z",
+        "log": {
+          "path": "artifacts/test-runs/aurora-final-focused-junit.xml",
+          "sha256": "6ffc3c32712ca46a1a5280b1b178fe5606ab563c28d371774edfd95804fa549c",
+          "size_bytes": 8505
+        },
+        "result": {
+          "failed": 0,
+          "passed": 59,
+          "status": "passed"
+        },
+        "started_at": "2026-07-28T04:56:39.751Z",
+        "working_directory": "backend"
+      }
+    ],
+    "full_suite": {
+      "command": "python -m pytest -q",
+      "duration_seconds": 759.17,
+      "finished_at": "2026-07-28T04:26:13.855Z",
+      "log": {
+        "path": "artifacts/test-runs/aurora-backend-1139-pytest.log",
+        "sha256": "2323165a215d27040415a490150d33e90dc0465094403506d26b984280101ac8",
+        "size_bytes": 1330
+      },
+      "result": {
+        "failed": 0,
+        "passed": 1139,
+        "status": "passed"
+      },
+      "started_at": "2026-07-28T04:13:29.528Z",
+      "tested_state": {
+        "base_commit": "85be48fb21c4e38d6468a0644b72106633ab8602",
+        "exact_final_commit_run": false,
+        "kind": "pre_commit_worktree"
+      },
+      "working_directory": "backend"
+    },
+    "generated_at": "2026-07-28T04:58:24Z",
+    "receipt_sha256": "910092db4d607fbd69a6528f8576615048bb878cbc4b5439049d884a5e539101",
+    "schema_version": "dronedream.test-run-receipt.v1",
+    "source_commit": "0429b4244fc1fd912bd211e80821ebdbabb8ae5d",
+    "validation_bridge": {
+      "focused_rerun_performed": true,
+      "focused_rerun_required": true,
+      "full_suite_rerun_performed": false,
+      "reason": "The full suite ran on the pre-commit AURORA worktree. Subsequent changes were formatter-only updates plus the v6 evidence and receipt contract; 59 directly affected tests were rerun on source_commit."
+    }
+  },
+  "bundle_sha256": "bd99720f50a63d282287b7ed2ee7b4692e416bc00db218a864ebc462f8298258",
+  "generated_at": "2026-07-28T04:59:08Z",
+  "harness_ablations": {
+    "artifact_sha256": "477da3d70cbd061f6b9f790fd7af962221f38f26fa8d4713130173e793e8e847",
+    "causal_claim_permitted": false,
+    "claim_boundary": "Paired deterministic software-contract probes under constructed inputs. They measure guard behavior only; they do not measure optimizer quality, simulator performance, user outcomes, causal component contribution, or real-flight safety.",
+    "component_rows": [
+      {
+        "ablated_contract_correct_count": 1,
+        "ablated_contract_correct_rate": 0.25,
+        "absolute_contract_delta": 0.75,
+        "component": "deterministic_fallback",
+        "full_contract_correct_count": 4,
+        "full_contract_correct_rate": 1.0,
+        "probe_count": 4
+      },
+      {
+        "ablated_contract_correct_count": 2,
+        "ablated_contract_correct_rate": 0.4,
+        "absolute_contract_delta": 0.6,
+        "component": "provider_trust_filter",
+        "full_contract_correct_count": 5,
+        "full_contract_correct_rate": 1.0,
+        "probe_count": 5
+      },
+      {
+        "ablated_contract_correct_count": 2,
+        "ablated_contract_correct_rate": 0.3333333333333333,
+        "absolute_contract_delta": 0.6666666666666667,
+        "component": "scenario_and_outcome_isolation",
+        "full_contract_correct_count": 6,
+        "full_contract_correct_rate": 1.0,
+        "probe_count": 6
+      },
+      {
+        "ablated_contract_correct_count": 0,
+        "ablated_contract_correct_rate": 0.0,
+        "absolute_contract_delta": 1.0,
+        "component": "scenario_profile_context",
+        "full_contract_correct_count": 5,
+        "full_contract_correct_rate": 1.0,
+        "probe_count": 5
+      },
+      {
+        "ablated_contract_correct_count": 1,
+        "ablated_contract_correct_rate": 0.2,
+        "absolute_contract_delta": 0.8,
+        "component": "tool_eligibility_gate",
+        "full_contract_correct_count": 5,
+        "full_contract_correct_rate": 1.0,
+        "probe_count": 5
+      }
+    ],
+    "evidence_class": "source_contract_ablation",
+    "live_model_calls": false,
+    "physical_fidelity": false,
+    "simulator_runs": false,
+    "summary": {
+      "ablated_contract_correct_count": 6,
+      "ablated_contract_correct_rate": 0.24,
+      "absolute_contract_delta": 0.76,
+      "component_count": 5,
+      "full_contract_correct_count": 25,
+      "full_contract_correct_rate": 1.0,
+      "probe_count": 25
+    }
+  },
+  "harness_component_outcome_ablation": {
+    "artifact_sha256": "b05fd1f41f05617c4674a68630bffb1a84dc0074313afd39768553e0b721df26",
+    "claim_boundary": "Matched, deterministic component intervention on MockSimulatorAdapter using a preregistered local scripted router. Results describe only this frozen synthetic protocol. They do not establish general AURORA or LLM superiority, PX4/Gazebo performance, physical fidelity, transfer to real aircraft, or real-flight safety.",
+    "claim_label": "SYNTHETIC_MOCK",
+    "comparison_rows": [
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 1,
+        "comparison_arm": "no_decision_memory",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 6100,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 1,
+        "comparison_arm": "no_observed_outcome_reflection",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 6100,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": false,
+        "block_id": 1,
+        "comparison_arm": "fixed_deterministic_portfolio",
+        "comparison_tool_sequence": [
+          "optimizer_portfolio",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": -0.08849999999999991,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": false,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": false,
+          "trials_to_target": false
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "observed_protocol_difference",
+        "seed_block": 6100,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 14
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 2,
+        "comparison_arm": "no_decision_memory",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 7200,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 2,
+        "comparison_arm": "no_observed_outcome_reflection",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 7200,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": false,
+        "block_id": 2,
+        "comparison_arm": "fixed_deterministic_portfolio",
+        "comparison_tool_sequence": [
+          "optimizer_portfolio",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.13229999999999997,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": false,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": false,
+          "trials_to_target": false
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "observed_protocol_difference",
+        "seed_block": 7200,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 15
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 3,
+        "comparison_arm": "no_decision_memory",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 8300,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 3,
+        "comparison_arm": "no_observed_outcome_reflection",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 8300,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": false,
+        "block_id": 3,
+        "comparison_arm": "fixed_deterministic_portfolio",
+        "comparison_tool_sequence": [
+          "optimizer_portfolio",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": false,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "observed_protocol_difference",
+        "seed_block": 8300,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 15
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 4,
+        "comparison_arm": "no_decision_memory",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 9400,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 4,
+        "comparison_arm": "no_observed_outcome_reflection",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 9400,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": false,
+        "block_id": 4,
+        "comparison_arm": "fixed_deterministic_portfolio",
+        "comparison_tool_sequence": [
+          "optimizer_portfolio",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": false,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "observed_protocol_difference",
+        "seed_block": 9400,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 15
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 5,
+        "comparison_arm": "no_decision_memory",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 10500,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": true,
+        "block_id": 5,
+        "comparison_arm": "no_observed_outcome_reflection",
+        "comparison_tool_sequence": [
+          "constrained_mobo",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": 0.0,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": true,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": true,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "no_observed_protocol_difference",
+        "seed_block": 10500,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 0
+      },
+      {
+        "all_preregistered_metrics_match": false,
+        "block_id": 5,
+        "comparison_arm": "fixed_deterministic_portfolio",
+        "comparison_tool_sequence": [
+          "optimizer_portfolio",
+          "optimizer_portfolio"
+        ],
+        "holdout_loss_delta_from_full": -0.02310000000000001,
+        "metric_matches": {
+          "evidence_completeness_rate": true,
+          "holdout_loss": false,
+          "optimizer_feasible_rate": true,
+          "recovered_trials": true,
+          "terminal_failure_trials": true,
+          "total_trials": false,
+          "trials_to_target": true
+        },
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "full_aurora",
+        "reference_tool_sequence": [
+          "constrained_mobo",
+          "turbo"
+        ],
+        "result_status": "observed_protocol_difference",
+        "seed_block": 10500,
+        "tool_sequence_changed": true,
+        "total_trials_delta_from_full": 15
+      }
+    ],
+    "component_isolation_rows": [
+      {
+        "block_id": 1,
+        "comparison_arm": "no_decision_memory",
+        "component": "decision_receipt_memory_without_reflection",
+        "interpretation": "Both arms exclude observed outcomes. The comparison retains decision receipts only in the reference arm. Identical routed tools and outcomes leave the incremental contribution of receipt-only memory unresolved under this scripted policy.",
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "no_observed_outcome_reflection",
+        "result_metrics_match": true,
+        "result_status": "inconclusive_component_not_decision_relevant_under_policy",
+        "seed_block": 6100,
+        "tool_sequence_match": true
+      },
+      {
+        "block_id": 2,
+        "comparison_arm": "no_decision_memory",
+        "component": "decision_receipt_memory_without_reflection",
+        "interpretation": "Both arms exclude observed outcomes. The comparison retains decision receipts only in the reference arm. Identical routed tools and outcomes leave the incremental contribution of receipt-only memory unresolved under this scripted policy.",
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "no_observed_outcome_reflection",
+        "result_metrics_match": true,
+        "result_status": "inconclusive_component_not_decision_relevant_under_policy",
+        "seed_block": 7200,
+        "tool_sequence_match": true
+      },
+      {
+        "block_id": 3,
+        "comparison_arm": "no_decision_memory",
+        "component": "decision_receipt_memory_without_reflection",
+        "interpretation": "Both arms exclude observed outcomes. The comparison retains decision receipts only in the reference arm. Identical routed tools and outcomes leave the incremental contribution of receipt-only memory unresolved under this scripted policy.",
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "no_observed_outcome_reflection",
+        "result_metrics_match": true,
+        "result_status": "inconclusive_component_not_decision_relevant_under_policy",
+        "seed_block": 8300,
+        "tool_sequence_match": true
+      },
+      {
+        "block_id": 4,
+        "comparison_arm": "no_decision_memory",
+        "component": "decision_receipt_memory_without_reflection",
+        "interpretation": "Both arms exclude observed outcomes. The comparison retains decision receipts only in the reference arm. Identical routed tools and outcomes leave the incremental contribution of receipt-only memory unresolved under this scripted policy.",
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "no_observed_outcome_reflection",
+        "result_metrics_match": true,
+        "result_status": "inconclusive_component_not_decision_relevant_under_policy",
+        "seed_block": 9400,
+        "tool_sequence_match": true
+      },
+      {
+        "block_id": 5,
+        "comparison_arm": "no_decision_memory",
+        "component": "decision_receipt_memory_without_reflection",
+        "interpretation": "Both arms exclude observed outcomes. The comparison retains decision receipts only in the reference arm. Identical routed tools and outcomes leave the incremental contribution of receipt-only memory unresolved under this scripted policy.",
+        "provider_visible_intervention_activated": true,
+        "reference_arm": "no_observed_outcome_reflection",
+        "result_metrics_match": true,
+        "result_status": "inconclusive_component_not_decision_relevant_under_policy",
+        "seed_block": 10500,
+        "tool_sequence_match": true
+      }
+    ],
+    "evidence_class": "synthetic_mock_component_ablation",
+    "general_causal_claim_permitted": false,
+    "live_model_calls": false,
+    "llm_superiority_claim_permitted": false,
+    "manifest_sha256": "8c4a9e015a0f7a579bf6e04d7f7811122420f766bbf6a27431d732df94ba043d",
+    "network_calls": 0,
+    "physical_fidelity": false,
+    "px4_or_flight_claim_permitted": false,
+    "real_credentials_used": false,
+    "simulator_backend": "mock",
+    "summary": {
+      "all_evidence_complete": true,
+      "all_network_calls_blocked": true,
+      "arm_count": 4,
+      "arm_run_count": 20,
+      "comparison_count": 15,
+      "component_isolation_count": 5,
+      "inconclusive_component_isolation_count": 5,
+      "interpretation_status_counts": {
+        "inconclusive_intervention_not_activated": 0,
+        "no_observed_protocol_difference": 10,
+        "observed_protocol_difference": 5
+      },
+      "seed_block_count": 5,
+      "total_persisted_trials": 554
+    }
+  },
+  "harness_outcome_campaign": {
+    "arm_rows": [
+      {
+        "arm": "direct_portfolio",
+        "block_id": 1,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.8247,
+        "network_calls": 0,
+        "provider_calls": 0,
+        "seed_block": 1100,
+        "trial_count": 39,
+        "winner_candidate_key": "g02-c09"
+      },
+      {
+        "arm": "provider_error_fallback",
+        "block_id": 1,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.8247,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 1100,
+        "trial_count": 39,
+        "winner_candidate_key": "g02-c09"
+      },
+      {
+        "arm": "invalid_response_fallback",
+        "block_id": 1,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.8247,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 1100,
+        "trial_count": 39,
+        "winner_candidate_key": "g02-c09"
+      },
+      {
+        "arm": "direct_portfolio",
+        "block_id": 2,
+        "candidate_count": 10,
+        "dispatched_trials": 38,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.9468,
+        "network_calls": 0,
+        "provider_calls": 0,
+        "seed_block": 2200,
+        "trial_count": 38,
+        "winner_candidate_key": "g01-c06"
+      },
+      {
+        "arm": "provider_error_fallback",
+        "block_id": 2,
+        "candidate_count": 10,
+        "dispatched_trials": 38,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.9468,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 2200,
+        "trial_count": 38,
+        "winner_candidate_key": "g01-c06"
+      },
+      {
+        "arm": "invalid_response_fallback",
+        "block_id": 2,
+        "candidate_count": 10,
+        "dispatched_trials": 38,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.9468,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 2200,
+        "trial_count": 38,
+        "winner_candidate_key": "g01-c06"
+      },
+      {
+        "arm": "direct_portfolio",
+        "block_id": 3,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 1.0052,
+        "network_calls": 0,
+        "provider_calls": 0,
+        "seed_block": 3300,
+        "trial_count": 39,
+        "winner_candidate_key": "g00-c00"
+      },
+      {
+        "arm": "provider_error_fallback",
+        "block_id": 3,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 1.0052,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 3300,
+        "trial_count": 39,
+        "winner_candidate_key": "g00-c00"
+      },
+      {
+        "arm": "invalid_response_fallback",
+        "block_id": 3,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 1.0052,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 3300,
+        "trial_count": 39,
+        "winner_candidate_key": "g00-c00"
+      },
+      {
+        "arm": "direct_portfolio",
+        "block_id": 4,
+        "candidate_count": 10,
+        "dispatched_trials": 38,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.9707,
+        "network_calls": 0,
+        "provider_calls": 0,
+        "seed_block": 4400,
+        "trial_count": 38,
+        "winner_candidate_key": "g01-c06"
+      },
+      {
+        "arm": "provider_error_fallback",
+        "block_id": 4,
+        "candidate_count": 10,
+        "dispatched_trials": 38,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.9707,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 4400,
+        "trial_count": 38,
+        "winner_candidate_key": "g01-c06"
+      },
+      {
+        "arm": "invalid_response_fallback",
+        "block_id": 4,
+        "candidate_count": 10,
+        "dispatched_trials": 38,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 0.9707,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 4400,
+        "trial_count": 38,
+        "winner_candidate_key": "g01-c06"
+      },
+      {
+        "arm": "direct_portfolio",
+        "block_id": 5,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 1.036,
+        "network_calls": 0,
+        "provider_calls": 0,
+        "seed_block": 5500,
+        "trial_count": 39,
+        "winner_candidate_key": "g01-c01"
+      },
+      {
+        "arm": "provider_error_fallback",
+        "block_id": 5,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 1.036,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 5500,
+        "trial_count": 39,
+        "winner_candidate_key": "g01-c01"
+      },
+      {
+        "arm": "invalid_response_fallback",
+        "block_id": 5,
+        "candidate_count": 10,
+        "dispatched_trials": 39,
+        "evidence_completeness_rate": 1.0,
+        "exact_match_to_direct_portfolio": true,
+        "failure_count": 0,
+        "holdout_loss": 1.036,
+        "network_calls": 0,
+        "provider_calls": 2,
+        "seed_block": 5500,
+        "trial_count": 39,
+        "winner_candidate_key": "g01-c01"
+      }
+    ],
+    "artifact_sha256": "84eeaf61955dfde6e95df332f69a3554a90dbd39c2cf9eb0a5d63cc0b5a81e1c",
+    "claim_boundary": "Outcome-level deterministic integration check on MockSimulatorAdapter. It verifies that declared fail-closed Harness paths reach the same optimizer-portfolio candidates and persisted outcomes as a direct portfolio run under matched seeds and budgets. It does not establish LLM superiority, causal Harness benefit, PX4/Gazebo performance, physical fidelity, or real-flight safety.",
+    "claim_label": "SYNTHETIC_MOCK",
+    "evidence_class": "synthetic_mock_campaign",
+    "harness_causal_benefit_claim_permitted": false,
+    "live_model_calls": false,
+    "llm_superiority_claim_permitted": false,
+    "network_calls": 0,
+    "network_connect_guard_enforced": true,
+    "physical_fidelity": false,
+    "protocol": {
+      "arm_count": 3,
+      "arms": [
+        "direct_portfolio",
+        "provider_error_fallback",
+        "invalid_response_fallback"
+      ],
+      "client_injection_boundary": "process-local test-only object; absent from JobCreateRequest and unavailable to the production API",
+      "common_random_numbers": true,
+      "holdout_cases_per_full_fidelity_candidate": 1,
+      "max_iterations_per_arm": 2,
+      "max_total_trials_per_arm": 40,
+      "network_measurement": "socket.connect, socket.connect_ex, and socket.create_connection are blocked and counted per arm",
+      "nondeterministic_fields_excluded": [
+        "database_primary_keys",
+        "timestamps",
+        "worker_ids",
+        "filesystem_paths",
+        "evidence_ids"
+      ],
+      "seed_block_count": 5,
+      "strict_components": [
+        "candidates",
+        "trials",
+        "budget",
+        "winner",
+        "holdout_loss",
+        "failure_count",
+        "evidence_completeness"
+      ],
+      "training_cases_per_candidate": 3
+    },
+    "px4_or_flight_claim_permitted": false,
+    "real_credentials_used": false,
+    "simulator_backend": "mock",
+    "summary": {
+      "all_evidence_complete": true,
+      "all_fallback_outcomes_match_direct_portfolio": true,
+      "arm_run_count": 15,
+      "exact_outcome_match_count": 10,
+      "fallback_comparison_count": 10,
+      "seed_block_count": 5,
+      "total_persisted_trials": 579
+    }
+  },
+  "routing": {
+    "absolute_lift_over_best_constant": 0.41666666666666663,
+    "absolute_lift_over_uniform_random": 0.765625,
+    "best_constant_pass_rate": 0.5833333333333334,
+    "best_constant_tools": [
+      "optimizer_portfolio"
+    ],
+    "case_count": 24,
+    "category_rows": [
+      {
+        "case_count": 3,
+        "category": "cold_start",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      },
+      {
+        "case_count": 3,
+        "category": "constraint_pressure",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      },
+      {
+        "case_count": 3,
+        "category": "failure_recovery",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      },
+      {
+        "case_count": 3,
+        "category": "high_dimension",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      },
+      {
+        "case_count": 3,
+        "category": "local_progress",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      },
+      {
+        "case_count": 3,
+        "category": "mixed_tool_history",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      },
+      {
+        "case_count": 3,
+        "category": "stagnation",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      },
+      {
+        "case_count": 3,
+        "category": "tight_budget",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      }
+    ],
+    "claim_boundary": "Measures acceptable optimizer-tool selection on a versioned development corpus; it is not a simulator outcome benchmark.",
+    "contract_current": false,
+    "current_evidence_schema_version": "2.7",
+    "current_prompt_template_version": "1.5",
+    "evidence_class": "development_routing_corpus",
+    "failed_requirements": [],
+    "model_snapshot": "gpt-4.1-2025-04-14",
+    "pass_rate": 1.0,
+    "passed_count": 24,
+    "provider": "openai",
+    "qualification_scope": "archived_evidence_2_4_prompt_1_1",
+    "qualified": true,
+    "tool_selection_rows": [
+      {
+        "selected_count": 3,
+        "tool": "bipop_cma_es"
+      },
+      {
+        "selected_count": 3,
+        "tool": "constrained_mobo"
+      },
+      {
+        "selected_count": 1,
+        "tool": "multi_fidelity_mobo"
+      },
+      {
+        "selected_count": 10,
+        "tool": "optimizer_portfolio"
+      },
+      {
+        "selected_count": 1,
+        "tool": "saasbo"
+      },
+      {
+        "selected_count": 2,
+        "tool": "surrogate_cma_es"
+      },
+      {
+        "selected_count": 4,
+        "tool": "turbo"
+      }
+    ],
+    "uniform_random_expected_pass_rate": 0.234375
+  },
+  "routing_policy_holdout": {
+    "case_count": 16,
+    "category_rows": [
+      {
+        "case_count": 1,
+        "category": "baseline",
+        "pass_rate": 1.0,
+        "passed_count": 1
+      },
+      {
+        "case_count": 1,
+        "category": "combined",
+        "pass_rate": 1.0,
+        "passed_count": 1
+      },
+      {
+        "case_count": 5,
+        "category": "evidence_depth",
+        "pass_rate": 1.0,
+        "passed_count": 5
+      },
+      {
+        "case_count": 2,
+        "category": "problem_dimension",
+        "pass_rate": 1.0,
+        "passed_count": 2
+      },
+      {
+        "case_count": 2,
+        "category": "problem_shape",
+        "pass_rate": 1.0,
+        "passed_count": 2
+      },
+      {
+        "case_count": 3,
+        "category": "restart_state",
+        "pass_rate": 1.0,
+        "passed_count": 3
+      },
+      {
+        "case_count": 2,
+        "category": "scenario_replication",
+        "pass_rate": 1.0,
+        "passed_count": 2
+      }
+    ],
+    "claim_boundary": "Measures exact production tool-eligibility sets on a separate, hash-locked deterministic policy corpus. It makes no LLM routing quality, simulator outcome, or permanent-blindness claim.",
+    "corpus_role": "locked_holdout",
+    "corpus_sha256": "61be87c173407328078e8ddf6332908e13bab4eb1845fe64a3a1deeef06335c5",
+    "development_corpus_sha256": "98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89",
+    "evidence_class": "deterministic_router_policy_holdout",
+    "feedback_writebacks": 0,
+    "manifest_sha256": "966df36688fb310d2ee05d482c519af72696f91bd179b23358b210832117c68a",
+    "online_calls": 0,
+    "pass_rate": 1.0,
+    "passed_count": 16,
+    "policy_input_suite_sha256": "29e937ea2d69453056b75a8f1ebf19afba8eabeab185e0cc0d012ffaeedc15d7",
+    "qualified": true,
+    "simulator_runs": 0
+  },
+  "scenario_generalization": {
+    "baseline_to_selected_validation_improvement_rate": 0.2507234153931163,
+    "baseline_validation_loss": 1.37542,
+    "candidate_budget": 61,
+    "case_rows": [
+      {
+        "absolute_improvement": 0.22229999999999994,
+        "baseline_validation_loss": 0.969,
+        "case_id": "validation-nominal-obstacles",
+        "relative_improvement_rate": 0.2294117647058823,
+        "selected_validation_loss": 0.7467,
+        "shift_class": "configuration_shift"
+      },
+      {
+        "absolute_improvement": 0.2891,
+        "baseline_validation_loss": 1.1734,
+        "case_id": "validation-noise-heavy",
+        "relative_improvement_rate": 0.24637804670189195,
+        "selected_validation_loss": 0.8843,
+        "shift_class": "configuration_shift"
+      },
+      {
+        "absolute_improvement": 0.40769999999999995,
+        "baseline_validation_loss": 1.5693,
+        "case_id": "validation-wind-gust",
+        "relative_improvement_rate": 0.2597973618810935,
+        "selected_validation_loss": 1.1616,
+        "shift_class": "configuration_shift"
+      },
+      {
+        "absolute_improvement": 0.49470000000000014,
+        "baseline_validation_loss": 1.8141,
+        "case_id": "validation-turbulence-high",
+        "relative_improvement_rate": 0.2726972052257318,
+        "selected_validation_loss": 1.3194,
+        "shift_class": "configuration_shift"
+      },
+      {
+        "absolute_improvement": 0.3316999999999999,
+        "baseline_validation_loss": 1.2044,
+        "case_id": "validation-payload-heavy",
+        "relative_improvement_rate": 0.2754068415808701,
+        "selected_validation_loss": 0.8727,
+        "shift_class": "configuration_shift"
+      },
+      {
+        "absolute_improvement": 0.5281,
+        "baseline_validation_loss": 1.7214,
+        "case_id": "validation-combined-novel",
+        "relative_improvement_rate": 0.306785174857674,
+        "selected_validation_loss": 1.1933,
+        "shift_class": "scenario_type_shift"
+      },
+      {
+        "absolute_improvement": 0.3518000000000001,
+        "baseline_validation_loss": 1.5058,
+        "case_id": "validation-gps-dropout-novel",
+        "relative_improvement_rate": 0.2336299641386639,
+        "selected_validation_loss": 1.154,
+        "shift_class": "scenario_type_shift"
+      },
+      {
+        "absolute_improvement": 0.24960000000000004,
+        "baseline_validation_loss": 1.1066,
+        "case_id": "validation-battery-novel",
+        "relative_improvement_rate": 0.22555575637086575,
+        "selected_validation_loss": 0.857,
+        "shift_class": "scenario_type_shift"
+      },
+      {
+        "absolute_improvement": 0.3177000000000001,
+        "baseline_validation_loss": 1.6068,
+        "case_id": "validation-actuator-delay-novel",
+        "relative_improvement_rate": 0.19772218073188952,
+        "selected_validation_loss": 1.2891,
+        "shift_class": "scenario_type_shift"
+      },
+      {
+        "absolute_improvement": 0.2557999999999999,
+        "baseline_validation_loss": 1.0834,
+        "case_id": "validation-custom-novel",
+        "relative_improvement_rate": 0.23610854716632818,
+        "selected_validation_loss": 0.8276,
+        "shift_class": "scenario_type_shift"
+      }
+    ],
+    "claim_boundary": "Measures report-only robustness to stronger synthetic configurations and unseen synthetic scenario types. It is not PX4/Gazebo, real-flight, or open-world generalization evidence.",
+    "configuration_shift_case_count": 5,
+    "evaluated_candidate_count": 61,
+    "evidence_class": "synthetic_mock_mixed_shift_campaign",
+    "generalization_evidence": {
+      "assessment": "qualified_with_degradation",
+      "claim_scope": "mixed_shift_robustness",
+      "evidence_id": "c1474dbf639d746ecc5a6b448117b92b79d594eb424504a4e36157d00e85ff90",
+      "observed_shift": "degraded",
+      "shift_axes": [
+        "configuration_shift",
+        "scenario_type_shift"
+      ],
+      "validation_completed_trial_count": 10,
+      "validation_trial_count": 10
+    },
+    "novel_scenario_type_case_count": 5,
+    "physical_fidelity": false,
+    "scalar_loss_relative_degradation": 0.17995191206778113,
+    "simulator_backend": "mock",
+    "training_case_count": 5,
+    "training_oracle_regret": 0.0,
+    "training_scalar_loss": 0.8734,
+    "validation_case_count": 10,
+    "validation_oracle_regret": 0.0,
+    "validation_outcomes_used_for_selection": false,
+    "validation_scalar_loss": 1.03057
+  },
+  "schema_version": "dronedream.technical-report-evidence.v6",
+  "simulation_coverage": {
+    "baseline_holdout_loss": 0.82811,
+    "candidate_budget": 61,
+    "claim_boundary": "Validates deterministic search, scenario aggregation, and holdout logic only; it is not PX4/Gazebo or real-flight performance.",
+    "evaluated_candidate_count": 61,
+    "evidence_class": "synthetic_mock_campaign",
+    "exhaustive_oracle_candidate_count": 2430,
+    "generalization_evidence": {
+      "assessment": "qualified_improved_or_equal",
+      "claim_scope": "seed_robustness",
+      "evidence_id": "e68de4c3b11d631d838d2ddf478396b3f531ec6b0514a0b3d32913058d0acd0c",
+      "role": "validation_report_only_no_adaptive_feedback",
+      "scalar_loss_degradation": -0.00028999999999990145,
+      "scalar_loss_relative_degradation": -0.0004952693240425957,
+      "shift_axes": [
+        "seed_shift"
+      ],
+      "training_scalar_loss": 0.58554,
+      "validation_completed_trial_count": 10,
+      "validation_replicate_count": 10,
+      "validation_scalar_loss": 0.58525,
+      "validation_trial_count": 10
+    },
+    "holdout_oracle_regret": 0.0,
+    "physical_fidelity": false,
+    "relative_improvement_rate": 0.29327021772469836,
+    "scenario_count": 10,
+    "scenario_rows": [
+      {
+        "absolute_improvement": 0.15660000000000002,
+        "baseline_holdout_loss": 0.5299,
+        "relative_improvement_rate": 0.2955274580109455,
+        "scenario": "nominal",
+        "selected_holdout_loss": 0.3733
+      },
+      {
+        "absolute_improvement": 0.2036,
+        "baseline_holdout_loss": 0.7221,
+        "relative_improvement_rate": 0.28195540783824957,
+        "scenario": "noise_perturbed",
+        "selected_holdout_loss": 0.5185
+      },
+      {
+        "absolute_improvement": 0.2871,
+        "baseline_holdout_loss": 0.8863,
+        "relative_improvement_rate": 0.3239309488886382,
+        "scenario": "wind_perturbed",
+        "selected_holdout_loss": 0.5992
+      },
+      {
+        "absolute_improvement": 0.3719,
+        "baseline_holdout_loss": 1.1193,
+        "relative_improvement_rate": 0.3322612347002591,
+        "scenario": "combined_perturbed",
+        "selected_holdout_loss": 0.7474
+      },
+      {
+        "absolute_improvement": 0.34839999999999993,
+        "baseline_holdout_loss": 1.1093,
+        "relative_improvement_rate": 0.31407193725773,
+        "scenario": "turbulence",
+        "selected_holdout_loss": 0.7609
+      },
+      {
+        "absolute_improvement": 0.24770000000000003,
+        "baseline_holdout_loss": 0.8899,
+        "relative_improvement_rate": 0.27834588155972584,
+        "scenario": "gps_dropout",
+        "selected_holdout_loss": 0.6422
+      },
+      {
+        "absolute_improvement": 0.23360000000000003,
+        "baseline_holdout_loss": 0.7429,
+        "relative_improvement_rate": 0.31444339749629835,
+        "scenario": "payload_changed",
+        "selected_holdout_loss": 0.5093
+      },
+      {
+        "absolute_improvement": 0.1758,
+        "baseline_holdout_loss": 0.6288,
+        "relative_improvement_rate": 0.27958015267175573,
+        "scenario": "battery_degraded",
+        "selected_holdout_loss": 0.453
+      },
+      {
+        "absolute_improvement": 0.2238,
+        "baseline_holdout_loss": 1.0262,
+        "relative_improvement_rate": 0.21808614305203664,
+        "scenario": "actuator_delay",
+        "selected_holdout_loss": 0.8024
+      },
+      {
+        "absolute_improvement": 0.18009999999999998,
+        "baseline_holdout_loss": 0.6264,
+        "relative_improvement_rate": 0.2875159642401022,
+        "scenario": "custom",
+        "selected_holdout_loss": 0.4463
+      }
+    ],
+    "selected_holdout_loss": 0.58525,
+    "simulator_backend": "mock"
+  },
+  "source_commit": "0429b4244fc1fd912bd211e80821ebdbabb8ae5d",
+  "sources": {
+    "backend_test_receipt": {
+      "path": "artifacts/test-runs/aurora-backend-1139-receipt.json",
+      "sha256": "bc86ed4ba9d67c3c14e699142ad6d79a0eba6ca0c1980549c069c80e7991c74b"
+    },
+    "harness_ablations": {
+      "path": "backend/evaluation_artifacts/harness-contract-ablation-v1.json",
+      "sha256": "738e8110302e09fffe161ebd3f2558b68eb8ef4b53ec5ad40d6e48b8c8185226"
+    },
+    "harness_component_outcome_ablation": {
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v1.json",
+      "sha256": "3d354307b479c1a44ba5d5abad26bef2562f028b4a09c059174b8a3b5c284da9"
+    },
+    "harness_component_outcome_ablation_csv": {
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v1.csv",
+      "sha256": "f2f34b4ccfd9fa21ca14d71db72de36f7489608e834d53dfbdd56357ea0d1c2f"
+    },
+    "harness_component_outcome_ablation_manifest": {
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v1.manifest.json",
+      "sha256": "b5bbc1ec679f79a4bc06d86485a804a178629a9706dc4af46e1c75009108dc1b"
+    },
+    "harness_outcome_campaign": {
+      "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+      "sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d"
+    },
+    "routing_corpus": {
+      "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+      "sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1"
+    },
+    "routing_policy_holdout_corpus": {
+      "path": "backend/tests/fixtures/harness_routing_policy_holdout_v1.jsonl",
+      "sha256": "d98d11773187efc225edcda2c38b9cf6c1ab6d7fe4df01f977589de65ec39179"
+    },
+    "routing_policy_holdout_manifest": {
+      "path": "backend/tests/fixtures/harness_routing_policy_holdout_v3.manifest.json",
+      "sha256": "5a0795ffc7a2a342cc0faf3edca29a54f3b1e72d5cf2842f5e8d16b7c2c0ef78"
+    },
+    "routing_policy_holdout_result": {
+      "path": "backend/evaluation_artifacts/harness-routing-policy-holdout-v3.json",
+      "sha256": "c10941ab0af221bc53d0c4f2d37eb7605c7a1a045b83b3775966cb9573bac2da"
+    },
+    "routing_predictions": {
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14.json",
+      "sha256": "8a6531580243f1fa1493f68570b01e965231995f6b754290aca9d6f285d4575b"
+    },
+    "scenario_generalization": {
+      "path": "backend/evaluation_artifacts/scenario-generalization-mock-v1.json",
+      "sha256": "a2ab40d2962ac9f883281f24b0f3e8fb0f5316847f71ea3734ec9370ad858030"
+    },
+    "simulation_coverage": {
+      "path": "backend/evaluation_artifacts/simulation-coverage-mock-v3.json",
+      "sha256": "f7523608ae3e7752fed04a789978c58b7546f89bd43098ea041e7ddfa9fbdf12"
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "corpus_sha256": "98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89",
+  "evidence_schema_version": "2.8",
+  "generation_config": {
+    "response_format": "json_schema",
+    "seed": 20260728,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "model_snapshot": "gpt-4.1-2025-04-14",
+  "predictions": {
+    "cold_start_four_parameters": {
+      "rationale": "There is no observed improvement over baseline (aggregated_score remains 1.0 for both baseline and optimizer candidates), and only one candidate has been evaluated so far. The plan phase is 'exploration' with a 'broad' batch policy, and the reason code is 'insufficient_scored_history.' The optimizer_portfolio tool is recommended for situations with little trustworthy history and when robust, non-­",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "cold_start_twelve_parameters": {
+      "rationale": "There is insufficient scored history (only 2 candidates, 1 generation of optimizer use) and no evidence favoring a specialized optimizer. The plan phase is 'exploration' with a 'broad' batch policy, and the tool manifest recommends the deterministic portfolio when evidence does not support specialization. The optimizer_portfolio tool ensures robust exploration across optimizer families, which is a",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "cold_start_with_constraint_pressure": {
+      "rationale": "There is insufficient trustworthy history, no feasible candidates, and no observed improvement over baseline. The current phase is exploration with a broad batch policy, and the job has explicit constraints. The optimizer_portfolio tool is designed for such cases, providing robust exploration across optimizer families when specialization is not supported by the evidence. This approach maximizes a)",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "constraint_pressure_no_feasible_points": {
+      "rationale": "There is no feasible candidate observed so far (feasible_candidate_count: 0), and only two candidate histories are included, both with aggregated scores above or equal to the baseline (1.0 and 1.2). The observed failure rate is high (0.35), and the job has explicit constraints and multiple objectives. The current phase is exploration with a broad batch policy, and there is insufficient evidence to",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "constraint_pressure_sparse_feasible_region": {
+      "rationale": "The job features explicit constraints, multiple objectives, and a moderate parameter dimension (8). The current phase is 'balanced' with a one-generation horizon, and the batch policy is also 'balanced.' The tool history shows that 'constrained_mobo' has already produced the best observed aggregate score (0.9, lower than the baseline 1.0) and feasible candidates, with a manageable failure rate. No",
+      "selected_tool": "constrained_mobo"
+    },
+    "constraint_pressure_with_progress": {
+      "rationale": "Constrained MOBO is preferred because the job has explicit constraints and multiple objectives, and there is sufficient completed numerical evidence (28 candidates, 12 from this tool) to fit a surrogate. The recent generation achieved a strong improvement (aggregated score reduced from 1.0 to 0.58), with a feasible candidate rate of 0.357 and a low observed failure rate (0.12). The plan phase is '",
+      "selected_tool": "constrained_mobo"
+    },
+    "failure_recovery_constraints_improving": {
+      "rationale": "Constrained MoBO is selected because the job has explicit constraints (3), a single robust objective, and a moderate parameter dimension (5). The tool has already demonstrated measurable improvement over baseline (best score improved from 1.0 to 0.7), with 6 feasible candidates out of 8 and a feasible candidate rate of 0.75 in its prior use. The observed failure rate is moderate (0.4), but the job",
+      "selected_tool": "constrained_mobo"
+    },
+    "failure_recovery_high_rate": {
+      "rationale": "The current phase is 'recovery' with a high observed failure rate (0.7), only two feasible candidates out of 20, and minimal improvement (best score 0.95 vs. baseline 1.0). There is insufficient evidence to support a specialized optimizer: only two candidates are included in history, and no tool-specific prior outcomes are available. The optimizer_portfolio is preferred because it robustly allocs,",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "failure_recovery_turbo_failures": {
+      "rationale": "The current phase is recovery with a conservative batch policy after high observed failure rates (62%) and two stagnant generations. Only one feasible candidate has been found by the prior tool (turbo), and the feasible candidate rate is low (15.4%). The job has 7 parameters and explicit constraints, but only a single robust objective and one training case, limiting the benefit of specialized or M",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "high_dimension_coldish_history": {
+      "rationale": "The current phase is 'balanced' with a batch policy of 'balanced', and there is only limited candidate history (2 included, 8 total) with no tool-specific history or evidence of stagnation. The parameter dimension is high (48), but there is only a single training case and no observed failures. Recent progress is observed (aggregated score improved from 1.0 to 0.91), but the evidence is not strong,",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "high_dimension_sparse_axes_24": {
+      "rationale": "The current phase is 'balanced' with a one-generation horizon and a balanced batch policy. There is only limited candidate history (2 included, 20 total), and while there is measurable improvement from baseline (aggregated score improved from 1.0 to 0.73), the evidence does not indicate strong justification for a specialized optimizer. No stagnation or failures are observed, but the parameter size",
+      "selected_tool": "optimizer_portfolio"
+    },
+    "high_dimension_sparse_history_wins": {
+      "rationale": "SAASBO is preferred due to the high parameter count (36), where sparse-axis Bayesian optimization is effective. Recent tool history shows SAASBO achieved the best observed aggregated score (0.49, lower is better) in the latest generation, outperforming other tools (e.g., Turbo's best score was 0.68). There is no stagnation, and the observed improvement trend supports continued use. The current 'st",
+      "selected_tool": "saasbo"
+    },
+    "local_progress_small_remaining_window": {
+      "rationale": "turbo is preferred because recent evidence shows strong measured progress: the best aggregated score improved from 1.0 (baseline) to 0.42 in generation 6, with no observed failures and a 0.58 absolute improvement. The job has a single robust objective, 5 parameters, and homogeneous training cases, matching turbo's local exploitation strengths. The plan phase is 'balanced' with a one-generation rec",
+      "selected_tool": "turbo"
+    },
+    "local_progress_surrogate_leads": {
+      "rationale": "Surrogate CMA-ES achieved the best observed aggregated score (0.48) in the most recent generation, outperforming both the baseline (1.0) and Turbo (0.66). It also maintained a high feasible candidate rate (7/8) and a low failure rate, with no evidence of stagnation or budget inefficiency. The current phase is 'balanced' with a single training case and moderate parameter dimension (8), which fits '",
+      "selected_tool": "surrogate_cma_es"
+    },
+    "local_progress_turbo_leads": {
+      "rationale": "The most recent generation (generation 3) achieved a strong improvement in aggregated score (from 1.0 to 0.55) using 'turbo', with no failed trials and all candidates feasible. The job is in the 'balanced' phase with a one-generation horizon, and the batch policy is also 'balanced'. The parameter dimension (6) and single training case with 4 replicates are well within 'turbo's capabilities. There",
+      "selected_tool": "turbo"
+    },
+    "mixed_history_no_clear_winner": {
+      "rationale": "The current phase is 'balanced' with a one-generation horizon, and recent evidence shows stable progress: the best aggregated score improved from 1.0 (baseline) to 0.62, with no observed stagnation and a 0.38 relative improvement. Among tools with recent cohort results, 'turbo' achieved the lowest best score (0.62) compared to 'surrogate_cma_es' (0.63) and 'saasbo' (0.64), with similar feasibility",
+      "selected_tool": "turbo"
+    },
+    "mixed_history_surrogate_clear_winner": {
+      "rationale": "Surrogate CMA-ES achieved the lowest aggregated loss (0.39) in the most recent generation, outperforming both Turbo (0.58) and constrained_mobo (0.61) in prior generations. The job has a moderate parameter dimension (12), a single nominal training case, and no observed stagnation or failures in the last cohort. The current phase is 'balanced' with a one-generation horizon, and the budget remains,",
+      "selected_tool": "surrogate_cma_es"
+    },
+    "mixed_history_turbo_clear_winner": {
+      "rationale": "turbo is preferred because it achieved the lowest observed aggregated score (0.44) in the most recent generation, with no failed trials and a strong improvement over the baseline (1.0). The job is in a balanced phase with a single training case and moderate parameter dimension (8), and the budget allows for continued focused exploitation. No stagnation is observed, and turbo's trust-region local-b",
+      "selected_tool": "turbo"
+    },
+    "stagnation_after_surrogate_plateau": {
+      "rationale": "Stagnation has been detected over four trailing generations, and the current plan phase is diversification with a broad batch policy. The best observed aggregate score (0.61) was achieved by surrogate_cma_es, but further improvement has stalled despite sufficient candidate and trial counts. The parameter dimension (9) is moderate, and the scenario is simple with a single nominal training case and",
+      "selected_tool": "bipop_cma_es"
+    },
+    "stagnation_high_dimension": {
+      "rationale": "Stagnation has been detected over four trailing generations, and the current phase is diversification with a broad batch policy. The parameter dimension is high (24), and there is sufficient budget remaining for exploration (60 trials left, 2 generations remaining). BIPOP CMA-ES is specifically recommended for escaping local basins after stagnation, as indicated in the tool manifest. Recent cohort",
+      "selected_tool": "bipop_cma_es"
+    },
+    "stagnation_three_generations": {
+      "rationale": "Three trailing stagnant generations are observed, and the best score (0.72) was achieved with the previous tool but no further improvement has occurred. The current phase is diversification, and the batch policy is broad. The parameter dimension (6) and single-case, single-type scenario do not require multi-fidelity or multi-objective support. According to the manifest, bipop_cma_es is best when '",
+      "selected_tool": "bipop_cma_es"
+    },
+    "tight_budget_expensive_matrix": {
+      "rationale": "The current evidence shows stable progress (relative improvement from baseline: 0.24, best score improved from 1.0 to 0.76), no observed failures, and no trailing stagnant generations. The batch policy is 'balanced' and the phase is 'balanced', with a moderate parameter dimension (8) and homogeneous training cases. The remaining budget (16 trials, 2 full candidates) is sufficient for focused local",
+      "selected_tool": "turbo"
+    },
+    "tight_budget_multifidelity_history": {
+      "rationale": "The recent generation (generation 4) achieved a substantial improvement in aggregated loss (from 1.0 to 0.57) using multi_fidelity_mobo, with no observed failures and a feasible candidate rate of 0.6. The remaining budget allows for two more full candidates, and the batch policy is balanced. The job has moderate parameter dimensionality (10), homogeneous training cases, and no explicit constraints",
+      "selected_tool": "multi_fidelity_mobo"
+    },
+    "tight_budget_one_full_matrix_left": {
+      "rationale": "The current phase is verification with a conservative batch policy and only one full candidate remaining in the budget. The evidence shows robust improvement (best aggregated score improved from 1.0 to 0.64), but only two candidate histories are included, and there is no tool-specific outcome history. The job has moderate parameter dimensionality (6), homogeneous training cases, and no observed or",
+      "selected_tool": "optimizer_portfolio"
+    }
+  },
+  "prompt_suite_sha256": "81b3cae64b16f6b8294ef05acd9792f5d86c36e6d9e2afecf2f60d4d4db41903",
+  "prompt_template_version": "1.7",
+  "provider": "openai",
+  "schema_version": "1.0",
+  "tool_registry_version": "2.1"
+}

@@ -1,0 +1,130 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "reference_track_json",
+      "display_name": "Reference Track",
+      "file_size_bytes": 32498,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/reference_track.json"
+    },
+    {
+      "artifact_type": "scenario_config_json",
+      "display_name": "Scenario Configuration",
+      "file_size_bytes": 616,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/scenario_config.json"
+    },
+    {
+      "artifact_type": "scenario_effect_request_json",
+      "display_name": "Scenario Effect Request",
+      "file_size_bytes": 4225,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/scenario_effects.request.json"
+    },
+    {
+      "artifact_type": "scenario_effect_evidence_json",
+      "display_name": "Scenario Effect Evidence",
+      "file_size_bytes": 79720,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/scenario_effects.applied.json"
+    },
+    {
+      "artifact_type": "controller_parameters_json",
+      "display_name": "Controller Parameters",
+      "file_size_bytes": 125,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/controller_params.json"
+    },
+    {
+      "artifact_type": "px4_parameters_input_json",
+      "display_name": "PX4 Parameter Input",
+      "file_size_bytes": 22,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/px4_parameters.input.json"
+    },
+    {
+      "artifact_type": "simulator_launch_config_json",
+      "display_name": "Simulator Launch Configuration",
+      "file_size_bytes": 93388,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/launch_config.json"
+    },
+    {
+      "artifact_type": "simulator_runtime_manifest_json",
+      "display_name": "Simulator Runtime Manifest",
+      "file_size_bytes": 89916,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/simulator_runtime_manifest.json"
+    },
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 201,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/runner.log"
+    },
+    {
+      "artifact_type": "simulator_stdout",
+      "display_name": "Simulator stdout",
+      "file_size_bytes": 5138,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/stdout.log"
+    },
+    {
+      "artifact_type": "simulator_stderr",
+      "display_name": "Simulator stderr",
+      "file_size_bytes": 386,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/stderr.log"
+    },
+    {
+      "artifact_type": "offboard_executor_log",
+      "display_name": "Offboard Executor Log",
+      "file_size_bytes": 238,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/offboard_executor.log"
+    },
+    {
+      "artifact_type": "offboard_timing_json",
+      "display_name": "Offboard Timing",
+      "file_size_bytes": 90,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/offboard_timing.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Requested",
+      "file_size_bytes": 504,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/px4_parameters.requested.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Before",
+      "file_size_bytes": 522,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/px4_parameters.before.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Applied",
+      "file_size_bytes": 583,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-real-px4-26b957e/gps-readiness-boundary/px4_parameters.applied.json"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-real-px4-26b957e",
+    "seed": 42001,
+    "trial_id": "advanced-physics-exact-26b957e-gps-boundary-seed-42001"
+  },
+  "failure": {
+    "code": "SIMULATION_FAILED",
+    "reason": "lower-level launcher exited with code 1"
+  },
+  "log_excerpt": "lower-level launcher exited with code 1",
+  "schema_version": "dronedream.trial_result.v2",
+  "success": false
+}

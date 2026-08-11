@@ -1,0 +1,178 @@
+{
+  "capability_contract": {
+    "contract_sha256": "4513783194916e9e844b317252fea278084167a6b0167eb6f41d4ca83f04e830",
+    "physically_applied": [
+      "actuator_first_order_delay",
+      "actuator_hard_failure",
+      "battery_initial_state_and_voltage_sag",
+      "deterministic_seeded_gps_dropout",
+      "gust_and_turbulence",
+      "obstacles",
+      "payload_mass_and_inertia",
+      "sensor_noise",
+      "steady_wind"
+    ],
+    "requires_runtime_extension": [],
+    "schema_version": "dronedream.scenario_effect_request.v1"
+  },
+  "claim_boundary": "Exact-byte aggregation of real PX4 SITL and Gazebo evidence for every bundled DroneDream physical-effect category. It proves request-bound injection and readback within the retained x500/default-world protocols. It does not claim that every perturbed flight passed its performance policy, real-aircraft transfer, flight safety, or general controller superiority.",
+  "coverage": [
+    {
+      "category": "steady_wind",
+      "effect_ids": [
+        "job_config.wind"
+      ],
+      "evidence_strength": "two_seed_successful_flight_and_runtime_readback",
+      "performance_success_for_all_retained_trials": true,
+      "source_role": "constant_wind_and_obstacles"
+    },
+    {
+      "category": "obstacles",
+      "effect_ids": [
+        "scenario_config.obstacles"
+      ],
+      "evidence_strength": "two_seed_successful_flight_and_entity_creation_readback",
+      "performance_success_for_all_retained_trials": true,
+      "source_role": "constant_wind_and_obstacles"
+    },
+    {
+      "category": "gust_and_turbulence",
+      "effect_ids": [
+        "wind_gusts"
+      ],
+      "evidence_strength": "three_successful_flights_and_generated_sdf_readback",
+      "performance_success_for_all_retained_trials": true,
+      "source_role": "gust_noise_payload_and_actuator_delay"
+    },
+    {
+      "category": "sensor_noise",
+      "effect_ids": [
+        "sensor_degradation.baro_noise_m",
+        "sensor_degradation.gps_noise_m",
+        "sensor_degradation.imu_noise_scale"
+      ],
+      "evidence_strength": "barometer_and_imu_successful_flight_plus_gps_readiness_boundary",
+      "performance_success_for_all_retained_trials": false,
+      "source_role": "gust_noise_payload_and_actuator_delay"
+    },
+    {
+      "category": "payload_mass_and_inertia",
+      "effect_ids": [
+        "battery.mass_payload_kg"
+      ],
+      "evidence_strength": "three_successful_flights_and_generated_sdf_readback",
+      "performance_success_for_all_retained_trials": true,
+      "source_role": "gust_noise_payload_and_actuator_delay"
+    },
+    {
+      "category": "actuator_first_order_delay",
+      "effect_ids": [
+        "scenario_type.actuator_delay"
+      ],
+      "evidence_strength": "three_successful_flights_and_generated_sdf_readback",
+      "performance_success_for_all_retained_trials": true,
+      "source_role": "gust_noise_payload_and_actuator_delay"
+    },
+    {
+      "category": "deterministic_seeded_gps_dropout",
+      "effect_ids": [
+        "sensor_degradation.dropout_rate"
+      ],
+      "evidence_strength": "flight_timed_parameter_readback_gps_telemetry_and_ulog_transition",
+      "performance_success_for_all_retained_trials": false,
+      "source_role": "gps_dropout_and_battery"
+    },
+    {
+      "category": "battery_initial_state_and_voltage_sag",
+      "effect_ids": [
+        "battery.initial_percent",
+        "battery.voltage_sag"
+      ],
+      "evidence_strength": "flight_timed_parameter_readback_and_battery_telemetry",
+      "performance_success_for_all_retained_trials": false,
+      "source_role": "gps_dropout_and_battery"
+    },
+    {
+      "category": "actuator_hard_failure",
+      "effect_ids": [
+        "scenario_type.actuator_failure"
+      ],
+      "evidence_strength": "generated_sdf_plus_failed_and_healthy_rotor_joint_state_readback",
+      "performance_success_for_all_retained_trials": false,
+      "source_role": "hard_actuator_failure"
+    }
+  ],
+  "evidence_class": "REAL_PX4_GAZEBO_BUNDLED_EFFECT_CLOSURE",
+  "generated_at": "2026-07-28T23:34:22Z",
+  "manifest_sha256": "7193e21ff826560e9e9f4d30453dc122d55fbee054397ff4a52f89deca15cb9f",
+  "remaining_runtime_extensions": [],
+  "runtime_identity": {
+    "gazebo_sim_version_observed_in_latest_closure": "8.14.0",
+    "gazebo_transport_version_observed_in_latest_closure": "13.5.0",
+    "px4_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "px4_version": "v1.16",
+    "real_aircraft": false,
+    "vehicle": "x500",
+    "world": "default"
+  },
+  "schema_version": "dronedream.advanced-physics-closure-manifest.v2",
+  "source_evidence": [
+    {
+      "manifest": {
+        "bytes": 245202,
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.manifest.json",
+        "sha256": "4ac760428ead1506fb41ef4928df486a1b0983517a6aee846c2444e882090eda"
+      },
+      "receipt": {
+        "bytes": 845,
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.receipt.json",
+        "sha256": "8f7e1c953338ae87154b25822bf7c781921473cbcd76fd5874d79c178ef73dee"
+      },
+      "role": "constant_wind_and_obstacles",
+      "subject_commit": "86273db6d827a790cb0a8b1472256b23e0a629d2"
+    },
+    {
+      "manifest": {
+        "bytes": 446837,
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.manifest.json",
+        "sha256": "599c2b8b89bedb525a36c00837e8f09e7b4598c4825a01cff2942c6c5825a923"
+      },
+      "receipt": {
+        "bytes": 1235,
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.receipt.json",
+        "sha256": "99e257fb56d46d9293ba9365ccae604ddd697802370b877360541628ebd1354f"
+      },
+      "role": "gust_noise_payload_and_actuator_delay",
+      "subject_commit": "26b957efd985d0ac37702a8d2518e87ab65347c3"
+    },
+    {
+      "receipt": {
+        "bytes": 6048,
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/receipt.json",
+        "sha256": "2d6470fb085e638c52754f580d22a5d3d50d2f26000e584148557f3c505fdd8a"
+      },
+      "role": "gps_dropout_and_battery",
+      "subject_commit": "fdf1250398567c6658ad5148efc1c302dede4a17"
+    },
+    {
+      "receipt": {
+        "bytes": 11114,
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/receipt.json",
+        "sha256": "5cc93ee5bfb75c53f95bdd925bb3121658d9ae93d6742d2b677d489112252cc6"
+      },
+      "role": "hard_actuator_failure",
+      "subject_commit": "793f02089413f2baa8ea78387cd1e9e078f02b83"
+    }
+  ],
+  "subject_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+  "summary": {
+    "all_effects_performance_successful": false,
+    "all_runtime_effect_categories_verified": true,
+    "capability_category_count": 9,
+    "categories_with_all_retained_performance_success": 5,
+    "real_aircraft_claim_permitted": false,
+    "source_manifest_count": 2,
+    "source_receipt_count": 4,
+    "verified_category_count": 9
+  }
+}

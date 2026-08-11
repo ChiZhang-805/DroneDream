@@ -4,17 +4,22 @@
 
 DroneDream uses two explicit operating modes:
 
-- **Local workspace** is the default for the signed Windows application. It
-  uses the local Runtime and local database, does not require an Internet
-  account, and keeps the current experiment draft only for the current app
-  session.
-- **Cloud workspace** is opt-in. It uses Supabase Auth as the identity
-  provider and DroneDream's authenticated API as the data boundary. New users
-  register with an email address, a password, and the verification code sent
-  to that address; returning users sign in with email and password. Google can
-  be enabled for the browser deployment after its OAuth callback is
-  configured. SMS is excluded from the first release because it adds provider
-  cost and abuse controls.
+- **Release Windows application** requires a Supabase account. Supabase
+  Auth supplies the access token, while the bundled local Runtime and database
+  remain the experiment execution boundary. The startup screen reports 100%
+  only for the local environment checks. At that point it exposes one
+  **Sign in and enter tuning workspace** action. The tuning workspace itself
+  remains locked until browser authentication succeeds and
+  `GET /api/v1/session` accepts the same account identity.
+- **Local development/test workspace** may explicitly omit Supabase and use
+  disabled or demo authentication. This exception is not a shippable desktop
+  configuration and must never be used to make a public build appear ready.
+
+New users register with an email address, a password, and the verification
+code sent to that address; returning users sign in with email and password.
+Google can be enabled for the browser deployment after its OAuth callback is
+configured. SMS is excluded from the first release because it adds provider
+cost and abuse controls.
 
 The product must never display a successful cloud sign-in while continuing to
 query unscoped local or cloud records. Authentication and tenant filtering are
@@ -31,21 +36,52 @@ The backend already has the required ownership model:
 - `AUTH_MODE=oidc_jwt` verifies asymmetric JWT signatures, issuer, audience,
   expiry, and subject through the configured JWKS endpoint.
 
-The frontend now has an optional Supabase account layer:
+The frontend has a Supabase account layer for public desktop builds:
 
-- no Supabase environment variables means an honest local-only workspace;
+- no Supabase environment variables means an honest local-development
+  workspace; a release desktop build must fail before packaging when those
+  public variables are absent;
+- the desktop launcher's chrome does not expose a separate account button;
+  after local checks reach 100%, a system-browser login is the only entry
+  action;
+- the system browser receives a random loopback port and a 64-hex one-time
+  state assembled from two OS-random UUIDs, then sends credentials directly to
+  the approved Supabase HTTPS origin;
+  access and refresh tokens return in a bounded same-origin POST body and never
+  appear in a URL, command line, Runtime request, or persisted browser page;
+- the local callback rejects wrong hosts, origins, state, content types,
+  duplicate headers, transfer encoding, oversized requests, and malformed
+  tokens; cancellation and a ten-minute timeout close abandoned attempts;
+- after the WebView adopts the returned session, the local API must confirm
+  the same account before navigation automatically enters the workspace;
 - email verification creates one password-protected account per verified
   email, and the registration form keeps the code field visible from the
   beginning;
 - a Supabase access token is attached to API requests in memory;
-- signing out or changing accounts clears the unfinished experiment draft;
+- the backend identity probe must accept the same immutable account subject
+  before the startup gate can reach 100%;
+- unfinished experiment drafts are redacted and mirrored into persistent local
+  storage so a normal app exit or restart can restore them;
+- an explicit desktop exit asks the backend to cancel known active jobs, then
+  terminates only the dedicated `DroneDreamRuntime` WSL distribution with a
+  bounded command before destroying the window; it never issues a global WSL
+  shutdown or targets the user's other distributions;
+- signing out or changing accounts clears the unfinished experiment draft to
+  prevent cross-account disclosure;
 - the desktop refresh-token session uses `sessionStorage` until an
   OS-keychain-backed Tauri storage adapter is added;
 - Google and Apple buttons are build flags and stay hidden in the desktop
   WebView until its signed deep-link callback is implemented.
 
-The model API key remains separate from account authentication. It is never
-placed in an experiment draft or persistent browser storage.
+Model access remains separate from account authentication:
+
+- included DroneDream model access uses a short-lived, purpose-scoped gateway
+  grant; the platform provider key exists only in an Edge Function secret;
+- BYOK credentials remain memory-only and are never placed in an experiment
+  draft or persistent browser storage.
+
+The quota, grant, and payment boundary is documented in
+[21 Managed Model Access, Allowances, and Billing](./21-managed-model-access-and-billing.md).
 
 ## Configuration contract
 
@@ -54,18 +90,27 @@ Frontend build variables:
 ```dotenv
 VITE_SUPABASE_URL=https://PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+VITE_TURNSTILE_SITE_KEY=public_site_key
 VITE_AUTH_GOOGLE_ENABLED=false
 VITE_AUTH_APPLE_ENABLED=false
 ```
 
+The standalone desktop browser page currently fails the desktop packaging gate
+when `VITE_TURNSTILE_SITE_KEY` is non-empty. Supabase CAPTCHA must not be
+enabled for desktop accounts until that browser page implements and verifies
+the Turnstile token exchange. This does not prevent the separately deployed
+website from using its own CAPTCHA integration.
+
 Backend runtime variables:
 
 ```dotenv
-APP_ENV=production
+APP_ENV=desktop
 AUTH_MODE=oidc_jwt
 OIDC_ISSUER=https://PROJECT_REF.supabase.co/auth/v1
 OIDC_AUDIENCE=authenticated
 OIDC_JWKS_URL=https://PROJECT_REF.supabase.co/auth/v1/.well-known/jwks.json
+OIDC_JWKS_TIMEOUT_SECONDS=5
+OIDC_JWKS_MAX_BYTES=1048576
 OIDC_ALGORITHMS=RS256,ES256
 ```
 
@@ -83,15 +128,23 @@ password, or any signing key in frontend variables or the repository.
    public release, connect a dedicated sender domain and custom SMTP provider
    such as Resend, Postmark, Amazon SES, or another provider chosen by the
    operator.
-4. Add the production website URL and allowed redirect URLs.
-5. Copy only the project URL and publishable key into the frontend build
-   secrets. Configure the backend OIDC values above in server secrets.
-6. Confirm the project uses an asymmetric signing key compatible with the
+4. The browser website may use Cloudflare Turnstile after its widget, public
+   site key, and Supabase private secret are configured. Keep Supabase CAPTCHA
+   disabled for desktop login until the standalone desktop browser page gains
+   the same verified token exchange; the desktop build gate rejects a
+   non-empty Turnstile key in the meantime.
+5. Add the production website URL and allowed redirect URLs.
+6. Copy only the project URL and publishable key into desktop frontend build
+   variables. The browser website may additionally receive the Turnstile
+   public site key. The packaged local Runtime receives only the public OIDC
+   verifier configuration above; it never receives a Supabase service-role
+   key.
+7. Confirm the project uses an asymmetric signing key compatible with the
    JWKS verifier, then run the cross-user isolation acceptance tests.
-7. If Google login is wanted, create a Google OAuth web client, register the
+8. If Google login is wanted, create a Google OAuth web client, register the
    Supabase callback URL, add its client ID and secret in Supabase, then set
    `VITE_AUTH_GOOGLE_ENABLED=true` for the browser build.
-8. Defer Apple login until an Apple Developer account, Services ID, verified
+9. Defer Apple login until an Apple Developer account, Services ID, verified
    domain, redirect URL, and secret-rotation owner are ready.
 
 No mailbox password is needed. The operator configures the SMTP provider
@@ -105,13 +158,14 @@ Before cloud accounts appear in a public build:
 2. User B cannot discover User A's job through list filters or guessed IDs.
 3. User B receives a not-found or forbidden response for User A's trials,
    artifacts, reports, batches, and downloads.
-4. Signing out clears the unfinished conversation and five-step draft.
+4. A normal close/restart restores the redacted unfinished five-step draft;
+   signing out clears it.
 5. Signing in as another user does not reveal the previous account's jobs,
    model API key, draft, or cached artifact URL.
 6. Expired, wrong-audience, wrong-issuer, unsigned, and symmetric-algorithm
    tokens fail closed.
-7. Local-only mode remains available without pretending that its data is
-   synced to a cloud account.
+7. Local-only development mode remains available without pretending that it is
+   a public signed build or that its data is synced to a cloud account.
 
 ## Storage direction for the initial user count
 

@@ -2,11 +2,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 #[cfg(target_os = "windows")]
-use crate::process::{spawn_contained_background, windows_command, ContainedChild};
+use crate::process::{command_output, spawn_contained_background, windows_command, ContainedChild};
 
 const KEEPALIVE_PROGRAM: &str = "/usr/bin/sleep";
 const KEEPALIVE_ARGUMENT: &str = "infinity";
 const STARTUP_SETTLE_TIME: Duration = Duration::from_millis(250);
+#[cfg(target_os = "windows")]
+const EXIT_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Default)]
 pub(crate) struct RuntimeKeepalive {
@@ -81,10 +83,58 @@ impl RuntimeKeepalive {
             .map_err(|_| "DroneDreamRuntime keepalive state is unavailable.".to_string())?;
         Ok(())
     }
+
+    /// Stop only the dedicated DroneDream WSL distribution before the desktop
+    /// process exits. This is intentionally stronger than dropping the
+    /// keepalive: queued/running simulator children must not outlive an
+    /// explicit exit decision.
+    #[cfg(target_os = "windows")]
+    fn terminate_for_exit(&self) -> Result<(), String> {
+        self.release()?;
+        let mut command = windows_command("wsl.exe");
+        command.args(terminate_wsl_args());
+        let output = command_output(
+            command,
+            EXIT_TERMINATION_TIMEOUT,
+            "DroneDreamRuntime exit termination",
+        )?;
+        if output.status.success() {
+            return Ok(());
+        }
+        let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Err(format!(
+            "Unable to stop DroneDreamRuntime before exit (code {}): {}",
+            output.status.code().unwrap_or(-1),
+            if detail.is_empty() {
+                "wsl.exe returned no diagnostic output"
+            } else {
+                &detail
+            }
+        ))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn terminate_for_exit(&self) -> Result<(), String> {
+        self.release()
+    }
 }
 
 fn keepalive_wsl_args() -> Vec<String> {
     crate::runtime::runtime_wsl_exec_args(KEEPALIVE_PROGRAM, &[KEEPALIVE_ARGUMENT])
+}
+
+fn terminate_wsl_args() -> [&'static str; 2] {
+    ["--terminate", "DroneDreamRuntime"]
+}
+
+#[tauri::command]
+pub(crate) async fn stop_runtime_for_exit(
+    keepalive: tauri::State<'_, RuntimeKeepalive>,
+) -> Result<(), String> {
+    let keepalive = keepalive.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || keepalive.terminate_for_exit())
+        .await
+        .map_err(|error| format!("Runtime exit termination task failed: {error}"))?
 }
 
 #[cfg(test)]
@@ -111,6 +161,12 @@ mod tests {
         assert!(!args.iter().any(|argument| argument == "/bin/sh"));
         assert!(!args.iter().any(|argument| argument == "-c"));
         assert!(!args.iter().any(|argument| argument == "--shutdown"));
+    }
+
+    #[test]
+    fn exit_termination_targets_only_the_dedicated_runtime() {
+        assert_eq!(terminate_wsl_args(), ["--terminate", "DroneDreamRuntime"]);
+        assert!(!terminate_wsl_args().contains(&"--shutdown"));
     }
 
     #[cfg(target_os = "windows")]

@@ -1,0 +1,95 @@
+{
+  "schema_version": "dronedream.internal-test-installer-release-receipt.v5",
+  "generated_at": "2026-07-31T07:55:00Z",
+  "subject_commit": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+  "subject_branch": "codex/software",
+  "subject_was_clean_and_equal_to_upstream_before_build": true,
+  "version": "1.0.0",
+  "artifact": {
+    "absolute_path": "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\internal-installer-1.0.0-c3fb2c0\\DroneDream_1.0.0_x64-setup.exe",
+    "file_name": "DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 10331399,
+    "sha256": "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+    "authenticode_status": "NotSigned",
+    "pe_certificate_table_offset": 0,
+    "pe_certificate_table_size": 0,
+    "owner_accepted_unsigned_internal_test_fact": true,
+    "git_ignored_and_not_committed": true
+  },
+  "build": {
+    "command": "npm --prefix desktop run build:llvm",
+    "nsis_attempts": 1,
+    "nsis_bundles_created": 1,
+    "pipeline_exit_code": 1,
+    "pipeline_failure_stage": "post_bundle_updater_signing",
+    "pipeline_failure_detail": "PowerShell array expansion did not pass the empty updater password as a value to the Tauri signer.",
+    "same_exe_signed_after_bundle_without_rebuild": true,
+    "second_nsis_attempt_performed": false,
+    "exe_bytes_unchanged_during_signing_recovery": true,
+    "source_script_modified_after_subject_freeze": false
+  },
+  "tauri_updater": {
+    "signature_file": "DroneDream_1.0.0_x64-setup.exe.sig",
+    "signature_file_bytes": 420,
+    "signature_file_sha256": "4d992ca27c3a42aabe411cb4123335ac608afbe62ec839ef7c3466fa14e12129",
+    "payload_signature_valid": true,
+    "trusted_comment_signature_valid": true,
+    "configured_key_id_matches": true,
+    "manifest_signature_matches_file": true
+  },
+  "validation": {
+    "release_source_policy": "pass",
+    "frontend_software_scope": "pass",
+    "backend": "1389 passed",
+    "rust": "112 passed, 1 ignored",
+    "production_frontend": "pass",
+    "browser_auth_edge": "pass",
+    "fixed_nsis_template": "pass",
+    "webview2": "pass",
+    "static_gnullvm_runtime": "pass",
+    "english_installer": "pass",
+    "simplified_chinese_installer": "pass",
+    "default_application_path_guard": "pass",
+    "desktop_shortcut_contract": "pass",
+    "loopback_http_status": 200,
+    "loopback_download_byte_parity": true,
+    "version_surfaces_all_1_0_0": true,
+    "product_source_binding_sha256": "0c514cca51d30b83b12cdcd15e1d92180a7d07bae8d2a5eaeec3c34da99d755c"
+  },
+  "delivery_boundary": {
+    "desktop_and_frontend_subject": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "backend_px4_gazebo_runtime_subject": "755c511539fe561207ca38ff5079f471a4110896",
+    "runtime_tag": "runtime-v0.1.0-beta.2",
+    "runtime_archive_bytes": 6141118464,
+    "runtime_archive_sha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+    "fresh_full_stack_runtime_delivery_ready": true
+  },
+  "publication": {
+    "upload_performed": false,
+    "deployment_performed": false,
+    "github_release_modified": false,
+    "aliyun_modified": false,
+    "website_modified": false,
+    "same_exact_exe_required_at_all_public_origins": true
+  },
+  "supersedes": [
+    {
+      "source": "755c511539fe561207ca38ff5079f471a4110896",
+      "sha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b"
+    },
+    {
+      "source": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+      "sha256_prefix": "b913e328"
+    },
+    {
+      "source": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+      "sha256_prefix": "f35c7aad"
+    }
+  ],
+  "known_residuals": [
+    "The source build script needs a future source fix for the empty updater-password argument; this release recovered the signature for the already-built EXE and did not rebuild.",
+    "One PublicSite test remains cross-line because codex/software intentionally lacks later website billing-checkout behavior.",
+    "The installer contains the c3fb2c0 desktop and frontend; backend, PX4 and Gazebo are obtained from the separate published 755c511 Runtime."
+  ],
+  "release_handoff_ready": true
+}

@@ -10,6 +10,22 @@ from fastapi import APIRouter
 from app import __version__
 from app.config import get_settings
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
+from app.orchestration.decision_harness import (
+    HARNESS_DECISION_TRACE_SCHEMA_VERSION,
+    HARNESS_PROMPT_TEMPLATE_VERSION,
+)
+from app.orchestration.experience_memory import (
+    HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+    HARNESS_EXPERIENCE_RETENTION_DAYS,
+    HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION,
+)
+from app.orchestration.harness_context import (
+    HARNESS_EVIDENCE_SCHEMA_VERSION,
+    HARNESS_TOOL_REGISTRY_VERSION,
+)
+from app.orchestration.llm_parameter_proposer import (
+    LLM_PROPOSER_PROMPT_SCHEMA_VERSION,
+)
 from app.parameters import CATALOG_VERSION, SUPPORTED_PX4_VERSIONS
 from app.response import ok
 from app.secrets import is_configured as secret_store_is_configured
@@ -101,6 +117,7 @@ def _simulator_capabilities() -> dict[str, object]:
             f"SIMULATOR_BACKEND forces {override!r}; per-job real_cli selection is ignored."
         )
 
+    scenario_effect_contract = bundled_launcher_capabilities()
     return {
         "configuration_scope": "api_process",
         # API and workers can be deployed separately. Until workers publish
@@ -129,6 +146,7 @@ def _simulator_capabilities() -> dict[str, object]:
                     "payload_changed",
                     "battery_degraded",
                     "actuator_delay",
+                    "actuator_failure",
                     "custom",
                 ],
             },
@@ -145,8 +163,10 @@ def _simulator_capabilities() -> dict[str, object]:
                 # operators must serialize real simulations per host.
                 "max_concurrency_per_host_without_instance_allocator": 1,
                 "instance_allocation": "operator_managed",
-                "bundled_runner_advanced_effects": ["obstacles"],
-                "scenario_effect_contract": bundled_launcher_capabilities(),
+                "bundled_runner_advanced_effects": list(
+                    scenario_effect_contract["physically_applied"]
+                ),
+                "scenario_effect_contract": scenario_effect_contract,
                 "unverified_effect_passthrough_opt_in": True,
             },
         },
@@ -176,7 +196,24 @@ def read_capabilities() -> dict[str, object]:
                 "llm_tool_harness": {
                     "available": True,
                     "decision_schema_version": "1.0",
+                    "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+                    "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+                    "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
+                    "trace_schema_version": HARNESS_DECISION_TRACE_SCHEMA_VERSION,
                     "tool_registry": "closed",
+                    "cross_job_memory": {
+                        "available": True,
+                        "schema_version": (
+                            HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION
+                        ),
+                        "retrieval_policy_version": (
+                            HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION
+                        ),
+                        "scope": "same_authenticated_user",
+                        "task_family_policy": "exact_structural_match",
+                        "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+                        "revocable": True,
+                    },
                 },
             },
             "simulators": _simulator_capabilities(),
@@ -200,6 +237,9 @@ def read_capabilities() -> dict[str, object]:
                             "available" if gpt_ready else "server_secret_not_configured"
                         ),
                         "requires_user_api_key": True,
+                        "prompt_schema_version": (
+                            LLM_PROPOSER_PROMPT_SCHEMA_VERSION
+                        ),
                         "reason": (
                             None
                             if gpt_ready

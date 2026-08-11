@@ -1,4 +1,4 @@
-import { Empty, Loading } from "./States";
+import { Empty, ErrorState, Loading } from "./States";
 import { SectionCard } from "./SectionCard";
 import { ArtifactCard } from "./ArtifactCard";
 import { useI18n } from "../i18n/I18nProvider";
@@ -15,6 +15,7 @@ interface ArtifactsPanelProps {
   description?: string;
   sections: ArtifactSection[];
   isLoading: boolean;
+  error?: string | null;
   emptyTitle?: string;
   emptyDescription?: string;
 }
@@ -41,6 +42,7 @@ export function ArtifactsPanel({
   description,
   sections,
   isLoading,
+  error,
   emptyTitle,
   emptyDescription,
 }: ArtifactsPanelProps) {
@@ -51,6 +53,11 @@ export function ArtifactsPanel({
     <SectionCard title={title ?? t("artifacts.title")} description={description}>
       {isLoading ? (
         <Loading label={t("artifacts.loading")} />
+      ) : error ? (
+        <ErrorState
+          title={t("artifacts.loadFailed")}
+          description={error}
+        />
       ) : total === 0 ? (
         <Empty
           title={emptyTitle ?? t("artifacts.emptyTitle")}

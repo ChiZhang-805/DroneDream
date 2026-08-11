@@ -44,4 +44,5 @@ tmp/
 /desktop/src-tauri/gen/
 /frontend/site-dist/
 /runtime/out/
+/engine-pack/out/
 /output/

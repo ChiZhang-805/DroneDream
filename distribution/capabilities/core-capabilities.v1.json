@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-capability-policy",
+  "policyId": "core-capabilities",
+  "policyVersion": "1.0.0",
+  "defaultDecision": "deny",
+  "frontendIsAuthority": false,
+  "llmControlBoundary": {
+    "generationBoundaryOnly": true,
+    "highFrequencyController": "px4-or-vehicle-autopilot"
+  },
+  "targetContext": {
+    "required": true,
+    "kinds": ["simulation", "hitl", "real-hardware"],
+    "authorityLayers": ["backend", "runtime", "native"],
+    "unknownTargetDecision": "deny"
+  },
+  "conditionDefinitions": [
+    {
+      "id": "control-takeover-ready",
+      "description": "An independent human takeover or emergency-stop path is armed and observed healthy.",
+      "enforcedBy": ["runtime", "native", "operator"]
+    },
+    {
+      "id": "firmware-compatible",
+      "description": "The detected firmware family, version, and immutable identity satisfy the selected Vehicle Pack contract.",
+      "enforcedBy": ["backend", "runtime", "native"]
+    },
+    {
+      "id": "hardware-identity-verified",
+      "description": "A native/runtime challenge binds the request to the expected physical controller and vehicle identity.",
+      "enforcedBy": ["runtime", "native"]
+    },
+    {
+      "id": "module-signature-valid",
+      "description": "The selected module or Vehicle Pack hash and signature verify against an active trust anchor.",
+      "enforcedBy": ["runtime", "native"]
+    },
+    {
+      "id": "operator-confirmed",
+      "description": "A local human explicitly confirms the safety-critical action after reviewing the exact target and diff.",
+      "enforcedBy": ["native", "operator"]
+    },
+    {
+      "id": "preflight-passed",
+      "description": "The prescribed telemetry, sensor, power, geofence, parameter, and control-link preflight completed without bypass.",
+      "enforcedBy": ["backend", "runtime", "native"]
+    },
+    {
+      "id": "qgc-external-install-verified",
+      "description": "A supported external QGroundControl installation is discovered without bundling or silently executing arbitrary paths.",
+      "enforcedBy": ["native"]
+    },
+    {
+      "id": "qualification-or-prescribed-preflight",
+      "description": "A trusted compatible Sim/HITL qualification receipt exists, or the edition executes the prescribed hardware safety preflight.",
+      "enforcedBy": ["backend", "runtime", "native"]
+    },
+    {
+      "id": "rollback-point-valid",
+      "description": "A verified parameter/configuration snapshot exists and the transaction can restore it after a partial failure.",
+      "enforcedBy": ["backend", "runtime", "native"]
+    },
+    {
+      "id": "safety-zone-configured",
+      "description": "The configured operating area, altitude, and emergency boundaries are valid for the detected vehicle and operator policy.",
+      "enforcedBy": ["backend", "runtime", "native", "operator"]
+    },
+    {
+      "id": "trusted-qualification-receipt",
+      "description": "A signed, compatible, unrevoked qualification receipt binds the exact Vehicle Pack, firmware, Engine Pack, Runtime Base, and scenario contract.",
+      "enforcedBy": ["backend", "runtime", "native"]
+    },
+    {
+      "id": "update-rollback-valid",
+      "description": "The update is immutable, signature-verified, source-bound, and has a compatible rollback target.",
+      "enforcedBy": ["runtime", "native"]
+    },
+    {
+      "id": "vehicle-pack-compatible",
+      "description": "The signed Vehicle Pack supports the edition, target, autopilot, controller, firmware, and installed module set.",
+      "enforcedBy": ["backend", "runtime", "native"]
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "external.qgroundcontrol.launch",
+      "risk": "controlled",
+      "targetKinds": ["installation", "hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "The Sim edition keeps its control surface inside the simulation-only product boundary."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["qgc-external-install-verified"],
+          "reason": "Lab may launch a separately installed GCS after native path and version validation."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["qgc-external-install-verified"],
+          "reason": "Field may launch a separately installed GCS after native path and version validation."
+        }
+      }
+    },
+    {
+      "id": "hardware.arm",
+      "risk": "safety-critical",
+      "targetKinds": ["hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Simulation-only builds must reject physical and HITL arming below the UI."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "qualification-or-prescribed-preflight", "preflight-passed", "safety-zone-configured", "control-takeover-ready", "operator-confirmed"],
+          "reason": "Lab arming is available only through the full hardware safety fence."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "qualification-or-prescribed-preflight", "preflight-passed", "safety-zone-configured", "control-takeover-ready", "operator-confirmed"],
+          "reason": "Field arming is available only through the full hardware safety fence."
+        }
+      }
+    },
+    {
+      "id": "hardware.discover",
+      "risk": "read-only",
+      "targetKinds": ["hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Simulation-only builds must not enumerate or claim physical hardware."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified"],
+          "reason": "Lab may discover hardware through the native identity boundary."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified"],
+          "reason": "Field may discover hardware through the native identity boundary."
+        }
+      }
+    },
+    {
+      "id": "hardware.emergency-stop",
+      "risk": "safety-critical",
+      "targetKinds": ["hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "The Sim edition has no physical target to stop."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "control-takeover-ready"],
+          "reason": "Lab exposes the independently fenced emergency path for the verified target."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "control-takeover-ready"],
+          "reason": "Field exposes the independently fenced emergency path for the verified target."
+        }
+      }
+    },
+    {
+      "id": "hardware.flight",
+      "risk": "safety-critical",
+      "targetKinds": ["real-hardware"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Simulation-only builds must reject physical flight below the UI."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "qualification-or-prescribed-preflight", "preflight-passed", "safety-zone-configured", "control-takeover-ready", "operator-confirmed"],
+          "reason": "Lab real flight is gated by target identity, qualification, preflight, local confirmation, and takeover."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "qualification-or-prescribed-preflight", "preflight-passed", "safety-zone-configured", "control-takeover-ready", "operator-confirmed"],
+          "reason": "Field real flight is gated by target identity, qualification, preflight, local confirmation, and takeover."
+        }
+      }
+    },
+    {
+      "id": "hardware.hitl.execute",
+      "risk": "safety-critical",
+      "targetKinds": ["hitl"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "The Sim edition does not connect a physical controller."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "preflight-passed", "control-takeover-ready", "operator-confirmed"],
+          "reason": "Lab HITL requires verified hardware and the same explicit safety boundary as real flight."
+        },
+        "field": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Field omits the simulator closure and may consume trusted HITL evidence but cannot execute HITL."
+        }
+      }
+    },
+    {
+      "id": "hardware.parameter.read",
+      "risk": "read-only",
+      "targetKinds": ["hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Simulation-only builds must not open a physical parameter channel."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible"],
+          "reason": "Lab may read parameters only from the bound supported target."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible"],
+          "reason": "Field may read parameters only from the bound supported target."
+        }
+      }
+    },
+    {
+      "id": "hardware.parameter.write",
+      "risk": "safety-critical",
+      "targetKinds": ["hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Simulation-only builds must reject physical parameter writes below the UI."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "trusted-qualification-receipt", "rollback-point-valid", "operator-confirmed"],
+          "reason": "Lab parameter writes are transactional, bounded, qualified, and locally confirmed."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "trusted-qualification-receipt", "rollback-point-valid", "operator-confirmed"],
+          "reason": "Field parameter writes are transactional, bounded, qualified, and locally confirmed."
+        }
+      }
+    },
+    {
+      "id": "hardware.preflight.execute",
+      "risk": "controlled",
+      "targetKinds": ["hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "The Sim edition has no physical preflight path."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "control-takeover-ready"],
+          "reason": "Lab may execute the pack-defined physical preflight without granting arm or flight authority."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["hardware-identity-verified", "vehicle-pack-compatible", "firmware-compatible", "control-takeover-ready"],
+          "reason": "Field may execute the pack-defined physical preflight without granting arm or flight authority."
+        }
+      }
+    },
+    {
+      "id": "qualification.simulation.issue",
+      "risk": "controlled",
+      "targetKinds": ["simulation"],
+      "requiredEnforcementLayers": ["backend", "runtime"],
+      "decisions": {
+        "sim": {
+          "decision": "conditioned",
+          "conditions": ["vehicle-pack-compatible", "module-signature-valid"],
+          "reason": "Sim may issue evidence-bound qualification receipts after the complete simulator gate."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["vehicle-pack-compatible", "module-signature-valid"],
+          "reason": "Lab may issue evidence-bound qualification receipts after the complete simulator gate."
+        },
+        "field": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Field does not contain the large simulator closure required to issue simulator qualification."
+        }
+      }
+    },
+    {
+      "id": "qualification.trusted.consume",
+      "risk": "controlled",
+      "targetKinds": ["hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Sim produces qualification evidence but does not authorize physical actions."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["trusted-qualification-receipt", "vehicle-pack-compatible", "firmware-compatible"],
+          "reason": "Lab may consume only a compatible, signed, unrevoked qualification receipt."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["trusted-qualification-receipt", "vehicle-pack-compatible", "firmware-compatible"],
+          "reason": "Field may consume only a compatible, signed, unrevoked qualification receipt."
+        }
+      }
+    },
+    {
+      "id": "simulation.execute",
+      "risk": "controlled",
+      "targetKinds": ["simulation"],
+      "requiredEnforcementLayers": ["backend", "runtime"],
+      "decisions": {
+        "sim": {
+          "decision": "conditioned",
+          "conditions": ["vehicle-pack-compatible", "module-signature-valid"],
+          "reason": "Sim is the simulation-first edition."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["vehicle-pack-compatible", "module-signature-valid"],
+          "reason": "Lab includes the same simulation core as Sim."
+        },
+        "field": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Field omits the large simulation module by default and cannot silently download or execute it."
+        }
+      }
+    },
+    {
+      "id": "simulation.parameter.write",
+      "risk": "controlled",
+      "targetKinds": ["simulation"],
+      "requiredEnforcementLayers": ["backend", "runtime"],
+      "decisions": {
+        "sim": {
+          "decision": "conditioned",
+          "conditions": ["vehicle-pack-compatible", "rollback-point-valid"],
+          "reason": "Sim may write bounded parameters only to the verified SITL target and must restore after a partial failure."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["vehicle-pack-compatible", "rollback-point-valid"],
+          "reason": "Lab may write bounded parameters to the verified SITL target under the same transaction contract."
+        },
+        "field": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Field has no simulation parameter channel."
+        }
+      }
+    },
+    {
+      "id": "simulation.vehicle.arm",
+      "risk": "controlled",
+      "targetKinds": ["simulation"],
+      "requiredEnforcementLayers": ["backend", "runtime"],
+      "decisions": {
+        "sim": {
+          "decision": "conditioned",
+          "conditions": ["vehicle-pack-compatible", "preflight-passed"],
+          "reason": "Simulated arming is allowed only after the launcher proves the target is SITL and healthy."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["vehicle-pack-compatible", "preflight-passed"],
+          "reason": "Lab uses the same SITL target proof before simulated arming."
+        },
+        "field": {
+          "decision": "deny",
+          "conditions": [],
+          "reason": "Field has no simulated arming capability."
+        }
+      }
+    },
+    {
+      "id": "updater.module.apply",
+      "risk": "controlled",
+      "targetKinds": ["installation"],
+      "requiredEnforcementLayers": ["runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "conditioned",
+          "conditions": ["module-signature-valid", "update-rollback-valid"],
+          "reason": "Sim modules update atomically from signed, source-bound artifacts."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["module-signature-valid", "update-rollback-valid"],
+          "reason": "Lab modules update atomically from signed, source-bound artifacts."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["module-signature-valid", "update-rollback-valid"],
+          "reason": "Field modules update atomically from signed, source-bound artifacts."
+        }
+      }
+    },
+    {
+      "id": "vehicle-pack.install",
+      "risk": "controlled",
+      "targetKinds": ["installation", "simulation", "hitl", "real-hardware"],
+      "requiredEnforcementLayers": ["backend", "runtime", "native"],
+      "decisions": {
+        "sim": {
+          "decision": "conditioned",
+          "conditions": ["module-signature-valid", "vehicle-pack-compatible", "update-rollback-valid"],
+          "reason": "Sim installs only signed simulation modules compatible with the edition."
+        },
+        "lab": {
+          "decision": "conditioned",
+          "conditions": ["module-signature-valid", "vehicle-pack-compatible", "update-rollback-valid"],
+          "reason": "Lab installs only signed modules compatible with its simulator and hardware policies."
+        },
+        "field": {
+          "decision": "conditioned",
+          "conditions": ["module-signature-valid", "vehicle-pack-compatible", "update-rollback-valid"],
+          "reason": "Field installs only signed hardware and validation modules compatible with the lightweight edition."
+        }
+      }
+    }
+  ]
+}

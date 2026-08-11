@@ -1,0 +1,90 @@
+{
+  "schema_version": "dronedream.advanced-physics-failure-lineage/v1",
+  "subject_commit": "fdf1250398567c6658ad5148efc1c302dede4a17",
+  "raw_local_directory": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe",
+  "raw_attempts_preserved_locally": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18
+  ],
+  "failed_attempt_summary": {
+    "1_to_7": "Launcher path, battery-unit, shell-output, MAVLink-direct ACK, daemon-lockstep, malformed-JSON, and direct-send integration failures were preserved before a physical command reached the intended PX4 handler.",
+    "8_to_13": "Raw GCS COMMAND_LONG variants used split or temporary UDP source ports and did not establish a valid bidirectional GCS command session; runner cleanup remained exact.",
+    "14": "MAVSDK Failure plus independent GCS STATUSTEXT monitoring timed out; no PX4 failure-handler evidence was emitted.",
+    "15": "The same path exposed MAVSDK FailureError TIMEOUT for both GPS off and GPS ok.",
+    "16": "A same-socket GCS COMMAND_LONG reached PX4 vehicle_command twice, but gz_x500 produced no command 420 acknowledgment because gz_bridge does not implement the SimulatorMavlink failure handler.",
+    "17": "The supported gz_bridge SIM_GPS_USED path first completed in the dirty working tree; it was not treated as exact-commit frozen evidence.",
+    "18": "The exact-commit SIM_GPS_USED plus gps_info path completed and became the authoritative frozen run."
+  },
+  "attempt_14": {
+    "acceptance_exit_code": 69,
+    "residual_process_count": 0,
+    "execution_window_sha256": "72aad7b385244b30d6cdca7057b26f5ae6363787c47399c252ff07d9bf7ee681",
+    "offboard_executor_log_sha256": "3dc0942dddcbb0cdd3fdb33eb729409d62c72f941ebaaecc5724f9649b62064e",
+    "runtime_evidence_sha256": "e90cd0cb47d7085af9f43da5022fbba70e04621ed1c709b36b93863e5d950d03"
+  },
+  "attempt_15": {
+    "acceptance_exit_code": 69,
+    "residual_process_count": 0,
+    "execution_window_sha256": "ee3b2db1f3782ac22589e20ba5ea5feea14efa9332e8eeb14631f1a3bafb3fb8",
+    "offboard_executor_log_sha256": "b62d98b77f607308a53e386a4534d65774d82f5f2c1e11d137ce0234be528e45",
+    "runtime_evidence_sha256": "7b1d14f6931b21c094a33bd314d1403f53b90fda08664b76d9901da31dca4f09"
+  },
+  "attempt_16": {
+    "acceptance_exit_code": 69,
+    "residual_process_count": 0,
+    "execution_window_sha256": "fd541dfa529959abd656078dcd67dc304154da6a740cc1ecf152a9b418c2f30d",
+    "offboard_executor_log_sha256": "3dc0942dddcbb0cdd3fdb33eb729409d62c72f941ebaaecc5724f9649b62064e",
+    "runtime_evidence_sha256": "2fd46b54c4f83d06ff64e3f739230cf6b6f480d52134ee6ab287fa37e7c8d523",
+    "px4_ulog": {
+      "path_in_runtime": "/opt/PX4-Autopilot/build/px4_sitl_default/rootfs/log/2026-07-28/22_28_12.ulg",
+      "bytes": 12287239,
+      "sha256": "555bc2e7a268417103ff51647533134a8d1034466469aabfe0947f9f452b0247",
+      "vehicle_command_420_count": 2,
+      "vehicle_command_420_parameters": [
+        {
+          "param1_unit": 4.0,
+          "param2_type": 1.0,
+          "param3_instance": 0.0,
+          "source_system": 255,
+          "source_component": 190,
+          "target_system": 1,
+          "target_component": 1,
+          "from_external": true
+        },
+        {
+          "param1_unit": 4.0,
+          "param2_type": 0.0,
+          "param3_instance": 0.0,
+          "source_system": 255,
+          "source_component": 190,
+          "target_system": 1,
+          "target_component": 1,
+          "from_external": true
+        }
+      ],
+      "vehicle_command_ack_420_count": 0
+    },
+    "root_cause": "PX4 gz_x500 starts gz_bridge, whose source consumes SIM_GPS_USED but does not subscribe to MAV_CMD_INJECT_FAILURE; the SimulatorMavlink failure handler is absent from this runtime."
+  },
+  "authoritative_resolution": {
+    "mechanism": "PX4 gz_bridge SIM_GPS_USED with exact parameter readback and MAVSDK gps_info telemetry",
+    "exact_commit_attempt": 18,
+    "receipt": "receipt.json"
+  }
+}

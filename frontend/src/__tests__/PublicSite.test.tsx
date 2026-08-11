@@ -29,12 +29,16 @@ function expectContentLinksToUseIcons(container: HTMLElement) {
 }
 
 describe("DroneDream public website", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
     window.localStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "en");
+    vi.stubEnv("VITE_BILLING_CHECKOUT_URL", "https://billing.test/functions/v1/billing-checkout");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
   });
 
@@ -126,23 +130,64 @@ describe("DroneDream public website", () => {
     expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();
   });
 
-  it("renders personal and business plans on the dedicated pricing page", () => {
+  it("renders three directly comparable plans with the same ordered feature rows", async () => {
     window.history.replaceState(null, "", "/pricing/");
 
-    renderSite();
+    const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "Choose the right workspace for every flight." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "The same complete product. More included AI." })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Free" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Plus" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Individual" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     fireEvent.click(screen.getByRole("tab", { name: "Business" }));
-    expect(screen.getByRole("heading", { name: "Business Free" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Business Plus" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Business Pro" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Business" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText(/300,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getByText(/3,000,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getByText(/15,000,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getAllByText(
+      "Full AURORA optimization Harness",
+    )).toHaveLength(3);
+    const expectedFeatureOrder = [
+      "workflow",
+      "harness",
+      "allowance",
+      "byok",
+      "reports",
+      "watermarkFree",
+    ];
+    container.querySelectorAll<HTMLElement>(".pricing-card").forEach((card) => {
+      expect(
+        Array.from(card.querySelectorAll<HTMLElement>("[data-feature]")).map(
+          (feature) => feature.dataset.feature,
+        ),
+      ).toEqual(expectedFeatureOrder);
+    });
+    expect(
+      container.querySelector('[data-plan="free"] [data-feature="watermarkFree"]'),
+    ).toHaveAttribute("data-available", "false");
+    expect(
+      container.querySelector('[data-plan="plus"] [data-feature="watermarkFree"]'),
+    ).toHaveAttribute("data-available", "true");
+    expect(
+      container.querySelector('[data-plan="pro"] [data-feature="watermarkFree"]'),
+    ).toHaveAttribute("data-available", "true");
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/billing-checkout/availability"),
+        expect.any(Object),
+      );
+    });
   });
 
-  it("shows honest inactive payment options without simulating a purchase", () => {
-    render(
+  it("shows honest inactive payment options without simulating a purchase", async () => {
+    const { container } = render(
       <PricingPage
         locale="en"
         authenticated
@@ -150,16 +195,25 @@ describe("DroneDream public website", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Upgrade Plus" }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Plus" }));
 
-    expect(screen.getByRole("dialog", { name: "Choose a payment method" })).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Payment" })).toBeVisible();
     expect(screen.getByRole("button", { name: "WeChat Pay" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    expect(
+      container.querySelector('[data-brand-mark="wechat-pay"]'),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "Alipay" })).toBeVisible();
+    expect(
+      container.querySelector('[data-brand-mark="alipay"]'),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "Continue to payment" })).toBeDisabled();
-    expect(screen.getByText("Merchant payment activation is in progress.")).toBeVisible();
+    await waitFor(() => {
+      expect(screen.queryByText(/Merchant payment activation/i)).toBeNull();
+    });
+    expect(screen.queryByText(/Review the selected plan/i)).toBeNull();
   });
 
   it("requires an account before a visitor can publish a community topic", () => {

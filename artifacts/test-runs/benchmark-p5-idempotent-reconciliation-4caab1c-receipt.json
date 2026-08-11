@@ -1,0 +1,159 @@
+{
+  "schema_id": "dronedream.benchmark-p5-idempotent-reconciliation-receipt/v1",
+  "receipt_id": "benchmark-p5-idempotent-reconciliation-4caab1c",
+  "generated_at_utc": "2026-08-05T04:12:19.7920848Z",
+  "execution_subject": {
+    "repository_commit": "4caab1c22658be93627bff7715edb2b3c1daaf32",
+    "repository_tree": "62e3dfadd38452e351d7673a470d77424b21711b",
+    "branch": "codex/software",
+    "upstream": "origin/codex/software",
+    "upstream_commit_before_evidence": "4caab1c22658be93627bff7715edb2b3c1daaf32",
+    "worktree_clean_before_evidence": true,
+    "ahead": 0,
+    "behind": 0,
+    "evidence_commit": null,
+    "evidence_commit_semantics": "This receipt is committed after the execution subject and must not be treated as tested source."
+  },
+  "resource_class": "YELLOW",
+  "source_files": [
+    {
+      "path": "backend/app/api_idempotency.py",
+      "sha256": "42dbe6e9cfdad666dc7166389bd57d218c5de4bfc2d5994c63c73cf11fc6c789"
+    },
+    {
+      "path": "backend/app/benchmarking/physical_stability_bridge.py",
+      "sha256": "5b0be544a4a3e7ee2884e96f570544e1c90d0a37e61c2d555871ee4b03a72d8a"
+    },
+    {
+      "path": "backend/app/routers/jobs.py",
+      "sha256": "84a415f68cb3772dc26c89df46c52ccaa879af0694c366b7a27960f313994161"
+    },
+    {
+      "path": "backend/tests/test_api_idempotency.py",
+      "sha256": "d67c3cc1acc6fd26e949059f02a2728af47793c4ae3db1aae85dae0f10b490e3"
+    },
+    {
+      "path": "backend/tests/test_benchmark_physical_stability_bridge.py",
+      "sha256": "0dacc605e317829e61121bf413bffd43ffb6a742f257f8dcb84139e3cc918a13"
+    },
+    {
+      "path": "desktop/scripts/p5-desktop-api-adapter.cjs",
+      "sha256": "f3823878ba45abbc5be2e7b4550ac9ff51f0b3230f0aec6f92741fada148e25d"
+    },
+    {
+      "path": "desktop/scripts/p5-desktop-api-adapter.test.cjs",
+      "sha256": "f6475857eca56496681a54cb1729744793e53aabf0fd5f6048778d54d80277b6"
+    }
+  ],
+  "closure": {
+    "idempotency_key": "Each compiled P5 Job now uses an RFC-compatible deterministic UUID v5 accepted by the generic Job mutation contract; the first frozen key is asserted exactly.",
+    "canonical_request": "The execution bundle retains Python-produced canonical UTF-8 JSON bytes, their SHA-256, and the server mutation-request SHA-256 so JavaScript number rendering cannot create false drift for values such as 3.0.",
+    "dispatch_reconciliation": "An authenticated user-scoped GET reports not_found, in_progress, or completed without replaying POST. Only a completed, request-hash-matched, current-user-owned Job can become a ledger observation.",
+    "automatic_replay": false,
+    "generic_idempotency_policy_weakened": false
+  },
+  "preserved_failures": [
+    {
+      "stage": "pre-RED Job create contract audit",
+      "result": "The prior p5-prefixed dispatch key was not a canonical UUID and a real POST would have returned HTTP 422.",
+      "root_cause": "The P5 bundle used a private display-oriented key format while the shared Job API requires canonical UUID idempotency keys.",
+      "fix": "Generate deterministic UUID v5 keys from the frozen plan, scenario ordinal, and request SHA without loosening the shared API.",
+      "expectations_weakened": false
+    },
+    {
+      "stage": "cross-runtime request proof audit",
+      "result": "The real compiled P5 payload contains values such as 3.0; JavaScript canonicalization renders the same number as 3 and would reject the Python request SHA before POST.",
+      "root_cause": "The request proof relied on separately reserializing a parsed numeric object in Python and JavaScript.",
+      "fix": "Freeze exact canonical JSON bytes in the bundle, hash those bytes in both runtimes, compare semantic parsed payloads, and bind read-only reconciliation to the server mutation hash.",
+      "expectations_weakened": false
+    },
+    {
+      "stage": "changed-source type check invocation",
+      "result": "A Mypy command without the repository config reported missing optional pyulog, mavsdk, boto3, and botocore modules.",
+      "root_cause": "The command omitted backend/pyproject.toml, whose CI contract explicitly allows missing optional runtime imports.",
+      "fix": "Rerun with --config-file backend/pyproject.toml; the three changed source files then passed with no type issues.",
+      "expectations_weakened": false
+    },
+    {
+      "stage": "tamper negative test",
+      "result": "The payload-tamper test failed only because the new earlier fail-closed check emitted a more precise rejection message.",
+      "root_cause": "The test expected the former later hash or zero-provider error.",
+      "fix": "Require the exact new canonical-request mismatch reason; the tampered bundle remains rejected.",
+      "expectations_weakened": false
+    }
+  ],
+  "verification": [
+    {
+      "name": "Current-exact P5, Job API, idempotency, artifact, and accepted-attempt regression",
+      "command": "python -m pytest backend/tests/test_benchmark_physical_stability.py backend/tests/test_benchmark_physical_stability_assessment.py backend/tests/test_benchmark_physical_stability_execution.py backend/tests/test_benchmark_physical_stability_bridge.py backend/tests/test_benchmark_physical_stability_job_evidence.py backend/tests/test_benchmark_physical_stability_runner.py backend/tests/test_jobs_api.py backend/tests/test_api_idempotency.py backend/tests/test_artifacts_api.py backend/tests/test_outcome_artifact_evidence.py -q",
+      "result": "passed",
+      "passed": 144,
+      "failed": 0,
+      "duration_seconds": 182.55
+    },
+    {
+      "name": "Focused P5 dispatch, reconciliation, and runner suite",
+      "result": "passed",
+      "passed": 30,
+      "failed": 0,
+      "duration_seconds": 29.03
+    },
+    {
+      "name": "P5 desktop local-API adapter including Python float spelling and Chinese UTF-8",
+      "command": "node --test desktop/scripts/p5-desktop-api-adapter.test.cjs",
+      "result": "passed",
+      "passed": 7,
+      "failed": 0,
+      "duration_seconds": 0.0765975
+    },
+    {
+      "name": "changed-source Ruff",
+      "result": "passed",
+      "summary": "All checks passed!"
+    },
+    {
+      "name": "changed-source Mypy with backend CI config",
+      "result": "passed",
+      "summary": "Success: no issues found in 3 source files"
+    },
+    {
+      "name": "git diff check",
+      "result": "passed"
+    },
+    {
+      "name": "changed-scope sensitive-value scan",
+      "result": "passed",
+      "provider_or_api_key_value_matches": 0,
+      "known_fake_password_negative_fixture_matches": 1
+    }
+  ],
+  "execution_boundaries": {
+    "physical_trials_attempted": 0,
+    "desktop_connections": 0,
+    "desktop_or_job_api_network_requests": 0,
+    "px4_runs": 0,
+    "gazebo_runs": 0,
+    "provider_logical_turns": 0,
+    "provider_network_requests": 0,
+    "api_keys_read": false,
+    "account_credentials_read": false,
+    "headed_browser_runs": 0,
+    "global_mouse_moved": false,
+    "runtime_installations_or_migrations": 0,
+    "engine_pack_builds_or_activations": 0,
+    "production_deployments": 0,
+    "website_or_technical_report_writes": 0
+  },
+  "remaining_boundaries": {
+    "actual_composite_inventory_binding": "not generated for this source",
+    "installed_desktop_alignment": "not reverified",
+    "active_runtime_base_alignment": "not reverified",
+    "active_engine_pack_alignment": "not reverified",
+    "red_window_authorization": "not issued",
+    "physical_stability_execution": "not run",
+    "pilot_scenario_selection": "not frozen from real baseline stability",
+    "p6_provider_approval_request": "not ready until P5 physical stability and current-exact gates close",
+    "technical_report": "frozen and unchanged"
+  },
+  "scope_claim": "This receipt proves source-bound deterministic Job dispatch keys, exact cross-runtime request-byte proofs, and read-only crash reconciliation under offline authenticated API and fake desktop transport tests. It does not prove an installed desktop connection, active Runtime or Engine Pack alignment, RED-window authorization, or any real PX4/Gazebo Trial."
+}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 
 class ArtifactStorage(Protocol):
@@ -10,6 +10,12 @@ class ArtifactStorage(Protocol):
 
     def read_bytes(self, storage_uri: str) -> bytes:
         """Read an artifact payload from storage."""
+
+    def content_digest(self, storage_uri: str) -> tuple[str, int]:
+        """Stream an artifact and return its SHA-256 hex digest and byte size."""
+
+    def copy_to(self, storage_uri: str, destination: BinaryIO) -> tuple[str, int]:
+        """Stream bytes into a caller-owned file and return its digest and size."""
 
     def exists(self, storage_uri: str) -> bool:
         """Return whether the artifact exists in storage."""

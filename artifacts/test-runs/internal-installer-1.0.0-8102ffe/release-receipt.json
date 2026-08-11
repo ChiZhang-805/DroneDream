@@ -1,0 +1,168 @@
+{
+  "schema_version": "dronedream.internal-test-installer-handoff-receipt.v1",
+  "generated_at": "2026-07-28T16:12:07Z",
+  "claim_boundary": "Local exact-source build, validation, and byte handoff only. No GitHub Release, Alibaba mirror, website, server, DNS, TLS, or tag was modified.",
+  "source": {
+    "branch": "codex/software",
+    "commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+    "upstream_commit_at_build": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+    "tracked_source_files": 901,
+    "runtime_code_delta_from_full_backend_test_subject_c1222c9": false,
+    "inventory_path": "release-source-inventory.json",
+    "inventory_bytes": 179068,
+    "inventory_sha256": "234e969aa842ed58c7b399ef7e5e089a1255198f8508f29966970b7b15829128"
+  },
+  "owner_override": {
+    "scope": "internal test",
+    "version": "1.0.0",
+    "new_version_required": false,
+    "authenticode_required": false,
+    "same_file_name_required": true,
+    "replace_old_public_1_0_0_bytes": true,
+    "software_line_upload_authorized": false
+  },
+  "artifact": {
+    "file_name": "DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 10386896,
+    "sha256": "f35c7aad9006a29607395a0e14b74d150b82fbf25afe3ff65474bdd764e7cf92",
+    "checksum_file": "DroneDream_1.0.0_x64-setup.exe.sha256",
+    "checksum_file_bytes": 98,
+    "checksum_file_sha256": "ac357908ca1c2874bc65dd21c95cfdf3c69b27c93d4ce1a5c7a1e4d5eb17b1eb",
+    "checksum_verified": true,
+    "authenticode_status": "NotSigned",
+    "authenticode_valid": false,
+    "pe_format": "PE32",
+    "pe_certificate_table_file_offset": 0,
+    "pe_certificate_table_size": 0,
+    "has_pe_certificate_table": false,
+    "not_signed_is_owner_accepted_internal_test_fact": true
+  },
+  "version_surfaces": {
+    "desktop_package_json": "1.0.0",
+    "tauri_conf_json": "1.0.0",
+    "cargo_toml": "1.0.0",
+    "cargo_lock": "1.0.0",
+    "application_file_version": "1.0.0",
+    "application_product_version": "1.0.0",
+    "website_display_version": "1.0.0"
+  },
+  "updater": {
+    "signature_file": "DroneDream_1.0.0_x64-setup.exe.sig",
+    "signature_file_bytes": 420,
+    "signature_file_sha256": "f86d89bec2e02882a75ff4b8c45d55872308ceea1c559aa52c09b3adcc967431",
+    "tauri_cli_sign_command_succeeded": true,
+    "build_manifest_file": "tauri-latest.build.json",
+    "build_manifest_file_bytes": 903,
+    "build_manifest_file_sha256": "9d17df5473bf0d5f6860db3fa6a5c3dc97d3639a312f1846000a77beedffc51e",
+    "publication_manifest_file": "tauri-latest.json",
+    "publication_manifest_file_bytes": 913,
+    "publication_manifest_file_sha256": "32cf8914134fd34daea8d852e517dd704bc950395b1bec1c60e8db9680c0a4fe",
+    "publication_manifest_release_tag": "signpath-candidate-v1.0.0",
+    "manifest_version": "1.0.0",
+    "authenticode_is_independent": true
+  },
+  "download_smoke": {
+    "transport": "loopback HTTP",
+    "http_status": 200,
+    "downloaded_bytes": 10386896,
+    "downloaded_sha256": "f35c7aad9006a29607395a0e14b74d150b82fbf25afe3ff65474bdd764e7cf92",
+    "source_download_byte_parity": true,
+    "upload_performed": false
+  },
+  "installer_ui": {
+    "english_real_render": "passed",
+    "simplified_chinese_real_render": "passed",
+    "default_application_path_guard": "passed",
+    "expected_application_path": "%LOCALAPPDATA%\\DroneDream",
+    "observed_current_user_path_matched": true,
+    "expected_runtime_target": "E:\\DroneDream",
+    "existing_install_registration_restored": true,
+    "installer_processes_remaining": 0
+  },
+  "validation": {
+    "build": {
+      "command": "npm.cmd --prefix desktop run build:llvm",
+      "result": "passed",
+      "frontend_production_build": "passed",
+      "llvm_static_runtime_and_webview2_loader": "passed",
+      "webview2_bootstrapper": "passed",
+      "nsis_template": "passed",
+      "nsis_locales": "passed",
+      "installer_path_guard": "passed",
+      "installer_planner": "passed",
+      "log": "build.log",
+      "log_bytes": 11511,
+      "log_sha256": "2c27cb478a1a871a90e0689ca869135d6ce248728efd6ac4c5dee28251695fa4"
+    },
+    "backend": {
+      "command": "python -m pytest backend/tests/test_health.py backend/tests/test_installer_integrity.py -q",
+      "result": "25 passed",
+      "log": "backend-validation.log",
+      "log_bytes": 230,
+      "log_sha256": "d723efe33e0b10f2e4bd94c773b9455497e42aa48cc601833fd3e34b351f48ce",
+      "full_suite_evidence": "artifacts/test-runs/aurora-software-c1222c9-receipt.json",
+      "full_suite_result": "1204 passed"
+    },
+    "frontend": {
+      "typecheck": "passed",
+      "lint": "passed",
+      "tests": "319 passed, 1 failed",
+      "test_files": "49 passed, 1 failed",
+      "known_cross_line_failure": "PublicSite.test.tsx expects the website branch billing-checkout availability evolution that is absent from codex/software; desktop console production build passed.",
+      "log": "frontend-validation.log",
+      "log_bytes": 19567,
+      "log_sha256": "0781fde66ec1116ea5862bd9569165d2e2b38243828b568d08ff6c33757d05ce"
+    },
+    "rust": {
+      "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+      "tests": "101 passed, 0 failed, 1 ignored",
+      "ignored_reason": "requires an installed, owned DroneDreamRuntime",
+      "clippy_all_targets_deny_warnings": "passed",
+      "log": "rust-validation.log",
+      "log_bytes": 23458,
+      "log_sha256": "26ded6bd5c1ae0dc5aca0e7f6b3bdb194d89d1e3059c6f7494bfc3b1d79cbc8e"
+    }
+  },
+  "rollback": {
+    "old_github_release": {
+      "bytes": 5526509,
+      "sha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368"
+    },
+    "old_alibaba_mirror": {
+      "bytes": 9881226,
+      "sha256": "aad5a7fdb1196059ce2e15b33e2495830f77ed5f1070e56e5423796b9ca96b86"
+    },
+    "old_origins_were_individually_consistent_but_not_equal": true
+  },
+  "diagnostics": [
+    {
+      "stage": "UI validation orchestration",
+      "result": "operator command corrected",
+      "detail": "An initial concurrent English/Chinese UI attempt was stopped because both instances share HKCU installer registration. The exact two registry backups were restored and the final English/Chinese checks were rerun serially and passed."
+    },
+    {
+      "stage": "build log capture",
+      "result": "operator command corrected",
+      "detail": "A PowerShell 5.1 Tee-Object parameter-set error occurred before a build began. The final build used the compatible FilePath form and completed with a full captured log."
+    },
+    {
+      "stage": "frontend full suite",
+      "result": "known cross-line failure retained",
+      "detail": "The one PublicSite test failure is preserved in the log and is not represented as a full pass."
+    }
+  ],
+  "handoff": {
+    "authoritative_directory": "artifacts/test-runs/internal-installer-1.0.0-8102ffe",
+    "single_authoritative_exe": true,
+    "rebuild_at_either_origin_forbidden": true,
+    "publication_files": [
+      "DroneDream_1.0.0_x64-setup.exe",
+      "DroneDream_1.0.0_x64-setup.exe.sha256",
+      "website-latest.json",
+      "website-pages-release.json",
+      "release-metadata-handoff.json"
+    ],
+    "upload_performed": false,
+    "deployment_performed": false
+  }
+}

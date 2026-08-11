@@ -1,0 +1,161 @@
+{
+  "schema_id": "dronedream.benchmark-composite-inventory-verification-receipt/v1",
+  "receipt_id": "benchmark-composite-inventory-verification-057b3bd",
+  "generated_at_utc": "2026-08-05T04:43:51.5609954+00:00",
+  "execution_subject": {
+    "repository_commit": "057b3bd8babd58c6b7a9f3d2fbc269473d0bd212",
+    "repository_tree": "26aef8d98438df968026d61a4f35c3e2754727f9",
+    "branch": "codex/software",
+    "upstream": "origin/codex/software",
+    "upstream_commit_before_evidence": "057b3bd8babd58c6b7a9f3d2fbc269473d0bd212",
+    "worktree_clean_before_evidence": true,
+    "evidence_commit": null,
+    "evidence_commit_semantics": "This receipt is committed after the tested source and must not be treated as execution source."
+  },
+  "source_closure": {
+    "contract_commit": "ff6db1ff5f3a28effb8cfcfb60c9b9447a6b8a1d",
+    "authorization_integration_commit": "057b3bd8babd58c6b7a9f3d2fbc269473d0bd212",
+    "summary": "Add a pure fail-closed composite inventory verifier that permits distinct component source commits only when exact identities and Runtime/Engine Pack/PX4/Gazebo compatibility agree, then require its exact verified receipt before P5 can create a zero-work RED execution ledger.",
+    "files": [
+      {
+        "path": "backend/app/benchmarking/composite_inventory.py",
+        "sha256": "2dce4929d2bba322f1b0f217e8b43c987848281456508c6332e976b9582c90c5"
+      },
+      {
+        "path": "backend/app/benchmarking/physical_stability_execution.py",
+        "sha256": "c499db9ba4b13440ffc59cd454931417aff5edae65740b6f3d4ed4b5c4ce7165"
+      },
+      {
+        "path": "backend/tests/test_benchmark_composite_inventory.py",
+        "sha256": "a2040eb40b1655ac82fd27492fc8650cbff1aad2f77886bcf7e8fa8676458910"
+      },
+      {
+        "path": "backend/tests/test_benchmark_physical_stability_execution.py",
+        "sha256": "44ace19b0ec2bd6b76365f0915e20c2d3604044a463b9f28f8ef6d217bf2efcb"
+      },
+      {
+        "path": "backend/tests/test_benchmark_physical_stability_bridge.py",
+        "sha256": "4a1f83587c54b3274085ed1ad2fad86b34d81ce97307897828fd3f9eef289a64"
+      },
+      {
+        "path": "backend/tests/test_benchmark_physical_stability_runner.py",
+        "sha256": "d18c91c29137ab3bb67533bbd7a26952e960c5c66b221310288eb9a9aa7548f8"
+      }
+    ]
+  },
+  "contract": {
+    "observation_schema": "dronedream.composite-execution-observation/v1",
+    "verification_schema": "dronedream.composite-execution-verification/v1",
+    "policy_version": "composite-compatibility-v1",
+    "properties": [
+      "Desktop, Runtime Base, Engine Pack, PX4, and Gazebo may use distinct source commits; source equality is not a generic compatibility rule.",
+      "Each declared component identity must exactly match its trusted observed version, source commit when applicable, artifact hash, and manifest hash.",
+      "Runtime and Engine Pack must agree on runtime product/version, Python version, dependency lock, PX4 commit, and Gazebo version.",
+      "Desktop participation additionally binds the supported Runtime product and Engine API version.",
+      "Prompt, response schema, tool, model, machine, concurrency, repository, evaluator, coordinator, and evidence-head identities are exact bindings.",
+      "Unknown fields, missing source pins, manifest/artifact byte drift, component-presence drift, and any compatibility mismatch fail closed.",
+      "A verified receipt always carries execution_authorized=false and cannot start work by itself.",
+      "P5 authorization binds both the verified receipt content and its SHA-256; denied, tampered, wrong-inventory, or incomplete-component receipts are rejected before ledger creation."
+    ]
+  },
+  "preserved_failures": [
+    {
+      "stage": "first composite verifier fixture run",
+      "result": "11 failed",
+      "root_cause": "The SHA fixture generator repeated hexadecimal numbers such as 10 and 11 sixty-four times, producing 128-byte strings; strict SHA validation correctly rejected every fixture.",
+      "fix": "Encode fixture indices as one zero-padded 64-character lowercase hexadecimal value without weakening SHA validation."
+    },
+    {
+      "stage": "first static verification run",
+      "result": "Ruff one error; Mypy three errors",
+      "root_cause": "One test line exceeded the style limit and two loops reused local names across component and registry value types.",
+      "fix": "Format the assertion and use type-specific local names."
+    },
+    {
+      "stage": "first authorization integration run",
+      "result": "41 passed, 1 failed",
+      "root_cause": "The new model-level rejection occurred earlier with a more precise authorized-inventory message than the old test expected; Ruff also required import ordering.",
+      "fix": "Update only the exact failure-message assertion and import order; the rejection remained fail closed."
+    }
+  ],
+  "verification": [
+    {
+      "name": "composite inventory verifier focused contract",
+      "result": "passed",
+      "passed": 11,
+      "failed": 0,
+      "duration_seconds": 0.14
+    },
+    {
+      "name": "benchmark campaign and P5 authorization compatibility",
+      "result": "passed",
+      "passed": 40,
+      "failed": 0,
+      "duration_seconds": 27.78
+    },
+    {
+      "name": "Runtime manifest contract",
+      "result": "passed",
+      "passed": 33,
+      "skipped": 5,
+      "subtests_passed": 7,
+      "duration_seconds": 0.17
+    },
+    {
+      "name": "Engine Pack manifest contract",
+      "result": "passed",
+      "passed": 12,
+      "failed": 0,
+      "duration_seconds": 4.55
+    },
+    {
+      "name": "composite verifier plus P5 authorization bridge and runner focused suite",
+      "result": "passed",
+      "passed": 42,
+      "failed": 0,
+      "duration_seconds": 6.48
+    },
+    {
+      "name": "expanded P5 Job/API/artifact regression",
+      "result": "passed",
+      "passed": 156,
+      "failed": 0,
+      "duration_seconds": 179.70
+    },
+    {
+      "name": "Ruff",
+      "result": "passed"
+    },
+    {
+      "name": "Mypy with backend configuration",
+      "result": "passed",
+      "checked_source_files": 2
+    },
+    {
+      "name": "git diff checks",
+      "result": "passed"
+    }
+  ],
+  "execution_boundaries": {
+    "physical_trials_attempted": 0,
+    "jobs_created": 0,
+    "px4_runs": 0,
+    "gazebo_runs": 0,
+    "wsl_runtime_started": false,
+    "desktop_connections": 0,
+    "provider_logical_turns": 0,
+    "provider_network_requests": 0,
+    "api_keys_or_account_credentials_read": false,
+    "runtime_installations_or_migrations": 0,
+    "engine_pack_builds_or_activations": 0,
+    "production_deployments": 0,
+    "website_or_technical_report_writes": 0
+  },
+  "remaining_boundaries": {
+    "trusted_manifest_observation_adapter": "not_implemented",
+    "installed_runtime_and_engine_pack_current_alignment": "not_verified",
+    "installed_desktop_source": "historically observed as eab24855f26a1249d33d13ef0b28ba402d6c9222; not refreshed or started in this closure",
+    "physical_stability_execution": "not_run",
+    "scope_claim": "This receipt proves the pure compatibility contract and P5 authorization consumption under offline tests. It does not prove current installed component alignment, a cryptographic manifest adapter, or any PX4/Gazebo result."
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-only-engine-pack-profile-receipt",
+  "generatedAt": "2026-08-06T01:47:47.571Z",
+  "branch": "codex/software",
+  "source": {
+    "commit": "4024e546fe6eaf298a37375924315a9816f6bf41",
+    "tree": "7e607dbb57fe98f6ba6b7967309e050e5219b954",
+    "treeState": "clean",
+    "priorHead": "d5699fcd6b36b996c323fc5ad476023df992a571"
+  },
+  "profile": {
+    "profileId": "sim-only",
+    "profileVersion": "1.0.0",
+    "path": "distribution/engine-pack-profiles/sim-only.v1.json",
+    "bytes": 3112,
+    "sha256": "439265c2df93661a8e9b7df2f75a24996c115cf414065d22e6c960037d71a177",
+    "allowedEditionIds": [
+      "sim"
+    ],
+    "allowedVehiclePackIds": [
+      "px4-gazebo-x500-reference"
+    ],
+    "hardwarePayloadAllowed": false
+  },
+  "bindings": {
+    "vehiclePackProfileRegistry": {
+      "path": "distribution/vehicle-packs/registry.sim-only.v1.json",
+      "bytes": 1594,
+      "sha256": "063c48f8cb1928c29a462ce65287fb69c0bd05f074808e2d8a55c7ca23cda49e"
+    },
+    "runtimeContractRegistry": {
+      "path": "distribution/runtime-contract-registry.sim-only.v1.json",
+      "bytes": 582,
+      "sha256": "97b47bf3a0c57c9d90e1b2ee95d867dd1d26d3e404d1cb1d210392c95a6d4310"
+    },
+    "profileSchema": {
+      "path": "distribution/schemas/engine-pack-profile.schema.json",
+      "bytes": 1999,
+      "sha256": "79bf5a94003f3c633538d69cbb282dedf22124e6e22087b0832ee1450547cf9a"
+    },
+    "vehiclePackProfileRegistrySchema": {
+      "path": "distribution/schemas/vehicle-pack-profile-registry.schema.json",
+      "bytes": 4024,
+      "sha256": "4a62cbf4e68ac97cb31bcd63416960ecbc11e0a80b73ef33d6841d192b74af7c"
+    }
+  },
+  "temporaryExactSourceArchiveVerification": {
+    "sourceCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
+    "profileId": "sim-only",
+    "profileVersion": "1.0.0",
+    "profileManifestSha256": "439265c2df93661a8e9b7df2f75a24996c115cf414065d22e6c960037d71a177",
+    "fileCount": 227,
+    "editionFiles": [
+      "distribution/editions/sim.v1.json"
+    ],
+    "vehicleMetadata": [
+      "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+      "distribution/vehicle-packs/registry.v1.json"
+    ],
+    "containsBackendSimulator": true,
+    "containsSimulatorLauncher": true,
+    "forbiddenHardwarePathCount": 0,
+    "archiveSha256": "18383ee23caa352a5ed2b2ffb7b3b95a00259f097dbc49c7f0a1479f766adbee",
+    "verified": true,
+    "artifactClass": "ephemeral-test-only",
+    "temporaryDirectoryRemoved": true,
+    "formalEnginePackArtifact": false
+  },
+  "verification": [
+    {
+      "command": "python -m unittest discover -s distribution/tests -p test_*.py",
+      "result": "passed",
+      "testsPassed": 120
+    },
+    {
+      "command": "python -m unittest discover -s engine-pack/tests -p test_*.py",
+      "result": "passed",
+      "testsPassed": 30
+    },
+    {
+      "command": "python -m pytest -q runtime/tests/test_edition_safety_gate.py",
+      "result": "passed",
+      "testsPassed": 16
+    },
+    {
+      "command": "python -m pytest -q backend/tests/test_benchmark_composite_inventory_observation.py backend/tests/test_distribution_safety.py",
+      "result": "passed",
+      "testsPassed": 27
+    },
+    {
+      "command": "python -m ruff check <20 changed Python paths>",
+      "result": "passed"
+    },
+    {
+      "command": "python -m mypy --ignore-missing-imports <7 changed source paths>",
+      "result": "passed",
+      "filesChecked": 7
+    },
+    {
+      "command": "ConvertFrom-Json <6 changed JSON contracts>",
+      "result": "passed",
+      "filesParsed": 6
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "engine_pack.py build/verify --edition-profile sim-only in one owned temporary directory",
+      "result": "passed",
+      "buildAttempts": 1,
+      "verifyAttempts": 1
+    }
+  ],
+  "testHarnessCorrections": [
+    {
+      "attemptedCommand": "python -m unittest runtime.tests.test_edition_safety_gate",
+      "result": "no-tests-ran",
+      "reason": "the Runtime suite is pytest-based and the command used an invalid unittest module entrypoint",
+      "countedAsPassed": false
+    },
+    {
+      "attemptedCommand": "python -m unittest discover -s runtime/tests -p test_edition_safety_gate.py",
+      "result": "no-tests-ran",
+      "reason": "unittest discovery does not collect pytest functions",
+      "countedAsPassed": false
+    }
+  ],
+  "failureGenealogy": [
+    {
+      "failure": "profile-scoped registry files matched legacy *.v1.json catalog globs",
+      "resolution": "all catalog loaders now exclude every registry.* projection while preserving canonical registries"
+    },
+    {
+      "failure": "the initial frozen-bytes test coupled the contract to one pretty-print representation",
+      "resolution": "the test now binds exact file bytes and SHA-256 without relying on a reserialized representation"
+    }
+  ],
+  "boundaries": {
+    "resourceClass": "GREEN",
+    "installerBuilt": false,
+    "formalEnginePackBuilt": false,
+    "runtimeInstalledOrMigrated": false,
+    "px4OrGazeboStarted": false,
+    "realDeviceConnected": false,
+    "apiKeyOrCredentialRead": false,
+    "networkProviderCalls": 0,
+    "validatedVehiclePacks": 0,
+    "releaseBranchesCreated": false,
+    "historicalArtifactsDeletedOrRewritten": false,
+    "frozenSimYellow2ArtifactRelabeled": false
+  }
+}

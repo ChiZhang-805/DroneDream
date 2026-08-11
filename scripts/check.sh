@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Aggregate quality gate: run linters, type-checkers, tests, and builds.
+# Portable service quality gate: run linters, type-checkers, tests, and builds.
 #
 # Modes:
 #   (default)  — local developer mode. Individual checks are skipped if their
@@ -69,8 +69,21 @@ fi
 if [[ -x worker/.venv/bin/ruff ]]; then
   section "Worker: ruff"
   run_or_skip "ruff" worker/.venv/bin/ruff check worker
+  section "Worker: mypy"
+  run_or_skip "mypy" worker/.venv/bin/python -m mypy \
+    --config-file worker/pyproject.toml worker/drone_dream_worker
+  section "Worker: pytest"
+  run_or_skip "pytest" worker/.venv/bin/python -m pytest worker
 else
   missing "worker ruff" "run 'python3 -m venv worker/.venv && worker/.venv/bin/pip install -e backend && worker/.venv/bin/pip install -e worker[dev]'"
+fi
+
+# ---- Runtime static contract ----
+if [[ -x runtime/.venv/bin/python ]]; then
+  section "Runtime: static contract"
+  run_or_skip "runtime" ./scripts/check-runtime.sh
+else
+  missing "runtime" "run 'python3 -m venv runtime/.venv && runtime/.venv/bin/pip install -r runtime/locks/release-tools-requirements.lock ruff==0.15.21'"
 fi
 
 # ---- Frontend ----
@@ -87,4 +100,6 @@ else
   missing "frontend" "run 'cd frontend && npm install'"
 fi
 
+echo
+echo "[check] Windows Desktop Rust/NSIS is a separate platform gate; see docs/10-development.md."
 exit "$status"

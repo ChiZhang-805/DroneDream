@@ -1,0 +1,5 @@
+launch executable: /opt/dronedream/venv/bin/python3 (argc=30)
+launch cwd: /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-3
+launch timeout: base_1x=300s speed_factor=1.0 effective=300s
+launcher exit code: 2
+UnsupportedScenarioEffectRunnerError: bundled PX4/Gazebo runner cannot verify requested advanced scenario effects: job_config.sensor_noise_level. Launcher evidence error: scenario effect evidence is missing. Configure a launcher that applies them, or explicitly set PX4_GAZEBO_ALLOW_UNVERIFIED_ADVANCED_EFFECTS=true for metadata-only passthrough (pass_flag will remain false).

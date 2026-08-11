@@ -1,5 +1,6 @@
+import { useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, ApiClientError } from "../api/client";
 import { SectionCard } from "../components/SectionCard";
@@ -7,7 +8,7 @@ import { MetricCard } from "../components/MetricCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Alert } from "../components/Alert";
 import { Loading, ErrorState } from "../components/States";
-import type { Artifact, Trial } from "../types/api";
+import type { Artifact, Trial, TrialStatus } from "../types/api";
 import { formatDateTime, formatNumber } from "../utils/format";
 import { ArtifactsPanel } from "../components/ArtifactsPanel";
 import {
@@ -17,25 +18,62 @@ import { GazeboLivePanel } from "../components/GazeboLivePanel";
 import { selectReplayArtifactsForTrial } from "../components/trajectoryReplayUtils";
 import { useI18n } from "../i18n/I18nProvider";
 
+const ACTIVE_TRIAL_POLL_INTERVAL_MS = 4000;
+
+function isActiveTrialStatus(status: TrialStatus): boolean {
+  return status === "PENDING" || status === "RUNNING";
+}
+
 export function TrialDetail() {
   const { t } = useI18n();
   const { trialId } = useParams<{ trialId: string }>();
   const safeId = trialId ?? "";
+  const queryClient = useQueryClient();
+  const observedActiveTrialRef = useRef<string | null>(null);
+  const terminalArtifactsReconciledTrialRef = useRef<string | null>(null);
 
   const trialQuery = useQuery({
     queryKey: ["trial", safeId],
     queryFn: () => apiClient.getTrial(safeId),
     enabled: !!safeId,
     retry: false,
+    refetchInterval: (query) => {
+      const trial = query.state.data as Trial | undefined;
+      return trial && isActiveTrialStatus(trial.status)
+        ? ACTIVE_TRIAL_POLL_INTERVAL_MS
+        : false;
+    },
   });
 
   const parentJobId = trialQuery.data?.job_id;
+  const trialStatus = trialQuery.data?.status;
   const artifactsQuery = useQuery({
     queryKey: ["job-artifacts", parentJobId ?? ""],
     queryFn: () => apiClient.listJobArtifacts(parentJobId ?? ""),
     enabled: !!parentJobId,
     retry: false,
   });
+
+  useEffect(() => {
+    if (!safeId || !trialStatus) return;
+    if (isActiveTrialStatus(trialStatus)) {
+      observedActiveTrialRef.current = safeId;
+      terminalArtifactsReconciledTrialRef.current = null;
+      return;
+    }
+    if (
+      observedActiveTrialRef.current !== safeId
+      || terminalArtifactsReconciledTrialRef.current === safeId
+      || !parentJobId
+    ) {
+      return;
+    }
+    terminalArtifactsReconciledTrialRef.current = safeId;
+    void queryClient.invalidateQueries({
+      queryKey: ["job-artifacts", parentJobId],
+      exact: true,
+    });
+  }, [parentJobId, queryClient, safeId, trialStatus]);
 
   if (trialQuery.isLoading) return <Loading label={t("trial.loading")} />;
   if (trialQuery.isError || !trialQuery.data) {
@@ -59,6 +97,13 @@ export function TrialDetail() {
   const trial = trialQuery.data;
   const artifacts = artifactsQuery.data ?? [];
   const replayArtifacts = selectReplayArtifactsForTrial(artifacts, trial.id);
+  const artifactsError = artifactsQuery.isError
+    ? (
+        artifactsQuery.error instanceof ApiClientError
+          ? artifactsQuery.error.message
+          : t("artifacts.loadFailedDescription")
+      )
+    : null;
 
   return (
     <section className="stack-md">
@@ -71,12 +116,14 @@ export function TrialDetail() {
           scenario: trial.scenario_type,
           candidate_id: trial.candidate_id,
         }}
+        artifactLoadError={artifactsError}
       />
       <GazeboLivePanel />
       <TrialArtifactsSection
         trial={trial}
         artifacts={artifacts}
         isLoading={artifactsQuery.isLoading}
+        error={artifactsError}
       />
       <FailureDetails trial={trial} />
     </section>
@@ -198,10 +245,12 @@ function TrialArtifactsSection({
   trial,
   artifacts,
   isLoading,
+  error,
 }: {
   trial: Trial;
   artifacts: Artifact[];
   isLoading: boolean;
+  error: string | null;
 }) {
   const { t } = useI18n();
   // Phase 8 polish: the job artifacts endpoint returns both job-scoped and
@@ -220,6 +269,7 @@ function TrialArtifactsSection({
       title={t("artifacts.title")}
       description={t("trial.artifactsDescription", { scenario: trial.scenario_type, seed: trial.seed })}
       isLoading={isLoading}
+      error={error}
       emptyDescription={t("trial.artifactsEmpty")}
       sections={[
         {

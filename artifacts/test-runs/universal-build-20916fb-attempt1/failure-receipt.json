@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-build-failure-receipt",
+  "generatedAt": "2026-08-06T17:05:39.0414935Z",
+  "executionSourceCommit": "20916fb0173d469000476d92e9d6665c53f1c76f",
+  "branch": "codex/software",
+  "upstreamMatchedExecutionSource": true,
+  "sourceDirtyBeforeAttempt": false,
+  "attemptOrdinal": 1,
+  "resourceClass": "YELLOW",
+  "authorizedScope": "single Universal Tauri/Cargo/NSIS build attempt",
+  "outputRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\handoffs\\universal-1.0.0-20916fb",
+  "cargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\universal-cargo-target",
+  "result": "failed-before-product-build",
+  "failure": {
+    "component": "desktop/scripts/release-build-driver.psm1",
+    "function": "Resolve-EditionGeneratedFrontendContract",
+    "reasonCode": "edition-overlay-missing-build-property-under-strict-mode",
+    "message": "The property 'build' cannot be found on this object.",
+    "sourceLocation": "desktop/scripts/build-windows-llvm.ps1:176"
+  },
+  "stages": {
+    "updaterSigningContractPreflight": "passed",
+    "updaterMetadataFixturePreflight": "passed",
+    "cargoMetadataPreflight": "completed",
+    "frontendProductionBuildAttempts": 0,
+    "tauriBuildAttempts": 0,
+    "cargoCompilationAttempts": 0,
+    "nsisAttempts": 0,
+    "newExeProduced": false,
+    "ownedOutputRootCreated": false,
+    "preexistingCargoTargetCandidateAttributedToThisAttempt": false
+  },
+  "credentialHandling": {
+    "valuesPrinted": false,
+    "valuesPersistedByReceipt": false,
+    "transientBuildVariablesPresentAfterFinally": 0
+  },
+  "retry": {
+    "automaticRetryCount": 0,
+    "sameSourceRetryProhibited": true,
+    "requiresNewCleanSourceAndFreshApproval": true
+  }
+}

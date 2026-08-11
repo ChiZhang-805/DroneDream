@@ -1,0 +1,31 @@
+{
+  "schema_version": "dronedream.runtime-handoff-verification.v1",
+  "generated_at": "2026-07-29T05:03:02Z",
+  "result": "pass",
+  "subject_commit": "755c511539fe561207ca38ff5079f471a4110896",
+  "runtime_id": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+  "manifest_sha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+  "signature_key_id": "ed25519:7839a33eb8451e26c0e03ec65857e0caef7af8df70e9ddde3430a681b3f0d8c1",
+  "part_count": 4,
+  "artifact_bytes": 6141118464,
+  "artifact_sha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+  "fresh_evidence_files": 4,
+  "checks": {
+    "source_receipt_manifest_commit_parity": true,
+    "source_tree_receipt_parity": true,
+    "runtime_id_parity": true,
+    "manifest_signature_sha_parity": true,
+    "signature_key_id_parity": true,
+    "all_part_sizes_match": true,
+    "all_part_sha256_match": true,
+    "whole_artifact_size_and_sha256_match": true,
+    "smoke_report_sha256_match": true,
+    "fresh_import_raw_files_match": true,
+    "all_image_smoke_checks_pass": true,
+    "all_fresh_import_core_services_active": true,
+    "fresh_import_default_user_checks_pass": true,
+    "upload_performed": false,
+    "online_provider_calls": 0,
+    "openai_api_key_read_or_used": false
+  }
+}

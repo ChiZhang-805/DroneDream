@@ -1,0 +1,37 @@
+{
+    "schema_version":  "dronedream.internal-installer-runtime-delivery-boundary.v3",
+    "generated_at":  "2026-08-01T00:13:27Z",
+    "desktop_source_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+    "desktop_installer_ready":  true,
+    "desktop_frontend_embedded":  true,
+    "backend_source_embedded_in_nsis":  false,
+    "wsl_runtime_embedded_in_nsis":  false,
+    "runtime_release":  {
+                            "tag":  "runtime-v0.1.0-beta.2",
+                            "source_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+                            "manifest_url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/runtime-release.json",
+                            "manifest_bytes":  2207,
+                            "manifest_sha256":  "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+                            "manifest_signature_sha256":  "db2465888c4b2dcb694c4503c6b995a6c534c2f040ddd886f601438d69c02c90",
+                            "public_release_draft":  false,
+                            "public_release_prerelease":  true,
+                            "all_four_parts_size_and_sha_match_public_github_assets":  true,
+                            "manifest_signature_valid":  true,
+                            "account_session_api_contract_present":  true,
+                            "archive_bytes":  6141118464,
+                            "archive_sha256":  "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+                            "prior_fresh_import_smoke_passed_without_touching_owned_runtime":  true
+                        },
+    "fresh_full_stack_runtime_delivery_ready":  true,
+    "existing_local_runtime":  {
+                                   "read_only_audit":  true,
+                                   "installed_source_commit":  "2cab65293983f96f608998ecf7203c993c03f098",
+                                   "compatible_with_beta2":  false,
+                                   "correctly_blocked":  true,
+                                   "migration_or_replacement_authorized":  false,
+                                   "distro_unregistered_or_overwritten":  false
+                               },
+    "latest_software_boundary":  "The installer embeds the 3f6cb1d desktop and production frontend. Backend, PX4 and Gazebo are downloaded from the separately signed public 755c511 Runtime beta2, whose account-session route is present. Existing beta1/source-2cab652 installations remain blocked until a separately authorized migration.",
+    "upload_performed":  false,
+    "release_modified":  false
+}

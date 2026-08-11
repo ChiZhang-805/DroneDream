@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-common-core-backflow-receipt",
+  "generatedAt": "2026-08-05T11:53:52.3841302Z",
+  "branch": "codex/software",
+  "source": {
+    "commit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "tree": "49c77646cc6bde0decba4023190bb76f65b79750",
+    "treeState": "clean",
+    "priorHead": "8e4086220773fdeb301bd7c8d26e2135d0bd089e"
+  },
+  "sourceCommits": [
+    {
+      "commit": "d3c1184e2206835305f5c348785680415c0acccb",
+      "closure": "edition-build-common-core-commit-binding"
+    },
+    {
+      "commit": "9d1a6e814c0cdf3b59ffe817c84dd88de8fd2781",
+      "closure": "engine-pack-edition-profile-binding"
+    },
+    {
+      "commit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+      "closure": "runtime-contract-registry-and-field-payload-filter"
+    }
+  ],
+  "fieldDonorAudit": {
+    "auditHead": "1f7d2d4638ac99919850e4c6c6028d845ac671bb",
+    "commonCoreCommitDonor": "2434e2342e76f875b0923a95fc730c0cff9a0133",
+    "editionProfileDonor": "2da989f341af72262e57de6e4403b48ecc0248a6",
+    "wholeCommitCherryPickUsed": false,
+    "fieldSpecificContractsImported": false,
+    "protectedEvidenceDeletionsImported": false
+  },
+  "bindings": {
+    "historicalBuildPlan": {
+      "path": "distribution/build-plans/software-1.0.0-065382b68bfa.v1.json",
+      "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+      "sha256": "af42495dde39ef18c15cc21e4e6f1ba26bb5de2902b6bbcad7023058023790ad",
+      "postSourceRetagged": false
+    },
+    "runtimeContractRegistry": {
+      "path": "distribution/runtime-contract-registry.v1.json",
+      "sha256": "defe5b232872273a5832e9163b84b89ee374de9ff212f4b9391e9d80de9cc7a9",
+      "fieldSpecificPathsPresent": false
+    },
+    "enginePackManifestSchema": {
+      "path": "engine-pack/manifest.schema.json",
+      "sha256": "03388a1955069932fc28128165cab3562822ca5e2a536d1a963d220480361385"
+    }
+  },
+  "verification": [
+    {
+      "command": "python -m pytest distribution/tests/test_edition_build_planner.py engine-pack/tests/test_engine_pack.py engine-pack/tests/test_engine_pack_manager.py runtime/tests/test_edition_safety_gate.py -q",
+      "result": "passed",
+      "testsPassed": 56,
+      "subtestsPassed": 11,
+      "durationSeconds": 16.89
+    },
+    {
+      "command": "python -m ruff check distribution/tools/edition_build_planner.py distribution/tests/test_edition_build_planner.py engine-pack/tools/engine_pack.py engine-pack/tests/test_engine_pack.py engine-pack/tests/test_engine_pack_manager.py runtime/scripts/edition-safety-gate.py runtime/tests/test_edition_safety_gate.py",
+      "result": "passed"
+    },
+    {
+      "command": "cargo fmt --manifest-path desktop/src-tauri/Cargo.toml -- --check",
+      "result": "passed"
+    },
+    {
+      "command": "desktop/scripts/verify-updater-build-contract.ps1",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check 8e4086220773fdeb301bd7c8d26e2135d0bd089e..e374d3f8d96b1265fcdb06864208b676566e94d9",
+      "result": "passed"
+    }
+  ],
+  "boundaries": {
+    "resourceClass": "GREEN",
+    "installerBuilt": false,
+    "enginePackProductionArtifactBuilt": false,
+    "runtimeMigrated": false,
+    "px4OrGazeboStarted": false,
+    "realDeviceConnected": false,
+    "apiKeyRead": false,
+    "validatedVehiclePacks": 0,
+    "editionArtifactsState": "planned-not-built",
+    "releaseBranchesCreated": false
+  }
+}

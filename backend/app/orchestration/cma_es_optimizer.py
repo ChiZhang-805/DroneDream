@@ -15,7 +15,12 @@ import random
 from typing import Any
 
 from app import models, schemas
+from app.optimization.candidate_evidence_ledger import (
+    candidate_evidence_chain_matches_current,
+    candidate_evidence_receipt_required,
+)
 from app.optimization.domain import SearchSpace
+from app.optimization.outcome_contract import selection_order_key
 from app.orchestration.optimizer import CandidateProposal
 from app.orchestration.parameter_constraints import validator_for_job
 
@@ -70,13 +75,20 @@ def _best_scored_center(
         if candidate.aggregated_score is not None
         and not isinstance(candidate.aggregated_score, bool)
         and math.isfinite(float(candidate.aggregated_score))
+        and (
+            not candidate_evidence_receipt_required(candidate)
+            or candidate_evidence_chain_matches_current(candidate)
+        )
         and (safe_ranges is None or _parameters_from(candidate, safe_ranges) is not None)
     ]
     if not scored:
         return None
     scored.sort(
         key=lambda c: (
-            c.aggregated_score if c.aggregated_score is not None else float("inf"),
+            *selection_order_key(
+                c.aggregated_metric_json,
+                c.aggregated_score,
+            ),
             c.generation_index,
             c.id,
         )
@@ -300,10 +312,17 @@ def _propose_selected_parameter_generation(
         if candidate.aggregated_score is not None
         and not isinstance(candidate.aggregated_score, bool)
         and math.isfinite(float(candidate.aggregated_score))
+        and (
+            not candidate_evidence_receipt_required(candidate)
+            or candidate_evidence_chain_matches_current(candidate)
+        )
     ]
     scored_history.sort(
         key=lambda item: (
-            (item[0].aggregated_score if item[0].aggregated_score is not None else float("inf")),
+            *selection_order_key(
+                item[0].aggregated_metric_json,
+                item[0].aggregated_score,
+            ),
             item[0].generation_index,
             item[0].id,
         )

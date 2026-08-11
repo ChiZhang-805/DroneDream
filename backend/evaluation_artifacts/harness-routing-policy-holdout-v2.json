@@ -1,0 +1,263 @@
+{
+  "case_count": 16,
+  "case_ids_sha256": "943dfc29d847a91f93740f7ee4d1b968fa54145af7440c07328c5853fdb126cb",
+  "corpus_sha256": "61be87c173407328078e8ddf6332908e13bab4eb1845fe64a3a1deeef06335c5",
+  "development_corpus_sha256": "52be8987e156838b2db0327fecc8cd1ea11e003fd5ec2887d12d71b83f57c978",
+  "eligibility_policy_version": "1.1",
+  "evidence_class": "deterministic_router_policy_holdout",
+  "evidence_schema_version": "2.6",
+  "exact_match_required": true,
+  "grades": [
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_minimal_bootstrap",
+      "category": "baseline",
+      "expected_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "constrained_mobo",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_constraints_single_objective",
+      "category": "problem_shape",
+      "expected_eligible_tools": [
+        "cma_es",
+        "constrained_mobo",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "constrained_mobo",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_multiobjective_unconstrained",
+      "category": "problem_shape",
+      "expected_eligible_tools": [
+        "cma_es",
+        "constrained_mobo",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_single_seed_per_case",
+      "category": "scenario_replication",
+      "expected_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "multi_fidelity_mobo",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_one_extra_replicate",
+      "category": "scenario_replication",
+      "expected_eligible_tools": [
+        "cma_es",
+        "multi_fidelity_mobo",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_turbo_below_observation_floor",
+      "category": "evidence_depth",
+      "expected_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "turbo",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_turbo_at_observation_floor",
+      "category": "evidence_depth",
+      "expected_eligible_tools": [
+        "cma_es",
+        "turbo",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "surrogate_cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_turbo_requires_feasible_point",
+      "category": "evidence_depth",
+      "expected_eligible_tools": [
+        "cma_es",
+        "surrogate_cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_sparse_dimension_below_floor",
+      "category": "problem_dimension",
+      "expected_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "saasbo",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_sparse_dimension_at_floor",
+      "category": "problem_dimension",
+      "expected_eligible_tools": [
+        "cma_es",
+        "saasbo",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "turbo",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_surrogate_below_history_floor",
+      "category": "evidence_depth",
+      "expected_eligible_tools": [
+        "cma_es",
+        "turbo",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "turbo",
+        "surrogate_cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_surrogate_at_history_floor",
+      "category": "evidence_depth",
+      "expected_eligible_tools": [
+        "cma_es",
+        "turbo",
+        "surrogate_cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_restart_generation_below_floor",
+      "category": "restart_state",
+      "expected_eligible_tools": [
+        "cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "bipop_cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_restart_stagnation_at_floor",
+      "category": "restart_state",
+      "expected_eligible_tools": [
+        "cma_es",
+        "bipop_cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "turbo",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_restart_without_history_or_stagnation",
+      "category": "restart_state",
+      "expected_eligible_tools": [
+        "cma_es",
+        "turbo",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    },
+    {
+      "actual_eligible_tools": [
+        "cma_es",
+        "constrained_mobo",
+        "multi_fidelity_mobo",
+        "turbo",
+        "saasbo",
+        "surrogate_cma_es",
+        "bipop_cma_es",
+        "optimizer_portfolio"
+      ],
+      "case_id": "locked_combined_all_capabilities",
+      "category": "combined",
+      "expected_eligible_tools": [
+        "cma_es",
+        "constrained_mobo",
+        "multi_fidelity_mobo",
+        "turbo",
+        "saasbo",
+        "surrogate_cma_es",
+        "bipop_cma_es",
+        "optimizer_portfolio"
+      ],
+      "passed": true
+    }
+  ],
+  "manifest_sha256": "7c9d119d7e71c68685d75054b714e08be4c81700457d3d97fcbdd70f53d6ba0d",
+  "pass_rate": 1.0,
+  "passed_count": 16,
+  "policy_input_suite_sha256": "17fb2c1f1966a7ff5f3d901c313e236fbc2c7e34da7a8a4bbbf445e13e7ea673",
+  "qualified": true,
+  "result_destination": "evaluation_artifact",
+  "schema_version": "1.0",
+  "source_role": "locked_holdout",
+  "tool_registry_version": "2.1"
+}

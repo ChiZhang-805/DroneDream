@@ -5,13 +5,16 @@
   "description": "Tauri desktop shell for the existing DroneDream web interface",
   "scripts": {
     "frontend:dev": "npm --prefix ../frontend run dev",
-    "frontend:build": "npm --prefix ../frontend run build",
+    "frontend:build": "node scripts/verify-browser-auth-config.mjs && npm --prefix ../frontend run build",
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
     "build:llvm": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-llvm.ps1",
     "check:frontend": "npm --prefix ../frontend run typecheck",
-    "verify:release-source": "node scripts/verify-release-source-policy.mjs"
+    "verify:browser-auth-config": "node scripts/verify-browser-auth-config.mjs",
+    "verify:release-source": "node scripts/verify-release-source-policy.mjs",
+    "verify:updater-signing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-updater-signing-contract.ps1",
+    "verify:updater-build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-updater-build-contract.ps1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.4"

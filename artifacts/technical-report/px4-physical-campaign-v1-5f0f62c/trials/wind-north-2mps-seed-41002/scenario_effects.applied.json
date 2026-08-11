@@ -1,0 +1,179 @@
+{
+  "effects": [
+    {
+      "capability": {
+        "reason": "Gazebo wind_info matched the compiled ENU vector and generated runtime SDF proved x500_0/base_link WindMode",
+        "status": "available"
+      },
+      "effect_id": "job_config.wind",
+      "evidence": {
+        "compiled_wind": {
+          "aggregation": "vector_sum",
+          "components": [
+            {
+              "bearing_deg_clockwise_from_north": null,
+              "direction_rule": "cardinal_components_to_gazebo_enu",
+              "effect_id": "job_config.wind",
+              "linear_velocity_mps": {
+                "x": 0.0,
+                "y": 2.0,
+                "z": 0.0
+              }
+            }
+          ],
+          "coordinate_frame": "GAZEBO_WORLD_ENU",
+          "linear_velocity_mps": {
+            "x": 0.0,
+            "y": 2.0,
+            "z": 0.0
+          },
+          "requested_effect_ids": [
+            "job_config.wind"
+          ],
+          "speed_mps": 2.0
+        },
+        "requested_value_sha256": "c617abede21b242cd103b805b8165d9fb1315990a7d126350c14a40f62b5f007",
+        "verification": {
+          "method": "gazebo_wind_info_and_generated_world_sdf",
+          "observations": [
+            {
+              "kind": "readback",
+              "sha256": "b56e85a72e970e06fa85d43ca48d30e8f3c21f571575b521c0123e565e77e081",
+              "source": "/world/default/wind_info",
+              "value": {
+                "enable_wind": true,
+                "linear_velocity_mps": {
+                  "x": 0.0,
+                  "y": 2.0,
+                  "z": 0.0
+                }
+              }
+            },
+            {
+              "kind": "artifact",
+              "sha256": "0d1df8ffcd76cad84bacaae878b190f61c2e51b1a1b03d9f28f161544f5f94f3",
+              "source": "/world/default/generate_world_sdf",
+              "value": {
+                "enable_wind": true,
+                "link_name": "base_link",
+                "sdf_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41002/scenario_runtime/generated_world.sdf",
+                "sdf_sha256": "29f7092a32989f72fd4424e448f12a6c66dd2f30e0cf8688f16d59c8558107d8",
+                "source_vehicle_model": "x500_base",
+                "vehicle_model": "x500_0"
+              }
+            },
+            {
+              "kind": "artifact",
+              "source": "trial_overlay/world_sdf",
+              "value": {
+                "linear_velocity_mps": {
+                  "x": 0.0,
+                  "y": 2.0,
+                  "z": 0.0
+                },
+                "materialized_px4_system_plugins": [
+                  {
+                    "filename": "gz-sim-physics-system",
+                    "name": "gz::sim::systems::Physics"
+                  },
+                  {
+                    "filename": "gz-sim-user-commands-system",
+                    "name": "gz::sim::systems::UserCommands"
+                  },
+                  {
+                    "filename": "gz-sim-scene-broadcaster-system",
+                    "name": "gz::sim::systems::SceneBroadcaster"
+                  },
+                  {
+                    "filename": "gz-sim-contact-system",
+                    "name": "gz::sim::systems::Contact"
+                  },
+                  {
+                    "filename": "gz-sim-imu-system",
+                    "name": "gz::sim::systems::Imu"
+                  },
+                  {
+                    "filename": "gz-sim-air-pressure-system",
+                    "name": "gz::sim::systems::AirPressure"
+                  },
+                  {
+                    "filename": "gz-sim-air-speed-system",
+                    "name": "gz::sim::systems::AirSpeed"
+                  },
+                  {
+                    "filename": "gz-sim-apply-link-wrench-system",
+                    "name": "gz::sim::systems::ApplyLinkWrench"
+                  },
+                  {
+                    "filename": "gz-sim-navsat-system",
+                    "name": "gz::sim::systems::NavSat"
+                  },
+                  {
+                    "filename": "gz-sim-magnetometer-system",
+                    "name": "gz::sim::systems::Magnetometer"
+                  },
+                  {
+                    "filename": "gz-sim-sensors-system",
+                    "name": "gz::sim::systems::Sensors"
+                  },
+                  {
+                    "filename": "libOpticalFlowSystem.so",
+                    "name": "custom::OpticalFlowSystem"
+                  },
+                  {
+                    "filename": "libGstCameraSystem.so",
+                    "name": "custom::GstCameraSystem"
+                  }
+                ],
+                "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41002/scenario_runtime/worlds/default.sdf",
+                "px4_server_config": {
+                  "path": "/opt/PX4-Autopilot/src/modules/simulation/gz_bridge/server.config",
+                  "sha256": "60871c73e32ecde05e008aaf995e1b9c09906ca3dacb143c595522c68d399172"
+                },
+                "sha256": "77a7d154852d6ea5b8e31693fbc2b3840cbe6c21dab7ce5b11624d9366bd5fe6",
+                "wind_effects_plugin": {
+                  "filename": "gz-sim-wind-effects-system",
+                  "name": "gz::sim::systems::WindEffects"
+                }
+              }
+            },
+            {
+              "kind": "artifact",
+              "source": "trial_overlay/x500_base_model_sdf",
+              "value": {
+                "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41002/scenario_runtime/models/x500_base/model.sdf",
+                "sanitized_classic_material_scripts": 4,
+                "sha256": "2d0aeb3ef6337e0a9b371a749b56f9cb2efb6f29ba3bc094fa244d582a793189",
+                "wind_enabled_link": "x500_base/base_link"
+              }
+            },
+            {
+              "kind": "artifact",
+              "source": "trial_overlay/px4_gz_env",
+              "value": {
+                "path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41002/scenario_runtime/px4_rootfs/gz_env.sh",
+                "rootfs_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41002/scenario_runtime/px4_rootfs",
+                "sha256": "adb3d443f66a142961f36b315e40210edaa2c7d5c117bf1b10bcea7ab31d449c",
+                "state_policy": "clean_copy_without_prior_params_dataman_logs_or_eeprom"
+              }
+            }
+          ],
+          "status": "verified"
+        }
+      },
+      "mechanism": "gazebo_wind_effects",
+      "status": "applied"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 1,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "px4-physical-campaign-86273db6",
+    "seed": 41002,
+    "trial_id": "px4-wind-north-2mps-seed-41002"
+  },
+  "launcher": "local_px4_launch_wrapper",
+  "request_sha256": "831fb434c7b9c1de63f8c5b5905962d3c28a666b9c73299c4c8fe052e231da84",
+  "schema_version": "dronedream.scenario_effect_evidence.v1",
+  "world": "default"
+}

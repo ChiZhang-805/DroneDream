@@ -1,0 +1,15 @@
+{
+    "schema_version":  "dronedream.tauri-updater-signature-verification.v2",
+    "generated_at":  "2026-08-01T00:13:27Z",
+    "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+    "artifact_sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+    "signature_file":  "DroneDream_1.0.0_x64-setup.exe.sig",
+    "signature_file_bytes":  420,
+    "signature_file_sha256":  "9506775db6a8f62bb973f1dcee5e558424a47124723dccf2b6b9aa62b1c9f05e",
+    "payload_signature_valid":  true,
+    "trusted_comment_signature_valid":  true,
+    "configured_key_id_matches":  true,
+    "trusted_comment":  "timestamp:1785542424\tfile:DroneDream_1.0.0_x64-setup.exe",
+    "verifier":  "minisign-verify 0.2.5 compiled with Rust 1.97.0 gnullvm",
+    "decoded_key_or_signature_persisted":  false
+}

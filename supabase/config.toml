@@ -1,0 +1,12 @@
+project_id = "dronedream"
+
+# Both functions implement their own authentication boundary. model-gateway
+# accepts a Supabase user JWT on account routes and an opaque hashed grant on
+# chat/completions. billing-checkout accepts a user JWT on checkout and signed
+# provider callbacks on webhook routes. Supabase's default JWT pre-check would
+# reject those non-JWT protocol credentials before our stricter checks run.
+[functions.model-gateway]
+verify_jwt = false
+
+[functions.billing-checkout]
+verify_jwt = false

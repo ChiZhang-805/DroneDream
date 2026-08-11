@@ -1,0 +1,174 @@
+{
+  "schemaVersion": "dronedream.final-software-audit.v1",
+  "generatedAt": "2026-08-03T01:52:26.9254335Z",
+  "subjectCommit": "7d301b9cb93a5011f462bc5aee7c714ebc349674",
+  "branch": "codex/software",
+  "upstream": "origin/codex/software",
+  "scope": {
+    "trackedCodeInventoryCount": 639,
+    "trackedCodeInventorySha256": "011cb46fe5d1f8f68f9be8827c18b98ddbf98e25e92c748b740821cc75a6a335",
+    "inventoryDefinition": "git ls-files --stage for backend, frontend excluding frontend/src/site and PublicSite, desktop, runtime, worker, scripts, and .github/workflows",
+    "ownershipExclusions": [
+      "website/**",
+      "technical-report/**",
+      "frontend/src/site/**",
+      "deploy/**",
+      "supabase/**"
+    ]
+  },
+  "fixes": [
+    {
+      "commit": "5146b477f724cac4ac5b236b70d67197a606ea1a",
+      "summary": "A diagnostic fallback is no longer presented as a validated baseline winner when a real-simulator job has no winner freeze receipt."
+    },
+    {
+      "commit": "7d301b9cb93a5011f462bc5aee7c714ebc349674",
+      "summary": "The comparison API and UI exclude diagnostic no-winner runs from optimized winner ranking while retaining their baseline diagnostics."
+    }
+  ],
+  "checks": [
+    {
+      "name": "backend pytest",
+      "result": "1500 passed",
+      "durationSeconds": 1323.0
+    },
+    {
+      "name": "backend Ruff and Mypy",
+      "result": "passed; Mypy checked 118 source files"
+    },
+    {
+      "name": "frontend software-scope Vitest",
+      "result": "66 files, 415 tests passed",
+      "exclusion": "frontend/src/__tests__/PublicSite.test.tsx is website-owned and separately recorded under residuals"
+    },
+    {
+      "name": "frontend typecheck, lint, and production build",
+      "result": "passed"
+    },
+    {
+      "name": "Runtime unit tests",
+      "result": "55 passed, 4 POSIX-only secure-deletion cases skipped on Windows"
+    },
+    {
+      "name": "Runtime Ruff, security rules, format, compileall, pin and lock validation",
+      "result": "passed"
+    },
+    {
+      "name": "worker pytest, Ruff, and Mypy",
+      "result": "2 passed; static checks passed for 3 source files"
+    },
+    {
+      "name": "desktop Rust native gnullvm fmt, clippy, and tests",
+      "result": "118 passed, 1 installed-Runtime ownership test ignored, 0 failed"
+    },
+    {
+      "name": "desktop release-source, updater build, and updater signing contracts",
+      "result": "passed"
+    },
+    {
+      "name": "repository hygiene",
+      "result": "passed: 1507 files, 1036 text files, 416 JSON files, 5 TOML files, 52 Markdown files, and 62 local links"
+    },
+    {
+      "name": "tracked script and workflow syntax",
+      "result": "17 PowerShell AST, 12 Node syntax, 6 YAML parse, and all Runtime/Scripts shell syntax checks passed"
+    },
+    {
+      "name": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "runtimeActivation": {
+    "distribution": "DroneDreamRuntime",
+    "runtimeId": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+    "runtimeVersion": "0.1.0",
+    "sourceCommit": "7d301b9cb93a5011f462bc5aee7c714ebc349674",
+    "packId": "sha256:57c15dd39b790dd0de3822a4d1a50b4d8503d1e4139c2e562cba04397bd0a8c4",
+    "previousPackId": "sha256:3306e99bd31907a4efaed05988d766b55629ab7c9e35eb1df0906a522d70d25f",
+    "archiveSha256": "7591937c20ea130d0ef3d0b16c5c9acb7767d676a789cc84f05d5a51ca601c65",
+    "archiveSizeBytes": 635663,
+    "manifestSha256": "3f64fb542ce051a99b5d107aff172bb9e0d3fd88ff9f4a9d81914a93b46ee51a",
+    "installedReleaseSizeBytes": 3742071,
+    "idleBeforeActivation": true,
+    "services": {
+      "dronedream-api.service": "active",
+      "dronedream-worker.service": "active"
+    },
+    "readiness": {
+      "database": "available",
+      "storage": "available",
+      "worker": "available",
+      "px4": "available",
+      "gazebo": "available"
+    }
+  },
+  "experimentArchive": {
+    "receiptPath": "artifacts/test-runs/prefinal-runtime-57a6d07/runtime-raw-run-archive-06fc17f-receipt.json",
+    "receiptSha256": "e0d883496b1cf56f86c1360e3961fad9843cd2c36d7259092fbcce90ab77e3bd",
+    "archivePath": "/var/lib/dronedream/archives/prefinal-px4-gazebo-06fc17f/prefinal-px4-gazebo-06fc17f-raw-runs.tar.gz",
+    "archiveSha256": "7a8b5220503a3bcb5af88f6a97fa93898274b4b4c8c3ee721b75984e64293734",
+    "archiveSizeBytes": 9519839,
+    "reclaimedBytes": 27735570,
+    "policy": "Only transient raw simulator directories were cold-stored and removed. Canonical Job directories remain live because the mixed eight-job matrix is not a fully successful class and the UI and database still reference those artifacts."
+  },
+  "dependencyAudit": {
+    "rust": "cargo audit found no vulnerabilities and 17 allowed upstream warnings",
+    "runtimeReleaseTools": "pip-audit found no known vulnerabilities",
+    "frontend": "npm audit reports two high-severity React Router RSC-mode advisories; this SPA does not enable React Server Components or server actions, and the proposed forced fix is a breaking downgrade"
+  },
+  "preservedFailuresAndResiduals": [
+    {
+      "area": "website-owned PublicSite test",
+      "result": "12 passed, 1 failed",
+      "detail": "The software branch's website test waits for billing checkout availability after only the download metadata request is observed. The failing paths are website-owned and were not modified."
+    },
+    {
+      "area": "desktop Rust host toolchain",
+      "result": "default MSVC-host attempt failed because link.exe is absent; the pinned native gnullvm toolchain passed all required gates",
+      "classification": "local toolchain environment"
+    },
+    {
+      "area": "worker command routing",
+      "result": "an initial repository-root pytest invocation could not import the worker package; the package-owned worker directory invocation passed",
+      "classification": "operator invocation corrected without changing product code"
+    },
+    {
+      "area": "WSL distribution routing",
+      "result": "initial Engine Pack manager probes targeted the default Ubuntu-22.04 distribution and made no Runtime change; the corrected explicit DroneDreamRuntime invocation activated and passed readiness",
+      "classification": "operator invocation corrected and future commands must name the distribution explicitly"
+    },
+    {
+      "area": "Runtime Base systemd",
+      "result": "kmod-static-nodes.service remains failed while DroneDream API, worker, PX4, Gazebo, database, and storage readiness are healthy",
+      "classification": "known unrelated Runtime Base environment residual"
+    },
+    {
+      "area": "production bundle size",
+      "result": "Vite warns that an application chunk is larger than 510 kB after minification",
+      "classification": "non-blocking performance follow-up"
+    },
+    {
+      "area": "public homepage HTTPS",
+      "result": "local curl validation observed a certificate principal/SNI mismatch for https://getdronedream.com while the current HTTP GitHub Pages homepage remains reachable",
+      "classification": "website/server ownership; desktop password submission remains restricted to the configured authenticated endpoint"
+    },
+    {
+      "area": "ignored Engine Pack build copy",
+      "result": "three generated files totaling 658765 bytes remain under engine-pack/out/final-audit-7d301b9 because two explicit safe-path recursive cleanup commands were rejected by local execution policy",
+      "classification": "ignored, non-tracked, negligible disk residual; installed Runtime copy is authoritative"
+    }
+  ],
+  "credentials": {
+    "openAiApiKeyRead": false,
+    "accountPasswordRead": false,
+    "modelProviderCalls": 0,
+    "repositorySecretScan": "passed"
+  },
+  "release": {
+    "exeRebuilt": false,
+    "runtimeBaseRebuilt": false,
+    "uploaded": false,
+    "deployed": false,
+    "technicalReportModified": false
+  }
+}

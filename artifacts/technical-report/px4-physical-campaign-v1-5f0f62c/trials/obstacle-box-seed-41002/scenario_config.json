@@ -1,0 +1,26 @@
+{
+  "advanced_scenario_config": {
+    "obstacles": [
+      {
+        "size_x": 1.0,
+        "size_y": 1.0,
+        "size_z": 1.0,
+        "type": "box",
+        "x": 0.0,
+        "y": 8.0,
+        "z": 0.5
+      }
+    ]
+  },
+  "scenario_config": {},
+  "scenario_type": "nominal",
+  "schema_version": "dronedream.scenario_config.v1",
+  "seed": 41002,
+  "sensor_noise_level": "medium",
+  "wind": {
+    "east": 0.0,
+    "north": 0.0,
+    "south": 0.0,
+    "west": 0.0
+  }
+}

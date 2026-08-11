@@ -1,0 +1,15 @@
+{
+  "schema_version": "dronedream.advanced-physics-actuator-failure-probe/v1",
+  "subject_head": "793f02089413f2baa8ea78387cd1e9e078f02b83",
+  "source_inventory_sha256": "a08133e3e68b79197eac53c96c362f3613fc03de9f582ca3b3bdc7ccbb48e98a",
+  "started_at": "2026-07-28T23:14:50Z",
+  "ended_at": "2026-07-28T23:16:12Z",
+  "duration_seconds": 82,
+  "runner_exit_code": 0,
+  "trial_success": false,
+  "physical_effect_verified": true,
+  "acceptance_exit_code": 0,
+  "preexisting_process_count": 0,
+  "residual_process_count": 0,
+  "openai_api_key_used": false
+}

@@ -1,0 +1,891 @@
+<sdf version='1.10'>
+  <world name='default'>
+    <physics type='ode'>
+      <max_step_size>0.0040000000000000001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>250</real_time_update_rate>
+    </physics>
+    <gravity>0 0 -9.8000000000000007</gravity>
+    <magnetic_field>6.0000000000000002e-06 2.3e-05 -4.1999999999999998e-05</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <scene>
+      <grid>false</grid>
+      <ambient>0.400000006 0.400000006 0.400000006 1</ambient>
+      <background>0.699999988 0.699999988 0.699999988 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <world_frame_orientation>ENU</world_frame_orientation>
+      <latitude_deg>47.397971057728974</latitude_deg>
+      <longitude_deg>8.5461637398001464</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <plugin name='gz::sim::systems::Physics' filename='gz-sim-physics-system'/>
+    <plugin name='gz::sim::systems::UserCommands' filename='gz-sim-user-commands-system'/>
+    <plugin name='gz::sim::systems::SceneBroadcaster' filename='gz-sim-scene-broadcaster-system'/>
+    <plugin name='gz::sim::systems::Contact' filename='gz-sim-contact-system'/>
+    <plugin name='gz::sim::systems::Imu' filename='gz-sim-imu-system'/>
+    <plugin name='gz::sim::systems::AirPressure' filename='gz-sim-air-pressure-system'/>
+    <plugin name='gz::sim::systems::AirSpeed' filename='gz-sim-air-speed-system'/>
+    <plugin name='gz::sim::systems::ApplyLinkWrench' filename='gz-sim-apply-link-wrench-system'/>
+    <plugin name='gz::sim::systems::NavSat' filename='gz-sim-navsat-system'/>
+    <plugin name='gz::sim::systems::Magnetometer' filename='gz-sim-magnetometer-system'/>
+    <plugin name='gz::sim::systems::Sensors' filename='gz-sim-sensors-system'>
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin name='custom::OpticalFlowSystem' filename='libOpticalFlowSystem.so'/>
+    <plugin name='custom::GstCameraSystem' filename='libGstCameraSystem.so'/>
+    <wind>
+      <linear_velocity>0 2 0</linear_velocity>
+    </wind>
+    <plugin name='gz::sim::systems::WindEffects' filename='gz-sim-wind-effects-system'/>
+    <model name='ground_plane'>
+      <static>true</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>1 1</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+            <contact/>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>500 500</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.800000012 0.800000012 0.800000012 1</ambient>
+            <diffuse>0.800000012 0.800000012 0.800000012 1</diffuse>
+            <specular>0.800000012 0.800000012 0.800000012 1</specular>
+          </material>
+        </visual>
+        <pose>0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1</mass>
+          <inertia>
+            <ixx>1</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1</iyy>
+            <iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <enable_wind>false</enable_wind>
+      </link>
+      <pose>0 0 0 0 0 0</pose>
+      <self_collide>false</self_collide>
+    </model>
+    <model name='x500_0'>
+      <frame name='_merged__x500_base__model__' attached_to='base_link'>
+        <pose relative_to='__model__'>0 0 0.23999999999999999 0 0 0</pose>
+      </frame>
+      <link name='base_link'>
+        <inertial>
+          <mass>2</mass>
+          <inertia>
+            <ixx>0.021666666666666671</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.021666666666666671</iyy>
+            <iyz>0</iyz>
+            <izz>0.040000000000000008</izz>
+          </inertia>
+          <pose>0 0 0 0 0 0</pose>
+        </inertial>
+        <gravity>true</gravity>
+        <velocity_decay/>
+        <visual name='base_link_visual'>
+          <pose>0 0 0.025000000000000001 0 0 -3.1415926531795866</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/NXP-HGD-CF.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <visual name='5010_motor_base_0'>
+          <pose>0.17399999999999999 0.17399999999999999 0.032000000000000001 0 0 -0.45000000000000001</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/5010Base.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <visual name='5010_motor_base_1'>
+          <pose>-0.17399999999999999 0.17399999999999999 0.032000000000000001 0 0 -0.45000000000000001</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/5010Base.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <visual name='5010_motor_base_2'>
+          <pose>0.17399999999999999 -0.17399999999999999 0.032000000000000001 0 0 -0.45000000000000001</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/5010Base.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <visual name='5010_motor_base_3'>
+          <pose>-0.17399999999999999 -0.17399999999999999 0.032000000000000001 0 0 -0.45000000000000001</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/5010Base.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <visual name='NXP_FMUK66_FRONT'>
+          <pose>0.047 0.001 0.042999999999999997 1 1.1102230246251565e-16 1.5699999999999998</pose>
+          <cast_shadows>false</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>0.012999999999999999 0.0070000000000000001</size>
+            </plane>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>1 1 1 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>model://x500_base/materials/textures/nxp.png</albedo_map>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <visual name='NXP_FMUK66_TOP'>
+          <pose>-0.023 0 0.051499999999999997 0 0 -1.5700000000000001</pose>
+          <cast_shadows>false</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>0.012999999999999999 0.0070000000000000001</size>
+            </plane>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>1 1 1 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>model://x500_base/materials/textures/nxp.png</albedo_map>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <visual name='RDDRONE_FMUK66_TOP'>
+          <pose>-0.029999999999999999 0 0.051499999999999997 0 0 -1.5700000000000001</pose>
+          <cast_shadows>false</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>0.032000000000000001 0.0033999999999999998</size>
+            </plane>
+          </geometry>
+          <material>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>1 1 1 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>model://x500_base/materials/textures/rd.png</albedo_map>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <collision name='base_link_collision_0'>
+          <pose>0 0 0.0070000000000000001 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.35355339059327373 0.35355339059327373 0.050000000000000003</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <collision name='base_link_collision_1'>
+          <pose>0 -0.098000000000000004 -0.123 -0.34999999999999998 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.014999999999999999 0.014999999999999999 0.20999999999999999</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <collision name='base_link_collision_2'>
+          <pose>0 0.098000000000000004 -0.123 0.34999999999999998 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.014999999999999999 0.014999999999999999 0.20999999999999999</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <collision name='base_link_collision_3'>
+          <pose>0 -0.13200000000000001 -0.2195 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.25 0.014999999999999999 0.014999999999999999</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <collision name='base_link_collision_4'>
+          <pose>0 0.13200000000000001 -0.2195 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.25 0.014999999999999999 0.014999999999999999</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <sensor name='air_pressure_sensor' type='air_pressure'>
+          <pose>0 0 0 0 0 0</pose>
+          <topic>__default__</topic>
+          <update_rate>50</update_rate>
+          <enable_metrics>false</enable_metrics>
+          <air_pressure>
+            <reference_altitude>0</reference_altitude>
+            <pressure>
+              <noise type='gaussian'>
+                <mean>0</mean>
+                <stddev>3</stddev>
+                <bias_mean>0</bias_mean>
+                <bias_stddev>0</bias_stddev>
+                <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                <precision>0</precision>
+              </noise>
+            </pressure>
+          </air_pressure>
+        </sensor>
+        <sensor name='magnetometer_sensor' type='magnetometer'>
+          <pose>0 0 0 0 0 0</pose>
+          <topic>__default__</topic>
+          <update_rate>100</update_rate>
+          <enable_metrics>false</enable_metrics>
+          <magnetometer>
+            <x>
+              <noise type='gaussian'>
+                <mean>0</mean>
+                <stddev>0.0001</stddev>
+                <bias_mean>0</bias_mean>
+                <bias_stddev>0</bias_stddev>
+                <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                <precision>0</precision>
+              </noise>
+            </x>
+            <y>
+              <noise type='gaussian'>
+                <mean>0</mean>
+                <stddev>0.0001</stddev>
+                <bias_mean>0</bias_mean>
+                <bias_stddev>0</bias_stddev>
+                <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                <precision>0</precision>
+              </noise>
+            </y>
+            <z>
+              <noise type='gaussian'>
+                <mean>0</mean>
+                <stddev>0.0001</stddev>
+                <bias_mean>0</bias_mean>
+                <bias_stddev>0</bias_stddev>
+                <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                <precision>0</precision>
+              </noise>
+            </z>
+          </magnetometer>
+        </sensor>
+        <sensor name='imu_sensor' type='imu'>
+          <pose>0 0 0 0 0 0</pose>
+          <topic>__default__</topic>
+          <update_rate>250</update_rate>
+          <enable_metrics>false</enable_metrics>
+          <imu>
+            <orientation_reference_frame>
+              <localization>CUSTOM</localization>
+              <custom_rpy>0 0 0</custom_rpy>
+              <grav_dir_x>1 0 0</grav_dir_x>
+            </orientation_reference_frame>
+            <angular_velocity>
+              <x>
+                <noise type='gaussian'>
+                  <mean>0</mean>
+                  <stddev>0.00087266459999999998</stddev>
+                  <bias_mean>0</bias_mean>
+                  <bias_stddev>0</bias_stddev>
+                  <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                  <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                  <precision>0</precision>
+                </noise>
+              </x>
+              <y>
+                <noise type='gaussian'>
+                  <mean>0</mean>
+                  <stddev>0.00087266459999999998</stddev>
+                  <bias_mean>0</bias_mean>
+                  <bias_stddev>0</bias_stddev>
+                  <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                  <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                  <precision>0</precision>
+                </noise>
+              </y>
+              <z>
+                <noise type='gaussian'>
+                  <mean>0</mean>
+                  <stddev>0.00087266459999999998</stddev>
+                  <bias_mean>0</bias_mean>
+                  <bias_stddev>0</bias_stddev>
+                  <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                  <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                  <precision>0</precision>
+                </noise>
+              </z>
+            </angular_velocity>
+            <linear_acceleration>
+              <x>
+                <noise type='gaussian'>
+                  <mean>0</mean>
+                  <stddev>0.0063699999999999998</stddev>
+                  <bias_mean>0</bias_mean>
+                  <bias_stddev>0</bias_stddev>
+                  <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                  <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                  <precision>0</precision>
+                </noise>
+              </x>
+              <y>
+                <noise type='gaussian'>
+                  <mean>0</mean>
+                  <stddev>0.0063699999999999998</stddev>
+                  <bias_mean>0</bias_mean>
+                  <bias_stddev>0</bias_stddev>
+                  <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                  <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                  <precision>0</precision>
+                </noise>
+              </y>
+              <z>
+                <noise type='gaussian'>
+                  <mean>0</mean>
+                  <stddev>0.0068599999999999998</stddev>
+                  <bias_mean>0</bias_mean>
+                  <bias_stddev>0</bias_stddev>
+                  <dynamic_bias_stddev>0</dynamic_bias_stddev>
+                  <dynamic_bias_correlation_time>0</dynamic_bias_correlation_time>
+                  <precision>0</precision>
+                </noise>
+              </z>
+            </linear_acceleration>
+            <enable_orientation>true</enable_orientation>
+          </imu>
+        </sensor>
+        <sensor name='navsat_sensor' type='navsat'>
+          <always_on>true</always_on>
+          <update_rate>30</update_rate>
+          <gps/>
+        </sensor>
+        <enable_wind>true</enable_wind>
+        <pose>0 0 0.23999999999999999 0 0 0</pose>
+      </link>
+      <link name='rotor_0'>
+        <gravity>true</gravity>
+        <self_collide>false</self_collide>
+        <velocity_decay/>
+        <pose>0.17400000000000002 -0.17399999999999999 0.29999999999999999 9.448906294877232e-34 5.0838653958285714e-33 1.9037094458544662e-17</pose>
+        <inertial>
+          <mass>0.016076923076923075</mass>
+          <inertia>
+            <ixx>3.8464910483993325e-07</ixx>
+            <iyy>2.6115851691700804e-05</iyy>
+            <izz>2.6498582347140039e-05</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+          <pose>0 0 0 0 0 0</pose>
+        </inertial>
+        <visual name='rotor_0_visual'>
+          <pose>-0.021999999999999999 -0.14638461538461536 -0.016 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.84615384615384615 0.84615384615384615 0.84615384615384615</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/1345_prop_ccw.stl</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.200000003 0.200000003 0.200000003 1</ambient>
+            <diffuse>0.200000003 0.200000003 0.200000003 1</diffuse>
+            <specular>0.100000001 0.100000001 0.100000001 1</specular>
+          </material>
+        </visual>
+        <visual name='rotor_0_visual_motor_bell'>
+          <pose>0 0 -0.032000000000000001 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/5010Bell.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name='rotor_0_collision'>
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.27923076923076923 0.016923076923076923 0.0008461538461538462</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <enable_wind>false</enable_wind>
+      </link>
+      <joint name='rotor_0_joint' type='revolute'>
+        <parent>base_link</parent>
+        <child>rotor_0</child>
+        <axis>
+          <xyz>0 0 1</xyz>
+          <limit>
+            <lower>-10000000000000000</lower>
+            <upper>10000000000000000</upper>
+            <effort>inf</effort>
+            <velocity>inf</velocity>
+            <stiffness>100000000</stiffness>
+            <dissipation>1</dissipation>
+          </limit>
+          <dynamics>
+            <spring_reference>0</spring_reference>
+            <spring_stiffness>0</spring_stiffness>
+            <damping>0</damping>
+            <friction>0</friction>
+          </dynamics>
+        </axis>
+        <pose>0 0 0 0 0 0</pose>
+      </joint>
+      <link name='rotor_1'>
+        <gravity>true</gravity>
+        <self_collide>false</self_collide>
+        <velocity_decay/>
+        <pose>-0.17399999999999996 0.17400000000000002 0.29999999999999993 -1.9758098621685271e-33 -7.242086248249738e-33 -3.9807442051381963e-17</pose>
+        <inertial>
+          <mass>0.016076923076923075</mass>
+          <inertia>
+            <ixx>3.8464910483993325e-07</ixx>
+            <iyy>2.6115851691700804e-05</iyy>
+            <izz>2.6498582347140039e-05</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+          <pose>0 0 0 0 0 0</pose>
+        </inertial>
+        <visual name='rotor_1_visual'>
+          <pose>-0.021999999999999999 -0.14638461538461536 -0.016 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.84615384615384615 0.84615384615384615 0.84615384615384615</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/1345_prop_ccw.stl</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.200000003 0.200000003 0.200000003 1</ambient>
+            <diffuse>0.200000003 0.200000003 0.200000003 1</diffuse>
+            <specular>0.100000001 0.100000001 0.100000001 1</specular>
+          </material>
+        </visual>
+        <visual name='rotor_1_visual_motor_top'>
+          <pose>0 0 -0.032000000000000001 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/5010Bell.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name='rotor_1_collision'>
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.27923076923076923 0.016923076923076923 0.0008461538461538462</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <enable_wind>false</enable_wind>
+      </link>
+      <joint name='rotor_1_joint' type='revolute'>
+        <parent>base_link</parent>
+        <child>rotor_1</child>
+        <axis>
+          <xyz>0 0 1</xyz>
+          <limit>
+            <lower>-10000000000000000</lower>
+            <upper>10000000000000000</upper>
+            <effort>inf</effort>
+            <velocity>inf</velocity>
+            <stiffness>100000000</stiffness>
+            <dissipation>1</dissipation>
+          </limit>
+          <dynamics>
+            <spring_reference>0</spring_reference>
+            <spring_stiffness>0</spring_stiffness>
+            <damping>0</damping>
+            <friction>0</friction>
+          </dynamics>
+        </axis>
+        <pose>0 0 0 0 0 0</pose>
+      </joint>
+      <link name='rotor_2'>
+        <gravity>true</gravity>
+        <self_collide>false</self_collide>
+        <velocity_decay/>
+        <pose>0.17400000000000002 0.17400000000000002 0.29999999999999993 -4.9558948814159564e-34 5.0838653958285714e-33 -9.9848422706111104e-18</pose>
+        <inertial>
+          <mass>0.016076923076923075</mass>
+          <inertia>
+            <ixx>3.8464910483993325e-07</ixx>
+            <iyy>2.6115851691700804e-05</iyy>
+            <izz>2.6498582347140039e-05</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+          <pose>0 0 0 0 0 0</pose>
+        </inertial>
+        <visual name='rotor_2_visual'>
+          <pose>-0.021999999999999999 -0.14638461538461536 -0.016 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.84615384615384615 0.84615384615384615 0.84615384615384615</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/1345_prop_cw.stl</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.200000003 0.200000003 0.200000003 1</ambient>
+            <diffuse>0.200000003 0.200000003 0.200000003 1</diffuse>
+            <specular>0.100000001 0.100000001 0.100000001 1</specular>
+          </material>
+        </visual>
+        <visual name='rotor_2_visual_motor_top'>
+          <pose>0 0 -0.032000000000000001 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/5010Bell.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name='rotor_2_collision'>
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.27923076923076923 0.016923076923076923 0.0008461538461538462</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <enable_wind>false</enable_wind>
+      </link>
+      <joint name='rotor_2_joint' type='revolute'>
+        <parent>base_link</parent>
+        <child>rotor_2</child>
+        <axis>
+          <xyz>0 0 1</xyz>
+          <limit>
+            <lower>-10000000000000000</lower>
+            <upper>10000000000000000</upper>
+            <effort>inf</effort>
+            <velocity>inf</velocity>
+            <stiffness>100000000</stiffness>
+            <dissipation>1</dissipation>
+          </limit>
+          <dynamics>
+            <spring_reference>0</spring_reference>
+            <spring_stiffness>0</spring_stiffness>
+            <damping>0</damping>
+            <friction>0</friction>
+          </dynamics>
+        </axis>
+        <pose>0 0 0 0 0 0</pose>
+      </joint>
+      <link name='rotor_3'>
+        <gravity>true</gravity>
+        <self_collide>false</self_collide>
+        <velocity_decay/>
+        <pose>-0.17399999999999996 -0.17399999999999999 0.29999999999999999 -1.7108706109536625e-35 -7.242086248249738e-33 -3.4469603582301169e-19</pose>
+        <inertial>
+          <mass>0.016076923076923075</mass>
+          <inertia>
+            <ixx>3.8464910483993325e-07</ixx>
+            <iyy>2.6115851691700804e-05</iyy>
+            <izz>2.6498582347140039e-05</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+          <pose>0 0 0 0 0 0</pose>
+        </inertial>
+        <visual name='rotor_3_visual'>
+          <pose>-0.021999999999999999 -0.14638461538461536 -0.016 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>0.84615384615384615 0.84615384615384615 0.84615384615384615</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/1345_prop_cw.stl</uri>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.200000003 0.200000003 0.200000003 1</ambient>
+            <diffuse>0.200000003 0.200000003 0.200000003 1</diffuse>
+            <specular>0.100000001 0.100000001 0.100000001 1</specular>
+          </material>
+        </visual>
+        <visual name='rotor_3_visual_motor_top'>
+          <pose>0 0 -0.032000000000000001 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <scale>1 1 1</scale>
+              <uri>file:///mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-86273db6/wind-north-2mps-seed-41001/scenario_runtime/models/x500_base/meshes/5010Bell.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name='rotor_3_collision'>
+          <pose>0 0 0 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>0.27923076923076923 0.016923076923076923 0.0008461538461538462</size>
+            </box>
+          </geometry>
+          <surface>
+            <contact>
+              <ode>
+                <min_depth>0.001</min_depth>
+                <max_vel>0</max_vel>
+              </ode>
+            </contact>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+          </surface>
+        </collision>
+        <enable_wind>false</enable_wind>
+      </link>
+      <joint name='rotor_3_joint' type='revolute'>
+        <parent>base_link</parent>
+        <child>rotor_3</child>
+        <axis>
+          <xyz>0 0 1</xyz>
+          <limit>
+            <lower>-10000000000000000</lower>
+            <upper>10000000000000000</upper>
+            <effort>inf</effort>
+            <velocity>inf</velocity>
+            <stiffness>100000000</stiffness>
+            <dissipation>1</dissipation>
+          </limit>
+          <dynamics>
+            <spring_reference>0</spring_reference>
+            <spring_stiffness>0</spring_stiffness>
+            <damping>0</damping>
+            <friction>0</friction>
+          </dynamics>
+        </axis>
+        <pose>0 0 0 0 0 0</pose>
+      </joint>
+      <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+        <jointName>rotor_0_joint</jointName>
+        <linkName>rotor_0</linkName>
+        <turningDirection>ccw</turningDirection>
+        <timeConstantUp>0.0125</timeConstantUp>
+        <timeConstantDown>0.025</timeConstantDown>
+        <maxRotVelocity>1000.0</maxRotVelocity>
+        <motorConstant>8.54858e-06</motorConstant>
+        <momentConstant>0.016</momentConstant>
+        <commandSubTopic>command/motor_speed</commandSubTopic>
+        <motorNumber>0</motorNumber>
+        <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+        <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <motorType>velocity</motorType>
+      </plugin>
+      <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+        <jointName>rotor_1_joint</jointName>
+        <linkName>rotor_1</linkName>
+        <turningDirection>ccw</turningDirection>
+        <timeConstantUp>0.0125</timeConstantUp>
+        <timeConstantDown>0.025</timeConstantDown>
+        <maxRotVelocity>1000.0</maxRotVelocity>
+        <motorConstant>8.54858e-06</motorConstant>
+        <momentConstant>0.016</momentConstant>
+        <commandSubTopic>command/motor_speed</commandSubTopic>
+        <motorNumber>1</motorNumber>
+        <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+        <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <motorType>velocity</motorType>
+      </plugin>
+      <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+        <jointName>rotor_2_joint</jointName>
+        <linkName>rotor_2</linkName>
+        <turningDirection>cw</turningDirection>
+        <timeConstantUp>0.0125</timeConstantUp>
+        <timeConstantDown>0.025</timeConstantDown>
+        <maxRotVelocity>1000.0</maxRotVelocity>
+        <motorConstant>8.54858e-06</motorConstant>
+        <momentConstant>0.016</momentConstant>
+        <commandSubTopic>command/motor_speed</commandSubTopic>
+        <motorNumber>2</motorNumber>
+        <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+        <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <motorType>velocity</motorType>
+      </plugin>
+      <plugin name='gz::sim::systems::MulticopterMotorModel' filename='gz-sim-multicopter-motor-model-system'>
+        <jointName>rotor_3_joint</jointName>
+        <linkName>rotor_3</linkName>
+        <turningDirection>cw</turningDirection>
+        <timeConstantUp>0.0125</timeConstantUp>
+        <timeConstantDown>0.025</timeConstantDown>
+        <maxRotVelocity>1000.0</maxRotVelocity>
+        <motorConstant>8.54858e-06</motorConstant>
+        <momentConstant>0.016</momentConstant>
+        <commandSubTopic>command/motor_speed</commandSubTopic>
+        <motorNumber>3</motorNumber>
+        <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+        <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+        <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+        <motorType>velocity</motorType>
+      </plugin>
+      <pose>2.0354373698267829e-17 0.0026092086481237686 -0.013000075523138421 -1.9489800001324402e-07 -9.926836252167507e-17 1.7493314641311186e-17</pose>
+      <static>false</static>
+      <self_collide>false</self_collide>
+    </model>
+    <light name='sunUTC' type='directional'>
+      <pose>0 0 500 0 0 0</pose>
+      <cast_shadows>true</cast_shadows>
+      <intensity>1</intensity>
+      <direction>0.001 0.625 -0.78000000000000003</direction>
+      <diffuse>0.903999984 0.903999984 0.903999984 1</diffuse>
+      <specular>0.270999998 0.270999998 0.270999998 1</specular>
+      <attenuation>
+        <range>2000</range>
+        <linear>0</linear>
+        <constant>1</constant>
+        <quadratic>0</quadratic>
+      </attenuation>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
+    </light>
+  </world>
+</sdf>

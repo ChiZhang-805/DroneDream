@@ -1,0 +1,101 @@
+{
+  "approval": {
+    "authorized_logical_calls": 24,
+    "authorized_max_retries": 0,
+    "authorized_model_snapshot": "gpt-4.1-2025-04-14",
+    "authorized_scope": "single Evidence 2.9 development-corpus campaign",
+    "estimated_cost_usd": 0.13,
+    "estimated_cost_upper_bound_usd": 0.25,
+    "user_permission_relayed_by_total_control": true
+  },
+  "artifact": {
+    "bytes": 12812,
+    "corpus_sha256": "98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89",
+    "evidence_schema_version": "2.9",
+    "generation_config": {
+      "response_format": "json_schema",
+      "seed": 20260729,
+      "temperature": 0.0,
+      "top_p": 1.0
+    },
+    "model_snapshot": "gpt-4.1-2025-04-14",
+    "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.9-prompt-1.7-20260729.json",
+    "prompt_suite_sha256": "5e57d7a02e855f68eb4eb481e92e24b520775af1479534063ae352321e200d3f",
+    "prompt_template_version": "1.7",
+    "provider": "openai",
+    "sha256": "11c5de7e208cb9b3e1263943ff8086bd919a57753948a9fd0db0ffd48e621ed1",
+    "tool_registry_version": "2.1"
+  },
+  "campaign": {
+    "command": [
+      "python",
+      "backend/scripts/run_harness_routing_campaign.py",
+      "--output",
+      "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.9-prompt-1.7-20260729.json",
+      "--model-snapshot",
+      "gpt-4.1-2025-04-14",
+      "--temperature",
+      "0",
+      "--top-p",
+      "1",
+      "--seed",
+      "20260729",
+      "--max-retries",
+      "0",
+      "--timeout-seconds",
+      "60"
+    ],
+    "completed_at": "2026-07-29T09:57:28.472Z",
+    "duration_seconds": 69.533,
+    "exit_code": 0,
+    "logical_calls": 24,
+    "network_calls": 24,
+    "output_replaced": false,
+    "provider_calls": 24,
+    "source_branch": "codex/software",
+    "source_commit": "d36ef166f985f761ab9e733753f61237950049da",
+    "source_tree_clean": true,
+    "started_at": "2026-07-29T09:56:18.937Z"
+  },
+  "claim_boundary": "This online development-corpus campaign establishes current-contract Evidence 2.9 routing discrimination for the exact frozen prompts, model snapshot, generation controls, and 24 enumerated cases. It does not establish causal optimizer-outcome benefit, multi-tool planning benefit, physical fidelity, sim-to-real transfer, real-aircraft performance, or flight safety.",
+  "credential_handling": {
+    "api_key_persisted": false,
+    "api_key_printed": false,
+    "api_key_source": "approved process-local HARNESS_ROUTING_API_KEY alias",
+    "environment_aliases_cleared_after": true,
+    "provider_request_ids_persisted": false,
+    "secret_values_in_artifact": false
+  },
+  "generated_at": "2026-07-29T09:58:33.640Z",
+  "manifest_sha256": "ea4c6242fe01c56f088d4042772dba763378d94d011f0c550c35ec862638ea7a",
+  "result": {
+    "absolute_lift_over_best_constant": 0.375,
+    "best_constant_pass_rate": 0.5833333333333334,
+    "case_count": 24,
+    "failed_cases": [
+      {
+        "acceptable_tools": [
+          "multi_fidelity_mobo",
+          "optimizer_portfolio"
+        ],
+        "case_id": "tight_budget_expensive_matrix",
+        "category": "tight_budget",
+        "selected_tool": "turbo"
+      }
+    ],
+    "failed_requirements": [],
+    "minimum_category_pass_rate": 0.6666666666666666,
+    "pass_rate": 0.9583333333333334,
+    "passed_count": 23,
+    "qualified": true,
+    "uniform_random_expected_pass_rate": 0.234375
+  },
+  "schema_version": "dronedream.harness-routing-online-campaign-manifest/v1",
+  "usage": {
+    "actual_billed_cost_available": false,
+    "actual_token_usage_available": false,
+    "explanation": "The current campaign client validates and returns only structured decision content; it does not persist provider usage or billing fields.",
+    "logical_calls": 24,
+    "max_retries": 0
+  }
+}

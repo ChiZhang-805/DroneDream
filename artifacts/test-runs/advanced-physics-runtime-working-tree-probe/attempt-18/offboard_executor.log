@@ -1,0 +1,10 @@
+vehicle=x500 world=default points=181 setpoints=309
+controller_params are applied by the offboard executor, not PX4 internal parameters
+connected via udp://:14540
+SIM_GPS_USED baseline recorded as 10
+armed
+offboard started
+offboard stopped
+land command sent
+offboard client closed
+executor completed successfully

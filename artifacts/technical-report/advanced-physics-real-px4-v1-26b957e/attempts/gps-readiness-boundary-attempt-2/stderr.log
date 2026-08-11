@@ -1,0 +1,5 @@
+Connection using udp:// is deprecated, please use udpin:// or udpout:// (cli_arg.cpp:28)
+Connection using udp:// is deprecated, please use udpin:// or udpout:// (cli_arg.cpp:28)
+px4 offboard executor failed: PX4 readiness timeout after 30.0s
+[local_px4_launch_wrapper] Sent SIGTERM to PX4 process group
+[local_px4_launch_wrapper] Real mode failure: offboard executor failed with code 1

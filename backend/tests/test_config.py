@@ -52,6 +52,20 @@ def test_finalization_lease_covers_llm_retry_window() -> None:
     assert settings.finalization_lease_seconds == 3700
 
 
+def test_managed_model_gateway_requires_credential_free_https() -> None:
+    settings = Settings(
+        model_gateway_base_url=(
+            "https://example.supabase.co/functions/v1/model-gateway"
+        )
+    )
+    assert settings.model_gateway_base_url.endswith("/model-gateway")
+
+    with pytest.raises(ValidationError, match="credential-free absolute HTTPS"):
+        Settings(model_gateway_base_url="http://example.com/model-gateway")
+    with pytest.raises(ValidationError, match="credential-free absolute HTTPS"):
+        Settings(model_gateway_base_url="https://user:pass@example.com/model-gateway")
+
+
 def test_runtime_id_is_optional_and_requires_a_canonical_uuid() -> None:
     assert Settings().dronedream_runtime_id is None
     assert (
@@ -81,6 +95,45 @@ def test_default_real_simulator_artifact_root_matches_cli_default(monkeypatch, t
 def test_production_rejects_disabled_auth() -> None:
     with pytest.raises(ValidationError, match="AUTH_MODE=disabled is forbidden"):
         Settings(app_env="production", auth_mode="disabled")
+
+
+def test_desktop_rejects_disabled_auth() -> None:
+    with pytest.raises(ValidationError, match="AUTH_MODE=disabled is forbidden"):
+        Settings(app_env="desktop", auth_mode="disabled")
+
+
+def test_desktop_requires_launch_bound_bridge_and_runtime_identity() -> None:
+    oidc = {
+        "auth_mode": "oidc_jwt",
+        "oidc_issuer": "https://identity.example.com/",
+        "oidc_audience": "dronedream-api",
+        "oidc_jwks_url": "https://identity.example.com/.well-known/jwks.json",
+        "oidc_algorithms": "ES256",
+    }
+    with pytest.raises(ValidationError, match="DESKTOP_BRIDGE_REQUIRED=true"):
+        Settings(app_env="desktop", **oidc)
+    with pytest.raises(ValidationError, match="DRONEDREAM_RUNTIME_ID"):
+        Settings(app_env="desktop", desktop_bridge_required=True, **oidc)
+
+    settings = Settings(
+        app_env="desktop",
+        desktop_bridge_required=True,
+        dronedream_runtime_id="123e4567-e89b-12d3-a456-426614174000",
+        **oidc,
+    )
+    assert settings.desktop_bridge_required is True
+
+    with pytest.raises(ValidationError, match="AUTH_MODE=oidc_jwt"):
+        Settings(
+            app_env="desktop",
+            auth_mode="demo_token",
+            demo_auth_tokens=(
+                "operator@example.com:"
+                "desktop-demo-token-0123456789-ABCDEFGH"
+            ),
+            desktop_bridge_required=True,
+            dronedream_runtime_id="123e4567-e89b-12d3-a456-426614174000",
+        )
 
 
 def test_production_demo_auth_requires_at_least_one_token() -> None:
@@ -133,6 +186,17 @@ def test_production_oidc_auth_accepts_asymmetric_https_configuration() -> None:
     assert settings.oidc_algorithm_list == ["RS256", "ES256"]
 
 
+def test_oidc_jwks_network_limits_are_bounded() -> None:
+    settings = Settings()
+    assert settings.oidc_jwks_timeout_seconds == 5
+    assert settings.oidc_jwks_max_bytes == 1024 * 1024
+
+    with pytest.raises(ValidationError):
+        Settings(oidc_jwks_timeout_seconds=31)
+    with pytest.raises(ValidationError):
+        Settings(oidc_jwks_max_bytes=4095)
+
+
 def test_oidc_auth_rejects_symmetric_token_algorithms() -> None:
     with pytest.raises(ValidationError, match="asymmetric algorithms"):
         Settings(
@@ -149,6 +213,14 @@ def test_worker_heartbeat_intervals_must_fit_inside_their_leases() -> None:
         Settings(worker_lease_seconds=30, worker_lease_heartbeat_seconds=30)
     with pytest.raises(ValidationError, match="PRESENCE_INTERVAL_SECONDS"):
         Settings(worker_presence_interval_seconds=45, worker_presence_ttl_seconds=45)
+    with pytest.raises(
+        ValidationError,
+        match="FINALIZATION_LEASE_HEARTBEAT_SECONDS",
+    ):
+        Settings(
+            finalization_lease_seconds=60,
+            finalization_lease_heartbeat_seconds=60,
+        )
 
 
 def test_cors_origins_reject_paths_and_insecure_production_web_origins() -> None:

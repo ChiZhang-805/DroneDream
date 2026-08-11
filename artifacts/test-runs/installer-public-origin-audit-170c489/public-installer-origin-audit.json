@@ -1,0 +1,82 @@
+{
+  "audit_sha256": "d0b1ab95698dbdd6022ae36fc921df40c4d4b428128dab7f3a580c1bf55d6619",
+  "auditor_commit": "170c48901baeb2240758f2722470906d332f84d5",
+  "authoritative_receipt_sha256": "cd53a1de257f6bafe9c05afcd381b5852f31f9381946d1a49038bc039ca6916a",
+  "claim_boundary": "Exact-byte audit of the two named public Windows installer artifacts. It reports each origin's internal checksum consistency, cross-origin byte parity, PE certificate-table presence, and Windows Authenticode status. It does not sign, publish, deploy, overwrite, or authorize any artifact.",
+  "conclusion": {
+    "authenticode_valid_on_both_origins": false,
+    "deployment_performed": false,
+    "dual_origin_byte_parity": false,
+    "global_internal_integrity": true,
+    "mirror_internal_integrity": true,
+    "publication_gate_status": "fail",
+    "release_modified": false,
+    "release_source_bound_to_tag_commit": false,
+    "server_modified": false
+  },
+  "generated_at": "2026-07-28T14:17:31Z",
+  "origins": {
+    "alibaba_baota_mirror": {
+      "authenticode_status": "NotSigned",
+      "authenticode_valid": false,
+      "bytes": 9881226,
+      "checksum": {
+        "bytes": 98,
+        "declared_installer_name": "DroneDream_1.0.0_x64-setup.exe",
+        "declared_installer_sha256": "aad5a7fdb1196059ce2e15b33e2495830f77ed5f1070e56e5423796b9ca96b86",
+        "path": "mirror-DroneDream_1.0.0_x64-setup.exe.sha256",
+        "sha256": "e7cd2b624cfedab6ef974b41ddfa28b5d263a2292ed8f551c57cb516ef30cd08",
+        "verified": true
+      },
+      "file_name": "DroneDream_1.0.0_x64-setup.exe",
+      "local_file_name": "mirror-DroneDream_1.0.0_x64-setup.exe",
+      "pe": {
+        "certificate_table_file_offset": 0,
+        "certificate_table_size": 0,
+        "has_certificate_table": false,
+        "pe_format": "PE32",
+        "pe_header_offset": 216
+      },
+      "public_file_name": "DroneDream_1.0.0_x64-setup.exe",
+      "sha256": "aad5a7fdb1196059ce2e15b33e2495830f77ed5f1070e56e5423796b9ca96b86"
+    },
+    "global_github_release": {
+      "authenticode_status": "NotSigned",
+      "authenticode_valid": false,
+      "bytes": 5526509,
+      "checksum": {
+        "bytes": 98,
+        "declared_installer_name": "DroneDream_1.0.0_x64-setup.exe",
+        "declared_installer_sha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+        "path": "DroneDream_1.0.0_x64-setup.exe.sha256",
+        "sha256": "7aaa61a1c536829554c24d78165ee23134bddf7671960f323a8d24606456b32e",
+        "verified": true
+      },
+      "file_name": "DroneDream_1.0.0_x64-setup.exe",
+      "local_file_name": "DroneDream_1.0.0_x64-setup.exe",
+      "pe": {
+        "certificate_table_file_offset": 0,
+        "certificate_table_size": 0,
+        "has_certificate_table": false,
+        "pe_format": "PE32",
+        "pe_header_offset": 216
+      },
+      "sha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368"
+    }
+  },
+  "release": {
+    "file_name": "DroneDream_1.0.0_x64-setup.exe",
+    "release_inventory_source_commit": "92444a2354d6e0b199eba4e50bdf1c49af7aa21f",
+    "release_target_commit": "41a7d8560d67f5380a34d03226326dd3041bf923",
+    "source_binding_matches_tag": false,
+    "tag": "signpath-candidate-v1.0.0",
+    "version": "1.0.0"
+  },
+  "schema_version": "dronedream.public-installer-origin-audit.v1",
+  "superseded_receipt_sha256": "a3d21ca26270d5de398f9468c3c52df452f13d09c1a708151ba6356b68bbfcbe",
+  "website_receipt": {
+    "bytes": 2320,
+    "path": "installer-public-recheck.json",
+    "sha256": "cd53a1de257f6bafe9c05afcd381b5852f31f9381946d1a49038bc039ca6916a"
+  }
+}

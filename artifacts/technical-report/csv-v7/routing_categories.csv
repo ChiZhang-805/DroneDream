@@ -1,0 +1,9 @@
+category,case_count,passed_count,pass_rate
+cold_start,3,3,1.0
+constraint_pressure,3,3,1.0
+failure_recovery,3,3,1.0
+high_dimension,3,3,1.0
+local_progress,3,3,1.0
+mixed_tool_history,3,3,1.0
+stagnation,3,3,1.0
+tight_budget,3,3,1.0

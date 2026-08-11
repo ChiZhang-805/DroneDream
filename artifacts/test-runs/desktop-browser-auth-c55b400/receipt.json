@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "subjectCommit": "c55b40041b982672b45820239c592af3845a68be",
+  "branch": "codex/software",
+  "generatedAt": "2026-07-30T04:20:48.283Z",
+  "scope": "Desktop startup browser authentication and responsive account page",
+  "result": "PASS_WITH_REPOSITORY_EXTERNAL_FAILURE",
+  "validation": {
+    "focusedFrontend": {
+      "result": "PASS",
+      "testFiles": 4,
+      "passed": 89,
+      "failed": 0
+    },
+    "frontendTypecheck": "PASS",
+    "frontendLint": "PASS",
+    "desktopFrontendProductionBuild": "PASS",
+    "browserAuthVisual": {
+      "result": "PASS",
+      "browser": "Microsoft Edge via Playwright Chromium driver",
+      "layouts": 3,
+      "exactCallbacks": 3,
+      "cancellations": 1,
+      "tokenInUrl": false,
+      "tokenInRequestInventory": false
+    },
+    "rust": {
+      "format": "PASS",
+      "clippyAllTargetsDenyWarnings": "PASS",
+      "fullTests": {
+        "passed": 112,
+        "failed": 0,
+        "ignored": 1,
+        "ignoredReason": "Requires an installed and owned DroneDreamRuntime"
+      },
+      "postCommitBrowserAuthTests": {
+        "passed": 4,
+        "failed": 0
+      }
+    },
+    "configurationNegativeGates": {
+      "missingPublicAccountConfigurationRejected": true,
+      "unsupportedDesktopCaptchaConfigurationRejected": true,
+      "serviceRoleKeyRejected": true
+    },
+    "repositoryFrontendAggregate": {
+      "passed": 392,
+      "failed": 1,
+      "failureOwner": "website",
+      "failure": "PublicSite pricing test expects /billing-checkout/availability while this frozen software baseline only requests /downloads/latest.json"
+    }
+  },
+  "visualContract": {
+    "background": "white",
+    "outerCard": false,
+    "explanatoryCopy": false,
+    "topModeTabs": false,
+    "brandMatchesInputWidth": true,
+    "desktopDocumentWidthParity": true,
+    "mobileDocumentWidthParity": true
+  },
+  "files": [
+    {
+      "path": "en-login-1440x900.png",
+      "bytes": 56415,
+      "sha256": "898d6a82df98558f61dc68d44217640c8d0fe303da7b944a0fb2241d03c51503"
+    },
+    {
+      "path": "en-reset-1440x900.png",
+      "bytes": 59430,
+      "sha256": "88405a56a644616262353a345d537b37a26559be6d72b8d142711cbf44081263"
+    },
+    {
+      "path": "zh-register-390x844.png",
+      "bytes": 48228,
+      "sha256": "4c30a6058a1b1b3ca25bb8a29a2521c59d7c91d2fd0294399b660acae3ee7590"
+    },
+    {
+      "path": "measurements.json",
+      "bytes": 2090,
+      "sha256": "ea0fab6d36a336d92e57f04d5f33d31a66b02a0eb188a3de26050dfa7893bb2b"
+    }
+  ],
+  "privacy": {
+    "syntheticAccountDataOnly": true,
+    "credentialsOrTokensPersisted": false,
+    "openAiApiKeyReadOrUsed": false
+  },
+  "knownWarnings": [
+    "Vite reports the existing 523.15 kB main chunk above the 510 kB advisory threshold.",
+    "LLVM-MinGW emits the known clang-22 unused -no-pie linker warning during Rust tests.",
+    "The default MSVC gate remains unavailable on this machine because link.exe is not installed; the pinned gnullvm gate passed."
+  ]
+}

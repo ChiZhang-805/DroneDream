@@ -1,0 +1,1044 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "telemetry_json",
+      "display_name": "Telemetry",
+      "file_size_bytes": 2295696,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/telemetry.json"
+    },
+    {
+      "artifact_type": "reference_track_json",
+      "display_name": "Reference Track",
+      "file_size_bytes": 32498,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/reference_track.json"
+    },
+    {
+      "artifact_type": "scenario_config_json",
+      "display_name": "Scenario Configuration",
+      "file_size_bytes": 425,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/scenario_config.json"
+    },
+    {
+      "artifact_type": "scenario_effect_request_json",
+      "display_name": "Scenario Effect Request",
+      "file_size_bytes": 2556,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/scenario_effects.request.json"
+    },
+    {
+      "artifact_type": "scenario_effect_evidence_json",
+      "display_name": "Scenario Effect Evidence",
+      "file_size_bytes": 23064,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/scenario_effects.applied.json"
+    },
+    {
+      "artifact_type": "controller_parameters_json",
+      "display_name": "Controller Parameters",
+      "file_size_bytes": 125,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/controller_params.json"
+    },
+    {
+      "artifact_type": "px4_parameters_input_json",
+      "display_name": "PX4 Parameter Input",
+      "file_size_bytes": 22,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/px4_parameters.input.json"
+    },
+    {
+      "artifact_type": "simulator_launch_config_json",
+      "display_name": "Simulator Launch Configuration",
+      "file_size_bytes": 31667,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/launch_config.json"
+    },
+    {
+      "artifact_type": "simulator_runtime_manifest_json",
+      "display_name": "Simulator Runtime Manifest",
+      "file_size_bytes": 28420,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/simulator_runtime_manifest.json"
+    },
+    {
+      "artifact_type": "trajectory_json",
+      "display_name": "Trajectory Samples",
+      "file_size_bytes": 890185,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/trajectory.json"
+    },
+    {
+      "artifact_type": "px4_ulog",
+      "display_name": "Retained PX4 ULog",
+      "file_size_bytes": 16803366,
+      "mime_type": "application/octet-stream",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/px4_source.ulg"
+    },
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 201,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/runner.log"
+    },
+    {
+      "artifact_type": "simulator_stdout",
+      "display_name": "Simulator stdout",
+      "file_size_bytes": 2106638,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/stdout.log"
+    },
+    {
+      "artifact_type": "simulator_stderr",
+      "display_name": "Simulator stderr",
+      "file_size_bytes": 535,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/stderr.log"
+    },
+    {
+      "artifact_type": "offboard_executor_log",
+      "display_name": "Offboard Executor Log",
+      "file_size_bytes": 313,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/offboard_executor.log"
+    },
+    {
+      "artifact_type": "offboard_timing_json",
+      "display_name": "Offboard Timing",
+      "file_size_bytes": 279,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/offboard_timing.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Requested",
+      "file_size_bytes": 535,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/px4_parameters.requested.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Before",
+      "file_size_bytes": 553,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/px4_parameters.before.json"
+    },
+    {
+      "artifact_type": "px4_parameter_evidence_json",
+      "display_name": "PX4 Parameters Applied",
+      "file_size_bytes": 614,
+      "mime_type": "application/json",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/px4_parameters.applied.json"
+    }
+  ],
+  "backend": "px4_gazebo",
+  "execution_identity": {
+    "attempt_count": 18,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-runtime-working-tree-probe",
+    "seed": 52001,
+    "trial_id": "advanced-physics-runtime-exact-commit-dropout-battery-seed-52001-attempt-18"
+  },
+  "log_excerpt": "px4_gazebo_runner mode=real trial=advanced-physics-runtime-exact-commit-dropout-battery-seed-52001-attempt-18 rmse=0.345207 score=82.183691",
+  "metrics": {
+    "completion_time": 21.784,
+    "crash_flag": false,
+    "final_error": 0.530116,
+    "instability_flag": true,
+    "max_error": 1.498568,
+    "overshoot_count": 0,
+    "pass_flag": false,
+    "raw_metric_json": {
+      "advanced_scenario_summary": {
+        "applied_effects": [
+          "battery.initial_percent",
+          "battery.voltage_sag",
+          "sensor_degradation.dropout_rate"
+        ],
+        "capabilities": [
+          {
+            "capability": {
+              "reason": "PX4 parameter readback and battery telemetry verified the profile",
+              "status": "available"
+            },
+            "effect_id": "battery.initial_percent",
+            "evidence": {
+              "compiled_runtime_profile": {
+                "battery": {
+                  "effect_ids": [
+                    "battery.initial_percent",
+                    "battery.voltage_sag"
+                  ],
+                  "no_sag_hold_drain_seconds": 86400.0,
+                  "parameter_names": [
+                    "SIM_BAT_DRAIN",
+                    "SIM_BAT_MIN_PCT"
+                  ],
+                  "sag_drain_seconds": 300.0,
+                  "target_track_start_percent": 90.0,
+                  "voltage_sag": true
+                },
+                "execution_identity_sha256": "b7c992f3ffdbc4bc87b4922dfa69aa36dcd4e7af42166e5270b5bdd7f6255799",
+                "gps_dropout": {
+                  "availability_source": "mavsdk.telemetry.gps_info",
+                  "dropout_value": 0,
+                  "effect_ids": [
+                    "sensor_degradation.dropout_rate"
+                  ],
+                  "parameter_name": "SIM_GPS_USED",
+                  "requested_rate": 0.2,
+                  "schedule_algorithm": "sha256-ranked-fixed-duty-v1",
+                  "tick_period_s": 1.0
+                },
+                "requested_effect_ids": [
+                  "battery.initial_percent",
+                  "battery.voltage_sag",
+                  "sensor_degradation.dropout_rate"
+                ]
+              },
+              "requested_value_sha256": "17e70b2fd0afd679e7d0c9741b940b06fff6bc980929f83ce4991be53b09dbbd",
+              "verification": {
+                "method": "mavsdk_parameter_readback_and_battery_telemetry",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "6265de9d21d026d929ea74e04264425f5d6ff122375f8b5f7e41e8adc6ecde30",
+                    "source": "mavsdk.param+telemetry/battery",
+                    "value": {
+                      "observed_nonincrease": true,
+                      "pretrack_drain_seconds": 20.000000000000004,
+                      "pretrack_parameters": {
+                        "SIM_BAT_DRAIN": {
+                          "applied": 20.0,
+                          "before": 300.0,
+                          "requested": 20.000000000000004
+                        },
+                        "SIM_BAT_MIN_PCT": {
+                          "applied": 90.0,
+                          "before": 0.0,
+                          "requested": 90.0
+                        }
+                      },
+                      "takeoff_hold_seconds": 2.0,
+                      "target_track_start_percent": 90.0,
+                      "track_end_sample": {
+                        "remaining_percent": 80.0,
+                        "voltage_v": 15.825000762939453
+                      },
+                      "track_parameters": {
+                        "SIM_BAT_DRAIN": {
+                          "applied": 300.0,
+                          "before": 20.0,
+                          "requested": 300.0
+                        },
+                        "SIM_BAT_MIN_PCT": {
+                          "applied": 0.0,
+                          "before": 90.0,
+                          "requested": 0.0
+                        }
+                      },
+                      "track_start_sample": {
+                        "remaining_percent": 92.0,
+                        "voltage_v": 16.020000457763672
+                      },
+                      "track_start_tolerance_percent": 5.0
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "px4_battery_simulation",
+            "status": "applied"
+          },
+          {
+            "capability": {
+              "reason": "PX4 parameter readback and battery telemetry verified the profile",
+              "status": "available"
+            },
+            "effect_id": "battery.voltage_sag",
+            "evidence": {
+              "compiled_runtime_profile": {
+                "battery": {
+                  "effect_ids": [
+                    "battery.initial_percent",
+                    "battery.voltage_sag"
+                  ],
+                  "no_sag_hold_drain_seconds": 86400.0,
+                  "parameter_names": [
+                    "SIM_BAT_DRAIN",
+                    "SIM_BAT_MIN_PCT"
+                  ],
+                  "sag_drain_seconds": 300.0,
+                  "target_track_start_percent": 90.0,
+                  "voltage_sag": true
+                },
+                "execution_identity_sha256": "b7c992f3ffdbc4bc87b4922dfa69aa36dcd4e7af42166e5270b5bdd7f6255799",
+                "gps_dropout": {
+                  "availability_source": "mavsdk.telemetry.gps_info",
+                  "dropout_value": 0,
+                  "effect_ids": [
+                    "sensor_degradation.dropout_rate"
+                  ],
+                  "parameter_name": "SIM_GPS_USED",
+                  "requested_rate": 0.2,
+                  "schedule_algorithm": "sha256-ranked-fixed-duty-v1",
+                  "tick_period_s": 1.0
+                },
+                "requested_effect_ids": [
+                  "battery.initial_percent",
+                  "battery.voltage_sag",
+                  "sensor_degradation.dropout_rate"
+                ]
+              },
+              "requested_value_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "verification": {
+                "method": "mavsdk_parameter_readback_and_battery_telemetry",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "6265de9d21d026d929ea74e04264425f5d6ff122375f8b5f7e41e8adc6ecde30",
+                    "source": "mavsdk.param+telemetry/battery",
+                    "value": {
+                      "observed_nonincrease": true,
+                      "pretrack_drain_seconds": 20.000000000000004,
+                      "pretrack_parameters": {
+                        "SIM_BAT_DRAIN": {
+                          "applied": 20.0,
+                          "before": 300.0,
+                          "requested": 20.000000000000004
+                        },
+                        "SIM_BAT_MIN_PCT": {
+                          "applied": 90.0,
+                          "before": 0.0,
+                          "requested": 90.0
+                        }
+                      },
+                      "takeoff_hold_seconds": 2.0,
+                      "target_track_start_percent": 90.0,
+                      "track_end_sample": {
+                        "remaining_percent": 80.0,
+                        "voltage_v": 15.825000762939453
+                      },
+                      "track_parameters": {
+                        "SIM_BAT_DRAIN": {
+                          "applied": 300.0,
+                          "before": 20.0,
+                          "requested": 300.0
+                        },
+                        "SIM_BAT_MIN_PCT": {
+                          "applied": 0.0,
+                          "before": 90.0,
+                          "requested": 0.0
+                        }
+                      },
+                      "track_start_sample": {
+                        "remaining_percent": 92.0,
+                        "voltage_v": 16.020000457763672
+                      },
+                      "track_start_tolerance_percent": 5.0
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "px4_battery_simulation",
+            "status": "applied"
+          },
+          {
+            "capability": {
+              "reason": "PX4 GPS availability parameter and telemetry verified the schedule",
+              "status": "available"
+            },
+            "effect_id": "sensor_degradation.dropout_rate",
+            "evidence": {
+              "compiled_runtime_profile": {
+                "battery": {
+                  "effect_ids": [
+                    "battery.initial_percent",
+                    "battery.voltage_sag"
+                  ],
+                  "no_sag_hold_drain_seconds": 86400.0,
+                  "parameter_names": [
+                    "SIM_BAT_DRAIN",
+                    "SIM_BAT_MIN_PCT"
+                  ],
+                  "sag_drain_seconds": 300.0,
+                  "target_track_start_percent": 90.0,
+                  "voltage_sag": true
+                },
+                "execution_identity_sha256": "b7c992f3ffdbc4bc87b4922dfa69aa36dcd4e7af42166e5270b5bdd7f6255799",
+                "gps_dropout": {
+                  "availability_source": "mavsdk.telemetry.gps_info",
+                  "dropout_value": 0,
+                  "effect_ids": [
+                    "sensor_degradation.dropout_rate"
+                  ],
+                  "parameter_name": "SIM_GPS_USED",
+                  "requested_rate": 0.2,
+                  "schedule_algorithm": "sha256-ranked-fixed-duty-v1",
+                  "tick_period_s": 1.0
+                },
+                "requested_effect_ids": [
+                  "battery.initial_percent",
+                  "battery.voltage_sag",
+                  "sensor_degradation.dropout_rate"
+                ]
+              },
+              "requested_value_sha256": "44896b09365746b5f7167ee4d64988a38f7f4628803cbf86224e74eeb7c69e9d",
+              "verification": {
+                "method": "mavsdk_sim_gps_used_plus_gps_info_telemetry_and_reset",
+                "observations": [
+                  {
+                    "kind": "readback",
+                    "sha256": "0450445054a853bee59b76a5627e853c370e49d552d61a83a36ecaf5e67daa18",
+                    "source": "mavsdk.param+telemetry/gps_info",
+                    "value": {
+                      "control_parameter": {
+                        "before": 10,
+                        "dropout_value": 0,
+                        "parameter_name": "SIM_GPS_USED",
+                        "recovery_value": 10,
+                        "restore": {
+                          "expected_availability": "available",
+                          "parameter": {
+                            "applied": 10,
+                            "before": 10,
+                            "requested": 10
+                          },
+                          "parameter_name": "SIM_GPS_USED",
+                          "physical_effect_verified": true,
+                          "telemetry_samples": [
+                            {
+                              "fix_type": 3,
+                              "fix_type_name": "FIX_3D",
+                              "num_satellites": 10
+                            }
+                          ]
+                        },
+                        "restore_verified": true
+                      },
+                      "off_tick_count": 6,
+                      "realized_rate": 0.20689655172413793,
+                      "reset_verified": true,
+                      "schedule": [
+                        true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        false,
+                        false,
+                        true,
+                        false,
+                        false,
+                        true,
+                        false,
+                        false,
+                        false
+                      ],
+                      "schedule_algorithm": "sha256-ranked-fixed-duty-v1",
+                      "tick_count": 29,
+                      "tick_period_s": 1.0,
+                      "transitions": [
+                        {
+                          "failure_type": "off",
+                          "physical_effect_verified": true,
+                          "tick_index": 0,
+                          "track_time_s": 0.0,
+                          "verification": {
+                            "expected_availability": "unavailable",
+                            "parameter": {
+                              "applied": 0,
+                              "before": 10,
+                              "requested": 0
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 0,
+                                "fix_type_name": "NO_GPS",
+                                "num_satellites": 0
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "ok",
+                          "physical_effect_verified": true,
+                          "tick_index": 1,
+                          "track_time_s": 1.0,
+                          "verification": {
+                            "expected_availability": "available",
+                            "parameter": {
+                              "applied": 10,
+                              "before": 0,
+                              "requested": 10
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 0,
+                                "fix_type_name": "NO_GPS",
+                                "num_satellites": 0
+                              },
+                              {
+                                "fix_type": 3,
+                                "fix_type_name": "FIX_3D",
+                                "num_satellites": 10
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "off",
+                          "physical_effect_verified": true,
+                          "tick_index": 5,
+                          "track_time_s": 5.0,
+                          "verification": {
+                            "expected_availability": "unavailable",
+                            "parameter": {
+                              "applied": 0,
+                              "before": 10,
+                              "requested": 0
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 0,
+                                "fix_type_name": "NO_GPS",
+                                "num_satellites": 0
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "ok",
+                          "physical_effect_verified": true,
+                          "tick_index": 6,
+                          "track_time_s": 6.0,
+                          "verification": {
+                            "expected_availability": "available",
+                            "parameter": {
+                              "applied": 10,
+                              "before": 0,
+                              "requested": 10
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 3,
+                                "fix_type_name": "FIX_3D",
+                                "num_satellites": 10
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "off",
+                          "physical_effect_verified": true,
+                          "tick_index": 12,
+                          "track_time_s": 12.0,
+                          "verification": {
+                            "expected_availability": "unavailable",
+                            "parameter": {
+                              "applied": 0,
+                              "before": 10,
+                              "requested": 0
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 0,
+                                "fix_type_name": "NO_GPS",
+                                "num_satellites": 0
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "ok",
+                          "physical_effect_verified": true,
+                          "tick_index": 13,
+                          "track_time_s": 13.0,
+                          "verification": {
+                            "expected_availability": "available",
+                            "parameter": {
+                              "applied": 10,
+                              "before": 0,
+                              "requested": 10
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 3,
+                                "fix_type_name": "FIX_3D",
+                                "num_satellites": 10
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "off",
+                          "physical_effect_verified": true,
+                          "tick_index": 18,
+                          "track_time_s": 18.0,
+                          "verification": {
+                            "expected_availability": "unavailable",
+                            "parameter": {
+                              "applied": 0,
+                              "before": 10,
+                              "requested": 0
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 0,
+                                "fix_type_name": "NO_GPS",
+                                "num_satellites": 0
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "ok",
+                          "physical_effect_verified": true,
+                          "tick_index": 19,
+                          "track_time_s": 19.0,
+                          "verification": {
+                            "expected_availability": "available",
+                            "parameter": {
+                              "applied": 10,
+                              "before": 0,
+                              "requested": 10
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 3,
+                                "fix_type_name": "FIX_3D",
+                                "num_satellites": 10
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "off",
+                          "physical_effect_verified": true,
+                          "tick_index": 22,
+                          "track_time_s": 22.0,
+                          "verification": {
+                            "expected_availability": "unavailable",
+                            "parameter": {
+                              "applied": 0,
+                              "before": 10,
+                              "requested": 0
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 0,
+                                "fix_type_name": "NO_GPS",
+                                "num_satellites": 0
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "ok",
+                          "physical_effect_verified": true,
+                          "tick_index": 23,
+                          "track_time_s": 23.0,
+                          "verification": {
+                            "expected_availability": "available",
+                            "parameter": {
+                              "applied": 10,
+                              "before": 0,
+                              "requested": 10
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 3,
+                                "fix_type_name": "FIX_3D",
+                                "num_satellites": 10
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "off",
+                          "physical_effect_verified": true,
+                          "tick_index": 25,
+                          "track_time_s": 25.0,
+                          "verification": {
+                            "expected_availability": "unavailable",
+                            "parameter": {
+                              "applied": 0,
+                              "before": 10,
+                              "requested": 0
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 0,
+                                "fix_type_name": "NO_GPS",
+                                "num_satellites": 0
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "ok",
+                          "physical_effect_verified": true,
+                          "tick_index": 26,
+                          "track_time_s": 26.0,
+                          "verification": {
+                            "expected_availability": "available",
+                            "parameter": {
+                              "applied": 10,
+                              "before": 0,
+                              "requested": 10
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 3,
+                                "fix_type_name": "FIX_3D",
+                                "num_satellites": 10
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "failure_type": "ok",
+                          "final_reset": true,
+                          "physical_effect_verified": true,
+                          "tick_index": 29,
+                          "track_time_s": 28.9,
+                          "verification": {
+                            "expected_availability": "available",
+                            "parameter": {
+                              "applied": 10,
+                              "before": 10,
+                              "requested": 10
+                            },
+                            "parameter_name": "SIM_GPS_USED",
+                            "physical_effect_verified": true,
+                            "telemetry_samples": [
+                              {
+                                "fix_type": 3,
+                                "fix_type_name": "FIX_3D",
+                                "num_satellites": 10
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "status": "verified"
+              }
+            },
+            "mechanism": "px4_sim_gps_used",
+            "status": "applied"
+          }
+        ],
+        "dropout_rate": 0.2,
+        "enabled": true,
+        "failed_effects": [],
+        "obstacle_count": 0,
+        "pending_effects": [],
+        "requested_effects": [
+          "battery.initial_percent",
+          "battery.voltage_sag",
+          "sensor_degradation.dropout_rate"
+        ],
+        "unsupported_effects": [],
+        "unverified_passthrough_enabled": false,
+        "verification_status": "verified_applied",
+        "wind_gust_enabled": false
+      },
+      "airframe": "x500",
+      "coverage_basis": "union_of_traversed_polyline_arc_length",
+      "crash_reason": "none",
+      "evaluation_backward_distance_m": 0.253268,
+      "evaluation_directed_progress_fraction": 0.975745,
+      "evaluation_direction_valid": true,
+      "evaluation_end_index": 7025,
+      "evaluation_end_t": 56.2,
+      "evaluation_endpoint_reached": true,
+      "evaluation_max_error_sample": {
+        "error": 1.498568,
+        "reference_x": 4.993922,
+        "reference_y": 0.232354,
+        "reference_z": 3.0,
+        "t": 34.416,
+        "track_progress_m": 0.23246,
+        "x": 3.497465,
+        "y": 0.153928,
+        "z": 2.98691
+      },
+      "evaluation_max_z": 3.045893,
+      "evaluation_min_z": 2.928032,
+      "evaluation_policy": {
+        "altitude_entry_fraction": 0.9,
+        "collapse_altitude_fraction": 0.5,
+        "consecutive_samples": 5,
+        "minimum_track_coverage": 0.9,
+        "near_track_threshold_m": 1.5,
+        "pass_max_error_m": 2.0,
+        "pass_rmse_m": 0.75,
+        "policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "schema_id": "dronedream.px4-evaluation-policy/v1"
+      },
+      "evaluation_progress_contract_ok": true,
+      "evaluation_progress_discontinuity_count": 0,
+      "evaluation_sample_count": 2724,
+      "evaluation_sampling": {
+        "duration_s": 21.784,
+        "end_time_s": 56.2,
+        "max_gap_limit_s": 0.5,
+        "max_gap_s": 0.008,
+        "median_interval_s": 0.008,
+        "minimum_sampling_coverage": 0.8,
+        "sample_count": 2724,
+        "sampling_coverage": 1.0,
+        "start_time_s": 34.416
+      },
+      "evaluation_start_index": 4302,
+      "evaluation_start_reached": true,
+      "evaluation_start_reason": "altitude_and_near_track",
+      "evaluation_start_t": 34.416,
+      "evaluation_track_coverage": 0.983807,
+      "evaluation_trimmed_landing_samples": 0,
+      "evaluation_trimmed_takeoff_samples": 4302,
+      "evaluation_window_evidence": {
+        "end_index": 7025,
+        "evidence_id": "sha256:0adb189c0d7505dd1d2194756910b7017707e9ff65cea1b1a2853bdd973e4e46",
+        "offboard_timing_sha256": "sha256:c2d59e9a832a119e859523c33c0d951fcf9d1ece7472f62ee6b07ec57a256149",
+        "policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "raw_end_time_s": null,
+        "raw_source": "telemetry_derived",
+        "raw_start_time_s": null,
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "schema_id": "dronedream.px4-evaluation-window-evidence/v1",
+        "source": "telemetry_derived_refined",
+        "start_index": 4302,
+        "start_reason": "altitude_and_near_track",
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:35d5c7ed88b4a86ef657d0657fb659b0dede037048a4608b175b9a5e6eb1db2d",
+        "trimmed_landing_samples": 0,
+        "trimmed_takeoff_samples": 4302,
+        "verifier_revision": "px4-evaluation-window-verifier-1.0"
+      },
+      "evaluation_window_raw_source": "telemetry_derived",
+      "evaluation_window_source": "telemetry_derived_refined",
+      "full_log_max_error": 5.853694,
+      "full_log_rmse": 4.235781,
+      "mode": "real",
+      "pass_thresholds": {
+        "max_error": 2.0,
+        "min_track_coverage": 0.9,
+        "rmse": 0.75
+      },
+      "px4_core_metric_evidence": {
+        "evaluation_duration_s": 21.784,
+        "evaluation_end_index": 7025,
+        "evaluation_end_time_s": 56.2,
+        "evaluation_max_error_sample": {
+          "error": 1.498568,
+          "reference_x": 4.993922,
+          "reference_y": 0.232354,
+          "reference_z": 3.0,
+          "t": 34.416,
+          "track_progress_m": 0.23246,
+          "x": 3.497465,
+          "y": 0.153928,
+          "z": 2.98691
+        },
+        "evaluation_sample_count": 2724,
+        "evaluation_sampling": {
+          "duration_s": 21.784,
+          "end_time_s": 56.2,
+          "max_gap_limit_s": 0.5,
+          "max_gap_s": 0.008,
+          "median_interval_s": 0.008,
+          "minimum_sampling_coverage": 0.8,
+          "sample_count": 2724,
+          "sampling_coverage": 1.0,
+          "start_time_s": 34.416
+        },
+        "evaluation_start_index": 4302,
+        "evaluation_start_time_s": 34.416,
+        "evidence_id": "sha256:922ef7425eeec5ef86f9a4f5b2391ed03e6c3ad21ea137a6ad2bc09e0c6bd8e0",
+        "final_error_m": 0.530116,
+        "full_log_max_error_m": 5.853694,
+        "full_log_rmse_m": 4.235781,
+        "max_error_m": 1.498568,
+        "overshoot_count": 0,
+        "projection_revision": "ordered-local-3d-segment-projection-1.0",
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "rmse_integration": "time_weighted_trapezoidal",
+        "rmse_m": 0.345207,
+        "schema_id": "dronedream.px4-core-metric-evidence/v1",
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:35d5c7ed88b4a86ef657d0657fb659b0dede037048a4608b175b9a5e6eb1db2d",
+        "total_sample_count": 7026,
+        "verifier_revision": "px4-core-metric-verifier-1.0"
+      },
+      "px4_outcome_evidence": {
+        "applied_effects": [
+          "battery.initial_percent",
+          "battery.voltage_sag",
+          "sensor_degradation.dropout_rate"
+        ],
+        "core_metric_evidence_id": "sha256:922ef7425eeec5ef86f9a4f5b2391ed03e6c3ad21ea137a6ad2bc09e0c6bd8e0",
+        "crash_flag": false,
+        "crash_reason": "none",
+        "crash_sample_index": null,
+        "evaluation_backward_distance_m": 0.253268,
+        "evaluation_directed_progress_fraction": 0.975745,
+        "evaluation_direction_valid": true,
+        "evaluation_endpoint_reached": true,
+        "evaluation_max_z_m": 3.045893,
+        "evaluation_min_z_m": 2.928032,
+        "evaluation_policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "evaluation_progress_contract_ok": true,
+        "evaluation_progress_discontinuity_count": 0,
+        "evaluation_start_reached": true,
+        "evaluation_track_coverage": 0.983807,
+        "evaluation_window_evidence_id": "sha256:0adb189c0d7505dd1d2194756910b7017707e9ff65cea1b1a2853bdd973e4e46",
+        "evidence_id": "sha256:5aba8a27583ee740daf6485e4ed4f1170756dfbe2426ae6833e5932d8018e2fe",
+        "full_track_coverage": 0.983807,
+        "instability_first_sample_index": 6742,
+        "instability_flag": true,
+        "instability_reasons": [
+          "position_speed_exceeded"
+        ],
+        "maximum_observed_position_speed_mps": 31.211302,
+        "outcome_policy_id": "sha256:c99b693fd3a8f920b16604c77a96420c9859aa53b2ad44ffc8ed23b0c3559de1",
+        "pass_flag": false,
+        "reference_track_sha256": "sha256:34ad74eb4fd6c654c83e4a717c8f7956b0b715bbf7f41a1f128900bdca166a93",
+        "requested_effects": [
+          "battery.initial_percent",
+          "battery.voltage_sag",
+          "sensor_degradation.dropout_rate"
+        ],
+        "scenario_effect_evidence_sha256": "sha256:c05457d01e062d7e01a42eefc2ad843532cf169adfa00eb1d743b56420dc232f",
+        "scenario_effect_request_sha256": "sha256:13025c823081eab1738e829dfee2ddf4f1968d910ab62ebc591f1d188c3ff3cd",
+        "scenario_effect_status": "verified_applied",
+        "scenario_effects_ready": true,
+        "schema_id": "dronedream.px4-outcome-evidence/v1",
+        "score": 82.183691,
+        "score_duration_component": 1.0892,
+        "score_max_error_component": 0.749284083524,
+        "score_penalty": 80.0,
+        "score_rmse_component": 0.345206941516,
+        "synthetic": false,
+        "telemetry_contract_id": "sha256:35d5c7ed88b4a86ef657d0657fb659b0dede037048a4608b175b9a5e6eb1db2d",
+        "timeout_flag": false,
+        "track_is_closed": true,
+        "track_length_3d_m": 31.414332,
+        "verifier_revision": "px4-outcome-verifier-1.0"
+      },
+      "px4_outcome_policy": {
+        "backward_tolerance_m": 0.1,
+        "backward_tolerance_track_fraction": 0.02,
+        "crash_penalty": 100.0,
+        "duration_score_weight": 0.05,
+        "endpoint_tolerance_m": 0.25,
+        "endpoint_tolerance_track_fraction": 0.01,
+        "evaluation_policy_id": "sha256:8fdb8cd7af25294ee2387a033d2507e5264681fab4d3fe40f703646f590f0537",
+        "instability_penalty": 80.0,
+        "max_error_score_weight": 0.5,
+        "maximum_position_speed_mps": 25.0,
+        "maximum_progress_step_fraction": 0.2,
+        "maximum_stable_track_error_m": 30.0,
+        "minimum_airborne_reference_altitude_m": 0.5,
+        "minimum_collapse_altitude_m": 0.2,
+        "minimum_progress_step_m": 0.25,
+        "policy_id": "sha256:c99b693fd3a8f920b16604c77a96420c9859aa53b2ad44ffc8ed23b0c3559de1",
+        "progress_offset_m": 0.1,
+        "progress_penalty": 20.0,
+        "progress_position_multiplier": 4.0,
+        "progress_revision": "directed-continuous-arc-coverage-1.0",
+        "schema_id": "dronedream.px4-outcome-policy/v1",
+        "score_revision": "rmse-plus-half-max-plus-duration-and-fixed-penalties-1.0",
+        "timeout_penalty": 120.0
+      },
+      "px4_version": "v1.16",
+      "raw_track_end_t": null,
+      "raw_track_start_t": null,
+      "rmse_integration": "time_weighted_trapezoidal",
+      "scenario_effect_evidence_sha256": "sha256:c05457d01e062d7e01a42eefc2ad843532cf169adfa00eb1d743b56420dc232f",
+      "scenario_effect_request_sha256": "sha256:13025c823081eab1738e829dfee2ddf4f1968d910ab62ebc591f1d188c3ff3cd",
+      "scenario_effect_status": "verified_applied",
+      "scenario_effects_ready": true,
+      "simulator": "px4_gazebo",
+      "simulator_model": "x500",
+      "telemetry_coordinate_frame": "dronedream_local_cartesian_z_up",
+      "telemetry_position_unit": "m",
+      "telemetry_sampling": {
+        "duration_s": 56.2,
+        "end_time_s": 56.2,
+        "max_gap_limit_s": 0.5,
+        "max_gap_s": 0.008,
+        "median_interval_s": 0.008,
+        "minimum_sampling_coverage": 0.8,
+        "sample_count": 7026,
+        "sampling_coverage": 1.0,
+        "start_time_s": 0.0
+      },
+      "telemetry_semantic_contract_id": "sha256:35d5c7ed88b4a86ef657d0657fb659b0dede037048a4608b175b9a5e6eb1db2d",
+      "telemetry_source_sha256": "sha256:c942681f7379a51b0f52a7c83dc8148bcc229b1c106287d7f7ac07d5aef59c90",
+      "telemetry_time_unit": "s",
+      "telemetry_verifier_revision": "telemetry-semantic-verifier-1.0",
+      "total_sample_count": 7026,
+      "track_coverage": 0.983807,
+      "track_is_closed": true,
+      "track_length_3d_m": 31.414332,
+      "track_projection": "ordered_local_3d_segment_projection",
+      "track_projection_comparison_limit": 10000000,
+      "vehicle": "x500",
+      "world": "default"
+    },
+    "rmse": 0.345207,
+    "score": 82.183691,
+    "timeout_flag": false
+  },
+  "schema_version": "dronedream.trial_result.v2",
+  "success": true
+}

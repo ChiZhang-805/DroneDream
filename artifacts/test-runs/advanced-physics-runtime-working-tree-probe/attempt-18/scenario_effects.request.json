@@ -1,0 +1,56 @@
+{
+  "effects": [
+    {
+      "capability": {
+        "reason": "the bundled offboard executor compiles the requested dropout rate into a trial-seed-bound one-second schedule, verifies each transition from the PX4 physical failure handler's STATUSTEXT, and verifies reset to GPS OK",
+        "status": "available"
+      },
+      "effect_id": "sensor_degradation.dropout_rate",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "px4_sim_gps_used",
+      "requested_value": 0.2,
+      "source": "advanced_scenario_config.sensor_degradation.dropout_rate"
+    },
+    {
+      "capability": {
+        "reason": "the bundled offboard executor applies and reads back SIM_BAT_DRAIN and SIM_BAT_MIN_PCT, observes battery telemetry at the track boundary, and records the continuing sag or target floor without treating a parameter write alone as physical proof",
+        "status": "available"
+      },
+      "effect_id": "battery.initial_percent",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "px4_battery_simulation",
+      "requested_value": 90.0,
+      "source": "advanced_scenario_config.battery.initial_percent"
+    },
+    {
+      "capability": {
+        "reason": "the bundled offboard executor applies and reads back SIM_BAT_DRAIN and SIM_BAT_MIN_PCT, observes battery telemetry at the track boundary, and records the continuing sag or target floor without treating a parameter write alone as physical proof",
+        "status": "available"
+      },
+      "effect_id": "battery.voltage_sag",
+      "launcher_input": {
+        "request_path_env": "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH",
+        "scenario_config_path_env": "PX4_TRIAL_SCENARIO_CONFIG_PATH"
+      },
+      "mechanism": "px4_battery_simulation",
+      "requested_value": true,
+      "source": "advanced_scenario_config.battery.voltage_sag"
+    }
+  ],
+  "execution_identity": {
+    "attempt_count": 18,
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-runtime-working-tree-probe",
+    "seed": 52001,
+    "trial_id": "advanced-physics-runtime-exact-commit-dropout-battery-seed-52001-attempt-18"
+  },
+  "request_sha256": "ee1a67f265e751f16b2f9112296d5548ada40ff1ff40a6726881ca227635b1e7",
+  "scenario_type": "nominal",
+  "schema_version": "dronedream.scenario_effect_request.v1"
+}

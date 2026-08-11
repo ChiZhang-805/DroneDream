@@ -1,0 +1,17 @@
+{
+  "captured_at": "2026-07-28T23:15:26.945649+00:00",
+  "catalog_version": "dronedream.px4.multicopter.2026-07-r2",
+  "context": {
+    "candidate_id": "baseline-mpc-xy-p-0.95",
+    "job_id": "advanced-physics-actuator-failure-working-tree-probe",
+    "trial_id": "advanced-physics-actuator-failure-exact-793f020-seed-62001-attempt-1"
+  },
+  "kind": "requested",
+  "px4_version": "v1.16",
+  "schema_version": "dronedream.px4_parameter_evidence.v1",
+  "status": "ok",
+  "transport": "environment",
+  "values": {
+    "MPC_XY_P": 0.95
+  }
+}

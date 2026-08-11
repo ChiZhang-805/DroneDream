@@ -1,0 +1,128 @@
+{
+  "schema_version": "dronedream.benchmark-p1-llm-direct-durable-receipt.v1",
+  "generated_at": "2026-08-05T06:27:47.986Z",
+  "branch": "codex/software",
+  "subject_commit": "cb8fd624a69e58606aa1d984eb6aeb9ac43dce8c",
+  "subject_parent": "fc5e814efabc8848bc41b5e010e128038a89c76d",
+  "subject_remote": "origin/codex/software",
+  "claim_boundary": "Offline production-shaped durability boundary for llm_direct/v1 only. Fake transports prove preregistered campaign, run, source, budget, logical-turn, and actual-network-attempt accounting. This receipt does not claim a real provider call, PX4/Gazebo execution, campaign usage reconciliation, runner integration, registry promotion, or pilot readiness.",
+  "resource_state": "GREEN",
+  "implementation": {
+    "status": "contract_bridge_verified_not_execution_ready",
+    "provider_api_surface": "chat_completions",
+    "provider_retry_cap": 0,
+    "maximum_network_requests_per_generation": 1,
+    "durable_logical_attempt_before_transport": true,
+    "durable_network_attempt_before_transport": true,
+    "indeterminate_attempt_replay": "denied",
+    "first_qualified_provider_work": 0,
+    "approved_provider_origins": [
+      "https://api.deepseek.com/v1",
+      "https://api.openai.com/v1"
+    ],
+    "credential_bearing_http_or_unknown_origins": "denied before transport",
+    "safe_receipt_excludes": [
+      "api_key",
+      "password",
+      "provider_request_id",
+      "raw_prompt",
+      "raw_chat",
+      "raw_provider_response"
+    ]
+  },
+  "execution_readiness": {
+    "registry_availability": "contract_only",
+    "method_inventory_readiness": "blocked",
+    "campaign_service_can_enable_arm": false,
+    "pilot_readiness": "blocked",
+    "remaining_blockers": [
+      "campaign_actual_usage_reconciliation_not_integrated",
+      "production_runner_binding_not_integrated",
+      "real_provider_batch_not_approved_or_executed"
+    ]
+  },
+  "validation": [
+    {
+      "command": "python -m pytest backend/tests/test_benchmark_llm_durable_runtime.py backend/tests/test_benchmark_method_inventory.py backend/tests/test_benchmark_proposal_adapters.py backend/tests/test_benchmark_pilot_readiness.py backend/tests/test_benchmark_composite_inventory.py backend/tests/test_benchmark_composite_inventory_observation.py -q",
+      "result": "passed",
+      "passed": 86,
+      "failed": 0,
+      "duration_seconds": 18.00,
+      "exact_post_commit_subject": true
+    },
+    {
+      "command": "python -m ruff check backend/app/orchestration/cognitive_budget.py backend/app/benchmarking/coordinator.py backend/app/benchmarking/llm_durable_runtime.py backend/tests/test_benchmark_llm_durable_runtime.py",
+      "result": "passed",
+      "exact_post_commit_subject": true
+    },
+    {
+      "command": "python -m mypy --ignore-missing-imports backend/app/benchmarking/llm_durable_runtime.py backend/app/orchestration/cognitive_budget.py backend/app/benchmarking/coordinator.py",
+      "result": "passed",
+      "checked_source_files": 3,
+      "exact_post_commit_subject": true
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed",
+      "subject_worktree_before_receipt": "clean"
+    }
+  ],
+  "negative_paths_verified": [
+    "provider transport failure",
+    "invalid provider result",
+    "invalid response schema",
+    "process crash and indeterminate recovery",
+    "attempt replay",
+    "nonzero retry drift",
+    "run binding drift",
+    "missing provider reservation",
+    "observation binding drift",
+    "Engine Pack source drift",
+    "stringified budget numbers",
+    "HTTP provider origin",
+    "credential-bearing provider URL",
+    "provider URL query",
+    "lookalike provider host",
+    "provider and origin mismatch",
+    "unknown provider",
+    "premature registry promotion"
+  ],
+  "online_and_physical_activity": {
+    "openai_api_key_read": false,
+    "deepseek_api_key_read": false,
+    "provider_calls": 0,
+    "px4_started": false,
+    "gazebo_started": false,
+    "runtime_migrated": false,
+    "desktop_installer_built": false,
+    "deployment_or_upload": false
+  },
+  "environment": {
+    "python": "3.13.0",
+    "pytest": "9.1.0",
+    "ruff": "0.15.21",
+    "mypy": "2.3.0"
+  },
+  "source_file_hashes": [
+    {
+      "path": "backend/app/benchmarking/coordinator.py",
+      "bytes": 30678,
+      "sha256": "1b87a936978b0eedfc32be265ed6c46166d30ec4ee0ff2bb792780fbd2069a52"
+    },
+    {
+      "path": "backend/app/benchmarking/llm_durable_runtime.py",
+      "bytes": 24989,
+      "sha256": "628ef291de7fca74f19fbf53bf2fc0d40040544f10b4bd994d2b3e2f79af3589"
+    },
+    {
+      "path": "backend/app/orchestration/cognitive_budget.py",
+      "bytes": 31380,
+      "sha256": "da28b8dea4d48b03d98a4dd603cadfbda4e5a937c1261b8f2ecb6d78e83d4383"
+    },
+    {
+      "path": "backend/tests/test_benchmark_llm_durable_runtime.py",
+      "bytes": 23936,
+      "sha256": "250a83731561dc9947424350174eb028290800947d300783d521fce635b2c994"
+    }
+  ]
+}

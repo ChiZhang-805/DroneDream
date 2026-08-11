@@ -10,6 +10,7 @@ import tempfile
 import tomllib
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "runtime"
@@ -57,6 +58,30 @@ class RuntimeManifestContractTests(unittest.TestCase):
         runtime_manifest.validate_manifest(manifest)
         with self.assertRaises(runtime_manifest.ManifestError):
             runtime_manifest.validate_manifest(manifest, require_smoke_passed=True)
+
+    def test_manifest_publication_preserves_existing_bytes_when_replace_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "runtime-manifest.json"
+            original = b'{"preserve":"this exact manifest"}\n'
+            output.write_bytes(original)
+
+            with (
+                mock.patch.object(
+                    runtime_manifest.os,
+                    "replace",
+                    side_effect=OSError("injected replacement failure"),
+                ),
+                self.assertRaisesRegex(OSError, "injected replacement failure"),
+            ):
+                runtime_manifest.generate(
+                    RUNTIME / "pins.env",
+                    RUNTIME / "locks" / "python-requirements.lock",
+                    "a" * 40,
+                    output,
+                )
+
+            self.assertEqual(output.read_bytes(), original)
+            self.assertEqual(list(output.parent.glob(f".{output.name}.partial-*")), [])
 
     def test_python_component_pins_match_the_exact_lock(self) -> None:
         pins = runtime_manifest.load_pins(RUNTIME / "pins.env")
@@ -122,6 +147,61 @@ class RuntimeManifestContractTests(unittest.TestCase):
             with self.assertRaisesRegex(runtime_manifest.ManifestError, "unsupported"):
                 runtime_manifest.validate_manifest(manifest)
 
+    def test_manifest_rejects_boolean_schema_and_incomplete_component_details(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["schemaVersion"] = True
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "schema"):
+                runtime_manifest.validate_manifest(manifest)
+
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["componentDetails"]["worker"]["version"] = ""
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "worker"):
+                runtime_manifest.validate_manifest(manifest)
+
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["componentDetails"]["python"]["unexpected"] = "drift"
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "unsupported"):
+                runtime_manifest.validate_manifest(manifest)
+
+    def test_runtime_pin_urls_require_a_credential_free_https_host(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            pins_path = Path(directory) / "pins.env"
+            pins = (RUNTIME / "pins.env").read_text(encoding="utf-8")
+            pins_path.write_text(
+                pins.replace(
+                    "GAZEBO_APT_KEY_URL=https://packages.osrfoundation.org/gazebo.gpg",
+                    "GAZEBO_APT_KEY_URL=https://",
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "GAZEBO_APT_KEY_URL"):
+                runtime_manifest.load_pins(pins_path)
+
+    def test_manifest_validation_recomputes_runtime_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["runtimeId"] = "123e4567-e89b-12d3-a456-426614174000"
+
+            with self.assertRaisesRegex(
+                runtime_manifest.ManifestError,
+                "runtimeId does not match its identity inputs",
+            ):
+                runtime_manifest.validate_manifest(manifest)
+
+    def test_manifest_validation_rejects_component_summary_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["components"]["backend"] = "9.9.9"
+
+            with self.assertRaisesRegex(
+                runtime_manifest.ManifestError,
+                "component summaries do not match",
+            ):
+                runtime_manifest.validate_manifest(manifest)
+
     def test_promotion_rejects_incomplete_or_duplicated_smoke_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
@@ -185,6 +265,34 @@ class RuntimeManifestContractTests(unittest.TestCase):
         ):
             self.assertIn(fragment, desktop)
 
+    def test_packaged_desktop_runtime_requires_supabase_oidc(self) -> None:
+        values = {}
+        for raw_line in (
+            (RUNTIME / "config" / "runtime.env.default").read_text(encoding="utf-8").splitlines()
+        ):
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            key, separator, value = line.partition("=")
+            self.assertEqual(separator, "=", raw_line)
+            values[key] = value
+
+        self.assertEqual(values["APP_ENV"], "desktop")
+        self.assertEqual(values["AUTH_MODE"], "oidc_jwt")
+        self.assertEqual(values["OIDC_AUDIENCE"], "authenticated")
+        self.assertEqual(values["OIDC_ALGORITHMS"], "ES256")
+        self.assertEqual(values["DESKTOP_BRIDGE_REQUIRED"], "true")
+        self.assertEqual(values["DESKTOP_BRIDGE_CLOCK_SKEW_SECONDS"], "30")
+        self.assertEqual(values["DESKTOP_BRIDGE_NONCE_RETENTION_SECONDS"], "600")
+        self.assertRegex(
+            values["OIDC_ISSUER"],
+            r"^https://[a-z0-9]+\.supabase\.co/auth/v1$",
+        )
+        self.assertEqual(
+            values["OIDC_JWKS_URL"],
+            values["OIDC_ISSUER"] + "/.well-known/jwks.json",
+        )
+
 
 class ThirdPartyNoticeContractTests(unittest.TestCase):
     def test_notice_is_included_in_the_exported_rootfs_source_tree(self) -> None:
@@ -238,14 +346,38 @@ class RuntimeReleaseImmutabilityContractTests(unittest.TestCase):
 
     def test_rootfs_export_refuses_every_existing_release_artifact(self) -> None:
         script = (RUNTIME / "export-rootfs.sh").read_text(encoding="utf-8")
-        self.assertIn(
-            'for artifact in "$output" "$partial" "$output.sha256" "$output.manifest.json"',
-            script,
-        )
+        for artifact in (
+            '"$output"',
+            '"$partial"',
+            '"$checksum"',
+            '"$checksum_partial"',
+            '"$manifest"',
+            '"$manifest_partial"',
+        ):
+            self.assertIn(artifact, script)
         self.assertIn('if [[ -e "$artifact" || -L "$artifact" ]]', script)
-        # The only deletion is cleanup of the just-created partial when it
-        # breaches the hard size cap; pre-existing partials are never removed.
-        self.assertEqual(script.count('rm -f "$partial"'), 1)
+
+    def test_rootfs_is_the_last_fail_closed_publication_signal(self) -> None:
+        script = (RUNTIME / "export-rootfs.sh").read_text(encoding="utf-8")
+        checksum_publish = 'ln -- "$checksum_partial" "$checksum"'
+        manifest_publish = 'ln -- "$manifest_partial" "$manifest"'
+        rootfs_publish = 'ln -- "$partial" "$output"'
+        self.assertLess(script.index(checksum_publish), script.index(manifest_publish))
+        self.assertLess(script.index(manifest_publish), script.index(rootfs_publish))
+        self.assertIn('"$output" -ef "$partial"', script)
+        self.assertIn('"$checksum" -ef "$checksum_partial"', script)
+        self.assertIn('"$manifest" -ef "$manifest_partial"', script)
+        self.assertIn('rm -f -- "$checksum" || true', script)
+        self.assertIn('rm -f -- "$manifest" || true', script)
+        self.assertIn("printf '%s  %s\\n'", script)
+
+
+class Px4LogCleanupPortableTests(unittest.TestCase):
+    def test_missing_proc_inventory_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory) / "missing-proc"
+            with self.assertRaisesRegex(px4_log_cleanup.CleanupError, "process file table"):
+                px4_log_cleanup._open_file_identities(missing)
 
 
 @unittest.skipUnless(
@@ -372,6 +504,34 @@ class Px4LogCleanupTests(unittest.TestCase):
             self.assertTrue((root / "day-original" / original.name).exists())
             self.assertTrue(outside_log.exists())
 
+    def test_log_opened_immediately_before_delete_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            log = self._log(root, "flight.ulg", size=100, age_seconds=7200)
+            opened = None
+
+            def open_before_delete() -> None:
+                nonlocal opened
+                opened = log.open("rb")
+
+            try:
+                result = px4_log_cleanup.cleanup_logs(
+                    root,
+                    max_total_bytes=1,
+                    max_age_seconds=1,
+                    min_age_seconds=0,
+                    keep_recent=0,
+                    now_ns=self.NOW_NS,
+                    _before_delete=open_before_delete,
+                )
+            finally:
+                if opened is not None:
+                    opened.close()
+
+            self.assertEqual(result.deleted_files, 0)
+            self.assertEqual(result.skipped_changed_or_open, 1)
+            self.assertTrue(log.exists())
+
 
 class SystemdContractTests(unittest.TestCase):
     EXPECTED_EXECUTABLES = {
@@ -381,7 +541,7 @@ class SystemdContractTests(unittest.TestCase):
             "/opt/dronedream/venv/bin/alembic",
             "/opt/dronedream/venv/bin/uvicorn",
         ],
-        "dronedream-worker.service": ["/opt/dronedream/venv/bin/drone-dream-worker"],
+        "dronedream-worker.service": ["/opt/dronedream/venv/bin/python"],
         "dronedream-px4-log-cleanup.service": ["/opt/dronedream/venv/bin/python"],
     }
 
@@ -447,6 +607,21 @@ class SystemdContractTests(unittest.TestCase):
             "/usr/bin/ip",
         ):
             self.assertIn(f"test -x {executable}", dockerfile, executable)
+
+    def test_runtime_base_activates_a_versioned_engine_pack(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        api = (RUNTIME / "systemd" / "dronedream-api.service").read_text(encoding="utf-8")
+        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(encoding="utf-8")
+        environment = (RUNTIME / "config" / "runtime.env.default").read_text(encoding="utf-8")
+        self.assertIn("engine-pack-manager.py", dockerfile)
+        self.assertIn("--no-services", dockerfile)
+        self.assertIn("test -L /opt/dronedream/engine/current", dockerfile)
+        self.assertIn("WorkingDirectory=/opt/dronedream/engine/current/backend", api)
+        self.assertIn("WorkingDirectory=/opt/dronedream/engine/current", worker)
+        self.assertIn("PYTHONPATH=/opt/dronedream/engine/current/backend", api)
+        self.assertIn("PYTHONPATH=/opt/dronedream/engine/current/backend", worker)
+        self.assertNotIn("/opt/dronedream/source/scripts/simulators", environment)
+        self.assertIn("/opt/dronedream/engine/current/scripts/simulators", environment)
 
     def test_generic_wsl_image_cannot_block_on_interactive_firstboot(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
@@ -532,10 +707,19 @@ class SystemdContractTests(unittest.TestCase):
         )
         self.assertEqual(smoke_properties, worker_properties)
         self.assertIn("/usr/bin/systemd-run", smoke)
-        self.assertIn("--working-directory=/opt/dronedream/source", smoke)
+        self.assertIn("--working-directory=/opt/dronedream/engine/current", smoke)
         self.assertNotIn('docker exec "$container" /usr/lib/dronedream/runtime-check.sh', smoke)
         self.assertIn("/var/lib/dronedream/runtime-smoke", smoke)
         self.assertNotIn("/tmp/dronedream-runtime-smoke", smoke)
+
+    def test_runtime_smoke_requires_the_signed_account_session_route(self) -> None:
+        smoke = (RUNTIME / "smoke-image.sh").read_text(encoding="utf-8")
+        check = (RUNTIME / "scripts" / "runtime-check.sh").read_text(encoding="utf-8")
+        self.assertIn("account_session_api", smoke)
+        self.assertIn('path = "/api/v1/session"', check)
+        self.assertIn('"X-DroneDream-Bridge-Version": "DD-BRIDGE-V2"', check)
+        self.assertIn('payload["error"].get("code") != "UNAUTHORIZED"', check)
+        self.assertNotIn("print(secret", check)
 
     def test_journal_limits_are_packaged_and_disk_conservative(self) -> None:
         parser = configparser.ConfigParser()

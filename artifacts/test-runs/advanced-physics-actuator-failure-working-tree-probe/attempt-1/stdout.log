@@ -1,0 +1,83 @@
+[local_px4_launch_wrapper] Launch command: cd /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/px4_rootfs; HEADLESS=1 PX4_SIM_MODEL=gz_x500 GZ_IP=127.0.0.1 /opt/PX4-Autopilot/build/px4_sitl_default/bin/px4 -d -w /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/px4_rootfs /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/px4_rootfs
+[local_px4_launch_wrapper] Waiting 30s for PX4 readiness (simple fixed wait)
+INFO  [px4] working directory seems to be rootfs, no symlinks needed
+
+______  __   __    ___ 
+| ___ \ \ \ / /   /   |
+| |_/ /  \ V /   / /| |
+|  __/   /   \  / /_| |
+| |     / /^\ \ \___  |
+\_|     \/   \/     |_/
+
+px4 starting.
+
+INFO  [px4] startup script: /bin/sh etc/init.d-posix/rcS 0
+INFO  [init] found model autostart file as SYS_AUTOSTART=4001
+INFO  [param] selected parameter default file parameters.bson
+INFO  [param] selected parameter backup file parameters_backup.bson
+  SYS_AUTOCONFIG: curr: 0 -> new: 1
+  SYS_AUTOSTART: curr: 0 -> new: 4001
+  CAL_ACC0_ID: curr: 0 -> new: 1310988
+  CAL_GYRO0_ID: curr: 0 -> new: 1310988
+  CAL_ACC1_ID: curr: 0 -> new: 1310996
+  CAL_GYRO1_ID: curr: 0 -> new: 1310996
+  CAL_ACC2_ID: curr: 0 -> new: 1311004
+  CAL_GYRO2_ID: curr: 0 -> new: 1311004
+  CAL_MAG0_ID: curr: 0 -> new: 197388
+  CAL_MAG0_PRIO: curr: -1 -> new: 50
+  CAL_MAG1_ID: curr: 0 -> new: 197644
+  CAL_MAG1_PRIO: curr: -1 -> new: 50
+  SENS_BOARD_X_OFF: curr: 0.0000 -> new: 0.0000
+  SENS_DPRES_OFF: curr: 0.0000 -> new: 0.0010
+COM_DL_LOSS_T set to 10.0
+COM_RC_LOSS_T set to 1.0
+  COM_RC_LOSS_T: curr: 0.5000 -> new: 1.0000
+COM_OF_LOSS_T set to 1.0
+COM_OBC_LOSS_T set to 5.0
+INFO  [dataman] data manager file './dataman' size is 1208528 bytes
+INFO  [init] Gazebo simulator
+INFO  [init] Starting gazebo with world: /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_runtime/worlds/default.sdf
+INFO  [init] Gazebo world is ready
+INFO  [init] Spawning model
+INFO  [gz_bridge] world: default, model: x500_0
+INFO  [init] Setting simulation speed factor: 1.0
+INFO  [lockstep_scheduler] setting initial absolute time to 3296000 us
+INFO  [commander] LED: open /dev/led0 failed (22)
+WARN  [health_and_arming_checks] Preflight Fail: ekf2 missing data
+WARN  [health_and_arming_checks] Preflight Fail: No connection to the ground control station	
+INFO  [uxrce_dds_client] init UDP agent IP:127.0.0.1, port:8888
+INFO  [tone_alarm] home set
+INFO  [mavlink] mode: Normal, data rate: 4000000 B/s on udp port 18570 remote port 14550
+INFO  [mavlink] mode: Onboard, data rate: 4000000 B/s on udp port 14580 remote port 14540
+INFO  [mavlink] mode: Onboard, data rate: 4000 B/s on udp port 14280 remote port 14030
+INFO  [mavlink] mode: Gimbal, data rate: 400000 B/s on udp port 13030 remote port 13280
+INFO  [logger] logger started (mode=all)
+INFO  [logger] Start file log (type: full)
+INFO  [logger] [logger] ./log/2026-07-28/23_15_08.ulg	
+INFO  [logger] Opened full log file: ./log/2026-07-28/23_15_08.ulg
+INFO  [mavlink] MAVLink only on localhost (set param MAV_{i}_BROADCAST = 1 to enable network)
+INFO  [mavlink] MAVLink only on localhost (set param MAV_{i}_BROADCAST = 1 to enable network)
+INFO  [px4] Startup script returned successfully
+WARN  [health_and_arming_checks] Preflight Fail: No connection to the ground control station	
+WARN  [health_and_arming_checks] Preflight Fail: No connection to the ground control station	
+INFO  [mavlink] partner IP: 127.0.0.1
+INFO  [commander] [32mReady for takeoff![0m
+[local_px4_launch_wrapper] PX4 parameter readback verified before flight
+[local_px4_launch_wrapper] Preflight Gazebo scenario effects applied with runtime readback evidence
+[local_px4_launch_wrapper] GUI client not launched: headless=true, PX4_GAZEBO_LAUNCH_GUI_CLIENT=false
+[local_px4_launch_wrapper] Track marker not launched: headless=true / PX4_GAZEBO_DRAW_TRACK_MARKER=false
+[local_px4_launch_wrapper] Offboard executor command: /opt/dronedream/venv/bin/python3 /mnt/z/DroneDream-worktrees/aurora-20260728/scripts/simulators/px4_offboard_track_executor.py --run-dir /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1 --track /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/reference_track.json --params /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/controller_params.json --vehicle x500 --world default --connection udp://:14540 --setpoint-rate-hz 10.0 --takeoff-timeout-seconds 30.0 --track-timeout-seconds 120.0 --log /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/offboard_executor.log
+INFO  [commander] Armed by external command	
+INFO  [tone_alarm] arming warning
+INFO  [commander] Takeoff detected	
+WARN  [health_and_arming_checks] Preflight Fail: Attitude failure (roll)
+WARN  [failsafe] Failsafe activated	
+WARN  [failsafe] Failsafe activated	
+WARN  [failsafe] Failsafe activated	
+INFO  [commander] Landing at current position	
+[local_px4_launch_wrapper] Offboard executor exit code: 0
+[local_px4_launch_wrapper] All scenario effects verified after flight
+
+PX4 Exiting...
+Exiting NOW.
+[local_px4_launch_wrapper] PX4 process terminated after execution window

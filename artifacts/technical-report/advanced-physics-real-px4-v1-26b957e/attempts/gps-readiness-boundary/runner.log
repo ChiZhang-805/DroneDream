@@ -1,0 +1,4 @@
+launch executable: /opt/dronedream/venv/bin/python3 (argc=30)
+launch cwd: /mnt/z/DroneDream-worktrees/aurora-20260728
+launch timeout: base_1x=900s speed_factor=1.0 effective=900s
+launcher exit code: 1

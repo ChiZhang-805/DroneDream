@@ -1,0 +1,116 @@
+{
+  "schema_id": "dronedream.software-test-receipt/v1",
+  "generated_at": "2026-08-05T08:30:06.128Z",
+  "subject_commit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+  "branch": "codex/software",
+  "resource_class": "GREEN_WITH_RELATED_YELLOW_REGRESSION",
+  "scope": "benchmark-p1-server-authoritative-job-runtime-arm-routing",
+  "status": "passed",
+  "provider_calls": 0,
+  "api_keys_read": false,
+  "px4_or_gazebo_started": false,
+  "contract": {
+    "proposal_router": "immutable-benchmark-run-binding",
+    "product_optimizer_strategy_can_select_benchmark_arm": false,
+    "pre_claim_binding_validation": true,
+    "shared_observation_contract": "dronedream.benchmark-observation/v2",
+    "sealed_holdout_visible_to_proposer": false,
+    "candidate_order": "server-dispatch-ordinal",
+    "failure_semantics": "versioned-and-hash-bound",
+    "scenario_manifest_semantics": "normalized-versioned-suite-hash",
+    "qualification_rule_hash_checked_at_runtime": true,
+    "observation_contract_hash_checked_at_runtime": true,
+    "evaluator_contract_cross_checked": true,
+    "implemented_production_arms_exercised": [
+      "random_search/v1",
+      "seeded_halton/v1"
+    ],
+    "llm_or_external_unimplemented_arm_fallback": "blocked-fail-closed"
+  },
+  "changed_files": [
+    {
+      "path": "backend/app/benchmarking/job_runtime.py",
+      "sha256": "1f22ea243e843064da9f7782c4ce8e0563585c451585f9304535e4405113af5b"
+    },
+    {
+      "path": "backend/app/orchestration/job_manager.py",
+      "sha256": "15d2b15ba8004fb58ca6b5136e00d7b904d579f89d59f836a48acca0cb58613b"
+    },
+    {
+      "path": "backend/app/orchestration/aggregation.py",
+      "sha256": "74fe825b407830721f49e66c578308735fe1956886bdec52cebba744e61ac011"
+    },
+    {
+      "path": "backend/tests/test_benchmark_job_runtime.py",
+      "sha256": "89a96f15dc581a22f11fa2c95fb34b877e6d54dbf85c1d9fbe8839ae6d41074e"
+    }
+  ],
+  "checks": [
+    {
+      "name": "focused-production-routing",
+      "command": "python -m pytest backend/tests/test_benchmark_job_runtime.py -q",
+      "result": "4 passed in 11.28s"
+    },
+    {
+      "name": "exact-source-related-regression",
+      "command": "python -m pytest backend/tests/test_benchmark_job_runtime.py backend/tests/test_benchmark_campaign_contracts.py backend/tests/test_benchmark_proposal_adapters.py backend/tests/test_qualification_job_manager_dispatch.py backend/tests/test_phase8_iterative_loop.py backend/tests/test_orchestration.py -q",
+      "result": "143 passed in 230.39s",
+      "subject_commit_observed_before_command": "2aec69e88ee8844cff759a025f109e5b938d18c0"
+    },
+    {
+      "name": "ruff",
+      "command": "python -m ruff check backend/app/benchmarking/job_runtime.py backend/app/orchestration/job_manager.py backend/app/orchestration/aggregation.py backend/tests/test_benchmark_job_runtime.py",
+      "result": "passed"
+    },
+    {
+      "name": "mypy-strict",
+      "command": "python -m mypy --config-file backend/pyproject.toml backend/app/benchmarking/job_runtime.py backend/app/orchestration/job_manager.py backend/app/orchestration/aggregation.py",
+      "result": "passed; 3 source files"
+    },
+    {
+      "name": "python-compile",
+      "command": "python -m py_compile backend/app/benchmarking/job_runtime.py backend/app/orchestration/job_manager.py backend/app/orchestration/aggregation.py backend/tests/test_benchmark_job_runtime.py",
+      "result": "passed"
+    },
+    {
+      "name": "git-diff-check",
+      "command": "git diff HEAD^ HEAD --check",
+      "result": "passed"
+    }
+  ],
+  "development_failure_history": [
+    {
+      "result": "3 focused fixture setup failures",
+      "cause": "the first fixture used max_total_trials=40 although the sealed 4-screening plus 20-qualification contract requires at least 48 trials",
+      "resolution": "raised only the test fixture cap to 100; production validation remained unchanged"
+    },
+    {
+      "result": "fixture expected HTTP 201 but the existing Batch API returns HTTP 200",
+      "cause": "new test assertion did not match the established API contract",
+      "resolution": "corrected the assertion to the existing 200 contract"
+    },
+    {
+      "result": "negative corruption test was rejected by the existing immutable-row database trigger",
+      "cause": "the first test attempted a real persisted arm mutation before reaching the runtime validator",
+      "resolution": "used an in-session corrupted snapshot so the runtime fail-closed path is independently exercised"
+    },
+    {
+      "result": "2 of 4 focused tests failed after adding explicit scenario-manifest validation",
+      "cause": "the fixture hashed raw input JSON while production binds the normalized versioned ScenarioSuiteConfig projection",
+      "resolution": "the preregistration fixture now freezes the same normalized suite hash as the Job binding"
+    },
+    {
+      "result": "strict mypy reported one widened screening_status string and Ruff reported two local import-order findings",
+      "cause": "the new observation builder did not preserve the status Literal type and the tests used noncanonical local import order",
+      "resolution": "locked the status to the schema Literal and normalized test imports; mypy and Ruff then passed"
+    }
+  ],
+  "honest_boundaries": [
+    "No real provider request was made and no API key was read.",
+    "No PX4, Gazebo, installer, Runtime migration, visible window, hardware operation, or deployment was started.",
+    "The end-to-end routing tests use the repository mock simulator, not physical PX4/Gazebo evidence.",
+    "This closure promotes the implemented Random and seeded Halton adapters through the production Job lifecycle; it does not claim that contract-only LLM, HEBO, TPE, CMA-ES, SCBO, TuRBO, or LLAMBO arms are executable.",
+    "Active Engine Pack and current-process source compatibility remain separate composite-inventory execution gates; frozen manifest integrity alone is not presented as that proof.",
+    "The receipt commit that contains this file is evidence-only and must not replace subject_commit."
+  ]
+}

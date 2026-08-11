@@ -1,0 +1,45 @@
+{
+  "schema_version": "dronedream.internal-test-installer-publication-handoff.v1",
+  "generated_at": "2026-07-28T16:12:07Z",
+  "source_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+  "branch": "codex/software",
+  "owner_override": {
+    "internal_test": true,
+    "version_must_remain": "1.0.0",
+    "authenticode_required": false,
+    "replace_existing_1_0_0_bytes": true,
+    "software_line_upload_authorized": false
+  },
+  "release": {
+    "version": "1.0.0",
+    "release_tag": "signpath-candidate-v1.0.0",
+    "file_name": "DroneDream_1.0.0_x64-setup.exe",
+    "checksum_file_name": "DroneDream_1.0.0_x64-setup.exe.sha256",
+    "bytes": 10386896,
+    "sha256": "f35c7aad9006a29607395a0e14b74d150b82fbf25afe3ff65474bdd764e7cf92",
+    "authenticode_status": "NotSigned",
+    "pe_certificate_table_file_offset": 0,
+    "pe_certificate_table_size": 0
+  },
+  "publication_contract": {
+    "single_authoritative_installer_for_both_origins": true,
+    "rebuild_per_origin": false,
+    "upload_or_deployment_performed": false,
+    "github_release_download_url": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+    "github_release_checksum_url": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe.sha256",
+    "mirror_download_path": "/downloads/DroneDream_1.0.0_x64-setup.exe",
+    "mirror_checksum_path": "/downloads/DroneDream_1.0.0_x64-setup.exe.sha256",
+    "website_latest": "website-latest.json",
+    "website_pages_release": "website-pages-release.json",
+    "tauri_updater_manifest": "tauri-latest.json",
+    "tauri_updater_signature": "DroneDream_1.0.0_x64-setup.exe.sig"
+  },
+  "rollback": {
+    "github_release_sha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
+    "github_release_bytes": 5526509,
+    "alibaba_mirror_sha256": "aad5a7fdb1196059ce2e15b33e2495830f77ed5f1070e56e5423796b9ca96b86",
+    "alibaba_mirror_bytes": 9881226,
+    "authoritative_prepublication_receipt_sha256": "cd53a1de257f6bafe9c05afcd381b5852f31f9381946d1a49038bc039ca6916a",
+    "superseded_receipt_sha256_must_not_be_used": "a3d21ca26270d5de398f9468c3c52df452f13d09c1a708151ba6356b68bbfcbe"
+  }
+}

@@ -1,0 +1,4 @@
+launch executable: /opt/dronedream/venv/bin/python3 (argc=30)
+launch cwd: /mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal-attempt-4
+launch timeout: base_1x=300s speed_factor=1.0 effective=300s
+launcher exit code: 1

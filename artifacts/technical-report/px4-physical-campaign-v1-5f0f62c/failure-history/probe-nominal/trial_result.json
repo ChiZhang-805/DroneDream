@@ -1,0 +1,17 @@
+{
+  "artifacts": [
+    {
+      "artifact_type": "worker_log",
+      "display_name": "Runner Log",
+      "file_size_bytes": 66,
+      "mime_type": "text/plain",
+      "storage_path": "/mnt/z/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/px4-gazebo-physical-campaign-95c3367/probe-nominal/runner.log"
+    }
+  ],
+  "failure": {
+    "code": "SIMULATION_FAILED",
+    "reason": "sensor_noise_level must be one of: low, medium, high"
+  },
+  "log_excerpt": "px4_gazebo_runner simulation failure: sensor_noise_level must be one of: low, medium, high",
+  "success": false
+}

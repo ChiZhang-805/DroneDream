@@ -169,12 +169,13 @@ def _inspect_log(
 
 def _open_file_identities(proc_root: Path = Path("/proc")) -> set[tuple[int, int]]:
     identities: set[tuple[int, int]] = set()
-    if not proc_root.is_dir():
-        return identities
     try:
+        proc_details = proc_root.stat()
+        if not stat.S_ISDIR(proc_details.st_mode):
+            raise CleanupError("process file table is not a directory; refusing cleanup")
         processes = list(proc_root.iterdir())
-    except OSError:
-        return identities
+    except OSError as exc:
+        raise CleanupError("process file table is unavailable; refusing cleanup") from exc
     for process in processes:
         if not process.name.isdigit():
             continue
@@ -385,11 +386,11 @@ def cleanup_logs(
     root_fd = _open_directory_chain(root)
     try:
         _verify_opened_root(root, root_fd)
+        if _before_delete is not None:
+            _before_delete()
         final_open_files = (
             open_identities if open_identities is not None else _open_file_identities()
         )
-        if _before_delete is not None:
-            _before_delete()
         _delete_selected_logs(
             selected,
             root_fd=root_fd,

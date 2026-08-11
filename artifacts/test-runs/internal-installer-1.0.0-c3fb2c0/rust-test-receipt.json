@@ -1,0 +1,20 @@
+{
+  "schema_version": "dronedream.desktop-rust-test-receipt.v2",
+  "generated_at": "2026-07-31T07:55:00Z",
+  "subject_commit": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+  "target": "x86_64-pc-windows-gnullvm",
+  "profile": "release",
+  "gates": {
+    "cargo_fmt_check": "pass",
+    "cargo_clippy_all_targets_deny_warnings": "pass",
+    "cargo_test_all_targets": {
+      "passed": 112,
+      "failed": 0,
+      "ignored": 1
+    }
+  },
+  "environment_boundary": "The fixed gnullvm toolchain was used to avoid the local MSVC link.exe environment gap.",
+  "non_failing_warning": "clang reported an unused -no-pie argument.",
+  "log_sha256": "4ef73746a1617bdc0c61824cfcfc01522c896c6fc951c5c75afdbcf59f81a0ef",
+  "result": "pass"
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": "dronedream.frontend-release-test-receipt.v2",
+  "generated_at": "2026-07-31T07:55:00Z",
+  "subject_commit": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+  "software_scope": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "bounded_test_files": 60,
+    "bounded_tests": 382,
+    "passed": 382,
+    "failed": 0,
+    "duration_seconds": 98.31,
+    "production_build": "pass",
+    "production_build_warning": "One generated chunk exceeded the configured advisory size; this is a non-failing Vite warning.",
+    "validation_log_sha256": "693fc50c9fa20351a1e2be290f0c9c23af3b9e1ba023aabd99cc1c9268a4d37d",
+    "production_build_log_sha256": "04ed03061104f7e9d0cdd2e3423e979db03db0101e3c4cd693c9d69928653899"
+  },
+  "browser_auth": {
+    "engine": "Microsoft Edge via Playwright Chromium driver",
+    "layouts": 3,
+    "exact_callbacks": 3,
+    "cancellations": 1,
+    "token_in_url": false,
+    "token_in_request_inventory": false,
+    "expected_account_url_compiled": true,
+    "exact_publishable_key_compiled": true,
+    "service_role_literal_compiled": false,
+    "measurements_sha256": "6c4b07c9a83f6a0d41d7742c27ce167e7b649a8fc6a8b5a112defd51b6aba9c2"
+  },
+  "preserved_residuals": [
+    {
+      "kind": "initial_high_concurrency_transient",
+      "detail": "An initial high-concurrency run hit one I18nWizard transient. Its focused rerun passed and the bounded 60-file suite subsequently passed 382 of 382."
+    },
+    {
+      "kind": "cross_line_public_site_test",
+      "detail": "PublicSite isolation passed 12 of 13. The remaining billing-checkout expectation depends on later website-line evolution absent from codex/software and was not changed in this release."
+    }
+  ],
+  "software_release_scope_result": "pass",
+  "repository_all_frontend_tests_claimed_green": false
+}

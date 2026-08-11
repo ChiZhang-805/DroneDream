@@ -1,0 +1,9 @@
+{
+    "Uri":  "http://127.0.0.1:62597/DroneDream_1.0.0_x64-setup.exe",
+    "HttpStatus":  200,
+    "DownloadedBytes":  10387042,
+    "DownloadedSha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "SourceSha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "ByteParity":  true,
+    "UploadPerformed":  false
+}

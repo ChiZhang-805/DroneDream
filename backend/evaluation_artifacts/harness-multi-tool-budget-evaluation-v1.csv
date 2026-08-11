@@ -1,0 +1,7 @@
+block_id,seed_block,arm,configured_max_iterations,configured_max_total_trials,realized_dispatched_trials,realized_completed_trials,realized_candidate_count,terminal_status,holdout_loss,failure_count,verified_generation_count,multi_tool_generation_count,scripted_decision_calls,plan_decision_wall_ms,revision_wall_ms,tool_execution_wall_ms,actual_tool_cpu_ms
+1,7100,direct_portfolio,2,40,38,38,10,COMPLETED,0.8576,0,0,0,0,0.0,0.0,0.0,0.0
+1,7100,scripted_multi_tool,2,40,32,32,8,COMPLETED,0.9415,0,2,1,4,43.896,0.394,23.677,15.625
+2,8200,direct_portfolio,2,40,38,38,10,COMPLETED,0.9776,0,0,0,0,0.0,0.0,0.0,0.0
+2,8200,scripted_multi_tool,2,40,32,32,8,COMPLETED,0.8284,0,2,1,4,45.717,0.343,12.231,0.0
+3,9300,direct_portfolio,2,40,39,39,10,COMPLETED,0.8823,0,0,0,0,0.0,0.0,0.0,0.0
+3,9300,scripted_multi_tool,2,40,32,32,8,COMPLETED,0.9532,0,2,1,4,42.488,0.327,13.04,0.0

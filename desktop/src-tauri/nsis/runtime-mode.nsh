@@ -20,6 +20,22 @@ Var DroneDreamDiagnosticLog
 Var DroneDreamDiagnosticHandle
 Var DroneDreamValidatePathOnly
 
+!macro DRONEDREAM_BLOCK_DOWNGRADE COMPARISON
+  ; The upstream page disables only the in-place downgrade option and still
+  ; offers to uninstall the newer copy first. DroneDream instead fails closed.
+  ${If} ${COMPARISON} = -1
+    IfSilent dronedream_downgrade_blocked_silent dronedream_downgrade_blocked_interactive
+    dronedream_downgrade_blocked_interactive:
+      MessageBox MB_ICONSTOP|MB_OK "$(DD_DowngradeBlocked)"
+      SetErrorLevel 74
+      Quit
+    dronedream_downgrade_blocked_silent:
+      DetailPrint "$(DD_DowngradeBlocked)"
+      SetErrorLevel 74
+      Quit
+  ${EndIf}
+!macroend
+
 !macro DRONEDREAM_ONINIT
   ; MUI_LANGDLL_DISPLAY has already returned at this anchor. Preserve that
   ; exact choice for every later custom page and message.
@@ -191,8 +207,14 @@ Var DroneDreamValidatePathOnly
         Push "error"
         Return
       ${EndIf}
+      Push "ok"
+      Return
     dronedream_revalidate_without_binary:
-    Push "ok"
+    ; The preinstall hook calls this only after observing the old binary. If it
+    ; disappears before or during revalidation, the durable quiesce can no
+    ; longer be authenticated; fail closed instead of treating the race as a
+    ; verified update window.
+    Push "error"
   FunctionEnd
 
   Function DroneDreamEndRuntimeQuiesce

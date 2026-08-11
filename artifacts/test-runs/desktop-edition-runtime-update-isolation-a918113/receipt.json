@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-desktop-edition-runtime-update-isolation-receipt",
+  "generatedAtUtc": "2026-08-06T05:55:33.9365232Z",
+  "executionSubject": {
+    "branch": "codex/software",
+    "commit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "tree": "a4077d3980cda8fbc8341cf3ad6e9af29b976b1c",
+    "evidenceCommitIsProductSource": false
+  },
+  "resourceClass": "GREEN",
+  "scope": {
+    "realInstallerBuilt": false,
+    "runtimeInstalledOrMigrated": false,
+    "px4OrGazeboStarted": false,
+    "providerOrAccountCredentialRead": false,
+    "websiteOrReleaseUpdated": false
+  },
+  "contracts": {
+    "familyRegistry": {
+      "path": "distribution/desktop/edition-runtime-update-families.v1.json",
+      "sha256": "79f421b8ec81a746b7b7ae4df7702d18d3df08e76e89ccbf9e6937e22306ce32",
+      "editionIds": [
+        "universal",
+        "sim",
+        "lab",
+        "field"
+      ]
+    },
+    "updaterManifestWriter": {
+      "path": "desktop/scripts/write-updater-manifest.ps1",
+      "sha256": "3ff32a6550b0bc20fc8bc1c0c3674fbb63a50d684c44f5e5a1b881059884582f",
+      "rules": [
+        "edition id is mandatory and allowlisted",
+        "metadata filename is latest-<edition>.json",
+        "public installer filename and URL family are edition-specific",
+        "immutable release tag includes edition, display version, and build number",
+        "generic latest.json is rejected"
+      ]
+    },
+    "universalOverlay": {
+      "path": "desktop/src-tauri/tauri.universal.conf.json",
+      "sha256": "300957997bde50912c4e093baac698c4c1f086174692b8d77ff96b76d94d9803"
+    },
+    "nativeUpdaterDecision": {
+      "path": "desktop/src-tauri/src/app_update.rs",
+      "sha256": "a9b95651712dcb3f20839906edcb02533b1a01aedd1f2d67ba7bb176468710cb",
+      "rule": "metadata must match the compiled edition before any version or build comparison"
+    }
+  },
+  "verification": [
+    {
+      "commandClass": "PowerShell AST parse",
+      "result": "passed",
+      "detail": "4 updater/build scripts parsed without errors"
+    },
+    {
+      "commandClass": "desktop/scripts/verify-updater-build-contract.ps1",
+      "result": "passed",
+      "detail": "universal/sim/lab/field metadata families were generated and verified in a temporary owned directory"
+    },
+    {
+      "commandClass": "desktop/scripts/verify-updater-signing-contract.ps1",
+      "result": "passed",
+      "detail": "empty and non-empty password argv contracts, signer failure, and missing output gates passed without real signing"
+    },
+    {
+      "commandClass": "pytest distribution build contracts",
+      "result": "passed",
+      "detail": "11 passed"
+    },
+    {
+      "commandClass": "cargo fmt --check",
+      "result": "passed"
+    },
+    {
+      "commandClass": "cargo test",
+      "result": "passed",
+      "detail": "157 passed, 0 failed, 1 ignored because an installed owned DroneDreamRuntime is required"
+    },
+    {
+      "commandClass": "cargo clippy --all-targets -- -D warnings",
+      "result": "passed",
+      "detail": "LLVM gnullvm emitted the known informational unused -no-pie linker message"
+    },
+    {
+      "commandClass": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "negativeCoverage": [
+    "unknown or missing edition id",
+    "wrong edition metadata delivered to a compiled desktop",
+    "duplicate or unknown updater note fields",
+    "generic or cross-edition updater filename and URL family",
+    "non-monotonic same-version build/source identity",
+    "signer failure or missing signature output"
+  ],
+  "remainingGates": [
+    "no real Tauri or NSIS artifact was built by this receipt",
+    "no updater metadata or installer was uploaded or publicly re-downloaded",
+    "fresh, upgrade, uninstall, shortcut, WebView2, and four-app coexistence lifecycle validation remain separate RED or YELLOW work",
+    "edition release branches and public URL families remain uncreated until exact artifacts pass their release gates"
+  ]
+}

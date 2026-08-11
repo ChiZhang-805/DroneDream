@@ -36,6 +36,12 @@ FAILURE_CANCELLED = "CANCELLED"
 FAILURE_ARTIFACT_PERSISTENCE = "ARTIFACT_PERSISTENCE_FAILED"
 FAILURE_RESULT_PERSISTENCE = "RESULT_PERSISTENCE_FAILED"
 FAILURE_INVALID_PARAMETERS = "INVALID_CANDIDATE_PARAMETERS"
+FAILURE_INVALID_RESULT = "INVALID_SIMULATOR_RESULT"
+FAILURE_INPUT_EVIDENCE_DRIFT = "INPUT_EVIDENCE_DRIFT"
+FAILURE_OUTCOME_CONTRACT_DRIFT = "OUTCOME_CONTRACT_DRIFT"
+FAILURE_SCENARIO_CONTRACT_DRIFT = "SCENARIO_CONTRACT_DRIFT"
+FAILURE_UNVERIFIED_REPORT = "UNVERIFIED_SIMULATOR_FAILURE"
+FAILURE_EXECUTION_TIMEOUT = "SIMULATOR_EXECUTION_TIMEOUT"
 
 _MAX_RAW_METRIC_DEPTH = 20
 _MAX_RAW_METRIC_NODES = 10_000
@@ -140,7 +146,7 @@ class TrialMetricsPayload:
                 raise TypeError(f"{name} must be numeric")
             if not math.isfinite(float(value)):
                 raise ValueError(f"{name} must be finite")
-        for name in ("rmse", "max_error", "completion_time", "final_error"):
+        for name in ("rmse", "max_error", "completion_time", "score", "final_error"):
             if float(getattr(self, name)) < 0:
                 raise ValueError(f"{name} must be non-negative")
         if (
@@ -157,6 +163,12 @@ class TrialMetricsPayload:
         ):
             if not isinstance(getattr(self, name), bool):
                 raise TypeError(f"{name} must be boolean")
+        if self.pass_flag and (
+            self.crash_flag or self.timeout_flag or self.instability_flag
+        ):
+            raise ValueError(
+                "pass_flag cannot be true for a crashed, timed-out, or unstable trial"
+            )
         if not isinstance(self.raw_metric_json, dict):
             raise TypeError("raw_metric_json must be an object")
         _validate_raw_metric_json(self.raw_metric_json)
@@ -342,6 +354,9 @@ __all__ = [
     "FAILURE_ARTIFACT_PERSISTENCE",
     "FAILURE_RESULT_PERSISTENCE",
     "FAILURE_INVALID_PARAMETERS",
+    "FAILURE_INVALID_RESULT",
+    "FAILURE_UNVERIFIED_REPORT",
+    "FAILURE_EXECUTION_TIMEOUT",
     "FAILURE_CANCELLED",
     "FAILURE_SIMULATION",
     "FAILURE_SIM_ERROR",

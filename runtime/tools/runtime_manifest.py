@@ -6,12 +6,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 SCHEMA_VERSION = 1
 REQUIRED_SMOKE_CHECKS = {
@@ -57,6 +59,22 @@ class ManifestError(ValueError):
     pass
 
 
+def _atomic_write_json(path: Path, value: dict[str, Any]) -> None:
+    """Publish canonical manifest JSON without exposing a truncated destination."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.parent / f".{path.name}.partial-{uuid.uuid4().hex}"
+    payload = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    try:
+        with temporary.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _require_exact_keys(value: dict[str, Any], expected: set[str], label: str) -> None:
     actual = set(value)
     if actual == expected:
@@ -80,6 +98,36 @@ def _validate_timestamp(value: Any, label: str) -> str:
         raise ManifestError(f"{label} must be an ISO-8601 UTC timestamp") from exc
     if parsed.utcoffset() is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
         raise ManifestError(f"{label} must use UTC")
+    return value
+
+
+def _validate_https_url(value: str, label: str) -> None:
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError as exc:
+        raise ManifestError(f"{label} must be a credential-free HTTPS URL") from exc
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or any(character.isspace() for character in value)
+        or (port is not None and port <= 0)
+    ):
+        raise ManifestError(f"{label} must be a credential-free HTTPS URL")
+
+
+def _safe_component_text(value: Any, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value) > 128
+        or any(ord(character) < 32 or 127 <= ord(character) <= 159 for character in value)
+    ):
+        raise ManifestError(f"manifest {label} is invalid")
     return value
 
 
@@ -111,10 +159,7 @@ def load_pins(path: Path) -> dict[str, str]:
     if not SHA256.fullmatch(pins["GAZEBO_APT_KEY_SHA256"]):
         raise ManifestError("GAZEBO_APT_KEY_SHA256 must be a full lowercase SHA-256")
     for key in ("PX4_GIT_URL", "GAZEBO_APT_KEY_URL", "VALKEY_GIT_URL"):
-        if not pins[key].startswith("https://") or any(
-            character.isspace() for character in pins[key]
-        ):
-            raise ManifestError(f"{key} must be an absolute whitespace-free HTTPS URL")
+        _validate_https_url(pins[key], key)
     for key in ("PX4_GIT_COMMIT", "VALKEY_GIT_COMMIT"):
         if not SHA40.fullmatch(pins[key]):
             raise ManifestError(f"{key} must be a full lowercase Git SHA")
@@ -160,25 +205,51 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def generate(pins_path: Path, lock_path: Path, source_commit: str, output: Path) -> dict:
+def _runtime_id(
+    *,
+    version: str,
+    source_commit: str,
+    ubuntu_image: str,
+    px4_commit: str,
+    valkey_commit: str,
+    python_lock_sha256: str,
+) -> str:
+    identity = "|".join(
+        (
+            version,
+            source_commit,
+            ubuntu_image,
+            px4_commit,
+            valkey_commit,
+            python_lock_sha256,
+        )
+    )
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, "https://dronedream/runtime/" + identity))
+
+
+def generate(
+    pins_path: Path,
+    lock_path: Path,
+    source_commit: str,
+    output: Path,
+) -> dict[str, Any]:
     pins = load_pins(pins_path)
     packages = validate_python_lock(lock_path)
     validate_pin_lock_versions(pins, packages)
     if not SHA40.fullmatch(source_commit):
         raise ManifestError("DroneDream source commit must be a full lowercase Git SHA")
-    identity = "|".join(
-        (
-            pins["DRONEDREAM_RUNTIME_VERSION"],
-            source_commit,
-            pins["UBUNTU_BASE_IMAGE"],
-            pins["PX4_GIT_COMMIT"],
-            pins["VALKEY_GIT_COMMIT"],
-            sha256(lock_path),
-        )
+    python_lock_sha256 = sha256(lock_path)
+    runtime_id = _runtime_id(
+        version=pins["DRONEDREAM_RUNTIME_VERSION"],
+        source_commit=source_commit,
+        ubuntu_image=pins["UBUNTU_BASE_IMAGE"],
+        px4_commit=pins["PX4_GIT_COMMIT"],
+        valkey_commit=pins["VALKEY_GIT_COMMIT"],
+        python_lock_sha256=python_lock_sha256,
     )
     manifest = {
         "schemaVersion": SCHEMA_VERSION,
-        "runtimeId": str(uuid.uuid5(uuid.NAMESPACE_URL, "https://dronedream/runtime/" + identity)),
+        "runtimeId": runtime_id,
         "version": pins["DRONEDREAM_RUNTIME_VERSION"],
         "target": {
             "os": "ubuntu",
@@ -217,15 +288,15 @@ def generate(pins_path: Path, lock_path: Path, source_commit: str, output: Path)
         },
         "locks": {
             "pinsSha256": sha256(pins_path),
-            "pythonRequirementsSha256": sha256(lock_path),
+            "pythonRequirementsSha256": python_lock_sha256,
         },
         # These are deliberately false. Only promote_smoke() may change them.
         "smokeTests": {"px4Sitl": False, "gazebo": False, "parameterReadback": False},
         "smokeReport": None,
         "artifact": None,
     }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    validate_manifest(manifest)
+    _atomic_write_json(output, manifest)
     return manifest
 
 
@@ -249,7 +320,10 @@ def validate_manifest(manifest: Any, *, require_smoke_passed: bool = False) -> N
         },
         "runtime manifest",
     )
-    if manifest.get("schemaVersion") != SCHEMA_VERSION:
+    if (
+        type(manifest.get("schemaVersion")) is not int
+        or manifest["schemaVersion"] != SCHEMA_VERSION
+    ):
         raise ManifestError("unsupported runtime manifest schema")
     runtime_id = manifest.get("runtimeId")
     if not isinstance(runtime_id, str):
@@ -287,6 +361,7 @@ def validate_manifest(manifest: Any, *, require_smoke_passed: bool = False) -> N
     components = manifest.get("components")
     if not isinstance(components, dict):
         raise ManifestError("manifest components must be an object")
+    _require_exact_keys(components, {"backend", "px4", "gazebo"}, "components")
     for name, value in components.items():
         if (
             not isinstance(name, str)
@@ -303,20 +378,23 @@ def validate_manifest(manifest: Any, *, require_smoke_passed: bool = False) -> N
     component_details = manifest.get("componentDetails")
     if not isinstance(component_details, dict):
         raise ManifestError("manifest componentDetails must be an object")
-    for component in (
-        "ubuntu",
-        "px4",
-        "gazebo",
-        "backend",
-        "worker",
-        "valkey",
-        "python",
-    ):
-        if not isinstance(component_details.get(component), dict):
+    detail_fields = {
+        "ubuntu": {"image", "indexDigest"},
+        "px4": {"version", "commit"},
+        "gazebo": {"release", "packageVersion", "aptKeySha256"},
+        "backend": {"version", "commit"},
+        "worker": {"version", "commit"},
+        "valkey": {"version", "commit"},
+        "python": {"version"},
+        "mavsdk": {"version"},
+        "pyulog": {"version"},
+    }
+    _require_exact_keys(component_details, set(detail_fields), "componentDetails")
+    for component, fields in detail_fields.items():
+        details = component_details.get(component)
+        if not isinstance(details, dict):
             raise ManifestError(f"manifest componentDetails.{component} must be an object")
-    for component in ("mavsdk", "pyulog"):
-        if not isinstance(component_details.get(component), dict):
-            raise ManifestError(f"manifest componentDetails.{component} must be an object")
+        _require_exact_keys(details, fields, f"componentDetails.{component}")
     px4_commit = component_details["px4"].get("commit")
     valkey_commit = component_details["valkey"].get("commit")
     backend_commit = component_details["backend"].get("commit")
@@ -327,12 +405,72 @@ def validate_manifest(manifest: Any, *, require_smoke_passed: bool = False) -> N
         raise ManifestError("manifest Valkey commit is invalid")
     if backend_commit != source_commit or worker_commit != source_commit:
         raise ManifestError("manifest backend/worker commits must match the source commit")
+    ubuntu_image = _safe_component_text(
+        component_details["ubuntu"].get("image"), "componentDetails.ubuntu.image"
+    )
+    ubuntu_index_digest = component_details["ubuntu"].get("indexDigest")
+    if not isinstance(ubuntu_index_digest, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", ubuntu_index_digest
+    ):
+        raise ManifestError("manifest componentDetails.ubuntu.indexDigest is invalid")
+    if not re.fullmatch(r"ubuntu:24\.04@sha256:[0-9a-f]{64}", ubuntu_image):
+        raise ManifestError("manifest componentDetails.ubuntu.image is invalid")
+    gazebo_key = component_details["gazebo"].get("aptKeySha256")
+    if not isinstance(gazebo_key, str) or not SHA256.fullmatch(gazebo_key):
+        raise ManifestError("manifest componentDetails.gazebo.aptKeySha256 is invalid")
+    for component in ("backend", "worker"):
+        component_version = component_details[component].get("version")
+        if not isinstance(component_version, str) or not SEMVER.fullmatch(component_version):
+            raise ManifestError(f"manifest componentDetails.{component}.version is invalid")
+    python_version = component_details["python"].get("version")
+    if (
+        not isinstance(python_version, str)
+        or re.fullmatch(r"[0-9]+\.[0-9]+", python_version) is None
+    ):
+        raise ManifestError("manifest componentDetails.python.version is invalid")
+    for component in ("px4", "gazebo", "valkey", "mavsdk", "pyulog"):
+        for field in detail_fields[component] - {"commit", "aptKeySha256"}:
+            _safe_component_text(
+                component_details[component].get(field),
+                f"componentDetails.{component}.{field}",
+            )
+    backend_version = component_details["backend"].get("version")
+    px4_version = component_details["px4"].get("version")
+    gazebo_release = component_details["gazebo"].get("release")
+    gazebo_package_version = component_details["gazebo"].get("packageVersion")
+    if any(
+        not isinstance(value, str) or not value
+        for value in (
+            backend_version,
+            px4_version,
+            gazebo_release,
+            gazebo_package_version,
+        )
+    ):
+        raise ManifestError("manifest component detail versions are invalid")
+    expected_components = {
+        "backend": backend_version,
+        "px4": f"{px4_version}@{px4_commit[:12]}",
+        "gazebo": f"{gazebo_release}@{gazebo_package_version}",
+    }
+    if any(components.get(name) != value for name, value in expected_components.items()):
+        raise ManifestError("manifest component summaries do not match componentDetails")
     locks = manifest.get("locks")
     if not isinstance(locks, dict):
         raise ManifestError("manifest locks must be an object")
     _require_exact_keys(locks, {"pinsSha256", "pythonRequirementsSha256"}, "locks")
     if any(not isinstance(value, str) or not SHA256.fullmatch(value) for value in locks.values()):
         raise ManifestError("manifest lock hashes are invalid")
+    expected_runtime_id = _runtime_id(
+        version=version,
+        source_commit=source_commit,
+        ubuntu_image=ubuntu_image,
+        px4_commit=px4_commit,
+        valkey_commit=valkey_commit,
+        python_lock_sha256=locks["pythonRequirementsSha256"],
+    )
+    if runtime_id != expected_runtime_id:
+        raise ManifestError("manifest runtimeId does not match its identity inputs")
     artifact = manifest.get("artifact")
     if artifact is not None and not isinstance(artifact, dict):
         raise ManifestError("manifest artifact must be an object or null")
@@ -439,7 +577,7 @@ def promote_smoke(manifest_path: Path, report_path: Path, output: Path) -> None:
         "checks": checks,
     }
     validate_manifest(manifest, require_smoke_passed=True)
-    output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _atomic_write_json(output, manifest)
 
 
 def main() -> int:

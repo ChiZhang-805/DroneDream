@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/desktop-edition-runtime-update-families.v1.json",
+  "title": "DroneDream desktop Runtime and updater family contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "contractVersion",
+    "productDisplayVersion",
+    "sharedRuntimeBase",
+    "updaterPolicy",
+    "editions"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-desktop-runtime-update-families"},
+    "contractVersion": {"const": "1.0.0"},
+    "productDisplayVersion": {"const": "1.0.0"},
+    "sharedRuntimeBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "productId",
+        "wslDistributionName",
+        "owner",
+        "managerNamespace",
+        "operationLeaseFileName",
+        "legacyCompatibilityLeaseRelativePath",
+        "legacyCompatibilityLeaseRequired",
+        "downloadCacheDirectoryName",
+        "diagnosticsRootDirectoryName",
+        "editionUninstallMayRemoveRuntime",
+        "editionOperationsMayUseIndependentLocks"
+      ],
+      "properties": {
+        "productId": {"const": "DroneDreamRuntime"},
+        "wslDistributionName": {"const": "DroneDreamRuntime"},
+        "owner": {"const": "runtime-base-manager"},
+        "managerNamespace": {"const": "io.dronedream.runtime-base-manager"},
+        "operationLeaseFileName": {"const": "runtime-operation-v1.lock"},
+        "legacyCompatibilityLeaseRelativePath": {"const": "io.dronedream.desktop/runtime-operation-v1.lock"},
+        "legacyCompatibilityLeaseRequired": {"const": true},
+        "downloadCacheDirectoryName": {"const": "DroneDream.download-cache"},
+        "diagnosticsRootDirectoryName": {"const": "diagnostics"},
+        "editionUninstallMayRemoveRuntime": {"const": false},
+        "editionOperationsMayUseIndependentLocks": {"const": false}
+      }
+    },
+    "updaterPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "metadataOrigin",
+        "channelTagTemplate",
+        "metadataFileTemplate",
+        "releaseTagTemplate",
+        "sameEditionUrlFamilyRequired",
+        "crossEditionMetadataAllowed",
+        "crossEditionArtifactAllowed",
+        "sourceCommitAndBuildNumberRequired",
+        "updaterSignatureRequired"
+      ],
+      "properties": {
+        "repository": {"const": "ChiZhang-805/DroneDream"},
+        "metadataOrigin": {"const": "https://github.com/ChiZhang-805/DroneDream/releases/download"},
+        "channelTagTemplate": {"const": "desktop-{editionId}-channel"},
+        "metadataFileTemplate": {"const": "latest-{editionId}.json"},
+        "releaseTagTemplate": {"const": "desktop-{editionId}-v{version}-build-{buildNumber}"},
+        "sameEditionUrlFamilyRequired": {"const": true},
+        "crossEditionMetadataAllowed": {"const": false},
+        "crossEditionArtifactAllowed": {"const": false},
+        "sourceCommitAndBuildNumberRequired": {"const": true},
+        "updaterSignatureRequired": {"const": true}
+      }
+    },
+    "editions": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "editionId",
+          "runtimeProfileId",
+          "localRuntimeStateNamespace",
+          "diagnosticsRelativePath",
+          "installerProductName",
+          "publicArtifactFileName",
+          "tauriBundleInstallerFileName",
+          "updaterChannelTag",
+          "updaterMetadataFileName",
+          "updaterMetadataUrl",
+          "updaterReleaseTagPrefix"
+        ],
+        "properties": {
+          "editionId": {"enum": ["universal", "sim", "lab", "field"]},
+          "runtimeProfileId": {"enum": ["unified-sim-lab", "sim-only", "field-lightweight"]},
+          "localRuntimeStateNamespace": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field)/runtime$"},
+          "diagnosticsRelativePath": {"pattern": "^diagnostics/(universal|sim|lab|field)$"},
+          "installerProductName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field)$"},
+          "publicArtifactFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field)-1\\.0\\.0\\.exe$"},
+          "tauriBundleInstallerFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field)_1\\.0\\.0_x64-setup\\.exe$"},
+          "updaterChannelTag": {"pattern": "^desktop-(universal|sim|lab|field)-channel$"},
+          "updaterMetadataFileName": {"pattern": "^latest-(universal|sim|lab|field)\\.json$"},
+          "updaterMetadataUrl": {"pattern": "^https://github\\.com/ChiZhang-805/DroneDream/releases/download/desktop-(universal|sim|lab|field)-channel/latest-(universal|sim|lab|field)\\.json$"},
+          "updaterReleaseTagPrefix": {"pattern": "^desktop-(universal|sim|lab|field)-v1\\.0\\.0-build-$"}
+        }
+      }
+    }
+  }
+}

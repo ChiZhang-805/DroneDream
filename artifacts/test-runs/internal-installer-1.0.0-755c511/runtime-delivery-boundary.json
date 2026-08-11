@@ -1,0 +1,18 @@
+{
+    "schema_version":  "dronedream.internal-installer-runtime-delivery-boundary.v1",
+    "generated_at":  "2026-07-29T01:00:32Z",
+    "source_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+    "configured_runtime_manifest_url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/runtime-release.json",
+    "public_manifest_http_status":  404,
+    "github_release_lookup":  "release not found",
+    "runtime_manifest_available":  false,
+    "runtime_signature_available":  false,
+    "backend_embedded_in_installer":  false,
+    "wsl_rootfs_embedded_in_installer":  false,
+    "desktop_installer_ready":  true,
+    "full_stack_runtime_ready":  false,
+    "claim_boundary":  "The installer delivers the exact 755c511 desktop executable and production frontend. Backend, PX4, Gazebo, and simulator scripts require a separate signed DroneDreamRuntime release; the configured beta.2 manifest is currently unavailable, so a fresh full Runtime setup cannot be claimed ready.",
+    "publication_requirement":  "If published before the Runtime asset exists, describe the package as desktop/app-only and do not claim fresh full-stack Runtime availability.",
+    "upload_performed":  false,
+    "release_modified":  false
+}

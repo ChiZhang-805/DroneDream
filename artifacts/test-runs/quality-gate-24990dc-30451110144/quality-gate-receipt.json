@@ -1,0 +1,230 @@
+{
+  "schema_version": "dronedream.software-quality-gate-receipt.v1",
+  "generated_at": "2026-07-29T12:35:18.601Z",
+  "subject_commit": "24990dc4dd6995cfa87d3581cd5c5c01a9d66aa6",
+  "branch": "codex/software",
+  "workflow": {
+    "name": "Quality gate",
+    "workflow_file": ".github/workflows/quality-gate.yml",
+    "run_id": 30451110144,
+    "run_number": 39,
+    "run_attempt": 1,
+    "event": "workflow_dispatch",
+    "created_at": "2026-07-29T12:19:23Z",
+    "started_at": "2026-07-29T12:19:23Z",
+    "completed_at": "2026-07-29T12:30:39Z",
+    "status": "completed",
+    "conclusion": "failure",
+    "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30451110144"
+  },
+  "online_policy": {
+    "openai_api_key_read": false,
+    "harness_routing_api_key_read": false,
+    "openai_api_calls": 0,
+    "local_test_environment_explicitly_cleared_both_api_key_variables": true,
+    "uploads_or_deployments_by_software_line": 0
+  },
+  "subject_closure": {
+    "source_commit": "4d74f3c4c813b8e6b0456d8c9cffd991995b70d4",
+    "evidence_commit": "24990dc4dd6995cfa87d3581cd5c5c01a9d66aa6",
+    "schema": "dronedream.harness-handoff-closure/v1",
+    "artifact_path": "artifacts/test-runs/harness-handoff-closure-v1/handoff-closure.json",
+    "artifact_bytes": 22050,
+    "artifact_sha256": "45af34e30c7ad2e333bed68648001a89750ca13e16ab610323f0b60a26b8766c",
+    "internal_manifest_sha256": "89719b75dd3d74492c6c995e2d5679b021864eafe5c7952df8441967ac25a3d3",
+    "checksum_file_sha256": "235412fbea5e5aa072276fc0b0518f339a7439007f5461a360215a01c119c7c1",
+    "claim_boundary": "The closure verifies immutable handoff bytes and their exact freeze commits without rewriting legacy evidence. It preserves mixed, negative, inconclusive, report-freeze, and cross-line boundaries."
+  },
+  "local_full_backend_suite": {
+    "command": "python -m pytest -q",
+    "working_directory": "backend",
+    "environment": {
+      "os": "Windows-11-10.0.26200-SP0",
+      "python": "3.13.0",
+      "OPENAI_API_KEY": "explicitly_unset_for_child_process",
+      "HARNESS_ROUTING_API_KEY": "explicitly_unset_for_child_process"
+    },
+    "subject_commit": "24990dc4dd6995cfa87d3581cd5c5c01a9d66aa6",
+    "exit_code": 0,
+    "pytest_passed": 1299,
+    "pytest_failed": 0,
+    "pytest_duration_seconds": 894.05,
+    "shell_wall_duration_seconds": 906.9
+  },
+  "jobs": [
+    {
+      "id": 90573127316,
+      "name": "Backend / Python 3.11",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30451110144/job/90573127316",
+      "started_at": "2026-07-29T12:19:27Z",
+      "completed_at": "2026-07-29T12:30:38Z",
+      "conclusion": "success",
+      "results": {
+        "repository_hygiene": {
+          "status": "passed",
+          "repository_files": 1242,
+          "text_files": 911,
+          "json_files": 356,
+          "toml_files": 5,
+          "markdown_files": 51,
+          "local_links": 62
+        },
+        "ruff_primary": "passed",
+        "ruff_security": "passed",
+        "ruff_format": "passed",
+        "mypy_backend_source_files": 115,
+        "mypy_worker_source_files": 3,
+        "compileall": "passed",
+        "pytest_passed": 1299,
+        "pytest_failed": 0,
+        "pytest_duration_seconds": 604.68
+      },
+      "regressions_closed": [
+        "The seven new handoff-closure verifier tests pass in the hosted Python 3.11 environment.",
+        "The full preceding test order does not reproduce the former outcome-campaign state pollution.",
+        "Historical freeze objects remain reachable through the backend checkout fetch-depth contract."
+      ]
+    },
+    {
+      "id": 90573127315,
+      "name": "Frontend / Node.js 22",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30451110144/job/90573127315",
+      "started_at": "2026-07-29T12:19:27Z",
+      "completed_at": "2026-07-29T12:22:19Z",
+      "conclusion": "failure",
+      "software_core_step": {
+        "name": "Lint, type-check, test, and build frontend",
+        "conclusion": "success",
+        "dependency_policy_audit": "passed",
+        "desktop_npm_high_severity_audit": "passed_with_0_vulnerabilities",
+        "lint": "passed",
+        "typecheck": "passed",
+        "test_files_passed": 51,
+        "tests_passed": 322,
+        "tests_failed": 0,
+        "test_duration_seconds": 59.82,
+        "application_build": {
+          "modules_transformed": 1967,
+          "duration_seconds": 4.2,
+          "status": "passed"
+        },
+        "public_site_build": {
+          "modules_transformed": 1907,
+          "duration_seconds": 3.6,
+          "status": "passed"
+        }
+      },
+      "website_owned_visual_step": {
+        "name": "Enforce bilingual copy rhythm and responsive layout",
+        "conclusion": "failure",
+        "failed_audit": "1440x1000 bilingual typography and layout",
+        "failure_count": 19,
+        "failures": [
+          "capability-detail-0-1: zh-CN final line 77% of available width",
+          "capability-detail-0-2: zh-CN final line 77% of available width",
+          "capability-detail-0-3: zh-CN final line 77% of available width",
+          "capability-detail-0-4: zh-CN final line 77% of available width",
+          "capability-detail-1-0: zh-CN final line 77% of available width",
+          "capability-detail-1-2: zh-CN final line 77% of available width",
+          "capability-detail-1-5: zh-CN final line 77% of available width",
+          "capability-detail-1-6: zh-CN final line 77% of available width",
+          "capability-detail-2-0: zh-CN final line 78% of available width",
+          "capability-detail-2-1: zh-CN final line 77% of available width",
+          "capability-detail-2-3: zh-CN final line 77% of available width",
+          "capability-detail-3-1: zh-CN final line 77% of available width",
+          "capability-detail-3-2: zh-CN final line 77% of available width",
+          "footer-line: en final line 50% of available width",
+          "footer-line: line mismatch en=2, zh-CN=1",
+          "product-body: en final line 50% of available width",
+          "product-body: line mismatch en=2, zh-CN=1",
+          "en phase-1: text overflows its own box by 26px",
+          "en phase-2: text overflows its own box by 6px in 23 states"
+        ],
+        "not_run_after_fail_fast": [
+          "2048x1280 typography and layout audit",
+          "390x844 layout-only audit"
+        ],
+        "ownership": "website line; preserved as a failing cross-line gate and not modified by the software line"
+      }
+    },
+    {
+      "id": 90573127429,
+      "name": "Deployment / Hardened images",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30451110144/job/90573127429",
+      "started_at": "2026-07-29T12:19:26Z",
+      "completed_at": "2026-07-29T12:20:51Z",
+      "conclusion": "success",
+      "results": {
+        "deployment_script_validation": "passed",
+        "production_configuration_fail_closed": "passed",
+        "api_image_sha256": "1c835a665c44de7c07b757f57e5840236afa4813e37b0eabb190d0b9a6b1d3d5",
+        "worker_image_sha256": "ac6697a85d13b3c2b27a62d1867dab198e12ddea24010ad128eed876ee9d9a35",
+        "frontend_image_sha256": "1c93a55ba59db3c987634e69b85bc2084c59dae657d0b43f738c2baabf367e2b",
+        "frontend_modules_transformed": 1967,
+        "frontend_build_duration_seconds": 3.37,
+        "nginx_configuration_checks_passed": 3
+      },
+      "regression_closed": "The production frontend image remains self-contained in the repository Docker context."
+    },
+    {
+      "id": 90573127308,
+      "name": "Desktop / Rust 1.97.0",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30451110144/job/90573127308",
+      "started_at": "2026-07-29T12:19:29Z",
+      "completed_at": "2026-07-29T12:21:01Z",
+      "conclusion": "success",
+      "results": {
+        "rustc": "1.97.0",
+        "cargo_audit": "passed_with_17_documented_allowed_warnings",
+        "format": "passed",
+        "clippy_all_targets_warnings_denied": "passed",
+        "tests_passed": 101,
+        "tests_failed": 0,
+        "tests_ignored": 1,
+        "ignored_reason": "requires an installed, owned DroneDreamRuntime",
+        "installer_contract": "Pinned Tauri 2.11.4 NSIS template and DroneDream anchors verified."
+      }
+    },
+    {
+      "id": 90573127398,
+      "name": "Runtime / Static contract",
+      "url": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30451110144/job/90573127398",
+      "started_at": "2026-07-29T12:19:26Z",
+      "completed_at": "2026-07-29T12:19:47Z",
+      "conclusion": "success",
+      "results": {
+        "backend_lock_pip_audit": "no_known_vulnerabilities",
+        "worker_lock_pip_audit": "no_known_vulnerabilities",
+        "ruff": "passed",
+        "manifest_and_python_contracts": "passed",
+        "tests_total": 48,
+        "tests_passed": 47,
+        "tests_failed": 0,
+        "tests_skipped": 1,
+        "skip_reason": "the unsupported-dirfd test is skipped because secure POSIX dirfd support is available",
+        "shell_scripts": "passed_bash_syntax_validation"
+      }
+    }
+  ],
+  "warnings": [
+    "npm ci reported two high-severity transitive advisories, while the repository policy audit passed and the separate desktop audit reported zero vulnerabilities.",
+    "Docker emitted two SecretsUsedInArgOrEnv warnings for the CI placeholder VITE_DEMO_AUTH_TOKEN build argument and environment variable.",
+    "The frontend test log retains existing React act(...) warnings even though all 322 tests passed.",
+    "Both frontend production builds retain chunk-size warnings.",
+    "cargo audit retained 17 explicitly allowed unmaintained or unsound advisories.",
+    "Runtime pip-audit retained its --no-deps and hash-pinning guidance while reporting no known vulnerabilities.",
+    "The workflow conclusion remains failure because the website-owned 1440x1000 visual contract has 19 failures."
+  ],
+  "overall": {
+    "software_owned_quality_gates": "passed",
+    "current_head_backend_parity": "CI Python 3.11 and local Windows Python 3.13 each passed all 1299 tests",
+    "workflow_status": "completed",
+    "workflow_conclusion": "failure",
+    "remaining_failure_owner": "website line",
+    "remaining_failure_count": 19,
+    "release_artifacts_rebuilt": false,
+    "runtime_artifacts_rebuilt": false,
+    "technical_report_modified": false,
+    "claim_boundary": "This receipt proves current-head software-owned gates and the exact Harness handoff closure. It does not convert the failed website visual step or the aggregate workflow into a pass, update the frozen technical report, or rebuild the 755c511 release artifacts."
+  }
+}

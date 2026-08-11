@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app import models, schemas
+from app.api_idempotency import begin_mutation
 from app.auth import get_current_user
 from app.db import get_db
 from app.response import ok
@@ -31,12 +32,24 @@ def create_batch(
     req: schemas.BatchCreateRequest,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="batches.create",
+        idempotency_key=idempotency_key,
+        payload=req.model_dump(mode="json"),
+    )
+    if gate.replay is not None:
+        return gate.replay
     try:
-        batch = job_service.create_batch(db, req, user=user)
+        batch = job_service.create_batch(db, req, user=user, commit=False)
     except job_service.JobServiceError as err:
+        db.rollback()
         _raise(err)
-    return ok(job_service.to_batch_schema(batch).model_dump(mode="json"))
+    response = ok(job_service.to_batch_schema(batch).model_dump(mode="json"))
+    return gate.complete(response, resource_type="batch", resource_id=batch.id)
 
 
 @router.get("/batches")
@@ -95,9 +108,31 @@ def cancel_batch(
     batch_id: str,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
 ) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="batches.cancel",
+        idempotency_key=idempotency_key,
+        payload={"batch_id": batch_id, "control_version": control_version},
+    )
+    if gate.replay is not None:
+        return gate.replay
     try:
-        batch = job_service.cancel_batch(db, batch_id, user=user)
+        batch = job_service.cancel_batch(
+            db,
+            batch_id,
+            user=user,
+            commit=False,
+            expected_control_version=control_version,
+        )
     except job_service.JobServiceError as err:
+        db.rollback()
         _raise(err)
-    return ok(job_service.to_batch_schema(batch).model_dump(mode="json"))
+    response = ok(job_service.to_batch_schema(batch).model_dump(mode="json"))
+    return gate.complete(response, resource_type="batch", resource_id=batch.id)

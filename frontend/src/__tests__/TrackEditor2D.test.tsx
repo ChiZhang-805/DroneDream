@@ -78,10 +78,13 @@ describe("TrackEditor2D", () => {
     const visualPane = screen.getByTestId("track-editor-visual-pane");
     const dataPane = screen.getByTestId("track-waypoint-table-scroll");
     const dataAction = screen.getByTestId("track-editor-data-action");
+      const viewSwitcher = screen.getByRole("group", { name: "Track view" });
 
     expect(workspace).toContainElement(visualPane);
     expect(workspace).toContainElement(dataPane);
     expect(workspace).toContainElement(dataAction);
+    expect(viewSwitcher.closest(".track-editor-toolbar")).not.toBeNull();
+    expect(visualPane).not.toContainElement(viewSwitcher);
     expect(dataAction).toHaveTextContent("JSON import / export");
   });
 
@@ -214,6 +217,33 @@ describe("TrackEditor2D", () => {
     expect(firstRow).toHaveClass("track-waypoint-row-selected");
     expect(screen.getByTestId("track-waypoint-1")).toHaveClass("track-waypoint-selected");
     expect(screen.getByTestId("track-waypoint-3")).not.toHaveClass("track-waypoint-selected");
+  });
+
+  it("preserves partial negative coordinate input until a finite value is committed", () => {
+    renderEditor();
+    const xInput = screen.getByLabelText("Waypoint 1 X");
+
+    fireEvent.focus(xInput);
+    fireEvent.change(xInput, { target: { value: "-" } });
+    expect(xInput).toHaveValue("-");
+    expect(screen.getByTestId("track-state")).toHaveTextContent('"x":0');
+
+    fireEvent.change(xInput, { target: { value: "-4.5" } });
+    fireEvent.blur(xInput);
+
+    const updated = JSON.parse(
+      screen.getByTestId("track-state").textContent ?? "[]",
+    ) as TrackPoint[];
+    expect(updated[0].x).toBe(-4.5);
+    expect(xInput).toHaveValue("-4.5");
+
+    fireEvent.focus(xInput);
+    fireEvent.change(xInput, { target: { value: "not-a-number" } });
+    fireEvent.keyDown(xInput, { key: "Escape" });
+    expect(xInput).toHaveValue("-4.5");
+    expect(JSON.parse(
+      screen.getByTestId("track-state").textContent ?? "[]",
+    )[0].x).toBe(-4.5);
   });
 
   it("keeps the editor controls and view labels fully localized in Chinese", () => {

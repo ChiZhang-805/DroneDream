@@ -1,0 +1,26 @@
+{
+  "difficulty_distribution": {
+    "easy": 2,
+    "hard": 3,
+    "representative": 13
+  },
+  "files": [
+    {
+      "bytes": 129939,
+      "path": "prefinal-realistic-scenario-registry-v1.json",
+      "sha256": "5aeb13096ef5e1755b9c9219b31950bb22d622c2ea6850641bc56f61ee078cd9"
+    },
+    {
+      "bytes": 3530,
+      "path": "prefinal-realistic-scenario-registry-v1.csv",
+      "sha256": "e7f1b5a0142d47f4af08e02495ab3297deac430a29e2f75f7f8b53890c7a5492"
+    }
+  ],
+  "manifest_sha256": "e84c6ac3a937400163eb916754f4d31242413982cccda079e5ec4ebb7a85da0f",
+  "problem_count": 18,
+  "registry_sha256": "00ea1a11319df1b3f2f7a2cf909698f7e6bd056c23f7cd3b22e89aac6b39c080",
+  "registry_version": "prefinal-realistic-px4-gazebo-v1",
+  "report_eligible": false,
+  "schema_version": "dronedream.prefinal-scenario-registry-manifest/v1",
+  "status": "design_only_not_execution_approved"
+}

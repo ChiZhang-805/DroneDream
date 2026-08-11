@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-sim-field-integration",
+  "editionId": "lab",
+  "integrationState": "sim-and-field-capabilities-integrated",
+  "simDonor": {
+    "branch": "codex/software-sim",
+    "productSource": "ef70567fe4c34f261fc9f16defb6e98e95f337dc",
+    "tree": "c102508870dcc98e534e1f4e51696bfed77ff18b",
+    "modelHarnessFeatureSource": "38731d530fdf3bfed6dde43167856f9c6b4a5d67",
+    "integrationMode": "path-limited-semantic-forward-sync",
+    "standaloneSimShellCopiedIntoLab": false,
+    "sharedCoreForkCreated": false
+  },
+  "fieldDonor": {
+    "branch": "codex/software-field",
+    "productSource": "2f8fa28564dab7b1ff264c853705535373cb9068",
+    "tree": "afb7b4db584bf71e03d2f0b707b8b992e96bc7e7",
+    "authWireContractSource": "1129b561a187edf9ddb3214f3e8c993be31f281b",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "originExactAtHandoff": true,
+    "integrationMode": "path-limited-semantic-forward-sync",
+    "fieldStandaloneShellCopiedIntoLab": false,
+    "fieldNoSimulationInstallerPolicyAppliedToLab": false,
+    "sharedCoreForkCreated": false,
+    "acceptedCapabilityGroups": [
+      "managed-read-only-protocol-adapters",
+      "recorded-telemetry-and-parameter-snapshots",
+      "bounded-model-harness-evidence-replay",
+      "preflight-and-rollback-planning",
+      "hardware-laboratory-workspace"
+    ],
+    "syncReceipt": "distribution/editions/lab/field-2f8fa285-capability-sync.v1.json"
+  },
+  "principles": {
+    "reuseMatureEditionModules": true,
+    "copyOrForkCommonCore": false,
+    "manualCodeCopyAllowed": false,
+    "pathLimitedForwardSyncRequired": true,
+    "exactDonorCommitRequired": true,
+    "evidenceCommitMayBeProductSource": false,
+    "labOwnsBidirectionalCalibration": true,
+    "crossEditionHarnessOrchestrator": false
+  },
+  "simInput": {
+    "envelopeKind": "dronedream-simulation-qualification-receipt",
+    "schemaVersion": 1,
+    "donorState": "accepted-exact-product-source",
+    "productSource": "ef70567fe4c34f261fc9f16defb6e98e95f337dc",
+    "modelHarnessFeatureSource": "38731d530fdf3bfed6dde43167856f9c6b4a5d67",
+    "requiredBindings": [
+      "simJobId",
+      "commonCoreCommit",
+      "editionManifestSha256",
+      "vehiclePackId",
+      "modelIdentityHash",
+      "controllerIdentity",
+      "firmwareIdentity",
+      "parameterCandidateHash",
+      "objectiveContractHash",
+      "constraintContractHash",
+      "simulationEvidenceHash",
+      "holdoutContractHash"
+    ],
+    "requiredPayload": [
+      "candidateParameters",
+      "simulationMetrics",
+      "scenarioCoverage",
+      "failureClassification",
+      "qualificationDecision"
+    ],
+    "hardwareAuthority": false
+  },
+  "fieldInput": {
+    "envelopeKind": "dronedream-field-harness-job-receipt",
+    "schemaVersion": 1,
+    "executionDomain": "real-device-recorded-evidence",
+    "executionMode": "offline-evidence-replay-no-device-io",
+    "requiredBindings": [
+      "sourceCommit",
+      "enginePackId",
+      "jobId",
+      "requestSha256",
+      "deviceObservationId",
+      "observationSha256",
+      "snapshotSha256",
+      "vehiclePackId",
+      "controllerId",
+      "firmwareVersion",
+      "adapterId",
+      "selectedCandidateSha256",
+      "holdoutTrialId",
+      "receiptSha256"
+    ],
+    "requiredPayload": [
+      "trials",
+      "qualification",
+      "blockers"
+    ],
+    "receiptHardwareAuthority": false,
+    "liveHardwareAuthority": "external-native-backend-runtime-quorum-only"
+  },
+  "metricCompatibility": {
+    "fieldMetrics": [
+      "trackingError",
+      "overshootPercent",
+      "controlEffort",
+      "constraintViolations",
+      "emergencyInterventions"
+    ],
+    "labCalibrationMetrics": [
+      "trackingRmseM",
+      "maxErrorM",
+      "energyWh",
+      "overshootCount"
+    ],
+    "directMappingAllowed": false,
+    "normalizationReceiptRequired": true,
+    "missingNormalizationDecision": "deny"
+  },
+  "join": {
+    "sameLabJobRequired": true,
+    "requiredExactMatches": [
+      "commonCoreCommit-via-donor-provenance",
+      "vehiclePackId",
+      "controllerIdentity",
+      "firmwareIdentity",
+      "parameterCandidateHash"
+    ],
+    "mismatchDecision": "deny",
+    "unboundEvidenceDecision": "deny",
+    "replayDecision": "deny",
+    "crossJobEvidenceDecision": "deny"
+  },
+  "labOwnedOutputs": [
+    "dronedream-lab-sim-real-gap-receipt/v1",
+    "dronedream-lab-model-calibration-revision/v1",
+    "dronedream-lab-resimulation-request/v1",
+    "dronedream-lab-independent-holdout-receipt/v1",
+    "dronedream-lab-qualification-receipt/v1",
+    "dronedream-lab-field-handoff/v1"
+  ],
+  "currentGate": {
+    "validatedVehiclePackCount": 0,
+    "simDonorAccepted": true,
+    "fieldDonorAccepted": true,
+    "fieldEvidenceAdapterState": "integrated-recorded-evidence-and-denied-hardware-planning",
+    "jobBindingDecision": "conditional-exact-match",
+    "metricNormalizationDecision": "explicit-receipt-required",
+    "hardwareExecutionDecision": "deny",
+    "qualificationIssueDecision": "deny",
+    "fieldHandoffDecision": "draft-only"
+  }
+}

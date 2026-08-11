@@ -1,0 +1,252 @@
+COMMAND=typecheck START_UTC=2026-07-29T00:45:36.0087632Z
+
+> drone-dream-frontend@1.0.0 typecheck
+> tsc -b --noEmit
+
+RESULT=typecheck EXIT_CODE=0 DURATION_SECONDS=5.645 END_UTC=2026-07-29T00:45:41.6539695Z
+COMMAND=lint START_UTC=2026-07-29T00:45:41.6623494Z
+
+> drone-dream-frontend@1.0.0 lint
+> eslint .
+
+RESULT=lint EXIT_CODE=0 DURATION_SECONDS=4.386 END_UTC=2026-07-29T00:45:46.0484175Z
+COMMAND=test START_UTC=2026-07-29T00:45:46.0494160Z
+
+> drone-dream-frontend@1.0.0 test
+> vitest run --testTimeout 15000
+
+
+ RUN  v4.1.10 Z:/DroneDream-release-staging/internal-installer-1.0.0-755c511/frontend
+
+ ❯ src/__tests__/PublicSite.test.tsx (13 tests | 1 failed) 6097ms
+     × renders three directly comparable plans with the same ordered feature rows 1202ms
+System.Management.Automation.RemoteException
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+System.Management.Automation.RemoteException
+ FAIL  src/__tests__/PublicSite.test.tsx > DroneDream public website > renders three directly comparable plans with the same ordered feature rows
+AssertionError: expected "vi.fn()" to be called with arguments: [ StringContaining{…}, Any<Object> ]
+System.Management.Automation.RemoteException
+Received:
+System.Management.Automation.RemoteException
+  1st vi.fn() call:
+System.Management.Automation.RemoteException
+  [
+-   StringContaining "/billing-checkout/availability",
+-   Any<Object>,
++   "/downloads/latest.json",
++   {
++     "cache": "no-cache",
++     "signal": AbortSignal {
++       Symbol(kEvents): Map {},
++       Symbol(events.maxEventTargetListeners): 0,
++       Symbol(events.maxEventTargetListenersWarned): false,
++       Symbol(kHandlers): Map {},
++       Symbol(kAborted): false,
++       Symbol(kReason): undefined,
++       Symbol(kComposite): false,
++     },
++   },
+  ]
+System.Management.Automation.RemoteException
+System.Management.Automation.RemoteException
+Number of calls: 1
+System.Management.Automation.RemoteException
+System.Management.Automation.RemoteException
+Ignored nodes: comments, script, style
+[36m<html[39m
+  [33mlang[39m=[32m"en"[39m
+[36m>[39m
+  [36m<head>[39m
+    [36m<title>[39m
+      [0mDroneDream[0m
+    [36m</title>[39m
+  [36m</head>[39m
+  [36m<body>[39m
+    [36m<div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"dd-site"[39m
+        [33mdata-locale[39m=[32m"en"[39m
+        [33mdata-page[39m=[32m"pricing"[39m
+      [36m>[39m
+        [36m<a[39m
+          [33mclass[39m=[32m"site-skip-link"[39m
+          [33mhref[39m=[32m"#main-content"[39m
+        [36m>[39m
+          [0mSkip to content[0m
+        [36m</a>[39m
+        [36m<header[39m
+          [33mclass[39m=[32m"site-header"[39m
+        [36m>[39m
+          [36m<a[39m
+            [33maria-label[39m=[32m"DroneDream"[39m
+            [33mclass[39m=[32m"site-brand"[39m
+            [33mhref[39m=[32m"/"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"brand-lockup brand-lockup-primary"[39m
+            [36m>[39m
+              [36m<img[39m
+                [33malt[39m=[32m""[39m
+                [33mclass[39m=[32m"brand-lockup-mark"[39m
+                [33msrc[39m=[32m"/src/assets/drone-dream-mark.png"[39m
+              [36m/>[39m
+              [36m<img[39m
+                [33malt[39m=[32m""[39m
+                [33mclass[39m=[32m"brand-lockup-wordmark"[39m
+                [33msrc[39m=[32m"/@fs/Z:/DroneDream-release-staging/internal-installer-1.0.0-755c511/docs/assets/brand/drone-dream-wordmark-primary.png"[39m
+              [36m/>[39m
+            [36m</span>[39m
+          [36m</a>[39m
+          [36m<nav[39m
+            [33maria-label[39m=[32m"Primary navigation"[39m
+            [33mclass[39m=[32m"site-nav"[39m
+            [33mid[39m=[32m"site-navigation"[39m
+          [36m>[39m
+            [36m<a[39m
+              [33mhref[39m=[32m"/pricing/"[39m
+            [36m>[39m
+              [0mProduct[0m
+            [36m</a>[39m
+            [36m<a[39m
+              [33mhref[39m=[32m"/"[39m
+            [36m>[39m
+              [0mWorkflow[0m
+            [36m</a>[39m
+            [36m<a[39m
+              [33mhref[39m=[32m"/manual/"[39m
+            [36m>[39m
+              [0mManual[0m
+            [36m</a>[39m
+            [36m<a[39m
+              [33mhref[39m=[32m"/community/"[39m
+            [36m>[39m
+              [0mCommunity[0m
+            [36m</a>[39m
+            [36m<button[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [0mConsole[0m
+            [36m</button>[39m
+          [36m</nav>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"site-header-actions"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"site-account-button"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [36m>[39m
+                [36m<circle[39m
+                  [33mcx[39m=[32m"12"[39m
+                  [33mcy[39m=[32m"8"[39m
+                  [33mr[39m=[32m"3.4"[39m
+                [36m/>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M5.5 20c.5-4.1 2.7-6.2 6.5-6.2s6 2.1 6.5 6.2"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [36m<span>[39m
+                [0mSign in[0m
+              [36m</span>[39m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Switch to Simplified Chinese"[39m
+              [33mclass[39m=[32m"site-language"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [36m>[39m
+                [36m<circle[39m
+                  [33mcx[39m=[32m"12"[39m
+                  [33mcy[39m=[32m"12"[39m
+                  [33mr[39m=[32m"9"[39m
+                [36m/>[39m
+                [36m<path[39m
+
+ Test Files  1 failed | 49 passed (50)
+      Tests  1 failed | 319 passed (320)
+   Start at  08:45:46
+   Duration  32.24s (transform 16.55s, setup 17.86s, import 27.50s, tests 75.90s, environment 96.50s)
+
+                  [33md[39m=[32m"M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [0m中文[0m
+            [36m</button>[39m
+            [36m<a[39m
+              [33mclass[39m=[32m"site-header-download"[39m
+              [33mdownload[39m=[32m"DroneDream_1.0.0_x64-setup.exe"[39m
+              [33mhref[39m=[32m"https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [36m>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M12 3v11m0 0 4-4m-4 4-4-4M5 20h14"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [0mDownload[0m
+            [36m</a>[39m
+            [36m<button[39m
+              [33maria-controls[39m=[32m"site-navigation"[39m
+              [33maria-expanded[39m=[32m"false"[39m
+              [33maria-label[39m=[32m"Open navigation"[39m
+              [33mclass[39m=[32m"site-menu-button"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<span />[39m
+              [36m<span />[39m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</header>[39m
+        [36m<main[39m
+          [33mid[39m=[32m"main-content"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"site-portal pricing-page"[39m
+          [36m>[39m
+            [36m<header[39m
+              [33mclass[39m=[32m"portal-page-heading"[39m
+            [36m>[39m
+              [36m<h1[39m
+                [33maria-label[39m=[32m"The same complete product. More included AI."[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"portal-title-desktop"[39m
+                [36m>[39m
+                  [0mThe same complete product. More included AI.[0m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"portal-title-mobile"[39m
+                [36m>[39m
+                  [0mChoose your allowance.[0m
+                [36m</span>[39m
+              [36m</h1>[39m
+            [36m</header>[39m
+            [36m<div[39m
+              [33maria-label[39m=[32m"Workspace type"[39m
+              [33mclass[39m=[32m"pricing-audience"[39m
+              [33m...
+ ❯ src/__tests__/PublicSite.test.tsx:178:21
+    176|     ).toHaveAttribute("data-available", "true");
+    177|     await waitFor(() => {
+    178|       expect(fetch).toHaveBeenCalledWith(
+       |                     ^
+    179|         expect.stringContaining("/billing-checkout/availability"),
+    180|         expect.any(Object),
+ ❯ runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ ❯ checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ ❯ Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+System.Management.Automation.RemoteException
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+System.Management.Automation.RemoteException
+RESULT=test EXIT_CODE=1 DURATION_SECONDS=33.062 END_UTC=2026-07-29T00:46:19.1119110Z

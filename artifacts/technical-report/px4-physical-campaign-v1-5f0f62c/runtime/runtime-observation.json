@@ -1,0 +1,158 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "git",
+        "-c",
+        "safe.directory=/opt/PX4-Autopilot",
+        "-C",
+        "/opt/PX4-Autopilot",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "name": "px4_git_head",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "6ea3539157ca358c70a515878b77077af7d4611d",
+      "stdout_sha256": "ec427d9c5f3a9d629a649ba996c252b2fa3a5b7c857694f3238770fb4ba5c278"
+    },
+    {
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "gz",
+        "sim",
+        "--version"
+      ],
+      "exit_code": 0,
+      "name": "gazebo_sim_version",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Gazebo Sim, version 8.14.0\nCopyright (C) 2018 Open Source Robotics Foundation.\nReleased under the Apache 2.0 License.",
+      "stdout_sha256": "9e1242bb22033a6464b93a6fea79dcb30a4d21bcb72d4e40e879bc4609242d13"
+    },
+    {
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "/opt/dronedream/venv/bin/python3",
+        "--version"
+      ],
+      "exit_code": 0,
+      "name": "python_version",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Python 3.12.3",
+      "stdout_sha256": "0fa8af6c2b2a63d274b1a244f0b2244fb2eb1ec4656455025f3d8edba9c0009c"
+    },
+    {
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "/opt/dronedream/venv/bin/python3",
+        "-c",
+        "import importlib.metadata as m; print(m.version('mavsdk'))"
+      ],
+      "exit_code": 0,
+      "name": "mavsdk_version",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "3.15.3",
+      "stdout_sha256": "f07deba1cbe4d763eb1ee2087f0711a222d9c97ed1ec75252f8cbc848fbf76b7"
+    },
+    {
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "/opt/dronedream/venv/bin/python3",
+        "-c",
+        "import importlib.metadata as m; print(m.version('pyulog'))"
+      ],
+      "exit_code": 0,
+      "name": "pyulog_version",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "1.2.3",
+      "stdout_sha256": "c47f5b18b8a430e698b9fe15e51f6119984e78334bcf3f45e210d30c37ef2f9e"
+    },
+    {
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "cat",
+        "/etc/os-release"
+      ],
+      "exit_code": 0,
+      "name": "ubuntu_release",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "PRETTY_NAME=\"Ubuntu 24.04.4 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.4 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo",
+      "stdout_sha256": "adf9b086d00509187f87ae72d4b385a0de7a8463e87b4f96d2761ed9b64585f3"
+    },
+    {
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "dpkg-query",
+        "-W",
+        "gz-harmonic"
+      ],
+      "exit_code": 0,
+      "name": "gazebo_harmonic_package",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "gz-harmonic\t1.0.0-1~noble",
+      "stdout_sha256": "40fe89bdec43c7e870577fddaf55f9f303cf4c0218282e8db2424e5c153ff100"
+    },
+    {
+      "argv": [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "uname",
+        "-srmo"
+      ],
+      "exit_code": 0,
+      "name": "kernel",
+      "stderr": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout": "Linux 6.6.114.1-microsoft-standard-WSL2 x86_64 GNU/Linux",
+      "stdout_sha256": "6b588b2607854c68d73ea4997e77b89c99fd18845ae1f8e468bb1c44a3a84b5e"
+    }
+  ],
+  "gazebo_harmonic_package": "1.0.0-1~noble",
+  "gazebo_sim_version": "8.14.0",
+  "kernel": "Linux 6.6.114.1-microsoft-standard-WSL2 x86_64 GNU/Linux",
+  "mavsdk_version": "3.15.3",
+  "network_calls": 0,
+  "observation_role": "post-campaign read-only identity check of the WSL Runtime used by the retained PX4/Gazebo Trial matrix",
+  "observation_sha256": "813445f19ae3adf966a6d929987c8b9516fbf9d0704aff4525bcfb8864e6c489",
+  "observed_at": "2026-07-28T14:35:31Z",
+  "observer_commit": "5f0f62c789680e5e2d34c6513727199fabbd50d0",
+  "px4_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+  "python_version": "3.12.3",
+  "pyulog_version": "1.2.3",
+  "real_credentials_used": false,
+  "runtime_id": "5e15a7a5-f943-5c38-a284-1bdcc9cd528f",
+  "schema_version": "dronedream.runtime-observation.v1",
+  "ubuntu_version": "24.04",
+  "wsl_distribution": "DroneDreamRuntime"
+}

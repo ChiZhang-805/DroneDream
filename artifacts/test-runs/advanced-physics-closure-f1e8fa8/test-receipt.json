@@ -1,0 +1,56 @@
+{
+  "schema_version": "dronedream.advanced-physics-closure-test-receipt/v1",
+  "subject_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+  "generated_at": "2026-07-28T23:35:11.3813565Z",
+  "command": "python -m pytest backend/tests/test_advanced_physics_closure_evidence.py backend/tests/test_advanced_physics_evidence.py backend/tests/test_physical_campaign_evidence.py backend/tests/test_scenario_effects.py backend/tests/test_capabilities.py -q --junitxml=artifacts/test-runs/advanced-physics-closure-f1e8fa8/focused-tests.xml",
+  "working_directory": "Z:\\DroneDream-worktrees\\aurora-20260728",
+  "started_at_utc": "2026-07-28T23:35:03.8528160Z",
+  "ended_at_utc": "2026-07-28T23:35:11.3813565Z",
+  "duration_seconds": 7.529,
+  "exit_code": 0,
+  "result": {
+    "tests": 52,
+    "passed": 52,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "junit_time_seconds": 6.498
+  },
+  "environment": {
+    "platform": "Microsoft Windows NT 10.0.26200.0",
+    "python_version": "3.13.0",
+    "pytest_version": "9.1.0",
+    "openai_api_key_used": false,
+    "network_calls": 0,
+    "px4_or_gazebo_runs": 0
+  },
+  "artifacts": {
+    "focused-tests.log": {
+      "bytes": 204,
+      "sha256": "20c9242d1a415e918a1cfd54321c159c21554fa797b2c55309ea638b3c16c34c"
+    },
+    "focused-tests.xml": {
+      "bytes": 7520,
+      "sha256": "2b95be8b9ce7ad3369ae7f8d0c2b8148acb691286a95269db9ae4fde28cda01a"
+    }
+  },
+  "bundle_binding": {
+    "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8",
+    "subject_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+    "manifest": {
+      "bytes": 7069,
+      "sha256": "5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3",
+      "internal_sha256": "7193e21ff826560e9e9f4d30453dc122d55fbee054397ff4a52f89deca15cb9f"
+    },
+    "receipt": {
+      "bytes": 1314,
+      "sha256": "1ee74f3b207d7c69e1d2cb6601bffa7d8a92f34181313c51ad22474c73995eda",
+      "internal_sha256": "6f195b2908aa8673eab3bfee56c5e6cd1254b3535c3029e652f237d8a08edc10"
+    },
+    "checksum_file": {
+      "bytes": 215,
+      "sha256": "096aed94fe18253cc9c9ac45acb10b478cf3b38bc58930dddafc8e5909715a3f"
+    }
+  },
+  "claim_boundary": "This receipt binds exact-commit offline regression tests to the advanced-physics closure bundle. It does not add a new PX4/Gazebo run, provider call, real-aircraft claim, or performance-success claim."
+}

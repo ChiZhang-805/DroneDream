@@ -1,0 +1,54 @@
+{
+  "schema_version": "dronedream.internal-installer-handoff-manifest.v1",
+  "generated_at": "2026-08-01T16:48:33Z",
+  "subject_commit": "3bd83fef599d72122488d1b841e1bd70919b7ae3",
+  "subject_branch": "codex/software",
+  "authoritative_directory": "artifacts/test-runs/internal-installer-1.0.0-3bd83fe",
+  "authoritative_installer": {
+    "file_name": "DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 10972856,
+    "sha256": "57f5ac12ec78b6667bc99e60e8e53ccfa02a525aa479ade6df585a32643b4ba4"
+  },
+  "files": [
+    {
+      "path": "DroneDream_1.0.0_x64-setup.exe",
+      "bytes": 10972856,
+      "sha256": "57f5ac12ec78b6667bc99e60e8e53ccfa02a525aa479ade6df585a32643b4ba4",
+      "committed": false
+    },
+    {
+      "path": "DroneDream_1.0.0_x64-setup.exe.sha256",
+      "bytes": 98,
+      "sha256": "39886404f433d90b202bf1359302af12dcfa32b2052fe35c6129c0d1f9223bdf",
+      "committed": false
+    },
+    {
+      "path": "DroneDream_1.0.0_x64-setup.exe.sig",
+      "bytes": 420,
+      "sha256": "24db8827925264b99e1eef0cbea1318a817ac335cea5b6a3e8ef5c08af955160",
+      "committed": false
+    },
+    {
+      "path": "latest.json",
+      "bytes": 979,
+      "sha256": "f74ba146ecf7b6b0ead34de843f30f4daacdb87ad1c10000140bb9cb2ee27e2e",
+      "committed": false
+    },
+    {
+      "path": "release-receipt.json",
+      "bytes": 5366,
+      "sha256": "cc30f8ab3a006f64653579afabb06b6522d141a33bfef40c5d8e1ef59d537922",
+      "committed": true
+    },
+    {
+      "path": "release-receipt.json.sha256",
+      "bytes": 87,
+      "sha256": "f10c12f238726d29c34268a7e5063062c3aa0975590ecc962265ab04de6d5885",
+      "committed": true
+    }
+  ],
+  "artifact_files_git_ignored": true,
+  "receipt_files_explicitly_committed": true,
+  "upload_performed": false,
+  "deployment_performed": false
+}

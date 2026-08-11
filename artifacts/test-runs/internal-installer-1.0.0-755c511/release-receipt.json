@@ -1,0 +1,198 @@
+{
+    "schema_version":  "dronedream.internal-test-installer-handoff-receipt.v3",
+    "generated_at":  "2026-07-29T01:02:08Z",
+    "claim_boundary":  "Exact 755c511 desktop installer build, validation, and byte handoff only. No GitHub Release, Alibaba mirror, website, server, DNS, TLS, tag, or Runtime release was modified.",
+    "source":  {
+                   "branch":  "codex/software",
+                   "commit":  "755c511539fe561207ca38ff5079f471a4110896",
+                   "post_validation_receipt_head":  "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+                   "post_validation_head_is_not_release_subject":  true,
+                   "tracked_source_files":  1162,
+                   "inventory":  {
+                                     "path":  "release-source-inventory.json",
+                                     "bytes":  179069,
+                                     "sha256":  "aec2e51e4440271b92cc96d98ddf5a719d0b3fc91226767e9b7f97809b04c70d"
+                                 },
+                   "source_policy":  {
+                                         "path":  "release-source-policy.log",
+                                         "bytes":  375,
+                                         "sha256":  "7fc8ad4b8714c21bf5025646cf9feeb8c38d2eb4cf6a2777d78869a9d8e247f0"
+                                     },
+                   "product_source_binding":  {
+                                                  "path":  "product-source-binding.json",
+                                                  "bytes":  20293,
+                                                  "sha256":  "0cd6374d501a425dafda08487b482c31788ada211bae6d416f9d506baf464360"
+                                              }
+               },
+    "owner_override":  {
+                           "internal_test":  true,
+                           "version_must_remain":  "1.0.0",
+                           "authenticode_required":  false,
+                           "replace_existing_1_0_0_bytes":  true,
+                           "software_line_upload_authorized":  false
+                       },
+    "artifact":  {
+                     "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+                     "bytes":  10387042,
+                     "sha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+                     "checksum_declared":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+                     "checksum_matches":  true,
+                     "pe_format":  "PE32",
+                     "pe_certificate_table_file_offset":  0,
+                     "pe_certificate_table_size":  0,
+                     "has_pe_certificate_table":  false,
+                     "authenticode_status":  "NotSigned",
+                     "authenticode_valid":  false,
+                     "not_signed_is_owner_accepted_internal_test_fact":  true
+                 },
+    "updater":  {
+                    "signature_file":  "DroneDream_1.0.0_x64-setup.exe.sig",
+                    "signature_file_bytes":  420,
+                    "signature_file_sha256":  "0406f72c46f44da494e29621b815b190d43698f1f700c63df14e95d66431230a",
+                    "signature_valid_against_configured_public_key":  true,
+                    "trusted_comment_and_global_signature_valid":  true,
+                    "build_manifest":  {
+                                           "path":  "tauri-latest.build.json",
+                                           "bytes":  903,
+                                           "sha256":  "a1bf256ceec6ff64afa9883248e92fbf624720bf3fc8e842b50b402bbf82d212"
+                                       },
+                    "publication_manifest":  {
+                                                 "path":  "tauri-latest.json",
+                                                 "bytes":  914,
+                                                 "sha256":  "96774c5f1db7ffd6ecb60b160044aaa21afaa771e67dd83cc0d9422072c410f0"
+                                             },
+                    "publication_manifest_release_tag":  "signpath-candidate-v1.0.0",
+                    "manifest_version":  "1.0.0",
+                    "authenticode_is_independent":  true
+                },
+    "download_smoke":  {
+                           "Uri":  "http://127.0.0.1:62597/DroneDream_1.0.0_x64-setup.exe",
+                           "HttpStatus":  200,
+                           "DownloadedBytes":  10387042,
+                           "DownloadedSha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+                           "SourceSha256":  "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+                           "ByteParity":  true,
+                           "UploadPerformed":  false
+                       },
+    "installer_ui":  {
+                         "english_real_render":  "passed",
+                         "simplified_chinese_real_render":  "passed",
+                         "default_application_path_guard":  "passed",
+                         "expected_application_path":  "%LOCALAPPDATA%\\DroneDream",
+                         "observed_application_path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream",
+                         "expected_runtime_target":  "E:\\DroneDream",
+                         "existing_install_registration_restored":  true,
+                         "installer_processes_remaining":  0,
+                         "log":  {
+                                     "path":  "installer-ui-validation.log",
+                                     "bytes":  1140,
+                                     "sha256":  "39105ab03c94791129bb98c5ae76fccf57aa38f02de3baf84dc4d5e17960367f"
+                                 }
+                     },
+    "validation":  {
+                       "backend":  {
+                                       "exact_source_full_suite":  "1284 passed, 0 failed",
+                                       "focused_suite":  "73 passed, 0 failed",
+                                       "online_provider_calls":  0,
+                                       "openai_api_key_read_or_used":  false,
+                                       "receipt":  {
+                                                       "path":  "backend-validation/test-receipt.json",
+                                                       "bytes":  2944,
+                                                       "sha256":  "113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10"
+                                                   },
+                                       "attestation_manifest":  {
+                                                                    "path":  "backend-validation/attestation-manifest.json",
+                                                                    "bytes":  2432,
+                                                                    "sha256":  "0e0e0df70087e2240aba7f76cfa72a8d17acc55a674033ec4475258e2ec13267"
+                                                                }
+                                   },
+                       "frontend":  {
+                                        "typecheck":  "passed",
+                                        "lint":  "passed",
+                                        "tests":  "319 passed, 1 failed",
+                                        "known_cross_line_failure":  "PublicSite test expects website-branch billing-checkout test environment absent from codex/software; production desktop frontend build passed.",
+                                        "production_build":  "passed",
+                                        "log":  {
+                                                    "path":  "frontend-validation.log",
+                                                    "bytes":  10358,
+                                                    "sha256":  "4a0f89c2d54541512aa2706d1d65aa28ae948d7868273ac622e7caabe42c1225"
+                                                }
+                                    },
+                       "rust":  {
+                                    "toolchain":  "1.97.0-x86_64-pc-windows-gnullvm",
+                                    "tests":  "101 passed, 0 failed, 1 ignored",
+                                    "ignored_gate":  "requires an installed and owned DroneDreamRuntime",
+                                    "clippy_all_targets_deny_warnings":  "passed",
+                                    "log":  {
+                                                "path":  "rust-validation.log",
+                                                "bytes":  28308,
+                                                "sha256":  "08fd1cca2dbb4f0fa92a69076b43adb7f64ed7d2fc28feceed5eb9ae90575fb5"
+                                            }
+                                },
+                       "build":  {
+                                     "command":  "npm.cmd --prefix desktop run build:llvm",
+                                     "result":  "passed",
+                                     "production_frontend_build":  "passed",
+                                     "nsis":  "passed",
+                                     "locales":  "English=1033 SimplifiedChinese=2052",
+                                     "path_guard":  "passed",
+                                     "static_llvm_runtime":  "passed",
+                                     "webview2_loader":  "passed",
+                                     "planner":  "passed",
+                                     "log":  {
+                                                 "path":  "build.log",
+                                                 "bytes":  15540,
+                                                 "sha256":  "5ce16a083a60e7e2af5eb37958efffdf6c78dd0eef9cc55d06a23fceb3fbb637"
+                                             }
+                                 },
+                       "artifact_validation":  {
+                                                   "path":  "artifact-validation.json",
+                                                   "bytes":  1931,
+                                                   "sha256":  "218350158b05c47a8ea9a10b480f3b3f2145c12dc03cfad59cbd76bc88c7f1be"
+                                               },
+                       "repository_hygiene":  {
+                                                  "result":  "failed",
+                                                  "source_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+                                                  "classification":  "existing explicit fake test fixture false-positive",
+                                                  "matched_literal":  "sk-contract-persistence-test",
+                                                  "real_credential_detected":  false,
+                                                  "openai_api_key_read_or_used":  false,
+                                                  "follow_up":  "Separate post-release-source hygiene fix required.",
+                                                  "log":  {
+                                                              "path":  "repository-hygiene.log",
+                                                              "bytes":  871,
+                                                              "sha256":  "9ab0e353d231cd820643e884402a57719c775e7b5649b104b838ac9cc2600359"
+                                                          }
+                                              }
+                   },
+    "delivery":  {
+                     "desktop_installer_ready":  true,
+                     "full_stack_runtime_ready":  false,
+                     "runtime_manifest_public_http_status":  404,
+                     "runtime_release_lookup":  "release not found",
+                     "backend_or_wsl_payload_embedded":  false,
+                     "runtime_followup_required":  true,
+                     "evidence":  {
+                                      "path":  "runtime-delivery-boundary.json",
+                                      "bytes":  1274,
+                                      "sha256":  "cf56cee98a9d891985b766883c47971f22e848328af146f2b6b20c295bbf1241"
+                                  }
+                 },
+    "supersession":  {
+                         "previous_15603c6_source":  "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+                         "previous_15603c6_exe_bytes":  10389138,
+                         "previous_15603c6_exe_sha256":  "b913e328079a59a94ea69be51a1c9b6352bc891a5927ba49f62bfec69341a6df",
+                         "previous_8102ffe_source":  "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+                         "previous_8102ffe_exe_bytes":  10386896,
+                         "previous_8102ffe_exe_sha256":  "f35c7aad9006a29607395a0e14b74d150b82fbf25afe3ff65474bdd764e7cf92",
+                         "both_previous_handoffs_must_not_be_published":  true,
+                         "new_desktop_handoff_is_authoritative":  true
+                     },
+    "handoff":  {
+                    "authoritative_directory":  "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\internal-installer-1.0.0-755c511",
+                    "single_authoritative_exe":  true,
+                    "rebuild_at_either_origin_forbidden":  true,
+                    "upload_performed":  false,
+                    "deployment_performed":  false
+                }
+}

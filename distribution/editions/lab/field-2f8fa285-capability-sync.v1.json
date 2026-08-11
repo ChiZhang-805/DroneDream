@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-field-capability-donor-sync",
+  "editionId": "lab",
+  "sourceBaseCommit": "2652c383",
+  "donor": {
+    "branch": "codex/software-field",
+    "productSource": "2f8fa28564dab7b1ff264c853705535373cb9068",
+    "tree": "afb7b4db584bf71e03d2f0b707b8b992e96bc7e7",
+    "authWireContractSource": "1129b561a187edf9ddb3214f3e8c993be31f281b"
+  },
+  "syncMode": "path-limited-semantic-forward-sync",
+  "donorBlobs": {
+    "desktop/src-tauri/src/field_adapters.rs": "0ddd2ac66226942b845e8630369ce99e86424e86",
+    "desktop/src-tauri/src/field_device.rs": "1f8e73932e34d5635a73cd160ee8c18c3188ecea",
+    "desktop/src-tauri/src/field_harness.rs": "60464f82bfdbd49390c4bdef2d685df91855df38",
+    "desktop/src-tauri/src/field_preflight.rs": "f3b06c50c96a0e3aeb7dbd512f5dbb36988ebc6b",
+    "desktop/src-tauri/src/field_recovery.rs": "9359b3ceacbfd41132a9b9224937c8a205a42b22",
+    "desktop/src-tauri/src/field_tuning.rs": "9ba7aaac625e5bf3130859d049331adbfbf65881",
+    "frontend/src/field/FieldAdapterCenter.tsx": "2396b09dc0957a0f8b11c8716b701f7e2f0eb65a",
+    "frontend/src/field/FieldAssistantWorkspace.tsx": "b3cae3f5afcaf02c558ce1f3c392b1059c7a4b5b",
+    "frontend/src/field/FieldPreflightWorkspace.tsx": "24d7f2a4dd8a3a42f43579b38d85f9860758ca3e",
+    "frontend/src/field/FieldRecoveryWorkspace.tsx": "251cdf3e155be830e647a04c9dc07fba984e7071",
+    "frontend/src/field/FieldTuningWorkspace.tsx": "8f8a9d25b7926ac78bc28d180682d1525a4d22c5",
+    "frontend/src/field/catalog.ts": "bf9769fc6f095aa910e7c19bd39113749f62f677",
+    "frontend/src/field/safety.ts": "94a50868bccde29654eb3bf9a8a37bd7b2f8a4c3",
+    "frontend/src/field/tuning.ts": "3405bf4fd179fae065fbcdc702d44336c7ab3683"
+  },
+  "exactContractAssets": [
+    {
+      "path": "distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md",
+      "gitBlob": "33ce0cbe5c7f6f2575729dd4b365c3c560e499c1",
+      "sha256": "2344531a2d7fa42e721d37db4639432f751aac89c3a3138eda89b4f1f279a1b8"
+    },
+    {
+      "path": "distribution/editions/field/adapters/catalog.v1.json",
+      "gitBlob": "af4fb1e4e781af6beb21c98e242d1699dec995c4",
+      "sha256": "5b1a7b9f5bd64624b6d4af7b0745e1ba4b1babca63fab0ba765ca97e58ac9419"
+    },
+    {
+      "path": "distribution/editions/field/field-tuning-contract.v1.json",
+      "gitBlob": "0d5774366c51cf1b8a150214a9e9cb8e755fdf37",
+      "sha256": "141a29cc9425c3857ddcf477e41d168184095adc9c7031deb16ef474b40f8815"
+    },
+    {
+      "path": "distribution/schemas/field-adapter-catalog.schema.json",
+      "gitBlob": "f7edcaecbf0862a91345b0a6921f3fc28a9b8259",
+      "sha256": "4dfdf70fa0cab31c61da77dba0c492e9b550d2308bb66f7285e3fdb63ea05075"
+    }
+  ],
+  "labAdaptations": {
+    "compiledEditionId": "lab",
+    "runtimeProfile": "unified-sim-lab",
+    "storageNamespace": "lab",
+    "standaloneFieldShellIncluded": false,
+    "fieldBrandIncluded": false,
+    "fieldInstallerPolicyIncluded": false,
+    "labSimulationPayloadRetained": true,
+    "hardwareAuthority": false,
+    "validatedVehiclePackCount": 0
+  },
+  "excludedDonorScopes": [
+    "desktop/src-tauri/src/field_installer_handoff.rs",
+    "desktop/src-tauri/tauri.field.conf.json",
+    "distribution/editions/field/build/**",
+    "distribution/editions/field/branding/**",
+    "distribution/editions/field/lifecycle/**",
+    "distribution/editions/field/release/**",
+    "frontend/src/field/FieldBrandLockup.tsx",
+    "frontend/src/field/FieldAuthControl.tsx",
+    "frontend/src/field/FieldSettingsDialog.tsx",
+    "frontend/src/field/main.tsx"
+  ],
+  "verification": {
+    "frontendTargetedTestsPassed": 73,
+    "frontendTypecheck": "passed",
+    "rustGnullvmCheck": "passed",
+    "hardwareExecutionDecision": "deny"
+  }
+}
