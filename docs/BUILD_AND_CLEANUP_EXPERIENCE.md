@@ -495,3 +495,56 @@ been removed without losing recovery evidence.
   evidence remains immutable; moving or deduplicating it would break frozen
   provenance, while ordinary generated data stays ignored or outside the
   source repository.
+
+### A12 - Edition ownership repair and final-build preflight
+
+- Product-boundary finding: the former shared Vite bundle kept lazy routes for
+  SIM, LAB, FIELD, and Vehicle Studio in every shared-core edition. This made
+  Universal and LAB nearly byte-identical and left Vehicle Studio reachable in
+  LAB navigation even though it is Universal-owned. The build now replaces an
+  exact compile-time edition symbol, emits only edition-owned routes, gives
+  fixed LAB a Vehicle-Studio-free sidebar, and verifies generated chunk
+  ownership after every Tauri build. Three isolated production probes confirmed
+  that Universal is the largest shared bundle, SIM contains no LAB/FIELD/model
+  chunks, and LAB contains no standalone SIM/FIELD/Vehicle Studio chunks.
+- FIELD copy finding: the reusable hardware workspace called standalone FIELD
+  an installed LAB application. Standalone FIELD now uses field-operations
+  navigation and Field-specific discovery wording; only the component embedded
+  in LAB keeps hardware-laboratory wording. Unit coverage binds both contexts.
+- Contract lesson: changing an edition manifest, protected UI source, or
+  integrated-workspace source requires updating every active downstream hash
+  binding in dependency order. The fail-closed distribution tests correctly
+  rejected stale profile, catalog, composite, and promotion hashes. Historical
+  source-bound build plans were not rewritten.
+- Test-runner lessons: Vitest 4 does not accept Jest's `--runInBand`; use the
+  repository's `vitest run` command. Python packages use separate local package
+  roots, so the complete invocation needs the repository, Backend, and Worker
+  roots on `PYTHONPATH`. The 127-file Backend suite is computation-heavy; run
+  deterministic file shards and preserve each exit code instead of treating an
+  outer timeout as a test failure.
+- Frozen-report correction: the routing fixture's Git blob at the v10 freeze
+  commit and current HEAD is byte-identical. Windows checkout converted its 24
+  LF endings to CRLF, so the old raw-worktree comparison reported false drift.
+  The validator now uses Git's normalized tree comparison, records the frozen
+  commit blob bytes, still fails on any real tracked change, and leaves the
+  Technical Report and all frozen evidence untouched. Its ten dedicated tests
+  pass.
+- Rust lesson: the default host target is MSVC but this machine intentionally
+  lacks `link.exe`; use the pinned Rust 1.97 gnullvm toolchain with LLVM-MinGW
+  and static CRT flags. The rejected MSVC attempt created only an external
+  Cargo target, which was removed before the corrected run. Universal passed
+  202 native tests, SIM 162 with two conditional ignores, LAB 200 with two
+  conditional ignores, and FIELD 87. The external target and generated Tauri
+  tree were removed after verification.
+- Current pre-build gates: frontend 95 files/612 tests, focused catalog 16
+  tests, Backend software suites, Worker, distribution 278 tests, Runtime 78
+  tests, brand/Engine Pack 34 tests, desktop Node 12 tests, TypeScript, Ruff,
+  Rust formatting, dependency audit, PowerShell parsing, and whitespace checks
+  pass. ESLint retains one non-blocking pre-existing Fast Refresh warning and
+  reports zero errors. Real OpenAI credentials were neither read nor used.
+- Cleanup: failed commands produced no installer. Their external Rust target,
+  generated frontend/Tauri output, and incremental TypeScript state were
+  verified absent. The one protected local public frontend configuration and
+  the four user-level public OAuth client IDs remain outside source control and
+  will be injected only into the clean formal build process without logging
+  their values.

@@ -9,7 +9,13 @@ import type { RouteObject } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
 import { getDesktopStartupGateSession } from "./desktop/startupGate";
-import { BUILD_EDITION, editionLandingPath } from "./edition";
+import {
+  BUILD_HAS_FIELD_WORKSPACE,
+  BUILD_HAS_LAB_WORKSPACE,
+  BUILD_HAS_SIM_WORKSPACE,
+  BUILD_HAS_VEHICLE_STUDIO,
+  editionLandingPath,
+} from "./edition";
 
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
   const requireDesktopReadiness = (feature: "experiment" | "job") =>
@@ -31,13 +37,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             ? <Navigate to="/desktop/setup" replace />
             : <Navigate to={fallbackPath} replace />,
         },
-        {
+        ...(BUILD_HAS_SIM_WORKSPACE ? [{
           path: "sim",
           lazy: async () => {
             const { SimOverview } = await import("./pages/SimOverview");
             return { Component: SimOverview };
           },
-        },
+        }] : []),
         {
           path: "assistant",
           lazy: async () => {
@@ -91,13 +97,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: FixedScenarios };
           },
         },
-        {
+        ...(BUILD_HAS_VEHICLE_STUDIO ? [{
           path: "vehicle-studio",
           lazy: async () => {
             const { VehicleStudio } = await import("./pages/VehicleStudio");
             return { Component: VehicleStudio };
           },
-        },
+        }] : []),
         {
           path: "admin",
           lazy: async () => {
@@ -122,30 +128,26 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: DesktopSetup };
           },
         },
-        {
+        ...(BUILD_HAS_LAB_WORKSPACE ? [{
           path: "lab",
           lazy: async () => {
             const { LabSetup } = await import("./lab/LabSetup");
             return { Component: LabSetup };
           },
-          loader: BUILD_EDITION === "sim" ? () => redirect(fallbackPath) : undefined,
-        },
-        {
+        }, {
           path: "lab/hardware",
           lazy: async () => {
             const { LabHardwareWorkspace } = await import("./lab/LabHardwareWorkspace");
             return { Component: LabHardwareWorkspace };
           },
-          loader: BUILD_EDITION === "sim" ? () => redirect(fallbackPath) : undefined,
-        },
-        {
+        }] : []),
+        ...(BUILD_HAS_FIELD_WORKSPACE ? [{
           path: "field",
           lazy: async () => {
             const { UniversalFieldApp } = await import("./field/FieldApp");
             return { Component: UniversalFieldApp };
           },
-          loader: BUILD_EDITION === "sim" ? () => redirect(fallbackPath) : undefined,
-        },
+        }] : []),
         { path: "*", loader: () => redirect(fallbackPath) },
       ],
     },

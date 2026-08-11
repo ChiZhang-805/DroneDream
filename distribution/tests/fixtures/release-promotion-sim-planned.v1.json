@@ -13,8 +13,8 @@
   "productDisplayVersion": "1.0.0",
   "edition": {
     "editionId": "sim",
-    "editionManifestSha256": "e6f71a0c80dfdfd3fbe31879e43de7ff5322f0a826888c161534e41a1bff454f",
-    "compositeManifestSha256": "290db05b47f17aed758096ca4f8367a8aa2726e1dab39ce5af8aa9bb0328aa41"
+    "editionManifestSha256": "62d63162a3c56252bd038833eccc24fb10cb0832193d8334c5b6588d7131c765",
+    "compositeManifestSha256": "b18dc771ec894f795d089235a2b6867a3be20efc6607a0fb9cf3a80cb32f48b8"
   },
   "branchPolicy": {
     "targetBranch": "codex/release-sim",

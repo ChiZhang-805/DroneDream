@@ -41,7 +41,8 @@ type FieldPageId = "assistant" | "device" | "compatibility" | "tuning" | "recove
 const COPY = {
   en: {
     skip: "Skip to workspace",
-    nav: "Hardware laboratory navigation",
+    navField: "Field operations navigation",
+    navLab: "Hardware laboratory navigation",
     assistant: "Chatting",
     device: "Device",
     compatibility: "Compatibility",
@@ -61,7 +62,8 @@ const COPY = {
     },
     scan: "Discover",
     scanning: "Scanning",
-    scanUnavailable: "Available in the installed Lab app",
+    scanUnavailableField: "Available in the installed Field app",
+    scanUnavailableLab: "Available in the installed Lab app",
     source: "Source",
     observation: "Observation",
     observedPorts: "Unopened serial ports",
@@ -88,7 +90,8 @@ const COPY = {
   },
   "zh-CN": {
     skip: "跳到工作区",
-    nav: "真机实验室导航",
+    navField: "现场作业导航",
+    navLab: "真机实验室导航",
     assistant: "调优对话",
     device: "设备",
     compatibility: "兼容性",
@@ -108,7 +111,8 @@ const COPY = {
     },
     scan: "发现设备",
     scanning: "正在扫描",
-    scanUnavailable: "仅在已安装的 Lab 应用中可用",
+    scanUnavailableField: "仅在已安装的 Field 应用中可用",
+    scanUnavailableLab: "仅在已安装的 Lab 应用中可用",
     source: "来源",
     observation: "观察状态",
     observedPorts: "未打开的串口",
@@ -214,6 +218,10 @@ function FieldWorkspace({
   const [latestSnapshot, setLatestSnapshot] = useState<FieldParameterSnapshot | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const copy = COPY[locale];
+  const navigationLabel = embeddedInLab ? copy.navLab : copy.navField;
+  const scanUnavailable = embeddedInLab
+    ? copy.scanUnavailableLab
+    : copy.scanUnavailableField;
   const observation = FIELD_OBSERVATION_FIXTURES[observationState];
   const decision = useMemo(() => evaluateFieldSafety(observation), [observation]);
   const selectedPack = FIELD_CATALOG.vehiclePacks.find((pack) => pack.packId === selectedPackId)
@@ -276,7 +284,7 @@ function FieldWorkspace({
                 type="button"
                 className="field-primary-command"
                 disabled={!isDesktopRuntime() || deviceScanBusy}
-                title={!isDesktopRuntime() ? copy.scanUnavailable : copy.scan}
+                title={!isDesktopRuntime() ? scanUnavailable : copy.scan}
                 onClick={() => void scanDevices()}
               >
                 <RefreshCw className={deviceScanBusy ? "field-auth-spinner" : undefined} aria-hidden="true" />
@@ -355,7 +363,7 @@ function FieldWorkspace({
       <a className="field-skip-link" href="#field-page">{copy.skip}</a>
       <div className="field-layout">
         <aside className="field-sidebar">
-          <nav aria-label={copy.nav}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
+          <nav aria-label={navigationLabel}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
           <div className="field-sidebar-status" title={`${copy.packs}: 0`}><Wrench aria-hidden="true" /><div><span>{copy.packs}</span><strong>0</strong></div><small>{copy.locked}</small></div>
         </aside>
         <main className="field-main" id="field-page">

@@ -268,6 +268,15 @@ if ($additionalConfig) {
         )
 }
 
+Invoke-CheckedNativeCommand `
+    -FilePath "node.exe" `
+    -DisplayName "$EditionId frontend ownership verification" `
+    -ArgumentList @(
+        (Join-Path $repoRoot "frontend\scripts\verify-edition-build-boundaries.mjs"),
+        "--edition", $EditionId,
+        "--dist", $frontendDistContract.absolutePath
+    )
+
 $postBuildCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
 $postBuildStatusLines = @(
     & git -C $repoRoot status --porcelain=v1 --untracked-files=all

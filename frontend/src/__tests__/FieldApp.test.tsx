@@ -45,7 +45,7 @@ describe("FieldApp", () => {
       "data-brand-edition",
       "field",
     );
-    const navigation = screen.getByRole("navigation", { name: "Hardware laboratory navigation" });
+    const navigation = screen.getByRole("navigation", { name: "Field operations navigation" });
     expect(within(navigation).getAllByRole("button")).toHaveLength(6);
     expect(within(navigation).getByRole("button", { name: "Chatting" }))
       .toHaveAttribute("aria-current", "page");
@@ -190,7 +190,7 @@ describe("FieldApp", () => {
 
   it("follows the Lab-owned locale without a second locale authority", async () => {
     await renderField("zh-CN");
-    expect(screen.getByRole("navigation", { name: "真机实验室导航" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "现场作业导航" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(document.documentElement.lang).toBe("zh-CN");
   });
@@ -204,6 +204,16 @@ describe("FieldApp", () => {
     expect(fieldSource).toContain("<FieldApp initialLocale={locale} />");
     expect(routerSource).toContain("const { UniversalFieldApp }");
     expect(routerSource).toContain("return { Component: UniversalFieldApp }");
+  });
+
+  it("uses Lab wording only when embedded in the Lab hardware workspace", async () => {
+    render(<FieldApp initialLocale="en" embeddedInLab />);
+    await waitFor(() => {
+      expect(screen.getByRole("navigation", { name: "Hardware laboratory navigation" }))
+        .toBeInTheDocument();
+    });
+    expect(screen.queryByRole("navigation", { name: "Field operations navigation" }))
+      .not.toBeInTheDocument();
   });
 
   it("uses canonical theme tokens and fixed viewport page layout", () => {

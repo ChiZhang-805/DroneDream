@@ -85,7 +85,7 @@
   },
   "knownGaps": [
     "The current Runtime Base is a full simulation image; the lightweight hardware profile does not yet exist.",
-    "No real-hardware capability is implemented or validated by this manifest alone.",
-    "A dedicated Field installer, hardware bridge, and promotion manifest have not yet been built or published."
+    "Read-only discovery, protocol inspection, evidence, snapshot, rollback-planning, and preflight surfaces are implemented, but no parameter-write, arm, flight, or HITL authority is validated by this manifest alone.",
+    "This source manifest does not attest a particular installer; release acceptance requires an exact external build receipt, checksum, updater signature, and headed edition-identity validation."
   ]
 }

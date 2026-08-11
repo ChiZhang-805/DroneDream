@@ -37,7 +37,7 @@ export const FIELD_CATALOG: FieldCatalog = {
   kind: "dronedream-field-catalog-projection",
   catalogVersion: "1.0.0",
   sourceBindings: {
-    fieldManifestSha256: "13b585d4cd9adb90b11d6332f4fad796df8fdeeb107581da6903bd134ae2ae27",
+    fieldManifestSha256: "130270577240fdd5d79d3a35a71fced7b3472105df97c7bc2323a19184610292",
     vehiclePackRegistrySha256: "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7",
   },
   vehiclePacks: [

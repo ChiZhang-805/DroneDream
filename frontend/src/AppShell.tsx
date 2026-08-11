@@ -176,6 +176,25 @@ const SIM_NAV_ITEMS: NavigationItem[] = [
   ...CORE_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio" && !item.externalUrl),
 ];
 
+const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
+  {
+    to: "/lab",
+    labelKey: "app.labWorkspace",
+    end: true,
+    icon: RadioTower,
+  },
+  {
+    to: "/lab/hardware",
+    labelKey: "app.hardwareLab",
+    icon: RadioTower,
+  },
+];
+
+const FIXED_LAB_NAV_ITEMS: NavigationItem[] = [
+  ...LAB_WORKSPACE_NAV_ITEMS,
+  ...CORE_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio"),
+];
+
 const FIELD_NAV_ITEMS: NavigationItem[] = [
   {
     to: "/field",
@@ -189,17 +208,7 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
 const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
   sim: SIM_NAV_ITEMS,
   lab: [
-    {
-      to: "/lab",
-      labelKey: "app.labWorkspace",
-      end: true,
-      icon: RadioTower,
-    },
-    {
-      to: "/lab/hardware",
-      labelKey: "app.hardwareLab",
-      icon: RadioTower,
-    },
+    ...LAB_WORKSPACE_NAV_ITEMS,
     ...CORE_NAV_ITEMS,
   ],
   field: FIELD_NAV_ITEMS,
@@ -2208,7 +2217,13 @@ function AppShellContent() {
     setMobileMenuOpen(false);
     navigate(MODE_LANDING_PATH[mode]);
   }, [navigate]);
-  const navigationItems = MODE_NAV_ITEMS[universalMode];
+  const navigationItems = EDITION_IS_FIXED
+    ? BUILD_EDITION === "sim"
+      ? SIM_NAV_ITEMS
+      : BUILD_EDITION === "lab"
+        ? FIXED_LAB_NAV_ITEMS
+        : FIELD_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio")
+    : MODE_NAV_ITEMS[universalMode];
   const sidebarUpdateLabel = updater.status === "available"
     ? updater.error
       ? t("updater.sidebarDeferred")

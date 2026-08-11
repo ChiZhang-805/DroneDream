@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 HELPER = ROOT / "desktop" / "scripts" / "confirm-universal-browser-consent.ps1"
 OAUTH = ROOT / "desktop" / "scripts" / "verify-universal-real-oauth.ps1"

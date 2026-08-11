@@ -286,18 +286,42 @@ def _freeze_bound_record(
     *,
     freeze_commit: str,
 ) -> dict[str, Any]:
-    current = _file_record(repository_root, relative)
     frozen = _git_snapshot_record(
         repository_root,
         relative,
         source_commit=freeze_commit,
     )
-    if current["bytes"] != frozen["bytes"] or current["sha256"] != frozen["sha256"]:
+    git = shutil.which("git")
+    if git is None:
+        raise ValueError("git is required to verify frozen evidence snapshots")
+    try:
+        comparison = subprocess.run(  # noqa: S603 - trusted executable and validated path.
+            [
+                git,
+                "diff",
+                "--quiet",
+                "--no-ext-diff",
+                freeze_commit,
+                "--",
+                frozen["path"],
+            ],
+            cwd=repository_root,
+            check=False,
+            capture_output=True,
+            timeout=_GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(
+            f"could not compare frozen evidence {freeze_commit}:{relative}"
+        ) from exc
+    if comparison.returncode == 1:
         raise ValueError(f"evidence source drifted from freeze commit {freeze_commit}: {relative}")
+    if comparison.returncode != 0:
+        raise ValueError(f"could not compare frozen evidence {freeze_commit}:{relative}")
     return {
-        **current,
+        **frozen,
         "snapshot_commit": freeze_commit,
-        "byte_source": "working_tree_matches_git_commit_blob",
+        "byte_source": "git_normalized_working_tree_matches_git_commit_blob",
     }
 
 

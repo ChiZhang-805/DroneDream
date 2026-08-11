@@ -13,8 +13,11 @@ interface ImportMetaEnv {
   readonly VITE_AUTH_APPLE_ENABLED?: "true" | "false";
   readonly VITE_PUBLIC_DEMO_CONSOLE?: string;
   readonly VITE_DRONEDREAM_SOURCE_COMMIT?: string;
+  readonly VITE_DRONEDREAM_EDITION?: "universal" | "sim" | "lab" | "field";
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+declare const __DRONEDREAM_BUILD_EDITION__: "universal" | "sim" | "lab";

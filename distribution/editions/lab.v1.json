@@ -88,6 +88,6 @@
     "The source integrates the SIM Model + Harness workflow, the FIELD recorded-evidence hardware workspace, and the Lab-owned bidirectional calibration framework, but no real-hardware or HITL capability is validated by this manifest alone.",
     "Sim-to-Real and Real-to-Sim outputs remain evidence-bound drafts until independent holdout, exact Vehicle Pack compatibility, and native/backend/runtime quorum all pass.",
     "Zero Vehicle Packs are validated, so hardware parameter writes, arm, flight, and HITL remain denied.",
-    "No final product artifact containing this source revision has been built or accepted."
+    "This source manifest does not attest a particular installer; release acceptance requires an exact external build receipt, checksum, updater signature, and headed edition-identity validation."
   ]
 }

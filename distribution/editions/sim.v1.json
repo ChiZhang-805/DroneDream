@@ -85,7 +85,7 @@
     "forcePushAllowed": false
   },
   "knownGaps": [
-    "A dedicated Sim installer and promotion manifest have not yet been built or published.",
-    "Existing simulator executors still require E5 target-context enforcement before the edition can be called physically incapable."
+    "This source manifest does not attest a particular installer; release acceptance requires an exact external build receipt, checksum, updater signature, and headed edition-identity validation.",
+    "Physical hardware modules are excluded from the compiled SIM command surface, while backend and Runtime capability policy must continue to deny every real-aircraft target."
   ]
 }

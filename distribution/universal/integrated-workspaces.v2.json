@@ -105,14 +105,14 @@
     },
     {
       "path": "frontend/src/field/FieldApp.tsx",
-      "sha256": "235705cb691ad869d9dc80f2148f9648ff9c24bb6c66b7a5a30d79adb855aa35",
+      "sha256": "f0c8bac40df00185af734c6080a85243280119928afbf17ab782e4ed09082cec",
       "donorEdition": "field",
       "donorBlob": "5c4e3f01f16d831cdf0d995904c5b8b0a9b11c0d",
       "integration": "semantic-universal-shared-locale-adapter"
     },
     {
       "path": "frontend/src/router.tsx",
-      "sha256": "77f9444f7d29643dbcdc1191dbf5a1a62643f065f2c6b3484e7fdd77b437249d",
+      "sha256": "474330bd706be5d816ba1297717ddcf264dd3ffb6b7eed6329d1ed755a503c30",
       "donorEdition": "universal",
       "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
       "integration": "semantic-universal-workspace-routing-and-shared-locale"

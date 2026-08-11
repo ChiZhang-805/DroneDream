@@ -7,15 +7,15 @@
     "editionManifests": {
       "sim": {
         "path": "distribution/editions/sim.v1.json",
-        "sha256": "e6f71a0c80dfdfd3fbe31879e43de7ff5322f0a826888c161534e41a1bff454f"
+        "sha256": "62d63162a3c56252bd038833eccc24fb10cb0832193d8334c5b6588d7131c765"
       },
       "lab": {
         "path": "distribution/editions/lab.v1.json",
-        "sha256": "9bcbbe04735d988376114f0d3d3eb55cd4fa84bab8c09f79ccde914a28cc2d72"
+        "sha256": "11b79220b3c87c162c1f97483d4abb91a6aba7d3a3f0c763902d854d1db5eb6f"
       },
       "field": {
         "path": "distribution/editions/field.v1.json",
-        "sha256": "13b585d4cd9adb90b11d6332f4fad796df8fdeeb107581da6903bd134ae2ae27"
+        "sha256": "130270577240fdd5d79d3a35a71fced7b3472105df97c7bc2323a19184610292"
       }
     },
     "vehiclePackRegistry": {
