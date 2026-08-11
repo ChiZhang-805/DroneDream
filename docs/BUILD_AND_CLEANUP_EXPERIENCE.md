@@ -675,3 +675,10 @@ been removed without losing recovery evidence.
   successful screenshot matrices, temporary FIELD bundle, and incremental
   build state were removed after their receipt facts and hashes were recorded;
   no installer or installed application was changed by these offline fixtures.
+- Formal-build preflight: clean commit `ae290c3abdcc94f1542299aabe5f79901da54de2`
+  passed source/public-key/updater gates and then stopped before compilation
+  because `DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL` is still not a provider-issued
+  UUID. The wrapper removed its dedicated output and Cargo roots, left all
+  generated source paths absent, and returned the source tree clean. Do not
+  build or install a Universal binary with the old internal identity label;
+  register the public client and pass the four-client live verifier first.
