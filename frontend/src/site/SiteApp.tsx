@@ -234,7 +234,7 @@ const content = {
     platform: "Platform",
     platformValue: "Windows x64",
     released: "Released",
-    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is published while code signing is being prepared.",
+    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is available now.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
     communityGuidelines: "Community guidelines",

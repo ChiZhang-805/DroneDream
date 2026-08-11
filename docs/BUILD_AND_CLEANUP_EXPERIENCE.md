@@ -959,7 +959,7 @@ been removed without losing recovery evidence.
   quality gate now allows 45 minutes instead of reporting a cancellation as a
   product failure. Public-site copy needs a small Chromium margin above the
   exact 80-percent final-line threshold: the corrected recovery sentence reaches
-  83 percent at both desktop widths, and the home-only footer stays on one line
-  on desktop while returning to normal wrapping below 1160 pixels. The bundled
+  83 percent at both desktop widths, and the home-only footer uses concise copy
+  that fits naturally without a `white-space` override. The bundled
   Chromium audits passed at 1440x1000, 2048x1280, and mobile 390x844; generated
   `site-dist`, audit JSON, and preview logs remain disposable after verification.
