@@ -548,3 +548,61 @@ been removed without losing recovery evidence.
   the four user-level public OAuth client IDs remain outside source control and
   will be injected only into the clean formal build process without logging
   their values.
+- Formal four-edition build: clean commit
+  `557ac311a90dc6bc846e11fba249ce9b764ab276` and tree
+  `d1421fa559bd470f3af56aa23e42edbd9d92b13c` produced the complete A12 batch in
+  539.1 seconds. Every edition emitted exactly the installer, SHA-256 sidecar,
+  updater signature, update manifest, and build receipt; all four receipts bind
+  the same source identity and independently match the installer bytes. The
+  canonical installers are Universal 12,451,558 bytes /
+  `c659d758ae24469b48947557355703b6e8e4c9502784ed6fcf29f7c046bb0ea9`;
+  SIM 12,099,447 bytes /
+  `837cde0ed67dbf6c1c8a33d6be09d7cfdd00a1e53636831d4afcb1e913c6b574`;
+  LAB 12,497,324 bytes /
+  `e2cd09daf39ecb1b2e5d1aeba30d7b61bb3468d5c4d14383db6e9eda235debd4`;
+  and FIELD 6,195,613 bytes /
+  `150505e861459289a9776c936dc059ecefd3a9b38c8fe26ca9fafa7b4e328a53`.
+  Their updater signatures are present, while Windows Authenticode remains
+  intentionally unavailable on this machine (`NotSigned`); this is acceptable
+  for the local/internal installation but must be closed before a public
+  Windows release.
+- Build cleanup and repeatability: the wrapper removed its dedicated Cargo
+  target and left `frontend/dist`, `frontend/field-dist`, TypeScript incremental
+  state, Tauri `gen`, and the LLVM bundle target absent. The source worktree was
+  clean immediately after the build. The authoritative delivery root is
+  `core-four-main-557ac311-final-a12`; after acceptance, the superseded A8 root
+  (20 files / 43,359,710 bytes) was deleted, leaving exactly one build batch.
+- Installed-product acceptance: Universal, SIM, LAB, and FIELD now coexist in
+  four independent `%LOCALAPPDATA%/DroneDream-*` roots, four distinct product
+  and uninstall registrations, and four exact desktop shortcuts. Their installed
+  executables are 1.0.0, carry the expected product names, have distinct hashes,
+  create responsive windows titled `DroneDream`, `DroneDream · SIM`,
+  `DroneDream · LAB`, and `DroneDream · FIELD`, and close normally. The former
+  generic `%LOCALAPPDATA%/DroneDream` application was uninstalled only after
+  acceptance; its old product key was removed, while all 52,673 dependency files,
+  current build evidence, caches, and all four edition hashes remained unchanged.
+- Installer UI acceptance: one maintenance-mode path-only attempt reached the
+  correct welcome, maintenance, and location pages but did not take the
+  fresh-install-only validation exit. It was terminated before installation,
+  its Runtime state recovered, and its exact diagnostic log removed. Re-running
+  with the verifier's registration-backed `SimulateFreshInstall` mode proved all
+  eight real NSIS page flows: English and Simplified Chinese for all four
+  editions, path-validation-only for Universal/SIM/LAB, and the intentional
+  app-location boundary for FIELD. Registrations, installed binaries, and
+  shortcuts were restored and unchanged after every case.
+- Installed UI evidence lesson: the first four-case CDP run passed assertions
+  but its non-auth launcher screenshot was taken before the case selected its
+  requested language, so an English case could inherit the prior Chinese
+  rendering. The verifier now captures both launcher and authenticated workspace
+  surfaces only after Settings applies the case locale. The corrected 390x700
+  and 1440x900 English/Chinese matrix produced four receipts and eight visually
+  checked screenshots with no overflow; all four Settings tabs were keyboard
+  activated. The flawed 12-file/3,304,070-byte evidence directory and its
+  isolated WebView2 profile were deleted after the corrected evidence passed.
+- Final hierarchy state: `Z:/DroneDream-Workspace/main` is the sole authoritative
+  source root and the retired `Z:/DroneDream` root is absent. No duplicate source
+  clone or accepted older build remains. Required detached dependencies and the
+  A12 delivery/evidence root are retained because they are necessary for
+  reproducible maintenance and delivery rather than source duplicates. Real
+  OpenAI credentials were neither read nor used during build, installation, or
+  UI acceptance.

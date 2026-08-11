@@ -222,12 +222,11 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert.equal(startupTheme.grantsHardwareAuthority, "false");
   assert.deepEqual(startupTheme.colors, canonicalColors[expectedThemeEdition]);
   let scene = null;
+  // Capture the visible surface only after Settings applies this case's locale
+  // below. Otherwise a case can inherit the previous case's rendered language
+  // even though its later Settings assertions pass.
   let surfaceScreenshot;
-  if (authenticatedWorkspace) {
-    // Capture the workspace after Settings applies the requested locale below.
-    // This prevents each case from inheriting the previous case's language.
-    surfaceScreenshot = null;
-  } else {
+  if (!authenticatedWorkspace) {
     scene = await page.locator(".drone-launch-scene").evaluate((element) => ({
       edition: element.getAttribute("data-theme-edition"),
       colors: [
@@ -240,7 +239,6 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     assert.equal(scene.edition, "universal");
     assert.equal(scene.grantsHardwareAuthority, "false");
     assert.deepEqual(scene.colors, canonicalColors.universal);
-    surfaceScreenshot = await saveScreenshot(page, "scene");
     // The pre-auth prerequisite intentionally stays on the Universal launcher.
     assert.equal(edition, "universal");
   }
@@ -316,9 +314,10 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   await closeButton.focus();
   await closeButton.press("Enter");
   await dialog.waitFor({ state: "hidden" });
-  if (authenticatedWorkspace) {
-    surfaceScreenshot = await saveScreenshot(page, "workspace");
-  }
+  surfaceScreenshot = await saveScreenshot(
+    page,
+    authenticatedWorkspace ? "workspace" : "scene",
+  );
 
   await atomicJson(outputPath, {
     schemaVersion: 1,
