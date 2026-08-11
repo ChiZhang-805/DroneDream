@@ -952,3 +952,14 @@ been removed without losing recovery evidence.
   cases. The Runtime workflows now install the pinned pytest version and run the
   complete directory through pytest; the corrected local contract executes 80
   tests and 15 subtests, with only five platform-declared skips.
+- Final-CI lesson: Ruff import ownership must be independent of the subset of
+  files named on its command line, so `distribution` is explicitly first-party
+  in both repository and backend configuration. The complete 1,160-test backend
+  suite also legitimately exceeds the old 20-minute hosted-runner limit; the
+  quality gate now allows 45 minutes instead of reporting a cancellation as a
+  product failure. Public-site copy needs a small Chromium margin above the
+  exact 80-percent final-line threshold: the corrected recovery sentence reaches
+  83 percent at both desktop widths, and the home-only footer stays on one line
+  on desktop while returning to normal wrapping below 1160 pixels. The bundled
+  Chromium audits passed at 1440x1000, 2048x1280, and mobile 390x844; generated
+  `site-dist`, audit JSON, and preview logs remain disposable after verification.

@@ -2844,6 +2844,7 @@ html[lang="zh-CN"] .site-hero h1 {
   gap: 0.22em;
 }
 .site-footer p, .site-footer span { margin: 0; font-size: .68rem; }
+.site-footer > .site-shell > p { white-space: nowrap; }
 .site-footer a { display: inline-flex; align-items: center; gap: .45rem; color: #bfc8ff; font-size: .7rem; text-decoration: none; }
 .site-footer a svg { width: 20px; height: 20px; fill: currentColor; }
 .site-footer-policy-links { display: flex; align-items: center; gap: 1rem; }
@@ -2857,6 +2858,7 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 @media (max-width: 1160px) {
+  .site-footer > .site-shell > p { white-space: normal; }
   .site-header { grid-template-columns: 1fr auto; }
   .site-nav { position: fixed; top: 78px; right: 18px; left: 18px; display: none; align-items: stretch; flex-direction: column; gap: 0; padding: .7rem; border: 1px solid rgba(255,255,255,.1); border-radius: 16px; background: rgba(9,11,24,.96); box-shadow: 0 25px 70px rgba(0,0,0,.35); backdrop-filter: blur(22px); }
   .site-header.is-scrolled .site-nav { top: 66px; }
