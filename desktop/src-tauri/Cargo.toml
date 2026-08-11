@@ -21,7 +21,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 dronecan = { version = "=0.1.0", default-features = false, features = ["std"] }
 ed25519-dalek = "2"
 hex = "0.4"
-mavlink = { version = "=0.17.1", default-features = false, features = ["std", "common", "ardupilotmega"] }
+mavlink = { version = "=0.18.0", default-features = false, features = ["std", "dialect-common", "dialect-ardupilotmega"] }
 multiwii_serial_protocol = { version = "=0.1.1", default-features = false, features = ["std"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 semver = "1"
@@ -55,3 +55,8 @@ windows-sys = { version = "0.61", features = [
   "Win32_System_Threading",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+[patch.crates-io]
+# mavlink-bindgen 0.18.0 was published with quick-xml 0.39.x. Pin the
+# upstream security fix until the next crate release carries quick-xml 0.41+.
+mavlink-bindgen = { git = "https://github.com/mavlink/rust-mavlink.git", rev = "ac3491fd415b15f0f89cf8523d38c2bf42399c50" }

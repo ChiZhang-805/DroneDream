@@ -180,7 +180,8 @@ class AtomicPhysicalStabilityCheckpointStore:
         chain: list[PhysicalStabilityCheckpointV1] = []
         for expected_sequence, path in enumerate(self._checkpoint_paths(), start=1):
             match = _CHECKPOINT_PATTERN.fullmatch(path.name)
-            assert match is not None
+            if match is None:
+                raise ValueError(f"unexpected checkpoint filename: {path.name}")
             if int(match.group("sequence")) != expected_sequence:
                 raise ValueError("checkpoint sequence contains a gap or duplicate")
             raw = path.read_bytes()

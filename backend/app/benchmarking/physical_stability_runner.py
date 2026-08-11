@@ -162,7 +162,8 @@ def advance_physical_stability_campaign(
         raise ValueError("P5 ledger contains more than one running scenario")
     if running:
         scenario = running[0]
-        assert scenario.observed_job_id is not None
+        if scenario.observed_job_id is None:
+            raise ValueError("running P5 scenario is missing its observed job ID")
         snapshot = transport.get_physical_stability_evidence(scenario.observed_job_id)
         if snapshot is None:
             return _result(

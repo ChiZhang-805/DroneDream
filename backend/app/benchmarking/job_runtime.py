@@ -421,7 +421,8 @@ def build_benchmark_job_observation(
 ) -> tuple[BenchmarkJobRuntimeContext, BenchmarkObservationV2]:
     context = require_benchmark_job_runtime_context(db, job)
     contract = sealed_contract_for_job(job)
-    assert contract is not None
+    if contract is None:
+        raise ValueError("benchmark job is missing its sealed runtime contract")
     parameter_domain, objectives, constraints = _normalized_runtime_contracts(job)
     history = _history_for_job(
         job,
