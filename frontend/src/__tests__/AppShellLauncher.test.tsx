@@ -73,7 +73,7 @@ function installDesktopBridge() {
             probeErrors: [],
           };
         }
-        if (command === "probe_runtime_status") {
+        if (command === "probe_runtime_status" || command === "start_runtime") {
           return {
             runtimeName: "DroneDreamRuntime",
             installed: true,
@@ -207,9 +207,13 @@ describe("desktop launcher chrome", () => {
     });
     const { router } = renderLauncher();
 
+    await screen.findByText("Checked");
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     const dialog = screen.getByRole("dialog", { name: "Settings" });
     fireEvent.click(within(dialog).getByRole("tab", { name: "Memory" }));
+    await waitFor(() => {
+      expect(apiClient.getUserExperiencePreferences).toHaveBeenCalledTimes(1);
+    });
     const memory = await within(dialog).findByLabelText(
       /Learn from my verified experiment outcomes/,
     );

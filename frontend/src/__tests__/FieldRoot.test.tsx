@@ -79,7 +79,7 @@ describe("FieldRoot", () => {
       </FieldLocaleProvider>,
     );
 
-    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "8");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
     expect(screen.queryByRole("button", {
       name: "Sign in and enter the tuning platform",
     })).not.toBeInTheDocument();

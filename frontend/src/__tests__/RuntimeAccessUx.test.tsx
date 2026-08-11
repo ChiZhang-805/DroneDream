@@ -365,7 +365,7 @@ afterEach(() => {
     queryClient.clear();
   });
 
-  it("does not auto-start from the real setup route and starts exactly once on request", async () => {
+  it("auto-starts exactly once from the real setup route without a manual button", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "get_installer_runtime_intent") {
         return { status: "none", mode: null, targetRoot: null, message: null };
@@ -390,21 +390,21 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByRole("button", { name: "Start runtime" }))
-      .toBeInTheDocument();
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status").length)
         .toBeGreaterThanOrEqual(2);
     });
-    expect(invoke.mock.calls.some(([command]) => command === "start_runtime")).toBe(false);
-
-    fireEvent.click(screen.getByRole("button", { name: "Start runtime" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
         .toHaveLength(1);
     });
     expect(await screen.findByText("The installed runtime is ready."))
       .toBeInTheDocument();
+    expect(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Start runtime" }))
+      .not.toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(1);
 
@@ -531,7 +531,7 @@ afterEach(() => {
       ([command]) => command === "probe_runtime_status",
     )).toHaveLength(initialRuntimeProbeCount + 1);
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "99");
+      .toHaveAttribute("aria-valuenow", "0");
 
     router.dispose();
   });

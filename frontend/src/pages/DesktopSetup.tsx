@@ -28,8 +28,6 @@ import {
   getRuntimeInstallPlan,
   isDesktopRuntime,
   probeRuntimeStatus,
-  repairRuntime,
-  startRuntime,
   startRuntimeInstall,
 } from "../desktop/bridge";
 import type {
@@ -52,13 +50,12 @@ import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
 import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
-  claimDesktopRuntimeLifetime,
-  clearRuntimeAutoStartFailure,
   isOverallDesktopReady,
   isRuntimeConfirmedMissing,
   isRuntimeFullyReady,
   MINIMUM_MEMORY_BYTES,
 } from "../desktop/readiness";
+import { useLauncherProgress } from "../desktop/launcherProgress";
 import {
   runtimeSessionContractFailure,
   verifyRuntimeSessionContract,
@@ -342,8 +339,6 @@ export function DesktopSetup() {
       checking: desktopAvailable,
     }));
   const [receiptCleanupRecovered, setReceiptCleanupRecovered] = useState(false);
-  const [runtimeCommandError, setRuntimeCommandError] = useState<string | null>(null);
-  const [runtimeCommandBusy, setRuntimeCommandBusy] = useState(false);
   const [selectedDrive, setSelectedDrive] = useState("");
   const [installerAttempt, setInstallerAttempt] = useState(0);
   const [dismissedLauncherError, setDismissedLauncherError] = useState("");
@@ -366,7 +361,6 @@ export function DesktopSetup() {
     installerHandoffState.autoStarting ||
     installerHandoffState.discarding ||
     installState.commandBusy ||
-    runtimeCommandBusy ||
     installActive;
   const showInstallPlanner =
     state.prerequisitesFresh &&
@@ -435,6 +429,21 @@ export function DesktopSetup() {
         : "launcher.accountVerificationFailed";
   const environmentBlocked =
     localRuntimeReady && !localChecksReady && !environmentChecking;
+  const launcherProgress = useLauncherProgress({
+    enabled: Boolean(
+      desktopAvailable &&
+      state.runtimeFresh &&
+      state.runtime?.installed,
+    ),
+    complete: localChecksReady && !updaterBlocksWorkspace,
+    blocked: Boolean(
+      runtimeSessionFailure ||
+      (state.runtimeFresh && state.runtime?.installed && !environmentChecking &&
+        !localRuntimeReady && runtimeAccess.status !== "starting"),
+    ),
+  });
+  const launcherEnvironmentReady =
+    localChecksReady && launcherProgress === 100;
   const installerHandoffNeedsAttention = Boolean(
     installerHandoffState.commandError ||
     installerHandoffState.autoStartUncertain ||
@@ -473,6 +482,9 @@ export function DesktopSetup() {
         ? t(runtimeSessionFailureKey)
         : state.runtime.diagnostics.join("\n") || t("desktop.runtimeNeedsRepair")
       : null,
+    runtimeAccess.status === "startFailed"
+      ? `${t("runtimeGate.startFailedTitle")}: ${t("runtimeGate.startFailedBody")}`
+      : null,
     installState.snapshot?.phase === "completed" &&
       state.prerequisitesFresh &&
       state.runtimeFresh &&
@@ -504,6 +516,35 @@ export function DesktopSetup() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!desktopAvailable || !runtimeAccess.snapshot) return;
+    let disposed = false;
+    const snapshot = runtimeAccess.snapshot;
+    void verifyRuntimeSessionContract(snapshot.runtime).then((runtime) => {
+      if (disposed) return;
+      setState((current) => ({
+        ...current,
+        prerequisites: snapshot.prerequisites,
+        runtime,
+        prerequisitesFresh: true,
+        runtimeFresh: true,
+        loading: false,
+        issues: replaceIssues(current.issues, ["prerequisites", "runtime"], []),
+      }));
+    }).catch((error) => {
+      if (disposed) return;
+      setState((current) => ({
+        ...current,
+        issues: replaceIssues(current.issues, ["runtime"], [
+          probeIssue("runtime", "verify_runtime_session_contract", error),
+        ]),
+      }));
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [desktopAvailable, runtimeAccess.snapshot]);
 
   useEffect(() => {
     if (!desktopAvailable) return;
@@ -568,7 +609,7 @@ export function DesktopSetup() {
   ]);
 
   const startBrowserSignIn = useCallback(async () => {
-    if (!localChecksReady || browserAuthStatus !== "idle") return;
+    if (!launcherEnvironmentReady || browserAuthStatus !== "idle") return;
     const configuration = browserAuthConfiguration();
     if (!configuration) {
       setBrowserAuthError(t("launcher.browserAuthNotConfigured"));
@@ -607,7 +648,7 @@ export function DesktopSetup() {
     } finally {
       browserAuthActive.current = false;
     }
-  }, [browserAuthStatus, localChecksReady, locale, t]);
+  }, [browserAuthStatus, launcherEnvironmentReady, locale, t]);
 
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
@@ -627,14 +668,10 @@ export function DesktopSetup() {
     ]);
     if (requestId.current !== currentRequest) return;
 
-    // Keep the navigation/action gate in sync after every explicit setup-page
-    // check, including transitions from ready to stopped or uncertain. The
-    // access provider performs its own fail-closed probe, so stale local
-    // reports are never promoted into global readiness.
-    // The launcher owns an explicit Start runtime action. Its passive status
-    // synchronization must never race that action by starting Runtime in the
-    // background.
-    void refreshRuntimeAccess({ autoStart: false });
+    // Keep the navigation/action gate in sync after every setup-page check.
+    // The access provider coordinates exactly one automatic Runtime start;
+    // stale local reports are never promoted into global readiness.
+    void refreshRuntimeAccess({ autoStart: true });
 
     const probeIssues: ProbeIssue[] = [];
     if (prerequisites.status === "rejected") {
@@ -852,40 +889,6 @@ export function DesktopSetup() {
       }));
     }
   }, [desktopAvailable, installState.commandBusy, installState.snapshot]);
-
-  const runRuntimeAction = useCallback(async (action: "start" | "repair") => {
-    if (!desktopAvailable || runtimeCommandBusy) return;
-    setRuntimeCommandError(null);
-    setRuntimeCommandBusy(true);
-    try {
-      const nativeRuntime = action === "start" ? await startRuntime() : await repairRuntime();
-      claimDesktopRuntimeLifetime(nativeRuntime);
-      const runtime = await verifyRuntimeSessionContract(nativeRuntime);
-      const sessionFailure = runtimeSessionContractFailure(runtime);
-      if (sessionFailure) {
-        setRuntimeCommandError(
-          `${action === "start" ? "start_runtime" : "repair_runtime"}: ${sessionFailure}`,
-        );
-      }
-      if (isRuntimeFullyReady(runtime)) clearRuntimeAutoStartFailure();
-      setState((current) => ({
-        ...current,
-        runtime,
-        runtimeFresh: true,
-        issues: replaceIssues(current.issues, ["runtime"], []),
-      }));
-      // The command above is the one authoritative start/repair attempt. The
-      // follow-up refresh observes its result and must not dispatch a second
-      // maintenance command if the first status probe is briefly stale.
-      await refreshRuntimeAccess({ autoStart: false });
-    } catch (error) {
-      setRuntimeCommandError(
-        `${action === "start" ? "start_runtime" : "repair_runtime"}: ${errorMessage(error)}`,
-      );
-    } finally {
-      setRuntimeCommandBusy(false);
-    }
-  }, [desktopAvailable, refreshRuntimeAccess, runtimeCommandBusy]);
 
   const pollingOperationId = installState.snapshot?.operationId;
   const pollingPhase = installState.snapshot?.phase;
@@ -1363,6 +1366,7 @@ export function DesktopSetup() {
       >
         <RuntimeLauncherHero
           snapshot={installState.snapshot}
+          environmentProgress={launcherProgress}
           localReady={localChecksReady}
           ready={workspaceReady}
           checking={environmentChecking}
@@ -1373,14 +1377,13 @@ export function DesktopSetup() {
               (postSignInBlocked || updaterBlocksWorkspace))
           }
           accountRequired={
-            localChecksReady &&
+            launcherEnvironmentReady &&
             !workspaceReady &&
             !postSignInBlocked &&
             !updaterBlocksWorkspace
           }
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
-          onCancel={() => void cancelInstall()}
         />
 
         {postSignInBlocked &&
@@ -1393,12 +1396,6 @@ export function DesktopSetup() {
         {runtimeSessionFailureKey ? (
           <Alert tone="warning" title={t("launcher.runtimeSessionApiTitle")}>
             <p>{t(runtimeSessionFailureKey)}</p>
-          </Alert>
-        ) : null}
-
-        {runtimeCommandError ? (
-          <Alert tone="warning" title={t("desktop.runtimeActionFailed")}>
-            <code>{runtimeCommandError}</code>
           </Alert>
         ) : null}
 
@@ -1440,7 +1437,7 @@ export function DesktopSetup() {
               {t("launcher.retryChecks")}
             </button>
           </div>
-        ) : localChecksReady && !workspaceReady ? (
+        ) : launcherEnvironmentReady && !workspaceReady ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
@@ -1461,7 +1458,7 @@ export function DesktopSetup() {
             </button>
           </div>
         ) : workspaceReady ? null : localRuntimeReady &&
-          environmentChecking ? null : localRuntimeReady ? (
+          (environmentChecking || !launcherEnvironmentReady) ? null : localRuntimeReady ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
@@ -1473,24 +1470,6 @@ export function DesktopSetup() {
           </div>
         ) : (
           <>
-            {state.runtimeFresh && state.runtime?.installed ? (
-              <div className="launcher-ready-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary launcher-primary-action"
-                  disabled={runtimeCommandBusy}
-                  onClick={() => void runRuntimeAction(
-                    state.runtime?.running ? "repair" : "start",
-                  )}
-                >
-                  {runtimeCommandBusy
-                    ? t("desktop.runtimeActionRunning")
-                    : state.runtime.running
-                      ? t("desktop.repairRuntime")
-                      : t("desktop.startRuntime")}
-                </button>
-              </div>
-            ) : null}
             {installState.snapshot?.phase !== "completed" &&
             ((showInstallPlanner && state.plan) ||
               (installState.snapshot && installState.snapshot.phase !== "idle")) ? (
@@ -1574,12 +1553,7 @@ export function DesktopSetup() {
             <RuntimeOverview report={state.runtime} stale={!state.runtimeFresh} />
           ) : null}
           {state.runtimeFresh && state.runtime?.installed ? (
-            <InstalledRuntimeNotice
-              report={state.runtime}
-              busy={runtimeCommandBusy}
-              onStart={() => void runRuntimeAction("start")}
-              onRepair={() => void runRuntimeAction("repair")}
-            />
+            <InstalledRuntimeNotice report={state.runtime} />
           ) : null}
           {showInstallPlanner && state.plan ? (
             <InstallPlanOverview
@@ -1747,19 +1721,6 @@ export function DesktopSetup() {
           ) : null}
           {state.runtime ? (
             <RuntimeOverview report={state.runtime} stale={!state.runtimeFresh} />
-          ) : null}
-          {runtimeCommandError ? (
-            <Alert tone="warning" title={t("desktop.runtimeActionFailed")}>
-              <code>{runtimeCommandError}</code>
-            </Alert>
-          ) : null}
-          {state.runtimeFresh && state.runtime?.installed ? (
-            <InstalledRuntimeNotice
-              report={state.runtime}
-              busy={runtimeCommandBusy}
-              onStart={() => void runRuntimeAction("start")}
-              onRepair={() => void runRuntimeAction("repair")}
-            />
           ) : null}
           {showInstallPlanner && state.prerequisites ? (
             <RuntimeStorageSelector
@@ -2434,17 +2395,7 @@ function StaleResultBadge() {
   return <span className="desktop-stale-pill">{t("desktop.lastSuccessful")}</span>;
 }
 
-function InstalledRuntimeNotice({
-  report,
-  busy,
-  onStart,
-  onRepair,
-}: {
-  report: RuntimeStatusReport;
-  busy: boolean;
-  onStart: () => void;
-  onRepair: () => void;
-}) {
+function InstalledRuntimeNotice({ report }: { report: RuntimeStatusReport }) {
   const { t } = useI18n();
   const ready = isRuntimeFullyReady(report);
   return (
@@ -2455,23 +2406,6 @@ function InstalledRuntimeNotice({
         : t("desktop.runtimeNeedsRepair")}
     >
       <p>{t("desktop.installedStorageHint")}</p>
-      {!ready ? (
-        <div className="desktop-install-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            autoFocus
-            disabled={busy}
-            onClick={report.running ? onRepair : onStart}
-          >
-            {busy
-              ? t("desktop.runtimeActionRunning")
-              : report.running
-                ? t("desktop.repairRuntime")
-                : t("desktop.startRuntime")}
-          </button>
-        </div>
-      ) : null}
     </Alert>
   );
 }
@@ -2571,6 +2505,7 @@ const LAUNCHER_STATUS_KEYS: Record<RuntimeInstallPhase, TranslationKey> = {
 
 function RuntimeLauncherHero({
   snapshot,
+  environmentProgress,
   localReady,
   ready,
   checking,
@@ -2578,9 +2513,9 @@ function RuntimeLauncherHero({
   accountRequired,
   automaticStartPending,
   commandBusy,
-  onCancel,
 }: {
   snapshot: RuntimeInstallSnapshot | null;
+  environmentProgress: number;
   localReady: boolean;
   ready: boolean;
   checking: boolean;
@@ -2588,7 +2523,6 @@ function RuntimeLauncherHero({
   accountRequired: boolean;
   automaticStartPending: boolean;
   commandBusy: boolean;
-  onCancel: () => void;
 }) {
   const { t } = useI18n();
   const phase = snapshot?.phase ?? "idle";
@@ -2596,17 +2530,9 @@ function RuntimeLauncherHero({
   const total = snapshot?.bytesTotal ?? null;
   const downloaded = snapshot?.bytesDownloaded ?? 0;
   const measuredPercent = runtimeInstallPercent(downloaded, total);
-  const percent = localReady
-    ? 100
-    : measuredPercent !== null
-      ? Math.min(measuredPercent, 99)
-      : checking ||
-          gateBlocked ||
-          accountRequired ||
-          automaticStartPending ||
-          phase === "completed"
-        ? 99
-        : null;
+  const percent = active
+    ? Math.max(1, Math.min(measuredPercent ?? 1, 96))
+    : environmentProgress;
   const status = ready
     ? t("launcher.status.ready")
     : commandBusy && active
@@ -2617,6 +2543,8 @@ function RuntimeLauncherHero({
         ? t("launcher.status.blocked")
       : accountRequired
         ? t("launcher.status.signIn")
+      : localReady && environmentProgress < 100
+        ? t("launcher.status.checking")
       : phase === "completed"
         ? t("launcher.status.healthChecking")
       : (checking || automaticStartPending) && phase === "idle"
@@ -2647,21 +2575,6 @@ function RuntimeLauncherHero({
           <span className="launcher-progress-percent">
             {percent === null ? "" : `${percent}%`}
           </span>
-          {active ? (
-            <button
-              type="button"
-              className="btn launcher-progress-action"
-              aria-label={t("launcher.pauseInstall")}
-              data-tooltip={t("launcher.pauseInstall")}
-              disabled={commandBusy}
-              onClick={onCancel}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="6.5" y="5" width="3.5" height="14" rx="1.25" />
-                <rect x="14" y="5" width="3.5" height="14" rx="1.25" />
-              </svg>
-            </button>
-          ) : null}
         </div>
       </div>
     </div>

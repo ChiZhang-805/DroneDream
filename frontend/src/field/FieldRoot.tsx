@@ -2,6 +2,7 @@ import { Settings } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import { DroneLaunchSceneCore } from "../components/DroneLaunchScene";
+import { useLauncherProgress } from "../desktop/launcherProgress";
 import { FieldAuthControl } from "./FieldAuthControl";
 import { FieldBrandLockup } from "./FieldBrandLockup";
 import { useFieldLocale } from "./FieldLocaleProvider";
@@ -178,30 +179,23 @@ function FieldLaunchScreen({
 
 export function FieldRoot() {
   const { locale, setLocale } = useFieldLocale();
-  const [progress, setProgress] = useState(8);
   const [entered, setEntered] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
+  const [fieldWorkspaceLoaded, setFieldWorkspaceLoaded] = useState(false);
+  const progress = useLauncherProgress({
+    enabled: true,
+    complete: fieldWorkspaceLoaded,
+  });
   useEffect(() => {
     let active = true;
-    const timers = [
-      window.setTimeout(() => active && setProgress(36), 180),
-      window.setTimeout(() => active && setProgress(68), 460),
-      window.setTimeout(() => active && setProgress(88), 760),
-    ];
     const fontsReady = "fonts" in document
       ? document.fonts.ready.catch(() => undefined)
       : Promise.resolve();
-    void Promise.all([
-      fontsReady,
-      import("./FieldApp"),
-      new Promise<void>((resolve) => window.setTimeout(resolve, 1_050)),
-    ]).then(() => {
-      if (active) setProgress(100);
+    void Promise.all([fontsReady, import("./FieldApp")]).then(() => {
+      if (active) setFieldWorkspaceLoaded(true);
     });
     return () => {
       active = false;
-      timers.forEach((timer) => window.clearTimeout(timer));
     };
   }, []);
 

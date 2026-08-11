@@ -142,11 +142,10 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
       return;
     }
 
-    // A full automatic check is allowed only on the setup screen, before the
-    // user enters the workspace. Dashboard, history, settings, and route
-    // changes must never start a probe. Inside the workspace, refresh() is the
-    // sole full-check entry point and is wired only to the explicit Settings
-    // button.
+    // A full automatic check and the one coordinated Runtime start are allowed
+    // only on the setup screen, before the user enters the workspace.
+    // Dashboard, history, settings, and route changes must never start a probe.
+    // Inside the workspace, refresh() remains the sole full-check entry point.
     if (initialPath.current !== "/desktop/setup" || getDesktopReadinessSession()) {
       setIsChecking(false);
       return;
@@ -157,7 +156,7 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     setIsChecking(true);
     let automaticStartAttempted = false;
     void ensureOverallDesktopReadiness({
-      autoStart: false,
+      autoStart: true,
       shouldAutoStart: () => requestId.current === currentRequest,
       onStarting: () => {
         automaticStartAttempted = true;
