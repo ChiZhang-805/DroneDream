@@ -646,3 +646,32 @@ been removed without losing recovery evidence.
   its provider client is registered with the exact Universal loopback URI, all
   four live probes pass, the hosted consent route has a trusted certificate,
   and each installed edition completes the browser-to-loopback round trip.
+
+### A14 - Launcher readiness and action-boundary verification
+
+- Product rule: a missing Runtime exposes only its install action at 0%; an
+  installed Runtime starts automatically and does not expose a manual Start or
+  Repair action. Readiness advances through visible intermediate milestones for
+  about five seconds, never creates a 99% action point, and exposes browser
+  sign-in only after the real checks and visual sequence both reach 100%.
+  Standalone FIELD follows the same action boundary while retaining its
+  real-device-only product language.
+- Visual verification: the shared Universal/SIM/LAB launcher fixture passed 24
+  English/Chinese, dark/light, desktop/tablet/mobile, missing/ready cases. All
+  12 ready cases called `start_runtime` exactly once, completed in
+  5.018-5.023 seconds, ended at 100%, and first exposed their primary action at
+  100%; all 12 missing cases remained at 0% and never started Runtime. The
+  receipt SHA-256 was
+  `7548d70ea4d3a83fba67e7d9f4e997a169a359093428ed6d96da47deaa9e1895`.
+  FIELD separately passed six English/Chinese desktop/tablet/mobile cases in
+  5.001-5.003 seconds, with no 99% or premature action, plus a real canvas click
+  that changed the drone from hover to starflight. Its receipt SHA-256 was
+  `2c9132da0d9c23e44bb65b930df2f8f18775e74bf21b6d13ee5fc540a16677c7`.
+- Failure lesson and cleanup: the first shared-launcher visual attempt stopped
+  after one case because the fixture inherited Universal as the default edition
+  while asserting SIM branding. The fixture now explicitly freezes
+  `VITE_DRONEDREAM_EDITION=sim`, so it tests the intended product identity
+  independently of the caller's environment. The failed one-case evidence,
+  successful screenshot matrices, temporary FIELD bundle, and incremental
+  build state were removed after their receipt facts and hashes were recorded;
+  no installer or installed application was changed by these offline fixtures.

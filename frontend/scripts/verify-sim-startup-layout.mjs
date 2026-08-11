@@ -33,6 +33,7 @@ const origin = `http://${host}:${port}`;
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
+process.env.VITE_DRONEDREAM_EDITION = "sim";
 process.env.VITE_SUPABASE_URL = "https://visual-fixture.supabase.co";
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_visual_fixture";
 const productionEnvironment = await readFile(
@@ -122,12 +123,26 @@ async function installDesktopFixture(context, testCase) {
     window.__SIM_VISUAL_CALLS__ = calls;
     const readinessTransitions = [];
     window.__SIM_READINESS_TRANSITIONS__ = readinessTransitions;
+    const primaryActionAppearances = [];
+    window.__SIM_PRIMARY_ACTION_APPEARANCES__ = primaryActionAppearances;
     let lastReadinessPercent = null;
+    let lastPrimaryActionSignature = null;
     const recordReadinessPercent = () => {
       const value = document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow");
-      if (value === null || value === undefined || value === lastReadinessPercent) return;
-      lastReadinessPercent = value;
-      readinessTransitions.push({ percent: Number(value), atMs: performance.now() });
+      if (value !== null && value !== undefined && value !== lastReadinessPercent) {
+        lastReadinessPercent = value;
+        readinessTransitions.push({ percent: Number(value), atMs: performance.now() });
+      }
+      const primaryAction = document.querySelector(".launcher-primary-action");
+      if (!primaryAction) return;
+      const signature = `${value ?? "none"}:${primaryAction.textContent?.trim() ?? ""}`;
+      if (signature === lastPrimaryActionSignature) return;
+      lastPrimaryActionSignature = signature;
+      primaryActionAppearances.push({
+        percent: value === null || value === undefined ? null : Number(value),
+        text: primaryAction.textContent?.trim() ?? "",
+        atMs: performance.now(),
+      });
     };
     const readinessObserver = new MutationObserver(recordReadinessPercent);
     readinessObserver.observe(document, {
@@ -316,6 +331,7 @@ async function verifyCase(browser, testCase) {
       grantsHardwareAuthority: document.documentElement.dataset.themeGrantsHardwareAuthority,
       calls: window.__SIM_VISUAL_CALLS__,
       readinessTransitions: window.__SIM_READINESS_TRANSITIONS__,
+      primaryActionAppearances: window.__SIM_PRIMARY_ACTION_APPEARANCES__,
       sceneStars: document.querySelector(".drone-launch-scene")?.getAttribute("data-scene-stars"),
       sceneParticles: document.querySelector(".drone-launch-scene")
         ?.getAttribute("data-scene-particles"),
@@ -397,17 +413,63 @@ async function verifyCase(browser, testCase) {
         `${testCase.id}: light scene is not predominantly white: ${canvasPixels.upperBrightRatio}`);
     }
     if (testCase.scenario === "ready") {
-      assert.equal(dimensions.calls.includes("start_runtime"), false);
+      assert.equal(
+        dimensions.calls.filter((command) => command === "start_runtime").length,
+        1,
+        `${testCase.id}: an installed Runtime must auto-start exactly once`,
+      );
       assert.equal(
         dimensions.readinessTransitions.at(-1)?.percent,
         100,
         `${testCase.id}: an already-ready Runtime did not render 100% readiness`,
+      );
+      assert(
+        dimensions.readinessTransitions.length >= 8,
+        `${testCase.id}: readiness did not expose a smooth multi-step sequence`,
+      );
+      assert.equal(
+        dimensions.readinessTransitions.some((transition) => transition.percent === 99),
+        false,
+        `${testCase.id}: the prohibited 99% action point was rendered`,
+      );
+      assert(
+        dimensions.readinessTransitions.some((transition) => transition.percent === 96),
+        `${testCase.id}: the final non-action readiness milestone was skipped`,
+      );
+      for (let index = 1; index < dimensions.readinessTransitions.length; index += 1) {
+        assert(
+          dimensions.readinessTransitions[index].percent
+            > dimensions.readinessTransitions[index - 1].percent,
+          `${testCase.id}: readiness must increase monotonically`,
+        );
+      }
+      const readinessDurationMs = dimensions.readinessTransitions.at(-1).atMs
+        - dimensions.readinessTransitions[0].atMs;
+      assert(
+        readinessDurationMs >= 4_500,
+        `${testCase.id}: readiness completed too quickly (${readinessDurationMs} ms)`,
+      );
+      assert(
+        readinessDurationMs <= 9_000,
+        `${testCase.id}: readiness exceeded the visual acceptance window (${readinessDurationMs} ms)`,
+      );
+      assert(
+        dimensions.primaryActionAppearances.length >= 1,
+        `${testCase.id}: sign-in action never appeared`,
+      );
+      assert(
+        dimensions.primaryActionAppearances.every((appearance) => appearance.percent === 100),
+        `${testCase.id}: a primary action appeared before 100% readiness`,
       );
     } else {
       assert.equal(dimensions.calls.includes("start_runtime"), false);
       assert.equal(
         dimensions.readinessTransitions.some((transition) => transition.percent === 100),
         false,
+      );
+      assert(
+        dimensions.primaryActionAppearances.every((appearance) => appearance.percent === 0),
+        `${testCase.id}: the Runtime install action must remain at 0%`,
       );
     }
     assert.equal(pageErrors.length, 0);

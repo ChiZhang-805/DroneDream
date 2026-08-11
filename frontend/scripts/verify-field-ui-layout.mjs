@@ -81,6 +81,34 @@ try {
     const context = await browser.newContext({ viewport: testCase.viewport });
     await context.addInitScript((locale) => {
       window.localStorage.setItem("dronedream:field:locale", locale);
+      const transitions = [];
+      const actionAppearances = [];
+      window.__FIELD_READINESS_TRANSITIONS__ = transitions;
+      window.__FIELD_ACTION_APPEARANCES__ = actionAppearances;
+      let lastPercent = null;
+      let actionRecorded = false;
+      const recordLauncherState = () => {
+        const value = document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow");
+        if (value !== null && value !== undefined && value !== lastPercent) {
+          lastPercent = value;
+          transitions.push({ percent: Number(value), atMs: performance.now() });
+        }
+        const action = document.querySelector(".field-auth-control-launcher button");
+        if (action && !actionRecorded) {
+          actionRecorded = true;
+          actionAppearances.push({
+            percent: value === null || value === undefined ? null : Number(value),
+            atMs: performance.now(),
+          });
+        }
+      };
+      const observer = new MutationObserver(recordLauncherState);
+      observer.observe(document, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["aria-valuenow"],
+      });
     }, testCase.locale);
     const page = await context.newPage();
     await page.goto(`${origin}/field.html`, { waitUntil: "networkidle" });
@@ -150,6 +178,28 @@ try {
         : "登录并进入调优平台",
     });
     await entry.waitFor();
+    const launcherTiming = await page.evaluate(() => ({
+      transitions: window.__FIELD_READINESS_TRANSITIONS__,
+      actionAppearances: window.__FIELD_ACTION_APPEARANCES__,
+    }));
+    assert(launcherTiming.transitions.length >= 8,
+      `${testCase.id}: Field readiness did not expose a smooth multi-step sequence`);
+    assert.equal(launcherTiming.transitions.at(-1)?.percent, 100,
+      `${testCase.id}: Field readiness did not finish at 100%`);
+    assert.equal(launcherTiming.transitions.some((transition) => transition.percent === 99), false,
+      `${testCase.id}: Field rendered the prohibited 99% action point`);
+    for (let index = 1; index < launcherTiming.transitions.length; index += 1) {
+      assert(launcherTiming.transitions[index].percent > launcherTiming.transitions[index - 1].percent,
+        `${testCase.id}: Field readiness must increase monotonically`);
+    }
+    const launcherDurationMs = launcherTiming.transitions.at(-1).atMs
+      - launcherTiming.transitions[0].atMs;
+    assert(launcherDurationMs >= 4_500 && launcherDurationMs <= 9_000,
+      `${testCase.id}: Field readiness duration is outside the visual acceptance window (${launcherDurationMs} ms)`);
+    assert(launcherTiming.actionAppearances.length >= 1,
+      `${testCase.id}: Field sign-in action never appeared`);
+    assert(launcherTiming.actionAppearances.every((appearance) => appearance.percent === 100),
+      `${testCase.id}: Field sign-in action appeared before 100% readiness`);
     const entryBounds = await entry.boundingBox();
     assert(entryBounds && entryBounds.x >= 0 && entryBounds.y >= 0 &&
       entryBounds.x + entryBounds.width <= testCase.viewport.width + 1 &&
@@ -201,6 +251,7 @@ try {
       canvasBounds,
       canvasPixelStats,
       entryBounds,
+      launcherTiming,
       droneInteraction: "hover-to-starflight",
       screenshot: {
         path: path.relative(repoRoot, screenshotPath).replaceAll("\\", "/"),
