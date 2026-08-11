@@ -719,3 +719,12 @@ been removed without losing recovery evidence.
   failed launches produced no dedicated failure output. Generated `site-dist`
   is deleted after verification, while selected screenshots remain under the
   external UI-acceptance root rather than inside the authoritative source tree.
+- Production deployment lesson: the exact feature-branch artifact built and
+  uploaded successfully, but its first deploy job was rejected before executing
+  because the `github-pages` environment allowed only `main`. Fast-forwarding
+  the branch would have published 670 unrelated commits, so the deploy used one
+  temporary exact-branch environment rule instead. The failed publish created no
+  site mutation; its failed job alone was rerun successfully, and the temporary
+  rule was then deleted. A read-back confirmed that `main` is again the sole
+  allowed Pages branch. Production Edge checks matched the local one-screen and
+  color assertions after deployment.
