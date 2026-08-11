@@ -395,6 +395,10 @@ export function DesktopSetup() {
     updater.status === "available" ||
     updater.status === "engineError" ||
     updater.status === "runtimeBaseRequired";
+  const updaterActionRequired =
+    updater.status === "available" ||
+    updater.status === "engineError" ||
+    updater.status === "runtimeBaseRequired";
   const localChecksReady =
     localRuntimeReady &&
     !state.loading &&
@@ -438,6 +442,7 @@ export function DesktopSetup() {
     complete: localChecksReady && !updaterBlocksWorkspace,
     blocked: Boolean(
       runtimeSessionFailure ||
+      updaterActionRequired ||
       (state.runtimeFresh && state.runtime?.installed && !environmentChecking &&
         !localRuntimeReady && runtimeAccess.status !== "starting"),
     ),

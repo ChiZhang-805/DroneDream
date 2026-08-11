@@ -363,6 +363,7 @@ describe("cloud model access client", () => {
       }),
       body: JSON.stringify({
         plan_id: "plus",
+        billing_scope: "individual",
         payment_method: "wechat",
         idempotency_key: "6f882c36-e6df-4a44-af8d-2ae0104f6bf0",
       }),

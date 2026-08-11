@@ -7,6 +7,7 @@ import {
 import type { ManagedModelProvider } from "./ModelAccessContext";
 
 export type ManagedModelPlanId = "free" | "plus" | "pro";
+export type ManagedModelBillingScope = "individual" | "business";
 export type ManagedModelGrantScope = "assistant" | "job";
 export type PaymentMethod = "alipay" | "wechat" | "card";
 
@@ -48,6 +49,12 @@ export interface ManagedModelUsageRequest {
 
 export interface ManagedModelUsageSnapshot {
   plan: ManagedModelPlan;
+  account?: {
+    billing_scope: ManagedModelBillingScope;
+    organization_id: string | null;
+    organization_name: string | null;
+    organization_role: "owner" | "admin" | "member" | null;
+  };
   period: {
     starts_at: string;
     ends_at: string;
@@ -118,6 +125,7 @@ export type CheckoutTarget =
 export interface BillingCheckout {
   order_id: string;
   plan_id: Exclude<ManagedModelPlanId, "free">;
+  billing_scope: ManagedModelBillingScope;
   payment_method: PaymentMethod;
   amount_cny_fen: number;
   currency: "CNY";
@@ -379,11 +387,13 @@ export function getBillingAvailability(): Promise<BillingAvailability> {
 export function createBillingCheckout(
   planId: Exclude<ManagedModelPlanId, "free">,
   paymentMethod: PaymentMethod,
+  billingScope: ManagedModelBillingScope = "individual",
 ): Promise<BillingCheckout> {
   return cloudRequest<BillingCheckout>(resolveBillingCheckoutUrl(), "/create", {
     method: "POST",
     body: JSON.stringify({
       plan_id: planId,
+      billing_scope: billingScope,
       payment_method: paymentMethod,
       idempotency_key: crypto.randomUUID(),
     }),

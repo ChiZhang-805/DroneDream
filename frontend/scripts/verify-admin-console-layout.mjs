@@ -197,24 +197,47 @@ try {
       const userGeometry = await geometry(page);
       assert.equal(userGeometry.passwordInputs, 0);
       assert.equal(userGeometry.documentScrollWidth, userGeometry.documentWidth);
-      const userTableScroll = page.locator(".admin-users-panel .admin-table-scroll");
-      await userTableScroll.scrollIntoViewIfNeeded();
+      const userTable = page.locator(".admin-users-table");
+      await userTable.scrollIntoViewIfNeeded();
       entry.users = {
         ...userGeometry,
         image: await screenshot(page, testCase, "users"),
       };
-      entry.users.horizontalScroll = await userTableScroll.evaluate((element) => {
-        element.scrollLeft = element.scrollWidth;
+      entry.users.tableFit = await userTable.evaluate((element) => {
         return {
           clientWidth: element.clientWidth,
           scrollWidth: element.scrollWidth,
-          scrollLeft: element.scrollLeft,
+          fits: element.scrollWidth <= element.clientWidth + 1,
         };
       });
-      if (entry.users.horizontalScroll.scrollWidth > entry.users.horizontalScroll.clientWidth + 1) {
-        assert(entry.users.horizontalScroll.scrollLeft > 0);
-      }
+      assert(entry.users.tableFit.fits, "user directory must not scroll horizontally");
       entry.users.usageImage = await screenshot(page, testCase, "users-usage");
+      const detailsTrigger = page.getByRole("button", { name: testCase.locale === "en"
+        ? "View details"
+        : "查看详情" }).first();
+      await detailsTrigger.click();
+      const userDialog = page.getByRole("dialog");
+      await userDialog.waitFor();
+      entry.users.detailsImage = await screenshot(page, testCase, "user-details");
+      await userDialog.getByRole("button", { name: testCase.locale === "en"
+        ? "Delete account"
+        : "删除账户" }).click();
+      const deletionReason = userDialog.getByLabel(testCase.locale === "en"
+        ? "Deletion reason"
+        : "删除原因");
+      const deleteAccount = userDialog.getByRole("button", { name: testCase.locale === "en"
+        ? "Permanently delete"
+        : "永久删除" });
+      assert(await deleteAccount.isDisabled());
+      await deletionReason.fill(testCase.locale === "en"
+        ? "Verified duplicate preview account"
+        : "已核实的重复预览账户");
+      assert(await deleteAccount.isEnabled());
+      entry.users.deletionImage = await screenshot(page, testCase, "user-delete-confirmation");
+      await userDialog.getByRole("button", { name: testCase.locale === "en"
+        ? "Close"
+        : "关闭" }).click();
+      await userDialog.waitFor({ state: "detached" });
 
       await page.getByRole("button", { name: testCase.locale === "en"
         ? "Community & audit"

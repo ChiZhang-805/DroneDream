@@ -75,6 +75,12 @@ function Get-OAuthClientId {
     param([Parameter(Mandatory = $true)][string]$EditionId)
     $editionVariable = "DRONEDREAM_OAUTH_CLIENT_ID_$($EditionId.ToUpperInvariant())"
     $value = [Environment]::GetEnvironmentVariable($editionVariable, "Process")
+    if (-not $value) {
+        # OAuth client IDs are public application identifiers. Keep an explicit
+        # process override for CI, while allowing the reviewed per-user desktop
+        # registration to drive a local four-edition release build.
+        $value = [Environment]::GetEnvironmentVariable($editionVariable, "User")
+    }
     if (-not $value -and $Edition -ne "all") {
         $value = [Environment]::GetEnvironmentVariable("DRONEDREAM_OAUTH_CLIENT_ID", "Process")
     }

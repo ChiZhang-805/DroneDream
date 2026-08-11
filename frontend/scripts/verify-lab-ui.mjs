@@ -202,7 +202,7 @@ const server = await createServer({
   server: { host, port, strictPort: true },
 });
 await server.listen();
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ channel: "msedge", headless: true });
 const evidence = [];
 
 try {

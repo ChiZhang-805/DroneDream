@@ -36,7 +36,7 @@ const OAUTH_AUTHORIZE_URL: &str =
     "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize";
 const OAUTH_TOKEN_URL: &str = "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/token";
 const EXPECTED_ISSUER: &str = "https://yggabfynndpzymlqvnim.supabase.co/auth/v1";
-const HOMEPAGE_URL: &str = "http://getdronedream.com/";
+const HOMEPAGE_URL: &str = "https://getdronedream.com/";
 const AUTH_PROTOCOL_VERSION: &str = "desktop-browser-auth-pkce-v1";
 const AUTH_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const TOKEN_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);

@@ -4,6 +4,11 @@ import { BrandLockup } from "../components/BrandLockup";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
+import { getManagedModelUsage } from "../features/settings/cloudModelAccess";
+import {
+  getOrganizationAccess,
+  type OrganizationAccess,
+} from "../features/organization/organizationConsole";
 import {
   captchaProtectionConfigured,
   turnstileSiteKey,
@@ -13,6 +18,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
 import { ManualPage } from "./ManualPage";
 import { OAuthConsentPage } from "./OAuthConsentPage";
+import { OrganizationPage } from "./OrganizationPage";
 import { PricingPage } from "./PricingPage";
 import { ProductPage } from "./ProductPage";
 import {
@@ -60,6 +66,8 @@ const content = {
     closeMenu: "Close navigation",
     downloadShort: "Download",
     console: "Console",
+    organization: "Manage organization",
+    accountPlan: "Plan",
     signIn: "Sign in",
     register: "Register",
     account: "Account",
@@ -248,6 +256,8 @@ const content = {
     closeMenu: "关闭导航",
     downloadShort: "下载",
     console: "控制台",
+    organization: "企业管理",
+    accountPlan: "套餐",
     signIn: "登录",
     register: "注册",
     account: "账号",
@@ -782,6 +792,12 @@ export function SiteApp() {
   const [authCaptchaCycle, setAuthCaptchaCycle] = useState(0);
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [organizationAccess, setOrganizationAccess] =
+    useState<OrganizationAccess | null>(null);
+  const [accountPlan, setAccountPlan] = useState<{
+    name: string;
+    billingScope: "individual" | "business";
+  } | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
@@ -795,11 +811,40 @@ export function SiteApp() {
       ? "product"
       : path === "/pricing"
         ? "pricing"
+      : path === "/organization"
+        ? "organization"
       : path === "/community"
         ? "community"
         : path === "/oauth/consent"
           ? "oauth-consent"
         : "home";
+
+  useEffect(() => {
+    let active = true;
+    if (!auth.account) {
+      setOrganizationAccess(null);
+      setAccountPlan(null);
+      return () => { active = false; };
+    }
+    void Promise.allSettled([
+      getOrganizationAccess(),
+      getManagedModelUsage(),
+    ]).then(([organizationResult, usageResult]) => {
+      if (!active) return;
+      setOrganizationAccess(
+        organizationResult.status === "fulfilled" ? organizationResult.value : null,
+      );
+      setAccountPlan(
+        usageResult.status === "fulfilled"
+          ? {
+              name: usageResult.value.plan.name,
+              billingScope: usageResult.value.account?.billing_scope ?? "individual",
+            }
+          : null,
+      );
+    });
+    return () => { active = false; };
+  }, [auth.account]);
 
   useEffect(() => {
     document.title = copy.metaTitle;
@@ -1134,6 +1179,9 @@ export function SiteApp() {
           {copy.nav.map(([label, target]) => (
             <a key={target} href={target} onClick={closeMenu}>{label}</a>
           ))}
+          {organizationAccess?.authorized ? (
+            <a href="/organization/" onClick={closeMenu}>{copy.organization}</a>
+          ) : null}
           <button type="button" onClick={openConsole}>{copy.console}</button>
         </nav>
         <div className="site-header-actions">
@@ -1184,6 +1232,8 @@ export function SiteApp() {
             authenticated={Boolean(auth.account)}
             onRequireAccount={() => openAccount("register")}
           />
+        ) : sitePage === "organization" ? (
+          <OrganizationPage locale={locale} />
         ) : sitePage === "community" ? (
           <CommunityPage
             locale={locale}
@@ -1472,10 +1522,21 @@ export function SiteApp() {
                 <AccountIcon />
                 <strong>{auth.account.displayName}</strong>
                 <span>{auth.account.email}</span>
+                {accountPlan ? (
+                  <span className="site-auth-plan">
+                    {copy.accountPlan}: {accountPlan.billingScope === "business" ? "Business " : ""}{accountPlan.name}
+                  </span>
+                ) : null}
                 <a className="site-button site-button-primary" href="/console/">
                   {copy.openConsole}
                   <ArrowRightIcon />
                 </a>
+                {organizationAccess?.authorized ? (
+                  <a className="site-button site-button-secondary" href="/organization/">
+                    {copy.organization}
+                    <ArrowRightIcon />
+                  </a>
+                ) : null}
                 <button
                   type="button"
                   className="site-auth-text-button"

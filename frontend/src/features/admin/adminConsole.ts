@@ -4,6 +4,7 @@ import {
   FetchResponseSizeError,
   fetchWithDeadline,
 } from "../../api/fetchWithDeadline";
+import type { SoftwareEditionId } from "../licensing/softwareLicense";
 
 export type AdminRange = "7d" | "30d" | "90d";
 export type ManagedProviderId = "openai" | "deepseek" | "qwen";
@@ -130,11 +131,15 @@ export interface AdminManagedModel {
 
 export interface AdminUserRow {
   id: string;
+  display_name: string;
   email: string;
   created_at: string;
   last_sign_in_at: string | null;
   plan: "free" | "plus" | "pro";
+  billing_scope: "individual" | "business";
+  organization_name: string | null;
   subscription_status: string;
+  licensed_editions: SoftwareEditionId[];
   period_consumed_ai_credits: number;
   period_remaining_ai_credits: number;
   period_request_count: number;
@@ -240,8 +245,10 @@ function authenticatedHeaders(accept = "application/json"): Record<string, strin
   };
 }
 
-function safeCsvCell(value: string | number | null): string {
-  let normalized = value === null ? "" : String(value);
+function safeCsvCell(value: unknown): string {
+  let normalized = Array.isArray(value)
+    ? value.join("|")
+    : value === null || value === undefined ? "" : String(value);
   if (/^[=+\-@]/u.test(normalized)) normalized = `'${normalized}`;
   return `"${normalized.replaceAll('"', '""')}"`;
 }
@@ -455,9 +462,9 @@ function previewDashboard(range: AdminRange): AdminDashboardSnapshot {
 }
 
 const PREVIEW_USERS: AdminUserRow[] = [
-  { id: "usr-001", email: "pilot.one@example.test", created_at: "2026-07-02T08:00:00Z", last_sign_in_at: "2026-08-01T22:14:00Z", plan: "pro", subscription_status: "active", period_consumed_ai_credits: 1840, period_remaining_ai_credits: 8160, period_request_count: 43, period_total_tokens: 231440 },
-  { id: "usr-002", email: "pilot.two@example.test", created_at: "2026-07-14T11:30:00Z", last_sign_in_at: "2026-08-01T19:05:00Z", plan: "plus", subscription_status: "active", period_consumed_ai_credits: 640, period_remaining_ai_credits: 2360, period_request_count: 19, period_total_tokens: 97220 },
-  { id: "usr-003", email: "pilot.three@example.test", created_at: "2026-07-28T04:40:00Z", last_sign_in_at: null, plan: "free", subscription_status: "free", period_consumed_ai_credits: 0, period_remaining_ai_credits: 100, period_request_count: 0, period_total_tokens: 0 },
+  { id: "usr-001", display_name: "Avery Lin", email: "pilot.one@example.test", created_at: "2026-07-02T08:00:00Z", last_sign_in_at: "2026-08-01T22:14:00Z", plan: "pro", billing_scope: "individual", organization_name: null, subscription_status: "active", licensed_editions: ["universal", "sim", "lab", "field"], period_consumed_ai_credits: 1840, period_remaining_ai_credits: 8160, period_request_count: 43, period_total_tokens: 231440 },
+  { id: "usr-002", display_name: "Morgan Wu", email: "pilot.two@example.test", created_at: "2026-07-14T11:30:00Z", last_sign_in_at: "2026-08-01T19:05:00Z", plan: "plus", billing_scope: "business", organization_name: "Northwind Robotics", subscription_status: "active", licensed_editions: ["sim", "lab"], period_consumed_ai_credits: 640, period_remaining_ai_credits: 2360, period_request_count: 19, period_total_tokens: 97220 },
+  { id: "usr-003", display_name: "Riley Chen", email: "pilot.three@example.test", created_at: "2026-07-28T04:40:00Z", last_sign_in_at: null, plan: "free", billing_scope: "individual", organization_name: null, subscription_status: "active", licensed_editions: [], period_consumed_ai_credits: 0, period_remaining_ai_credits: 100, period_request_count: 0, period_total_tokens: 0 },
 ];
 
 const PREVIEW_TOPICS: AdminTopicRow[] = [
@@ -471,7 +478,7 @@ const PREVIEW_AUDIT: AdminAuditRow[] = [
 
 export async function getAdminAccess(): Promise<AdminAccessSnapshot> {
   if (adminPreviewEnabled()) {
-    return { authorized: true, role: "owner", permissions: ["metrics.read", "users.read", "users.export", "models.write", "community.moderate", "audit.read"] };
+    return { authorized: true, role: "owner", permissions: ["dashboard.read", "models.read", "models.write", "users.read", "users.export", "users.delete", "community.read", "community.remove", "audit.read"] };
   }
   return adminRequest<AdminAccessSnapshot>("/access");
 }
@@ -515,6 +522,17 @@ export async function listAdminUsers(
   const params = new URLSearchParams({ page: String(page), page_size: "25" });
   if (search.trim()) params.set("search", search.trim());
   return adminRequest<AdminPageResult<AdminUserRow>>(`/users?${params}`);
+}
+
+export async function deleteAdminUser(userId: string, reason: string): Promise<void> {
+  if (adminPreviewEnabled()) return;
+  await adminRequest<{ deleted_user_id: string; deleted: true }>(
+    `/users/${encodeURIComponent(userId)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: reason.trim() }),
+    },
+  );
 }
 
 export async function exportAdminUsers(search: string): Promise<AdminUserExport> {

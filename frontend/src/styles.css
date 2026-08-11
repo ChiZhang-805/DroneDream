@@ -2609,6 +2609,7 @@ code {
   --text: #fff7ff;
   --text-muted: #d6b7ea;
   --text-dim: #f0d9ff;
+  --text-secondary: var(--text-dim);
   --primary: #ff73d5;
   --primary-strong: #a855f7;
   --success: #5df7c8;
@@ -12740,6 +12741,139 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
   width: 100%;
 }
 
+.admin-users-table {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-users-table table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.admin-users-table th:nth-child(1) { width: 31%; }
+.admin-users-table th:nth-child(2) { width: 19%; }
+.admin-users-table th:nth-child(3) { width: 18%; }
+.admin-users-table th:nth-child(4) { width: 18%; }
+.admin-users-table th:nth-child(5) { width: 14%; }
+
+.admin-users-table td {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-users-table td strong,
+.admin-users-table td small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-user-details-button {
+  min-height: 32px;
+  padding: 0.38rem 0.58rem;
+  white-space: nowrap;
+}
+
+.admin-user-dialog {
+  width: min(100%, 620px);
+}
+
+.admin-user-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-user-dialog > header span,
+.admin-user-detail-grid dt {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-user-dialog > header h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.35rem;
+}
+
+.admin-user-dialog > header p {
+  margin-top: 0.18rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-dialog > .admin-user-license-card {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-elev));
+}
+
+.admin-user-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.admin-user-detail-grid > div {
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--bg-elev-2) 70%, transparent);
+}
+
+.admin-user-detail-grid dd {
+  margin: 0.3rem 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 760;
+}
+
+.admin-user-danger-zone {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.9rem;
+  border-top: 1px solid color-mix(in srgb, #e05278 24%, transparent);
+}
+
+.admin-dialog > .admin-user-delete-confirmation {
+  display: grid;
+  justify-content: stretch;
+  gap: 1rem;
+  padding-top: 0.35rem;
+}
+
+.admin-user-delete-confirmation > p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.admin-user-delete-confirmation label {
+  display: grid;
+  gap: 0.48rem;
+  font-weight: 700;
+}
+
+.admin-user-delete-confirmation textarea {
+  min-height: 6.5rem;
+  resize: vertical;
+}
+
+.admin-user-delete-confirmation > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.7rem;
+}
+
 .admin-community-grid {
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
   margin-top: 0.8rem;
@@ -12843,6 +12977,16 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
     align-items: stretch;
     flex-direction: column;
   }
+
+  .admin-users-table th:nth-child(1) { width: 39%; }
+  .admin-users-table th:nth-child(2) { width: 24%; }
+  .admin-users-table th:nth-child(3) { width: 22%; }
+  .admin-users-table th:nth-child(4),
+  .admin-users-table td:nth-child(4) { display: none; }
+  .admin-users-table th:nth-child(5) { width: 15%; }
+  .admin-user-details-button { font-size: 0; }
+  .admin-user-details-button::after { content: "•••"; font-size: 0.86rem; }
+  .admin-user-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .admin-hero-actions > label,
   .admin-hero-actions select,

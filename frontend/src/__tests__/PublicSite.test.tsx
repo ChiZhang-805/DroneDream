@@ -164,7 +164,7 @@ describe("DroneDream public website", () => {
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "The same complete product. More included AI." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Choose the optimization depth for every flight." })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Free" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Plus" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeVisible();
@@ -182,7 +182,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByText(/3,000,000 managed AI credits/i)).toBeVisible();
     expect(screen.getByText(/15,000,000 managed AI credits/i)).toBeVisible();
     expect(screen.getAllByText(
-      "Full AURORA optimization Harness",
+      "Team AURORA optimization Harness",
     )).toHaveLength(3);
     const expectedFeatureOrder = [
       "workflow",
@@ -190,7 +190,10 @@ describe("DroneDream public website", () => {
       "allowance",
       "byok",
       "reports",
+      "comparisonWorkspace",
       "watermarkFree",
+      "premiumRouting",
+      "advancedHarness",
     ];
     container.querySelectorAll<HTMLElement>(".pricing-card").forEach((card) => {
       expect(

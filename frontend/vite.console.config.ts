@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
     base: "/console/",
     define: {
       "import.meta.env.VITE_PUBLIC_DEMO_CONSOLE": JSON.stringify("true"),
+      __DRONEDREAM_BUILD_EDITION__: JSON.stringify("universal"),
     },
     build: {
       outDir: "site-dist/console",

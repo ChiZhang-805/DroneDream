@@ -639,7 +639,7 @@ export function CommunityPage({
           ))}
         </div>
 
-        {loading ? <p role="status">{copy.loading}</p> : null}
+        {loading ? <p className="community-state" role="status">{copy.loading}</p> : null}
 
         {!loading && error ? (
           <p className="community-state is-error" role="status">{error}</p>

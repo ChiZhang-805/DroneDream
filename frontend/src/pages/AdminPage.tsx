@@ -11,6 +11,7 @@ import {
 import { useAdminAccess } from "../features/admin/AdminAccessContext";
 import {
   AdminConsoleError,
+  deleteAdminUser,
   exportAdminUsers,
   getAdminDashboard,
   listAdminAudit,
@@ -26,6 +27,8 @@ import {
   type AdminTopicRow,
   type AdminUserRow,
 } from "../features/admin/adminConsole";
+import { EditionLicenseStrip } from "../components/EditionLicenseStrip";
+import { useModalFocus } from "../hooks/useModalFocus";
 import { useI18n } from "../i18n/I18nProvider";
 
 type AdminTab = "overview" | "models" | "users" | "community";
@@ -114,14 +117,34 @@ const COPY = {
     exportScope: "Exports every user matching the applied email search. Passwords, API keys, auth tokens, and raw conversations are excluded.",
     searchEmail: "Search email",
     search: "Search",
+    name: "Account",
     email: "Email",
     plan: "Subscription",
+    applications: "Applications",
+    scope: "Billing scope",
+    organization: "Organization",
+    created: "Registered",
     lastSignIn: "Last sign-in",
     usage: "Current-period usage",
     requests: "requests",
     remaining: "remaining",
     noUsers: "No users match this search.",
     userPortfolio: "Account portfolio",
+    viewDetails: "View details",
+    detailsTitle: "Account details",
+    closeDetails: "Close",
+    deleteAccount: "Delete account",
+    deleteAccountTitle: "Permanently delete account",
+    deleteAccountWarning: "This permanently removes the sign-in account and all data that is not protected by financial or administrative retention. This cannot be undone.",
+    deleteReason: "Deletion reason",
+    deleteReasonPlaceholder: "State the verified reason (minimum 8 characters).",
+    confirmDeleteAccount: "Permanently delete",
+    deletingAccount: "Deleting account…",
+    deleteAccountFailed: "The account could not be deleted.",
+    backToDetails: "Back to details",
+    individual: "Individual",
+    business: "Business",
+    noOrganization: "Personal account",
     previous: "Previous",
     next: "Next",
     page: "Page",
@@ -261,14 +284,34 @@ const COPY = {
     exportScope: "导出符合当前邮箱搜索条件的全部用户；不包含密码、API Key、登录令牌或原始对话。",
     searchEmail: "搜索邮箱",
     search: "搜索",
+    name: "账户",
     email: "邮箱",
     plan: "订阅",
+    applications: "软件授权",
+    scope: "计费类型",
+    organization: "所属企业",
+    created: "注册时间",
     lastSignIn: "最近登录",
     usage: "本周期用量",
     requests: "次请求",
     remaining: "剩余额度",
     noUsers: "没有符合条件的用户。",
     userPortfolio: "账户结构",
+    viewDetails: "查看详情",
+    detailsTitle: "账户详情",
+    closeDetails: "关闭",
+    deleteAccount: "删除账户",
+    deleteAccountTitle: "永久删除账户",
+    deleteAccountWarning: "此操作会永久删除登录账户及所有不受财务或管理留存要求保护的数据，且无法撤销。",
+    deleteReason: "删除原因",
+    deleteReasonPlaceholder: "填写已核实的原因（至少 8 个字符）。",
+    confirmDeleteAccount: "永久删除",
+    deletingAccount: "正在删除账户…",
+    deleteAccountFailed: "无法删除该账户。",
+    backToDetails: "返回详情",
+    individual: "个人版",
+    business: "企业版",
+    noOrganization: "个人账户",
     previous: "上一页",
     next: "下一页",
     page: "第",
@@ -476,6 +519,10 @@ export function AdminPage() {
   const [dashboard, setDashboard] = useState<AdminDashboardSnapshot | null>(null);
   const [models, setModels] = useState<AdminManagedModel[]>([]);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
+  const [confirmingUserDelete, setConfirmingUserDelete] = useState(false);
+  const [userDeleteReason, setUserDeleteReason] = useState("");
+  const [deletingUser, setDeletingUser] = useState(false);
   const [userPage, setUserPage] = useState(1);
   const [usersTotal, setUsersTotal] = useState(0);
   const [topics, setTopics] = useState<AdminTopicRow[]>([]);
@@ -497,26 +544,31 @@ export function AdminPage() {
   const moderationDialogRef = useRef<HTMLElement | null>(null);
   const moderationReasonRef = useRef<HTMLTextAreaElement | null>(null);
   const moderationTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const userDetailsDialogRef = useRef<HTMLElement | null>(null);
+  const userDetailsCloseRef = useRef<HTMLButtonElement | null>(null);
   const permissions = useMemo(
     () => new Set(access.access?.permissions ?? []),
     [access.access?.permissions],
   );
-  const canViewMetrics = permissions.has("metrics.read");
+  const canViewMetrics = permissions.has("dashboard.read");
+  const canReadModels = permissions.has("models.read");
   const canManageModels = permissions.has("models.write");
   const canReadUsers = permissions.has("users.read");
   const canExportUsers = permissions.has("users.export");
-  const canModerateCommunity = permissions.has("community.moderate");
+  const canDeleteUsers = permissions.has("users.delete");
+  const canReadCommunity = permissions.has("community.read");
+  const canModerateCommunity = permissions.has("community.remove");
   const canReadAudit = permissions.has("audit.read");
   const availableTabs = useMemo(() => ([
     ...(canViewMetrics ? [["overview", copy.overview] as const] : []),
-    ...(canManageModels ? [["models", copy.models] as const] : []),
+    ...(canReadModels ? [["models", copy.models] as const] : []),
     ...(canReadUsers ? [["users", copy.users] as const] : []),
-    ...(canModerateCommunity || canReadAudit
+    ...(canReadCommunity || canReadAudit
       ? [["community", copy.community] as const]
       : []),
   ]), [
-    canManageModels,
-    canModerateCommunity,
+    canReadCommunity,
+    canReadModels,
     canReadAudit,
     canReadUsers,
     canViewMetrics,
@@ -540,11 +592,11 @@ export function AdminPage() {
     try {
       const [nextDashboard, nextModels, nextUsers, nextTopics, nextAudit] = await Promise.all([
         canViewMetrics ? getAdminDashboard(range) : Promise.resolve(null),
-        canManageModels ? listAdminModels() : Promise.resolve([]),
+        canReadModels ? listAdminModels() : Promise.resolve([]),
         canReadUsers
           ? listAdminUsers(userPage, submittedUserSearch)
           : Promise.resolve({ items: [], page: 1, page_size: 25, total: 0 }),
-        canModerateCommunity
+        canReadCommunity
           ? listAdminTopics(topicPage)
           : Promise.resolve({ items: [], page: 1, page_size: 25, total: 0 }),
         canReadAudit
@@ -567,8 +619,8 @@ export function AdminPage() {
     }
   }, [
     access.status,
-    canManageModels,
-    canModerateCommunity,
+    canReadCommunity,
+    canReadModels,
     canReadAudit,
     canReadUsers,
     canViewMetrics,
@@ -593,6 +645,10 @@ export function AdminPage() {
     setDashboard(null);
     setModels([]);
     setUsers([]);
+    setSelectedUser(null);
+    setConfirmingUserDelete(false);
+    setUserDeleteReason("");
+    setDeletingUser(false);
     setUsersTotal(0);
     setTopics([]);
     setTopicsTotal(0);
@@ -604,6 +660,19 @@ export function AdminPage() {
     setModerationReason("");
     setModerating(false);
   }, [access.status]);
+
+  const closeUserDetails = useCallback(() => {
+    if (deletingUser) return;
+    setSelectedUser(null);
+    setConfirmingUserDelete(false);
+    setUserDeleteReason("");
+  }, [deletingUser]);
+  const captureUserDetailsTrigger = useModalFocus({
+    open: selectedUser !== null,
+    dialogRef: userDetailsDialogRef,
+    initialFocusRef: userDetailsCloseRef,
+    onClose: closeUserDetails,
+  });
 
   const closeModeration = useCallback((restoreFocus = true) => {
     setModeratingTopic(null);
@@ -772,6 +841,32 @@ export function AdminPage() {
     }
   };
 
+  const confirmUserDeletion = async () => {
+    if (
+      !canDeleteUsers || !selectedUser || deletingUser ||
+      userDeleteReason.trim().length < 8
+    ) return;
+    setDeletingUser(true);
+    setError(null);
+    const deletedUserId = selectedUser.id;
+    try {
+      await deleteAdminUser(deletedUserId, userDeleteReason);
+      setUsers((current) => current.filter((user) => user.id !== deletedUserId));
+      setUsersTotal((current) => Math.max(0, current - 1));
+      setSelectedUser(null);
+      setConfirmingUserDelete(false);
+      setUserDeleteReason("");
+      if (canReadAudit) {
+        const refreshedAudit = await listAdminAudit(1);
+        setAudit(refreshedAudit.items);
+      }
+    } catch (caught) {
+      setError(safeError(caught, copy.deleteAccountFailed));
+    } finally {
+      setDeletingUser(false);
+    }
+  };
+
   return (
     <main className="admin-page" id="main-content" tabIndex={-1}>
       <header className="admin-hero">
@@ -894,9 +989,9 @@ export function AdminPage() {
             {models.map((item) => (
               <article key={item.provider}>
                 <div className="admin-model-title"><span>{item.display_name}</span><strong>{item.model}</strong></div>
-                <label><span>{copy.globallyEnabled}</span><input type="checkbox" checked={item.enabled} disabled={savingProvider === item.provider} onChange={() => void toggleModel(item, "enabled")} /></label>
-                <label><span>{copy.assistantEnabled}</span><input type="checkbox" checked={item.assistant_enabled} disabled={!item.enabled || savingProvider === item.provider} onChange={() => void toggleModel(item, "assistant_enabled")} /></label>
-                <label><span>{copy.jobEnabled}</span><input type="checkbox" checked={item.job_enabled} disabled={!item.enabled || savingProvider === item.provider} onChange={() => void toggleModel(item, "job_enabled")} /></label>
+                <label><span>{copy.globallyEnabled}</span><input type="checkbox" checked={item.enabled} disabled={!canManageModels || savingProvider === item.provider} onChange={() => void toggleModel(item, "enabled")} /></label>
+                <label><span>{copy.assistantEnabled}</span><input type="checkbox" checked={item.assistant_enabled} disabled={!canManageModels || !item.enabled || savingProvider === item.provider} onChange={() => void toggleModel(item, "assistant_enabled")} /></label>
+                <label><span>{copy.jobEnabled}</span><input type="checkbox" checked={item.job_enabled} disabled={!canManageModels || !item.enabled || savingProvider === item.provider} onChange={() => void toggleModel(item, "job_enabled")} /></label>
                 <small>{savingProvider === item.provider ? copy.saving : `${copy.lastChange}: ${date.format(new Date(item.updated_at))}`}</small>
               </article>
             ))}
@@ -910,9 +1005,9 @@ export function AdminPage() {
           {canExportUsers ? <p className="admin-user-export-scope">{copy.exportScope}</p> : null}
           {userExportMessage ? <p className="admin-user-export-status" role="status">{userExportMessage}</p> : null}
           {dashboard ? <div className="admin-section-summary admin-user-summary" aria-label={copy.userPortfolio}><article><span>Free</span><strong>{number.format(dashboard.monetization.free_users)}</strong></article><article><span>Plus</span><strong>{number.format(dashboard.monetization.plus_users)}</strong></article><article><span>Pro</span><strong>{number.format(dashboard.monetization.pro_users)}</strong></article><article><span>{copy.credits}</span><strong>{number.format(dashboard.monetization.consumed_ai_credits)}</strong></article></div> : null}
-          <div className="admin-table-scroll"><table><thead><tr><th>{copy.email}</th><th>{copy.plan}</th><th>{copy.lastSignIn}</th><th>{copy.usage}</th></tr></thead><tbody>
-            {users.map((user) => <tr key={user.id}><td><strong>{user.email}</strong><small>{date.format(new Date(user.created_at))}</small></td><td><strong>{user.plan.toUpperCase()}</strong><small>{user.subscription_status}</small></td><td>{user.last_sign_in_at ? date.format(new Date(user.last_sign_in_at)) : "—"}</td><td><strong>{number.format(user.period_consumed_ai_credits)}</strong><small>{number.format(user.period_request_count)} {copy.requests} · {number.format(user.period_total_tokens)} {copy.tokens} · {number.format(user.period_remaining_ai_credits)} {copy.remaining}</small></td></tr>)}
-            {users.length === 0 ? <tr><td colSpan={4}>{copy.noUsers}</td></tr> : null}
+          <div className="admin-users-table"><table aria-label={copy.users}><thead><tr><th>{copy.name}</th><th>{copy.plan}</th><th>{copy.applications}</th><th>{copy.lastSignIn}</th><th /></tr></thead><tbody>
+            {users.map((user) => <tr key={user.id}><td><strong>{user.display_name}</strong><small title={user.email}>{user.email}</small></td><td><strong>{user.billing_scope === "business" ? copy.business : copy.individual} {user.plan.toUpperCase()}</strong><small>{user.subscription_status}</small></td><td><EditionLicenseStrip licenses={user.licensed_editions} locale={locale === "zh-CN" ? "zh-CN" : "en"} /></td><td>{user.last_sign_in_at ? date.format(new Date(user.last_sign_in_at)) : "—"}</td><td><button type="button" className="btn admin-user-details-button" onClick={() => { captureUserDetailsTrigger(); setSelectedUser(user); }}>{copy.viewDetails}</button></td></tr>)}
+            {users.length === 0 ? <tr><td colSpan={5}>{copy.noUsers}</td></tr> : null}
           </tbody></table></div>
           <div className="admin-pager"><button type="button" className="btn" disabled={loading || userPage <= 1} onClick={() => setUserPage((current) => Math.max(1, current - 1))}>{copy.previous}</button><span>{copy.page} {userPage} {copy.of} {Math.max(1, Math.ceil(usersTotal / 25))}{locale === "zh-CN" ? " 页" : ""}</span><button type="button" className="btn" disabled={loading || userPage >= Math.max(1, Math.ceil(usersTotal / 25))} onClick={() => setUserPage((current) => current + 1)}>{copy.next}</button></div>
         </section>
@@ -922,10 +1017,10 @@ export function AdminPage() {
         <div>
           <section className="admin-section-summary admin-community-summary" aria-label={copy.community}><article><span>{copy.totalTopics}</span><strong>{number.format(topicsTotal)}</strong></article><article><span>{copy.reportedOnPage}</span><strong>{number.format(topics.filter((topic) => topic.report_count > 0).length)}</strong></article><article><span>{copy.removedOnPage}</span><strong>{number.format(topics.filter((topic) => topic.status === "removed").length)}</strong></article><article><span>{copy.auditOnPage}</span><strong>{number.format(audit.length)}</strong></article></section>
           <div className="admin-community-grid">
-          {canModerateCommunity ? <section className="admin-panel">
+          {canReadCommunity ? <section className="admin-panel">
             <h2>{copy.topics}</h2>
             <div className="admin-table-scroll"><table><thead><tr><th>{copy.topic}</th><th>{copy.author}</th><th>{copy.comments}</th><th>{copy.reports}</th><th>{copy.status}</th><th /></tr></thead><tbody>
-              {topics.map((topic) => <tr key={topic.id}><td><strong>{topic.title}</strong><small>{date.format(new Date(topic.created_at))}</small></td><td>{topic.author_email}</td><td>{topic.comment_count}</td><td>{topic.report_count}</td><td>{topic.status === "removed" ? copy.removed : copy.active}</td><td><button type="button" className="btn btn-danger" disabled={topic.status === "removed"} onClick={(event) => { moderationTriggerRef.current = event.currentTarget; setModeratingTopic(topic); }}>{copy.remove}</button></td></tr>)}
+              {topics.map((topic) => <tr key={topic.id}><td><strong>{topic.title}</strong><small>{date.format(new Date(topic.created_at))}</small></td><td>{topic.author_email}</td><td>{topic.comment_count}</td><td>{topic.report_count}</td><td>{topic.status === "removed" ? copy.removed : copy.active}</td><td>{canModerateCommunity ? <button type="button" className="btn btn-danger" disabled={topic.status === "removed"} onClick={(event) => { moderationTriggerRef.current = event.currentTarget; setModeratingTopic(topic); }}>{copy.remove}</button> : null}</td></tr>)}
             </tbody></table></div>
             <div className="admin-pager"><button type="button" className="btn" disabled={loading || topicPage <= 1} onClick={() => setTopicPage((current) => Math.max(1, current - 1))}>{copy.previous}</button><span>{copy.page} {topicPage} {copy.of} {Math.max(1, Math.ceil(topicsTotal / 25))}{locale === "zh-CN" ? " 页" : ""}</span><button type="button" className="btn" disabled={loading || topicPage >= Math.max(1, Math.ceil(topicsTotal / 25))} onClick={() => setTopicPage((current) => current + 1)}>{copy.next}</button></div>
           </section> : null}
@@ -948,6 +1043,42 @@ export function AdminPage() {
             <p>{copy.removeWarning}</p>
             <label><span>{copy.reason}</span><textarea ref={moderationReasonRef} value={moderationReason} minLength={8} maxLength={500} onChange={(event) => setModerationReason(event.target.value)} placeholder={copy.reasonPlaceholder} /></label>
             <div><button type="button" className="btn" disabled={moderating} onClick={() => closeModeration()}>{copy.cancel}</button><button type="button" className="btn btn-danger" disabled={moderating || moderationReason.trim().length < 8} onClick={() => void confirmModeration()}>{copy.confirmRemove}</button></div>
+          </section>
+        </div>
+      ) : null}
+
+      {selectedUser ? (
+        <div className="admin-dialog-backdrop" role="presentation">
+          <section ref={userDetailsDialogRef} role="dialog" aria-modal="true" aria-labelledby="admin-user-details-title" className="admin-dialog admin-user-dialog" tabIndex={-1}>
+            <header>
+              <div><span>{confirmingUserDelete ? copy.deleteAccountTitle : copy.detailsTitle}</span><h2 id="admin-user-details-title">{selectedUser.display_name}</h2><p>{selectedUser.email}</p></div>
+              <button ref={userDetailsCloseRef} type="button" className="btn" disabled={deletingUser} onClick={closeUserDetails}>{copy.closeDetails}</button>
+            </header>
+            {confirmingUserDelete ? (
+              <div className="admin-user-delete-confirmation">
+                <p>{copy.deleteAccountWarning}</p>
+                <label><span>{copy.deleteReason}</span><textarea value={userDeleteReason} minLength={8} maxLength={500} disabled={deletingUser} onChange={(event) => setUserDeleteReason(event.target.value)} placeholder={copy.deleteReasonPlaceholder} /></label>
+                <div><button type="button" className="btn" disabled={deletingUser} onClick={() => { setConfirmingUserDelete(false); setUserDeleteReason(""); }}>{copy.backToDetails}</button><button type="button" className="btn btn-danger" disabled={deletingUser || userDeleteReason.trim().length < 8} onClick={() => void confirmUserDeletion()}>{deletingUser ? copy.deletingAccount : copy.confirmDeleteAccount}</button></div>
+              </div>
+            ) : (
+              <>
+                <div className="admin-user-license-card">
+                  <EditionLicenseStrip licenses={selectedUser.licensed_editions} locale={locale === "zh-CN" ? "zh-CN" : "en"} />
+                </div>
+                <dl className="admin-user-detail-grid">
+                  <div><dt>{copy.plan}</dt><dd>{selectedUser.billing_scope === "business" ? copy.business : copy.individual} {selectedUser.plan.toUpperCase()}</dd></div>
+                  <div><dt>{copy.status}</dt><dd>{selectedUser.subscription_status}</dd></div>
+                  <div><dt>{copy.organization}</dt><dd>{selectedUser.organization_name ?? copy.noOrganization}</dd></div>
+                  <div><dt>{copy.created}</dt><dd>{date.format(new Date(selectedUser.created_at))}</dd></div>
+                  <div><dt>{copy.lastSignIn}</dt><dd>{selectedUser.last_sign_in_at ? date.format(new Date(selectedUser.last_sign_in_at)) : "—"}</dd></div>
+                  <div><dt>{copy.credits}</dt><dd>{number.format(selectedUser.period_consumed_ai_credits)}</dd></div>
+                  <div><dt>{copy.requests}</dt><dd>{number.format(selectedUser.period_request_count)}</dd></div>
+                  <div><dt>{copy.tokens}</dt><dd>{number.format(selectedUser.period_total_tokens)}</dd></div>
+                  <div><dt>{copy.remaining}</dt><dd>{number.format(selectedUser.period_remaining_ai_credits)}</dd></div>
+                </dl>
+                {canDeleteUsers ? <div className="admin-user-danger-zone"><button type="button" className="btn btn-danger" onClick={() => setConfirmingUserDelete(true)}>{copy.deleteAccount}</button></div> : null}
+              </>
+            )}
           </section>
         </div>
       ) : null}

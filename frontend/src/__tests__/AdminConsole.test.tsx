@@ -17,11 +17,14 @@ const allowed: AdminAccessContextValue = {
     authorized: true,
     role: "owner",
     permissions: [
-      "metrics.read",
+      "dashboard.read",
+      "models.read",
       "users.read",
       "users.export",
+      "users.delete",
       "models.write",
-      "community.moderate",
+      "community.read",
+      "community.remove",
       "audit.read",
     ],
   },
@@ -153,8 +156,31 @@ describe("administration console", () => {
     await waitFor(() => expect(gptSwitches?.[1]).not.toBeChecked());
 
     fireEvent.click(screen.getByRole("button", { name: "Users & usage" }));
-    expect(await screen.findByText("pilot.one@example.test")).toBeVisible();
+    expect(await screen.findByText("Avery Lin")).toBeVisible();
+    expect(screen.getByText("pilot.one@example.test")).toBeVisible();
     expect(screen.getByLabelText("Account portfolio")).toBeVisible();
+    expect(screen.getAllByLabelText("Universal licensed")).not.toHaveLength(0);
+    const detailButtons = screen.getAllByRole("button", { name: "View details" });
+    detailButtons[1].focus();
+    fireEvent.click(detailButtons[1]);
+    const userDialog = await screen.findByRole("dialog", { name: "Morgan Wu" });
+    expect(userDialog).toHaveTextContent("Northwind Robotics");
+    expect(userDialog).toHaveTextContent("Business PLUS");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(userDialog).not.toBeInTheDocument());
+    await waitFor(() => expect(detailButtons[1]).toHaveFocus());
+    fireEvent.click(detailButtons[0]);
+    const deletionDialog = await screen.findByRole("dialog", { name: "Avery Lin" });
+    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+    expect(deletionDialog).toHaveTextContent("This permanently removes the sign-in account");
+    const deleteButton = screen.getByRole("button", { name: "Permanently delete" });
+    expect(deleteButton).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Deletion reason"), {
+      target: { value: "Verified duplicate test account" },
+    });
+    expect(deleteButton).toBeEnabled();
+    fireEvent.click(deleteButton);
+    await waitFor(() => expect(screen.queryByText("Avery Lin")).not.toBeInTheDocument());
     expect(screen.getByText(/Passwords and password hashes are never returned/))
       .toBeVisible();
     expect(document.querySelector('input[type="password"]')).toBeNull();

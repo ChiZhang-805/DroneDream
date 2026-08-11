@@ -169,6 +169,32 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
             workflow,
         )
 
+    def test_public_console_build_is_pinned_to_universal_demo_mode(self) -> None:
+        config = self.read("frontend/vite.console.config.ts")
+
+        self.assertIn(
+            '"import.meta.env.VITE_PUBLIC_DEMO_CONSOLE": JSON.stringify("true")',
+            config,
+        )
+        self.assertIn(
+            '__DRONEDREAM_BUILD_EDITION__: JSON.stringify("universal")',
+            config,
+        )
+
+    def test_site_build_includes_the_role_gated_organization_route(self) -> None:
+        config = self.read("frontend/vite.site.config.ts")
+        route = self.read("frontend/organization/index.html")
+        pages_builder = self.read("website/scripts/build-pages-site.ps1")
+        release_builder = self.read("website/scripts/build-release-site.ps1")
+
+        self.assertIn(
+            'organization: `${projectRoot}organization/index.html`',
+            config,
+        )
+        self.assertIn('name="robots" content="noindex,nofollow"', route)
+        self.assertIn("organization\\index.html", pages_builder)
+        self.assertIn("organization\\index.html", release_builder)
+
     def test_pages_build_verifies_policy_source_and_compiled_policy_links(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")
         policy = self.read("CODE_SIGNING_POLICY.md")

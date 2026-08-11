@@ -451,6 +451,18 @@ async function verifyEce498ExternalEntry(page, testCase) {
   const courseUrl =
     "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
   await page.goto(`${origin}/dashboard?docsPreview=1`, { waitUntil: "networkidle" });
+  await page.evaluate(() => {
+    const selector = document.querySelector(".universal-mode-switch select");
+    if (!(selector instanceof HTMLSelectElement)) {
+      throw new Error("Universal workspace selector is missing");
+    }
+    selector.value = "lab";
+    selector.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForFunction(() => (
+    document.documentElement.dataset.brandEdition === "lab"
+    && window.localStorage.getItem("dronedream:universal-workspace:v2") === "lab"
+  ));
   if (testCase.viewport.width <= 520) {
     await page.locator(".app-mobile-menu-button").click();
   }
@@ -459,7 +471,6 @@ async function verifyEce498ExternalEntry(page, testCase) {
   assert.equal(await courseLink.getAttribute("href"), courseUrl);
   assert.equal(await courseLink.getAttribute("target"), "_blank");
   assert.equal(await courseLink.getAttribute("rel"), "noreferrer");
-  assert.equal(await page.getByRole("tab").count(), 0);
   assert.equal(await page.locator(".ece498-stage-detail").count(), 0);
 
   await page.context().route(courseUrl, (route) => route.fulfill({
@@ -478,6 +489,19 @@ async function verifyEce498ExternalEntry(page, testCase) {
   assert.equal(popup.url(), courseUrl);
   await popup.close();
   await page.context().unroute(courseUrl);
+
+  await page.evaluate(() => {
+    const selector = document.querySelector(".universal-mode-switch select");
+    if (!(selector instanceof HTMLSelectElement)) {
+      throw new Error("Universal workspace selector is missing");
+    }
+    selector.value = "sim";
+    selector.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForFunction(() => (
+    document.documentElement.dataset.brandEdition === "sim"
+    && window.localStorage.getItem("dronedream:universal-workspace:v2") === "sim"
+  ));
 
   const dimensions = await page.evaluate(() => ({
     documentWidth: document.documentElement.clientWidth,
@@ -545,7 +569,7 @@ async function verifyFixedScenarios(page, testCase) {
         documentScrollWidth: document.documentElement.scrollWidth,
       };
     });
-    assert.equal(mobileMenu.links.length, 6);
+    assert.equal(mobileMenu.links.length, 5);
     assert(mobileMenu.account.bottom <= mobileMenu.links[0].top + 1);
     assert(mobileMenu.links.at(-1).bottom <= mobileMenu.settings.top + 1);
     assert(mobileMenu.links.every((entry) => closeEnough(
@@ -573,7 +597,7 @@ async function verifyFixedScenarios(page, testCase) {
     mobileMenuImage = await screenshot(page, testCase.id, "mobile-navigation");
   }
   await activeEntry.waitFor();
-  assert.equal(await navEntries.count(), 6);
+  assert.equal(await navEntries.count(), 5);
   assert.equal(await cards.count(), 4);
   assert(await activeEntry.evaluate((element) => element.classList.contains("active")));
 
