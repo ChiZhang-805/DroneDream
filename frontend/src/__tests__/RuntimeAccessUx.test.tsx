@@ -151,6 +151,7 @@ afterEach(() => {
   });
 
   it("keeps read-only pages visible, marks runtime routes, and avoids backend calls", async () => {
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "lab");
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return missingRuntime;
@@ -218,7 +219,7 @@ afterEach(() => {
     expect(screen.getByRole("link", { name: "Vehicle Studio" }))
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(6);
+      .querySelectorAll("a")).toHaveLength(8);
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);

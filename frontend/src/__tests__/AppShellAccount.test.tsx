@@ -90,14 +90,16 @@ describe("workspace account entry", () => {
     router.dispose();
   });
 
-  it("uses a consistent icon and label for every workspace navigation item", () => {
+  it("uses a consistent icon and label for every item in the active SIM workspace", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { container, router } = renderWorkspace();
 
     const links = container.querySelectorAll(".app-nav a");
-    expect(links).toHaveLength(6);
-    expect(screen.getByRole("link", { name: "Vehicle Studio" }))
-      .toHaveAttribute("href", "/vehicle-studio");
+    expect(links).toHaveLength(5);
+    expect(screen.getByRole("link", { name: "SIM" }))
+      .toHaveAttribute("href", "/sim");
+    expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
+      .not.toBeInTheDocument();
     links.forEach((link) => {
       expect(link.querySelector(".app-nav-entry > svg")).not.toBeNull();
     });
@@ -122,9 +124,9 @@ describe("workspace account entry", () => {
     expect(panel).not.toHaveAttribute("hidden");
     expect(within(panel!).getByRole("button", { name: "Account" }))
       .toHaveTextContent("Local user");
-    expect(within(panel!).getAllByRole("link")).toHaveLength(6);
-    expect(within(panel!).getByRole("link", { name: "Vehicle Studio" }))
-      .toHaveAttribute("href", "/vehicle-studio");
+    expect(within(panel!).getAllByRole("link")).toHaveLength(5);
+    expect(within(panel!).getByRole("link", { name: "SIM" }))
+      .toHaveAttribute("href", "/sim");
 
     fireEvent.click(within(panel!).getByRole("button", { name: "Settings" }));
     expect(panel).toHaveAttribute("hidden");

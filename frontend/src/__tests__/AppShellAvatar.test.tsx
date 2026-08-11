@@ -137,7 +137,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { container, router } = renderWorkspace();
 
-    expect(screen.getByRole("link", { name: "DroneDream" }))
+    expect(screen.getByRole("link", { name: "DroneDream · SIM" }))
       .toHaveAttribute("href", "/");
     expect(getUserMedia).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Account" }));

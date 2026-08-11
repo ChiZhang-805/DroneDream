@@ -6,10 +6,13 @@
   "scripts": {
     "frontend:dev": "npm --prefix ../frontend run dev",
     "frontend:build": "node scripts/verify-browser-auth-config.mjs && npm --prefix ../frontend run build",
+    "frontend:field-dev": "npm --prefix ../frontend run field:dev",
+    "frontend:field-build": "node scripts/verify-browser-auth-config.mjs && npm --prefix ../frontend run field:build",
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
     "build:llvm": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-llvm.ps1",
+    "build:four": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-four-edition-installers.ps1",
     "check:frontend": "npm --prefix ../frontend run typecheck",
     "verify:browser-auth-config": "node scripts/verify-browser-auth-config.mjs",
     "verify:release-source": "node scripts/verify-release-source-policy.mjs",

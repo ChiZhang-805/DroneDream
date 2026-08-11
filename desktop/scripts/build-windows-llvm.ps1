@@ -353,7 +353,8 @@ if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
 & (Join-Path $PSScriptRoot "verify-installer-locales.ps1") -GeneratedNsi $generatedNsi
 & (Join-Path $PSScriptRoot "verify-installer-planner.ps1") `
     -Application $application `
-    -WebViewLoader $webViewLoaderStaged
+    -WebViewLoader $webViewLoaderStaged `
+    -EditionId $EditionId
 
 $tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
     ConvertFrom-Json

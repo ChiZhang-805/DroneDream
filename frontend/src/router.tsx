@@ -9,6 +9,7 @@ import type { RouteObject } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
 import { getDesktopStartupGateSession } from "./desktop/startupGate";
+import { BUILD_EDITION, editionLandingPath } from "./edition";
 
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
   const requireDesktopReadiness = (feature: "experiment" | "job") =>
@@ -17,7 +18,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         ? null
         : redirect(`/dashboard?settings=runtime&required=${feature}`)
       : undefined;
-  const fallbackPath = "/assistant";
+  const fallbackPath = editionLandingPath();
 
   return [
     {
@@ -29,6 +30,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           element: desktopRuntime
             ? <Navigate to="/desktop/setup" replace />
             : <Navigate to={fallbackPath} replace />,
+        },
+        {
+          path: "sim",
+          lazy: async () => {
+            const { SimOverview } = await import("./pages/SimOverview");
+            return { Component: SimOverview };
+          },
         },
         {
           path: "assistant",
@@ -120,6 +128,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             const { LabSetup } = await import("./lab/LabSetup");
             return { Component: LabSetup };
           },
+          loader: BUILD_EDITION === "sim" ? () => redirect(fallbackPath) : undefined,
         },
         {
           path: "lab/hardware",
@@ -127,6 +136,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             const { LabHardwareWorkspace } = await import("./lab/LabHardwareWorkspace");
             return { Component: LabHardwareWorkspace };
           },
+          loader: BUILD_EDITION === "sim" ? () => redirect(fallbackPath) : undefined,
         },
         {
           path: "field",
@@ -134,6 +144,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             const { UniversalFieldApp } = await import("./field/FieldApp");
             return { Component: UniversalFieldApp };
           },
+          loader: BUILD_EDITION === "sim" ? () => redirect(fallbackPath) : undefined,
         },
         { path: "*", loader: () => redirect(fallbackPath) },
       ],

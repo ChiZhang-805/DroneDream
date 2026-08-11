@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream-Sim",
+  "identifier": "io.dronedream.desktop.sim",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream · SIM",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 390,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "publisher": "DroneDream",
+    "shortDescription": "PX4 SITL and Gazebo simulation workspace",
+    "longDescription": "DroneDream · SIM provides simulation-only autonomous tuning across PX4 SITL and Gazebo. Hardware, HITL and physical-aircraft authority are not included.",
+    "icon": [
+      "../../brand/generated/sim/windows/32x32.png",
+      "../../brand/generated/sim/windows/128x128.png",
+      "../../brand/generated/sim/windows/128x128@2x.png",
+      "../../brand/generated/sim/windows/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "../../brand/generated/sim/windows/icon.ico",
+        "uninstallerIcon": "../../brand/generated/sim/windows/icon.ico"
+      }
+    },
+    "resources": {
+      "../../distribution/editions/sim.v1.json": "distribution/editions/sim.v1.json",
+      "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",
+      "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",
+      "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json",
+      "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",
+      "../../distribution/desktop/edition-browser-auth.v1.json": "distribution/desktop/edition-browser-auth.v1.json",
+      "../../distribution/desktop/edition-runtime-update-families.v1.json": "distribution/desktop/edition-runtime-update-families.v1.json",
+      "../../brand/brand-editions.v1.json": "brand/brand-editions.v1.json",
+      "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-sim-channel/latest-sim.json"
+      ],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

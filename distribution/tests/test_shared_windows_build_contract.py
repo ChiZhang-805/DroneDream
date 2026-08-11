@@ -9,6 +9,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "desktop" / "scripts" / "build-windows-llvm.ps1"
+FOUR_EDITION_SCRIPT = ROOT / "desktop" / "scripts" / "build-four-edition-installers.ps1"
+PLANNER_VERIFIER = ROOT / "desktop" / "scripts" / "verify-installer-planner.ps1"
+RUNTIME_MODE_HOOK = ROOT / "desktop" / "src-tauri" / "nsis" / "runtime-mode.nsh"
+INSTALLER_HOOK = ROOT / "desktop" / "src-tauri" / "nsis" / "webview2-health.nsh"
 DRIVER = ROOT / "desktop" / "scripts" / "release-build-driver.psm1"
 RELEASE_POLICY = ROOT / "desktop" / "scripts" / "verify-release-source-policy.mjs"
 SIGNING_POLICY = ROOT / "desktop" / "scripts" / "verify-updater-signing-contract.ps1"
@@ -20,7 +24,115 @@ def _script() -> str:
     return SCRIPT.read_text(encoding="utf-8-sig")
 
 
+def _four_edition_script() -> str:
+    return FOUR_EDITION_SCRIPT.read_text(encoding="utf-8-sig")
+
+
+def test_four_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs() -> None:
+    script = _four_edition_script()
+    for fragment in (
+        '[ValidateSet("all", "universal", "sim", "lab", "field")]',
+        'throw "The four-edition build requires one exact clean source commit."',
+        '"desktop\\src-tauri\\tauri.universal.conf.json"',
+        '"desktop\\src-tauri\\tauri.sim.conf.json"',
+        '"desktop\\src-tauri\\tauri.lab.conf.json"',
+        '"desktop\\src-tauri\\tauri.field.conf.json"',
+        '"DRONEDREAM_OAUTH_CLIENT_ID_$($EditionId.ToUpperInvariant())"',
+        'Remove-Item Env:\\RUSTFLAGS -ErrorAction SilentlyContinue',
+        'Remove-Item Env:\\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue',
+        '"DRONEDREAM_RELEASE_SOURCE_COMMIT"',
+        '& git -C $repoRoot clean -fdx -- @paths',
+        'Refusing to delete a reparse-point root',
+        'Refusing to delete a tree containing reparse points',
+        'The source tree changed after the $editionId build.',
+        '[IO.Path]::GetFileName($builtInstaller)',
+        'build-receipt.json',
+    ):
+        assert fragment in script
+    assert 'Join-Path $editionOutput "$($contract.product)-${version}.exe"' not in script
+
+
+def test_four_edition_wrapper_is_valid_windows_powershell() -> None:
+    script_path = str(FOUR_EDITION_SCRIPT).replace("'", "''")
+    result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $tokens = $null
+            $errors = $null
+            [void][Management.Automation.Language.Parser]::ParseFile(
+              '{script_path}', [ref]$tokens, [ref]$errors)
+            if ($errors.Count -ne 0) {{
+              $errors | ForEach-Object {{ Write-Error $_.Message }}
+              exit 1
+            }}
+            Write-Output 'four-edition-ast-ok'
+            """
+        ),
+        cwd=ROOT,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "four-edition-ast-ok" in result.stdout
+
+
+def test_planner_verifier_waits_for_exit_and_retries_only_its_exact_temp_tree() -> None:
+    script = PLANNER_VERIFIER.read_text(encoding="utf-8-sig")
+    for fragment in (
+        "function Remove-PlannerSmokeSandbox",
+        '$process.WaitForExit()',
+        '$process.StandardOutput.ReadToEndAsync()',
+        '$process.StandardError.ReadToEndAsync()',
+        '[string]$EditionId = "universal"',
+        '"--clear-installer-handoff"',
+        'The FIELD app-only command unexpectedly created a Runtime plan.',
+        'StartsWith("DroneDream-Planner-Smoke-"',
+        "Refusing to remove a reparse-point planner smoke directory",
+        '[int]$MaximumAttempts = 40',
+        "Start-Sleep -Milliseconds $RetryDelayMilliseconds",
+    ):
+        assert fragment in script
+    assert script.index("ReadToEndAsync()") < script.index("WaitForExit(90000)")
+
+    script_path = str(PLANNER_VERIFIER).replace("'", "''")
+    result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $tokens = $null
+            $errors = $null
+            [void][Management.Automation.Language.Parser]::ParseFile(
+              '{script_path}', [ref]$tokens, [ref]$errors)
+            if ($errors.Count -ne 0) {{
+              $errors | ForEach-Object {{ Write-Error $_.Message }}
+              exit 1
+            }}
+            Write-Output 'planner-verifier-ast-ok'
+            """
+        ),
+        cwd=ROOT,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "planner-verifier-ast-ok" in result.stdout
+
+
+def test_field_installer_is_app_only_and_never_advertises_runtime_protocol() -> None:
+    runtime_mode = RUNTIME_MODE_HOOK.read_text(encoding="utf-8-sig")
+    installer_hook = INSTALLER_HOOK.read_text(encoding="utf-8-sig")
+    page = "Page custom DroneDreamRuntimeModePageCreate DroneDreamRuntimeModePageLeave"
+    field_guard = '!if "${DRONEDREAM_EDITION_ID}" != "field"'
+    assert field_guard in runtime_mode
+    assert runtime_mode.index(field_guard) < runtime_mode.index(page)
+    assert '!if "${DRONEDREAM_EDITION_ID}" == "field"' in installer_hook
+    assert (
+        'DeleteRegValue SHCTX "${MANUPRODUCTKEY}" '
+        '"DroneDreamRuntimeOperationProtocol"'
+    ) in installer_hook
+
+
 def _run_powershell(script: str, *, cwd: Path) -> subprocess.CompletedProcess[str]:
+    utf8_script = (
+        "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); "
+        "$OutputEncoding = [Console]::OutputEncoding; "
+        + script
+    )
     return subprocess.run(
         [
             "powershell.exe",
@@ -29,7 +141,7 @@ def _run_powershell(script: str, *, cwd: Path) -> subprocess.CompletedProcess[st
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            script,
+            utf8_script,
         ],
         cwd=cwd,
         check=False,
@@ -616,7 +728,7 @@ def test_detached_dependency_contract_rejects_owned_root_and_output_overlap(tmp_
 
     unknown = _verify_detached(manifest_path, manifest, edition="unknown")
     assert unknown.returncode != 0
-    assert "ValidateSet" in unknown.stderr
+    assert "ParameterArgumentValidationError" in unknown.stderr
 
 
 def test_dependency_payload_isolation_rejects_node_modules_and_dependency_manifest(

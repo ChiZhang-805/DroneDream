@@ -22,11 +22,13 @@ import {
   MailCheck,
   MapPinned,
   Menu,
+  Moon,
   MoreHorizontal,
   RadioTower,
   Save,
   Settings,
   ShieldCheck,
+  Sun,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -48,7 +50,10 @@ import {
   type SettingsSurfaceTabId,
 } from "./components/EditionSettingsSurface";
 import { UniversalModeSwitch } from "./components/UniversalModeSwitch";
-import type { BrandEditionId } from "./brand/edition-brand.generated";
+import {
+  EDITION_BRAND_TOKENS,
+  type BrandEditionId,
+} from "./brand/edition-brand.generated";
 import {
   getDesktopWindowHandle,
   isDesktopRuntime,
@@ -114,7 +119,13 @@ import type {
   UserExperiencePreferences,
 } from "./types/api";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
-import { EditionThemeProvider } from "./theme/EditionThemeProvider";
+import { EditionThemeProvider, useEditionTheme } from "./theme/EditionThemeProvider";
+import {
+  BUILD_EDITION,
+  EDITION_IS_FIXED,
+  editionLandingPath,
+  initialWorkspaceMode,
+} from "./edition";
 
 type NavigationItem = {
   to: string;
@@ -160,6 +171,11 @@ const CORE_NAV_ITEMS: NavigationItem[] = [
   },
 ];
 
+const SIM_NAV_ITEMS: NavigationItem[] = [
+  { to: "/sim", label: "SIM", end: true, icon: Box },
+  ...CORE_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio" && !item.externalUrl),
+];
+
 const FIELD_NAV_ITEMS: NavigationItem[] = [
   {
     to: "/field",
@@ -171,7 +187,7 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
 ];
 
 const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
-  sim: CORE_NAV_ITEMS,
+  sim: SIM_NAV_ITEMS,
   lab: [
     {
       to: "/lab",
@@ -190,7 +206,7 @@ const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
 };
 
 const MODE_LANDING_PATH: Record<UniversalWorkspaceId, string> = {
-  sim: "/assistant",
+  sim: "/sim",
   lab: "/lab",
   field: "/field",
 };
@@ -451,6 +467,7 @@ function SettingsDialog({
   onClose: () => void;
 }) {
   const { locale, setLocale, t } = useI18n();
+  const editionTheme = useEditionTheme();
   const auth = useAuth();
   const {
     settings: modelAccess,
@@ -742,7 +759,7 @@ function SettingsDialog({
       onTabChange={setActiveSettingsTab}
       tabs={settingsTabs}
       title={t("app.settingsTitle")}
-      consumerProfile="universal"
+      consumerProfile={edition === "field" ? "field-lightweight" : edition}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
         <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
@@ -769,6 +786,33 @@ function SettingsDialog({
           <i aria-hidden="true">✓</i>
         </button>
         </fieldset>
+        <div className="settings-general-section">
+          <span className="settings-section-label">{t("settings.general.appearance")}</span>
+          <div
+            className="settings-appearance-options"
+            role="group"
+            aria-label={t("settings.general.appearance")}
+          >
+            <button
+              type="button"
+              className={editionTheme.appearance === "dark" ? "selected" : undefined}
+              aria-pressed={editionTheme.appearance === "dark"}
+              onClick={() => editionTheme.setAppearance("dark")}
+            >
+              <Moon aria-hidden="true" />
+              <span>{t("settings.general.dark")}</span>
+            </button>
+            <button
+              type="button"
+              className={editionTheme.appearance === "light" ? "selected" : undefined}
+              aria-pressed={editionTheme.appearance === "light"}
+              onClick={() => editionTheme.setAppearance("light")}
+            >
+              <Sun aria-hidden="true" />
+              <span>{t("settings.general.light")}</span>
+            </button>
+          </div>
+        </div>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "memory"} id="memory">
         <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
@@ -2094,7 +2138,9 @@ function AppShellContent() {
     () => false,
   );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
-  const [universalMode, setUniversalMode] = useState(loadUniversalMode);
+  const [universalMode, setUniversalMode] = useState(() =>
+    initialWorkspaceMode(loadUniversalMode()),
+  );
   const [accountOpen, setAccountOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
@@ -2112,9 +2158,11 @@ function AppShellContent() {
   const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
-  const activeThemeEdition: BrandEditionId = launcherMode || location.pathname === "/vehicle-studio"
-    ? "universal"
-    : universalMode;
+  const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
+    ? BUILD_EDITION
+    : launcherMode || location.pathname === "/vehicle-studio"
+      ? "universal"
+      : universalMode;
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
   const launcherRuntimeChecking =
@@ -2152,9 +2200,10 @@ function AppShellContent() {
   ].includes(updater.status);
 
   useEffect(() => {
-    persistUniversalMode(universalMode);
+    if (!EDITION_IS_FIXED) persistUniversalMode(universalMode);
   }, [universalMode]);
   const handleUniversalModeChange = useCallback((mode: UniversalWorkspaceId) => {
+    if (EDITION_IS_FIXED) return;
     setUniversalMode(mode);
     setMobileMenuOpen(false);
     navigate(MODE_LANDING_PATH[mode]);
@@ -2600,8 +2649,12 @@ function AppShellContent() {
           {t("app.skipToContent")}
         </a>
         <header className="launcher-chrome">
-          <Link to="/desktop/setup" className="launcher-brand" aria-label="DroneDream">
-            <BrandLockup variant="compact" />
+          <Link
+            to="/desktop/setup"
+            className="launcher-brand"
+            aria-label={EDITION_BRAND_TOKENS[activeThemeEdition].productName}
+          >
+            <BrandLockup variant="compact" edition={activeThemeEdition} />
           </Link>
           <div className="launcher-chrome-actions">
             <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
@@ -2666,11 +2719,19 @@ function AppShellContent() {
       </a>
       <aside className="app-sidebar">
         {desktopRuntime ? (
-          <Link to="/assistant" className="app-title" aria-label="DroneDream">
+          <Link
+            to={editionLandingPath(activeThemeEdition)}
+            className="app-title"
+            aria-label={EDITION_BRAND_TOKENS[activeThemeEdition].productName}
+          >
             <BrandLockup variant="compact" edition={activeThemeEdition} />
           </Link>
         ) : (
-          <a href="/" className="app-title" aria-label="DroneDream">
+          <a
+            href="/"
+            className="app-title"
+            aria-label={EDITION_BRAND_TOKENS[activeThemeEdition].productName}
+          >
             <BrandLockup variant="compact" edition={activeThemeEdition} />
           </a>
         )}
@@ -2693,16 +2754,18 @@ function AppShellContent() {
           className={`app-mobile-menu-panel${mobileMenuExpanded ? " is-open" : ""}`}
           hidden={mobileNavigationEnabled && !mobileMenuExpanded}
         >
-          <UniversalModeSwitch
-            mode={universalMode}
-            activeEdition={location.pathname === "/vehicle-studio" ? "universal" : universalMode}
-            locale={locale}
-            onChange={handleUniversalModeChange}
-            onOpenUniversal={() => {
-              setMobileMenuOpen(false);
-              navigate("/vehicle-studio");
-            }}
-          />
+          {!EDITION_IS_FIXED ? (
+            <UniversalModeSwitch
+              mode={universalMode}
+              activeEdition={location.pathname === "/vehicle-studio" ? "universal" : universalMode}
+              locale={locale}
+              onChange={handleUniversalModeChange}
+              onOpenUniversal={() => {
+                setMobileMenuOpen(false);
+                navigate("/vehicle-studio");
+              }}
+            />
+          ) : null}
           <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">
             {runtimeNavDescription}
@@ -2867,7 +2930,9 @@ function AppShellContent() {
       </aside>
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
-          <div className="app-header-title">DroneDream — {t("app.platform")}</div>
+          <div className="app-header-title">
+            {EDITION_BRAND_TOKENS[activeThemeEdition].productName} — {t("app.platform")}
+          </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">
               <button

@@ -247,3 +247,183 @@ been removed without losing recovery evidence.
   Cargo target, ten untracked `frontend/field-dist` files, Tauri generation
   directories, and TypeScript incremental files were removed. The FIELD
   worktree is tracked-clean with only its dependency junctions.
+
+### A10 - Unified-core integration and current UI contract
+
+- The Universal, SIM, LAB, and FIELD source surfaces were integrated into the
+  single authoritative `main` worktree. Build-time edition selection now keeps
+  Universal's mode switch while SIM, LAB, and FIELD are fixed to their product
+  identity. FIELD retains its standalone lightweight entry and native command
+  boundary.
+- Static validation passed for frontend type checking, linting (one existing
+  Fast Refresh warning only), 27 targeted SIM/FIELD tests, 13 shared Windows
+  build-contract tests, all four Rust feature/profile combinations, and all
+  four production frontend bundles.
+- Failed UI attempt: the first integrated SIM headed check stopped on its first
+  offline case before any EXE build. The current page correctly rendered the
+  reviewed `Ready to install` state and `Install DroneDreamRuntime` action, but
+  the inherited SIM visual script still required the superseded `0%` startup
+  progress bar and `Download the Runtime` label.
+- Lesson and repair: UI acceptance must assert the current product contract,
+  not preserve historical copy or transitional widget values. The
+  missing-Runtime case now requires the current install action, forbids the
+  login action, and forbids a false `100%` readiness claim; it does not require
+  the optional readiness container to be present, absent, or frozen at the old
+  `0%` value. The ready case supplies an already-running Runtime and verifies a
+  `100%` result plus the login action without allowing any background
+  `start_runtime` call. This preserves the unified launcher's explicit
+  start/repair safety contract instead of reviving an obsolete automatic-start
+  behavior.
+  Edition identity, absence of hardware authority, bilingual copy, responsive
+  layout, light/dark rendering, canvas detail, and offline-only fixtures remain
+  mandatory.
+- Cleanup: the external Rust check target (2,945,335,732 bytes) and generated
+  frontend/Tauri outputs were independently scoped and removed after their
+  successful checks. The failed headed-check screenshot and receipt are kept
+  only until this lesson is recorded, then the exact failed attempt directory
+  is removed before the corrected run.
+- Visual integration follow-up: the first light-scene run proved that the 3D
+  scene and controls had switched correctly, but the inherited dark launcher
+  header kept the sampled upper-white ratio at `0.54246`, below the reviewed
+  `0.60` minimum. The missing high-specificity light-header rule was restored;
+  the threshold was not weakened.
+- Localization follow-up: after all 12 English cases and the first Chinese
+  missing-Runtime case passed, the old SIM script still expected the historical
+  Chinese sign-in wording ending in `工作区`. The unified interface deliberately
+  uses `登录并进入调优平台`; the check now follows the canonical translation key
+  while retaining an exact accessible-name assertion.
+- Corrected result: all 24 SIM headed cases passed across English/Simplified
+  Chinese, dark/light appearance, desktop/tablet/mobile viewports, and
+  missing/ready Runtime states. The offline-only receipt SHA-256 is
+  `189b82eccf78c1287a888742f97962291948a2ba65ec1270f219ffd924b92451`.
+  The screenshots and receipt are reproducible diagnostics rather than product
+  deliverables and are deleted after this compact evidence is recorded.
+- FIELD integration failure: the first standalone FIELD layout preflight
+  stopped before launching a browser because its production bundle lacked the
+  shared Settings consumer marker. `FieldSettingsDialog` existed but had no
+  reachable import from `FieldRoot`, so the optimizer correctly removed the
+  orphaned popup. The repair adds the launcher settings control, shared dialog,
+  backdrop-close behavior, and focus return, plus a unit assertion that the
+  live dialog carries the `field-lightweight` consumer boundary.
+- FIELD responsive follow-up: after the Settings surface became reachable, all
+  desktop and tablet cases passed but the new second chrome action narrowed the
+  390px mobile brand/action gap below the required 8px. FIELD now gives its
+  compact lockup an explicit small-screen width bound and keeps both language
+  and Settings controls visible; the overlap assertion remains unchanged.
+- Corrected FIELD result: all 6 standalone headed cases passed for
+  English/Simplified Chinese at desktop, tablet, and mobile sizes. The check
+  verifies the shared Settings surface, edition colors, no hardware authority,
+  no simulator terminology, a detailed nonblank 3D canvas, and the
+  hover-to-starflight interaction. The receipt SHA-256 is
+  `128031cac92ef474589fb277673ebb9fa747ff186e3b506e3b82d6d76a991c38`;
+  its screenshots, receipt, and generated `field-dist` are removed after this
+  evidence is recorded.
+
+### A11 - Unified four-edition build entry and full-suite preflight
+
+- A single PowerShell entry now maps Universal, SIM, LAB, and FIELD to their
+  exact Tauri overlays, product names, native profiles, and public OAuth client
+  identifiers. It requires one clean source commit, reuses one external Cargo
+  target during the batch, preserves the canonical installer filenames, and
+  copies only installers, checksums, updater signatures/manifests, and compact
+  JSON receipts into the exact handoff root.
+- Failure lesson: renaming a copied installer while retaining the build
+  system's original checksum sidecar makes standard filename-aware checksum
+  verification fail even when the bytes are identical. The wrapper therefore
+  keeps each canonical NSIS filename and its matching sidecars together.
+- Full-suite preflight lesson: Universal intentionally opens in its SIM
+  workspace, whose sidebar has five SIM-safe entries. Four inherited UI tests
+  still asserted the old all-surfaces sidebar and Universal lockup. The tests
+  now assert the active workspace contract; the Runtime access test explicitly
+  selects LAB before checking its broader read-only/course navigation.
+- Contract lesson: integration changes to protected shared UI files require an
+  explicit refresh of their SHA-256 entries in the Universal build profile.
+  The hash gate remains strict; no assertion or validation threshold was
+  weakened.
+- Python test invocation lesson: the Worker package is not importable from the
+  repository root without its declared local package path or editable install.
+  Run its tests with the Worker and Backend package roots explicitly on
+  `PYTHONPATH`; do not treat a collection-path error as a product-code failure.
+- Cleanup: these preflight failures produced no installers or Cargo targets.
+  Pytest/Vitest caches are disposable and are removed after the corrected
+  suites pass; the sole Markdown file retains the reusable diagnosis.
+- Backend timing lesson: the complete backend collection contains 2,169 tests
+  across 127 files and legitimately exceeds a 15-minute monolithic command on
+  this machine. A host-command timeout left its Python child alive, and a
+  second attempt briefly competed with that stale process. Verify the exact
+  command line, stop only the orphaned PID, then run deterministic sequential
+  file batches; do not infer a test failure from an outer timeout.
+- Corrected backend result: 126 files and 2,161 tests passed. The remaining
+  eight tests are all in `test_technical_report_evidence_v10.py` and correctly
+  fail closed because the current routing-evaluation fixture differs from its
+  frozen evidence commit `ef00362927475b2fc411a4d82084bbbae8846582`.
+  The technical report and its frozen evidence remain untouched by policy;
+  this expected freeze-bound rejection is not an EXE product regression.
+- Cleanup follow-up: the two timed-out backend processes were identified by
+  exact command line and terminated without affecting other Python work. The
+  batch diagnostic directory was deleted after its result was recorded. The
+  corrected runs then removed 24 repository pytest/bytecode cache directories
+  (13,609,381 bytes) and four exact system-temp pytest trees (about 692 MB),
+  deleting test-created links themselves without following their targets.
+- First unified EXE attempt: Universal compiled, bundled, signed, and passed
+  its checksum/updater checks, but SIM stopped before compilation. The shared
+  lower-level LLVM builder intentionally sets process-local `RUSTFLAGS`; a
+  second invocation in the same wrapper process correctly rejected that value
+  as an unexpected caller override.
+- Repair: the four-edition wrapper now refuses caller-supplied Rust flags up
+  front, snapshots every build environment variable it or the lower-level
+  script mutates, and clears only the known lower-level Rust flag outputs
+  immediately before each edition. The lower-level custom-flag safety gate is
+  unchanged.
+- Failed-attempt cleanup: the incomplete `a1` handoff, shared Cargo target
+  (about 1.6 GB at failure), generated frontend output, Tauri generation, and
+  staged LLVM loader were all verified absent after the wrapper's `finally`
+  cleanup. The previously accepted historical Universal installer remains the
+  fallback until a complete four-edition batch passes.
+- Second unified EXE attempt: Universal, SIM, and LAB compiled, bundled,
+  updater-signed, and passed their planner/checksum gates. FIELD also compiled
+  and produced its signed NSIS installer, but the planner verifier failed only
+  while deleting its copied `dronedream-runtime-probe.exe`: Windows briefly
+  retained the just-exited executable and returned `Access denied`.
+- Repair: the verifier now completes process-exit bookkeeping, waits after a
+  timed-out kill, disposes the process object, and retries deletion for a
+  bounded ten-second window. Every retry revalidates that the exact target is
+  a non-reparse `DroneDream-Planner-Smoke-*` child of the system TEMP root; it
+  never broadens the cleanup target or suppresses a persistent failure. The
+  PowerShell parser and the shared Windows build-contract suite cover this
+  lifecycle contract.
+- Failed-attempt cleanup: the incomplete `a2` handoff, its external Cargo
+  target, generated source outputs, planner process, and planner temp directory
+  were all verified absent. The repository returned to a tracked-clean state
+  before the next attempt, while the four historical fallback installers were
+  retained.
+- Third unified EXE attempt: Universal, SIM, and LAB again completed all build
+  gates, and FIELD again compiled and bundled successfully. This time the FIELD
+  planner probe reached its 90-second timeout. The verifier redirected both
+  native output streams but waited for process exit before reading them, which
+  permits a full pipe buffer to deadlock the child and parent.
+- Repair: start asynchronous reads for stdout and stderr immediately after the
+  probe starts, then wait for exit and collect both completed tasks. A timed-out
+  process is killed and awaited before exact cleanup. This keeps diagnostic
+  capture without allowing either redirected stream to block planner exit.
+- Failed-attempt cleanup: the `a3` handoff, Cargo target, generated source
+  outputs, and timed-out probe process were verified absent. A separate
+  18,846,272-byte planner directory left by the earlier `a2` cleanup failure
+  was identified by its exact TEMP child path, verified to contain no reparse
+  points and have no running probe, then permanently removed. No current or
+  historical accepted installer was deleted.
+- Fourth unified EXE attempt: the asynchronous pipe fix was validated by
+  Universal, SIM, and LAB, but FIELD still timed out. The remaining failure was
+  therefore not process I/O: FIELD's intentionally reduced native entry rejects
+  Runtime handoff commands, while the shared installer and build verifier were
+  still trying to invoke the Runtime planner.
+- Product-contract repair: FIELD is now compiled without the Runtime selection
+  page and never advertises, seals, quiesces, or preserves Runtime installer
+  metadata. Install/repair removes any such values written by an early FIELD
+  candidate. Its build gate verifies the exact app-only clear command instead;
+  Universal, SIM, and LAB retain the complete planner and durable Runtime
+  quiesce contract. Static tests enforce both sides of this edition boundary.
+- Failed-attempt cleanup: the entire `a4` handoff, Cargo target, generated
+  source outputs, FIELD probe, and planner temp directory were verified absent
+  before the FIELD-only repair build. No passed-but-incomplete A4 artifacts
+  were retained as a release.

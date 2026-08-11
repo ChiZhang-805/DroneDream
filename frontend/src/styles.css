@@ -31,6 +31,122 @@
   --dd-theme-panel: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, var(--bg-elev));
 }
 
+/* Build-edition appearance is persisted by EditionThemeProvider. These
+   high-specificity rules keep launch, setup, settings, and the 3D scene on one
+   coherent light contract. */
+:root[data-dd-appearance="light"] {
+  color-scheme: light;
+  --bg: #f1faff;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #e5f4fc;
+  --border: #bdd7e6;
+  --border-strong: #8fbfd8;
+  --text: #12334b;
+  --text-muted: #526f83;
+  --text-dim: #294f68;
+}
+
+:root[data-dd-appearance="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-dd-appearance="light"] body,
+:root[data-dd-appearance="light"] .app-shell,
+:root[data-dd-appearance="light"] .app-body,
+:root[data-dd-appearance="light"] .app-shell-launcher,
+:root[data-dd-appearance="light"] .launcher-chrome,
+:root[data-dd-appearance="light"] .launcher-stage,
+:root[data-dd-appearance="light"] .drone-launch-scene {
+  color: var(--text);
+  background: #ffffff;
+}
+
+:root[data-dd-appearance="light"] .launcher-chrome {
+  border-color: var(--border);
+  box-shadow: 0 8px 26px rgba(22, 56, 77, 0.12);
+}
+
+.settings-general-section {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.settings-appearance-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.settings-appearance-options button {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.settings-appearance-options button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-appearance-options button.selected {
+  border-color: var(--dd-brand-start);
+  color: #ffffff;
+  background: color-mix(in srgb, var(--dd-brand-middle) 44%, var(--dd-brand-dark-surface));
+}
+
+:root[data-dd-appearance="light"] .launcher-runtime-indicator {
+  color: #17334b;
+  border-color: rgba(38, 113, 255, 0.22);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+:root[data-dd-appearance="light"] .launcher-runtime-indicator.is-checked {
+  color: #10283b;
+  border-color: rgba(19, 139, 98, 0.34);
+  background: rgba(210, 247, 233, 0.9);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-button,
+:root[data-dd-appearance="light"] .launcher-settings-close {
+  color: #17334b;
+  border-color: rgba(38, 113, 255, 0.24);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+:root[data-dd-appearance="light"] .drone-launch-hud {
+  color: rgba(255, 255, 255, 0.82);
+  border-left-color: rgba(0, 217, 255, 0.72);
+  background: linear-gradient(90deg, rgba(7, 42, 86, 0.96), rgba(38, 113, 255, 0.78));
+  box-shadow: 0 8px 24px rgba(18, 72, 145, 0.18);
+  text-shadow: none;
+}
+
+:root[data-dd-appearance="light"] .drone-launch-hud strong {
+  color: #ffffff;
+}
+
+:root[data-dd-appearance="light"] .drone-launch-hud-right {
+  border-right-color: rgba(116, 76, 255, 0.72);
+  border-left: 0;
+  background: linear-gradient(270deg, rgba(45, 29, 112, 0.96), rgba(38, 113, 255, 0.78));
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog {
+  color-scheme: light;
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--dd-brand-light-surface);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-appearance-options button.selected {
+  color: #12334b;
+  border-color: var(--dd-brand-middle);
+  background: color-mix(in srgb, var(--dd-brand-start) 18%, #ffffff);
+}
+
 * {
   box-sizing: border-box;
 }

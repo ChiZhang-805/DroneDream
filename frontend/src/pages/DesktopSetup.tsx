@@ -10,6 +10,7 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { apiClient } from "../api/client";
+import { editionLandingPath } from "../edition";
 import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
@@ -556,7 +557,7 @@ export function DesktopSetup() {
       auth.account &&
       browserAuthStatus === "idle"
     ) {
-      navigate("/assistant", { replace: true });
+      navigate(editionLandingPath(), { replace: true });
     }
   }, [
     auth?.account,
@@ -3087,7 +3088,7 @@ function RuntimeInstallControls({
             </span>
           </>
         ) : phase === "completed" ? (
-          <Link to={launcherMode ? "/assistant" : "/jobs/new"} className="btn btn-primary">
+          <Link to={launcherMode ? editionLandingPath() : "/jobs/new"} className="btn btn-primary">
             {launcherMode ? t("launcher.openWorkspace") : t("desktop.continue")}
           </Link>
         ) : phase !== "failed" || canRetry ? (

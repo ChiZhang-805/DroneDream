@@ -252,6 +252,9 @@ if (-not $runtimeMode.Contains(
     )) {
     throw "Runtime quiesce revalidation must return ok before the missing-binary failure label"
 }
+if ($runtimeMode -notmatch '(?ms)!if "\$\{DRONEDREAM_EDITION_ID\}" != "field"\s+Page custom DroneDreamRuntimeModePageCreate DroneDreamRuntimeModePageLeave\s+!endif') {
+    throw "FIELD must be omitted from the shared DroneDreamRuntime installer page"
+}
 
 $pathGuard = Get-Content -LiteralPath $pathGuardPath -Raw
 foreach ($required in @(
@@ -380,6 +383,7 @@ foreach ($required in @(
     'Call DroneDreamRevalidateRuntimeQuiesce',
     'Call DroneDreamEndRuntimeQuiesce',
     'Call un.DroneDreamPrepareRuntimeQuiesce',
+    'DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"',
     '!macro DRONEDREAM_REFRESH_BRANDED_SHORTCUT SHORTCUT_PATH',
     '!macro DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT DISPLAY_PATH INTERNAL_PATH LABEL_PREFIX',
     'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"',
@@ -395,6 +399,9 @@ foreach ($required in @(
     if (-not $installerHook.Contains($required)) {
         throw "Durable installer quiesce contract is missing: $required"
     }
+}
+if ($installerHook -notmatch '(?ms)!if "\$\{DRONEDREAM_EDITION_ID\}" == "field"\s+.*?DeleteRegValue SHCTX "\$\{MANUPRODUCTKEY\}" "DroneDreamRuntimeOperationProtocol"\s+!else') {
+    throw "FIELD must remove legacy Runtime metadata instead of advertising a Runtime protocol"
 }
 
 $editionShortcut =
