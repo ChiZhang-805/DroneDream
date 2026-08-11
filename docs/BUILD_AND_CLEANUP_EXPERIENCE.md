@@ -682,3 +682,40 @@ been removed without losing recovery evidence.
   generated source paths absent, and returned the source tree clean. Do not
   build or install a Universal binary with the old internal identity label;
   register the public client and pass the four-client live verifier first.
+
+### A15 - GitHub Pages product navigation and production-site parity
+
+- Product decision: GitHub Pages at `getdronedream.com` is the production
+  website, while the Aliyun deployment remains an internal preview. The public
+  navigation is now Product, Pricing, Manual, Community, and Console. Product
+  is a dedicated SIM/LAB/FIELD edition-selection route; Pricing retains the
+  Free/Plus/Pro plans; the former Workflow navigation item is removed.
+- Download safety: the three product cards use exact, schema-validated edition
+  availability metadata. Until matching public GitHub Release assets, SHA-256,
+  size, source commit, publication date, and receipt URLs are available, their
+  buttons remain visibly unavailable instead of linking to a missing or stale
+  installer. Publishing those three assets is a separate release operation.
+- Visual parity: the public landing-page drone now uses the approved Aliyun-like
+  cyan, blue-violet, and pink lighting without changing the edition-specific
+  desktop application themes. English and independently authored Simplified
+  Chinese product pages were checked in Edge at 1440x900; the product page was
+  also checked at 390x844.
+- Layout rule: the policy/GitHub footer is rendered only on the home page. At
+  1440x900, Product, Pricing, and Community each measured exactly 900 CSS pixels
+  for both viewport and document height, rendered no vertical scrollbar, and
+  contained no footer. Mobile Product intentionally remains vertically
+  scrollable so its three editions stay readable.
+- Validation: TypeScript, the complete 98-file/622-test frontend suite, ESLint
+  with its one pre-existing Fast Refresh warning, focused 18-test public-site
+  and product-page coverage, the production website build, the console build,
+  direct Product/OAuth route assertions, custom-domain output, and headed Edge
+  screenshots all pass. The production builder now fails if Product or its
+  edition availability metadata is absent.
+- Failure lessons and cleanup: a direct local build and preview initially exited
+  before rendering because the GitHub Actions public Supabase variables were not
+  present in that shell; injecting the repository variables into only the child
+  process fixed it without exposing their values. A later script invocation used
+  unavailable `pwsh`; rerunning with the installed `powershell.exe` passed. Both
+  failed launches produced no dedicated failure output. Generated `site-dist`
+  is deleted after verification, while selected screenshots remain under the
+  external UI-acceptance root rather than inside the authoritative source tree.

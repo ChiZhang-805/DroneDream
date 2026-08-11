@@ -82,11 +82,24 @@ describe("DroneDream public website", () => {
     expect(screen.getByText(
       /Version 1\.0\.0 is published while code signing is being prepared\./i,
     )).toBeVisible();
-    expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/pricing/");
-    expect(screen.getByRole("link", { name: "Workflow" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/product/");
+    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute("href", "/pricing/");
+    expect(screen.queryByRole("link", { name: "Workflow" })).toBeNull();
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
     expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/community/");
     expect(screen.getByRole("button", { name: "Console" })).toBeVisible();
+    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
+      "data-theme-primary",
+      "#68e8ff",
+    );
+    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
+      "data-theme-secondary",
+      "#9b72ff",
+    );
+    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
+      "data-theme-tertiary",
+      "#f166d8",
+    );
     expectContentLinksToUseIcons(container);
 
     const downloads = screen.getAllByRole("link", { name: /Download/i });
@@ -122,12 +135,28 @@ describe("DroneDream public website", () => {
   it("renders the full manual as a dedicated documentation page", () => {
     window.history.replaceState(null, "", "/manual/");
 
-    renderSite();
+    const { container } = renderSite();
 
     expect(screen.getByRole("heading", { name: "Build explainable tuning experiments." })).toBeVisible();
     expect(screen.getByRole("complementary", { name: "On this page" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Complete the five-step experiment" })).toBeVisible();
     expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();
+    expect(container.querySelector(".site-footer")).toBeNull();
+  });
+
+  it("routes Product to the three focused software download entries", () => {
+    window.history.replaceState(null, "", "/product/");
+
+    const { container } = renderSite();
+
+    expect(screen.getByRole("heading", { name: "Choose Your DroneDream Edition" })).toBeVisible();
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
+    expect(container.querySelectorAll('[data-download-ready="false"]')).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /Download unavailable/i })).toHaveLength(3);
+    expect(container.querySelector(".site-footer")).toBeNull();
   });
 
   it("renders three directly comparable plans with the same ordered feature rows", async () => {
@@ -139,6 +168,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("heading", { name: "Free" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Plus" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeVisible();
+    expect(container.querySelector(".site-footer")).toBeNull();
     expect(screen.getByRole("tab", { name: "Individual" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -219,9 +249,10 @@ describe("DroneDream public website", () => {
   it("requires an account before a visitor can publish a community topic", () => {
     window.history.replaceState(null, "", "/community/");
 
-    renderSite();
+    const { container } = renderSite();
 
     expect(screen.getByRole("heading", { name: "Share questions. Compare flight evidence." })).toBeVisible();
+    expect(container.querySelector(".site-footer")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sign in to publish" }));
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
   });

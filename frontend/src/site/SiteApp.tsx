@@ -14,6 +14,12 @@ import { CommunityPage } from "./CommunityPage";
 import { ManualPage } from "./ManualPage";
 import { OAuthConsentPage } from "./OAuthConsentPage";
 import { PricingPage } from "./PricingPage";
+import { ProductPage } from "./ProductPage";
+import {
+  fallbackEditionAvailability,
+  isEditionAvailabilityDocument,
+  type EditionAvailabilityDocument,
+} from "./editionAvailability";
 import {
   compareReleaseVersions,
   fallbackRelease,
@@ -27,6 +33,15 @@ const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`
 const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 const COMMUNITY_GUIDELINES_URL = `${GITHUB_URL}/blob/main/COMMUNITY_GUIDELINES.md`;
 
+const WEBSITE_DRONE_THEME = Object.freeze({
+  primary: 0x68e8ff,
+  secondary: 0x9b72ff,
+  tertiary: 0xf166d8,
+  darkSurface: 0x070913,
+  fog: 0x070913,
+  gridMinor: 0x34244f,
+});
+
 const content = {
   en: {
     skip: "Skip to content",
@@ -34,8 +49,8 @@ const content = {
     metaDescription: "Configure, optimize, simulate, and compare PX4 control parameters in one local Windows workflow.",
     navLabel: "Primary navigation",
     nav: [
-      ["Product", "/pricing/"],
-      ["Workflow", "/"],
+      ["Product", "/product/"],
+      ["Pricing", "/pricing/"],
       ["Manual", "/manual/"],
       ["Community", "/community/"],
     ],
@@ -222,8 +237,8 @@ const content = {
     metaDescription: "在 Windows 本地完成 PX4 控制参数选择、自动优化、可复现仿真与结果对比。",
     navLabel: "主导航",
     nav: [
-      ["产品", "/pricing/"],
-      ["工作流", "/"],
+      ["产品", "/product/"],
+      ["价格", "/pricing/"],
       ["说明书", "/manual/"],
       ["社区", "/community/"],
     ],
@@ -751,6 +766,8 @@ export function SiteApp() {
   const auth = useAuthOrLocal();
   const copy = content[locale];
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
+  const [editionAvailability, setEditionAvailability] =
+    useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -774,8 +791,10 @@ export function SiteApp() {
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
-    : path === "/pricing"
-      ? "pricing"
+    : path === "/product"
+      ? "product"
+      : path === "/pricing"
+        ? "pricing"
       : path === "/community"
         ? "community"
         : path === "/oauth/consent"
@@ -806,6 +825,20 @@ export function SiteApp() {
         ) {
           setRelease(candidate);
         }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/downloads/editions.json", { signal: controller.signal, cache: "no-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`edition metadata: ${response.status}`);
+        return response.json() as Promise<unknown>;
+      })
+      .then((candidate) => {
+        if (isEditionAvailabilityDocument(candidate)) setEditionAvailability(candidate);
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -1143,6 +1176,8 @@ export function SiteApp() {
       <main id="main-content">
         {sitePage === "manual" ? (
           <ManualPage locale={locale} />
+        ) : sitePage === "product" ? (
+          <ProductPage availability={editionAvailability} locale={locale} />
         ) : sitePage === "pricing" ? (
           <PricingPage
             locale={locale}
@@ -1167,7 +1202,12 @@ export function SiteApp() {
           <>
         <section className="site-hero" id="home" aria-labelledby="hero-title">
           <div className="site-hero-scene" aria-hidden="true">
-            <DroneLaunchScene active starflightControllerRef={droneFlightRef} visualOffsetX={1.58} />
+            <DroneLaunchScene
+              active
+              starflightControllerRef={droneFlightRef}
+              themeOverride={WEBSITE_DRONE_THEME}
+              visualOffsetX={1.58}
+            />
           </div>
           <div className="site-hero-shade" aria-hidden="true" />
           <div className="site-shell site-hero-layout">
@@ -1581,29 +1621,31 @@ export function SiteApp() {
         </div>
       ) : null}
 
-      <footer className="site-footer">
-        <div className="site-shell">
-          <div className="site-footer-brand" role="img" aria-label="DroneDream">
-            <BrandLockup variant="primary" />
+      {sitePage === "home" ? (
+        <footer className="site-footer">
+          <div className="site-shell">
+            <div className="site-footer-brand" role="img" aria-label="DroneDream">
+              <BrandLockup variant="primary" />
+            </div>
+            <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
+            <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
+              <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
+                <FeatureIcon name="shield" />
+                {copy.codeSigningPolicy}
+              </a>
+              <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
+                <DocumentIcon />
+                {copy.privacyPolicy}
+              </a>
+              <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
+                <FeatureIcon name="report" />
+                {copy.communityGuidelines}
+              </a>
+            </nav>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
           </div>
-          <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
-          <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
-            <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
-              <FeatureIcon name="shield" />
-              {copy.codeSigningPolicy}
-            </a>
-            <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
-              <DocumentIcon />
-              {copy.privacyPolicy}
-            </a>
-            <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
-              <FeatureIcon name="report" />
-              {copy.communityGuidelines}
-            </a>
-          </nav>
-          <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
-        </div>
-      </footer>
+        </footer>
+      ) : null}
     </div>
   );
 }

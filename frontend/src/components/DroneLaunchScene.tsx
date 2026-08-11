@@ -26,6 +26,7 @@ type DroneLaunchSceneProps = {
   telemetryActiveLabel?: string;
   telemetryStandbyLabel?: string;
   telemetrySystemLabel?: string;
+  themeOverride?: EditionTheme3D;
   visualOffsetX?: number;
 };
 
@@ -540,6 +541,7 @@ export function DroneLaunchSceneCore({
   progress = null,
   starflightControllerRef,
   labels,
+  themeOverride,
   visualOffsetX = 0,
 }: DroneLaunchSceneCoreProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -549,7 +551,7 @@ export function DroneLaunchSceneCore({
   const [starflightActive, setStarflightActive] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const editionTheme = useEditionTheme();
-  const sceneTheme = editionTheme.three;
+  const sceneTheme = themeOverride ?? editionTheme.three;
   const lightAppearance = editionTheme.appearance === "light";
 
   useEffect(() => {
