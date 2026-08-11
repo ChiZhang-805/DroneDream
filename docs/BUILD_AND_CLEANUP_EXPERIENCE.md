@@ -947,3 +947,8 @@ been removed without losing recovery evidence.
   script syntax result. Keep the Linux `bash -n` gate in CI, do not create a
   substitute source copy, and remove only generated build, audit, and log paths
   after recording the local limitation.
+- Runtime-test discovery lesson: `unittest discover` imports a pytest-style
+  module but neither supplies pytest nor executes its fixtures and parameterized
+  cases. The Runtime workflows now install the pinned pytest version and run the
+  complete directory through pytest; the corrected local contract executes 80
+  tests and 15 subtests, with only five platform-declared skips.
