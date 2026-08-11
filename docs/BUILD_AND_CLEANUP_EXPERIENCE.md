@@ -427,3 +427,15 @@ been removed without losing recovery evidence.
   source outputs, FIELD probe, and planner temp directory were verified absent
   before the FIELD-only repair build. No passed-but-incomplete A4 artifacts
   were retained as a release.
+- Fifth EXE attempt (FIELD-only repair proof): FIELD rebuilt from clean commit
+  `2ed1d062f3e9f057dbb584fa738134f9ea9eb1c1` and tree
+  `d86e1390e2950ca288d974fdb592efe10fb5b1a2`. Its frontend, LLVM/Rust binary,
+  NSIS installer, updater signature, checksum, update manifest, and app-only
+  installer handoff gate all passed. The canonical installer is 6,191,817
+  bytes; its receipt hash and checksum sidecar independently match, and the
+  update manifest contains a non-empty FIELD signature.
+- Successful-attempt cleanup: the dedicated external Cargo target and every
+  generated source-tree path were absent after the wrapper completed. The
+  small FIELD-only handoff is retained only until the succeeding complete
+  four-edition batch is independently accepted; it is not a separate release
+  or another source tree.
