@@ -470,9 +470,11 @@ been removed without losing recovery evidence.
   app process remained, and the exact diagnostics file was removed. The two
   failed verifier runs also stopped before installation and left those states
   unchanged.
-- Open cleanup item: the old installed executables predate the new Runtime
-  quiesce recovery command, so they could not clear the authenticated marker
-  left when the verifier deliberately terminated NSIS. Do not delete that
-  marker by path. Build or retain an exact current native executable, invoke
-  its supported recovery command, require exit zero and marker absence, then
-  delete only the temporary build target.
+- Closed cleanup item: the old installed executables predate the new Runtime
+  quiesce recovery command, so they could not clear the authenticated 470-byte
+  marker left when the verifier deliberately terminated NSIS. The marker was
+  never deleted by path. A seventh, temporary Universal build from the current
+  clean source produced an exact current native executable; its supported
+  recovery command returned zero and the marker then disappeared. The complete
+  A7 installer handoff, external Cargo target, generated source paths, and
+  product processes were verified absent immediately afterward.
