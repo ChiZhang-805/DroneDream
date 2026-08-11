@@ -632,8 +632,8 @@ html[lang="zh-CN"] .site-hero h1 {
 .site-capability-entry { position: relative; z-index: 1; display: grid; align-content: center; flex: 1; min-height: 0; padding: .35rem 3.2rem; text-align: center; }
 .site-capability-entry h3 { margin: .38rem 0 .55rem; color: #161929; font-size: clamp(1.12rem, 1.45vw, 1.45rem); letter-spacing: -.025em; }
 .site-capability-entry p { margin: 0 auto; color: #687086; font-size: clamp(.8rem, .92vw, .95rem); line-height: 1.48; }
-.dd-site[data-locale="en"] .site-capability-entry p { max-width: 48ch; }
-.dd-site[data-locale="zh-CN"] .site-capability-entry p { max-width: 35ch; }
+.dd-site[data-locale="en"] .site-capability-entry p { max-width: 47ch; }
+.dd-site[data-locale="zh-CN"] .site-capability-entry p { max-width: 33ch; }
 .site-capability-back nav { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; }
 .site-capability-back nav > span { color: #747c98; font-family: ui-monospace, monospace; font-size: .72rem; }
 .site-capability-back nav button,
@@ -2937,6 +2937,8 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 @media (min-width: 1441px) {
+  .dd-site[data-locale="en"] .site-capability-summary { font-size: .9rem; }
+  .site-phase-description { width: 98%; }
   .site-workflow-visual {
     width: calc(100% + clamp(4rem, 10vw, 12rem));
     margin-inline: calc(clamp(2rem, 5vw, 6rem) * -1);

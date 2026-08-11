@@ -957,9 +957,9 @@ been removed without losing recovery evidence.
   in both repository and backend configuration. The complete 1,160-test backend
   suite also legitimately exceeds the old 20-minute hosted-runner limit; the
   quality gate now allows 45 minutes instead of reporting a cancellation as a
-  product failure. Public-site copy needs a small Chromium margin above the
-  exact 80-percent final-line threshold: the corrected recovery sentence reaches
-  83 percent at both desktop widths, and the home-only footer uses concise copy
-  that fits naturally without a `white-space` override. The bundled
+  product failure. Public-site copy needs a real cross-platform margin above the
+  exact 80-percent final-line threshold: wide-screen English and Chinese copy
+  widths are bounded separately, long summary copy is concise, and the home-only
+  footer fits naturally without a `white-space` override. The bundled
   Chromium audits passed at 1440x1000, 2048x1280, and mobile 390x844; generated
   `site-dist`, audit JSON, and preview logs remain disposable after verification.
