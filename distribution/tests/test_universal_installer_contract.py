@@ -507,6 +507,9 @@ def test_visible_locale_verifier_handles_language_selector_in_edition_namespace(
     for fragment in (
         '[ValidatePattern("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]',
         '[string]$InstallerProductName = "DroneDream"',
+        '[string]$ExpectedDisplayName = "DroneDream"',
+        '"Welcome to $ExpectedDisplayName Setup"',
+        '" $ExpectedDisplayName"',
         '"HKCU:\\Software\\DroneDream\\$InstallerProductName"',
         '"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$InstallerProductName"',
         '"Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$InstallerProductName"',
@@ -520,6 +523,9 @@ def test_visible_locale_verifier_handles_language_selector_in_edition_namespace(
         '$languageIndex = if ($Language -eq "English") { 0 } else { 1 }',
         'SendMessage($languageCombo, $CB_SETCURSEL',
         'Invoke-DialogButton -Dialog $entryPage.Handle -ControlId 1',
+        '[switch]$StopAfterLocationPage',
+        'StopAfterLocationPage and ValidatePathGuard are mutually exclusive.',
+        'Interactive installer application page verified:',
         '$installerArguments += "/DRONEDREAMVALIDATEPATHONLY"',
         'The installer path-only validation did not exit',
     ):

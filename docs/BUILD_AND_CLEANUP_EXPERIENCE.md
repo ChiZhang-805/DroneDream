@@ -439,3 +439,40 @@ been removed without losing recovery evidence.
   small FIELD-only handoff is retained only until the succeeding complete
   four-edition batch is independently accepted; it is not a separate release
   or another source tree.
+- Sixth EXE attempt (complete integrated batch): Universal, SIM, LAB, and
+  FIELD all rebuilt from clean commit
+  `224903c01ecaeb60b2b4ebfc5ebbba3d517d5413`. Each edition produced exactly
+  five canonical delivery files, and every receipt bound the same source
+  commit and tree. Independently recomputed installer hashes matched both the
+  receipt and `.sha256` sidecar; all four updater manifests carried non-empty
+  signatures. The installers were: Universal 12,455,655 bytes / SHA-256
+  `9b76b222642de513d11ed07cd58b1a7b82fd6028bb5e2465a5c5568321ae32b4`;
+  SIM 12,179,007 bytes / `5ba3aeba4a41b2c3a0fb4b68b14deb1d7f8c96fa6c9436a303d2a6c719bb853c`;
+  LAB 12,522,906 bytes / `11d6d48e646b3e59bb4b33b92bf7404bf2b595fd245d9ed1a1d78de3f6acae48`;
+  FIELD 6,197,030 bytes /
+  `7b08f88d08a1338e60826933037f99b9fcb34090c1361c605af1f7cb601c896c`.
+  The shared external Cargo target and all five generated source-tree paths
+  were absent at completion.
+- Installer UI validation lesson: the first FIELD UI run reached the correct
+  visible welcome page but the verifier still expected the old generic
+  `Welcome to DroneDream Setup` text. The verifier now accepts an explicit,
+  newline-free Unicode display name while keeping the registry product name a
+  separate strict identifier. The second FIELD run reached the correct app
+  location page but showed that the old path-only auto-exit expected the next
+  Runtime page; FIELD intentionally has no such page. A mutually exclusive
+  `StopAfterLocationPage` verifier mode now validates the FIELD app-only flow
+  without weakening the Universal/SIM/LAB path guard.
+- Corrected installer UI result: all eight real NSIS flows passed serially
+  (four editions, English and Simplified Chinese). Universal/SIM/LAB exercised
+  the real path-validation-only exit; FIELD stopped at its verified app
+  location boundary. Every pre-existing installation directory and edition
+  registration was byte-for-byte unchanged after each run, no installer or
+  app process remained, and the exact diagnostics file was removed. The two
+  failed verifier runs also stopped before installation and left those states
+  unchanged.
+- Open cleanup item: the old installed executables predate the new Runtime
+  quiesce recovery command, so they could not clear the authenticated marker
+  left when the verifier deliberately terminated NSIS. Do not delete that
+  marker by path. Build or retain an exact current native executable, invoke
+  its supported recovery command, require exit zero and marker absence, then
+  delete only the temporary build target.
