@@ -143,16 +143,23 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
         );
         "unregistered-development-client".to_owned()
     });
+    let oauth_segments = oauth_client_id.split('-').collect::<Vec<_>>();
+    let registered_oauth_client = oauth_segments.len() == 5
+        && oauth_segments
+            .iter()
+            .map(|segment| segment.len())
+            .eq([8, 4, 4, 4, 12])
+        && oauth_client_id
+            .bytes()
+            .filter(|byte| *byte != b'-')
+            .all(|byte| byte.is_ascii_hexdigit());
+    let development_placeholder = !release_build && oauth_client_id.starts_with("unregistered-");
     assert!(
-        oauth_client_id.len() >= 8
-            && oauth_client_id.len() <= 512
-            && oauth_client_id
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')),
+        registered_oauth_client || development_placeholder,
         "DRONEDREAM_OAUTH_CLIENT_ID is malformed"
     );
     assert!(
-        !release_build || !oauth_client_id.starts_with("unregistered-"),
+        !release_build || registered_oauth_client,
         "release builds cannot use an unregistered OAuth client"
     );
     println!("cargo:rustc-env=DRONEDREAM_DESKTOP_EDITION_ID={edition_id}");

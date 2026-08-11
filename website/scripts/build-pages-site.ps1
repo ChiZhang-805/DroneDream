@@ -78,6 +78,10 @@ $consoleHtml = Join-Path $outputDirectory "console\index.html"
 if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
     throw "The console build completed without producing $consoleHtml"
 }
+$oauthConsentHtml = Join-Path $outputDirectory "oauth\consent\index.html"
+if (-not (Test-Path -LiteralPath $oauthConsentHtml -PathType Leaf)) {
+    throw "The site build completed without producing the desktop OAuth consent route."
+}
 
 $builtJavaScript = @(
     Get-ChildItem -LiteralPath $assetDirectory -Filter "*.js" -File |

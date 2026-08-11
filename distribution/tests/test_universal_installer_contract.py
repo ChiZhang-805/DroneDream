@@ -64,6 +64,61 @@ def test_release_ci_placeholder_cannot_bypass_oauth_client_registration() -> Non
     assert "registered public DRONEDREAM_OAUTH_CLIENT_ID" in result.stderr
 
 
+@pytest.mark.parametrize(
+    "client_id",
+    [
+        "dronedream-desktop-universal",
+        "dronedream-desktop-sim",
+        "dronedream-desktop-lab",
+        "dronedream-desktop-field",
+        "unregistered-development-client",
+    ],
+)
+def test_release_rejects_internal_oauth_identity_labels(client_id: str) -> None:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "VITE_SUPABASE_URL": "https://yggabfynndpzymlqvnim.supabase.co",
+            "VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_contract_public_key",
+            "DRONEDREAM_RELEASE_SOURCE_COMMIT": "fixture-source",
+            "DRONEDREAM_DESKTOP_EDITION_ID": "universal",
+            "DRONEDREAM_OAUTH_CLIENT_ID": client_id,
+        }
+    )
+    result = subprocess.run(
+        ["node", str(BROWSER_AUTH_VERIFIER)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "registered public DRONEDREAM_OAUTH_CLIENT_ID" in result.stderr
+
+
+def test_release_accepts_provider_issued_oauth_client_id_shape() -> None:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "VITE_SUPABASE_URL": "https://yggabfynndpzymlqvnim.supabase.co",
+            "VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_contract_public_key",
+            "DRONEDREAM_RELEASE_SOURCE_COMMIT": "fixture-source",
+            "DRONEDREAM_DESKTOP_EDITION_ID": "universal",
+            "DRONEDREAM_OAUTH_CLIENT_ID": "01234567-89ab-cdef-0123-456789abcdef",
+        }
+    )
+    result = subprocess.run(
+        ["node", str(BROWSER_AUTH_VERIFIER)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_visible_installer_receipt_is_exact_source_bound_and_never_commits() -> None:
     text = VISIBLE_INSTALLER_UI.read_text(encoding="utf-8")
     for fragment in (

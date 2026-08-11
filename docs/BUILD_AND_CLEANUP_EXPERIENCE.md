@@ -606,3 +606,43 @@ been removed without losing recovery evidence.
   reproducible maintenance and delivery rather than source duplicates. Real
   OpenAI credentials were neither read nor used during build, installation, or
   UI acceptance.
+
+### A13 - Four-edition browser OAuth repair
+
+- Failure symptom and root cause: Universal opened the Supabase authorization
+  endpoint with the internal identity label `dronedream-desktop-universal` as
+  its provider `client_id`. Supabase correctly returned HTTP 400 with
+  `oauth_client_not_found` because that label was never a provider-issued OAuth
+  client ID. Live no-secret probes confirmed that SIM, LAB, and FIELD already
+  use registered clients and each receives an exact 302 redirect to the hosted
+  consent route with an authorization transaction ID.
+- Missing web link: the public site already contained the full email/password
+  sign-in and email-code account-registration dialog, but `/oauth/consent` fell
+  back to the ordinary home page and never called Supabase's OAuth consent API.
+  The new dedicated no-index route preserves `authorization_id`, automatically
+  offers the existing sign-in/register dialog, verifies the requesting edition
+  and its exact loopback callback, and approves or denies only the four fixed
+  `127.0.0.1` desktop callbacks. A production Pages build now fails if that
+  direct route is absent.
+- Prevention: release configuration, Rust compile-time configuration, runtime
+  browser-auth startup, the four-edition wrapper, and the Universal release
+  wrapper now reject internal identity labels and require the provider-issued
+  UUID-shaped public client ID. A live verifier checks all four registrations
+  without printing their values and requires each provider response to reach
+  exactly `https://getdronedream.com/oauth/consent`.
+- Validation: 616 frontend tests, 284 distribution tests plus 15 subtests,
+  TypeScript, ESLint with its one pre-existing warning, Rust formatting, two
+  complete Pages builds, and headed local Edge checks of both the sign-in and
+  registration surfaces pass. The registration check proved that email,
+  password, password confirmation, verification code, and return-to-sign-in
+  controls remain on the same authorization URL.
+- Build-tool lesson and cleanup: a direct host-default `cargo test` selected the
+  unavailable MSVC linker instead of DroneDream's pinned gnullvm/LLVM-MinGW
+  toolchain. The failed attempt produced no installer; its exact in-repository
+  Cargo target was immediately removed. The Pages output and preview logs were
+  also removed after verification. Native validation must use the repository's
+  pinned build entrypoint with an external Cargo target.
+- External acceptance gates: a repaired Universal build is not accepted until
+  its provider client is registered with the exact Universal loopback URI, all
+  four live probes pass, the hosted consent route has a trusted certificate,
+  and each installed edition completes the browser-to-loopback round trip.

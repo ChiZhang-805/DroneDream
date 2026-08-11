@@ -115,13 +115,17 @@ fn compiled_desktop_auth_identity() -> Result<DesktopAuthIdentity, String> {
 
 fn compiled_oauth_client_id() -> Result<&'static str, String> {
     let client_id = env!("DRONEDREAM_OAUTH_CLIENT_ID");
-    if client_id.starts_with("unregistered-")
-        || client_id.len() < 8
-        || client_id.len() > 512
-        || !client_id
+    let segments = client_id.split('-').collect::<Vec<_>>();
+    let registered = segments.len() == 5
+        && segments
+            .iter()
+            .map(|segment| segment.len())
+            .eq([8, 4, 4, 4, 12])
+        && client_id
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-    {
+            .filter(|byte| *byte != b'-')
+            .all(|byte| byte.is_ascii_hexdigit());
+    if !registered {
         return Err("This desktop edition has not been registered for browser sign-in.".to_owned());
     }
     Ok(client_id)

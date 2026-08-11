@@ -222,9 +222,9 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert.equal(startupTheme.grantsHardwareAuthority, "false");
   assert.deepEqual(startupTheme.colors, canonicalColors[expectedThemeEdition]);
   let scene = null;
-  // Capture the visible surface only after Settings applies this case's locale
-  // below. Otherwise a case can inherit the previous case's rendered language
-  // even though its later Settings assertions pass.
+  // Capture only after Settings applies the requested locale. This ordering
+  // prevents each case from inheriting the previous case's language even when
+  // its later Settings assertions pass.
   let surfaceScreenshot;
   if (!authenticatedWorkspace) {
     scene = await page.locator(".drone-launch-scene").evaluate((element) => ({

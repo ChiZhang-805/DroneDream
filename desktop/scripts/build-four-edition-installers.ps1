@@ -79,10 +79,8 @@ function Get-OAuthClientId {
         $value = [Environment]::GetEnvironmentVariable("DRONEDREAM_OAUTH_CLIENT_ID", "Process")
     }
     if ([string]::IsNullOrWhiteSpace($value) -or
-        $value.Length -lt 8 -or
-        $value.Length -gt 512 -or
-        $value -notmatch '^[A-Za-z0-9._-]+$' -or
-        $value.StartsWith("unregistered-", [StringComparison]::Ordinal)) {
+        $value -notmatch '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$' -or
+        $value -match '^dronedream-desktop-(universal|sim|lab|field)$') {
         throw "Set the approved public $editionVariable before building $EditionId."
     }
     return $value

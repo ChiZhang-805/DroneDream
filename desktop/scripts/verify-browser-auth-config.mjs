@@ -18,6 +18,7 @@ const editionId = (
 const oauthClientId = (
   process.env.DRONEDREAM_OAUTH_CLIENT_ID ?? ""
 ).trim();
+const registeredOAuthClientId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 function fail(message) {
   throw new Error(`Desktop browser-auth configuration failed: ${message}`);
@@ -50,10 +51,8 @@ if (!/^(universal|sim|lab|field)$/u.test(editionId)) {
 if (
   releaseBuild
   && (
-    oauthClientId.length < 8
-    || oauthClientId.length > 512
-    || !/^[A-Za-z0-9._-]+$/u.test(oauthClientId)
-    || oauthClientId.startsWith("unregistered-")
+    !registeredOAuthClientId.test(oauthClientId)
+    || /^dronedream-desktop-(universal|sim|lab|field)$/u.test(oauthClientId)
   )
 ) {
   fail("release builds require the registered public DRONEDREAM_OAUTH_CLIENT_ID");

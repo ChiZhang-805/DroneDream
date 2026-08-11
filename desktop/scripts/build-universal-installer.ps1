@@ -351,8 +351,8 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PATH -or
     throw "Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH."
 }
 if (-not $env:DRONEDREAM_OAUTH_CLIENT_ID -or
-    $env:DRONEDREAM_OAUTH_CLIENT_ID -match '\s' -or
-    $env:DRONEDREAM_OAUTH_CLIENT_ID -like 'unregistered-*') {
+    $env:DRONEDREAM_OAUTH_CLIENT_ID -notmatch '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$' -or
+    $env:DRONEDREAM_OAUTH_CLIENT_ID -match '^dronedream-desktop-(universal|sim|lab|field)$') {
     throw "Universal browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID."
 }
 $providerOAuthClientIdSha256 = Get-StringSha256Lower $env:DRONEDREAM_OAUTH_CLIENT_ID

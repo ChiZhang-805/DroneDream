@@ -12,6 +12,7 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
 import { ManualPage } from "./ManualPage";
+import { OAuthConsentPage } from "./OAuthConsentPage";
 import { PricingPage } from "./PricingPage";
 import {
   compareReleaseVersions,
@@ -769,6 +770,7 @@ export function SiteApp() {
   const droneFlightRef = useRef<(() => void) | null>(null);
   const authDialogRef = useRef<HTMLElement>(null);
   const authCloseRef = useRef<HTMLButtonElement>(null);
+  const oauthPromptedRef = useRef(false);
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
@@ -776,6 +778,8 @@ export function SiteApp() {
       ? "pricing"
       : path === "/community"
         ? "community"
+        : path === "/oauth/consent"
+          ? "oauth-consent"
         : "home";
 
   useEffect(() => {
@@ -974,6 +978,22 @@ export function SiteApp() {
     setAuthOpen(true);
   };
 
+  useEffect(() => {
+    if (sitePage !== "oauth-consent") return;
+    if (auth.account && authOpen) {
+      setAuthOpen(false);
+    } else if (
+      auth.configured
+      && !auth.loading
+      && !auth.account
+      && !authOpen
+      && !oauthPromptedRef.current
+    ) {
+      oauthPromptedRef.current = true;
+      openAccount("sign-in");
+    }
+  }, [auth.account, auth.configured, auth.loading, authOpen, sitePage]);
+
   const openConsole = () => {
     if (auth.account) {
       window.location.assign("/console/");
@@ -1134,6 +1154,14 @@ export function SiteApp() {
             locale={locale}
             account={auth.account}
             onRequireAccount={() => openAccount("sign-in")}
+          />
+        ) : sitePage === "oauth-consent" ? (
+          <OAuthConsentPage
+            locale={locale}
+            account={auth.account}
+            authConfigured={auth.configured}
+            authLoading={auth.loading}
+            onRequireSignIn={() => openAccount("sign-in")}
           />
         ) : (
           <>
