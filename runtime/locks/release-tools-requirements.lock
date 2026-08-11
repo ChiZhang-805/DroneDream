@@ -1,4 +1,4 @@
 # Host-only release tooling. These packages are not installed in the WSL rootfs.
-cryptography==49.0.0
+cryptography==50.0.0
 cffi==2.1.0
 pycparser==3.0

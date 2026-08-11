@@ -49,6 +49,8 @@ jobs:
 
       - name: Lint, type-check, and test backend
         working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python -m ruff check app tests alembic scripts ../worker \
             ../scripts/check-repository.py ../scripts/simulators

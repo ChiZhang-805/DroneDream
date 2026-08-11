@@ -107,6 +107,7 @@ export interface ManagedModelCatalogEntry {
 
 export interface ManagedModelCatalog {
   generated_at: string;
+  policy_version: number;
   models: ManagedModelCatalogEntry[];
 }
 

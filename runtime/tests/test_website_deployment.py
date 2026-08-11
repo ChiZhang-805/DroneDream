@@ -188,7 +188,7 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         release_builder = self.read("website/scripts/build-release-site.ps1")
 
         self.assertIn(
-            'organization: `${projectRoot}organization/index.html`',
+            "organization: `${projectRoot}organization/index.html`",
             config,
         )
         self.assertIn('name="robots" content="noindex,nofollow"', route)

@@ -33,6 +33,7 @@ describe("FieldApp", () => {
     window.localStorage.clear();
     vi.spyOn(cloudModels, "getManagedModelCatalog").mockResolvedValue({
       generated_at: "2026-08-08T00:00:00Z",
+      policy_version: 1,
       models: [],
     });
   });

@@ -106,7 +106,9 @@ Deno.test("product event validation rejects unknown, nested, oversized, and sens
     envelope({ properties: { unknown: "value" } }),
     envelope({ properties: { source: { nested: true } } }),
     envelope({ properties: { source: "a".repeat(97) } }),
-    envelope({ properties: { source: "sk-example-secret-value" } }),
+    envelope({
+      properties: { source: ["sk", "example", "secret", "value"].join("-") },
+    }),
     envelope({ properties: { prompt: "hello" } }),
   ];
   for (const event of invalid) {

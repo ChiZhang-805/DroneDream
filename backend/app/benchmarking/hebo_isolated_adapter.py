@@ -205,7 +205,9 @@ def _run_isolated_bounded(
     environment: dict[str, str],
     timeout_seconds: float,
 ) -> tuple[int, bytes, bytes, bool, bool, bool]:
-    process = subprocess.Popen(
+    # Every argv element is assembled from the validated interpreter and
+    # repository-owned runner path below; no request value reaches argv.
+    process = subprocess.Popen(  # noqa: S603
         argv,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -215,9 +217,10 @@ def _run_isolated_bounded(
         shell=False,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
-    assert process.stdin is not None
-    assert process.stdout is not None
-    assert process.stderr is not None
+    if process.stdin is None or process.stdout is None or process.stderr is None:
+        process.kill()
+        process.wait()
+        raise RuntimeError("isolated HEBO subprocess pipes were not created")
     stdout = bytearray()
     stderr = bytearray()
     stdout_overflow = threading.Event()

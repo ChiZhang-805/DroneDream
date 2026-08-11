@@ -108,7 +108,7 @@ describe("DroneDream public website", () => {
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "Choose the next candidate" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Choose the next trial" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Full manual" })).toHaveAttribute("href", "/manual/");
     expectContentLinksToUseIcons(container);
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(

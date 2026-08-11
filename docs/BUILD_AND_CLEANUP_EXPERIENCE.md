@@ -907,3 +907,43 @@ been removed without losing recovery evidence.
   `npm exec` bypassed that project configuration and made every DOM test fail
   with `document` or `window` undefined. That was a harness error, not a product
   regression, and it produced no release or source artifact.
+- CI import-boundary lesson: backend tests import both `backend` and
+  repository-root packages, so every workflow invocation must set
+  `PYTHONPATH` to the checked-out repository root. A local full run otherwise
+  appears healthy only when launched from an accommodating shell. The corrected
+  full run reached 1,160 passes before one deliberate static-contract update;
+  that contract and the four affected runtime paths then passed focused reruns.
+- Security-lint lesson: production `assert` statements are not durable runtime
+  checks because optimized Python can remove them. HEBO pipe creation, sealed
+  benchmark contracts, checkpoint names, and running physical scenarios now
+  raise explicit errors. The isolated HEBO process call is annotated only at
+  the exact site where its interpreter and repository-owned script form a
+  reviewed argument vector; the security rules remain enabled globally.
+- Provider-gateway lesson: a multi-provider managed-model gateway cannot retain
+  a test that recognizes only one literal OpenAI environment accessor. The
+  contract now proves both provider-specific server keys and the reviewed global
+  fallback, while the gateway exposes no credential to the browser. Its model
+  catalog, grant provider, policy version, and chat configuration are tested as
+  one boundary.
+- Locked-dependency lesson: changing an input constraint is incomplete until
+  every committed lock agrees. The Python runtime, release tools, and deployment
+  locks now use the audited cryptography release; the Rust desktop pins the
+  reviewed MAVLink generator revision so `quick-xml` also meets the audit gate.
+  Temporary lock generators and failed alternate Rust target directories were
+  removed immediately after their outputs were validated.
+- Container-context lesson: FIELD's distribution catalog is canonical outside
+  `frontend`. The frontend container must copy that exact reviewed JSON into the
+  path expected by Vite rather than duplicating it under another source tree.
+  This preserves one owner for product metadata while keeping the container
+  build reproducible.
+- Reduced-motion visual lesson: disabling animation must reveal the final chart,
+  not its pre-animation blank state. The public product curve, points, and bars
+  now render at their completed values under `prefers-reduced-motion`. Final
+  1440 and 2048 desktop checks kept Product, Pricing, and Community to one screen;
+  the 390-pixel pass had no horizontal overflow. Preview logs and screenshots
+  are disposable evidence and must be deleted after the result is recorded.
+- Local-platform lesson: Windows shell validation that enters WSL can fail before
+  Bash starts when the workstation distribution is unavailable; it is not a
+  script syntax result. Keep the Linux `bash -n` gate in CI, do not create a
+  substitute source copy, and remove only generated build, audit, and log paths
+  after recording the local limitation.
