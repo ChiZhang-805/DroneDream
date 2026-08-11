@@ -51,3 +51,8 @@ windows-sys = { version = "0.61", features = [
   "Win32_System_Threading",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+[patch.crates-io]
+# mavlink-bindgen 0.18.0 was published with quick-xml 0.39.x. Pin the
+# upstream security fix until the next crate release carries quick-xml 0.41+.
+mavlink-bindgen = { git = "https://github.com/mavlink/rust-mavlink.git", rev = "ac3491fd415b15f0f89cf8523d38c2bf42399c50" }
