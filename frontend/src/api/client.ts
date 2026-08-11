@@ -399,14 +399,14 @@ async function transportRequest(
   }
 
   const method = (init?.method ?? "GET").toUpperCase();
-  if (!["GET", "POST", "PATCH", "DELETE"].includes(method)) {
+  if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) {
     throw new Error(`Unsupported desktop API method: ${method}`);
   }
   if (init?.body != null && typeof init.body !== "string") {
     throw new Error("Desktop API request bodies must be JSON strings.");
   }
   const bridged = await desktopApiRequest({
-    method: method as "GET" | "POST" | "PATCH" | "DELETE",
+    method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: `/api/v1${path}`,
     body: (init?.body as string | undefined) ?? null,
     accessToken: currentAccessToken(),

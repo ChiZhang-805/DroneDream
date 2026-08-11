@@ -767,15 +767,12 @@ fn inspect_frame(
         return Err("Field adapter frame must be canonical base64".to_string());
     }
     match request.adapter_id.as_str() {
-        "mavlink-common-v2" | "mavlink-px4-v2" => {
-            inspect_mavlink_message::<mavlink::common::MavMessage>(&request.adapter_id, &bytes)
-        }
-        "mavlink-ardupilotmega-v2" => {
-            inspect_mavlink_message::<mavlink::ardupilotmega::MavMessage>(
-                &request.adapter_id,
-                &bytes,
-            )
-        }
+        "mavlink-common-v2" | "mavlink-px4-v2" => inspect_mavlink_message::<
+            mavlink::dialects::common::MavMessage,
+        >(&request.adapter_id, &bytes),
+        "mavlink-ardupilotmega-v2" => inspect_mavlink_message::<
+            mavlink::dialects::ardupilotmega::MavMessage,
+        >(&request.adapter_id, &bytes),
         _ => Err("Field adapter has no native frame parser".to_string()),
     }
 }
@@ -1142,7 +1139,7 @@ fn inspect_protocol_frame(
     }
     match request.adapter_id.as_str() {
         "mavlink-common-v2" | "mavlink-px4-v2" => {
-            let parsed = inspect_mavlink_message::<mavlink::common::MavMessage>(
+            let parsed = inspect_mavlink_message::<mavlink::dialects::common::MavMessage>(
                 &request.adapter_id,
                 &bytes,
             )?;
@@ -1175,7 +1172,7 @@ fn inspect_protocol_frame(
             ))
         }
         "mavlink-ardupilotmega-v2" => {
-            let parsed = inspect_mavlink_message::<mavlink::ardupilotmega::MavMessage>(
+            let parsed = inspect_mavlink_message::<mavlink::dialects::ardupilotmega::MavMessage>(
                 &request.adapter_id,
                 &bytes,
             )?;
@@ -1341,16 +1338,15 @@ fn probe_from_reader(
     reader: &mut dyn Read,
 ) -> Result<FieldMavlinkTelemetryProbeReceipt, String> {
     let frame = read_one_mavlink_frame(reader, Duration::from_millis(request.read_deadline_ms))?;
-    let inspection =
-        match request.adapter_id.as_str() {
-            "mavlink-common-v2" | "mavlink-px4-v2" => {
-                inspect_mavlink_message::<mavlink::common::MavMessage>(&request.adapter_id, &frame)?
-            }
-            "mavlink-ardupilotmega-v2" => inspect_mavlink_message::<
-                mavlink::ardupilotmega::MavMessage,
-            >(&request.adapter_id, &frame)?,
-            _ => return Err("Field adapter has no native telemetry parser".to_string()),
-        };
+    let inspection = match request.adapter_id.as_str() {
+        "mavlink-common-v2" | "mavlink-px4-v2" => inspect_mavlink_message::<
+            mavlink::dialects::common::MavMessage,
+        >(&request.adapter_id, &frame)?,
+        "mavlink-ardupilotmega-v2" => inspect_mavlink_message::<
+            mavlink::dialects::ardupilotmega::MavMessage,
+        >(&request.adapter_id, &frame)?,
+        _ => return Err("Field adapter has no native telemetry parser".to_string()),
+    };
     Ok(FieldMavlinkTelemetryProbeReceipt {
         schema_version: 1,
         kind: "dronedream-field-mavlink-telemetry-probe-receipt",
@@ -1601,7 +1597,7 @@ mod tests {
 
     #[test]
     fn installed_mavlink_adapter_parses_a_real_frame_without_device_access() {
-        use mavlink::common;
+        use mavlink::dialects::common;
 
         let root = sandbox("frame");
         fs::create_dir(&root).unwrap();
@@ -1937,7 +1933,7 @@ mod tests {
 
     #[test]
     fn fake_serial_probe_reads_one_message_without_hardware_authority() {
-        use mavlink::common;
+        use mavlink::dialects::common;
 
         let root = sandbox("serial-probe");
         fs::create_dir(&root).unwrap();
