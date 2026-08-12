@@ -292,7 +292,7 @@ body:has(.app-shell-public-demo),
   min-width: 0;
   min-height: 3.05rem;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.38rem;
   padding: 0.46rem 0.48rem;
   border: 1px solid transparent;
@@ -326,6 +326,8 @@ body:has(.app-shell-public-demo),
   width: auto;
   height: 1.2rem;
   max-width: 100%;
+  box-sizing: content-box;
+  padding-right: 0.12rem;
   flex: 0 0 auto;
   object-fit: contain;
   object-position: left center;
@@ -346,6 +348,7 @@ body:has(.app-shell-public-demo),
   width: 1rem;
   height: 1rem;
   flex: 0 0 auto;
+  margin-left: 0.28rem;
   color: var(--text-dim);
   transition: transform 150ms ease;
 }
@@ -355,7 +358,7 @@ body:has(.app-shell-public-demo),
 }
 
 .universal-mode-switch-trigger .workspace-switch-brand {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
 }
 
 .universal-mode-switch-trigger .workspace-switch-brand img {
