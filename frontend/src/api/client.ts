@@ -2,7 +2,6 @@
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
 import {
-  desktopApiRequest,
   desktopDownloadArtifact,
   isDesktopRuntime,
 } from "../desktop/bridge";
@@ -21,7 +20,6 @@ import { publicDemoConsole } from "../features/demo/publicDemo";
 import type {
   ApiEnvelope,
   Artifact,
-  AuthenticatedSessionResponse,
   BackendCapabilitiesResponse,
   BatchCreateRequest,
   BatchJob,
@@ -77,6 +75,10 @@ const DEMO_AUTH_TOKEN: string | undefined =
 const BROWSER_REQUEST_TIMEOUT_MS = 120_000;
 const BROWSER_API_RESPONSE_MAX_BYTES = 64 * 1024 * 1024;
 const BROWSER_ARTIFACT_RESPONSE_MAX_BYTES = 256 * 1024 * 1024;
+// The current backend does not persist idempotency receipts yet. Keep mutation
+// retries disabled until that server contract is deployed end to end.
+const BACKEND_IDEMPOTENCY_RECEIPTS_ENABLED =
+  import.meta.env.VITE_BACKEND_IDEMPOTENCY_RECEIPTS === "enabled";
 
 function authHeaders(): Record<string, string> {
   const accessToken = currentAccessToken();
@@ -263,7 +265,8 @@ async function request<T>(
     }
   }
 
-  const pendingMutation = policy.idempotentMutation
+  const pendingMutation =
+    policy.idempotentMutation && BACKEND_IDEMPOTENCY_RECEIPTS_ENABLED
     ? await preparePendingMutation(path, init)
     : null;
   const idempotencyKey = pendingMutation?.idempotencyKey ?? null;
@@ -281,40 +284,16 @@ async function request<T>(
         networkError.httpStatus,
       );
     }
-    // A transport failure can occur after the Runtime committed the action but
-    // before its response reached the WebView. Retrying once is safe only for
-    // endpoints whose durable backend receipt binds this exact key and body.
-    if (idempotencyKey) {
-      try {
-        response = await send();
-      } catch (retryError) {
-        if (retryError instanceof FetchResponseSizeError) {
-          throw new ApiClientError(
-            "RESPONSE_TOO_LARGE",
-            retryError.message,
-            null,
-            retryError.httpStatus,
-          );
-        }
-        throw new ApiClientError(
-          "NETWORK_ERROR",
-          retryError instanceof Error
-            ? retryError.message
-            : "Failed to reach the API after a safe retry.",
-          null,
-          0,
-        );
-      }
-    } else {
-      throw new ApiClientError(
-        "NETWORK_ERROR",
-        networkError instanceof Error
-          ? networkError.message
-          : "Failed to reach the API.",
-        null,
-        0,
-      );
-    }
+    // Do not retry writes after an ambiguous transport failure until the
+    // deployed backend persists and replays idempotency receipts.
+    throw new ApiClientError(
+      "NETWORK_ERROR",
+      networkError instanceof Error
+        ? networkError.message
+        : "Failed to reach the API.",
+      null,
+      0,
+    );
   }
 
   let envelope: ApiEnvelope<T>;
@@ -366,15 +345,6 @@ async function request<T>(
   );
 }
 
-function decodeBase64(value: string): Uint8Array {
-  const binary = atob(value);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
 async function transportRequest(
   path: string,
   init?: RequestInit,
@@ -382,51 +352,23 @@ async function transportRequest(
     "application/json",
   idempotencyKey: string | null = null,
 ): Promise<Response> {
-  if (!isDesktopRuntime()) {
-    return fetchWithDeadline(
-      `${API_BASE_URL}/api/v1${path}`,
-      {
-        ...init,
-        headers: {
-          "Content-Type": "application/json",
-          Accept: accept,
-          ...authHeaders(),
-          ...(init?.headers ?? {}),
-          ...(idempotencyKey
-            ? { "Idempotency-Key": idempotencyKey }
-            : {}),
-        },
+  return fetchWithDeadline(
+    `${API_BASE_URL}/api/v1${path}`,
+    {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: accept,
+        ...authHeaders(),
+        ...(init?.headers ?? {}),
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       },
-      BROWSER_REQUEST_TIMEOUT_MS,
-      accept === "application/octet-stream"
-        ? BROWSER_ARTIFACT_RESPONSE_MAX_BYTES
-        : BROWSER_API_RESPONSE_MAX_BYTES,
-    );
-  }
-
-  const method = (init?.method ?? "GET").toUpperCase();
-  if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-    throw new Error(`Unsupported desktop API method: ${method}`);
-  }
-  if (init?.body != null && typeof init.body !== "string") {
-    throw new Error("Desktop API request bodies must be JSON strings.");
-  }
-  const bridged = await desktopApiRequest({
-    method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
-    path: `/api/v1${path}`,
-    body: (init?.body as string | undefined) ?? null,
-    accessToken: currentAccessToken(),
-    accept,
-    idempotencyKey,
-  });
-  const decoded = decodeBase64(bridged.bodyBase64);
-  const bodyBuffer = Uint8Array.from(decoded).buffer;
-  return new Response(bodyBuffer, {
-    status: bridged.status,
-    headers: bridged.contentType
-      ? { "Content-Type": bridged.contentType }
-      : undefined,
-  });
+    },
+    BROWSER_REQUEST_TIMEOUT_MS,
+    accept === "application/octet-stream"
+      ? BROWSER_ARTIFACT_RESPONSE_MAX_BYTES
+      : BROWSER_API_RESPONSE_MAX_BYTES,
+  );
 }
 
 function buildQuery(params: Record<string, string | number | undefined>): string {
@@ -440,10 +382,6 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
-  async verifyAuthenticatedSession(): Promise<AuthenticatedSessionResponse> {
-    return request<AuthenticatedSessionResponse>("/session");
-  },
-
   async compileExperimentAssistantTurn(
     req: ExperimentAssistantTurnRequest,
   ): Promise<ExperimentAssistantTurnResponse> {

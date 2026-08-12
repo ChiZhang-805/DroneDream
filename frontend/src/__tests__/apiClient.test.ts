@@ -294,7 +294,7 @@ describe("apiClient envelope handling", () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
-  it("preserves the oversized-response classification after a safe mutation retry", async () => {
+  it("does not retry an ambiguous mutation without backend receipts", async () => {
     const fetchSpy = vi.fn()
       .mockRejectedValueOnce(new Error("response channel closed"))
       .mockResolvedValueOnce(
@@ -319,11 +319,11 @@ describe("apiClient envelope handling", () => {
       }),
     ).rejects.toMatchObject({
       name: "ApiClientError",
-      code: "RESPONSE_TOO_LARGE",
-      httpStatus: 200,
-      message: "Response exceeded the 64 MiB safety limit.",
+      code: "NETWORK_ERROR",
+      httpStatus: 0,
+      message: "response channel closed",
     });
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledOnce();
   });
 
   it("fails a browser request when response headers arrive but the body stalls", async () => {
@@ -555,40 +555,23 @@ describe("apiClient envelope handling", () => {
       if (command === "probe_system_prerequisites") return desktopPrerequisites;
       if (command === "probe_runtime_status") return readyRuntime;
       if (command === "start_runtime") return readyRuntime;
-      if (command === "desktop_api_request") {
-        return {
-          status: 200,
-          contentType: "application/json",
-          bodyBase64: btoa(JSON.stringify({
-            success: true,
-            data: { id: "job_1" },
-            error: null,
-          })),
-        };
-      }
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
     await ensureOverallDesktopReadiness({ autoStart: true });
     approveDesktopStartupGateWithoutCloudAuth();
     invoke.mockClear();
-    const fetchSpy = vi.fn();
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: { id: "job_1" },
+      error: null,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchSpy);
 
     await expect(apiClient.createJob({} as never)).resolves.toMatchObject({ id: "job_1" });
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(invoke).toHaveBeenCalledTimes(2);
-    expect(invoke).toHaveBeenNthCalledWith(1, "probe_runtime_status", undefined);
-    expect(invoke).toHaveBeenNthCalledWith(
-      2,
-      "desktop_api_request",
-      expect.objectContaining({
-        request: expect.objectContaining({
-          method: "POST",
-          path: "/api/v1/jobs",
-        }),
-      }),
-    );
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith("probe_runtime_status", undefined);
   });
 
   it("blocks a real run without a cached manual check and never probes automatically", async () => {
@@ -620,21 +603,14 @@ describe("apiClient envelope handling", () => {
       if (command === "probe_system_prerequisites") return desktopPrerequisites;
       if (command === "probe_runtime_status") return readyRuntime;
       if (command === "start_runtime") return readyRuntime;
-      if (command === "desktop_api_request") {
-        return {
-          status: 200,
-          contentType: "application/json",
-          bodyBase64: btoa(JSON.stringify({
-            success: true,
-            data: { id: "job_1", display_name: "safe write" },
-            error: null,
-          })),
-        };
-      }
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
-    const fetchSpy = vi.fn();
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: { id: "job_1", display_name: "safe write" },
+      error: null,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchSpy);
 
     await apiClient.updateJob(
@@ -643,88 +619,11 @@ describe("apiClient envelope handling", () => {
       7,
     );
 
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(invoke).toHaveBeenCalledOnce();
-    expect(invoke).toHaveBeenCalledWith(
-      "desktop_api_request",
-      expect.objectContaining({
-        request: expect.objectContaining({
-          method: "PATCH",
-          path: "/api/v1/jobs/job_1?control_version=7",
-        }),
-      }),
-    );
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("retries an ambiguous desktop mutation once with the same idempotency key", async () => {
-    const invoke = vi.fn()
-      .mockRejectedValueOnce(new Error("response channel closed"))
-      .mockResolvedValueOnce({
-        status: 200,
-        contentType: "application/json",
-        bodyBase64: btoa(JSON.stringify({
-          success: true,
-          data: { id: "job_1", display_name: "safe retry" },
-          error: null,
-        })),
-      });
-    window.__TAURI__ = { core: { invoke } };
-
-    await expect(
-      apiClient.updateJob("job_1", { display_name: "safe retry" }, 7),
-    ).resolves.toMatchObject({ id: "job_1", display_name: "safe retry" });
-
-    expect(invoke).toHaveBeenCalledTimes(2);
-    const firstRequest = invoke.mock.calls[0]?.[1]?.request;
-    const secondRequest = invoke.mock.calls[1]?.[1]?.request;
-    expect(firstRequest.idempotencyKey).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
-    expect(secondRequest).toEqual(firstRequest);
-  });
-
-  it("retains the idempotency key while a mutation is still in progress", async () => {
-    const invoke = vi.fn()
-      .mockResolvedValueOnce({
-        status: 409,
-        contentType: "application/json",
-        bodyBase64: btoa(JSON.stringify({
-          success: false,
-          data: null,
-          error: {
-            code: "IDEMPOTENCY_REQUEST_IN_PROGRESS",
-            message: "The original request is still running.",
-            details: null,
-          },
-        })),
-      })
-      .mockResolvedValueOnce({
-        status: 200,
-        contentType: "application/json",
-        bodyBase64: btoa(JSON.stringify({
-          success: true,
-          data: { id: "job_1", display_name: "reconciled" },
-          error: null,
-        })),
-      });
-    window.__TAURI__ = { core: { invoke } };
-
-    await expect(
-      apiClient.updateJob("job_1", { display_name: "reconciled" }, 7),
-    ).rejects.toMatchObject({ code: "IDEMPOTENCY_REQUEST_IN_PROGRESS" });
-    await expect(
-      apiClient.updateJob("job_1", { display_name: "reconciled" }, 7),
-    ).resolves.toMatchObject({ id: "job_1", display_name: "reconciled" });
-
-    expect(invoke.mock.calls[1]?.[1]?.request.idempotencyKey).toBe(
-      invoke.mock.calls[0]?.[1]?.request.idempotencyKey,
-    );
-    expect(
-      localStorage.getItem("dronedream.api.pending-mutations.v1"),
-    ).toBeNull();
-  });
-
-  it("forwards preference updates through the desktop bridge with PUT", async () => {
+  it("forwards preference updates over the current HTTP transport with PUT", async () => {
     const preferences = {
       schema_version: "1.0",
       saved: true,
@@ -738,12 +637,12 @@ describe("apiClient envelope handling", () => {
       updated_at: "2026-08-12T00:00:00Z",
       deleted_memory_count: 0,
     };
-    const invoke = vi.fn().mockResolvedValue({
-      status: 200,
-      contentType: "application/json",
-      bodyBase64: btoa(JSON.stringify({ success: true, data: preferences, error: null })),
-    });
-    window.__TAURI__ = { core: { invoke } };
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      success: true,
+      data: preferences,
+      error: null,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchSpy);
 
     await expect(apiClient.updateUserExperiencePreferences({
       memory_enabled: true,
@@ -753,53 +652,10 @@ describe("apiClient envelope handling", () => {
       default_altitude_m: 4,
     })).resolves.toEqual(preferences);
 
-    expect(invoke).toHaveBeenCalledWith(
-      "desktop_api_request",
-      expect.objectContaining({
-        request: expect.objectContaining({
-          method: "PUT",
-          path: "/api/v1/preferences/experience",
-        }),
-      }),
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/preferences/experience",
+      expect.objectContaining({ method: "PUT" }),
     );
-  });
-
-  it("reuses an unresolved mutation key after an application restart boundary", async () => {
-    const failedInvoke = vi.fn().mockRejectedValue(
-      new Error("response channel closed"),
-    );
-    window.__TAURI__ = { core: { invoke: failedInvoke } };
-
-    await expect(
-      apiClient.updateJob("job_1", { display_name: "recover me" }, 7),
-    ).rejects.toMatchObject({ code: "NETWORK_ERROR" });
-    expect(failedInvoke).toHaveBeenCalledTimes(2);
-    const unresolvedRequest = failedInvoke.mock.calls[0]?.[1]?.request;
-
-    const recoveredInvoke = vi.fn().mockResolvedValue({
-      status: 200,
-      contentType: "application/json",
-      bodyBase64: btoa(JSON.stringify({
-        success: true,
-        data: { id: "job_1", display_name: "recover me" },
-        error: null,
-      })),
-    });
-    // Replacing the native bridge models a fresh WebView process. Persistent
-    // storage is the only state shared with the new request invocation.
-    window.__TAURI__ = { core: { invoke: recoveredInvoke } };
-
-    await expect(
-      apiClient.updateJob("job_1", { display_name: "recover me" }, 7),
-    ).resolves.toMatchObject({ id: "job_1", display_name: "recover me" });
-
-    const recoveredRequest = recoveredInvoke.mock.calls[0]?.[1]?.request;
-    expect(recoveredRequest.idempotencyKey).toBe(
-      unresolvedRequest.idempotencyKey,
-    );
-    expect(
-      localStorage.getItem("dronedream.api.pending-mutations.v1"),
-    ).toBeNull();
   });
 
   it("loads the versioned parameter catalog from the advanced endpoint", async () => {

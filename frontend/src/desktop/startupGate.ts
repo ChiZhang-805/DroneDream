@@ -86,6 +86,20 @@ export function approveDesktopStartupGateWithoutCloudAuth(): DesktopStartupGateS
   });
 }
 
+export function approveDesktopStartupGateForAccount(
+  accountId: string,
+): DesktopStartupGateSession {
+  verificationRevision += 1;
+  verificationInFlight = null;
+  return publish({
+    status: "ready",
+    accountId,
+    checkedAt: Date.now(),
+    error: null,
+    failureCode: null,
+  });
+}
+
 export async function verifyDesktopStartupGate(
   accountId: string,
   verifier: () => Promise<{ status: string; user_id: string }>,

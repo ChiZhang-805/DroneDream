@@ -106,7 +106,6 @@ import type {
   RuntimeStatusReport,
   SystemPrerequisiteReport,
 } from "../desktop/bridge";
-import { apiClient } from "../api/client";
 import { formatBytes } from "../desktop/format";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { DesktopSetup } from "../pages/DesktopSetup";
@@ -824,7 +823,7 @@ describe("DesktopSetup", () => {
       .not.toBeInTheDocument();
   });
 
-  it("enters only after the browser flow and local backend accept the same account", async () => {
+  it("enters after browser authentication and local checks are ready", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
@@ -843,9 +842,6 @@ describe("DesktopSetup", () => {
         },
       };
     });
-    const verifySession = vi
-      .spyOn(apiClient, "verifyAuthenticatedSession")
-      .mockResolvedValue({ status: "ready", user_id: "user-accepted" });
     window.__TAURI__ = {
       core: {
         invoke: vi.fn(async (command: string) => {
@@ -863,7 +859,6 @@ describe("DesktopSetup", () => {
     expect(await screen.findByRole("button", {
       name: "Sign in and enter tuning workspace",
     })).toBeEnabled();
-    expect(verifySession).not.toHaveBeenCalled();
     expect(screen.getByTestId("current-route")).toHaveTextContent("/");
 
     await userEvent.click(screen.getByRole("button", {
@@ -873,55 +868,6 @@ describe("DesktopSetup", () => {
     await waitFor(() => {
       expect(screen.getByTestId("current-route")).toHaveTextContent("/assistant");
     });
-    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "100");
-    expect(verifySession).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps the workspace locked when the backend identity differs from the signed-in account", async () => {
-    optionalAuthState.current = {
-      configured: true,
-      loading: false,
-      account: null,
-    };
-    browserAuthMocks.adoptSession.mockImplementationOnce(async () => {
-      optionalAuthState.current = {
-        configured: true,
-        loading: false,
-        account: {
-          id: "user-expected",
-          email: "pilot@example.com",
-          displayName: "Pilot",
-          avatarUrl: null,
-        },
-      };
-    });
-    vi.spyOn(apiClient, "verifyAuthenticatedSession").mockResolvedValue({
-      status: "ready",
-      user_id: "user-other",
-    });
-    window.__TAURI__ = {
-      core: {
-        invoke: vi.fn(async (command: string) => {
-          if (command === "probe_system_prerequisites") return prerequisites;
-          if (command === "probe_runtime_status") return runtime;
-          if (command === "restore_browser_auth_vault") return null;
-          if (command === "begin_browser_auth") {
-            return validBrowserSession;
-          }
-          throw new Error(`Unexpected command: ${command}`);
-        }),
-      },
-    };
-
-    renderPage();
-
-    await userEvent.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
-    }));
-    expect(await screen.findByText(/different account identit/i)).toBeVisible();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
-      .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
   });

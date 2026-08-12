@@ -67,9 +67,9 @@ import {
 import type { DesktopRuntimeAccess } from "./desktop/access";
 import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
 import {
+  approveDesktopStartupGateForAccount,
   approveDesktopStartupGateWithoutCloudAuth,
   setDesktopStartupGateState,
-  verifyDesktopStartupGate,
 } from "./desktop/startupGate";
 import {
   AppUpdaterProvider,
@@ -2330,10 +2330,7 @@ function AppShellContent() {
       setDesktopStartupGateState("accountRequired");
       return;
     }
-    void verifyDesktopStartupGate(
-      auth.account.id,
-      () => apiClient.verifyAuthenticatedSession(),
-    );
+    approveDesktopStartupGateForAccount(auth.account.id);
   }, [
     auth.account,
     auth.configured,

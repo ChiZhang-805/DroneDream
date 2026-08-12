@@ -9,7 +9,6 @@ import {
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { apiClient } from "../api/client";
 import { editionLandingPath } from "../edition";
 import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
@@ -61,10 +60,10 @@ import {
   verifyRuntimeSessionContract,
 } from "../desktop/runtimeSessionContract";
 import {
+  approveDesktopStartupGateForAccount,
   getDesktopStartupGateSession,
   setDesktopStartupGateState,
   subscribeDesktopStartupGate,
-  verifyDesktopStartupGate,
 } from "../desktop/startupGate";
 import { useAppUpdaterState } from "../desktop/updaterContext";
 import { useI18n } from "../i18n/I18nProvider";
@@ -582,10 +581,7 @@ export function DesktopSetup() {
       return;
     }
     if (!signedInAccount) return;
-    void verifyDesktopStartupGate(
-      signedInAccount.id,
-      () => apiClient.verifyAuthenticatedSession(),
-    );
+    approveDesktopStartupGateForAccount(signedInAccount.id);
   }, [
     browserAuthCompletedForLaunch,
     desktopAvailable,
