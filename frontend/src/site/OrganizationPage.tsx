@@ -91,7 +91,13 @@ function roleLabel(
   return role === "owner" ? copy.owner : role === "admin" ? copy.admin : copy.member;
 }
 
-export function OrganizationPage({ locale }: { locale: SiteLocale }) {
+export function OrganizationPage({
+  locale,
+  accountId,
+}: {
+  locale: SiteLocale;
+  accountId: string | null;
+}) {
   const copy = content[locale];
   const [snapshot, setSnapshot] = useState<OrganizationSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,6 +123,13 @@ export function OrganizationPage({ locale }: { locale: SiteLocale }) {
 
   useEffect(() => {
     let active = true;
+    setSnapshot(null);
+    setSelected(null);
+    setError(null);
+    if (!accountId) {
+      setLoading(false);
+      return () => { active = false; };
+    }
     setLoading(true);
     void getOrganizationSnapshot()
       .then((result) => {
@@ -132,7 +145,7 @@ export function OrganizationPage({ locale }: { locale: SiteLocale }) {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [copy.unavailable]);
+  }, [accountId, copy.unavailable]);
 
   const updateSnapshot = (next: OrganizationSnapshot) => {
     setSnapshot(next);

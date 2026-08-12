@@ -1233,7 +1233,7 @@ export function SiteApp() {
             onRequireAccount={() => openAccount("register")}
           />
         ) : sitePage === "organization" ? (
-          <OrganizationPage locale={locale} />
+          <OrganizationPage locale={locale} accountId={auth.account?.id ?? null} />
         ) : sitePage === "community" ? (
           <CommunityPage
             locale={locale}

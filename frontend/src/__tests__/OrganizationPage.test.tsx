@@ -83,7 +83,7 @@ describe("OrganizationPage", () => {
   });
 
   it("renders a compact member directory and four explicit application marks", async () => {
-    const { container } = render(<OrganizationPage locale="en" />);
+    const { container } = render(<OrganizationPage locale="en" accountId="user-owner" />);
 
     expect(await screen.findByRole("heading", { name: "Aerial Systems Lab" })).toBeVisible();
     expect(screen.getByText("1 / 3")).toBeVisible();
@@ -98,7 +98,7 @@ describe("OrganizationPage", () => {
   });
 
   it("adds an existing account with an owner-selected delegated role", async () => {
-    render(<OrganizationPage locale="en" />);
+    render(<OrganizationPage locale="en" accountId="user-owner" />);
     await screen.findByRole("heading", { name: "Aerial Systems Lab" });
 
     fireEvent.change(screen.getByLabelText("Account email"), {
@@ -116,7 +116,7 @@ describe("OrganizationPage", () => {
   });
 
   it("keeps detailed data and destructive actions inside the member card", async () => {
-    render(<OrganizationPage locale="en" />);
+    render(<OrganizationPage locale="en" accountId="user-owner" />);
     await screen.findByRole("heading", { name: "Aerial Systems Lab" });
 
     const pilotRow = screen.getByText("pilot@example.test").closest("tr");
@@ -137,7 +137,7 @@ describe("OrganizationPage", () => {
 
   it("does not let a delegated admin control another delegated admin", async () => {
     organizationMock.getOrganizationSnapshot.mockResolvedValueOnce(snapshot("admin"));
-    render(<OrganizationPage locale="en" />);
+    render(<OrganizationPage locale="en" accountId="user-admin" />);
     await screen.findByRole("heading", { name: "Aerial Systems Lab" });
 
     const adminRow = screen.getByText("admin@example.test").closest("tr");
