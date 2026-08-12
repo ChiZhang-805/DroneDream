@@ -132,14 +132,24 @@ describe("DroneDream public website", () => {
     await waitFor(() => expect(open).toHaveFocus());
   });
 
-  it("renders the full manual as a dedicated documentation page", () => {
+  it("renders the production manual reader with its chapter sidebar and offline editions", () => {
     window.history.replaceState(null, "", "/manual/");
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "Build explainable tuning experiments." })).toBeVisible();
-    expect(screen.getByRole("complementary", { name: "On this page" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Complete the five-step experiment" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DroneDream 1.0.0 User Manual" })).toBeVisible();
+    expect(screen.getByRole("complementary", { name: "DroneDream manual contents" })).toBeVisible();
+    expect(screen.getByRole("searchbox", { name: "Search chapters" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Markdown" })).toHaveAttribute(
+      "href",
+      "/docs/downloads/DroneDream-Manual-en.md",
+    );
+    expect(screen.getByRole("link", { name: "PDF" })).toHaveAttribute(
+      "href",
+      "/docs/downloads/DroneDream-Manual-en.pdf",
+    );
+    expect(container.querySelector(".manual-sidebar")).not.toBeNull();
+    expect(container.querySelector(".manual-reader")).not.toBeNull();
     expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();
     expect(container.querySelector(".site-footer")).toBeNull();
   });
@@ -255,6 +265,9 @@ describe("DroneDream public website", () => {
     const { container } = renderSite();
 
     expect(screen.getByRole("heading", { name: "Share questions. Compare flight evidence." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Recent topics" })).toBeVisible();
+    expect(container.querySelector(".community-feed")).not.toBeNull();
+    expect(container.querySelector(".community-topic-grid")).not.toBeNull();
     expect(container.querySelector(".site-footer")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sign in to publish" }));
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();

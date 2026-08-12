@@ -968,9 +968,12 @@ been removed without losing recovery evidence.
   and the Aliyun preview must be built from the same reviewed commit, deploy the
   same route components and design tokens, record that commit at both targets,
   and pass fresh route-by-route screenshot comparison before visual parity is
-  claimed. A more complete current Manual page should replace the older preview
-  shell, while a mature nine-row Pricing layout should be preserved instead of
-  squeezing nine benefits into a six-row grid.
+  claimed. The mature Aliyun Manual reader and editorial Community cards are
+  the approved visual baseline and must be preserved in source before either
+  target is redeployed; changing the preview first destroyed the only visible
+  comparison baseline and required an immediate atomic rollback. The mature
+  nine-row Pricing layout must likewise be preserved instead of squeezing nine
+  benefits into a six-row grid.
 - Hosted-installer provenance lesson: backend provenance and historical commit
   tests require the complete Git graph. A shallow checkout caused 17 misleading
   backend failures late in the Windows installer job even though the referenced

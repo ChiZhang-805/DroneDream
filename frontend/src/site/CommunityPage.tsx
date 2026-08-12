@@ -1,8 +1,11 @@
 import {
+  Activity,
   ArrowLeft,
   ArrowUpRight,
-  Camera,
+  ChartNoAxesCombined,
   ChevronRight,
+  Compass,
+  Gauge,
   Heart,
   ImagePlus,
   MessageCircle,
@@ -14,13 +17,17 @@ import {
   Trash2,
   Upload,
   UserRound,
+  Wind,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent,
   useCallback,
   useEffect,
+  useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -31,6 +38,7 @@ import {
   CommunityImageError,
   optimizeCommunityImage,
 } from "./communityMedia";
+import { useModalFocus } from "./useModalFocus";
 
 type SiteLocale = "en" | "zh-CN";
 
@@ -38,6 +46,7 @@ interface CommunityPageProps {
   locale: SiteLocale;
   account: DroneDreamAccount | null;
   onRequireAccount: () => void;
+  sensitiveCloudActionsEnabled?: boolean;
 }
 
 interface CommunityTopic {
@@ -67,7 +76,8 @@ interface CommunityComment {
   liked_by_viewer: boolean;
 }
 
-const TOPIC_PAGE_SIZE = 24;
+const TOPIC_PAGE_SIZE = 20;
+const RECENT_TOPIC_COUNT = 5;
 const COMMENT_PAGE_SIZE = 100;
 
 const tagOptions = {
@@ -126,7 +136,7 @@ const communityContent = {
     clearReply: "Cancel reply",
     sendComment: "Post comment",
     likes: "likes",
-    loadMore: "Load more topics",
+    loadMore: "Load the next 20 topics",
     loadMoreComments: "Load more comments",
     noComments: "No comments yet. Add the first evidence-based response.",
     signInAction: "Sign in to join the discussion",
@@ -177,7 +187,7 @@ const communityContent = {
     clearReply: "取消回复",
     sendComment: "发表评论",
     likes: "次点赞",
-    loadMore: "加载更多话题",
+    loadMore: "加载接下来的 20 个话题",
     loadMoreComments: "加载更多评论",
     noComments: "还没有评论；你可以补充第一条基于证据的回复。",
     signInAction: "登录后参与讨论",
@@ -196,10 +206,125 @@ function dateLabel(locale: SiteLocale, value: string) {
   }).format(new Date(value));
 }
 
+type TopicCoverTemplate = "analysis" | "comparison" | "route" | "wind" | "evidence";
+
+interface TopicCoverPresentation {
+  template: TopicCoverTemplate;
+  kicker: string;
+  emphasis: string;
+  issue: string;
+  icon: LucideIcon;
+}
+
+function topicCoverPresentation(
+  topic: CommunityTopic,
+  locale: SiteLocale,
+): TopicCoverPresentation {
+  const subject = `${topic.title} ${topic.body} ${topic.tags.join(" ")}`.toLocaleLowerCase(locale);
+  const issue = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "2-digit",
+  }).format(new Date(topic.created_at));
+  const emphasis = topic.tags[0] ?? (locale === "zh-CN" ? "飞行调优" : "Flight tuning");
+
+  if (/(wind|gust|风|抗风)/u.test(subject)) {
+    return {
+      template: "wind",
+      kicker: locale === "zh-CN" ? "抗扰研究笔记" : "ROBUSTNESS NOTE",
+      emphasis,
+      issue,
+      icon: Wind,
+    };
+  }
+  if (/(versus|compare|comparison|bayes|cma|对比|比较|优化器)/u.test(subject)) {
+    return {
+      template: "comparison",
+      kicker: locale === "zh-CN" ? "算法对照实验" : "METHOD COMPARISON",
+      emphasis,
+      issue,
+      icon: ChartNoAxesCombined,
+    };
+  }
+  if (/(route|track|waypoint|trajectory|轨迹|航线|航点)/u.test(subject)) {
+    return {
+      template: "route",
+      kicker: locale === "zh-CN" ? "飞行轨迹研究" : "FLIGHT PATH STUDY",
+      emphasis,
+      issue,
+      icon: Compass,
+    };
+  }
+  if (/(fail|failure|overshoot|error|失败|超调|故障)/u.test(subject)) {
+    return {
+      template: "analysis",
+      kicker: locale === "zh-CN" ? "问题诊断记录" : "DIAGNOSTIC LOG",
+      emphasis,
+      issue,
+      icon: Activity,
+    };
+  }
+  return {
+    template: "evidence",
+    kicker: locale === "zh-CN" ? "可复查飞行证据" : "FLIGHT EVIDENCE",
+    emphasis,
+    issue,
+    icon: Gauge,
+  };
+}
+
+function TopicCoverArtwork({
+  topic,
+  locale,
+  dialog = false,
+}: {
+  topic: CommunityTopic;
+  locale: SiteLocale;
+  dialog?: boolean;
+}) {
+  const presentation = topicCoverPresentation(topic, locale);
+  const Icon = presentation.icon;
+  return (
+    <div
+      className={`community-cover-art is-${presentation.template}${dialog ? " is-dialog" : ""}`}
+      data-template={presentation.template}
+    >
+      <span className="community-cover-shape is-secondary" aria-hidden="true" />
+      <header>
+        <Icon aria-hidden="true" />
+        <span>{presentation.kicker}</span>
+      </header>
+      <strong>{topic.title}</strong>
+      <p><span># {presentation.emphasis}</span></p>
+      <footer>
+        <time dateTime={topic.created_at}>{presentation.issue}</time>
+        <span>DRONEDREAM · 1.0</span>
+      </footer>
+    </div>
+  );
+}
+
+function selectRecentTopics(topics: CommunityTopic[], seed: number): CommunityTopic[] {
+  if (topics.length <= RECENT_TOPIC_COUNT) return topics;
+
+  const [newest, ...remaining] = topics;
+  const ranked = remaining
+    .map((topic) => {
+      let rank = 2166136261 ^ seed;
+      for (const character of topic.id) {
+        rank ^= character.charCodeAt(0);
+        rank = Math.imul(rank, 16777619);
+      }
+      return { rank: rank >>> 0, topic };
+    })
+    .sort((left, right) => left.rank - right.rank);
+  return [newest, ...ranked.slice(0, RECENT_TOPIC_COUNT - 1).map(({ topic }) => topic)];
+}
+
 export function CommunityPage({
   locale,
   account,
   onRequireAccount,
+  sensitiveCloudActionsEnabled = true,
 }: CommunityPageProps) {
   const copy = communityContent[locale];
   const presets = tagOptions[locale];
@@ -211,10 +336,17 @@ export function CommunityPage({
   const [hasMoreTopics, setHasMoreTopics] = useState(false);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [hasMoreComments, setHasMoreComments] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
+  const [composerError, setComposerError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [settledQuery, setSettledQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [recentSampleSeed] = useState(() => {
+    const value = new Uint32Array(1);
+    globalThis.crypto?.getRandomValues(value);
+    return value[0];
+  });
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<CommunityTopic | null>(null);
   const [title, setTitle] = useState("");
@@ -227,16 +359,32 @@ export function CommunityPage({
   const [deletingTopicId, setDeletingTopicId] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
+  const composerRef = useRef<HTMLFormElement>(null);
+  const composerTitleRef = useRef<HTMLInputElement>(null);
+  const topicDialogRef = useRef<HTMLElement>(null);
+  const topicCloseRef = useRef<HTMLButtonElement>(null);
+  const captureComposerTrigger = useModalFocus({
+    open: composerOpen,
+    dialogRef: composerRef,
+    initialFocusRef: composerTitleRef,
+    onClose: () => setComposerOpen(false),
+  });
+  const captureTopicTrigger = useModalFocus({
+    open: Boolean(selectedTopic),
+    dialogRef: topicDialogRef,
+    initialFocusRef: topicCloseRef,
+    onClose: () => setSelectedTopic(null),
+  });
 
   const loadTopics = useCallback(async (offset = 0, append = false) => {
     if (!supabaseClient) {
       setLoading(false);
-      setError(copy.unavailable);
+      setFeedError(copy.unavailable);
       return;
     }
     if (append) setLoadingMoreTopics(true);
     else setLoading(true);
-    setError(null);
+    setFeedError(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
@@ -258,7 +406,7 @@ export function CommunityPage({
       setHasMoreTopics(page.length > TOPIC_PAGE_SIZE);
       setTopics((current) => append ? [...current, ...boundedPage] : boundedPage);
     } catch {
-      setError(copy.unavailable);
+      setFeedError(copy.unavailable);
     } finally {
       window.clearTimeout(timeout);
       if (append) setLoadingMoreTopics(false);
@@ -284,7 +432,7 @@ export function CommunityPage({
   ) => {
     if (!supabaseClient) return;
     setCommentsLoading(true);
-    setError(null);
+    setDialogError(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
@@ -304,25 +452,21 @@ export function CommunityPage({
       setHasMoreComments(page.length > COMMENT_PAGE_SIZE);
       setComments((current) => append ? [...current, ...boundedPage] : boundedPage);
     } catch {
-      setError(copy.unavailable);
+      setDialogError(copy.unavailable);
     } finally {
       window.clearTimeout(timeout);
       setCommentsLoading(false);
     }
   }, [copy.unavailable]);
 
-  useEffect(() => {
-    if (!composerOpen && !selectedTopic) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [composerOpen, selectedTopic]);
-
-  const visibleTopics = allTopicsView ? topics : topics.slice(0, 3);
+  const visibleTopics = useMemo(
+    () => allTopicsView ? topics : selectRecentTopics(topics, recentSampleSeed),
+    [allTopicsView, recentSampleSeed, topics],
+  );
 
   const openTopic = (topic: CommunityTopic) => {
+    captureTopicTrigger();
+    setDialogError(null);
     setSelectedTopic(topic);
     setComments([]);
     setHasMoreComments(false);
@@ -330,10 +474,13 @@ export function CommunityPage({
   };
 
   const startTopic = () => {
+    if (!sensitiveCloudActionsEnabled) return;
     if (!account) {
       onRequireAccount();
       return;
     }
+    captureComposerTrigger();
+    setComposerError(null);
     setComposerOpen(true);
   };
 
@@ -353,7 +500,7 @@ export function CommunityPage({
 
   const selectImages = async (selected: File[]) => {
     setPreparingMedia(true);
-    setError(null);
+    setComposerError(null);
     try {
       const optimized: File[] = [];
       for (const file of selected.slice(0, COMMUNITY_IMAGE_MAX_FILES)) {
@@ -368,9 +515,9 @@ export function CommunityPage({
           "decode-failed": copy.mediaDecodeFailed,
           "output-too-large": copy.mediaOutputTooLarge,
         }[mediaError.code];
-        setError(message);
+        setComposerError(message);
       } else {
-        setError(copy.mediaDecodeFailed);
+        setComposerError(copy.mediaDecodeFailed);
       }
     } finally {
       setPreparingMedia(false);
@@ -378,7 +525,11 @@ export function CommunityPage({
   };
 
   const removeUploadedImages = async (paths: string[]) => {
-    if (!supabaseClient || paths.length === 0) return;
+    if (
+      !sensitiveCloudActionsEnabled
+      || !supabaseClient
+      || paths.length === 0
+    ) return;
     const { error: removeError } = await supabaseClient.storage
       .from("community-media")
       .remove(paths);
@@ -388,7 +539,12 @@ export function CommunityPage({
   };
 
   const uploadImages = async () => {
-    if (!account || !supabaseClient || files.length === 0) {
+    if (
+      !sensitiveCloudActionsEnabled
+      || !account
+      || !supabaseClient
+      || files.length === 0
+    ) {
       return { urls: [] as string[], paths: [] as string[] };
     }
     const urls: string[] = [];
@@ -417,9 +573,14 @@ export function CommunityPage({
 
   const publish = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!account || !supabaseClient || publishing) return;
+    if (
+      !sensitiveCloudActionsEnabled
+      || !account
+      || !supabaseClient
+      || publishing
+    ) return;
     setPublishing(true);
-    setError(null);
+    setComposerError(null);
     let uploadedPaths: string[] = [];
     try {
       const uploaded = await uploadImages();
@@ -441,7 +602,9 @@ export function CommunityPage({
       await loadTopics();
     } catch (requestError) {
       await removeUploadedImages(uploadedPaths);
-      setError(requestError instanceof Error ? requestError.message : copy.unavailable);
+      setComposerError(
+        requestError instanceof Error ? requestError.message : copy.unavailable,
+      );
     } finally {
       setPublishing(false);
     }
@@ -450,6 +613,7 @@ export function CommunityPage({
   const deleteTopic = async (topic: CommunityTopic) => {
     if (
       !account ||
+      !sensitiveCloudActionsEnabled ||
       account.id !== topic.author_id ||
       !supabaseClient ||
       deletingTopicId
@@ -459,7 +623,8 @@ export function CommunityPage({
     if (!window.confirm(copy.deleteTopicConfirm)) return;
 
     setDeletingTopicId(topic.id);
-    setError(null);
+    if (selectedTopic?.id === topic.id) setDialogError(null);
+    else setFeedError(null);
     try {
       const { error: requestError } = await supabaseClient
         .from("community_topics")
@@ -484,17 +649,18 @@ export function CommunityPage({
       });
       await removeUploadedImages(mediaPaths);
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : copy.unavailable
-      );
+      const message = requestError instanceof Error
+        ? requestError.message
+        : copy.unavailable;
+      if (selectedTopic?.id === topic.id) setDialogError(message);
+      else setFeedError(message);
     } finally {
       setDeletingTopicId(null);
     }
   };
 
   const toggleTopicLike = async (topicId: string) => {
+    if (!sensitiveCloudActionsEnabled) return;
     if (!account || !supabaseClient) {
       onRequireAccount();
       return;
@@ -502,6 +668,8 @@ export function CommunityPage({
     const topic = topics.find((candidate) => candidate.id === topicId)
       ?? (selectedTopic?.id === topicId ? selectedTopic : null);
     if (!topic) return;
+    if (selectedTopic?.id === topicId) setDialogError(null);
+    else setFeedError(null);
     const liked = topic.liked_by_viewer;
     const { error: requestError } = liked
       ? await supabaseClient
@@ -513,7 +681,8 @@ export function CommunityPage({
         .from("community_topic_likes")
         .insert({ topic_id: topicId, user_id: account.id });
     if (requestError) {
-      setError(requestError.message);
+      if (selectedTopic?.id === topicId) setDialogError(requestError.message);
+      else setFeedError(requestError.message);
       return;
     }
     const updateTopic = (candidate: CommunityTopic): CommunityTopic =>
@@ -529,12 +698,14 @@ export function CommunityPage({
   };
 
   const toggleCommentLike = async (commentId: string) => {
+    if (!sensitiveCloudActionsEnabled) return;
     if (!account || !supabaseClient) {
       onRequireAccount();
       return;
     }
     const comment = comments.find((candidate) => candidate.id === commentId);
     if (!comment) return;
+    setDialogError(null);
     const liked = comment.liked_by_viewer;
     const { error: requestError } = liked
       ? await supabaseClient
@@ -546,7 +717,7 @@ export function CommunityPage({
         .from("community_comment_likes")
         .insert({ comment_id: commentId, user_id: account.id });
     if (requestError) {
-      setError(requestError.message);
+      setDialogError(requestError.message);
       return;
     }
     setComments((current) =>
@@ -564,7 +735,14 @@ export function CommunityPage({
 
   const publishComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!account || !selectedTopic || !supabaseClient || !commentBody.trim()) return;
+    if (
+      !sensitiveCloudActionsEnabled
+      || !account
+      || !selectedTopic
+      || !supabaseClient
+      || !commentBody.trim()
+    ) return;
+    setDialogError(null);
     const { error: requestError } = await supabaseClient.from("community_comments").insert({
       topic_id: selectedTopic.id,
       parent_id: replyTo?.id ?? null,
@@ -573,7 +751,7 @@ export function CommunityPage({
       body: commentBody.trim(),
     });
     if (requestError) {
-      setError(requestError.message);
+      setDialogError(requestError.message);
       return;
     }
     setCommentBody("");
@@ -602,7 +780,11 @@ export function CommunityPage({
           </h1>
           <p>{copy.intro}</p>
         </div>
-        <button type="button" onClick={startTopic}>
+        <button
+          type="button"
+          disabled={!sensitiveCloudActionsEnabled}
+          onClick={startTopic}
+        >
           <PenLine aria-hidden="true" />
           {account ? copy.newTopic : copy.signIn}
         </button>
@@ -619,6 +801,8 @@ export function CommunityPage({
           <label className="community-search">
             <Search aria-hidden="true" />
             <input
+              type="search"
+              aria-label={copy.search}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={copy.search}
@@ -626,33 +810,46 @@ export function CommunityPage({
           </label>
         </header>
 
-        <div className="community-tag-filter" aria-label={copy.tagsLabel}>
-          {presets.map((tagName) => (
-            <button
-              key={tagName}
-              type="button"
-              className={activeTag === tagName ? "is-active" : ""}
-              onClick={() => setActiveTag(activeTag === tagName ? null : tagName)}
-            >
-              #{tagName}
-            </button>
-          ))}
+        <div className="community-filter-row">
+          <div className="community-tag-filter" role="group" aria-label={copy.tagsLabel}>
+            {presets.map((tagName) => (
+              <button
+                key={tagName}
+                type="button"
+                className={activeTag === tagName ? "is-active" : ""}
+                aria-pressed={activeTag === tagName}
+                onClick={() => setActiveTag(activeTag === tagName ? null : tagName)}
+              >
+                # {tagName}
+              </button>
+            ))}
+          </div>
+          {!loading && !feedError && !allTopicsView && visibleTopics.length > 0 ? (
+            <a className="community-more is-filter-action" href="/community/?view=all">
+              {copy.more}
+              <ChevronRight aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
 
-        {loading ? <p className="community-state" role="status">{copy.loading}</p> : null}
+        {loading ? <p role="status">{copy.loading}</p> : null}
 
-        {!loading && error ? (
-          <p className="community-state is-error" role="status">{error}</p>
+        {!loading && feedError ? (
+          <p className="community-state is-error" role="alert">{feedError}</p>
+        ) : null}
+
+        {!loading && !feedError && visibleTopics.length === 0 ? (
+          <p className="community-state" role="status">{copy.empty}</p>
         ) : null}
 
         <div className="community-topic-grid">
-          {visibleTopics.map((topic, index) => {
+          {visibleTopics.map((topic) => {
             const liked = Boolean(account && topic.liked_by_viewer);
             return (
               <article key={topic.id}>
                 <button
                   type="button"
-                  className={`community-topic-cover is-tone-${(index % 4) + 1}`}
+                  className="community-topic-cover"
                   onClick={() => openTopic(topic)}
                   aria-label={`${copy.open}: ${topic.title}`}
                 >
@@ -664,10 +861,7 @@ export function CommunityPage({
                       decoding="async"
                     />
                   ) : (
-                    <>
-                      <Camera aria-hidden="true" />
-                      <strong>{topic.title}</strong>
-                    </>
+                    <TopicCoverArtwork topic={topic} locale={locale} />
                   )}
                 </button>
                 <div className="community-topic-card-body">
@@ -683,19 +877,26 @@ export function CommunityPage({
                   <p>{topic.body}</p>
                   <div className="community-topic-tags">
                     {topic.tags.slice(0, 3).map((tagName) => (
-                      <span key={tagName}>#{tagName}</span>
+                      <span key={tagName}># {tagName}</span>
                     ))}
                   </div>
                   <footer>
                     <button
                       type="button"
                       className={liked ? "is-liked" : ""}
+                      aria-label={`${topic.like_count} ${copy.likes}`}
+                      aria-pressed={liked}
+                      disabled={!sensitiveCloudActionsEnabled}
                       onClick={() => void toggleTopicLike(topic.id)}
                     >
                       <Heart aria-hidden="true" />
                       {topic.like_count}
                     </button>
-                    <button type="button" onClick={() => openTopic(topic)}>
+                    <button
+                      type="button"
+                      aria-label={`${topic.comment_count} ${copy.comments}`}
+                      onClick={() => openTopic(topic)}
+                    >
                       <MessageCircle aria-hidden="true" />
                       {topic.comment_count}
                     </button>
@@ -703,7 +904,10 @@ export function CommunityPage({
                       <button
                         type="button"
                         className="community-topic-delete"
-                        disabled={deletingTopicId === topic.id}
+                        disabled={
+                          !sensitiveCloudActionsEnabled
+                          || deletingTopicId === topic.id
+                        }
                         onClick={() => void deleteTopic(topic)}
                         aria-label={copy.deleteTopic}
                         title={copy.deleteTopic}
@@ -722,7 +926,7 @@ export function CommunityPage({
           })}
         </div>
 
-        {!loading && !error && allTopicsView && hasMoreTopics ? (
+        {!loading && !feedError && allTopicsView && hasMoreTopics ? (
           <button
             type="button"
             className="community-more"
@@ -733,29 +937,39 @@ export function CommunityPage({
             <ChevronRight aria-hidden="true" />
           </button>
         ) : null}
-        {!loading && !error && (!allTopicsView || !hasMoreTopics) ? (
+        {!loading && !feedError && allTopicsView && !hasMoreTopics ? (
           <a
             className="community-more"
-            href={allTopicsView ? "/community/" : "/community/?view=all"}
+            href="/community/"
           >
-            {allTopicsView ? (
-              <><ArrowLeft aria-hidden="true" />{copy.back}</>
-            ) : (
-              <>{copy.more}<ChevronRight aria-hidden="true" /></>
-            )}
+            <ArrowLeft aria-hidden="true" />
+            {copy.back}
           </a>
         ) : null}
       </section>
 
       {composerOpen && account ? (
-        <div className="community-modal-backdrop" role="presentation">
+        <div
+          className="community-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setComposerOpen(false);
+          }}
+        >
           <form
+            ref={composerRef}
             className="community-composer"
             onSubmit={(event) => void publish(event)}
-            aria-label={copy.newTopic}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="community-composer-title"
+            tabIndex={-1}
           >
             <header>
-              <div><PenLine aria-hidden="true" /><h2>{copy.newTopic}</h2></div>
+              <div>
+                <PenLine aria-hidden="true" />
+                <h2 id="community-composer-title">{copy.newTopic}</h2>
+              </div>
               <button type="button" onClick={() => setComposerOpen(false)} aria-label={copy.close}>
                 <X aria-hidden="true" />
               </button>
@@ -763,6 +977,7 @@ export function CommunityPage({
             <label>
               <span>{copy.titleLabel}</span>
               <input
+                ref={composerTitleRef}
                 required
                 maxLength={120}
                 value={title}
@@ -789,6 +1004,7 @@ export function CommunityPage({
                     key={tagName}
                     type="button"
                     className={tags.includes(tagName) ? "is-active" : ""}
+                    aria-pressed={tags.includes(tagName)}
                     onClick={() =>
                       setTags(
                         tags.includes(tagName)
@@ -799,7 +1015,7 @@ export function CommunityPage({
                       )
                     }
                   >
-                    #{tagName}
+                    # {tagName}
                   </button>
                 ))}
                 {tags
@@ -811,16 +1027,18 @@ export function CommunityPage({
                       key={tagName}
                       type="button"
                       className="is-active"
+                      aria-pressed="true"
                       onClick={() =>
                         setTags((current) =>
                           current.filter((value) => value !== tagName)
                         )
                       }
                     >
-                      #{tagName}
+                      # {tagName}
                     </button>
                   ))}
                 <input
+                  aria-label={copy.customTag}
                   value={customTag}
                   onChange={(event) => setCustomTag(event.target.value)}
                   onKeyDown={addCustomTag}
@@ -862,7 +1080,9 @@ export function CommunityPage({
                 </div>
               ) : null}
             </fieldset>
-            {error ? <p className="community-form-error">{error}</p> : null}
+            {composerError ? (
+              <p className="community-form-error" role="alert">{composerError}</p>
+            ) : null}
             <footer>
               <button
                 type="button"
@@ -889,14 +1109,23 @@ export function CommunityPage({
       ) : null}
 
       {selectedTopic ? (
-        <div className="community-modal-backdrop" role="presentation">
+        <div
+          className="community-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedTopic(null);
+          }}
+        >
           <section
+            ref={topicDialogRef}
             className="community-topic-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="community-topic-title"
+            tabIndex={-1}
           >
             <button
+              ref={topicCloseRef}
               type="button"
               className="community-dialog-close"
               onClick={() => setSelectedTopic(null)}
@@ -916,10 +1145,7 @@ export function CommunityPage({
                   />
                 ))
               ) : (
-                <div>
-                  <MessageCircle aria-hidden="true" />
-                  <strong>{selectedTopic.title}</strong>
-                </div>
+                <TopicCoverArtwork topic={selectedTopic} locale={locale} dialog />
               )}
             </div>
             <div className="community-topic-dialog-content">
@@ -928,14 +1154,16 @@ export function CommunityPage({
                   <span><UserRound aria-hidden="true" /></span>
                   <div>
                     <strong>{selectedTopic.author_name}</strong>
-                    <time>{dateLabel(locale, selectedTopic.created_at)}</time>
+                    <time dateTime={selectedTopic.created_at}>
+                      {dateLabel(locale, selectedTopic.created_at)}
+                    </time>
                   </div>
                 </div>
                 <h2 id="community-topic-title">{selectedTopic.title}</h2>
                 <p>{selectedTopic.body}</p>
                 <div className="community-topic-tags">
                   {selectedTopic.tags.map((tagName) => (
-                    <span key={tagName}>#{tagName}</span>
+                    <span key={tagName}># {tagName}</span>
                   ))}
                 </div>
                 <div className="community-topic-dialog-actions">
@@ -944,6 +1172,8 @@ export function CommunityPage({
                     className={
                       account && selectedTopic.liked_by_viewer ? "is-liked" : ""
                     }
+                    aria-pressed={Boolean(account && selectedTopic.liked_by_viewer)}
+                    disabled={!sensitiveCloudActionsEnabled}
                     onClick={() => void toggleTopicLike(selectedTopic.id)}
                   >
                     <Heart aria-hidden="true" />
@@ -964,6 +1194,9 @@ export function CommunityPage({
                   ) : null}
                 </div>
               </header>
+              {dialogError ? (
+                <p className="community-form-error" role="alert">{dialogError}</p>
+              ) : null}
               <div className="community-comment-list">
                 <h3>{copy.comments}</h3>
                 {commentsLoading && comments.length === 0 ? (
@@ -978,7 +1211,9 @@ export function CommunityPage({
                     <article key={comment.id} className={comment.parent_id ? "is-reply" : ""}>
                       <header>
                         <strong>{comment.author_name}</strong>
-                        <time>{dateLabel(locale, comment.created_at)}</time>
+                        <time dateTime={comment.created_at}>
+                          {dateLabel(locale, comment.created_at)}
+                        </time>
                       </header>
                       {comment.parent_author_name
                         ? <small>@{comment.parent_author_name}</small>
@@ -988,6 +1223,9 @@ export function CommunityPage({
                         <button
                           type="button"
                           className={liked ? "is-liked" : ""}
+                          aria-label={`${comment.like_count} ${copy.likes}`}
+                          aria-pressed={liked}
+                          disabled={!sensitiveCloudActionsEnabled}
                           onClick={() => void toggleCommentLike(comment.id)}
                         >
                           <Heart aria-hidden="true" />{comment.like_count}
@@ -995,9 +1233,11 @@ export function CommunityPage({
                         <button
                           type="button"
                           onClick={() => {
+                            if (!sensitiveCloudActionsEnabled) return;
                             if (!account) onRequireAccount();
                             else setReplyTo(comment);
                           }}
+                          disabled={!sensitiveCloudActionsEnabled}
                         >
                           <Reply aria-hidden="true" />{copy.reply}
                         </button>
@@ -1019,7 +1259,7 @@ export function CommunityPage({
                   </button>
                 ) : null}
               </div>
-              {account ? (
+              {account && sensitiveCloudActionsEnabled ? (
                 <form
                   className="community-comment-form"
                   onSubmit={(event) => void publishComment(event)}
@@ -1033,6 +1273,7 @@ export function CommunityPage({
                     </div>
                   ) : null}
                   <textarea
+                    aria-label={copy.commentPlaceholder}
                     required
                     maxLength={2000}
                     value={commentBody}
@@ -1040,10 +1281,11 @@ export function CommunityPage({
                     placeholder={copy.commentPlaceholder}
                   />
                   <button type="submit" disabled={!commentBody.trim()}>
-                    <Send aria-hidden="true" />{copy.sendComment}
+                    <Send aria-hidden="true" />
+                    <span className="site-sr-only">{copy.sendComment}</span>
                   </button>
                 </form>
-              ) : (
+              ) : sensitiveCloudActionsEnabled ? (
                 <button
                   type="button"
                   className="community-sign-in-action"
@@ -1051,7 +1293,7 @@ export function CommunityPage({
                 >
                   {copy.signInAction}
                 </button>
-              )}
+              ) : null}
             </div>
           </section>
         </div>

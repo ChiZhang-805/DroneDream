@@ -7,6 +7,7 @@ import { I18nProvider } from "../i18n/I18nProvider";
 import "../styles.css";
 import { SiteApp } from "./SiteApp";
 import "./site.css";
+import "./aliyun-manual-community.css";
 
 ReactDOM.createRoot(document.getElementById("site-root")!).render(
   <React.StrictMode>
