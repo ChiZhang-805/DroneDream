@@ -479,9 +479,6 @@ export function ExperimentWorkspaceSidebar({
         {previewAtEnd ? (
           <div className="app-workspace-drop-preview" aria-hidden="true" />
         ) : null}
-        {visible.length === 0 ? (
-          <p className="app-workspaces-empty">{copy.empty}</p>
-        ) : null}
       </div>
 
       {contextMenu && selectedForMenu ? (

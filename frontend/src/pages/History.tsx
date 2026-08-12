@@ -260,9 +260,6 @@ export function History() {
       <header className="page-header history-header">
         <div>
           <h1>{t("history.title")}</h1>
-          <p className="page-header-subtitle">
-            {t("history.subtitle")}
-          </p>
         </div>
         <div className="page-header-actions">
           {runtimeAccess.canUseRuntime ? (

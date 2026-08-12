@@ -257,7 +257,7 @@ export function LabCalibrationWorkspace() {
     >
       <div className="lab-tool-intro">
         <RefreshCw aria-hidden="true" />
-        <div><h2>{copy.title}</h2><p>{copy.subtitle}</p></div>
+        <div><h2>{copy.title}</h2></div>
       </div>
 
       <div className="lab-role-strip" aria-label={copy.title}>
@@ -312,7 +312,7 @@ export function LabCalibrationWorkspace() {
         </div>
       ) : !input || !analysis ? (
         <div className="lab-empty-evidence">
-          <RefreshCw aria-hidden="true" /><strong>{copy.noInput}</strong><p>{copy.noInputBody}</p>
+          <RefreshCw aria-hidden="true" /><strong>{copy.noInput}</strong>
         </div>
       ) : (
         <>

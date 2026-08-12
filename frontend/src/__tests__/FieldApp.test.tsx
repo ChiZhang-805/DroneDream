@@ -202,7 +202,7 @@ describe("FieldApp", () => {
 
     expect(fieldSource).toContain("export function UniversalFieldApp()");
     expect(fieldSource).toContain("const { locale } = useI18n()");
-    expect(fieldSource).toContain("<FieldApp initialLocale={locale} />");
+    expect(fieldSource).toContain("<FieldApp initialLocale={locale} embeddedInConsole />");
     expect(routerSource).toContain("const { UniversalFieldApp }");
     expect(routerSource).toContain("return { Component: UniversalFieldApp }");
   });

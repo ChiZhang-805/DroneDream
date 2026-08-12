@@ -1,4 +1,4 @@
-import { ArrowRight, Gauge, ShieldCheck, Wind } from "lucide-react";
+import { ArrowRight, Gauge, Wind } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { recordProductEvent } from "../features/analytics/productEvents";
@@ -79,7 +79,6 @@ export function FixedScenarios() {
         <div>
           <div className="page-eyebrow">PX4 / GAZEBO STUDY</div>
           <h1>{t("scenarioLibrary.title")}</h1>
-          <p className="page-header-subtitle">{t("scenarioLibrary.subtitle")}</p>
         </div>
         <span className="fixed-scenarios-version">
           {t("scenarioLibrary.catalogVersion", {
@@ -87,11 +86,7 @@ export function FixedScenarios() {
           })}
         </span>
       </header>
-
-      <div className="fixed-scenarios-assurance" role="note">
-        <ShieldCheck aria-hidden="true" />
-        <span>{t("scenarioLibrary.safeHandoff")}</span>
-      </div>
+      <p className="sr-only">{t("scenarioLibrary.safeHandoff")}</p>
 
       <div className="fixed-scenarios-grid">
         {FIXED_SCENARIO_DEFINITIONS.map((definition) => {
@@ -127,7 +122,6 @@ export function FixedScenarios() {
                 </div>
                 <code>{template.key}</code>
               </div>
-              <p>{t(definition.descriptionKey)}</p>
               <dl className="fixed-scenario-facts">
                 <div>
                   <dt>{t("scenarioLibrary.track")}</dt>
@@ -176,10 +170,6 @@ export function FixedScenarios() {
                 pointCountLabel={t("wizard.preview.pointCount", { count: points.length })}
                 localOnlyLabel={t("scenarioLibrary.localPreview")}
               />
-              <div className="fixed-scenario-goal">
-                <strong>{t("scenarioLibrary.goal")}</strong>
-                <span>{t(definition.goalKey)}</span>
-              </div>
               <Link
                 className="btn btn-primary fixed-scenario-use"
                 to={`/jobs/new?scenario=${encodeURIComponent(template.key)}`}

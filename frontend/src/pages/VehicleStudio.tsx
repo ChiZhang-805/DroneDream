@@ -274,8 +274,8 @@ export function VehicleStudio() {
   return (
     <div className="vehicle-studio-page" data-brand-edition="universal">
       <header className="vehicle-studio-hero">
-        <div><span>{copy.eyebrow}</span><h1>{copy.title}</h1><p>{copy.subtitle}</p></div>
-        <div className="vehicle-studio-safety"><ShieldCheck /><p>{copy.safety}</p></div>
+        <div><span>{copy.eyebrow}</span><h1>{copy.title}</h1></div>
+        <div className="vehicle-studio-safety"><ShieldCheck /><strong>{copy.safety}</strong></div>
       </header>
       <div className="vehicle-studio-layout">
         <aside className="vehicle-studio-library" aria-label={copy.savedModels}>

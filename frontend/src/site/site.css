@@ -2207,7 +2207,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .community-topic-grid {
   display: grid;
   min-height: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 1rem;
   margin-top: 1rem;
 }

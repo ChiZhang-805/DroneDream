@@ -672,7 +672,6 @@ export function ExperimentAssistant() {
               <span>&gt;_</span>
             </div>
             <h1>{copy.title}</h1>
-            <p>{copy.subtitle}</p>
             <div className="assistant-examples">
               {copy.examples.map((example, index) => (
                 <button
@@ -684,7 +683,7 @@ export function ExperimentAssistant() {
                     <AssistantTemplateIcon index={index} />
                     <strong>{example.title}</strong>
                   </span>
-                  <span className="assistant-example-body">{example.body}</span>
+                  <span className="sr-only">{example.body}</span>
                 </button>
               ))}
             </div>

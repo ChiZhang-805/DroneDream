@@ -1,6 +1,19 @@
 .app-main:has(.lab-page) {
-  max-width: 1440px;
+  width: 100%;
+  max-width: none;
   padding: 0;
+}
+
+.app-shell-public-demo:has(.lab-page),
+.app-shell-public-demo:has(.lab-page) .app-body {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell-public-demo .app-main:has(.lab-page) {
+  min-height: 0;
+  overflow: auto;
 }
 
 .lab-page {
@@ -16,8 +29,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.8fr);
   align-items: end;
-  gap: 2rem;
-  padding: 2rem 2.25rem 1.6rem;
+  gap: 1rem;
+  padding: 1rem 1.4rem;
   border-bottom: 1px solid #dfe3e6;
   background: #ffffff;
 }
@@ -33,7 +46,7 @@
 .lab-header h1 {
   margin: 0;
   color: #171a1d;
-  font-size: 2rem;
+  font-size: 1.55rem;
   line-height: 1.15;
   letter-spacing: 0;
 }
@@ -56,7 +69,7 @@
 .lab-status-summary > span {
   display: flex;
   min-width: 0;
-  min-height: 4.6rem;
+  min-height: 3.65rem;
   flex-direction: column;
   justify-content: center;
   gap: 0.25rem;
@@ -95,7 +108,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
-  padding: 1.35rem 2.25rem 0;
+  padding: 0.85rem 1.4rem 0;
 }
 
 .lab-workspace-switch button {
@@ -104,8 +117,8 @@
   align-items: center;
   gap: 0.85rem;
   min-width: 0;
-  min-height: 5.2rem;
-  padding: 0.9rem 1.1rem;
+  min-height: 3.85rem;
+  padding: 0.65rem 0.9rem;
   border: 1px solid #d7dce0;
   border-radius: 0;
   background: #ffffff;
@@ -191,14 +204,14 @@
 .lab-view-tabs {
   display: flex;
   gap: 1.4rem;
-  padding: 0 2.25rem;
+  padding: 0 1.4rem;
   border-bottom: 1px solid #d7dce0;
   background: #ffffff;
 }
 
 .lab-view-tabs button {
   display: inline-flex;
-  min-height: 3.2rem;
+  min-height: 2.65rem;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.1rem;
@@ -222,27 +235,27 @@
 }
 
 .lab-tool {
-  min-height: 30rem;
-  padding: 1.75rem 2.25rem 2.5rem;
+  min-height: 0;
+  padding: 1rem 1.4rem 1.25rem;
 }
 
 .lab-setup-layout,
 .lab-tool {
   display: flex;
   flex-direction: column;
-  gap: 1.4rem;
+  gap: 0.85rem;
 }
 
 .lab-tool-intro {
   display: grid;
-  grid-template-columns: 2.4rem minmax(0, 1fr);
+  grid-template-columns: 2rem minmax(0, 1fr);
   gap: 0.85rem;
   align-items: start;
 }
 
 .lab-tool-intro > svg {
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   padding: 0.38rem;
   border: 1px solid #d7dce0;
   border-radius: 6px;
@@ -267,7 +280,7 @@
 .lab-calibration {
   display: flex;
   flex-direction: column;
-  gap: 1.35rem;
+  gap: 0.8rem;
 }
 
 .lab-role-strip {
@@ -866,7 +879,7 @@
 
 .lab-empty-evidence {
   display: grid;
-  min-height: 13rem;
+  min-height: 6.75rem;
   place-items: center;
   align-content: center;
   gap: 0.55rem;

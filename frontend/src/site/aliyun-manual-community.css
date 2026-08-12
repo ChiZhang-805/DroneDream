@@ -1503,7 +1503,7 @@ html[lang="zh-CN"] .community-cover-art > strong {
 
 @media (min-width: 901px) {
   .community-page:not(.is-all-topics) .community-topic-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .community-page.is-all-topics .community-topic-grid {

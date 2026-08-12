@@ -18,7 +18,6 @@ type EditionCopy = {
 
 const copy: Record<Locale, {
   title: string;
-  subtitle: string;
   download: string;
   unavailable: string;
   previous: string;
@@ -27,7 +26,6 @@ const copy: Record<Locale, {
 }> = {
   en: {
     title: "Choose Your DroneDream Edition",
-    subtitle: "Three focused editions cover simulation search, lab validation, and controlled field tuning.",
     download: "Download",
     unavailable: "Download unavailable",
     previous: "Previous screenshot",
@@ -85,7 +83,6 @@ const copy: Record<Locale, {
   },
   "zh-CN": {
     title: "选择你的 DroneDream 版本",
-    subtitle: "三个版本分别覆盖仿真搜索、实验验证和受控真机现场调参。",
     download: "下载",
     unavailable: "暂不可下载",
     previous: "上一张截图",
@@ -162,7 +159,6 @@ export function ProductPage({
       <div className="site-product-page-shell">
         <header className="site-product-page-header">
           <h1 id="site-product-title">{text.title}</h1>
-          <p>{text.subtitle}</p>
         </header>
         <div className="site-product-page-grid">
           {primaryEditionIds.map((id) => {

@@ -312,7 +312,7 @@ export function LabSetup() {
         <div>
           <p className="lab-eyebrow">{copy.eyebrow}</p>
           <h1>{copy.title}</h1>
-          <p className="lab-subtitle">{copy.subtitle}</p>
+          <p className="sr-only">{copy.subtitle}</p>
         </div>
         <div className="lab-status-summary" aria-label={copy.authority}>
           <span><small>{copy.edition}</small><strong>{copy.editionValue}</strong></span>
@@ -329,7 +329,7 @@ export function LabSetup() {
           onClick={() => chooseWorkspace("simulation")}
         >
           <MonitorUp aria-hidden="true" />
-          <span><strong>{copy.simulation}</strong><small>{copy.simulationDetail}</small></span>
+          <span><strong>{copy.simulation}</strong></span>
         </button>
         <button
           type="button"
@@ -338,12 +338,10 @@ export function LabSetup() {
           onClick={() => chooseWorkspace("hardware")}
         >
           <RadioTower aria-hidden="true" />
-          <span><strong>{copy.hardware}</strong><small>{copy.hardwareDetail}</small></span>
+          <span><strong>{copy.hardware}</strong></span>
         </button>
       </div>
-      <p className="lab-switch-notice" role="status">
-        <LockKeyhole aria-hidden="true" /> {copy.switchNotice}
-      </p>
+      <p className="sr-only" role="status">{copy.switchNotice}</p>
 
       <div className="lab-view-tabs" role="tablist" aria-label={copy.title}>
         {VIEWS.map((item) => {

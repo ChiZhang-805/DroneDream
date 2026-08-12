@@ -99,9 +99,9 @@ describe("workspace account entry", () => {
     const { container, router } = renderWorkspace();
 
     const links = container.querySelectorAll(".app-nav a");
-    expect(links).toHaveLength(5);
-    expect(screen.getByRole("link", { name: "SIM" }))
-      .toHaveAttribute("href", "/sim");
+    expect(links).toHaveLength(4);
+    expect(screen.queryByRole("link", { name: "SIM" }))
+      .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
       .not.toBeInTheDocument();
     links.forEach((link) => {
@@ -128,9 +128,9 @@ describe("workspace account entry", () => {
     expect(panel).not.toHaveAttribute("hidden");
     expect(within(panel!).getByRole("button", { name: "Account" }))
       .toHaveTextContent("Local user");
-    expect(within(panel!).getAllByRole("link")).toHaveLength(5);
-    expect(within(panel!).getByRole("link", { name: "SIM" }))
-      .toHaveAttribute("href", "/sim");
+    expect(within(panel!).getAllByRole("link")).toHaveLength(4);
+    expect(within(panel!).queryByRole("link", { name: "SIM" }))
+      .not.toBeInTheDocument();
 
     fireEvent.click(within(panel!).getByRole("button", { name: "Settings" }));
     expect(panel).toHaveAttribute("hidden");

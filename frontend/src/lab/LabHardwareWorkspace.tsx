@@ -1,4 +1,4 @@
-import { LockKeyhole, RadioTower, ShieldCheck } from "lucide-react";
+import { LockKeyhole, RadioTower } from "lucide-react";
 
 import { FieldApp } from "../field/FieldApp";
 import { useI18n } from "../i18n/I18nProvider";
@@ -33,7 +33,6 @@ export function LabHardwareWorkspace() {
         <div>
           <span><RadioTower aria-hidden="true" />{copy.eyebrow}</span>
           <h1>{copy.title}</h1>
-          <p>{copy.body}</p>
         </div>
         <div className="lab-hardware-deny" role="status">
           <LockKeyhole aria-hidden="true" />
@@ -41,10 +40,7 @@ export function LabHardwareWorkspace() {
           <small>0 validated packs</small>
         </div>
       </header>
-      <div className="lab-hardware-safety">
-        <ShieldCheck aria-hidden="true" />
-        <p>{copy.safety}</p>
-      </div>
+      <p className="sr-only">{copy.safety}</p>
       <FieldApp initialLocale={locale} embeddedInLab />
     </section>
   );

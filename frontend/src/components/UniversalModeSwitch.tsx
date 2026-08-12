@@ -4,6 +4,7 @@ import { Check, ChevronDown } from "lucide-react";
 import fieldMark from "../assets/brand/field-mark.png";
 import labMark from "../assets/brand/lab-mark.png";
 import simMark from "../assets/brand/sim-mark.png";
+import universalMark from "../assets/brand/universal-mark.png";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import {
   UNIVERSAL_WORKSPACE_IDS,
@@ -23,7 +24,7 @@ const EDITION_LABELS: Record<BrandEditionId, string> = {
   field: "DroneDream · FIELD",
 };
 const EDITION_MARKS: Record<BrandEditionId, string> = {
-  universal: "/drone-favicon.png",
+  universal: universalMark,
   sim: simMark,
   lab: labMark,
   field: fieldMark,

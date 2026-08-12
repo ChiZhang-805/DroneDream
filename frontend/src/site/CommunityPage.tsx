@@ -778,7 +778,6 @@ export function CommunityPage({
               </>
             )}
           </h1>
-          <p>{copy.intro}</p>
         </div>
         <button
           type="button"

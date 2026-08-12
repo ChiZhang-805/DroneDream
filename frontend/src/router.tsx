@@ -39,10 +39,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         },
         ...(BUILD_HAS_SIM_WORKSPACE ? [{
           path: "sim",
-          lazy: async () => {
-            const { SimOverview } = await import("./pages/SimOverview");
-            return { Component: SimOverview };
-          },
+          element: <Navigate to="/assistant" replace />,
         }] : []),
         {
           path: "assistant",

@@ -2787,6 +2787,82 @@ body:has(.field-app),
   outline: none;
 }
 
+.field-app-embedded-console {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.field-app-embedded-console .field-layout {
+  height: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.field-app-embedded-console .field-sidebar {
+  position: relative;
+  top: auto;
+  display: flex;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  align-items: center;
+  justify-content: stretch;
+  padding: 8px 12px;
+  border-right: 0;
+  border-bottom: 1px solid var(--field-line);
+}
+
+.field-app-embedded-console .field-sidebar nav {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.field-app-embedded-console .field-sidebar nav button {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  grid-template-columns: none;
+  gap: 7px;
+  padding: 7px 9px;
+  text-align: center;
+}
+
+.field-app-embedded-console .field-sidebar nav button[aria-current="page"] {
+  box-shadow: inset 0 -3px 0 var(--dd-brand-middle);
+}
+
+.field-app-embedded-console .field-sidebar-status {
+  display: none;
+}
+
+.field-app-embedded-console .field-main {
+  grid-row: 2;
+  height: 100%;
+  min-height: 0;
+}
+
+.field-app-embedded-console .field-active-page {
+  padding: 8px 12px;
+}
+
+.field-app-embedded-console .field-page-heading p {
+  display: none;
+}
+
+.field-app-embedded-console .field-page-heading h1 {
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .field-app-embedded-console .field-sidebar nav button span {
+    display: none;
+  }
+}
+
 .field-page {
   display: grid;
   height: 100%;
@@ -3072,7 +3148,7 @@ body:has(.field-app),
   height: 100%;
   min-height: 0;
   place-content: center;
-  gap: 18px;
+  gap: 12px;
   margin: 0 auto;
 }
 
@@ -3114,6 +3190,25 @@ body:has(.field-app),
   color: var(--field-muted);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.field-app-embedded-console .field-assistant-intro p,
+.field-app-embedded-lab .field-assistant-intro p,
+.field-app-embedded-console .field-assistant-prompts span,
+.field-app-embedded-lab .field-assistant-prompts span {
+  display: none;
+}
+
+.field-app-embedded-console .field-assistant-prompts button,
+.field-app-embedded-lab .field-assistant-prompts button {
+  min-height: 64px;
+  align-content: center;
+  text-align: center;
+}
+
+.field-app-embedded-console .field-assistant-composer,
+.field-app-embedded-lab .field-assistant-composer {
+  margin-bottom: 8px;
 }
 
 .field-assistant-prompts {

@@ -172,7 +172,6 @@ const CORE_NAV_ITEMS: NavigationItem[] = [
 ];
 
 const SIM_NAV_ITEMS: NavigationItem[] = [
-  { to: "/sim", label: "SIM", end: true, icon: Box },
   ...CORE_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio" && !item.externalUrl),
 ];
 
@@ -215,7 +214,7 @@ const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
 };
 
 const MODE_LANDING_PATH: Record<UniversalWorkspaceId, string> = {
-  sim: "/sim",
+  sim: "/assistant",
   lab: "/lab",
   field: "/field",
 };

@@ -35,7 +35,7 @@
 .lab-hardware-workspace {
   display: grid;
   height: 100%;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -43,8 +43,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
-  align-items: end;
-  padding: 24px 28px;
+  align-items: center;
+  padding: 12px 18px;
   border-bottom: 1px solid color-mix(in srgb, #087e69 20%, transparent);
   background: color-mix(in srgb, #f3fcef 82%, #ffffff);
 }
@@ -65,8 +65,8 @@
 }
 
 .lab-hardware-heading h1 {
-  margin: 8px 0 6px;
-  font-size: 30px;
+  margin: 4px 0 0;
+  font-size: 24px;
   letter-spacing: 0;
 }
 
@@ -83,7 +83,7 @@
   gap: 1px 8px;
   align-items: center;
   min-width: 152px;
-  padding: 12px 14px;
+  padding: 8px 11px;
   border: 1px solid #e3b7aa;
   border-radius: 6px;
   background: #fff5f1;
@@ -115,7 +115,7 @@
   height: auto;
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
-  margin-top: 16px;
+  margin-top: 0;
   overflow: hidden;
   background: #f3fcef;
 }
@@ -128,9 +128,10 @@
   min-height: 0;
 }
 
-.field-app-embedded-lab .field-sidebar {
-  position: static;
-  height: 100%;
+.field-app-embedded-lab .field-layout {
+  display: grid;
+  grid-template-rows: 50px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .field-app-embedded-lab .field-main,
@@ -143,13 +144,45 @@
 }
 
 .field-app-embedded-lab .field-sidebar {
-  border-color: color-mix(in srgb, #087e69 22%, transparent);
-  background: #092019;
+  position: static;
+  display: block;
+  width: 100%;
+  height: 50px;
+  padding: 6px 12px;
+  border-right: 0;
+  border-bottom: 1px solid color-mix(in srgb, #087e69 22%, transparent);
+  background: #f3fcef;
+}
+
+.field-app-embedded-lab .field-sidebar nav {
+  display: grid;
+  height: 100%;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.field-app-embedded-lab .field-sidebar nav button {
+  min-height: 0;
+  justify-content: center;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #355047;
 }
 
 .field-app-embedded-lab .field-sidebar button[aria-current="page"] {
   color: #092019;
   background: linear-gradient(90deg, #a7e84a, #20c77a);
+}
+
+.field-app-embedded-lab .field-sidebar-status {
+  display: none;
+}
+
+.field-app-embedded-lab .field-main {
+  min-width: 0;
+  min-height: 0;
 }
 
 .field-app-embedded-lab .field-primary-command,
@@ -196,11 +229,15 @@
   }
 
   .field-app-embedded-lab {
-    margin-top: 8px;
+    margin-top: 0;
   }
 
   .field-app.field-app-embedded-lab .field-sidebar {
-    height: 58px;
+    height: 50px;
+  }
+
+  .field-app-embedded-lab .field-sidebar nav button span {
+    display: none;
   }
 
   .field-app-embedded-lab .field-assistant-composer {

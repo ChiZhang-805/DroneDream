@@ -170,6 +170,7 @@ interface FieldAppProps {
   initialObservationState?: FieldObservationState;
   focusOnMount?: boolean;
   embeddedInLab?: boolean;
+  embeddedInConsole?: boolean;
 }
 
 function FieldPageHeading({
@@ -199,6 +200,7 @@ function FieldWorkspace({
   initialObservationState = "device-missing",
   focusOnMount = false,
   embeddedInLab = false,
+  embeddedInConsole = false,
 }: FieldAppProps) {
   const presentationEdition = embeddedInLab ? "lab" as const : hardwareDomainEdition;
   const [locale, setLocale] = useState<FieldLocale>(initialLocale ?? savedLocale);
@@ -354,7 +356,7 @@ function FieldWorkspace({
 
   return (
     <div
-      className={`field-app${embeddedInLab ? " field-app-embedded-lab" : ""}`}
+      className={`field-app${embeddedInLab ? " field-app-embedded-lab" : ""}${embeddedInConsole ? " field-app-embedded-console" : ""}`}
       data-brand-edition={presentationEdition}
       data-authority="false"
       data-validated-pack-count={decision.validatedPackCount}
@@ -391,5 +393,5 @@ export function FieldApp(props: FieldAppProps) {
  */
 export function UniversalFieldApp() {
   const { locale } = useI18n();
-  return <FieldApp initialLocale={locale} />;
+  return <FieldApp initialLocale={locale} embeddedInConsole />;
 }
