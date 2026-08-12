@@ -125,7 +125,7 @@ describe("CommunityPage public data loading", () => {
     fireEvent.change(customTag, { target: { value: "Wind tunnel" } });
     fireEvent.keyDown(customTag, { key: "Enter" });
 
-    expect(screen.getByRole("button", { name: "#Wind tunnel" })).toHaveClass("is-active");
+    expect(screen.getByRole("button", { name: "# Wind tunnel" })).toHaveClass("is-active");
     expect(customTag).toHaveValue("");
   });
 

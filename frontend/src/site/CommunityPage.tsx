@@ -76,7 +76,7 @@ interface CommunityComment {
   liked_by_viewer: boolean;
 }
 
-const TOPIC_PAGE_SIZE = 20;
+const TOPIC_PAGE_SIZE = 24;
 const RECENT_TOPIC_COUNT = 5;
 const COMMENT_PAGE_SIZE = 100;
 
