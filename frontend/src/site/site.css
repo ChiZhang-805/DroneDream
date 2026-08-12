@@ -98,16 +98,28 @@ body:has(#site-root) a {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
+  gap: 0.38rem;
   justify-self: start;
   text-decoration: none;
 }
 
-.site-brand .brand-lockup {
-  display: inline-flex;
-  width: auto;
-  height: 36px;
-  align-items: center;
-  gap: 0.22em;
+.site-brand-mark {
+  display: block;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  object-fit: contain;
+}
+
+.site-brand-wordmark {
+  color: transparent;
+  background: linear-gradient(96deg, #ff557f 2%, #d94ec0 30%, #714cff 63%, #e25ad0 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-size: 2.08rem;
+  font-weight: 720;
+  letter-spacing: -0.055em;
+  line-height: 1;
 }
 
 .brand-lockup-primary .brand-lockup-mark {
@@ -328,7 +340,7 @@ body:has(#site-root) a {
   font-size: clamp(3.75rem, 5.25vw, 6.25rem);
   font-weight: 680;
   letter-spacing: -0.065em;
-  line-height: 0.98;
+  line-height: 1.035;
 }
 
 html[lang="zh-CN"] .site-hero h1 {
@@ -338,6 +350,11 @@ html[lang="zh-CN"] .site-hero h1 {
 .site-hero-line {
   display: block;
   white-space: nowrap;
+}
+
+.site-hero-line + .site-hero-line {
+  margin-top: 0.025em;
+  padding-bottom: 0.11em;
 }
 
 .site-hero h1 .site-hero-line-accent {
@@ -1157,10 +1174,10 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-product-edition-icon {
   display: block;
-  width: 58px;
-  height: 58px;
-  flex: 0 0 58px;
-  margin: -5px -4px -5px -5px;
+  width: 50px;
+  height: 50px;
+  flex: 0 0 50px;
+  margin: -1px -2px -1px -3px;
   object-fit: contain;
 }
 
@@ -1169,11 +1186,13 @@ html[lang="zh-CN"] .site-hero h1 {
   color: transparent;
   background: linear-gradient(100deg, var(--edition-accent-a), var(--edition-accent-b) 54%, var(--edition-accent-c));
   background-clip: text;
-  font-size: clamp(1.08rem, 1.28vw, 1.42rem);
+  font-size: clamp(1.55rem, 1.72vw, 1.85rem);
   font-weight: 820;
-  letter-spacing: -0.045em;
-  line-height: 48px;
+  letter-spacing: -0.065em;
+  line-height: 1;
   text-overflow: clip;
+  transform: scaleY(1.22);
+  transform-origin: left center;
   white-space: nowrap;
 }
 
@@ -1328,7 +1347,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-product-screenshots { grid-row: auto; }
   .site-product-edition-picture { width: auto; height: 42px; }
   .site-product-edition-icon { width: 50px; height: 50px; flex-basis: 50px; margin: -4px -3px -4px -4px; }
-  .site-product-edition-brand-text { font-size: 1.05rem; line-height: 42px; }
+  .site-product-edition-brand-text { font-size: 1.34rem; line-height: 1; }
   .site-product-edition li { min-height: 1.9rem; font-size: 0.76rem; }
 }
 

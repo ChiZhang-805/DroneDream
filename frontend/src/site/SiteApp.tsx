@@ -93,7 +93,7 @@ const content = {
     openConsole: "Open console",
     signOut: "Sign out",
     closeAuth: "Close account dialog",
-    eyebrow: "LOCAL-FIRST PX4 / GAZEBO TUNING",
+    eyebrow: "AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION",
     heroLead: "Tune with evidence.",
     heroAccent: "Fly with confidence.",
     downloadWindows: "Download for Windows",
@@ -1169,7 +1169,12 @@ export function SiteApp() {
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
         <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
-          <BrandLockup variant="primary" />
+          <img
+            className="site-brand-mark"
+            src="/drone-favicon.png?v=aliyun-20260812"
+            alt=""
+          />
+          <span className="site-brand-wordmark">DroneDream</span>
         </a>
         <nav
           id="site-navigation"

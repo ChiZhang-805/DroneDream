@@ -244,6 +244,10 @@ body:has(.app-shell-public-demo),
   overflow: auto;
 }
 
+.app-shell-public-demo .app-footer {
+  display: none;
+}
+
 .app-shell-public-demo .app-main:has(.dashboard-page) {
   overflow: hidden;
 }

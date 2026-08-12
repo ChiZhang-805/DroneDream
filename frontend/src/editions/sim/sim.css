@@ -388,6 +388,132 @@
   font-size: 0.92rem;
 }
 
+@media (min-width: 901px) {
+  .app-shell-public-demo .app-main:has(.sim-overview-page) {
+    flex: 1 1 0;
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.72rem 0.9rem;
+  }
+
+  .app-shell-public-demo .sim-overview-page {
+    grid-template-areas:
+      "header header"
+      "loop loop"
+      "capabilities dependencies"
+      "boundary setup";
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    gap: 0.62rem 0.72rem;
+  }
+
+  .app-shell-public-demo .sim-overview-header {
+    grid-area: header;
+    grid-template-columns: minmax(0, 1fr) minmax(210px, 0.28fr);
+    align-items: center;
+    gap: 1.25rem;
+    padding: 0 0.78rem 0.62rem;
+  }
+
+  .app-shell-public-demo .sim-overview-lockup {
+    max-height: 58px;
+    margin-top: 0.28rem;
+  }
+
+  .app-shell-public-demo .sim-overview-header p {
+    max-width: 86ch;
+    margin-top: 0.38rem;
+    font-size: 0.78rem;
+    line-height: 1.38;
+  }
+
+  .app-shell-public-demo .sim-overview-state {
+    gap: 0.3rem;
+  }
+
+  .app-shell-public-demo .sim-overview-band,
+  .app-shell-public-demo .sim-setup-preview {
+    min-width: 0;
+    padding: 0.7rem 0.78rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--bg-elev) 78%, transparent);
+  }
+
+  .app-shell-public-demo .sim-loop-band {
+    grid-area: loop;
+    grid-template-columns: minmax(190px, 0.28fr) minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .app-shell-public-demo .sim-loop-action {
+    margin-top: 0.55rem;
+  }
+
+  .app-shell-public-demo .sim-loop-grid > li {
+    min-height: 0;
+    padding: 0.43rem 0.58rem;
+  }
+
+  .app-shell-public-demo .sim-loop-grid p {
+    margin-top: 0.16rem;
+    font-size: 0.68rem;
+    line-height: 1.32;
+  }
+
+  .app-shell-public-demo .sim-overview-band[aria-labelledby="sim-capability-title"] {
+    grid-area: capabilities;
+  }
+
+  .app-shell-public-demo .sim-dependency-band {
+    grid-area: dependencies;
+  }
+
+  .app-shell-public-demo .sim-overview-band:not(.sim-loop-band):not(.sim-boundary-band) {
+    grid-template-columns: minmax(116px, 0.24fr) minmax(0, 1fr);
+    gap: 0.7rem;
+  }
+
+  .app-shell-public-demo .sim-capability-item {
+    min-height: 62px;
+    padding: 0.55rem;
+  }
+
+  .app-shell-public-demo .sim-dependency-list {
+    gap: 0.42rem;
+  }
+
+  .app-shell-public-demo .sim-dependency-list > li {
+    min-height: 42px;
+    padding: 0.45rem 0.55rem;
+  }
+
+  .app-shell-public-demo .sim-boundary-band {
+    grid-area: boundary;
+  }
+
+  .app-shell-public-demo .sim-setup-preview {
+    grid-area: setup;
+  }
+
+  .app-shell-public-demo .sim-boundary-band,
+  .app-shell-public-demo .sim-setup-preview {
+    min-height: 78px;
+  }
+
+  .app-shell-public-demo .sim-band-heading p,
+  .app-shell-public-demo .sim-boundary-band p,
+  .app-shell-public-demo .sim-setup-preview p {
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+}
+
 .distribution-sim-locked-edition {
   display: flex;
   align-items: center;

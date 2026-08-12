@@ -47,6 +47,7 @@ describe("DroneDream public website", () => {
 
     expect(document.title).toBe("DroneDream");
     expect(screen.getByRole("heading", { name: /Tune with evidence/i })).toBeVisible();
+    expect(screen.getByText("AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION")).toBeVisible();
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
     expect(starflightButton).not.toHaveTextContent("+");
