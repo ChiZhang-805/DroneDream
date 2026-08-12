@@ -59,9 +59,13 @@ describe("workspace account entry", () => {
     window.localStorage.setItem("dronedream:universal-workspace:v2", "field");
     const { router } = renderWorkspace("/vehicle-studio");
 
-    const selector = screen.getByRole("combobox", { name: "Workspace mode" });
-    expect(selector).toHaveValue("universal");
-    expect(screen.getByRole("option", { name: "DroneDream" })).toBeInTheDocument();
+    const selector = screen.getByRole("button", { name: "Switch DroneDream edition" });
+    expect(selector).toHaveTextContent("DroneDream");
+    fireEvent.click(selector);
+    expect(screen.getByRole("menuitemradio", { name: "DroneDream" }))
+      .toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: /DroneDream.*FIELD/ }))
+      .toHaveAttribute("aria-checked", "false");
     expect(document.documentElement).toHaveAttribute("data-brand-edition", "universal");
     expect(document.documentElement).toHaveAttribute("data-theme-grants-hardware-authority", "false");
 

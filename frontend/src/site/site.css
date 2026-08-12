@@ -44,8 +44,8 @@ body:has(#site-root) a {
   --site-magenta: #f166d8;
   --site-ink: #070913;
   --site-muted: #a9aec2;
-  --site-content-width: 1440px;
-  --site-gutter: 32px;
+  --site-content-width: 1740px;
+  --site-gutter: 24px;
   min-height: 100vh;
   overflow: clip;
   color: #f7f8ff;
@@ -1174,10 +1174,10 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-product-edition-icon {
   display: block;
-  width: 50px;
-  height: 50px;
-  flex: 0 0 50px;
-  margin: -1px -2px -1px -3px;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  margin: 0 -1px 0 -2px;
   object-fit: contain;
 }
 
@@ -1186,12 +1186,12 @@ html[lang="zh-CN"] .site-hero h1 {
   color: transparent;
   background: linear-gradient(100deg, var(--edition-accent-a), var(--edition-accent-b) 54%, var(--edition-accent-c));
   background-clip: text;
-  font-size: clamp(1.55rem, 1.72vw, 1.85rem);
+  font-size: clamp(1.66rem, 1.86vw, 2rem);
   font-weight: 820;
-  letter-spacing: -0.065em;
+  letter-spacing: -0.058em;
   line-height: 1;
   text-overflow: clip;
-  transform: scaleY(1.22);
+  transform: scaleY(1.2);
   transform-origin: left center;
   white-space: nowrap;
 }
