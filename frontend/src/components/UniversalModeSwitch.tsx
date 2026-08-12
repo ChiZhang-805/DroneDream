@@ -29,10 +29,10 @@ const EDITION_MARKS: Record<BrandEditionId, string> = {
   field: fieldMark,
 };
 
-function EditionBrand({ edition, masterMark = false }: { edition: BrandEditionId; masterMark?: boolean }) {
+function EditionBrand({ edition }: { edition: BrandEditionId }) {
   return (
     <span className="workspace-switch-brand" data-brand-edition={edition}>
-      <img src={masterMark ? EDITION_MARKS.universal : EDITION_MARKS[edition]} alt="" aria-hidden="true" />
+      <img src={EDITION_MARKS[edition]} alt="" aria-hidden="true" />
       <span>{EDITION_LABELS[edition]}</span>
     </span>
   );
@@ -101,7 +101,7 @@ export function UniversalModeSwitch({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <EditionBrand edition={activeEdition} masterMark />
+        <EditionBrand edition={activeEdition} />
         <ChevronDown className="universal-mode-switch-chevron" aria-hidden="true" strokeWidth={2} />
       </button>
       {open ? (

@@ -340,8 +340,8 @@ body:has(.app-shell-public-demo),
 }
 
 .workspace-switch-brand img {
-  width: 2rem;
-  height: 2rem;
+  width: 1.65rem;
+  height: 1.65rem;
   flex: 0 0 auto;
   object-fit: contain;
   object-position: center;
@@ -359,7 +359,7 @@ body:has(.app-shell-public-demo),
   );
   background-clip: text;
   -webkit-background-clip: text;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 780;
   letter-spacing: -0.025em;
   line-height: 1.15;
@@ -384,12 +384,12 @@ body:has(.app-shell-public-demo),
 }
 
 .universal-mode-switch-trigger .workspace-switch-brand img {
-  width: 1.78rem;
-  height: 1.78rem;
+  width: 1.55rem;
+  height: 1.55rem;
 }
 
 .universal-mode-switch-trigger .workspace-switch-brand > span {
-  font-size: 0.9rem;
+  font-size: 0.98rem;
 }
 
 .universal-mode-switch-menu {
@@ -13266,8 +13266,8 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
   }
 
   .app-shell:not(.app-shell-launcher) .workspace-switch-brand img {
-    width: 1.8rem;
-    height: 1.8rem;
+    width: 1.55rem;
+    height: 1.55rem;
   }
 
   .app-shell:not(.app-shell-launcher) .universal-mode-switch-menu {
