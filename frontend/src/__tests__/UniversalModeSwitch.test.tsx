@@ -38,7 +38,7 @@ describe("UniversalModeSwitch", () => {
     expect(document.documentElement.dataset.themeGrantsHardwareAuthority).toBe("false");
   });
 
-  it("offers the Universal modeling surface and three integrated workspaces without granting authority", () => {
+  it("offers Universal and all integrated workspaces in a checked popup menu", () => {
     const onChange = vi.fn();
     const onOpenUniversal = vi.fn();
     const { container } = render(
@@ -54,24 +54,39 @@ describe("UniversalModeSwitch", () => {
     const region = container.querySelector(".universal-mode-switch");
     expect(region).toHaveAttribute("data-presentation-only", "true");
     expect(region).toHaveAttribute("data-grants-hardware-authority", "false");
-    expect(screen.getAllByRole("option")).toHaveLength(4);
-    expect(screen.getByRole("option", { name: "DroneDream" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Workspace mode" })).toHaveValue("universal");
+    const trigger = screen.getByRole("button", { name: "Switch DroneDream edition" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Workspace mode" }), {
-      target: { value: "lab" },
-    });
+    fireEvent.click(trigger);
+    expect(screen.getAllByRole("menuitemradio")).toHaveLength(4);
+    expect(screen.getByRole("menuitemradio", { name: "DroneDream" }))
+      .toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream · LAB" }));
     expect(onChange).toHaveBeenCalledWith("lab");
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Workspace mode" }), {
-      target: { value: "universal" },
-    });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream" }));
+    expect(onOpenUniversal).not.toHaveBeenCalled();
+  });
+
+  it("opens Universal from a workspace selection", () => {
+    const onOpenUniversal = vi.fn();
+    render(
+      <UniversalModeSwitch
+        mode="sim"
+        locale="en"
+        onChange={() => undefined}
+        onOpenUniversal={onOpenUniversal}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Switch DroneDream edition" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream" }));
     expect(onOpenUniversal).toHaveBeenCalledOnce();
   });
 
-  it("authors the Chinese safety boundary independently", () => {
+  it("provides an independently authored Chinese switch label", () => {
     render(<UniversalModeSwitch mode="sim" locale="zh-CN" onChange={() => undefined} />);
-    expect(screen.getByText(/这里只切换工作区/)).toBeInTheDocument();
-    expect(screen.getByText(/不会启动 Model \+ Harness/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "切换 DroneDream 版本" })).toBeInTheDocument();
   });
 });

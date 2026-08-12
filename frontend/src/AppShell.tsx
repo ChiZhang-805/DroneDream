@@ -109,6 +109,7 @@ import {
   persistUniversalMode,
   type UniversalWorkspaceId,
 } from "./features/distribution/universalMode";
+import { publicDemoConsole } from "./features/demo/publicDemo";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
 import type {
@@ -123,7 +124,6 @@ import { EditionThemeProvider, useEditionTheme } from "./theme/EditionThemeProvi
 import {
   BUILD_EDITION,
   EDITION_IS_FIXED,
-  editionLandingPath,
   initialWorkspaceMode,
 } from "./edition";
 
@@ -2718,7 +2718,7 @@ function AppShellContent() {
 
   return (
     <EditionThemeProvider edition={activeThemeEdition}>
-      <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}>
+      <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}${publicDemoConsole ? " app-shell-public-demo" : ""}`}>
       <a
         className="skip-link"
         href="#main-content"
@@ -2730,22 +2730,21 @@ function AppShellContent() {
         {t("app.skipToContent")}
       </a>
       <aside className="app-sidebar">
-        {desktopRuntime ? (
-          <Link
-            to={editionLandingPath(activeThemeEdition)}
-            className="app-title"
-            aria-label={EDITION_BRAND_TOKENS[activeThemeEdition].productName}
-          >
-            <BrandLockup variant="compact" edition={activeThemeEdition} />
-          </Link>
+        {!EDITION_IS_FIXED ? (
+          <UniversalModeSwitch
+            mode={universalMode}
+            activeEdition={location.pathname === "/vehicle-studio" ? "universal" : universalMode}
+            locale={locale}
+            onChange={handleUniversalModeChange}
+            onOpenUniversal={() => {
+              setMobileMenuOpen(false);
+              navigate("/vehicle-studio");
+            }}
+          />
         ) : (
-          <a
-            href="/"
-            className="app-title"
-            aria-label={EDITION_BRAND_TOKENS[activeThemeEdition].productName}
-          >
+          <div className="app-title" aria-label={EDITION_BRAND_TOKENS[activeThemeEdition].productName}>
             <BrandLockup variant="compact" edition={activeThemeEdition} />
-          </a>
+          </div>
         )}
         {mobileNavigationEnabled ? (
           <button
@@ -2766,18 +2765,6 @@ function AppShellContent() {
           className={`app-mobile-menu-panel${mobileMenuExpanded ? " is-open" : ""}`}
           hidden={mobileNavigationEnabled && !mobileMenuExpanded}
         >
-          {!EDITION_IS_FIXED ? (
-            <UniversalModeSwitch
-              mode={universalMode}
-              activeEdition={location.pathname === "/vehicle-studio" ? "universal" : universalMode}
-              locale={locale}
-              onChange={handleUniversalModeChange}
-              onOpenUniversal={() => {
-                setMobileMenuOpen(false);
-                navigate("/vehicle-studio");
-              }}
-            />
-          ) : null}
           <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">
             {runtimeNavDescription}
