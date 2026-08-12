@@ -78,6 +78,30 @@ $consoleHtml = Join-Path $outputDirectory "console\index.html"
 if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
     throw "The console build completed without producing $consoleHtml"
 }
+$consoleRoutes = @(
+    "assistant",
+    "dashboard",
+    "jobs\new",
+    "history",
+    "scenarios",
+    "vehicle-studio",
+    "admin",
+    "compare",
+    "desktop\setup",
+    "lab",
+    "lab\hardware",
+    "field",
+    "sim"
+)
+foreach ($route in $consoleRoutes) {
+    $routeDirectory = Join-Path (Join-Path $outputDirectory "console") $route
+    New-Item -ItemType Directory -Force -Path $routeDirectory | Out-Null
+    $routeHtml = Join-Path $routeDirectory "index.html"
+    Copy-Item -LiteralPath $consoleHtml -Destination $routeHtml -Force
+    if (-not (Test-Path -LiteralPath $routeHtml -PathType Leaf)) {
+        throw "The Pages build failed to produce the console route entry: $route"
+    }
+}
 $productHtml = Join-Path $outputDirectory "product\index.html"
 if (-not (Test-Path -LiteralPath $productHtml -PathType Leaf)) {
     throw "The site build completed without producing the three-edition product route."
