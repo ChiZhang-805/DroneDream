@@ -1,6 +1,8 @@
 import { hasExperimentDraft } from "./draftStorage";
+import type { BrandEditionId } from "../../brand/edition-brand.generated";
 
-const WORKSPACE_REGISTRY_PREFIX = "drone-dream:experiment-workspaces:v1:";
+const WORKSPACE_REGISTRY_PREFIX = "drone-dream:experiment-workspaces:v2:";
+const LEGACY_WORKSPACE_REGISTRY_PREFIX = "drone-dream:experiment-workspaces:v1:";
 export const EXPERIMENT_WORKSPACES_CHANGED_EVENT =
   "drone-dream:experiment-workspaces-changed";
 
@@ -10,6 +12,7 @@ export type ExperimentWorkspaceStatus = "draft" | "created";
 export interface ExperimentWorkspace {
   id: string;
   ownerId: string;
+  edition: BrandEditionId;
   name: string;
   source: ExperimentWorkspaceSource;
   status: ExperimentWorkspaceStatus;
@@ -24,13 +27,14 @@ export interface ExperimentWorkspace {
 }
 
 interface ExperimentWorkspaceRegistry {
-  schemaVersion: 1;
+  schemaVersion: 2;
   items: ExperimentWorkspace[];
 }
 
 interface RegisterWorkspaceInput {
   id: string;
   ownerId: string;
+  edition: BrandEditionId;
   name: string;
   source: ExperimentWorkspaceSource;
   activeStep?: number;
@@ -69,9 +73,17 @@ function registryKey(ownerId: string): string {
   return `${WORKSPACE_REGISTRY_PREFIX}${encodeURIComponent(normalizeOwnerId(ownerId))}`;
 }
 
+function legacyRegistryKey(ownerId: string): string {
+  return `${LEGACY_WORKSPACE_REGISTRY_PREFIX}${encodeURIComponent(normalizeOwnerId(ownerId))}`;
+}
+
 function isWorkspaceJobId(value: unknown): value is string {
   return typeof value === "string" &&
     /^[a-zA-Z0-9_-]{1,64}$/u.test(value);
+}
+
+function isBrandEditionId(value: unknown): value is BrandEditionId {
+  return value === "universal" || value === "sim" || value === "lab" || value === "field";
 }
 
 function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorkspace {
@@ -81,6 +93,7 @@ function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorksp
     typeof candidate.id === "string" &&
     /^[a-zA-Z0-9_-]{8,128}$/u.test(candidate.id) &&
     candidate.ownerId === ownerId &&
+    isBrandEditionId(candidate.edition) &&
     typeof candidate.name === "string" &&
     candidate.name.trim().length > 0 &&
     candidate.name.length <= 255 &&
@@ -118,30 +131,64 @@ function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorksp
 function readRegistry(ownerId: string): ExperimentWorkspaceRegistry {
   const normalizedOwnerId = normalizeOwnerId(ownerId);
   const storage = safePersistentStorage();
-  if (!storage) return { schemaVersion: 1, items: [] };
+  if (!storage) return { schemaVersion: 2, items: [] };
   try {
     const raw = storage.getItem(registryKey(normalizedOwnerId));
-    if (!raw) return { schemaVersion: 1, items: [] };
+    if (!raw) {
+      const legacyRaw = storage.getItem(legacyRegistryKey(normalizedOwnerId));
+      if (!legacyRaw) return { schemaVersion: 2, items: [] };
+      const legacyParsed = JSON.parse(legacyRaw) as unknown;
+      if (
+        !legacyParsed
+        || typeof legacyParsed !== "object"
+        || Array.isArray(legacyParsed)
+      ) {
+        return { schemaVersion: 2, items: [] };
+      }
+      const legacyCandidate = legacyParsed as Record<string, unknown>;
+      if (
+        legacyCandidate.schemaVersion !== 1
+        || !Array.isArray(legacyCandidate.items)
+      ) {
+        return { schemaVersion: 2, items: [] };
+      }
+      const migrated: ExperimentWorkspace[] = [];
+      for (const [index, item] of legacyCandidate.items.entries()) {
+        if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+        const candidateItem = { ...item, edition: "sim" };
+        if (!isWorkspace(candidateItem, normalizedOwnerId)) continue;
+        migrated.push({
+          ...candidateItem,
+          order: candidateItem.order ?? index,
+        });
+      }
+      storage.setItem(
+        registryKey(normalizedOwnerId),
+        JSON.stringify({ schemaVersion: 2, items: migrated }),
+      );
+      storage.removeItem(legacyRegistryKey(normalizedOwnerId));
+      return { schemaVersion: 2, items: migrated };
+    }
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { schemaVersion: 1, items: [] };
+      return { schemaVersion: 2, items: [] };
     }
     const candidate = parsed as Record<string, unknown>;
-    if (candidate.schemaVersion !== 1 || !Array.isArray(candidate.items)) {
-      return { schemaVersion: 1, items: [] };
+    if (candidate.schemaVersion !== 2 || !Array.isArray(candidate.items)) {
+      return { schemaVersion: 2, items: [] };
     }
     const items = candidate.items.filter(
       (item) => isWorkspace(item, normalizedOwnerId),
     );
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       items: items.map((item, index) => ({
         ...item,
         order: item.order ?? index,
       })),
     };
   } catch {
-    return { schemaVersion: 1, items: [] };
+    return { schemaVersion: 2, items: [] };
   }
 }
 
@@ -165,7 +212,7 @@ function writeRegistry(
   try {
     storage.setItem(
       registryKey(normalizedOwnerId),
-      JSON.stringify({ schemaVersion: 1, items }),
+      JSON.stringify({ schemaVersion: 2, items }),
     );
     if (emit) emitRegistryChanged(normalizedOwnerId);
   } catch {
@@ -199,7 +246,10 @@ export function createExperimentWorkspaceId(): string {
   return `experiment-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function listExperimentWorkspaces(ownerId: string): ExperimentWorkspace[] {
+export function listExperimentWorkspaces(
+  ownerId: string,
+  edition: BrandEditionId,
+): ExperimentWorkspace[] {
   const normalizedOwnerId = normalizeOwnerId(ownerId);
   const registry = readRegistry(normalizedOwnerId);
   const retained = registry.items.filter(
@@ -211,18 +261,21 @@ export function listExperimentWorkspaces(ownerId: string): ExperimentWorkspace[]
   if (retained.length !== registry.items.length) {
     writeRegistry(normalizedOwnerId, retained, false);
   }
-  return retained.sort((left, right) => {
-    if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
-    if ((left.order ?? 0) !== (right.order ?? 0)) {
-      return (left.order ?? 0) - (right.order ?? 0);
-    }
-    return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
-  });
+  return retained
+    .filter((workspace) => workspace.edition === edition)
+    .sort((left, right) => {
+      if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+      if ((left.order ?? 0) !== (right.order ?? 0)) {
+        return (left.order ?? 0) - (right.order ?? 0);
+      }
+      return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+    });
 }
 
 export function isExperimentWorkspaceNameAvailable(
   ownerId: string,
   name: string,
+  edition: BrandEditionId,
   excludeWorkspaceId?: string | null,
 ): boolean {
   const identity = normalizedNameIdentity(name);
@@ -231,6 +284,7 @@ export function isExperimentWorkspaceNameAvailable(
   return !readRegistry(normalizedOwnerId).items.some(
     (workspace) =>
       !workspace.archived
+      && workspace.edition === edition
       && workspace.id !== excludeWorkspaceId
       && normalizedNameIdentity(workspace.name) === identity,
   );
@@ -268,9 +322,10 @@ export function reorderExperimentWorkspace(
   ownerId: string,
   draggedWorkspaceId: string,
   insertionIndex: number,
+  edition: BrandEditionId,
 ): ExperimentWorkspace[] {
   const normalizedOwnerId = normalizeOwnerId(ownerId);
-  const visible = listExperimentWorkspaces(normalizedOwnerId).filter(
+  const visible = listExperimentWorkspaces(normalizedOwnerId, edition).filter(
     (workspace) => !workspace.archived,
   );
   const reordered = reorderExperimentWorkspaceItems(
@@ -297,7 +352,7 @@ export function reorderExperimentWorkspace(
       };
     }),
   );
-  return listExperimentWorkspaces(normalizedOwnerId).filter(
+  return listExperimentWorkspaces(normalizedOwnerId, edition).filter(
     (workspace) => !workspace.archived,
   );
 }
@@ -309,6 +364,9 @@ export function registerExperimentWorkspace(
   const registry = readRegistry(ownerId);
   const now = new Date().toISOString();
   const existing = registry.items.find((item) => item.id === input.id);
+  if (existing && existing.edition !== input.edition) {
+    throw new Error("Experiment workspaces cannot move between editions.");
+  }
   const firstOrder = registry.items.reduce(
     (minimum, item) => Math.min(minimum, item.order ?? 0),
     0,
@@ -316,6 +374,7 @@ export function registerExperimentWorkspace(
   const workspace: ExperimentWorkspace = {
     id: input.id,
     ownerId,
+    edition: input.edition,
     name: normalizedName(input.name),
     source: input.source,
     status: existing?.status ?? "draft",
@@ -341,11 +400,12 @@ export function updateExperimentWorkspace(
   ownerId: string,
   workspaceId: string,
   patch: WorkspacePatch,
+  edition: BrandEditionId,
 ): ExperimentWorkspace | null {
   const normalizedOwnerId = normalizeOwnerId(ownerId);
   const registry = readRegistry(normalizedOwnerId);
   const current = registry.items.find((item) => item.id === workspaceId);
-  if (!current) return null;
+  if (!current || current.edition !== edition) return null;
   const updated: ExperimentWorkspace = {
     ...current,
     ...patch,
@@ -371,16 +431,26 @@ export function updateExperimentWorkspace(
 export function removeExperimentWorkspace(
   ownerId: string,
   workspaceId: string,
+  edition: BrandEditionId,
 ): void {
   const normalizedOwnerId = normalizeOwnerId(ownerId);
   const registry = readRegistry(normalizedOwnerId);
   writeRegistry(
     normalizedOwnerId,
-    registry.items.filter((item) => item.id !== workspaceId),
+    registry.items.filter(
+      (item) => item.id !== workspaceId || item.edition !== edition,
+    ),
   );
 }
 
 export function experimentWorkspacePath(workspace: ExperimentWorkspace): string {
+  if (workspace.edition === "field") {
+    return `/field?experiment=${encodeURIComponent(workspace.id)}`;
+  }
+  if (workspace.edition === "lab") {
+    return `/lab?experiment=${encodeURIComponent(workspace.id)}`;
+  }
+  if (workspace.edition === "universal") return "/vehicle-studio";
   if (workspace.jobId) return `/jobs/${encodeURIComponent(workspace.jobId)}`;
   return `/jobs/new?experiment=${encodeURIComponent(workspace.id)}`;
 }

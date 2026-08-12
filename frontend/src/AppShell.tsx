@@ -1530,10 +1530,12 @@ function AccountAvatar({
 function AccountDialog({
   closeRef,
   required,
+  edition,
   onClose,
 }: {
   closeRef: RefObject<HTMLButtonElement>;
   required: boolean;
+  edition: BrandEditionId;
   onClose: () => void;
 }) {
   const { locale } = useI18n();
@@ -2128,6 +2130,7 @@ function AccountDialog({
       <ArchivedExperimentManager
         ownerId={auth.account?.id ?? "local"}
         locale={locale}
+        edition={edition}
       />
       {error ? (
         <p className="account-dialog-error" role="alert">
@@ -2648,6 +2651,7 @@ function AppShellContent() {
       <AccountDialog
         closeRef={accountCloseRef}
         required={accountDialogRequired}
+        edition={activeThemeEdition}
         onClose={closeAccount}
       />
     </div>
@@ -2716,7 +2720,7 @@ function AppShellContent() {
         ) : null}
         {exitGuard}
         <main id="main-content" className="launcher-main" tabIndex={-1}>
-          <Outlet />
+          <Outlet key={activeThemeEdition} />
         </main>
         </div>
       </EditionThemeProvider>
@@ -2852,6 +2856,7 @@ function AppShellContent() {
           <ExperimentWorkspaceSidebar
             ownerId={auth.account?.id ?? "local"}
             locale={locale}
+            edition={activeThemeEdition}
           />
           <div className="app-sidebar-footer">
             <button
@@ -2983,7 +2988,7 @@ function AppShellContent() {
           </div>
         ) : null}
         <main id="main-content" className={`app-main${experimentWizardMode ? " app-main-wizard" : ""}`} tabIndex={-1}>
-          <Outlet />
+          <Outlet key={activeThemeEdition} />
         </main>
         <footer className="app-footer">
           <div className="app-footer-content">

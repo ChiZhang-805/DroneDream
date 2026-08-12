@@ -38,7 +38,7 @@ const EMPTY_CONVERSATION: ExperimentConversationState = {
   messages: [],
 };
 
-function emptyDraft(): AssistantDraft {
+export function createEmptyAssistantDraft(): AssistantDraft {
   return {
     form: { ...EXPERIMENT_FORM_DEFAULTS },
     selections: createParameterSelections(
@@ -57,12 +57,12 @@ function emptyDraft(): AssistantDraft {
 
 export function clearAssistantDraft(workspaceId?: string | null): AssistantDraft {
   clearExperimentDraft(workspaceId);
-  return emptyDraft();
+  return createEmptyAssistantDraft();
 }
 
 export function loadAssistantDraft(workspaceId?: string | null): AssistantDraft {
   const stored = loadExperimentDraft(EXPERIMENT_DRAFT_SCHEMA, workspaceId);
-  if (!stored) return emptyDraft();
+  if (!stored) return createEmptyAssistantDraft();
   return {
     form: stored.form,
     selections: stored.selections,

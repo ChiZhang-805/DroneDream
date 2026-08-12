@@ -30,6 +30,7 @@ import {
   assistantCurrentParameters,
   assistantCurrentValues,
   clearAssistantDraft,
+  createEmptyAssistantDraft,
   explicitAssistantFields,
   loadAssistantDraft,
   type AssistantDraft,
@@ -40,6 +41,7 @@ import { publicDemoConsole } from "../features/demo/publicDemo";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import {
   createExperimentWorkspaceId,
+  listExperimentWorkspaces,
   registerExperimentWorkspace,
   removeExperimentWorkspace,
 } from "../features/experiment/workspaceRegistry";
@@ -524,12 +526,27 @@ export function ExperimentAssistant() {
         examples: copy.examples,
       };
   const [vehicleDraftId, setVehicleDraftId] = useState<string | null>(null);
+  const initialWorkspace = useRef(
+    listExperimentWorkspaces(ownerId, editionTheme.id).find(
+      (workspace) => workspace.source === "assistant" && !workspace.archived,
+    ) ?? null,
+  ).current;
 
   function openDraftPath(): string {
     if (editionTheme.id === "universal") {
       return vehicleDraftId
         ? `/vehicle-studio?draft=${encodeURIComponent(vehicleDraftId)}`
         : "/vehicle-studio";
+    }
+    if (editionTheme.id === "field") {
+      return workspaceId
+        ? `/field?experiment=${encodeURIComponent(workspaceId)}`
+        : "/field";
+    }
+    if (editionTheme.id === "lab") {
+      return workspaceId
+        ? `/lab?experiment=${encodeURIComponent(workspaceId)}`
+        : "/lab";
     }
     return workspaceId
       ? `/jobs/new?experiment=${encodeURIComponent(workspaceId)}`
@@ -578,8 +595,14 @@ export function ExperimentAssistant() {
   )
       ? activeProfileId
       : "none";
-  const [draft, setDraft] = useState<AssistantDraft>(loadAssistantDraft);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<AssistantDraft>(() =>
+    initialWorkspace
+      ? loadAssistantDraft(initialWorkspace.id)
+      : createEmptyAssistantDraft(),
+  );
+  const [workspaceId, setWorkspaceId] = useState<string | null>(
+    initialWorkspace?.id ?? null,
+  );
   const [composer, setComposer] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -839,6 +862,7 @@ export function ExperimentAssistant() {
       registerExperimentWorkspace({
         id: targetWorkspaceId,
         ownerId,
+        edition: editionTheme.id,
         name:
           next.form.display_name.trim()
           || result.experiment_summary.trim().slice(0, 255)
@@ -934,7 +958,7 @@ export function ExperimentAssistant() {
                   voice.stop();
                   setDraft(clearAssistantDraft(workspaceId));
                   if (workspaceId) {
-                    removeExperimentWorkspace(ownerId, workspaceId);
+                    removeExperimentWorkspace(ownerId, workspaceId, editionTheme.id);
                     setWorkspaceId(null);
                   } else {
                     clearExperimentDraft();

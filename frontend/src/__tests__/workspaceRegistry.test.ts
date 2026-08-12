@@ -42,6 +42,7 @@ describe("experiment workspace registry", () => {
     registerExperimentWorkspace({
       id: FIRST_ID,
       ownerId: OWNER_A,
+      edition: "sim",
       name: "First experiment",
       source: "manual",
       activeStep: 2,
@@ -50,13 +51,14 @@ describe("experiment workspace registry", () => {
     registerExperimentWorkspace({
       id: SECOND_ID,
       ownerId: OWNER_B,
+      edition: "sim",
       name: "Second experiment",
       source: "assistant",
       activeStep: 3,
       completedSteps: [0, 1, 2],
     });
 
-    expect(listExperimentWorkspaces(OWNER_A)).toMatchObject([
+    expect(listExperimentWorkspaces(OWNER_A, "sim")).toMatchObject([
       {
         id: FIRST_ID,
         name: "First experiment",
@@ -64,7 +66,7 @@ describe("experiment workspace registry", () => {
         source: "manual",
       },
     ]);
-    expect(listExperimentWorkspaces(OWNER_B)).toMatchObject([
+    expect(listExperimentWorkspaces(OWNER_B, "sim")).toMatchObject([
       {
         id: SECOND_ID,
         name: "Second experiment",
@@ -72,7 +74,7 @@ describe("experiment workspace registry", () => {
         source: "assistant",
       },
     ]);
-    expect(experimentWorkspacePath(listExperimentWorkspaces(OWNER_A)[0]))
+    expect(experimentWorkspacePath(listExperimentWorkspaces(OWNER_A, "sim")[0]))
       .toBe(`/jobs/new?experiment=${FIRST_ID}`);
   });
 
@@ -81,6 +83,7 @@ describe("experiment workspace registry", () => {
     registerExperimentWorkspace({
       id: FIRST_ID,
       ownerId: OWNER_A,
+      edition: "sim",
       name: "Draft",
       source: "manual",
     });
@@ -88,6 +91,7 @@ describe("experiment workspace registry", () => {
     registerExperimentWorkspace({
       id: SECOND_ID,
       ownerId: OWNER_A,
+      edition: "sim",
       name: "Created job",
       source: "assistant",
     });
@@ -97,10 +101,10 @@ describe("experiment workspace registry", () => {
       pinned: true,
       activeStep: 4,
       completedSteps: [0, 1, 2, 3, 4],
-    });
+    }, "sim");
     clearExperimentDraft(SECOND_ID);
 
-    const workspaces = listExperimentWorkspaces(OWNER_A);
+    const workspaces = listExperimentWorkspaces(OWNER_A, "sim");
     expect(workspaces.map((workspace) => workspace.id)).toEqual([
       SECOND_ID,
       FIRST_ID,
@@ -113,14 +117,15 @@ describe("experiment workspace registry", () => {
     registerExperimentWorkspace({
       id: FIRST_ID,
       ownerId: OWNER_A,
+      edition: "sim",
       name: "Temporary",
       source: "manual",
     });
-    expect(listExperimentWorkspaces(OWNER_A)).toHaveLength(1);
+    expect(listExperimentWorkspaces(OWNER_A, "sim")).toHaveLength(1);
 
     clearExperimentDraft(FIRST_ID);
 
-    expect(listExperimentWorkspaces(OWNER_A)).toEqual([]);
+    expect(listExperimentWorkspaces(OWNER_A, "sim")).toEqual([]);
   });
 
   it("scopes active names by account and releases them after archive", () => {
@@ -128,18 +133,19 @@ describe("experiment workspace registry", () => {
     registerExperimentWorkspace({
       id: FIRST_ID,
       ownerId: OWNER_A,
+      edition: "sim",
       name: "Wind Study",
       source: "manual",
     });
 
-    expect(isExperimentWorkspaceNameAvailable(OWNER_A, " wind   study ")).toBe(false);
-    expect(isExperimentWorkspaceNameAvailable(OWNER_B, "Wind Study")).toBe(true);
+    expect(isExperimentWorkspaceNameAvailable(OWNER_A, " wind   study ", "sim")).toBe(false);
+    expect(isExperimentWorkspaceNameAvailable(OWNER_B, "Wind Study", "sim")).toBe(true);
     expect(
-      isExperimentWorkspaceNameAvailable(OWNER_A, "Wind Study", FIRST_ID),
+      isExperimentWorkspaceNameAvailable(OWNER_A, "Wind Study", "sim", FIRST_ID),
     ).toBe(true);
 
-    updateExperimentWorkspace(OWNER_A, FIRST_ID, { archived: true });
-    expect(isExperimentWorkspaceNameAvailable(OWNER_A, "WIND STUDY")).toBe(true);
+    updateExperimentWorkspace(OWNER_A, FIRST_ID, { archived: true }, "sim");
+    expect(isExperimentWorkspaceNameAvailable(OWNER_A, "WIND STUDY", "sim")).toBe(true);
   });
 
   it("changes pin state only when a drag crosses into the other group", () => {
@@ -205,14 +211,15 @@ describe("experiment workspace registry", () => {
       registerExperimentWorkspace({
         id,
         ownerId: OWNER_A,
+        edition: "sim",
         name,
         source: "manual",
       });
-      updateExperimentWorkspace(OWNER_A, id, { pinned, order });
+      updateExperimentWorkspace(OWNER_A, id, { pinned, order }, "sim");
     }
 
     expect(
-      reorderExperimentWorkspace(OWNER_A, "experiment-normal-a", 1)
+      reorderExperimentWorkspace(OWNER_A, "experiment-normal-a", 1, "sim")
         .map((workspace) => [workspace.name, workspace.pinned]),
     ).toEqual([
       ["Pinned A", true],
@@ -220,7 +227,7 @@ describe("experiment workspace registry", () => {
       ["Pinned B", true],
     ]);
     expect(
-      listExperimentWorkspaces(OWNER_A)
+      listExperimentWorkspaces(OWNER_A, "sim")
         .map((workspace) => [workspace.name, workspace.pinned]),
     ).toEqual([
       ["Pinned A", true],
@@ -262,6 +269,79 @@ describe("experiment workspace registry", () => {
       }),
     );
 
-    expect(listExperimentWorkspaces(OWNER_A)).toEqual([]);
+    expect(listExperimentWorkspaces(OWNER_A, "sim")).toEqual([]);
+  });
+
+  it("keeps SIM and FIELD workspaces in separate product registries", () => {
+    const fieldId = "experiment-field";
+    saveWorkspaceDraft(FIRST_ID, "SIM experiment");
+    saveWorkspaceDraft(fieldId, "FIELD trial");
+    registerExperimentWorkspace({
+      id: FIRST_ID,
+      ownerId: OWNER_A,
+      edition: "sim",
+      name: "SIM experiment",
+      source: "assistant",
+    });
+    registerExperimentWorkspace({
+      id: fieldId,
+      ownerId: OWNER_A,
+      edition: "field",
+      name: "FIELD trial",
+      source: "assistant",
+    });
+
+    expect(listExperimentWorkspaces(OWNER_A, "sim").map(({ id }) => id))
+      .toEqual([FIRST_ID]);
+    expect(listExperimentWorkspaces(OWNER_A, "field").map(({ id }) => id))
+      .toEqual([fieldId]);
+    expect(experimentWorkspacePath(listExperimentWorkspaces(OWNER_A, "field")[0]))
+      .toBe(`/field?experiment=${fieldId}`);
+    expect(isExperimentWorkspaceNameAvailable(OWNER_A, "SIM experiment", "field"))
+      .toBe(true);
+    expect(updateExperimentWorkspace(OWNER_A, FIRST_ID, {
+      name: "Cross-edition rename",
+    }, "field")).toBeNull();
+    expect(() => registerExperimentWorkspace({
+      id: FIRST_ID,
+      ownerId: OWNER_A,
+      edition: "field",
+      name: "Cross-edition replacement",
+      source: "assistant",
+    })).toThrow(/cannot move between editions/u);
+  });
+
+  it("migrates the legacy unscoped registry into SIM only", () => {
+    saveWorkspaceDraft(FIRST_ID, "Legacy SIM experiment");
+    window.localStorage.setItem(
+      `drone-dream:experiment-workspaces:v1:${encodeURIComponent(OWNER_A)}`,
+      JSON.stringify({
+        schemaVersion: 1,
+        items: [
+          {
+            id: FIRST_ID,
+            ownerId: OWNER_A,
+            name: "Legacy SIM experiment",
+            source: "assistant",
+            status: "draft",
+            activeStep: 1,
+            completedSteps: [0],
+            jobId: null,
+            pinned: false,
+            archived: false,
+            createdAt: "2026-08-01T00:00:00.000Z",
+            updatedAt: "2026-08-01T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    expect(listExperimentWorkspaces(OWNER_A, "field")).toEqual([]);
+    expect(listExperimentWorkspaces(OWNER_A, "sim")).toMatchObject([
+      { id: FIRST_ID, edition: "sim", name: "Legacy SIM experiment" },
+    ]);
+    expect(window.localStorage.getItem(
+      `drone-dream:experiment-workspaces:v1:${encodeURIComponent(OWNER_A)}`,
+    )).toBeNull();
   });
 });

@@ -4,17 +4,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient, ApiClientError } from "../api/client";
 import { EXPERIMENT_DRAFT_KEY } from "../features/experiment/draftStorage";
+import {
+  createEmptyAssistantDraft,
+  persistAssistantDraft,
+} from "../features/experiment/assistantDraft";
+import { registerExperimentWorkspace } from "../features/experiment/workspaceRegistry";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { ExperimentAssistant } from "../pages/ExperimentAssistant";
 import { EditionThemeProvider } from "../theme/EditionThemeProvider";
+import type { BrandEditionId } from "../brand/edition-brand.generated";
 import type { ExperimentAssistantTurnResponse } from "../types/api";
 
-function renderAssistant() {
+function renderAssistant(edition: BrandEditionId = "sim") {
   return render(
     <I18nProvider>
       <MemoryRouter>
-        <EditionThemeProvider edition="sim">
+        <EditionThemeProvider edition={edition}>
           <ModelAccessProvider
             initialSettings={{
               provider: "qwen",
@@ -104,6 +110,42 @@ describe("conversational experiment drafting", () => {
       value: undefined,
     });
     Reflect.deleteProperty(window, "SpeechRecognition");
+  });
+
+  it("restores only the active edition's assistant experiment", () => {
+    const seedDraft = (
+      edition: BrandEditionId,
+      workspaceId: string,
+      label: string,
+    ) => {
+      const draft = createEmptyAssistantDraft();
+      draft.form.display_name = label;
+      draft.conversation = {
+        summary: label,
+        field_provenance: {},
+        messages: [{ id: `${workspaceId}:user`, role: "user", content: label }],
+      };
+      persistAssistantDraft(draft, workspaceId);
+      registerExperimentWorkspace({
+        id: workspaceId,
+        ownerId: "local",
+        edition,
+        name: label,
+        source: "assistant",
+      });
+    };
+
+    seedDraft("sim", "sim-workspace-01", "SIM-only experiment");
+    seedDraft("field", "field-workspace-01", "FIELD-only experiment");
+
+    const field = renderAssistant("field");
+    expect(screen.getByText("FIELD-only experiment")).toBeVisible();
+    expect(screen.queryByText("SIM-only experiment")).not.toBeInTheDocument();
+    field.unmount();
+
+    renderAssistant("sim");
+    expect(screen.getByText("SIM-only experiment")).toBeVisible();
+    expect(screen.queryByText("FIELD-only experiment")).not.toBeInTheDocument();
   });
 
   it("compiles a turn into the shared V3 draft without persisting the API key", async () => {

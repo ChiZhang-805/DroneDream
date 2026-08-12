@@ -99,6 +99,7 @@ import {
 import { generateReferenceTrack } from "../utils/referenceTrack";
 import { formatNumber } from "../utils/format";
 import { useI18n } from "../i18n/I18nProvider";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type { TranslationKey, TranslationParams } from "../i18n/I18nProvider";
 
 type Translate = (key: TranslationKey, params?: TranslationParams) => string;
@@ -1342,13 +1343,15 @@ export function NewJob() {
   const { t } = useI18n();
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
+  const editionTheme = useEditionTheme();
+  const workspaceEdition = editionTheme.id;
   const { settings: modelAccess } = useModelAccess();
   const initialWorkspaceId = useRef((() => {
     const requested = searchParams.get("experiment");
     if (!requested || !/^[a-zA-Z0-9_-]{8,128}$/u.test(requested)) {
       return null;
     }
-    return listExperimentWorkspaces(ownerId).some(
+    return listExperimentWorkspaces(ownerId, workspaceEdition).some(
       (workspace) => workspace.id === requested && !workspace.archived,
     )
       ? requested
@@ -1444,15 +1447,16 @@ export function NewJob() {
 
   useEffect(() => {
     if (!workspaceId || !initialDraft?.form.display_name.trim()) return;
-    registerExperimentWorkspace({
-      id: workspaceId,
-      ownerId,
-      name: initialDraft.form.display_name,
-      source: initialDraft.conversation ? "assistant" : "manual",
-      activeStep: initialDraft.active_step,
-      completedSteps: initialDraft.completed_steps,
-    });
-  }, [initialDraft, ownerId, workspaceId]);
+      registerExperimentWorkspace({
+        id: workspaceId,
+        ownerId,
+        edition: workspaceEdition,
+        name: initialDraft.form.display_name,
+        source: initialDraft.conversation ? "assistant" : "manual",
+        activeStep: initialDraft.active_step,
+        completedSteps: initialDraft.completed_steps,
+      });
+  }, [initialDraft, ownerId, workspaceEdition, workspaceId]);
 
   useEffect(() => {
     setForm((current) => {
@@ -1547,7 +1551,7 @@ export function NewJob() {
           name: form.display_name,
           activeStep: step,
           completedSteps: [...completedSteps],
-        });
+        }, workspaceEdition);
       }
     }, 700);
     return () => window.clearTimeout(timer);
@@ -1558,6 +1562,7 @@ export function NewJob() {
     manualEditOriginSelections,
     nameConfirmed,
     ownerId,
+    workspaceEdition,
     selections,
     step,
     workspaceId,
@@ -1888,6 +1893,7 @@ export function NewJob() {
       registerExperimentWorkspace({
         id: targetWorkspaceId,
         ownerId,
+        edition: workspaceEdition,
         name: nextForm.display_name,
         source: conversationRef.current ? "assistant" : "manual",
         activeStep,
@@ -1911,6 +1917,7 @@ export function NewJob() {
       !isExperimentWorkspaceNameAvailable(
         ownerId,
         trimmedName,
+        workspaceEdition,
         workspaceId,
       )
     ) {
@@ -1989,7 +1996,7 @@ export function NewJob() {
             status: "draft",
             activeStep: 4,
             completedSteps: [0, 1, 2, 3, 4],
-          });
+          }, workspaceEdition);
         }
         navigate("/dashboard", { replace: false });
         return;
@@ -2045,7 +2052,7 @@ export function NewJob() {
           jobId: created.id,
           activeStep: 4,
           completedSteps: [0, 1, 2, 3, 4],
-        });
+        }, workspaceEdition);
       }
       clearExperimentDraft(workspaceId);
       void recordProductEvent("job_created", {

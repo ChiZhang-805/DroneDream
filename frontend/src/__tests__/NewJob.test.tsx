@@ -12,6 +12,7 @@ import {
 import type { BackendCapabilitiesResponse, Job } from "../types/api";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 import type { ModelAccessSettings } from "../features/settings/ModelAccessContext";
+import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 import {
   listExperimentWorkspaces,
   updateExperimentWorkspace,
@@ -43,9 +44,11 @@ function renderPage({
   const result = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialEntry]}>
-        <ModelAccessProvider initialSettings={modelSettings}>
-          <NewJob />
-        </ModelAccessProvider>
+        <EditionThemeProvider edition="sim">
+          <ModelAccessProvider initialSettings={modelSettings}>
+            <NewJob />
+          </ModelAccessProvider>
+        </EditionThemeProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -384,7 +387,7 @@ describe("NewJob experiment wizard", () => {
     });
 
     first.unmount();
-    const workspace = listExperimentWorkspaces("local")[0];
+    const workspace = listExperimentWorkspaces("local", "sim")[0];
     expect(workspace).toBeDefined();
     renderPage({
       confirmName: false,
@@ -852,7 +855,7 @@ describe("NewJob experiment wizard", () => {
     });
 
     first.unmount();
-    const workspace = listExperimentWorkspaces("local")[0];
+    const workspace = listExperimentWorkspaces("local", "sim")[0];
     expect(workspace).toBeDefined();
     renderPage({
       confirmName: false,
@@ -877,7 +880,7 @@ describe("NewJob experiment wizard", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Next$/i }));
 
     first.unmount();
-    const workspace = listExperimentWorkspaces("local")[0];
+    const workspace = listExperimentWorkspaces("local", "sim")[0];
     expect(workspace).toBeDefined();
     renderPage({
       confirmName: false,
@@ -976,14 +979,14 @@ describe("NewJob experiment wizard", () => {
       name: "Experiment setup progress",
     })).toBeNull();
 
-    const existing = listExperimentWorkspaces("local")[0];
+    const existing = listExperimentWorkspaces("local", "sim")[0];
     expect(existing).toBeDefined();
-    updateExperimentWorkspace("local", existing.id, { archived: true });
+    updateExperimentWorkspace("local", existing.id, { archived: true }, "sim");
     fireEvent.submit(dialog);
     expect(screen.getByRole("navigation", {
       name: "Experiment setup progress",
     })).toBeVisible();
-    expect(listExperimentWorkspaces("local").filter((item) => !item.archived))
+    expect(listExperimentWorkspaces("local", "sim").filter((item) => !item.archived))
       .toHaveLength(1);
   });
 

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { apiClient } from "../api/client";
+import type { BrandEditionId } from "../brand/edition-brand.generated";
 import {
   clearExperimentDraft,
   renameExperimentDraft,
@@ -37,6 +38,7 @@ import {
 interface ExperimentWorkspaceSidebarProps {
   ownerId: string;
   locale: "en" | "zh-CN";
+  edition: BrandEditionId;
 }
 
 const COPY = {
@@ -97,8 +99,14 @@ function activeWorkspaceId(
   pathname: string,
   search: string,
 ): string | null {
+  const requestedWorkspace = new URLSearchParams(search).get("experiment");
+  if (requestedWorkspace) {
+    return workspaces.some((workspace) => workspace.id === requestedWorkspace)
+      ? requestedWorkspace
+      : null;
+  }
   if (pathname === "/jobs/new") {
-    return new URLSearchParams(search).get("experiment");
+    return null;
   }
   if (pathname.startsWith("/jobs/")) {
     let jobId: string;
@@ -115,6 +123,7 @@ function activeWorkspaceId(
 export function ExperimentWorkspaceSidebar({
   ownerId,
   locale,
+  edition,
 }: ExperimentWorkspaceSidebarProps) {
   const location = useLocation();
   const copy = COPY[locale === "zh-CN" ? "zh" : "en"];
@@ -130,8 +139,8 @@ export function ExperimentWorkspaceSidebar({
   const listRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(
-    () => setWorkspaces(listExperimentWorkspaces(ownerId)),
-    [ownerId],
+    () => setWorkspaces(listExperimentWorkspaces(ownerId, edition)),
+    [edition, ownerId],
   );
 
   useEffect(() => {
@@ -235,7 +244,12 @@ export function ExperimentWorkspaceSidebar({
       return;
     }
     if (
-      !isExperimentWorkspaceNameAvailable(ownerId, nextName, workspace.id)
+      !isExperimentWorkspaceNameAvailable(
+        ownerId,
+        nextName,
+        edition,
+        workspace.id,
+      )
     ) {
       renameInputRef.current?.setCustomValidity(copy.nameInUse);
       renameInputRef.current?.reportValidity();
@@ -256,7 +270,7 @@ export function ExperimentWorkspaceSidebar({
     } else {
       renameExperimentDraft(workspace.id, nextName);
     }
-    updateExperimentWorkspace(ownerId, workspace.id, { name: nextName });
+    updateExperimentWorkspace(ownerId, workspace.id, { name: nextName }, edition);
     setRenamingId(null);
     refresh();
   }
@@ -347,6 +361,7 @@ export function ExperimentWorkspaceSidebar({
             ownerId,
             workspaceId,
             insertionIndex,
+            edition,
           );
           setWorkspaces(reordered);
           clearDragState();
@@ -447,7 +462,7 @@ export function ExperimentWorkspaceSidebar({
                     onClick={() => {
                       updateExperimentWorkspace(ownerId, workspace.id, {
                         pinned: !workspace.pinned,
-                      });
+                      }, edition);
                       refresh();
                     }}
                   >
@@ -464,7 +479,7 @@ export function ExperimentWorkspaceSidebar({
                     onClick={() => {
                       updateExperimentWorkspace(ownerId, workspace.id, {
                         archived: true,
-                      });
+                      }, edition);
                       refresh();
                     }}
                   >
@@ -502,7 +517,7 @@ export function ExperimentWorkspaceSidebar({
             onClick={() => {
               updateExperimentWorkspace(ownerId, selectedForMenu.id, {
                 pinned: !selectedForMenu.pinned,
-              });
+              }, edition);
               setContextMenu(null);
               refresh();
             }}
@@ -520,7 +535,7 @@ export function ExperimentWorkspaceSidebar({
             onClick={() => {
               updateExperimentWorkspace(ownerId, selectedForMenu.id, {
                 archived: true,
-              });
+              }, edition);
               setContextMenu(null);
               refresh();
             }}
@@ -537,14 +552,15 @@ export function ExperimentWorkspaceSidebar({
 export function ArchivedExperimentManager({
   ownerId,
   locale,
+  edition,
 }: ExperimentWorkspaceSidebarProps) {
   const copy = COPY[locale === "zh-CN" ? "zh" : "en"];
   const [workspaces, setWorkspaces] = useState<ExperimentWorkspace[]>([]);
   const refresh = useCallback(
     () => setWorkspaces(
-      listExperimentWorkspaces(ownerId).filter((workspace) => workspace.archived),
+      listExperimentWorkspaces(ownerId, edition).filter((workspace) => workspace.archived),
     ),
-    [ownerId],
+    [edition, ownerId],
   );
 
   useEffect(() => {
@@ -586,6 +602,7 @@ export function ArchivedExperimentManager({
                     !isExperimentWorkspaceNameAvailable(
                       ownerId,
                       workspace.name,
+                      edition,
                       workspace.id,
                     )
                   ) {
@@ -594,7 +611,7 @@ export function ArchivedExperimentManager({
                   }
                   updateExperimentWorkspace(ownerId, workspace.id, {
                     archived: false,
-                  });
+                  }, edition);
                   refresh();
                 }}
               >
@@ -613,7 +630,7 @@ export function ArchivedExperimentManager({
                   );
                   if (!confirmed) return;
                   if (!workspace.jobId) clearExperimentDraft(workspace.id);
-                  removeExperimentWorkspace(ownerId, workspace.id);
+                  removeExperimentWorkspace(ownerId, workspace.id, edition);
                   refresh();
                 }}
               >

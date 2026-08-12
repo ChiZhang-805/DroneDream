@@ -31,6 +31,7 @@ function createWorkspace(
   registerExperimentWorkspace({
     id,
     ownerId: OWNER_ID,
+    edition: "sim",
     name,
     source: "manual",
   });
@@ -38,7 +39,7 @@ function createWorkspace(
     status: "created",
     jobId,
     archived,
-  });
+  }, "sim");
 }
 
 afterEach(() => {
@@ -49,7 +50,7 @@ describe("ExperimentWorkspaceSidebar", () => {
   it("does not crash on a malformed encoded job path", () => {
     render(
       <MemoryRouter initialEntries={["/jobs/%E0%A4%A"]}>
-        <ExperimentWorkspaceSidebar ownerId={OWNER_ID} locale="en" />
+        <ExperimentWorkspaceSidebar ownerId={OWNER_ID} locale="en" edition="sim" />
       </MemoryRouter>,
     );
 
@@ -65,7 +66,7 @@ describe("ExperimentWorkspaceSidebar", () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter initialEntries={["/jobs/job-rename"]}>
-        <ExperimentWorkspaceSidebar ownerId={OWNER_ID} locale="en" />
+        <ExperimentWorkspaceSidebar ownerId={OWNER_ID} locale="en" edition="sim" />
       </MemoryRouter>,
     );
 
@@ -82,7 +83,7 @@ describe("ExperimentWorkspaceSidebar", () => {
       { display_name: "Renamed experiment" },
       7,
     );
-    expect(listExperimentWorkspaces(OWNER_ID)[0]?.name).toBe("Renamed experiment");
+    expect(listExperimentWorkspaces(OWNER_ID, "sim")[0]?.name).toBe("Renamed experiment");
   });
 
   it("shows a persistent pin marker and previews a drag insertion before reordering", async () => {
@@ -92,18 +93,18 @@ describe("ExperimentWorkspaceSidebar", () => {
     updateExperimentWorkspace(OWNER_ID, "workspace-pinned-a", {
       pinned: true,
       order: 0,
-    });
+    }, "sim");
     updateExperimentWorkspace(OWNER_ID, "workspace-pinned-b", {
       pinned: true,
       order: 1,
-    });
+    }, "sim");
     updateExperimentWorkspace(OWNER_ID, "workspace-normal", {
       pinned: false,
       order: 2,
-    });
+    }, "sim");
     render(
       <MemoryRouter>
-        <ExperimentWorkspaceSidebar ownerId={OWNER_ID} locale="en" />
+        <ExperimentWorkspaceSidebar ownerId={OWNER_ID} locale="en" edition="sim" />
       </MemoryRouter>,
     );
 
@@ -164,7 +165,7 @@ describe("ExperimentWorkspaceSidebar", () => {
 
     await waitFor(() => {
       expect(list.querySelector(".app-workspace-drop-preview")).toBeNull();
-      expect(listExperimentWorkspaces(OWNER_ID)
+      expect(listExperimentWorkspaces(OWNER_ID, "sim")
         .filter((workspace) => !workspace.archived)
         .map((workspace) => [workspace.name, workspace.pinned]))
         .toEqual([
@@ -182,7 +183,9 @@ describe("ArchivedExperimentManager", () => {
     createWorkspace("workspace-draft", "Local draft", null, true);
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const user = userEvent.setup();
-    render(<ArchivedExperimentManager ownerId={OWNER_ID} locale="en" />);
+    render(
+      <ArchivedExperimentManager ownerId={OWNER_ID} locale="en" edition="sim" />,
+    );
 
     const removeJob = screen.getByRole("button", {
       name: "Remove: Completed job",
@@ -194,11 +197,11 @@ describe("ArchivedExperimentManager", () => {
     expect(confirm).toHaveBeenLastCalledWith(
       expect.stringContaining("job and trials will remain in History"),
     );
-    expect(listExperimentWorkspaces(OWNER_ID)).toHaveLength(2);
+    expect(listExperimentWorkspaces(OWNER_ID, "sim")).toHaveLength(2);
 
     confirm.mockReturnValue(true);
     await user.click(removeJob);
-    expect(listExperimentWorkspaces(OWNER_ID).map((item) => item.id)).toEqual([
+    expect(listExperimentWorkspaces(OWNER_ID, "sim").map((item) => item.id)).toEqual([
       "workspace-draft",
     ]);
 
@@ -208,6 +211,6 @@ describe("ArchivedExperimentManager", () => {
     expect(confirm).toHaveBeenLastCalledWith(
       expect.stringContaining("cannot be undone"),
     );
-    expect(listExperimentWorkspaces(OWNER_ID)).toEqual([]);
+    expect(listExperimentWorkspaces(OWNER_ID, "sim")).toEqual([]);
   });
 });
