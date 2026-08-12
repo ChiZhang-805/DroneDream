@@ -45,7 +45,7 @@ body:has(#site-root) a {
   --site-ink: #070913;
   --site-muted: #a9aec2;
   --site-content-width: 1740px;
-  --site-gutter: clamp(32px, 3.2vw, 72px);
+  --site-gutter: clamp(56px, 7.4vw, 152px);
   min-height: 100vh;
   overflow: clip;
   color: #f7f8ff;
@@ -98,28 +98,16 @@ body:has(#site-root) a {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 0.38rem;
   justify-self: start;
   text-decoration: none;
 }
 
-.site-brand-mark {
+.site-brand .brand-lockup {
   display: block;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
+  width: auto;
+  height: 39px;
+  flex: 0 0 auto;
   object-fit: contain;
-}
-
-.site-brand-wordmark {
-  color: transparent;
-  background: linear-gradient(96deg, #ff557f 2%, #d94ec0 30%, #714cff 63%, #e25ad0 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  font-size: 2.08rem;
-  font-weight: 720;
-  letter-spacing: -0.055em;
-  line-height: 1;
 }
 
 .brand-lockup-primary .brand-lockup-mark {

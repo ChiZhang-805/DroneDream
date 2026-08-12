@@ -1169,12 +1169,7 @@ export function SiteApp() {
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
         <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
-          <img
-            className="site-brand-mark"
-            src="/drone-favicon.png?v=aliyun-20260812"
-            alt=""
-          />
-          <span className="site-brand-wordmark">DroneDream</span>
+          <BrandLockup variant="primary" />
         </a>
         <nav
           id="site-navigation"
