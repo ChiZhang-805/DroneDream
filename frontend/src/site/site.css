@@ -102,7 +102,7 @@ body:has(#site-root) a {
   text-decoration: none;
 }
 
-.site-brand .brand-lockup {
+.site-brand-aliyun-lockup {
   display: block;
   width: auto;
   height: 39px;
@@ -3042,7 +3042,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-brand {
     min-width: 0;
   }
-  .site-brand .brand-lockup {
+  .site-brand-aliyun-lockup {
     width: auto;
     height: 28px;
   }
@@ -3140,7 +3140,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-header { height: 66px; padding: 0 18px; }
   .site-nav,
   .site-header.is-scrolled .site-nav { top: 66px; }
-  .site-brand .brand-lockup { height: 27px; }
+  .site-brand-aliyun-lockup { height: 27px; }
   .site-header-download { display: none; }
   .site-language { padding: .45rem; }
   .site-hero { min-height: 720px; height: 100svh; }
@@ -3345,7 +3345,7 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 @media (max-width: 520px) {
-  .site-brand .brand-lockup { height: 24px; }
+  .site-brand-aliyun-lockup { height: 24px; }
   .site-language { font-size: .7rem; }
   .site-account-button { width: 38px; height: 38px; padding: 0; }
   .site-account-button span { display: none; }

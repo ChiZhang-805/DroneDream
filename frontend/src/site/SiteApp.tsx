@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import aliyunPrimaryLockup from "../../../docs/assets/brand/drone-dream-lockup-primary.png";
 import { BrandLockup } from "../components/BrandLockup";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
@@ -1169,7 +1170,7 @@ export function SiteApp() {
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
         <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
-          <BrandLockup variant="primary" />
+          <img className="site-brand-aliyun-lockup" src={aliyunPrimaryLockup} alt="" aria-hidden="true" />
         </a>
         <nav
           id="site-navigation"
