@@ -179,10 +179,10 @@ export function ProductPage({
                 key={id}
               >
                 <div className="site-product-edition-topline">
-                  <picture className="site-product-edition-picture">
-                    <source media="(min-width: 1161px)" srcSet={brand.lockup} />
-                    <img className="site-product-edition-icon" src={brand.mark} alt="" aria-hidden="true" />
-                  </picture>
+                  <div className="site-product-edition-picture" aria-hidden="true">
+                    <img className="site-product-edition-icon" src={brand.mark} alt="" />
+                    <span className="site-product-edition-brand-text">{editionText.title}</span>
+                  </div>
                   {published ? (
                     <a className="site-product-edition-action" href={edition.downloadUrl!} download={edition.fileName} aria-label={`${editionText.title} ${text.download}`}>
                       <Download aria-hidden="true" />

@@ -122,6 +122,7 @@ const pricingContent = {
     perUserMonth: "/ user / month",
     current: "Free plan",
     currentPlan: "Current plan",
+    currentSubscription: "Current subscription",
     start: "Start free",
     upgrade: "Choose",
     recommended: "Recommended",
@@ -172,6 +173,7 @@ const pricingContent = {
     perUserMonth: "/ 人 / 月",
     current: "免费套餐",
     currentPlan: "当前套餐",
+    currentSubscription: "当前订阅",
     start: "免费开始",
     upgrade: "选择",
     recommended: "推荐",
@@ -517,11 +519,24 @@ export function PricingPage({
             </header>
             <button
               type="button"
-              className={plan.featured ? "is-primary" : ""}
-              disabled={!sensitiveCloudActionsEnabled}
-              onClick={() => choosePlan(plan)}
+              className={
+                plan.subscriptionKey === currentSubscriptionKey
+                  ? "is-current-action"
+                  : ""
+              }
+              disabled={
+                plan.subscriptionKey === currentSubscriptionKey
+                || !sensitiveCloudActionsEnabled
+              }
+              onClick={() => {
+                if (plan.subscriptionKey !== currentSubscriptionKey) choosePlan(plan);
+              }}
             >
-              {plan.id === "free" ? copy.start : `${copy.upgrade} ${plan.name}`}
+              {plan.subscriptionKey === currentSubscriptionKey
+                ? copy.currentSubscription
+                : plan.id === "free"
+                  ? copy.start
+                  : `${copy.upgrade} ${plan.name}`}
             </button>
             <ul>
               {FEATURE_KEYS.map((feature) => {

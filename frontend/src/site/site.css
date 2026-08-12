@@ -1140,25 +1140,41 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-product-edition-topline {
   display: grid;
-  min-height: 60px;
+  min-height: 48px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.9rem;
 }
 
 .site-product-edition-picture {
-  display: block;
-  width: min(70%, 300px);
+  display: flex;
+  width: auto;
+  height: 48px;
   min-width: 0;
-  line-height: 0;
+  align-items: center;
+  overflow: hidden;
 }
 
 .site-product-edition-icon {
   display: block;
-  width: 100%;
-  max-height: 60px;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  margin: -5px -4px -5px -5px;
   object-fit: contain;
-  object-position: left center;
+}
+
+.site-product-edition-brand-text {
+  overflow: hidden;
+  color: transparent;
+  background: linear-gradient(100deg, var(--edition-accent-a), var(--edition-accent-b) 54%, var(--edition-accent-c));
+  background-clip: text;
+  font-size: clamp(1.08rem, 1.28vw, 1.42rem);
+  font-weight: 820;
+  letter-spacing: -0.045em;
+  line-height: 48px;
+  text-overflow: clip;
+  white-space: nowrap;
 }
 
 .site-product-edition > h2 {
@@ -1310,7 +1326,9 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-product-edition ul,
   .site-product-screenshots { grid-column: 1; }
   .site-product-screenshots { grid-row: auto; }
-  .site-product-edition-picture { width: 52px; }
+  .site-product-edition-picture { width: auto; height: 42px; }
+  .site-product-edition-icon { width: 50px; height: 50px; flex-basis: 50px; margin: -4px -3px -4px -4px; }
+  .site-product-edition-brand-text { font-size: 1.05rem; line-height: 42px; }
   .site-product-edition li { min-height: 1.9rem; font-size: 0.76rem; }
 }
 
@@ -1642,9 +1660,14 @@ html[lang="zh-CN"] .site-hero h1 {
   box-shadow: 0 20px 55px rgba(38, 45, 77, 0.08);
 }
 
-.pricing-card.is-featured {
-  border-color: #b24bca;
-  box-shadow: 0 24px 65px rgba(153, 62, 190, 0.15);
+.pricing-card.is-current {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.96)) padding-box,
+    linear-gradient(120deg, #64dffa, #8b73f2 52%, #e151cc) border-box;
+  box-shadow:
+    0 24px 65px rgba(121, 93, 221, 0.17),
+    0 0 0 1px rgba(139, 115, 242, 0.08);
 }
 
 .pricing-badge {
@@ -1699,16 +1722,20 @@ html[lang="zh-CN"] .site-hero h1 {
   cursor: pointer;
 }
 
-.pricing-card > button.is-primary {
+.pricing-card > button:disabled {
+  color: #7c8190;
+  background: #fff;
+  cursor: default;
+  opacity: 0.62;
+}
+
+.pricing-card > button.is-current-action,
+.pricing-card > button.is-current-action:disabled {
   border-color: transparent;
   color: #fff;
   background: linear-gradient(90deg, #64dffa, #8b73f2, #e151cc);
-}
-
-.pricing-card > button:disabled {
-  color: #7c8190;
-  background: #edeef2;
   cursor: default;
+  opacity: 1;
 }
 
 .pricing-card ul {

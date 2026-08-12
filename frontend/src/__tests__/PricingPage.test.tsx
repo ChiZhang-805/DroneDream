@@ -280,15 +280,10 @@ describe("PricingPage payment channels", () => {
         .toHaveClass("is-current");
     });
     expect(screen.getByText("Current plan")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Choose Plus" }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue to payment" }));
-    await waitFor(() => {
-      expect(billingMock.createBillingCheckout).toHaveBeenCalledWith(
-        "plus",
-        "card",
-        "business",
-      );
-    });
+    expect(screen.getByRole("button", { name: "Current subscription" }))
+      .toBeDisabled();
+    expect(screen.getByRole("button", { name: "Choose Pro" })).toBeEnabled();
+    expect(billingMock.createBillingCheckout).not.toHaveBeenCalled();
   });
 
   it("locks the Chinese mobile heading to a natural six-plus-nine character rhythm", () => {
