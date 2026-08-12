@@ -199,7 +199,7 @@ const content = {
         ["Scenario identity", "Links each result to its world, route, disturbances, seeds, and acceptance criteria for direct comparison."],
         ["Logs and metrics", "Keeps telemetry, process logs, tracking metrics, failures, and artifacts together in one auditable result."],
         ["Pareto evidence", "Shows feasible trade-offs across error, overshoot, settling, robustness, and cost without hiding constraints."],
-        ["Reproducibility manifest", "Hashes critical inputs and identifies the runtime so another machine can audit the same decision later."],
+        ["Reproducibility manifest", "Records the runtime and hashes every critical input so another machine can reproduce the same decision."],
       ],
     ],
     manualEyebrow: "GET STARTED",
