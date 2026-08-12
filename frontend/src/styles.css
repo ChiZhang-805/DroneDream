@@ -209,7 +209,7 @@ code {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 440px minmax(0, 1fr);
+  grid-template-columns: 320px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -324,7 +324,7 @@ body:has(.app-shell-public-demo),
 .workspace-switch-brand img {
   display: block;
   width: auto;
-  height: 1.85rem;
+  height: 1.2rem;
   max-width: 100%;
   flex: 0 0 auto;
   object-fit: contain;
@@ -360,7 +360,7 @@ body:has(.app-shell-public-demo),
 
 .universal-mode-switch-trigger .workspace-switch-brand img {
   width: auto;
-  height: 1.85rem;
+  height: 1.2rem;
 }
 
 .universal-mode-switch-menu {
@@ -370,7 +370,7 @@ body:has(.app-shell-public-demo),
   z-index: 1000;
   display: grid;
   width: 100%;
-  min-width: 19.5rem;
+  min-width: 0;
   gap: 0.18rem;
   padding: 0.42rem;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 18%, var(--border));
@@ -13271,7 +13271,7 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
 
   .app-shell:not(.app-shell-launcher) .workspace-switch-brand img {
     width: auto;
-    height: 1.55rem;
+    height: 1.2rem;
   }
 
   .app-shell:not(.app-shell-launcher) .universal-mode-switch-menu {
