@@ -45,7 +45,7 @@ body:has(#site-root) a {
   --site-ink: #070913;
   --site-muted: #a9aec2;
   --site-content-width: 1740px;
-  --site-gutter: 24px;
+  --site-gutter: clamp(32px, 3.2vw, 72px);
   min-height: 100vh;
   overflow: clip;
   color: #f7f8ff;
