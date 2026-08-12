@@ -8789,29 +8789,17 @@ html[data-brand-edition="lab"] .app-main:has(.experiment-assistant-page) {
 .assistant-hero-icon {
   position: relative;
   display: inline-flex;
-  width: 5rem;
-  height: 4.2rem;
+  width: 5.4rem;
+  height: 4rem;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.8rem;
   color: #aaa4ad;
 }
 
 .assistant-hero-icon svg {
-  width: 4.6rem;
-  height: 4.6rem;
-}
-
-.assistant-hero-icon span {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  color: #8d8791;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: -0.08em;
-  transform: translate(-50%, -17%);
+  width: 5.4rem;
+  height: 4rem;
 }
 
 .assistant-empty-state h1 {
@@ -8849,17 +8837,18 @@ html[data-brand-edition="lab"] .assistant-empty-state h1 {
 .assistant-examples {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.8rem;
+  gap: 0.9rem;
   width: min(100%, 58rem);
+  margin-top: clamp(1.8rem, 3.2vh, 2.6rem);
 }
 
 .assistant-examples button {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   flex-direction: column;
-  justify-content: center;
-  min-height: 5.2rem;
-  padding: 1rem 1.15rem;
+  justify-content: flex-start;
+  min-height: 9.25rem;
+  padding: 1.2rem 1.25rem;
   border: 1px solid #e2dbe5;
   border-radius: 1.05rem;
   background: rgba(255, 255, 255, 0.88);
@@ -8867,7 +8856,7 @@ html[data-brand-edition="lab"] .assistant-empty-state h1 {
   font: inherit;
   font-size: 0.98rem;
   line-height: 1.45;
-  text-align: center;
+  text-align: left;
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(48, 27, 53, 0.055);
   transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
@@ -8906,7 +8895,10 @@ html[data-brand-edition="lab"] .assistant-empty-state h1 {
 
 .assistant-example-body {
   display: block;
+  margin-top: 0.8rem;
   color: #352b39;
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 .assistant-examples button:hover {
@@ -9377,8 +9369,8 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
   }
 
   .assistant-examples button {
-    min-height: 4.4rem;
-    justify-content: center;
+    min-height: 7.4rem;
+    justify-content: flex-start;
     padding: 0.75rem;
   }
 
@@ -9387,16 +9379,12 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
   }
 
   .assistant-empty-state h1 {
-    margin-bottom: 0.8rem;
-  }
-
-  .assistant-example-body {
-    display: none;
+    margin-bottom: 0;
   }
 
   .assistant-example-heading {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
   }
 
   .assistant-draft-result {
@@ -9454,7 +9442,7 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
   }
 
   .assistant-examples button {
-    min-height: 3.9rem;
+    min-height: 6rem;
     gap: 0.35rem;
     padding: 0.55rem;
   }
@@ -9466,6 +9454,12 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
 
   .assistant-example-heading strong {
     font-size: 0.78rem;
+  }
+
+  .assistant-example-body {
+    margin-top: 0.4rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
   }
 
   .assistant-composer textarea {

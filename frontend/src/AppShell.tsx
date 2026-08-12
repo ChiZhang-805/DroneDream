@@ -175,6 +175,9 @@ const SIM_NAV_ITEMS: NavigationItem[] = [
   ...CORE_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio" && !item.externalUrl),
 ];
 
+const ASSISTANT_NAV_ITEM = CORE_NAV_ITEMS[0];
+const CORE_NAV_ITEMS_AFTER_ASSISTANT = CORE_NAV_ITEMS.slice(1);
+
 const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
   {
     to: "/lab",
@@ -190,33 +193,38 @@ const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
 ];
 
 const FIXED_LAB_NAV_ITEMS: NavigationItem[] = [
+  ASSISTANT_NAV_ITEM,
   ...LAB_WORKSPACE_NAV_ITEMS,
-  ...CORE_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio"),
+  ...CORE_NAV_ITEMS_AFTER_ASSISTANT.filter((item) => item.to !== "/vehicle-studio"),
 ];
 
 const FIELD_NAV_ITEMS: NavigationItem[] = [
+  ASSISTANT_NAV_ITEM,
   {
     to: "/field",
     labelKey: "app.fieldWorkspace",
     end: true,
     icon: RadioTower,
   },
-  ...CORE_NAV_ITEMS.filter((item) => item.to === "/vehicle-studio" || item.externalUrl),
+  ...CORE_NAV_ITEMS.filter((item) => item.externalUrl),
 ];
 
 const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
+  universal: CORE_NAV_ITEMS,
   sim: SIM_NAV_ITEMS,
   lab: [
+    ASSISTANT_NAV_ITEM,
     ...LAB_WORKSPACE_NAV_ITEMS,
-    ...CORE_NAV_ITEMS,
+    ...CORE_NAV_ITEMS_AFTER_ASSISTANT,
   ],
   field: FIELD_NAV_ITEMS,
 };
 
 const MODE_LANDING_PATH: Record<UniversalWorkspaceId, string> = {
+  universal: "/assistant",
   sim: "/assistant",
-  lab: "/lab",
-  field: "/field",
+  lab: "/assistant",
+  field: "/assistant",
 };
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
@@ -2665,7 +2673,7 @@ function AppShellContent() {
             className="launcher-brand"
             aria-label={EDITION_BRAND_TOKENS[activeThemeEdition].productName}
           >
-            <BrandLockup variant="compact" edition={activeThemeEdition} />
+            <BrandLockup edition={activeThemeEdition} />
           </Link>
           <div className="launcher-chrome-actions">
             <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
@@ -2732,17 +2740,13 @@ function AppShellContent() {
         {!EDITION_IS_FIXED ? (
           <UniversalModeSwitch
             mode={universalMode}
-            activeEdition={location.pathname === "/vehicle-studio" ? "universal" : universalMode}
+            activeEdition={activeThemeEdition}
             locale={locale}
             onChange={handleUniversalModeChange}
-            onOpenUniversal={() => {
-              setMobileMenuOpen(false);
-              navigate("/vehicle-studio");
-            }}
           />
         ) : (
           <div className="app-title" aria-label={EDITION_BRAND_TOKENS[activeThemeEdition].productName}>
-            <BrandLockup variant="compact" edition={activeThemeEdition} />
+            <BrandLockup edition={activeThemeEdition} />
           </div>
         )}
         {mobileNavigationEnabled ? (

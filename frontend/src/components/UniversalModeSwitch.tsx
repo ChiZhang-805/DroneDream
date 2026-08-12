@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
-import fieldLockup from "../assets/brand/field-lockup-compact.png";
-import labLockup from "../assets/brand/lab-lockup-compact.png";
-import simLockup from "../assets/brand/sim-lockup-compact.png";
-import universalLockup from "../assets/brand/universal-lockup-compact.png";
+import fieldLockup from "../../../brand/commercial/field-lockup.png";
+import labLockup from "../../../brand/commercial/lab-lockup.png";
+import simLockup from "../../../brand/commercial/sim-lockup.png";
+import universalLockup from "../../../brand/commercial/universal-lockup.png";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import {
   UNIVERSAL_WORKSPACE_IDS,
@@ -16,7 +16,7 @@ const COPY = {
   "zh-CN": { label: "切换 DroneDream 版本", menuLabel: "DroneDream 版本" },
 } as const;
 
-const SELECTABLE_SURFACES: BrandEditionId[] = ["universal", ...UNIVERSAL_WORKSPACE_IDS];
+const SELECTABLE_SURFACES: BrandEditionId[] = [...UNIVERSAL_WORKSPACE_IDS];
 const EDITION_LABELS: Record<BrandEditionId, string> = {
   universal: "DroneDream",
   sim: "DroneDream · SIM",
@@ -34,7 +34,7 @@ function EditionBrand({ edition }: { edition: BrandEditionId }) {
   return (
     <span className="workspace-switch-brand" data-brand-edition={edition}>
       <img src={EDITION_LOCKUPS[edition]} alt="" aria-hidden="true" />
-      <span className="workspace-switch-brand-label">{EDITION_LABELS[edition]}</span>
+      <span className="sr-only">{EDITION_LABELS[edition]}</span>
     </span>
   );
 }
@@ -44,13 +44,11 @@ export function UniversalModeSwitch({
   activeEdition = mode,
   locale,
   onChange,
-  onOpenUniversal,
 }: {
   mode: UniversalWorkspaceId;
   activeEdition?: BrandEditionId;
   locale: keyof typeof COPY;
   onChange: (mode: UniversalWorkspaceId) => void;
-  onOpenUniversal?: () => void;
 }) {
   const copy = COPY[locale];
   const [open, setOpen] = useState(false);
@@ -78,11 +76,7 @@ export function UniversalModeSwitch({
   const selectEdition = (edition: BrandEditionId) => {
     setOpen(false);
     if (edition === activeEdition) return;
-    if (edition === "universal") {
-      onOpenUniversal?.();
-      return;
-    }
-    onChange(edition);
+    onChange(edition as UniversalWorkspaceId);
   };
 
   return (

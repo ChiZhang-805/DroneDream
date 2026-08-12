@@ -1,25 +1,22 @@
-import fieldCompactLockup from "../assets/brand/field-lockup-compact.png";
-import fieldPrimaryLockup from "../assets/brand/field-lockup-primary.png";
+import fieldLockup from "../../../brand/commercial/field-lockup.png";
 
 type FieldBrandLockupProps = {
-  variant?: "primary" | "compact";
   className?: string;
 };
 
 export function FieldBrandLockup({
-  variant = "primary",
   className = "",
 }: FieldBrandLockupProps) {
   const classes = [
     "brand-lockup",
-    `brand-lockup-${variant}`,
+    "brand-lockup-primary",
     className,
   ].filter(Boolean).join(" ");
 
   return (
     <img
       className={classes}
-      src={variant === "compact" ? fieldCompactLockup : fieldPrimaryLockup}
+      src={fieldLockup}
       alt=""
       aria-hidden="true"
       data-brand-edition="field"

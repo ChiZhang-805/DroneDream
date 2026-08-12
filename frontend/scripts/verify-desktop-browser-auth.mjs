@@ -24,19 +24,19 @@ const homeUrl = "http://getdronedream.com/";
 const editions = {
   universal: {
     displayName: "DroneDream",
-    lockupPath: "brand/generated/universal/lockup-primary.png",
+    lockupPath: "brand/commercial/universal-lockup.png",
   },
   sim: {
     displayName: "DroneDream · SIM",
-    lockupPath: "brand/generated/sim/lockup-primary.png",
+    lockupPath: "brand/commercial/sim-lockup.png",
   },
   lab: {
     displayName: "DroneDream · LAB",
-    lockupPath: "brand/generated/lab/lockup-primary.png",
+    lockupPath: "brand/commercial/lab-lockup.png",
   },
   field: {
     displayName: "DroneDream · FIELD",
-    lockupPath: "brand/generated/field/lockup-primary.png",
+    lockupPath: "brand/commercial/field-lockup.png",
   },
 };
 

@@ -7,22 +7,25 @@ import { EXPERIMENT_DRAFT_KEY } from "../features/experiment/draftStorage";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { ExperimentAssistant } from "../pages/ExperimentAssistant";
+import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 import type { ExperimentAssistantTurnResponse } from "../types/api";
 
 function renderAssistant() {
   return render(
     <I18nProvider>
       <MemoryRouter>
-        <ModelAccessProvider
-          initialSettings={{
-            provider: "qwen",
-            apiKey: "memory-only-key",
-            model: "qwen-plus",
-            baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-          }}
-        >
-          <ExperimentAssistant />
-        </ModelAccessProvider>
+        <EditionThemeProvider edition="sim">
+          <ModelAccessProvider
+            initialSettings={{
+              provider: "qwen",
+              apiKey: "memory-only-key",
+              model: "qwen-plus",
+              baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            }}
+          >
+            <ExperimentAssistant />
+          </ModelAccessProvider>
+        </EditionThemeProvider>
       </MemoryRouter>
     </I18nProvider>,
   );
@@ -133,7 +136,7 @@ describe("conversational experiment drafting", () => {
       await screen.findByText(/Tune an x500 on a five metre circular track/),
     ).toBeVisible();
     expect(screen.getByText("Still to decide")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Open experiment" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Open experiment draft" })).toBeEnabled();
 
     const raw = window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY);
     expect(raw).not.toBeNull();
@@ -285,9 +288,9 @@ describe("conversational experiment drafting", () => {
   it("keeps the manual five-step path available beside the conversation path", () => {
     const { container } = renderAssistant();
 
-    expect(container.querySelector(".assistant-hero-icon"))
-      .toHaveTextContent(">_");
     expect(container.querySelector(".assistant-hero-icon svg")).not.toBeNull();
+    expect(container.querySelector(".assistant-terminal-chevron")).not.toBeNull();
+    expect(container.querySelector(".assistant-terminal-underscore")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "More ways to start" }));
     expect(screen.getByRole("menuitem", { name: "Create manually" }))

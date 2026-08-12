@@ -102,7 +102,7 @@ body:has(#site-root) a {
   text-decoration: none;
 }
 
-.site-brand-aliyun-lockup {
+.site-brand .brand-lockup {
   display: block;
   width: auto;
   height: 39px;
@@ -1152,36 +1152,18 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .site-product-edition-picture {
-  display: flex;
-  width: auto;
-  height: 48px;
+  display: block;
+  width: min(70%, 300px);
   min-width: 0;
-  align-items: center;
-  overflow: hidden;
+  line-height: 0;
 }
 
 .site-product-edition-icon {
   display: block;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  margin: 0 -1px 0 -2px;
+  width: 100%;
+  max-height: 60px;
   object-fit: contain;
-}
-
-.site-product-edition-brand-text {
-  overflow: hidden;
-  color: transparent;
-  background: linear-gradient(100deg, var(--edition-accent-a), var(--edition-accent-b) 54%, var(--edition-accent-c));
-  background-clip: text;
-  font-size: clamp(1.66rem, 1.86vw, 2rem);
-  font-weight: 820;
-  letter-spacing: -0.058em;
-  line-height: 1;
-  text-overflow: clip;
-  transform: scaleY(1.2);
-  transform-origin: left center;
-  white-space: nowrap;
+  object-position: left center;
 }
 
 .site-product-edition > h2 {
@@ -1333,9 +1315,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-product-edition ul,
   .site-product-screenshots { grid-column: 1; }
   .site-product-screenshots { grid-row: auto; }
-  .site-product-edition-picture { width: auto; height: 42px; }
-  .site-product-edition-icon { width: 50px; height: 50px; flex-basis: 50px; margin: -4px -3px -4px -4px; }
-  .site-product-edition-brand-text { font-size: 1.34rem; line-height: 1; }
+  .site-product-edition-picture { width: 52px; }
   .site-product-edition li { min-height: 1.9rem; font-size: 0.76rem; }
 }
 
@@ -3042,7 +3022,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-brand {
     min-width: 0;
   }
-  .site-brand-aliyun-lockup {
+  .site-brand .brand-lockup {
     width: auto;
     height: 28px;
   }
@@ -3140,7 +3120,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-header { height: 66px; padding: 0 18px; }
   .site-nav,
   .site-header.is-scrolled .site-nav { top: 66px; }
-  .site-brand-aliyun-lockup { height: 27px; }
+  .site-brand .brand-lockup { height: 27px; }
   .site-header-download { display: none; }
   .site-language { padding: .45rem; }
   .site-hero { min-height: 720px; height: 100svh; }
@@ -3345,7 +3325,7 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 @media (max-width: 520px) {
-  .site-brand-aliyun-lockup { height: 24px; }
+  .site-brand .brand-lockup { height: 24px; }
   .site-language { font-size: .7rem; }
   .site-account-button { width: 38px; height: 38px; padding: 0; }
   .site-account-button span { display: none; }

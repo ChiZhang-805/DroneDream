@@ -2,7 +2,7 @@ import {
   type BrandEditionId,
 } from "../../brand/edition-brand.generated";
 
-export const UNIVERSAL_WORKSPACE_IDS = ["sim", "lab", "field"] as const;
+export const UNIVERSAL_WORKSPACE_IDS = ["universal", "sim", "lab", "field"] as const;
 export type UniversalWorkspaceId = (typeof UNIVERSAL_WORKSPACE_IDS)[number];
 
 export const UNIVERSAL_MODE_STORAGE_KEY = "dronedream:universal-workspace:v2";

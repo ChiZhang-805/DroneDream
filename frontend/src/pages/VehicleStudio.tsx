@@ -190,6 +190,7 @@ function downloadEnvelope(envelope: VehiclePackDraftEnvelope) {
 }
 
 export function VehicleStudio() {
+  const requestedDraftId = new URLSearchParams(window.location.search).get("draft");
   const { locale } = useI18n();
   const copy = COPY[locale];
   const { account } = useAuth();
@@ -205,12 +206,17 @@ export function VehicleStudio() {
 
   useEffect(() => {
     const ownerModels = loadVehicleModels(ownerId);
+    const requestedModel = requestedDraftId
+      ? ownerModels.find((model) => model.draftId === requestedDraftId)
+      : null;
     setModels(ownerModels);
-    setDraft(ownerModels[0]?.revisions[0]
+    setDraft(requestedModel?.revisions[0]
+      ? structuredClone(requestedModel.revisions[0])
+      : ownerModels[0]?.revisions[0]
       ? structuredClone(ownerModels[0].revisions[0])
       : createVehicleModelDraft());
     setMessage(null);
-  }, [ownerId]);
+  }, [ownerId, requestedDraftId]);
 
   const update = (mutator: (next: VehicleModelDraft) => void) => {
     setDraft((current) => {

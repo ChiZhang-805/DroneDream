@@ -1,29 +1,28 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import fieldPrimaryLockup from "../assets/brand/field-lockup-primary.png";
-import labPrimaryLockup from "../assets/brand/lab-lockup-primary.png";
-import simCompactLockup from "../assets/brand/sim-lockup-compact.png";
-import universalPrimaryLockup from "../assets/brand/universal-lockup-primary.png";
+import fieldLockup from "../../../brand/commercial/field-lockup.png";
+import labLockup from "../../../brand/commercial/lab-lockup.png";
+import simLockup from "../../../brand/commercial/sim-lockup.png";
+import universalLockup from "../../../brand/commercial/universal-lockup.png";
 import { BrandLockup } from "../components/BrandLockup";
 
 describe("BrandLockup", () => {
   it.each([
-    ["universal", "primary", universalPrimaryLockup],
-    ["sim", "compact", simCompactLockup],
-    ["lab", "primary", labPrimaryLockup],
-    ["field", "primary", fieldPrimaryLockup],
-  ] as const)("renders the %s %s asset from the frontend build context", (
+    ["universal", universalLockup],
+    ["sim", simLockup],
+    ["lab", labLockup],
+    ["field", fieldLockup],
+  ] as const)("renders the %s natural-width asset from the frontend build context", (
     edition,
-    variant,
     source,
   ) => {
-    const { container } = render(<BrandLockup edition={edition} variant={variant} />);
+    const { container } = render(<BrandLockup edition={edition} />);
     const image = container.querySelector("img");
 
     expect(image).not.toBeNull();
     expect(image).toHaveAttribute("src", source);
-    expect(image).toHaveClass("brand-lockup", `brand-lockup-${variant}`);
+    expect(image).toHaveClass("brand-lockup", "brand-lockup-primary");
     expect(image).toHaveAttribute("aria-hidden", "true");
     expect(image).toHaveAttribute("data-brand-edition", edition);
   });
@@ -31,7 +30,7 @@ describe("BrandLockup", () => {
   it("keeps Universal as the canonical backwards-compatible default", () => {
     const { container } = render(<BrandLockup />);
 
-    expect(container.querySelector("img")).toHaveAttribute("src", universalPrimaryLockup);
+    expect(container.querySelector("img")).toHaveAttribute("src", universalLockup);
     expect(container.querySelector("img")).toHaveAttribute("data-brand-edition", "universal");
   });
 });

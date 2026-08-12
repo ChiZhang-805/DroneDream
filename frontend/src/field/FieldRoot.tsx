@@ -78,7 +78,7 @@ function FieldLaunchScreen({
     >
       <header className="launcher-chrome">
         <div className="launcher-brand" aria-label={copy.brand}>
-          <FieldBrandLockup variant="compact" />
+          <FieldBrandLockup />
         </div>
         <div className="launcher-chrome-actions">
           <span className={`launcher-runtime-indicator${ready ? " is-checked" : ""}`}>

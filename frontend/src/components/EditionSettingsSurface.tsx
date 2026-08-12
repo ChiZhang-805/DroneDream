@@ -87,7 +87,7 @@ export function EditionSettingsSurface({
     >
       <div className="launcher-settings-heading">
         <div className="launcher-settings-title-lockup">
-          <BrandLockup edition={edition} variant="compact" />
+          <BrandLockup edition={edition} />
           <h2 id="launcher-settings-title">{title}</h2>
         </div>
         <button

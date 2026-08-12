@@ -70,6 +70,27 @@ describe("apiClient envelope handling", () => {
     );
   });
 
+  it("fails closed before any network request when the public console tries to run a job", async () => {
+    vi.stubEnv("VITE_PUBLIC_DEMO_CONSOLE", "true");
+    vi.resetModules();
+    const publicClient = (await import("../api/client")).apiClient;
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(publicClient.createJob({
+      track_type: "circle",
+      start_point: { x: 0, y: 0 },
+      altitude_m: 3,
+      wind: { north: 0, east: 0, south: 0, west: 0 },
+      sensor_noise_level: "medium",
+      objective_profile: "robust",
+    })).rejects.toMatchObject({
+      code: "EXECUTION_DISABLED",
+      httpStatus: 403,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("unwraps the success envelope's data field", async () => {
     mockFetchOnce({
       success: true,

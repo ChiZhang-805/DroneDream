@@ -3007,7 +3007,28 @@ export function NewJob() {
         <div className="wizard-actions">
           {step > 0 ? <button type="button" className="btn btn-ghost" disabled={submitting} onClick={previousStep}>{t("wizard.back")}</button> : null}
           {step < 4 ? <button type="button" className="btn btn-primary" disabled={submitting || currentStepHasErrors} onClick={nextStep}>{t("wizard.next")}</button> : null}
-          {step === 4 ? <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? t("wizard.creating") : t("wizard.create")}</button> : null}
+          {step === 4 ? (
+            <>
+              <button className="btn btn-primary" type="submit" disabled={submitting}>
+                {submitting
+                  ? t("wizard.creating")
+                  : publicDemoConsole
+                    ? "Save editable draft"
+                    : t("wizard.create")}
+              </button>
+              {publicDemoConsole ? (
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled
+                  title="Execution is available only in an installed DroneDream edition with its validated runtime and safety gates."
+                  data-execution-authority="false"
+                >
+                  Run experiment in installed app
+                </button>
+              ) : null}
+            </>
+          ) : null}
         </div>
       </form>
     </section>

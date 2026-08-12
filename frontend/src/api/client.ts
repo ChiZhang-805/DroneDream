@@ -420,6 +420,14 @@ export const apiClient = {
   },
 
   async createJob(req: JobCreateRequest): Promise<Job> {
+    if (publicDemoConsole) {
+      throw new ApiClientError(
+        "EXECUTION_DISABLED",
+        "The public web console can save editable drafts but cannot run experiments.",
+        null,
+        403,
+      );
+    }
     return request<Job>("/jobs", {
       method: "POST",
       body: JSON.stringify(req),

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -9,7 +10,6 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowUp,
-  Cloud,
   FileText,
   Mic,
   Orbit,
@@ -34,13 +34,24 @@ import {
   loadAssistantDraft,
   type AssistantDraft,
 } from "../features/experiment/assistantDraft";
+import { compileHostedAssistantTurn } from "../features/experiment/hostedAssistant";
 import { clearExperimentDraft } from "../features/experiment/draftStorage";
+import { publicDemoConsole } from "../features/demo/publicDemo";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import {
   createExperimentWorkspaceId,
   registerExperimentWorkspace,
   removeExperimentWorkspace,
 } from "../features/experiment/workspaceRegistry";
+import {
+  createVehicleModelDraft,
+  type VehicleModelDraft,
+} from "../features/vehicleStudio/model";
+import {
+  loadVehicleModels,
+  nextVehicleRevision,
+  saveVehicleModel,
+} from "../features/vehicleStudio/storage";
 import { useVoiceInput } from "../features/experiment/useVoiceInput";
 import {
   modelProviderLabel,
@@ -58,6 +69,7 @@ import type {
   ExperimentAssistantDocumentContext,
   ExperimentAssistantTurnResponse,
 } from "../types/api";
+import type { BrandEditionId } from "../brand/edition-brand.generated";
 
 const COPY = {
   en: {
@@ -196,6 +208,138 @@ const COPY = {
   },
 } as const;
 
+type AssistantExample = Readonly<{ title: string; body: string }>;
+type EditionAssistantCopy = Readonly<{
+  title: string;
+  openDraft: string;
+  examples: readonly [AssistantExample, AssistantExample, AssistantExample];
+}>;
+
+const EDITION_ASSISTANT_COPY: Record<BrandEditionId, EditionAssistantCopy> = {
+  universal: {
+    title: "What should DroneDream design with you?",
+    openDraft: "Open Vehicle Studio",
+    examples: [
+      {
+        title: "Build a 3D Vehicle",
+        body: "Create an editable quadrotor digital prototype with an x-frame, camera payload, realistic mass properties, and a reviewable component layout.",
+      },
+      {
+        title: "Plan the Full Workflow",
+        body: "Turn one flight objective into a connected SIM, LAB, and FIELD workflow with explicit qualification gates between every stage.",
+      },
+      {
+        title: "Compare Editions",
+        body: "Help me decide which work belongs in SIM, LAB, and FIELD, then prepare the corresponding reviewable drafts without running anything.",
+      },
+    ],
+  },
+  sim: {
+    title: COPY.en.title,
+    openDraft: "Open experiment draft",
+    examples: COPY.en.examples,
+  },
+  lab: {
+    title: "What validation experiment should we build?",
+    openDraft: "Open validation draft",
+    examples: [
+      {
+        title: "Sim-to-Real Check",
+        body: "Create a lab validation experiment that compares simulation evidence against captured vehicle behavior and highlights the largest mismatches.",
+      },
+      {
+        title: "Calibration Study",
+        body: "Prepare a bounded calibration study for the vehicle model, sensors, and controller response with explicit acceptance criteria.",
+      },
+      {
+        title: "Qualification Review",
+        body: "Build an independent qualification experiment with holdout evidence, reproducible receipts, and a clear pass or revise decision.",
+      },
+    ],
+  },
+  field: {
+    title: "What real-device task should we prepare?",
+    openDraft: "Open field trial draft",
+    examples: [
+      {
+        title: "Stable Hover Trial",
+        body: "Prepare a conservative real-device hover tuning plan with short bounded trials, strict abort limits, snapshots, and rollback checkpoints.",
+      },
+      {
+        title: "Response Tuning",
+        body: "Create a reviewable roll and pitch response tuning plan that preserves stability margins and requires operator approval before execution.",
+      },
+      {
+        title: "Field Recovery Test",
+        body: "Draft a disturbance-recovery field trial with live telemetry, an independent holdout, safety boundaries, and a rollback plan.",
+      },
+    ],
+  },
+};
+
+function universalVehicleName(
+  result: ExperimentAssistantTurnResponse,
+): string | null {
+  const accepted = result.accepted_patches.find((candidate) =>
+    candidate.field_id === "display_name"
+    && typeof candidate.value === "string"
+  );
+  return typeof accepted?.value === "string" && accepted.value.trim()
+    ? accepted.value.trim().slice(0, 96)
+    : null;
+}
+
+function saveUniversalVehicleDraft(
+  ownerId: string,
+  result: ExperimentAssistantTurnResponse,
+  currentDraftId: string | null,
+): VehicleModelDraft {
+  const current = currentDraftId
+    ? loadVehicleModels(ownerId).find((model) => model.draftId === currentDraftId)
+      ?.revisions[0]
+    : null;
+  const draft = current
+    ? nextVehicleRevision(current)
+    : createVehicleModelDraft();
+  draft.name = universalVehicleName(result) ?? draft.name;
+  draft.notes = result.experiment_summary.trim().slice(0, 4096);
+  for (const accepted of result.accepted_patches) {
+    if (accepted.field_id === "vehicle_mass_kg" && typeof accepted.value === "number") {
+      draft.body.massKg = accepted.value;
+    }
+    if (
+      accepted.field_id === "motor_count"
+      && (accepted.value === 4 || accepted.value === 6 || accepted.value === 8)
+    ) {
+      draft.propulsion.motorCount = accepted.value;
+    }
+    if (accepted.field_id === "arm_length_m" && typeof accepted.value === "number") {
+      draft.propulsion.armLengthM = accepted.value;
+    }
+    if (
+      accepted.field_id === "propeller_diameter_m"
+      && typeof accepted.value === "number"
+    ) {
+      draft.propulsion.propellerDiameterM = accepted.value;
+    }
+    if (accepted.field_id === "camera_payload" && accepted.value === true) {
+      const camera = draft.sensors.find((sensor) => sensor.type === "camera");
+      if (camera) camera.enabled = true;
+      else {
+        draft.sensors.push({
+          id: crypto.randomUUID(),
+          type: "camera",
+          model: "Generic camera payload",
+          enabled: true,
+        });
+      }
+    }
+  }
+  draft.updatedAt = new Date().toISOString();
+  saveVehicleModel(ownerId, draft);
+  return draft;
+}
+
 const ACCEPTED_REFERENCE_EXTENSIONS = new Set([
   "csv",
   "json",
@@ -288,6 +432,43 @@ function AssistantTemplateIcon({ index }: { index: number }) {
   return <Icon className="assistant-example-icon" aria-hidden="true" strokeWidth={1.8} />;
 }
 
+function CloudTerminalIcon() {
+  return (
+    <svg
+      className="assistant-cloud-terminal-icon"
+      viewBox="0 0 112 80"
+      role="presentation"
+      focusable="false"
+    >
+      <path
+        d="M34 65h48c14.4 0 26-10.8 26-24.2 0-12.5-10.2-22.9-23.3-24.1C79.2 7.3 68.5 2 57.2 4.2 43.8 6.8 34.4 17 32.9 29.4 17.7 29.9 5.5 40.2 5.5 47.8 5.5 57.4 18.3 65 34 65Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        className="assistant-terminal-chevron"
+        d="m38 39 10 8-10 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="5.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        className="assistant-terminal-underscore"
+        d="M55 55h17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="5.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function acceptedFieldLabels(
   response: ExperimentAssistantTurnResponse,
   locale: "en" | "zh-CN",
@@ -335,6 +516,25 @@ export function ExperimentAssistant() {
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
   const copy = COPY[locale];
+  const editionCopy = locale === "en"
+    ? EDITION_ASSISTANT_COPY[editionTheme.id]
+    : {
+        title: copy.title,
+        openDraft: copy.openExperiment,
+        examples: copy.examples,
+      };
+  const [vehicleDraftId, setVehicleDraftId] = useState<string | null>(null);
+
+  function openDraftPath(): string {
+    if (editionTheme.id === "universal") {
+      return vehicleDraftId
+        ? `/vehicle-studio?draft=${encodeURIComponent(vehicleDraftId)}`
+        : "/vehicle-studio";
+    }
+    return workspaceId
+      ? `/jobs/new?experiment=${encodeURIComponent(workspaceId)}`
+      : "/jobs/new";
+  }
   const {
     settings: modelAccess,
     profiles: modelProfiles,
@@ -354,11 +554,20 @@ export function ExperimentAssistant() {
       : [],
   );
   const [managedModelsReady, setManagedModelsReady] = useState(docsPreview);
+  const assistantManagedModels = useMemo(
+    () => publicDemoConsole
+      ? managedModels.filter((model) => model.provider === "openai")
+      : managedModels,
+    [managedModels],
+  );
+  const assistantManagedProvider = publicDemoConsole
+    ? "openai"
+    : modelAccess.managedProvider;
   const configuredModelProfiles = modelProfiles.filter((profile) =>
     profile.apiKey.trim(),
   );
-  const selectedManagedModel = managedModels.find(
-    (model) => model.provider === modelAccess.managedProvider,
+  const selectedManagedModel = assistantManagedModels.find(
+    (model) => model.provider === assistantManagedProvider,
   );
   const selectedModelProfileId = modelAccess.accessMode === "platform"
     ? selectedManagedModel
@@ -426,17 +635,17 @@ export function ExperimentAssistant() {
   useEffect(() => {
     if (
       modelAccess.accessMode === "platform"
-      && managedModels.length > 0
-      && !managedModels.some(
-        (model) => model.provider === modelAccess.managedProvider,
+      && assistantManagedModels.length > 0
+      && !assistantManagedModels.some(
+        (model) => model.provider === assistantManagedProvider,
       )
     ) {
-      selectManagedProvider(managedModels[0].provider);
+      selectManagedProvider(assistantManagedModels[0].provider);
     }
   }, [
-    managedModels,
+    assistantManagedModels,
+    assistantManagedProvider,
     modelAccess.accessMode,
-    modelAccess.managedProvider,
     selectManagedProvider,
   ]);
 
@@ -550,14 +759,34 @@ export function ExperimentAssistant() {
     setPending(true);
     setError(null);
     try {
-      const platformGrant = modelAccess.accessMode === "platform"
-        ? (await issueManagedModelGrant(
+      const platformAccess = modelAccess.accessMode === "platform"
+        ? await issueManagedModelGrant(
             "assistant",
             workspaceId ?? `draft:${ownerId}`,
-            modelAccess.managedProvider,
-          )).grant
+            assistantManagedProvider,
+          )
         : null;
-      const result = await apiClient.compileExperimentAssistantTurn({
+      const documentContext = requestOnlyDocumentContext(referenceFiles);
+      const result = publicDemoConsole
+        ? platformAccess
+          ? await compileHostedAssistantTurn({
+              grant: platformAccess,
+              edition: editionTheme.id,
+              locale,
+              messageId: id,
+              message: visibleMessage,
+              conversationSummary: draft.conversation.summary,
+              currentValues: assistantCurrentValues(draft.form),
+              documentContext,
+            })
+          : (() => {
+              throw new CloudModelAccessError(
+                "PLATFORM_ACCESS_REQUIRED",
+                "The public console uses the included DroneDream managed-model allowance.",
+                400,
+              );
+            })()
+        : await apiClient.compileExperimentAssistantTurn({
         message_id: id,
         message: visibleMessage,
         locale,
@@ -565,12 +794,12 @@ export function ExperimentAssistant() {
         current_values: assistantCurrentValues(draft.form),
         explicit_field_ids: explicitAssistantFields(draft.conversation),
         current_parameters: assistantCurrentParameters(draft.selections),
-        document_context: requestOnlyDocumentContext(referenceFiles),
+        document_context: documentContext,
         llm: modelAccess.accessMode === "platform"
           ? {
               access_mode: "platform",
               provider: "dronedream",
-              platform_grant: platformGrant,
+              platform_grant: platformAccess?.grant ?? null,
               api_key: null,
               model: null,
               base_url: null,
@@ -599,6 +828,14 @@ export function ExperimentAssistant() {
         },
         targetWorkspaceId,
       );
+      if (editionTheme.id === "universal") {
+        const vehicleDraft = saveUniversalVehicleDraft(
+          ownerId,
+          result,
+          vehicleDraftId,
+        );
+        setVehicleDraftId(vehicleDraft.draftId);
+      }
       registerExperimentWorkspace({
         id: targetWorkspaceId,
         ownerId,
@@ -622,7 +859,7 @@ export function ExperimentAssistant() {
       void recordProductEvent("assistant_turn_succeeded", {
         access_mode: modelAccess.accessMode,
         provider: modelAccess.accessMode === "platform"
-          ? modelAccess.managedProvider
+          ? assistantManagedProvider
           : modelAccess.provider,
         has_reference_files: referenceFiles.length > 0,
       });
@@ -631,7 +868,7 @@ export function ExperimentAssistant() {
       void recordProductEvent("assistant_turn_failed", {
         access_mode: modelAccess.accessMode,
         provider: modelAccess.accessMode === "platform"
-          ? modelAccess.managedProvider
+          ? assistantManagedProvider
           : modelAccess.provider,
       });
     } finally {
@@ -668,12 +905,11 @@ export function ExperimentAssistant() {
         {messages.length === 0 ? (
           <div className="assistant-empty-state">
             <div className="assistant-hero-icon" aria-hidden="true">
-              <Cloud strokeWidth={1.65} />
-              <span>&gt;_</span>
+              <CloudTerminalIcon />
             </div>
-            <h1>{copy.title}</h1>
+            <h1>{editionCopy.title}</h1>
             <div className="assistant-examples">
-              {copy.examples.map((example, index) => (
+              {editionCopy.examples.map((example, index) => (
                 <button
                   key={example.title}
                   type="button"
@@ -683,7 +919,7 @@ export function ExperimentAssistant() {
                     <AssistantTemplateIcon index={index} />
                     <strong>{example.title}</strong>
                   </span>
-                  <span className="sr-only">{example.body}</span>
+                  <span className="assistant-example-body">{example.body}</span>
                 </button>
               ))}
             </div>
@@ -743,13 +979,9 @@ export function ExperimentAssistant() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => navigate(
-                    workspaceId
-                      ? `/jobs/new?experiment=${encodeURIComponent(workspaceId)}`
-                      : "/jobs/new",
-                  )}
+                  onClick={() => navigate(openDraftPath())}
                 >
-                  {copy.openExperiment}
+                  {editionCopy.openDraft}
                 </button>
               </div>
             ) : null}
@@ -856,6 +1088,7 @@ export function ExperimentAssistant() {
             disabled={
               pending
               || (modelAccess.accessMode === "platform" && !managedModelsReady)
+              || (publicDemoConsole && modelAccess.accessMode === "platform")
             }
             onChange={(event) => {
               if (event.target.value.startsWith("managed:")) {
@@ -871,8 +1104,8 @@ export function ExperimentAssistant() {
             }}
           >
             {modelAccess.accessMode === "platform" ? (
-              managedModels.length ? (
-                managedModels.map((model) => (
+              assistantManagedModels.length ? (
+                assistantManagedModels.map((model) => (
                   <option key={model.provider} value={`managed:${model.provider}`}>
                     {model.display_name} · {model.model}
                   </option>

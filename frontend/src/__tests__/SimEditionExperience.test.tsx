@@ -30,13 +30,13 @@ describe("DroneDream Sim experience", () => {
     const lockup = container.querySelector(".sim-overview-lockup");
     const mark = container.querySelector(".sim-brand-mark");
     expect(lockup?.getAttribute("src")).toContain(
-      "dronedream-sim-centered-separator-lockup.png",
+      "sim-lockup.png",
     );
     expect(lockup).toHaveAttribute("aria-hidden", "true");
     expect(lockup).toHaveAttribute("data-brand-edition", "sim");
     expect(container.querySelector(".sim-overview-page"))
       .toHaveAttribute("data-brand-edition", "sim");
-    expect(mark?.getAttribute("src")).toContain("dronedream-sim-mark.png");
+    expect(mark?.getAttribute("src")).toContain("sim-mark.png");
     expect(mark).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByRole("list", { name: "Simulation workspace" }))
       .toHaveTextContent("PX4 SITL");

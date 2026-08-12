@@ -1,7 +1,7 @@
-import fieldMark from "../assets/brand/field-mark.png";
-import labMark from "../assets/brand/lab-mark.png";
-import simMark from "../assets/brand/sim-mark.png";
-import universalMark from "../assets/brand/universal-mark.png";
+import fieldMark from "../../../brand/commercial/field-mark.png";
+import labMark from "../../../brand/commercial/lab-mark.png";
+import simMark from "../../../brand/commercial/sim-mark.png";
+import universalMark from "../../../brand/commercial/universal-mark.png";
 import type { SoftwareEditionId } from "../features/licensing/softwareLicense";
 import "./EditionLicenseStrip.css";
 

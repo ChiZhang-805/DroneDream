@@ -40,14 +40,12 @@ describe("UniversalModeSwitch", () => {
 
   it("offers Universal and all integrated workspaces in a checked popup menu", () => {
     const onChange = vi.fn();
-    const onOpenUniversal = vi.fn();
     const { container } = render(
       <UniversalModeSwitch
         mode="sim"
         activeEdition="universal"
         locale="en"
         onChange={onChange}
-        onOpenUniversal={onOpenUniversal}
       />,
     );
 
@@ -67,22 +65,21 @@ describe("UniversalModeSwitch", () => {
 
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream" }));
-    expect(onOpenUniversal).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
-  it("opens Universal from a workspace selection", () => {
-    const onOpenUniversal = vi.fn();
+  it("switches back to Universal from an integrated workspace", () => {
+    const onChange = vi.fn();
     render(
       <UniversalModeSwitch
         mode="sim"
         locale="en"
-        onChange={() => undefined}
-        onOpenUniversal={onOpenUniversal}
+        onChange={onChange}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Switch DroneDream edition" }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream" }));
-    expect(onOpenUniversal).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith("universal");
   });
 
   it("provides an independently authored Chinese switch label", () => {
