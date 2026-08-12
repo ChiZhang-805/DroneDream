@@ -963,3 +963,17 @@ been removed without losing recovery evidence.
   footer fits naturally without a `white-space` override. The bundled
   Chromium audits passed at 1440x1000, 2048x1280, and mobile 390x844; generated
   `site-dist`, audit JSON, and preview logs remain disposable after verification.
+- Dual-site deployment lesson: a shared source directory does not make two live
+  websites equivalent when they were built from different commits. GitHub Pages
+  and the Aliyun preview must be built from the same reviewed commit, deploy the
+  same route components and design tokens, record that commit at both targets,
+  and pass fresh route-by-route screenshot comparison before visual parity is
+  claimed. A more complete current Manual page should replace the older preview
+  shell, while a mature nine-row Pricing layout should be preserved instead of
+  squeezing nine benefits into a six-row grid.
+- Hosted-installer provenance lesson: backend provenance and historical commit
+  tests require the complete Git graph. A shallow checkout caused 17 misleading
+  backend failures late in the Windows installer job even though the referenced
+  revisions were ancestors of the reviewed head. Installer CI now uses
+  `fetch-depth: 0`; failed hosted artifacts are never treated as releases, and
+  local build/audit outputs are removed after the cause is recorded.
