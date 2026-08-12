@@ -16,6 +16,7 @@ import bisect
 import contextlib
 import copy
 import hashlib
+import ipaddress
 import json
 import math
 import numbers
@@ -118,6 +119,43 @@ REQUIRED_SAMPLE_KEYS = (
 
 class ScenarioEffectUnsupportedError(RuntimeError):
     """The running Gazebo instance cannot provide a requested capability."""
+
+
+def _is_wsl_runtime() -> bool:
+    if os.environ.get("WSL_DISTRO_NAME") or os.environ.get("WSL_INTEROP"):
+        return True
+    try:
+        return "microsoft" in Path("/proc/sys/kernel/osrelease").read_text(
+            encoding="utf-8"
+        ).lower()
+    except OSError:
+        return False
+
+
+def _resolve_gazebo_transport_ip() -> str:
+    configured = os.environ.get("GZ_IP", "").strip()
+    if configured:
+        return configured
+    if not _is_wsl_runtime():
+        return "127.0.0.1"
+
+    try:
+        result = subprocess.run(  # noqa: S603
+            ["ip", "-4", "route", "get", "1.1.1.1"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=5.0,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("unable to resolve the WSL default-route source address") from exc
+    match = re.search(r"\bsrc\s+(?P<address>[0-9.]+)\b", result.stdout)
+    if result.returncode != 0 or match is None:
+        raise RuntimeError("unable to resolve the WSL default-route source address")
+    address = ipaddress.ip_address(match.group("address"))
+    if address.version != 4 or address.is_loopback or address.is_unspecified:
+        raise RuntimeError("WSL default-route source address is not a usable IPv4 address")
+    return str(address)
 
 
 def _checked_xml_bytes(raw: bytes, *, byte_limit: int, context: str) -> bytes:
@@ -4062,6 +4100,13 @@ def main() -> int:
         # for the next Trial in the same worker campaign.
         os.environ["GZ_PARTITION"] = gazebo_transport_partition
         launch_env, previous_parameter_environment = _prepare_px4_launch_environment(px4_parameters)
+        gazebo_transport_ip = _resolve_gazebo_transport_ip()
+        # Resolve this once before constructing any PX4, Gazebo, offboard, or
+        # evidence child. WSL loopback is not a reliable cross-process
+        # discovery interface, so every child must share the default-route
+        # source address unless the operator explicitly configured GZ_IP.
+        os.environ["GZ_IP"] = gazebo_transport_ip
+        launch_env["GZ_IP"] = gazebo_transport_ip
         launch_env["PX4_GZ_WORLD"] = args.world
     except Exception as exc:
         _write_launcher_failure(args.run_dir, stage="input_preparation", exc=exc)

@@ -347,10 +347,17 @@ async function request<T>(
     clearPendingMutation(pendingMutation);
     return envelope.data;
   }
-  if (!response.ok && envelope.success === false) {
+  const error = envelope?.error;
+  // An in-progress idempotent mutation is not terminal. Keep its key so a
+  // later retry can reconcile the same logical operation instead of starting
+  // a duplicate with a fresh UUID.
+  if (
+    !response.ok &&
+    envelope.success === false &&
+    error?.code !== "IDEMPOTENCY_REQUEST_IN_PROGRESS"
+  ) {
     clearPendingMutation(pendingMutation);
   }
-  const error = envelope?.error;
   throw new ApiClientError(
     error?.code ?? (response.ok ? "INTERNAL_ERROR" : "HTTP_ERROR"),
     error?.message ?? `Request failed with HTTP ${response.status}`,

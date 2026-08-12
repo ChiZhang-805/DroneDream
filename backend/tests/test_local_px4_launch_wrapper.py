@@ -2011,6 +2011,34 @@ def test_offboard_executor_shares_gazebo_transport_interface(
     assert captured_env["GZ_PARTITION"] == "dronedream_test_partition"
 
 
+def test_gazebo_transport_ip_uses_wsl_default_route(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("GZ_IP", raising=False)
+    monkeypatch.setenv("WSL_DISTRO_NAME", "Ubuntu")
+
+    def route(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            ["ip"],
+            0,
+            stdout="1.1.1.1 via 172.28.80.1 dev eth0 src 172.28.91.42 uid 1000\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(wrapper.subprocess, "run", route)
+
+    assert wrapper._resolve_gazebo_transport_ip() == "172.28.91.42"
+
+
+def test_gazebo_transport_ip_honors_explicit_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GZ_IP", "192.0.2.25")
+    monkeypatch.setenv("WSL_DISTRO_NAME", "Ubuntu")
+
+    assert wrapper._resolve_gazebo_transport_ip() == "192.0.2.25"
+
+
 def test_json_and_normalized_telemetry_limits_fail_before_unbounded_processing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

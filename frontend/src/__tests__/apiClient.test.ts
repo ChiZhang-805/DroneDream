@@ -683,6 +683,47 @@ describe("apiClient envelope handling", () => {
     expect(secondRequest).toEqual(firstRequest);
   });
 
+  it("retains the idempotency key while a mutation is still in progress", async () => {
+    const invoke = vi.fn()
+      .mockResolvedValueOnce({
+        status: 409,
+        contentType: "application/json",
+        bodyBase64: btoa(JSON.stringify({
+          success: false,
+          data: null,
+          error: {
+            code: "IDEMPOTENCY_REQUEST_IN_PROGRESS",
+            message: "The original request is still running.",
+            details: null,
+          },
+        })),
+      })
+      .mockResolvedValueOnce({
+        status: 200,
+        contentType: "application/json",
+        bodyBase64: btoa(JSON.stringify({
+          success: true,
+          data: { id: "job_1", display_name: "reconciled" },
+          error: null,
+        })),
+      });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(
+      apiClient.updateJob("job_1", { display_name: "reconciled" }, 7),
+    ).rejects.toMatchObject({ code: "IDEMPOTENCY_REQUEST_IN_PROGRESS" });
+    await expect(
+      apiClient.updateJob("job_1", { display_name: "reconciled" }, 7),
+    ).resolves.toMatchObject({ id: "job_1", display_name: "reconciled" });
+
+    expect(invoke.mock.calls[1]?.[1]?.request.idempotencyKey).toBe(
+      invoke.mock.calls[0]?.[1]?.request.idempotencyKey,
+    );
+    expect(
+      localStorage.getItem("dronedream.api.pending-mutations.v1"),
+    ).toBeNull();
+  });
+
   it("forwards preference updates through the desktop bridge with PUT", async () => {
     const preferences = {
       schema_version: "1.0",
