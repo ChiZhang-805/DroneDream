@@ -6,7 +6,7 @@ import { Alert } from "./Alert";
 export function RuntimeAccessNotice({
   page,
 }: {
-  page: "dashboard" | "history" | "ece498";
+  page: "dashboard" | "history";
 }) {
   const runtimeAccess = useDesktopRuntimeAccess();
   const { t } = useI18n();
@@ -35,9 +35,7 @@ export function RuntimeAccessNotice({
               ? t("runtimeGate.startFailedBody")
               : page === "dashboard"
                 ? t("runtimeGate.dashboardPreviewBody")
-                : page === "history"
-                  ? t("runtimeGate.historyPreviewBody")
-                  : t("runtimeGate.ece498PreviewBody")}
+                : t("runtimeGate.historyPreviewBody")}
       </p>
       {!busy ? (
         <button className="btn btn-primary" type="button" onClick={openAppSettings}>

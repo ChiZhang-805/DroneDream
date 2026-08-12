@@ -7,7 +7,14 @@ import globals from "globals";
 
 export default [
   {
-    ignores: ["dist/**", "site-dist/**", "node_modules/**"],
+    ignores: [
+      "dist/**",
+      "site-dist/**",
+      "sim-dist/**",
+      "lab-dist/**",
+      "field-dist/**",
+      "node_modules/**",
+    ],
   },
   {
     files: ["**/*.{js,mjs,cjs,ts,tsx}"],

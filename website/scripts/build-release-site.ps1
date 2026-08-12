@@ -107,6 +107,10 @@ $consoleHtml = Join-Path $outputDirectory "console\index.html"
 if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
     throw "The console build completed without producing $consoleHtml"
 }
+$organizationHtml = Join-Path $outputDirectory "organization\index.html"
+if (-not (Test-Path -LiteralPath $organizationHtml -PathType Leaf)) {
+    throw "The site build completed without producing the organization management route."
+}
 Copy-Item -LiteralPath $siteHtml -Destination (Join-Path $outputDirectory "index.html") -Force
 
 $metadataPath = Join-Path $downloadsDirectory "latest.json"

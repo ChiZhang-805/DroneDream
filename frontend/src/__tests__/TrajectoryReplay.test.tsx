@@ -104,7 +104,7 @@ describe("TrajectoryReplay", () => {
     expect(screen.queryByText("Replay failed")).not.toBeInTheDocument();
   });
 
-  it("applies playback speed once rather than multiplying both step and timer", async () => {
+  it("applies playback speed to telemetry time rather than sample count", async () => {
     vi.spyOn(apiClient, "fetchArtifactJson").mockResolvedValue({
       samples: Array.from({ length: 8 }, (_, index) => ({
         t: index,
@@ -122,7 +122,9 @@ describe("TrajectoryReplay", () => {
     });
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
-    act(() => vi.advanceTimersByTime(56));
+    act(() => vi.advanceTimersByTime(249));
+    expect(screen.getByLabelText("Replay position")).toHaveValue("0");
+    act(() => vi.advanceTimersByTime(1));
 
     expect(screen.getByLabelText("Replay position")).toHaveValue("1");
     vi.useRealTimers();

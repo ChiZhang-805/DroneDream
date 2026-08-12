@@ -8,6 +8,11 @@ interface ArtifactCardProps {
   artifact: Artifact;
 }
 
+// Reading an artifact through the download endpoint transfers the complete
+// object. Only inspect bounded metadata-sized JSON automatically; telemetry
+// payloads remain an explicit user download/replay action.
+const MAX_SCHEMA_PREFETCH_BYTES = 64 * 1024;
+
 function basename(path: string): string {
   const normalized = path.replace(/\\/g, "/");
   const parts = normalized.split("/").filter(Boolean);
@@ -44,6 +49,7 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
   const isPdf =
     artifact.artifact_type === "pdf_report" ||
     artifact.mime_type === "application/pdf";
+  const isDownloadable = !artifact.storage_path.startsWith("mock://");
 
   const handleCopy = async () => {
     try {
@@ -62,7 +68,7 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
   const handleDownload = async () => {
     setDownloadState("downloading");
     try {
-      await apiClient.downloadArtifact(artifact.id, artifact.display_name ?? fileName);
+      await apiClient.downloadArtifact(artifact.id, fileName);
       setDownloadState("idle");
     } catch {
       setDownloadState("failed");
@@ -79,7 +85,9 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
     const isJson =
       artifact.mime_type === "application/json" ||
       artifact.storage_path.toLowerCase().endsWith(".json");
-    if (!isJson || artifact.storage_path.startsWith("mock://")) return;
+    const isBoundedMetadata = artifact.file_size_bytes !== null
+      && artifact.file_size_bytes <= MAX_SCHEMA_PREFETCH_BYTES;
+    if (!isJson || !isDownloadable || !isBoundedMetadata) return;
     void apiClient
       .fetchArtifactJson<Record<string, unknown>>(artifact.id)
       .then((payload) => {
@@ -92,7 +100,13 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
     return () => {
       cancelled = true;
     };
-  }, [artifact.id, artifact.mime_type, artifact.storage_path]);
+  }, [
+    artifact.file_size_bytes,
+    artifact.id,
+    artifact.mime_type,
+    artifact.storage_path,
+    isDownloadable,
+  ]);
 
   return (
     <article className="artifact-card" data-testid="artifact-card">
@@ -105,7 +119,7 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
         >
           {t("artifact.copyPath")}
         </button>
-        {isPdf ? (
+        {isDownloadable ? (
           <button
             type="button"
             className="btn"
@@ -114,7 +128,7 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
           >
             {downloadState === "downloading"
               ? t("artifact.downloading")
-              : t("artifact.downloadPdf")}
+              : t(isPdf ? "artifact.downloadPdf" : "artifact.download")}
           </button>
         ) : null}
       </header>

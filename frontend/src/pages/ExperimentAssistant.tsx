@@ -24,6 +24,7 @@ import {
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { isDesktopRuntime } from "../desktop/bridge";
+import { recordProductEvent } from "../features/analytics/productEvents";
 import {
   applyAssistantTurn,
   assistantCurrentParameters,
@@ -45,8 +46,18 @@ import {
   modelProviderLabel,
   useModelAccess,
 } from "../features/settings/ModelAccessContext";
+import {
+  CloudModelAccessError,
+  getManagedModelCatalog,
+  issueManagedModelGrant,
+  type ManagedModelCatalogEntry,
+} from "../features/settings/cloudModelAccess";
 import { useI18n } from "../i18n/I18nProvider";
-import type { ExperimentAssistantTurnResponse } from "../types/api";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
+import type {
+  ExperimentAssistantDocumentContext,
+  ExperimentAssistantTurnResponse,
+} from "../types/api";
 
 const COPY = {
   en: {
@@ -55,14 +66,19 @@ const COPY = {
       "Describe the flight, model, constraints, and trial budget; DroneDream will turn your intent into a reviewable experiment draft.",
     manual: "Create manually",
     moreActions: "More ways to start",
-    importFiles: "Import reference files",
+    importFiles: "Import files",
     removeFile: "Remove file",
     unsupportedFile: "Use JSON, text, Markdown, CSV, YAML, TOML, XML, or log files.",
-    fileTooLarge: "Each imported file must be 1 MB or smaller.",
-    tooManyFiles: "You can attach up to 5 reference files.",
-    messageTooLong: "The request and imported file content must stay within 12,000 characters.",
+    fileTooLarge: "Each imported file must contain 4,000 bytes or fewer.",
+    tooManyFiles: "You can attach up to 4 reference files.",
+    referenceContextTooLarge:
+      "Imported reference content must contain 8,000 bytes or fewer in total.",
+    emptyFile: "Empty reference files cannot be attached.",
+    messageTooLong: "The request must stay within 12,000 characters.",
     attachmentOnlyPrompt: "Use the imported reference files to prepare this experiment.",
     attachmentLabel: "Imported reference files",
+    referencePrivacy:
+      "DroneDream uses reference content only in this request and does not save it in drafts or memory. Your selected model provider still receives the request.",
     placeholder: "Describe your experiment…",
     send: "Send",
     sending: "Reading your intent…",
@@ -84,7 +100,9 @@ const COPY = {
     needsReview: "Still to decide",
     model: "Model",
     noModel: "None",
-    modelRequired: "Configure a model and API key in Settings before sending.",
+    managedModel: "DroneDream Managed",
+    managedUnavailable: "No managed conversation model is currently available.",
+    modelRequired: "Use the included allowance or configure your API key in Settings.",
     requestFailed: "The model could not compile this draft turn.",
     runtimeOutdated:
       "This installed DroneDreamRuntime does not support AI experiment drafting yet. Update the Runtime before sending again.",
@@ -119,11 +137,15 @@ const COPY = {
     importFiles: "导入参考文件",
     removeFile: "移除文件",
     unsupportedFile: "请选择 JSON、文本、Markdown、CSV、YAML、TOML、XML 或日志文件。",
-    fileTooLarge: "每个导入文件不能超过 1 MB。",
-    tooManyFiles: "最多可以添加 5 个参考文件。",
-    messageTooLong: "输入内容和参考文件合计不能超过 12,000 个字符。",
+    fileTooLarge: "每个导入文件的内容不能超过 4,000 字节。",
+    tooManyFiles: "最多可以添加 4 个参考文件。",
+    referenceContextTooLarge: "导入的参考内容合计不能超过 8,000 字节。",
+    emptyFile: "不能添加空白参考文件。",
+    messageTooLong: "输入内容不能超过 12,000 个字符。",
     attachmentOnlyPrompt: "请根据导入的参考文件准备这次实验。",
     attachmentLabel: "导入的参考文件",
+    referencePrivacy:
+      "DroneDream 只在本次请求中使用参考内容，不会写入草稿或长期记忆；你选择的模型服务商仍会收到本次请求。",
     placeholder: "描述你的实验…",
     send: "发送",
     sending: "正在理解你的意图…",
@@ -145,7 +167,9 @@ const COPY = {
     needsReview: "仍需确认",
     model: "模型",
     noModel: "无",
-    modelRequired: "请先在设置中配置模型和 API Key。",
+    managedModel: "DroneDream 托管模型",
+    managedUnavailable: "当前没有可用的平台托管对话模型。",
+    modelRequired: "请在设置中使用赠送额度，或配置自己的 API Key。",
     requestFailed: "模型未能完成这次实验草稿编译。",
     runtimeOutdated:
       "当前安装的 DroneDreamRuntime 尚不支持 AI 创建实验，请先更新 Runtime 再重新发送。",
@@ -183,14 +207,17 @@ const ACCEPTED_REFERENCE_EXTENSIONS = new Set([
   "yaml",
   "yml",
 ]);
-const MAX_REFERENCE_FILES = 5;
-const MAX_REFERENCE_FILE_BYTES = 1_000_000;
+const MAX_REFERENCE_FILES = 4;
+const MAX_REFERENCE_FILE_BYTES = 4_000;
+const MAX_REFERENCE_CONTEXT_BYTES = 8_000;
 const MAX_ASSISTANT_MESSAGE_LENGTH = 12_000;
 
 interface AssistantReferenceFile {
   id: string;
   name: string;
   content: string;
+  contentBytes: number;
+  contentSha256: string;
 }
 
 function referenceFileExtension(fileName: string): string {
@@ -198,19 +225,33 @@ function referenceFileExtension(fileName: string): string {
   return separator >= 0 ? fileName.slice(separator + 1).toLowerCase() : "";
 }
 
-function assistantMessageWithReferences(
-  message: string,
+async function sha256Hex(content: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(content),
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function requestOnlyDocumentContext(
   files: AssistantReferenceFile[],
-  attachmentLabel: string,
-): string {
-  if (!files.length) return message;
-  const references = files
-    .map(
-      (file) =>
-        `--- ${file.name} ---\n${file.content.trim()}\n--- end ${file.name} ---`,
-    )
-    .join("\n\n");
-  return `${message}\n\n${attachmentLabel}:\n${references}`;
+): ExperimentAssistantDocumentContext | null {
+  if (!files.length) return null;
+  return {
+    schema_version: "1.0",
+    purpose: "experiment_draft_reference",
+    chunks: files.map((file) => ({
+      schema_version: "1.0",
+      document_id: `document-${file.id}`,
+      chunk_id: "chunk-1",
+      display_name: file.name,
+      content: file.content,
+      content_sha256: file.contentSha256,
+      retention: "request_only",
+    })),
+  };
 }
 
 const FIELD_LABELS: Record<string, { en: string; "zh-CN": string }> = {
@@ -271,6 +312,9 @@ function assistantErrorMessage(
   reason: unknown,
   copy: (typeof COPY)[keyof typeof COPY],
 ): string {
+  if (reason instanceof CloudModelAccessError) {
+    return reason.message || copy.requestFailed;
+  }
   if (!(reason instanceof ApiClientError)) return copy.requestFailed;
   if (reason.httpStatus === 404 || reason.code === "NOT_FOUND") {
     return copy.runtimeOutdated;
@@ -287,6 +331,7 @@ function assistantErrorMessage(
 export function ExperimentAssistant() {
   const navigate = useNavigate();
   const { locale } = useI18n();
+  const editionTheme = useEditionTheme();
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
   const copy = COPY[locale];
@@ -294,16 +339,36 @@ export function ExperimentAssistant() {
     settings: modelAccess,
     profiles: modelProfiles,
     activeProfileId,
+    selectManagedProvider,
     selectProfile,
   } = useModelAccess();
+  const docsPreview = import.meta.env.DEV
+    && new URLSearchParams(window.location.search).has("docsPreview");
+  const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
+    docsPreview
+      ? [
+          { provider: "openai", display_name: "GPT", model: "gpt-4.1", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+          { provider: "deepseek", display_name: "DeepSeek", model: "deepseek-chat", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+          { provider: "qwen", display_name: "Qwen", model: "qwen-plus", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+        ]
+      : [],
+  );
+  const [managedModelsReady, setManagedModelsReady] = useState(docsPreview);
   const configuredModelProfiles = modelProfiles.filter((profile) =>
     profile.apiKey.trim(),
   );
-  const selectedModelProfileId = configuredModelProfiles.some(
+  const selectedManagedModel = managedModels.find(
+    (model) => model.provider === modelAccess.managedProvider,
+  );
+  const selectedModelProfileId = modelAccess.accessMode === "platform"
+    ? selectedManagedModel
+      ? `managed:${selectedManagedModel.provider}`
+      : "none"
+    : configuredModelProfiles.some(
     (profile) => profile.id === activeProfileId,
   )
-    ? activeProfileId
-    : "none";
+      ? activeProfileId
+      : "none";
   const [draft, setDraft] = useState<AssistantDraft>(loadAssistantDraft);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
@@ -318,8 +383,62 @@ export function ExperimentAssistant() {
   const [latest, setLatest] = useState<ExperimentAssistantTurnResponse | null>(
     null,
   );
+  const pendingRef = useRef(false);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (modelAccess.accessMode !== "platform") return;
+    if (docsPreview) {
+      setManagedModelsReady(true);
+      return;
+    }
+    if (!auth?.account) {
+      setManagedModels([]);
+      setManagedModelsReady(false);
+      return;
+    }
+    let active = true;
+    setManagedModelsReady(false);
+    void getManagedModelCatalog()
+      .then((catalog) => {
+        if (!active) return;
+        const available = catalog.models.filter((model) =>
+          model.enabled && model.assistant_enabled
+        );
+        setManagedModels(available);
+        setManagedModelsReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setManagedModels([]);
+        setManagedModelsReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    auth?.account,
+    docsPreview,
+    modelAccess.accessMode,
+  ]);
+
+  useEffect(() => {
+    if (
+      modelAccess.accessMode === "platform"
+      && managedModels.length > 0
+      && !managedModels.some(
+        (model) => model.provider === modelAccess.managedProvider,
+      )
+    ) {
+      selectManagedProvider(managedModels[0].provider);
+    }
+  }, [
+    managedModels,
+    modelAccess.accessMode,
+    modelAccess.managedProvider,
+    selectManagedProvider,
+  ]);
 
   const appendTranscript = useCallback((transcript: string) => {
     setComposer((current) =>
@@ -357,6 +476,10 @@ export function ExperimentAssistant() {
       return;
     }
     const imported: AssistantReferenceFile[] = [];
+    let totalContentBytes = referenceFiles.reduce(
+      (total, file) => total + file.contentBytes,
+      0,
+    );
     for (const file of selected) {
       if (!ACCEPTED_REFERENCE_EXTENSIONS.has(referenceFileExtension(file.name))) {
         setError(copy.unsupportedFile);
@@ -366,10 +489,27 @@ export function ExperimentAssistant() {
         setError(copy.fileTooLarge);
         return;
       }
+      const content = await file.text();
+      const contentBytes = new TextEncoder().encode(content).byteLength;
+      if (!content.trim()) {
+        setError(copy.emptyFile);
+        return;
+      }
+      if (contentBytes > MAX_REFERENCE_FILE_BYTES) {
+        setError(copy.fileTooLarge);
+        return;
+      }
+      totalContentBytes += contentBytes;
+      if (totalContentBytes > MAX_REFERENCE_CONTEXT_BYTES) {
+        setError(copy.referenceContextTooLarge);
+        return;
+      }
       imported.push({
         id: messageId(),
         name: file.name,
-        content: await file.text(),
+        content,
+        contentBytes,
+        contentSha256: await sha256Hex(content),
       });
     }
     setReferenceFiles((current) => [...current, ...imported]);
@@ -378,40 +518,71 @@ export function ExperimentAssistant() {
 
   async function submitMessage(event: FormEvent): Promise<void> {
     event.preventDefault();
-    const visibleMessage = composer.trim() || copy.attachmentOnlyPrompt;
-    const message = assistantMessageWithReferences(
-      visibleMessage,
-      referenceFiles,
-      copy.attachmentLabel,
+    const submittedComposer = composer;
+    const submittedReferenceFileIds = new Set(
+      referenceFiles.map((file) => file.id),
     );
-    if ((!composer.trim() && !referenceFiles.length) || pending) return;
-    if (message.length > MAX_ASSISTANT_MESSAGE_LENGTH) {
+    const visibleMessage = composer.trim() || copy.attachmentOnlyPrompt;
+    if (
+      (!composer.trim() && !referenceFiles.length)
+      || pendingRef.current
+    ) {
+      return;
+    }
+    if (visibleMessage.length > MAX_ASSISTANT_MESSAGE_LENGTH) {
       setError(copy.messageTooLong);
       return;
     }
-    if (!modelAccess.apiKey.trim()) {
+    if (modelAccess.accessMode === "byok" && !modelAccess.apiKey.trim()) {
       setError(copy.modelRequired);
       openAppSettings();
       return;
     }
+    if (
+      modelAccess.accessMode === "platform"
+      && (!managedModelsReady || !selectedManagedModel)
+    ) {
+      setError(copy.managedUnavailable);
+      return;
+    }
     const id = messageId();
+    pendingRef.current = true;
     setPending(true);
     setError(null);
     try {
+      const platformGrant = modelAccess.accessMode === "platform"
+        ? (await issueManagedModelGrant(
+            "assistant",
+            workspaceId ?? `draft:${ownerId}`,
+            modelAccess.managedProvider,
+          )).grant
+        : null;
       const result = await apiClient.compileExperimentAssistantTurn({
         message_id: id,
-        message,
+        message: visibleMessage,
         locale,
         conversation_summary: draft.conversation.summary,
         current_values: assistantCurrentValues(draft.form),
         explicit_field_ids: explicitAssistantFields(draft.conversation),
         current_parameters: assistantCurrentParameters(draft.selections),
-        llm: {
-          provider: modelAccess.provider,
-          api_key: modelAccess.apiKey,
-          model: modelAccess.model.trim() || null,
-          base_url: modelAccess.baseUrl.trim() || null,
-        },
+        document_context: requestOnlyDocumentContext(referenceFiles),
+        llm: modelAccess.accessMode === "platform"
+          ? {
+              access_mode: "platform",
+              provider: "dronedream",
+              platform_grant: platformGrant,
+              api_key: null,
+              model: null,
+              base_url: null,
+            }
+          : {
+              access_mode: "byok",
+              provider: modelAccess.provider,
+              api_key: modelAccess.apiKey,
+              platform_grant: null,
+              model: modelAccess.model.trim() || null,
+              base_url: modelAccess.baseUrl.trim() || null,
+            },
       });
       const targetWorkspaceId = workspaceId ?? createExperimentWorkspaceId();
       const next = applyAssistantTurn(
@@ -444,11 +615,27 @@ export function ExperimentAssistant() {
       }
       setDraft(next);
       setLatest(result);
-      setComposer("");
-      setReferenceFiles([]);
+      setComposer((current) => current === submittedComposer ? "" : current);
+      setReferenceFiles((current) => current.filter(
+        (file) => !submittedReferenceFileIds.has(file.id),
+      ));
+      void recordProductEvent("assistant_turn_succeeded", {
+        access_mode: modelAccess.accessMode,
+        provider: modelAccess.accessMode === "platform"
+          ? modelAccess.managedProvider
+          : modelAccess.provider,
+        has_reference_files: referenceFiles.length > 0,
+      });
     } catch (reason) {
       setError(assistantErrorMessage(reason, copy));
+      void recordProductEvent("assistant_turn_failed", {
+        access_mode: modelAccess.accessMode,
+        provider: modelAccess.accessMode === "platform"
+          ? modelAccess.managedProvider
+          : modelAccess.provider,
+      });
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   }
@@ -472,7 +659,11 @@ export function ExperimentAssistant() {
   const remainingLabels = latest ? reviewLabels(latest, locale) : [];
 
   return (
-    <section className={`experiment-assistant-page ${messages.length ? "has-messages" : ""}`}>
+    <section
+      className={`experiment-assistant-page ${messages.length ? "has-messages" : ""}`}
+      data-brand-edition={editionTheme.id}
+      data-grants-hardware-authority="false"
+    >
       <div className="experiment-assistant-stage">
         {messages.length === 0 ? (
           <div className="assistant-empty-state">
@@ -595,26 +786,29 @@ export function ExperimentAssistant() {
           }}
         />
         {referenceFiles.length ? (
-          <div className="assistant-reference-files" aria-label={copy.attachmentLabel}>
-            {referenceFiles.map((file) => (
-              <span key={file.id}>
-                <FileText aria-hidden="true" strokeWidth={1.8} />
-                <b title={file.name}>{file.name}</b>
-                <button
-                  type="button"
-                  aria-label={`${copy.removeFile}: ${file.name}`}
-                  title={`${copy.removeFile}: ${file.name}`}
-                  onClick={() =>
-                    setReferenceFiles((current) =>
-                      current.filter((item) => item.id !== file.id),
-                    )
-                  }
-                >
-                  <X aria-hidden="true" strokeWidth={1.9} />
-                </button>
-              </span>
-            ))}
-          </div>
+          <>
+            <div className="assistant-reference-files" aria-label={copy.attachmentLabel}>
+              {referenceFiles.map((file) => (
+                <span key={file.id}>
+                  <FileText aria-hidden="true" strokeWidth={1.8} />
+                  <b title={file.name}>{file.name}</b>
+                  <button
+                    type="button"
+                    aria-label={`${copy.removeFile}: ${file.name}`}
+                    title={`${copy.removeFile}: ${file.name}`}
+                    onClick={() =>
+                      setReferenceFiles((current) =>
+                        current.filter((item) => item.id !== file.id),
+                      )
+                    }
+                  >
+                    <X aria-hidden="true" strokeWidth={1.9} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <p className="assistant-reference-privacy">{copy.referencePrivacy}</p>
+          </>
         ) : null}
         <div className="assistant-composer-bar">
           <div
@@ -660,19 +854,44 @@ export function ExperimentAssistant() {
             className="assistant-model-button"
             aria-label={copy.model}
             value={selectedModelProfileId}
+            disabled={
+              pending
+              || (modelAccess.accessMode === "platform" && !managedModelsReady)
+            }
             onChange={(event) => {
-              if (event.target.value !== "none") {
+              if (event.target.value.startsWith("managed:")) {
+                selectManagedProvider(
+                  event.target.value.slice("managed:".length) as
+                    | "openai"
+                    | "deepseek"
+                    | "qwen",
+                );
+              } else if (event.target.value !== "none") {
                 selectProfile(event.target.value);
               }
             }}
           >
-            <option value="none">{copy.noModel}</option>
-            {configuredModelProfiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {modelProviderLabel(profile.provider)} ·{" "}
-                {profile.model.trim() || "default"}
-              </option>
-            ))}
+            {modelAccess.accessMode === "platform" ? (
+              managedModels.length ? (
+                managedModels.map((model) => (
+                  <option key={model.provider} value={`managed:${model.provider}`}>
+                    {model.display_name} · {model.model}
+                  </option>
+                ))
+              ) : (
+                <option value="none">{copy.managedUnavailable}</option>
+              )
+            ) : (
+              <>
+                <option value="none">{copy.noModel}</option>
+                {configuredModelProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {modelProviderLabel(profile.provider)} ·{" "}
+                    {profile.model.trim() || "default"}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
           <button
             type="button"

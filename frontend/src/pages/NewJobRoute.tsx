@@ -4,5 +4,5 @@ import { NewJob } from "./NewJob";
 
 export function NewJobRoute() {
   const location = useLocation();
-  return <NewJob key={location.search} />;
+  return <NewJob key={`${location.key}:${location.search}`} />;
 }

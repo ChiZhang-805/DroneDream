@@ -4,6 +4,11 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __DRONEDREAM_BUILD_EDITION__: JSON.stringify(
+      process.env.VITE_DRONEDREAM_EDITION ?? "universal",
+    ),
+  },
   test: {
     environment: "jsdom",
     globals: true,

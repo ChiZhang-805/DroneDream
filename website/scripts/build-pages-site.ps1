@@ -78,6 +78,22 @@ $consoleHtml = Join-Path $outputDirectory "console\index.html"
 if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
     throw "The console build completed without producing $consoleHtml"
 }
+$productHtml = Join-Path $outputDirectory "product\index.html"
+if (-not (Test-Path -LiteralPath $productHtml -PathType Leaf)) {
+    throw "The site build completed without producing the three-edition product route."
+}
+$organizationHtml = Join-Path $outputDirectory "organization\index.html"
+if (-not (Test-Path -LiteralPath $organizationHtml -PathType Leaf)) {
+    throw "The site build completed without producing the organization management route."
+}
+$editionAvailabilityJson = Join-Path $outputDirectory "downloads\editions.json"
+if (-not (Test-Path -LiteralPath $editionAvailabilityJson -PathType Leaf)) {
+    throw "The site build completed without producing edition download availability metadata."
+}
+$oauthConsentHtml = Join-Path $outputDirectory "oauth\consent\index.html"
+if (-not (Test-Path -LiteralPath $oauthConsentHtml -PathType Leaf)) {
+    throw "The site build completed without producing the desktop OAuth consent route."
+}
 
 $builtJavaScript = @(
     Get-ChildItem -LiteralPath $assetDirectory -Filter "*.js" -File |

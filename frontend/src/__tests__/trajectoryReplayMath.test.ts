@@ -34,6 +34,62 @@ describe("trajectoryReplayMath", () => {
     expect(points).toEqual([{ t: 0, x: 1, y: 2, z: 0 }]);
   });
 
+  it("rejects coercible or partially corrupt coordinates instead of drawing false zeroes", () => {
+    expect(extractPoints({ samples: [{ t: 0, x: null, y: 2, z: 3 }] })).toEqual([]);
+    expect(extractPoints({ samples: [{ t: 0, x: "", y: 2, z: 3 }] })).toEqual([]);
+    expect(extractPoints({ samples: [{ t: 0, x: false, y: 2, z: 3 }] })).toEqual([]);
+    expect(extractPoints({
+      samples: [
+        { t: 0, x: 0, y: 0, z: 0 },
+        { t: 1, x: "corrupt", y: 1, z: 1 },
+        { t: 2, x: 2, y: 2, z: 2 },
+      ],
+    })).toEqual([]);
+  });
+
+  it("rejects reordered or duplicate telemetry time", () => {
+    expect(extractPoints({
+      samples: [
+        { t: 1, x: 0, y: 0, z: 0 },
+        { t: 0.5, x: 1, y: 1, z: 1 },
+      ],
+    })).toEqual([]);
+    expect(extractPoints({
+      samples: [
+        { t: 1, x: 0, y: 0, z: 0 },
+        { t: 1, x: 1, y: 1, z: 1 },
+      ],
+    })).toEqual([]);
+  });
+
+  it("does not substitute an embedded reference track for corrupt actual telemetry", () => {
+    expect(extractPoints({
+      samples: [{ t: 0, x: null, y: 0, z: 0 }],
+      reference_track: [
+        { t: 0, x: 10, y: 10, z: 3 },
+        { t: 1, x: 20, y: 20, z: 3 },
+      ],
+    })).toEqual([]);
+  });
+
+  it("computes finite bounds for telemetry larger than JavaScript argument limits", () => {
+    const points = Array.from({ length: 150_000 }, (_, index) => ({
+      t: index,
+      x: index,
+      y: -index,
+      z: index % 10,
+    }));
+    const bounds = getCombinedBounds([points]);
+    expect(bounds).toMatchObject({
+      minX: 0,
+      maxX: 149_999,
+      minY: -149_999,
+      minZ: 0,
+      maxZ: 9,
+    });
+    expect(bounds?.maxY).toBeCloseTo(0);
+  });
+
   it("3D projection returns finite SVG coordinates", () => {
     const projected = to3DProjectedCoordinates([
       { t: 0, x: 0, y: 0, z: 0 },

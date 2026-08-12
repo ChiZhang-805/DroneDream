@@ -1,0 +1,29 @@
+.edition-license-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edition-license-strip > span {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, #7156b8 8%, transparent);
+}
+
+.edition-license-strip img {
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
+}
+
+.edition-license-strip .is-inactive {
+  filter: grayscale(1);
+  opacity: 0.2;
+}
+
+.edition-license-strip .is-active {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #7a53dc 16%, transparent);
+}

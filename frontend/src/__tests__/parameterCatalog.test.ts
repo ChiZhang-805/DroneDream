@@ -147,4 +147,43 @@ describe("parameter catalog compatibility", () => {
     expect(result.source).toBe("builtin");
     expect(result.parameters).toHaveLength(31);
   });
+
+  it("drops wire rows with ambiguous parameter types or reboot flags", () => {
+    const valid = {
+      name: "MPC_XY_P",
+      type: "float",
+      unit: "1/s",
+      hard_bounds: { min: 0, max: 2 },
+      safe_bounds: { min: 0.6, max: 1.3 },
+      step: 0.1,
+      default: 0.95,
+      group: "xy_position_velocity",
+      risk: "medium",
+      requires_reboot: false,
+      label: { en: "Horizontal position P", "zh-CN": "水平位置 P" },
+      description: { en: "Position gain", "zh-CN": "位置增益" },
+      dependencies: [],
+    };
+    const result = normalizeApiCatalog({
+      catalog_version: "strict-wire",
+      source: "runtime",
+      px4_version: "v1.16",
+      supported_px4_versions: ["v1.16"],
+      vehicle_type: "multicopter",
+      parameter_count: 3,
+      parameters: [
+        { ...valid, name: "BAD_KIND", type: "boolean" },
+        { ...valid, name: "BAD_REBOOT", requires_reboot: "false" },
+        valid,
+      ],
+    } as never);
+
+    expect(result.source).toBe("backend");
+    expect(result.parameters).toHaveLength(1);
+    expect(result.parameters[0]).toMatchObject({
+      name: "MPC_XY_P",
+      value_type: "float",
+      requires_reboot: false,
+    });
+  });
 });

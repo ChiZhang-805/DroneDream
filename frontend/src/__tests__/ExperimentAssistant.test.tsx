@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -94,6 +94,7 @@ describe("conversational experiment drafting", () => {
   });
 
   afterEach(() => {
+    window.history.replaceState({}, "", "/");
     vi.restoreAllMocks();
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
@@ -159,6 +160,80 @@ describe("conversational experiment drafting", () => {
       "user",
       "assistant",
     ]);
+    const persistentRaw = window.localStorage.getItem(EXPERIMENT_DRAFT_KEY);
+    expect(persistentRaw).toContain("five metre circular track");
+    expect(persistentRaw).not.toContain(
+      "Tune an x500 on a circular track at 3 metres and include MPC_XY_P.",
+    );
+    expect(JSON.parse(persistentRaw ?? "null").conversation.messages).toEqual([]);
+  });
+
+  it("coalesces duplicate submissions before React can disable the composer", async () => {
+    let resolveCompile:
+      | ((response: ExperimentAssistantTurnResponse) => void)
+      | null = null;
+    const compile = vi
+      .spyOn(apiClient, "compileExperimentAssistantTurn")
+      .mockImplementation(
+        () =>
+          new Promise<ExperimentAssistantTurnResponse>((resolve) => {
+            resolveCompile = resolve;
+          }),
+      );
+    const { container } = renderAssistant();
+    fireEvent.change(screen.getByLabelText("Describe your experiment…"), {
+      target: { value: "Tune one safe circular-track experiment." },
+    });
+    const form = container.querySelector<HTMLFormElement>(".assistant-composer");
+    expect(form).not.toBeNull();
+
+    act(() => {
+      form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      form?.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    });
+
+    expect(compile).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveCompile?.(assistantResponse());
+    });
+    expect(
+      await screen.findByText(/Tune an x500 on a five metre circular track/),
+    ).toBeVisible();
+    expect(compile).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves a follow-up typed while the previous turn is pending", async () => {
+    let resolveCompile:
+      | ((response: ExperimentAssistantTurnResponse) => void)
+      | null = null;
+    vi.spyOn(apiClient, "compileExperimentAssistantTurn").mockImplementation(
+      () => new Promise<ExperimentAssistantTurnResponse>((resolve) => {
+        resolveCompile = resolve;
+      }),
+    );
+    renderAssistant();
+    const composer = screen.getByLabelText("Describe your experiment…");
+    fireEvent.change(composer, {
+      target: { value: "Tune one safe circular-track experiment." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    fireEvent.change(composer, {
+      target: { value: "Also verify the result in a wind holdout." },
+    });
+    await act(async () => {
+      resolveCompile?.(assistantResponse());
+    });
+
+    expect(await screen.findByText(/Tune an x500 on a five metre circular track/))
+      .toBeVisible();
+    expect(composer).toHaveValue(
+      "Also verify the result in a wind holdout.",
+    );
   });
 
   it("does not request microphone permission until the user clicks the voice button", async () => {
@@ -218,13 +293,14 @@ describe("conversational experiment drafting", () => {
     expect(screen.getByRole("menuitem", { name: "Create manually" }))
       .toHaveAttribute("href", "/jobs/new");
     expect(
-      screen.getByRole("menuitem", { name: "Import reference files" }),
+      screen.getByRole("menuitem", { name: "Import files" }),
     ).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Model" }))
       .toHaveValue("default");
   });
 
-  it("shows None instead of an unconfigured provider in the model selector", () => {
+  it("shows only centrally available managed models without exposing a key", () => {
+    window.history.replaceState({}, "", "/?docsPreview=1");
     render(
       <I18nProvider>
         <MemoryRouter>
@@ -236,10 +312,33 @@ describe("conversational experiment drafting", () => {
     );
 
     const selector = screen.getByRole("combobox", { name: "Model" });
-    expect(selector).toHaveValue("none");
-    expect(selector).toHaveTextContent("None");
-    expect(selector).not.toHaveTextContent("OpenAI");
+    expect(selector).toHaveValue("managed:openai");
+    expect(selector).toHaveTextContent("GPT · gpt-4.1");
+    expect(selector).toHaveTextContent("DeepSeek · deepseek-chat");
+    expect(selector).toHaveTextContent("Qwen · qwen-plus");
     expect(selector).not.toHaveTextContent("key required");
+
+    fireEvent.change(selector, { target: { value: "managed:deepseek" } });
+    expect(selector).toHaveValue("managed:deepseek");
+  });
+
+  it("fails closed when a signed-out build has no managed model policy", () => {
+    render(
+      <I18nProvider>
+        <MemoryRouter>
+          <ModelAccessProvider>
+            <ExperimentAssistant />
+          </ModelAccessProvider>
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+
+    const selector = screen.getByRole("combobox", { name: "Model" });
+    expect(selector).toBeDisabled();
+    expect(selector).toHaveValue("none");
+    expect(selector).toHaveTextContent(
+      "No managed conversation model is currently available.",
+    );
   });
 
   it("inserts only a template body and keeps its heading out of the prompt", () => {
@@ -257,6 +356,8 @@ describe("conversational experiment drafting", () => {
   });
 
   it("imports a supported reference file from the add menu", async () => {
+    const compile = vi.spyOn(apiClient, "compileExperimentAssistantTurn")
+      .mockResolvedValue(assistantResponse());
     const { container } = renderAssistant();
     const fileInput = container.querySelector<HTMLInputElement>(
       ".assistant-reference-input",
@@ -276,7 +377,34 @@ describe("conversational experiment drafting", () => {
     expect(
       screen.getByRole("button", { name: "Remove file: experiment.json" }),
     ).toBeEnabled();
+    expect(screen.getByText(
+      "DroneDream uses reference content only in this request and does not save it in drafts or memory. Your selected model provider still receives the request.",
+    )).toBeVisible();
     expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(compile).toHaveBeenCalledTimes(1));
+    const request = compile.mock.calls[0][0];
+    expect(request.message).toBe(
+      "Use the imported reference files to prepare this experiment.",
+    );
+    expect(request.message).not.toContain("track_type");
+    expect(request.document_context).toMatchObject({
+      schema_version: "1.0",
+      purpose: "experiment_draft_reference",
+      chunks: [
+        {
+          chunk_id: "chunk-1",
+          display_name: "experiment.json",
+          content: '{"track_type":"circle","altitude_m":3}',
+          retention: "request_only",
+        },
+      ],
+    });
+    expect(request.document_context?.chunks[0].content_sha256)
+      .toMatch(/^[0-9a-f]{64}$/u);
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .not.toContain('{"track_type":"circle","altitude_m":3}');
   });
 
   it("clears the conversation and shared experiment draft only after confirmation", async () => {

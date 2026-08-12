@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
   "fileName": "DroneDream_1.0.0_x64-setup.exe",
-  "releaseTag": "signpath-candidate-v1.0.0",
-  "sha256": "3be26b78aa1ec3383dd67c04b9d762b6ac2a481c2befc6880f43e2b59b6ee368",
-  "sizeBytes": 5526509,
-  "publishedAt": "2026-07-21"
+  "releaseTag": "four-edition-v1.0.0",
+  "sha256": "84b6b5a25cfe0cd110d214b7849032624b93b2c529eca1f9923658aee93fe813",
+  "sizeBytes": 12888384,
+  "publishedAt": "2026-08-12"
 }

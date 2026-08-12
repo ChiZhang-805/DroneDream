@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-calibration-input",
+  "editionId": "lab",
+  "jobId": "lab_job_fixture_001",
+  "cycleOrdinal": 2,
+  "source": {
+    "kind": "test-fixture",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "editionManifestSha256": "96953004774b7044129c491d3ff251213d4c7bf09d188d3d3c00724343aebf3c"
+  },
+  "vehicle": {
+    "vehiclePackId": "px4-gazebo-x500-reference",
+    "controllerIdentity": "px4-autopilot",
+    "firmwareIdentity": "px4-v1.16.0"
+  },
+  "evidence": {
+    "simulationReceiptHash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "realObservationReceiptHash": "2222222222222222222222222222222222222222222222222222222222222222",
+    "parameterCandidateHash": "3333333333333333333333333333333333333333333333333333333333333333",
+    "objectiveContractHash": "4444444444444444444444444444444444444444444444444444444444444444",
+    "constraintContractHash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "holdoutContractHash": "6666666666666666666666666666666666666666666666666666666666666666",
+    "metricNormalizationReceiptHash": "7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  "simulation": {
+    "trackingRmseM": 0.12,
+    "maxErrorM": 0.31,
+    "energyWh": 18.4,
+    "overshootCount": 1
+  },
+  "realObservation": {
+    "trackingRmseM": 0.19,
+    "maxErrorM": 0.46,
+    "energyWh": 21.8,
+    "overshootCount": 3
+  },
+  "authority": {
+    "decision": "deny",
+    "grantsHardwareAuthority": false
+  }
+}
