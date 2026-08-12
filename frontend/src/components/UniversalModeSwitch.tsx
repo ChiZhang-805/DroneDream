@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
-import fieldMark from "../assets/brand/field-mark.png";
-import labMark from "../assets/brand/lab-mark.png";
-import simMark from "../assets/brand/sim-mark.png";
-import universalMark from "../assets/brand/universal-mark.png";
+import fieldLockup from "../assets/brand/field-lockup-compact.png";
+import labLockup from "../assets/brand/lab-lockup-compact.png";
+import simLockup from "../assets/brand/sim-lockup-compact.png";
+import universalLockup from "../assets/brand/universal-lockup-compact.png";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import {
   UNIVERSAL_WORKSPACE_IDS,
@@ -23,18 +23,18 @@ const EDITION_LABELS: Record<BrandEditionId, string> = {
   lab: "DroneDream · LAB",
   field: "DroneDream · FIELD",
 };
-const EDITION_MARKS: Record<BrandEditionId, string> = {
-  universal: universalMark,
-  sim: simMark,
-  lab: labMark,
-  field: fieldMark,
+const EDITION_LOCKUPS: Record<BrandEditionId, string> = {
+  universal: universalLockup,
+  sim: simLockup,
+  lab: labLockup,
+  field: fieldLockup,
 };
 
 function EditionBrand({ edition }: { edition: BrandEditionId }) {
   return (
     <span className="workspace-switch-brand" data-brand-edition={edition}>
-      <img src={EDITION_MARKS[edition]} alt="" aria-hidden="true" />
-      <span>{EDITION_LABELS[edition]}</span>
+      <img src={EDITION_LOCKUPS[edition]} alt="" aria-hidden="true" />
+      <span className="workspace-switch-brand-label">{EDITION_LABELS[edition]}</span>
     </span>
   );
 }
@@ -114,6 +114,7 @@ export function UniversalModeSwitch({
                 key={edition}
                 type="button"
                 role="menuitemradio"
+                aria-label={EDITION_LABELS[edition]}
                 aria-checked={current}
                 onClick={() => selectEdition(edition)}
               >

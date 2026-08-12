@@ -209,7 +209,7 @@ code {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 440px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -316,59 +316,30 @@ body:has(.app-shell-public-demo),
 }
 
 .workspace-switch-brand {
-  --workspace-brand-start: #ff5574;
-  --workspace-brand-middle: #6a4cff;
-  --workspace-brand-end: #e657d1;
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 0.55rem;
-}
-
-.workspace-switch-brand[data-brand-edition="sim"] {
-  --workspace-brand-start: #00d9ff;
-  --workspace-brand-middle: #2671ff;
-  --workspace-brand-end: #744cff;
-}
-
-.workspace-switch-brand[data-brand-edition="lab"] {
-  --workspace-brand-start: #a7e84a;
-  --workspace-brand-middle: #20c77a;
-  --workspace-brand-end: #087e69;
-}
-
-.workspace-switch-brand[data-brand-edition="field"] {
-  --workspace-brand-start: #ffc247;
-  --workspace-brand-middle: #ff754b;
-  --workspace-brand-end: #d746a5;
 }
 
 .workspace-switch-brand img {
-  width: 1.55rem;
-  height: 1.55rem;
+  display: block;
+  width: auto;
+  height: 1.85rem;
+  max-width: 100%;
   flex: 0 0 auto;
   object-fit: contain;
-  object-position: center;
+  object-position: left center;
 }
 
-.workspace-switch-brand > span {
-  min-width: 0;
+.workspace-switch-brand-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
   overflow: hidden;
-  color: transparent;
-  background: linear-gradient(
-    90deg,
-    var(--workspace-brand-start),
-    var(--workspace-brand-middle) 52%,
-    var(--workspace-brand-end)
-  );
-  background-clip: text;
-  -webkit-background-clip: text;
-  font-size: 1.1rem;
-  font-weight: 780;
-  letter-spacing: -0.025em;
-  line-height: 1.15;
-  text-overflow: ellipsis;
+  clip: rect(0 0 0 0);
   white-space: nowrap;
+  border: 0;
 }
 
 .universal-mode-switch-chevron {
@@ -384,16 +355,12 @@ body:has(.app-shell-public-demo),
 }
 
 .universal-mode-switch-trigger .workspace-switch-brand {
-  gap: 0.42rem;
+  flex: 1 1 auto;
 }
 
 .universal-mode-switch-trigger .workspace-switch-brand img {
-  width: 1.48rem;
-  height: 1.48rem;
-}
-
-.universal-mode-switch-trigger .workspace-switch-brand > span {
-  font-size: 1.02rem;
+  width: auto;
+  height: 1.85rem;
 }
 
 .universal-mode-switch-menu {
@@ -402,7 +369,8 @@ body:has(.app-shell-public-demo),
   left: 0;
   z-index: 1000;
   display: grid;
-  width: min(20rem, calc(100vw - 2rem));
+  width: 100%;
+  min-width: 19.5rem;
   gap: 0.18rem;
   padding: 0.42rem;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 18%, var(--border));
@@ -426,6 +394,10 @@ body:has(.app-shell-public-demo),
   color: var(--text);
   cursor: pointer;
   text-align: left;
+}
+
+.universal-mode-switch-menu > button .workspace-switch-brand {
+  flex: 1 1 auto;
 }
 
 .universal-mode-switch-menu > button:hover,
@@ -13298,7 +13270,7 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
   }
 
   .app-shell:not(.app-shell-launcher) .workspace-switch-brand img {
-    width: 1.55rem;
+    width: auto;
     height: 1.55rem;
   }
 
