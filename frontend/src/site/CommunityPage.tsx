@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   ChartNoAxesCombined,
+  ChevronLeft,
   ChevronRight,
   Compass,
   Gauge,
@@ -76,7 +77,8 @@ interface CommunityComment {
   liked_by_viewer: boolean;
 }
 
-const TOPIC_PAGE_SIZE = 24;
+const RECENT_TOPIC_POOL_SIZE = 24;
+const DISCOVERY_PAGE_SIZE = 10;
 const RECENT_TOPIC_COUNT = 5;
 const COMMENT_PAGE_SIZE = 100;
 
@@ -136,7 +138,9 @@ const communityContent = {
     clearReply: "Cancel reply",
     sendComment: "Post comment",
     likes: "likes",
-    loadMore: "Load the next 20 topics",
+    previousPage: "Previous page",
+    nextPage: "Next page",
+    page: "Page",
     loadMoreComments: "Load more comments",
     noComments: "No comments yet. Add the first evidence-based response.",
     signInAction: "Sign in to join the discussion",
@@ -187,7 +191,9 @@ const communityContent = {
     clearReply: "取消回复",
     sendComment: "发表评论",
     likes: "次点赞",
-    loadMore: "加载接下来的 20 个话题",
+    previousPage: "上一页",
+    nextPage: "下一页",
+    page: "第",
     loadMoreComments: "加载更多评论",
     noComments: "还没有评论；你可以补充第一条基于证据的回复。",
     signInAction: "登录后参与讨论",
@@ -332,8 +338,9 @@ export function CommunityPage({
   const [topics, setTopics] = useState<CommunityTopic[]>([]);
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMoreTopics, setLoadingMoreTopics] = useState(false);
   const [hasMoreTopics, setHasMoreTopics] = useState(false);
+  const [topicPage, setTopicPage] = useState(0);
+  const [totalTopicCount, setTotalTopicCount] = useState<number | null>(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [hasMoreComments, setHasMoreComments] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
@@ -376,43 +383,58 @@ export function CommunityPage({
     onClose: () => setSelectedTopic(null),
   });
 
-  const loadTopics = useCallback(async (offset = 0, append = false) => {
+  const loadTopics = useCallback(async () => {
     if (!supabaseClient) {
       setLoading(false);
       setFeedError(copy.unavailable);
       return;
     }
-    if (append) setLoadingMoreTopics(true);
-    else setLoading(true);
+    setLoading(true);
     setFeedError(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
-      const { data, error: requestError } = await supabaseClient
+      const pageSize = allTopicsView ? DISCOVERY_PAGE_SIZE : RECENT_TOPIC_POOL_SIZE;
+      const offset = allTopicsView ? topicPage * DISCOVERY_PAGE_SIZE : 0;
+      const listRequest = supabaseClient
         .rpc("community_list_topics", {
           p_search: settledQuery.trim() || null,
           p_tag: activeTag,
           p_offset: offset,
-          p_limit: TOPIC_PAGE_SIZE + 1,
+          p_limit: pageSize + 1,
         })
         .abortSignal(controller.signal);
+      const countRequest = allTopicsView
+        ? supabaseClient
+            .rpc("community_count_topics", {
+              p_search: settledQuery.trim() || null,
+              p_tag: activeTag,
+            })
+            .abortSignal(controller.signal)
+        : Promise.resolve({ data: null, error: null });
+      const [listResponse, countResponse] = await Promise.all([listRequest, countRequest]);
+      const { data, error: requestError } = listResponse;
       if (requestError) throw requestError;
       const page = ((data ?? []) as CommunityTopic[]).map((topic) => ({
         ...topic,
         comment_count: Number(topic.comment_count),
         like_count: Number(topic.like_count),
       }));
-      const boundedPage = page.slice(0, TOPIC_PAGE_SIZE);
-      setHasMoreTopics(page.length > TOPIC_PAGE_SIZE);
-      setTopics((current) => append ? [...current, ...boundedPage] : boundedPage);
+      const boundedPage = page.slice(0, pageSize);
+      setHasMoreTopics(page.length > pageSize);
+      setTopics(boundedPage);
+      setTotalTopicCount(
+        allTopicsView && !countResponse.error
+          ? Number(countResponse.data ?? 0)
+          : null,
+      );
     } catch {
       setFeedError(copy.unavailable);
     } finally {
       window.clearTimeout(timeout);
-      if (append) setLoadingMoreTopics(false);
-      else setLoading(false);
+      setLoading(false);
     }
-  }, [activeTag, copy.unavailable, settledQuery]);
+  }, [activeTag, allTopicsView, copy.unavailable, settledQuery, topicPage]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -463,6 +485,21 @@ export function CommunityPage({
     () => allTopicsView ? topics : selectRecentTopics(topics, recentSampleSeed),
     [allTopicsView, recentSampleSeed, topics],
   );
+
+  const totalPages = useMemo(() => {
+    if (!allTopicsView) return 1;
+    if (totalTopicCount !== null) {
+      return Math.max(1, Math.ceil(totalTopicCount / DISCOVERY_PAGE_SIZE));
+    }
+    return Math.max(1, topicPage + 1 + (hasMoreTopics ? 1 : 0));
+  }, [allTopicsView, hasMoreTopics, topicPage, totalTopicCount]);
+
+  const pageNumbers = useMemo(() => {
+    const windowSize = 5;
+    const start = Math.max(0, Math.min(topicPage - 2, totalPages - windowSize));
+    const end = Math.min(totalPages, start + windowSize);
+    return Array.from({ length: end - start }, (_, index) => start + index);
+  }, [topicPage, totalPages]);
 
   const openTopic = (topic: CommunityTopic) => {
     captureTopicTrigger();
@@ -803,7 +840,10 @@ export function CommunityPage({
               type="search"
               aria-label={copy.search}
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setTopicPage(0);
+              }}
               placeholder={copy.search}
             />
           </label>
@@ -817,7 +857,10 @@ export function CommunityPage({
                 type="button"
                 className={activeTag === tagName ? "is-active" : ""}
                 aria-pressed={activeTag === tagName}
-                onClick={() => setActiveTag(activeTag === tagName ? null : tagName)}
+                onClick={() => {
+                  setActiveTag(activeTag === tagName ? null : tagName);
+                  setTopicPage(0);
+                }}
               >
                 # {tagName}
               </button>
@@ -925,25 +968,43 @@ export function CommunityPage({
           })}
         </div>
 
-        {!loading && !feedError && allTopicsView && hasMoreTopics ? (
-          <button
-            type="button"
-            className="community-more"
-            disabled={loadingMoreTopics}
-            onClick={() => void loadTopics(topics.length, true)}
-          >
-            {copy.loadMore}
-            <ChevronRight aria-hidden="true" />
-          </button>
-        ) : null}
-        {!loading && !feedError && allTopicsView && !hasMoreTopics ? (
-          <a
-            className="community-more"
-            href="/community/"
-          >
-            <ArrowLeft aria-hidden="true" />
-            {copy.back}
-          </a>
+        {!loading && !feedError && allTopicsView && visibleTopics.length > 0 ? (
+          <nav className="community-pagination" aria-label={copy.allTopics}>
+            <a className="community-pagination-back" href="/community/">
+              <ArrowLeft aria-hidden="true" />
+              {copy.back}
+            </a>
+            <div>
+              <button
+                type="button"
+                aria-label={copy.previousPage}
+                disabled={topicPage === 0}
+                onClick={() => setTopicPage((current) => Math.max(0, current - 1))}
+              >
+                <ChevronLeft aria-hidden="true" />
+              </button>
+              {pageNumbers.map((pageIndex) => (
+                <button
+                  key={pageIndex}
+                  type="button"
+                  className={pageIndex === topicPage ? "is-active" : ""}
+                  aria-current={pageIndex === topicPage ? "page" : undefined}
+                  aria-label={`${copy.page} ${pageIndex + 1}`}
+                  onClick={() => setTopicPage(pageIndex)}
+                >
+                  {pageIndex + 1}
+                </button>
+              ))}
+              <button
+                type="button"
+                aria-label={copy.nextPage}
+                disabled={topicPage >= totalPages - 1}
+                onClick={() => setTopicPage((current) => Math.min(totalPages - 1, current + 1))}
+              >
+                <ChevronRight aria-hidden="true" />
+              </button>
+            </div>
+          </nav>
         ) : null}
       </section>
 

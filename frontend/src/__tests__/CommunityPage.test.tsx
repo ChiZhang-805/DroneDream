@@ -27,7 +27,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
 
 import { CommunityPage } from "../site/CommunityPage";
 
-function rpcResult(data: unknown[]) {
+function rpcResult(data: unknown) {
   return {
     abortSignal: vi.fn().mockResolvedValue({ data, error: null }),
   };
@@ -44,6 +44,7 @@ describe("CommunityPage public data loading", () => {
     supabaseMock.deleteAuthorEq.mockResolvedValue({ error: null });
     supabaseMock.rpc.mockImplementation((name: string) => {
       if (name === "community_list_comments") return rpcResult([]);
+      if (name === "community_count_topics") return rpcResult(17);
       return rpcResult([
         {
           id: "00000000-0000-0000-0000-000000000001",
@@ -72,10 +73,54 @@ describe("CommunityPage public data loading", () => {
     })).toBeVisible();
     expect(supabaseMock.rpc).toHaveBeenCalledWith(
       "community_list_topics",
-      expect.objectContaining({ p_offset: 0, p_limit: 25 }),
+      expect.objectContaining({ p_offset: 0, p_limit: 11 }),
     );
     expect(screen.getByText("7")).toBeVisible();
     expect(screen.getByText("4")).toBeVisible();
+  });
+
+  it("loads the second ten-card discovery page from a numbered pager", async () => {
+    render(
+      <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
+    );
+
+    await screen.findByRole("heading", { name: "Stable hover evidence" });
+    fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
+
+    await waitFor(() =>
+      expect(supabaseMock.rpc).toHaveBeenCalledWith(
+        "community_list_topics",
+        expect.objectContaining({ p_offset: 10, p_limit: 11 }),
+      )
+    );
+  });
+
+  it("shows exactly five featured cards on the community landing page", async () => {
+    window.history.replaceState(null, "", "/community/");
+    const featuredTopics = Array.from({ length: 7 }, (_, index) => ({
+      id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`,
+      author_id: "00000000-0000-0000-0000-000000000002",
+      author_name: "Pilot",
+      title: `Featured topic ${index + 1}`,
+      body: "A compact evidence summary.",
+      tags: ["PX4"],
+      image_urls: [],
+      created_at: `2026-07-${String(25 - index).padStart(2, "0")}T12:00:00Z`,
+      comment_count: index,
+      like_count: index,
+      liked_by_viewer: false,
+    }));
+    supabaseMock.rpc.mockImplementation((name: string) => {
+      if (name === "community_list_comments") return rpcResult([]);
+      return rpcResult(featuredTopics);
+    });
+
+    const { container } = render(
+      <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
+    );
+
+    await screen.findByRole("button", { name: "Open discussion: Featured topic 1" });
+    expect(container.querySelectorAll(".community-topic-grid article")).toHaveLength(5);
   });
 
   it("loads only the selected topic's comments when opening a discussion", async () => {
