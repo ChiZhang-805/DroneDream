@@ -1053,7 +1053,7 @@ html[lang="zh-CN"] .site-hero h1 {
 /* Product edition downloads */
 .site-product-page {
   min-height: 100svh;
-  padding: calc(78px + 1.65rem) max(var(--site-gutter), calc((100% - var(--site-content-width)) / 2)) 1.65rem;
+  padding: calc(78px + 1.65rem) max(var(--site-gutter), calc((100% - var(--site-content-width)) / 2)) 0.65rem;
   color: #101522;
   background:
     linear-gradient(120deg, rgba(0, 217, 255, 0.1), transparent 34%),
@@ -1102,7 +1102,7 @@ html[lang="zh-CN"] .site-hero h1 {
   display: grid;
   min-width: 0;
   align-content: start;
-  gap: clamp(0.82rem, 1.25vh, 1rem);
+  gap: clamp(0.88rem, 1.35vh, 1.08rem);
   overflow: hidden;
   padding: clamp(1.2rem, 1.35vw, 1.5rem);
   border: 1px solid var(--edition-border);
@@ -1145,7 +1145,7 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-product-edition-topline {
   display: grid;
-  min-height: 48px;
+  min-height: 54px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.9rem;
@@ -1153,7 +1153,7 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-product-edition-picture {
   display: block;
-  width: min(70%, 300px);
+  width: min(88%, 340px);
   min-width: 0;
   line-height: 0;
 }
@@ -1161,7 +1161,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .site-product-edition-icon {
   display: block;
   width: 100%;
-  max-height: 60px;
+  max-height: 68px;
   object-fit: contain;
   object-position: left center;
 }
@@ -1212,13 +1212,13 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-product-edition li {
   display: flex;
-  min-height: 2.48rem;
+  min-height: 2.68rem;
   align-items: center;
   gap: 0.7rem;
   border-top: 1px solid var(--edition-rule);
-  font-size: clamp(0.86rem, 0.88vw, 1rem);
+  font-size: clamp(0.92rem, 0.94vw, 1.06rem);
   font-weight: 720;
-  line-height: 1.22;
+  line-height: 1.24;
 }
 
 .site-product-edition li::before {
@@ -1274,7 +1274,7 @@ html[lang="zh-CN"] .site-hero h1 {
 
 @media (min-width: 901px) and (min-height: 960px) {
   .site-product-page-shell {
-    min-height: calc(100svh - 78px - 3.3rem);
+    min-height: calc(100svh - 78px - 2.35rem);
     grid-template-rows: auto minmax(0, 1fr);
   }
 
