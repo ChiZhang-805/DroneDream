@@ -16,6 +16,7 @@ import {
   Camera,
   CircleUserRound,
   Download,
+  FlaskConical,
   Gift,
   GraduationCap,
   Gauge,
@@ -216,7 +217,7 @@ const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
     to: "/lab",
     labelKey: "app.labWorkspace",
     end: true,
-    icon: RadioTower,
+    icon: FlaskConical,
   },
   {
     to: "/lab/hardware",
