@@ -113,16 +113,24 @@ export function packCommunityTopicPages(
 
   while (remaining.length > 0) {
     const page: CommunityTopicPlacement[] = [];
-    let unitsLeft = DISCOVERY_PAGE_SIZE;
+    let visualUnits = 0;
 
-    while (remaining.length > 0 && unitsLeft > 0) {
-      const fittingIndex = remaining.findIndex(({ isLong }) =>
-        (isLong ? 2 : 1) <= unitsLeft
-      );
-      if (fittingIndex < 0) break;
-      const [placement] = remaining.splice(fittingIndex, 1);
+    // The first five placements form the top row. A long card may safely span
+    // downward from any of those positions without changing ranked order.
+    while (remaining.length > 0 && page.length < 5) {
+      const placement = remaining.shift()!;
       page.push(placement);
-      unitsLeft -= placement.isLong ? 2 : 1;
+      visualUnits += placement.isLong ? 2 : 1;
+    }
+
+    // Fill the second row only with the immediately following short cards. If
+    // the next ranked topic is long, start a new page so it can remain next in
+    // both DOM and visual order while still spanning exactly two rows.
+    while (remaining.length > 0 && visualUnits < DISCOVERY_PAGE_SIZE) {
+      const nextPlacement = remaining[0];
+      if (nextPlacement.isLong) break;
+      page.push(remaining.shift()!);
+      visualUnits += 1;
     }
 
     pages.push(page);
