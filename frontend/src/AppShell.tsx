@@ -10,9 +10,11 @@ import type { ChangeEvent, MouseEvent, ReactNode, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
+  ArrowRight,
   Bell,
   BotMessageSquare,
   Box,
+  BrainCircuit,
   Camera,
   CircleUserRound,
   Download,
@@ -561,17 +563,19 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
 
 function SettingsToggle({
   checked,
+  className,
   disabled = false,
   label,
   onChange,
 }: {
   checked: boolean;
+  className?: string;
   disabled?: boolean;
   label: ReactNode;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="settings-toggle-row">
+    <label className={`settings-toggle-row${className ? ` ${className}` : ""}`}>
       <span>{label}</span>
       <input
         type="checkbox"
@@ -1150,7 +1154,7 @@ function SettingsDialog({
       setExperiencePreferenceMessage(t("settings.memory.deleteFailed"));
     }
   };
-  const numberFormatter = new Intl.NumberFormat(locale === "zh-CN" ? "zh-CN" : "en");
+  const numberFormatter = new Intl.NumberFormat(interfaceLocale);
   const experiencePreferenceControlsDisabled =
     experiencePreferenceState === "blocked" ||
     experiencePreferenceState === "loading" ||
@@ -1173,6 +1177,86 @@ function SettingsDialog({
     interfaceLocale,
     { dateStyle: "medium", timeStyle: "short" },
   );
+  const allowanceResetCopy = {
+    en: {
+      cards: "Allowance reset cards",
+      ready: "Ready to use",
+      full: "Full refill",
+      fullCard: "Full refill card",
+      empty: "No cards available",
+      expires: "Expires",
+      use: "Use card",
+      using: "Using…",
+      confirm: "Confirm",
+      cancel: "Cancel",
+      refresh: "Refresh usage",
+    },
+    "zh-CN": {
+      cards: "额度重置卡",
+      ready: "准备使用",
+      full: "全额恢复",
+      fullCard: "全额恢复卡",
+      empty: "暂无可用额度卡",
+      expires: "有效期至",
+      use: "使用重置卡",
+      using: "使用中…",
+      confirm: "确认兑换",
+      cancel: "取消",
+      refresh: "刷新用量",
+    },
+    "zh-TW": {
+      cards: "額度重設卡",
+      ready: "準備使用",
+      full: "全額恢復",
+      fullCard: "全額恢復卡",
+      empty: "暫無可用額度卡",
+      expires: "有效期至",
+      use: "使用重設卡",
+      using: "使用中…",
+      confirm: "確認兌換",
+      cancel: "取消",
+      refresh: "重新整理用量",
+    },
+    es: {
+      cards: "Tarjetas de recarga",
+      ready: "Lista para usar",
+      full: "Recarga completa",
+      fullCard: "Tarjeta de recarga completa",
+      empty: "No hay tarjetas disponibles",
+      expires: "Vence",
+      use: "Usar tarjeta",
+      using: "Aplicando…",
+      confirm: "Confirmar",
+      cancel: "Cancelar",
+      refresh: "Actualizar uso",
+    },
+    ja: {
+      cards: "リセットカード",
+      ready: "使用準備完了",
+      full: "全額回復",
+      fullCard: "全額回復カード",
+      empty: "利用可能なカードなし",
+      expires: "有効期限",
+      use: "カードを使用",
+      using: "使用中…",
+      confirm: "確認",
+      cancel: "キャンセル",
+      refresh: "使用量を更新",
+    },
+    ko: {
+      cards: "충전 카드",
+      ready: "사용 가능",
+      full: "전체 충전",
+      fullCard: "전체 충전 카드",
+      empty: "사용 가능한 카드 없음",
+      expires: "만료",
+      use: "카드 사용",
+      using: "사용 중…",
+      confirm: "확인",
+      cancel: "취소",
+      refresh: "사용량 새로고침",
+    },
+  }[interfaceLocale];
   useEffect(() => {
     if (!allowanceResetCards || allowanceResetCards.length === 0) {
       setSelectedAllowanceResetCardId("");
@@ -1463,6 +1547,7 @@ function SettingsDialog({
               onClick={(event) => onOpenExternal(event, ECE498BH_COURSE_URL)}
             >
               {settingsCopy.courseOpen}
+              <ArrowRight aria-hidden="true" />
             </a>
           </div>
           <div className="settings-course-editions" aria-label={locale === "zh-CN" ? "DroneDream 四款软件" : "DroneDream editions"}>
@@ -1483,6 +1568,7 @@ function SettingsDialog({
                   {courseEdition === "universal"
                     ? settingsCopy.courseActions[0]
                     : settingsCopy.courseActions[1]}
+                  <ArrowRight aria-hidden="true" />
                 </Link>
               </article>
             ))}
@@ -1503,8 +1589,9 @@ function SettingsDialog({
           <div className="settings-memory-switches">
             <SettingsToggle
               checked={experiencePreferenceDraft.memory_enabled}
+              className="settings-memory-master-toggle"
               disabled={experiencePreferenceControlsDisabled}
-              label={settingsCopy.crossSession}
+              label={<><BrainCircuit aria-hidden="true" /><span>{settingsCopy.crossSession}</span></>}
               onChange={(checked) => setExperiencePreferenceDraft((current) => ({
                 ...current,
                 memory_enabled: checked,
@@ -1858,9 +1945,9 @@ function SettingsDialog({
                 </div>
                 <div className="settings-model-reset-row">
                   <div className="settings-model-reset-summary">
-                    <span>{locale === "zh-CN" ? "额度重置卡" : "Allowance reset cards"}</span>
+                    <span>{allowanceResetCopy.cards}</span>
                     <strong>{allowanceResetCards?.length ?? 0}</strong>
-                    <span>{locale === "zh-CN" ? "准备使用" : "Ready to use"}</span>
+                    <span>{allowanceResetCopy.ready}</span>
                   </div>
                   <div className="settings-model-reset-controls">
                     <div className="settings-reset-card-picker">
@@ -1875,10 +1962,19 @@ function SettingsDialog({
                         {(() => {
                           const card = allowanceResetCards?.find((candidate) => candidate.id === selectedAllowanceResetCardId);
                           return card ? (
-                            <><AllowanceCardIcon card={card} /><span>{card.kind === "full_refill"
-                              ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill")
-                              : `+${numberFormatter.format(card.credits)}`}</span></>
-                          ) : <span>{locale === "zh-CN" ? "暂无可用额度卡" : "No cards available"}</span>;
+                            <>
+                              <AllowanceCardIcon card={card} />
+                              <span className="settings-reset-card-trigger-copy">
+                                <strong>{card.kind === "full_refill"
+                                  ? allowanceResetCopy.full
+                                  : `+${numberFormatter.format(card.credits)}`}</strong>
+                                <small>
+                                  · {allowanceResetCopy.expires}{" "}
+                                  {allowanceResetCardFormatter.format(new Date(card.expires_at))}
+                                </small>
+                              </span>
+                            </>
+                          ) : <span>{allowanceResetCopy.empty}</span>;
                         })()}
                       </button>
                       {allowanceResetMenuOpen && allowanceResetCards?.length ? (
@@ -1898,9 +1994,9 @@ function SettingsDialog({
                               <AllowanceCardIcon card={card} />
                               <span>
                                 <strong>{card.kind === "full_refill"
-                                  ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill card")
+                                  ? allowanceResetCopy.fullCard
                                   : `+${numberFormatter.format(card.credits)} ${t("settings.model.credits")}`}</strong>
-                                <small>{locale === "zh-CN" ? "有效期至" : "Expires"} {allowanceResetCardFormatter.format(new Date(card.expires_at))}</small>
+                                <small>{allowanceResetCopy.expires} {allowanceResetCardFormatter.format(new Date(card.expires_at))}</small>
                               </span>
                               {card.id === selectedAllowanceResetCardId ? <i aria-hidden="true">✓</i> : null}
                             </button>
@@ -1916,10 +2012,10 @@ function SettingsDialog({
                         onClick={() => void redeemAllowanceResetCard()}
                       >
                         {allowanceResetState === "redeeming"
-                          ? locale === "zh-CN" ? "使用中…" : "Using…"
+                          ? allowanceResetCopy.using
                           : allowanceResetConfirmationOpen
-                            ? locale === "zh-CN" ? "确认兑换" : "Confirm"
-                            : locale === "zh-CN" ? "使用重置卡" : "Use card"}
+                            ? allowanceResetCopy.confirm
+                            : allowanceResetCopy.use}
                       </button>
                       {allowanceResetConfirmationOpen ? (
                         <button
@@ -1927,7 +2023,7 @@ function SettingsDialog({
                           className="btn settings-model-reset-cancel"
                           onClick={() => setAllowanceResetConfirmationOpen(false)}
                         >
-                          {locale === "zh-CN" ? "取消" : "Cancel"}
+                          {allowanceResetCopy.cancel}
                         </button>
                       ) : null}
                     </div>
@@ -1971,7 +2067,7 @@ function SettingsDialog({
                   disabled={managedUsageState === "loading"}
                   onClick={() => void refreshManagedUsage()}
                 >
-                  {t("settings.model.refreshUsage")}
+                  {allowanceResetCopy.refresh}
                 </button>
               ) : null}
             </div>
@@ -2060,7 +2156,6 @@ function SettingsDialog({
                 />
               </label>
             </div>
-            <p className="settings-model-security-note">{t("settings.model.securityNote")}</p>
           </>
         )}
         </section>

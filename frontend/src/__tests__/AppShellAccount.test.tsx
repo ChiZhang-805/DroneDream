@@ -146,8 +146,8 @@ describe("workspace account entry", () => {
       "Tuning Chat",
       "Experiment Builder",
       "Lab workspace",
-      "Hardware laboratory",
-      "Validation & Evidence",
+      "Hardware Lab",
+      "Evidence Review",
       "Run History",
     ]);
 

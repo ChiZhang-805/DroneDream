@@ -204,7 +204,7 @@ try {
     await page.goto(`${origin}/assistant?edition=lab&docsPreview=1`, { waitUntil: "networkidle" });
     const assistantTitle = testCase.locale === "en"
       ? "What validation experiment should we build?"
-      : "想创建怎样的飞行调优实验？";
+      : "\u60f3\u521b\u5efa\u600e\u6837\u7684\u9a8c\u8bc1\u5b9e\u9a8c\uff1f";
     await page.getByRole("heading", { name: assistantTitle }).waitFor();
     const assistant = page.locator('.experiment-assistant-page[data-brand-edition="lab"]');
     assert.equal(await assistant.getAttribute("data-grants-hardware-authority"), "false");

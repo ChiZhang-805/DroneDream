@@ -187,7 +187,7 @@ afterEach(() => {
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "Validation & Evidence" }))
+    expect(screen.getByRole("link", { name: "Evidence Review" }))
       .toHaveAttribute("href", "/lab/validation");
     expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));

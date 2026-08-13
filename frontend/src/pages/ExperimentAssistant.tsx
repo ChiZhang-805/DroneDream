@@ -75,7 +75,10 @@ import {
   managedModelAvailableForAssistant,
   type ManagedModelCatalogEntry,
 } from "../features/settings/cloudModelAccess";
-import { useI18n } from "../i18n/I18nProvider";
+import {
+  useI18n,
+  type InterfaceLocale,
+} from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type {
   ExperimentAssistantDocumentContext,
@@ -289,6 +292,47 @@ const EDITION_ASSISTANT_COPY: Record<BrandEditionId, EditionAssistantCopy> = {
         body: "Draft a disturbance-recovery field trial with live telemetry, an independent holdout, safety boundaries, and a rollback plan.",
       },
     ],
+  },
+};
+
+const EDITION_ASSISTANT_TITLES: Readonly<
+  Record<InterfaceLocale, Readonly<Record<BrandEditionId, string>>>
+> = {
+  en: {
+    universal: "What should DroneDream design with you?",
+    sim: "What flight experiment should we build?",
+    lab: "What validation experiment should we build?",
+    field: "What real-device task should we prepare?",
+  },
+  "zh-CN": {
+    universal: "想让 DroneDream 与你设计什么？",
+    sim: "想创建怎样的飞行调优实验？",
+    lab: "想创建怎样的验证实验？",
+    field: "想准备怎样的真机任务？",
+  },
+  "zh-TW": {
+    universal: "想讓 DroneDream 與你設計什麼？",
+    sim: "想建立怎樣的飛行調校實驗？",
+    lab: "想建立怎樣的驗證實驗？",
+    field: "想準備怎樣的實機任務？",
+  },
+  es: {
+    universal: "¿Qué debería diseñar DroneDream contigo?",
+    sim: "¿Qué experimento de vuelo creamos?",
+    lab: "¿Qué experimento de validación creamos?",
+    field: "¿Qué tarea de vuelo real preparamos?",
+  },
+  ja: {
+    universal: "DroneDreamと何を設計しますか？",
+    sim: "どんな飛行実験を作りますか？",
+    lab: "どんな検証実験を作りますか？",
+    field: "どんな実機タスクを準備しますか？",
+  },
+  ko: {
+    universal: "DroneDream과 무엇을 설계할까요?",
+    sim: "어떤 비행 실험을 만들까요?",
+    lab: "어떤 검증 실험을 만들까요?",
+    field: "어떤 실기체 작업을 준비할까요?",
   },
 };
 
@@ -527,18 +571,21 @@ function assistantErrorMessage(
 export function ExperimentAssistant() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { locale } = useI18n();
+  const { interfaceLocale, locale } = useI18n();
   const editionTheme = useEditionTheme();
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
   const copy = COPY[locale];
-  const editionCopy = locale === "en"
-    ? EDITION_ASSISTANT_COPY[editionTheme.id]
-    : {
-        title: copy.title,
-        openDraft: copy.openExperiment,
-        examples: copy.examples,
-      };
+  const editionCopy = {
+    ...(locale === "en"
+      ? EDITION_ASSISTANT_COPY[editionTheme.id]
+      : {
+          title: copy.title,
+          openDraft: copy.openExperiment,
+          examples: copy.examples,
+        }),
+    title: EDITION_ASSISTANT_TITLES[interfaceLocale][editionTheme.id],
+  };
   const requestedWorkspaceId = (() => {
     const value = searchParams.get("experiment")?.trim() ?? "";
     return /^[a-zA-Z0-9_-]{8,128}$/u.test(value) ? value : null;
