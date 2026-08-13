@@ -284,6 +284,43 @@ async function verifySettings(page, testCase) {
     assert.equal(await modelMenu.locator(".model-provider-logo-kimi").count(), 2);
     assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: "Default" }).count(), 1);
     assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: "Custom" }).count(), 1);
+    const measureSelectedModel = async () => assistantModel.evaluate((element) => {
+      const logo = element.querySelector(".model-provider-logo");
+      const label = element.querySelector(":scope > span");
+      const chevron = element.querySelector(":scope > svg:last-child");
+      if (!(logo instanceof SVGElement) || !(label instanceof HTMLElement) || !(chevron instanceof SVGElement)) {
+        throw new Error("Model picker trigger is missing a logo, label, or chevron");
+      }
+      const buttonBounds = element.getBoundingClientRect();
+      const labelBounds = label.getBoundingClientRect();
+      const chevronBounds = chevron.getBoundingClientRect();
+      return {
+        buttonWidth: buttonBounds.width,
+        labelToChevron: chevronBounds.left - labelBounds.right,
+        chevronToButtonEdge: buttonBounds.right - chevronBounds.right,
+      };
+    });
+    const longOption = defaultModelOptions.filter({ hasText: "DeepSeek V4 Flash" });
+    await longOption.click();
+    const longMetrics = await measureSelectedModel();
+    await assistantModel.click();
+    await modelMenu.waitFor();
+    await defaultModelOptions.filter({ hasText: "Kimi K3" }).click();
+    const shortMetrics = await measureSelectedModel();
+    assert(
+      Math.abs(longMetrics.labelToChevron - shortMetrics.labelToChevron) <= 1,
+      `${testCase.id}: model label-to-chevron spacing changes with label length`,
+    );
+    assert(
+      shortMetrics.buttonWidth < longMetrics.buttonWidth,
+      `${testCase.id}: short model selection does not shrink to its content`,
+    );
+    assert(
+      Math.abs(longMetrics.chevronToButtonEdge - shortMetrics.chevronToButtonEdge) <= 1,
+      `${testCase.id}: chevron edge padding changes with label length`,
+    );
+    await assistantModel.click();
+    await modelMenu.waitFor();
     await assistantModel.scrollIntoViewIfNeeded();
     assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
     await assistantModel.click();

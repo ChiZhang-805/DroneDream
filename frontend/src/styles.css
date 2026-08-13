@@ -9304,8 +9304,9 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
 
 .assistant-model-button {
   display: inline-flex;
+  width: max-content;
   max-width: 18rem;
-  min-width: 10.5rem;
+  min-width: 0;
   align-items: center;
   justify-content: flex-start;
   gap: 0.48rem;
@@ -9321,6 +9322,7 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
 
 .assistant-model-button > span {
   min-width: 0;
+  max-width: 13rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -9329,7 +9331,7 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
 .assistant-model-button > svg:last-child {
   width: 0.9rem;
   height: 0.9rem;
-  margin-left: auto;
+  margin-left: 0;
   flex: 0 0 auto;
 }
 
