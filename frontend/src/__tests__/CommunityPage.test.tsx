@@ -207,8 +207,9 @@ describe("CommunityPage public data loading", () => {
 
     const topics = [
       ...Array.from({ length: 10 }, (_, index) => makeTopic(index + 1, `First page ${index + 1}`)),
-      makeTopic(11, "This title is deliberately longer than twenty eight characters"),
-      ...Array.from({ length: 8 }, (_, index) => makeTopic(index + 12, `Short ${index + 1}`)),
+      makeTopic(11, "Short ranked first"),
+      makeTopic(12, "This title is deliberately longer than twenty eight characters"),
+      ...Array.from({ length: 7 }, (_, index) => makeTopic(index + 13, `Short ${index + 2}`)),
     ];
     const pages = packCommunityTopicPages(topics);
 
@@ -216,7 +217,11 @@ describe("CommunityPage public data loading", () => {
     expect(pages[0]).toHaveLength(10);
     expect(pages[0].every(({ isLong }) => !isLong)).toBe(true);
     expect(pages[1]).toHaveLength(9);
-    expect(pages[1][0].isLong).toBe(true);
+    expect(pages[1].map(({ topic }) => topic.id)).toEqual(
+      topics.slice(10).map(({ id }) => id),
+    );
+    expect(pages[1][0].isLong).toBe(false);
+    expect(pages[1][1].isLong).toBe(true);
     expect(pages[1].reduce((units, topic) => units + (topic.isLong ? 2 : 1), 0)).toBe(10);
   });
 
