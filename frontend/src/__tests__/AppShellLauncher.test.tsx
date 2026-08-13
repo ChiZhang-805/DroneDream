@@ -214,9 +214,7 @@ describe("desktop launcher chrome", () => {
     await waitFor(() => {
       expect(apiClient.getUserExperiencePreferences).toHaveBeenCalledTimes(1);
     });
-    const memory = await within(dialog).findByLabelText(
-      /Learn from my verified experiment outcomes/,
-    );
+    const memory = await within(dialog).findByLabelText(/Cross-session memory/);
     expect(memory).not.toBeChecked();
     fireEvent.click(memory);
     fireEvent.change(within(dialog).getByLabelText("Default starter template"), {
@@ -301,11 +299,11 @@ describe("desktop launcher chrome", () => {
     expect(within(dialog).getByRole("button", { name: "简体中文" }).querySelector("svg"))
       .toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("tab", { name: "Model" }));
-    expect(within(dialog).getByRole("button", { name: /Included allowance/ }))
+    expect(within(dialog).getByRole("button", { name: /Default models/ }))
       .toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).getByRole("link", { name: "Manage subscription" }))
       .toHaveAttribute("href", "https://getdronedream.com/pricing/");
-    fireEvent.click(within(dialog).getByRole("button", { name: /Use my API key/ }));
+    fireEvent.click(within(dialog).getByRole("button", { name: /Custom \/ BYOK/ }));
     expect(within(dialog).getByLabelText("Model profile")).toHaveValue("default");
 
     fireEvent.change(within(dialog).getByLabelText("Model provider"), {

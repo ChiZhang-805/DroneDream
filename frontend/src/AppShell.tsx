@@ -291,6 +291,18 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
     credit_policy_version: 1,
   },
   recent_requests: [],
+  allowance_reset_cards: [
+    {
+      id: "preview-reset-august",
+      credits: 2_000,
+      expires_at: "2026-08-31T23:59:59Z",
+    },
+    {
+      id: "preview-reset-december",
+      credits: 2_000,
+      expires_at: "2026-12-31T23:59:59Z",
+    },
+  ],
 };
 
 const DOCS_PREVIEW_MANAGED_MODELS: ManagedModelCatalogEntry[] =
@@ -577,6 +589,8 @@ function SettingsDialog({
   const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
     docsPreview ? DOCS_PREVIEW_MANAGED_MODELS : DEFAULT_MANAGED_MODEL_CATALOG,
   );
+  const [selectedAllowanceResetCardId, setSelectedAllowanceResetCardId] =
+    useState("");
   const [, setExperiencePreferences] =
     useState<UserExperiencePreferences | null>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
@@ -790,6 +804,20 @@ function SettingsDialog({
         ),
       )
     : 0;
+  const allowanceResetCards = managedUsage?.allowance_reset_cards;
+  const allowanceResetCardFormatter = new Intl.DateTimeFormat(
+    locale === "zh-CN" ? "zh-CN" : "en",
+    { dateStyle: "medium" },
+  );
+  useEffect(() => {
+    if (!allowanceResetCards || allowanceResetCards.length === 0) {
+      setSelectedAllowanceResetCardId("");
+      return;
+    }
+    if (!allowanceResetCards.some((card) => card.id === selectedAllowanceResetCardId)) {
+      setSelectedAllowanceResetCardId(allowanceResetCards[0]?.id ?? "");
+    }
+  }, [allowanceResetCards, selectedAllowanceResetCardId]);
   const [activeSettingsTab, setActiveSettingsTab] =
     useState<SettingsSurfaceTabId>("general");
   const settingsTabs: readonly SettingsSurfaceTab[] = [
@@ -866,9 +894,9 @@ function SettingsDialog({
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
         <section className="settings-general-panel">
-          <div className="settings-general-card">
+          <div className="settings-general-card settings-language-card">
             <div className="settings-card-heading">
-              <span><SlidersHorizontal aria-hidden="true" />{locale === "zh-CN" ? "界面" : "Interface"}</span>
+              <span><LanguageRegionIcon region="west" />{locale === "zh-CN" ? "语言" : "Language"}</span>
             </div>
             <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
               <button
@@ -894,6 +922,11 @@ function SettingsDialog({
                 <i aria-hidden="true">✓</i>
               </button>
             </fieldset>
+          </div>
+          <div className="settings-general-card settings-interface-card">
+            <div className="settings-card-heading">
+              <span><SlidersHorizontal aria-hidden="true" />{locale === "zh-CN" ? "界面" : "Interface"}</span>
+            </div>
             <div
               className="settings-appearance-options"
               role="group"
@@ -906,7 +939,8 @@ function SettingsDialog({
                 onClick={() => editionTheme.setAppearance("dark")}
               >
                 <Moon aria-hidden="true" />
-                <span>{t("settings.general.dark")}</span>
+                <strong>{t("settings.general.dark")}</strong>
+                <i aria-hidden="true">✓</i>
               </button>
               <button
                 type="button"
@@ -915,7 +949,8 @@ function SettingsDialog({
                 onClick={() => editionTheme.setAppearance("light")}
               >
                 <Sun aria-hidden="true" />
-                <span>{t("settings.general.light")}</span>
+                <strong>{t("settings.general.light")}</strong>
+                <i aria-hidden="true">✓</i>
               </button>
             </div>
           </div>
@@ -966,7 +1001,7 @@ function SettingsDialog({
             rel="noreferrer"
             onClick={(event) => onOpenExternal(event, ECE498BH_COURSE_URL)}
           >
-            {locale === "zh-CN" ? "访问课程网站" : "Visit course website"}
+            {locale === "zh-CN" ? "打开课程" : "Open course"}
           </a>
         </section>
       </EditionSettingsPanel>
@@ -984,24 +1019,26 @@ function SettingsDialog({
             )}
           </span>
         </div>
-        <div className="settings-memory-switches">
-          <SettingsToggle
-            checked={experiencePreferenceDraft.memory_enabled}
-            disabled={experiencePreferenceControlsDisabled}
-            label={locale === "zh-CN" ? "跨会话记忆" : "Cross-session memory"}
-            onChange={(checked) => setExperiencePreferenceDraft((current) => ({
-              ...current,
-              memory_enabled: checked,
-            }))}
-          />
-          <div className="settings-memory-scope-grid" aria-label={locale === "zh-CN" ? "记忆范围" : "Memory scope"}>
-            <span><Sparkles aria-hidden="true" />{locale === "zh-CN" ? "对话偏好" : "Chat preferences"}</span>
-            <span><SlidersHorizontal aria-hidden="true" />{locale === "zh-CN" ? "实验默认值" : "Experiment defaults"}</span>
-            <span><RadioTower aria-hidden="true" />{locale === "zh-CN" ? "设备与机型" : "Device and vehicle"}</span>
-            <span><ShieldCheck aria-hidden="true" />{locale === "zh-CN" ? "指标与约束" : "Metrics and constraints"}</span>
+        <div className="settings-memory-body">
+          <div className="settings-memory-switches">
+            <SettingsToggle
+              checked={experiencePreferenceDraft.memory_enabled}
+              disabled={experiencePreferenceControlsDisabled}
+              label={locale === "zh-CN" ? "跨会话记忆" : "Cross-session memory"}
+              onChange={(checked) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                memory_enabled: checked,
+              }))}
+            />
+            <div className="settings-memory-scope-grid" aria-label={locale === "zh-CN" ? "记忆范围" : "Memory scope"}>
+              <span><Sparkles aria-hidden="true" />{locale === "zh-CN" ? "对话偏好" : "Chat preferences"}</span>
+              <span><SlidersHorizontal aria-hidden="true" />{locale === "zh-CN" ? "实验默认值" : "Experiment defaults"}</span>
+              <span><RadioTower aria-hidden="true" />{locale === "zh-CN" ? "设备与机型" : "Device and vehicle"}</span>
+              <span><ShieldCheck aria-hidden="true" />{locale === "zh-CN" ? "指标与约束" : "Metrics and constraints"}</span>
+            </div>
           </div>
-        </div>
-        <div className="settings-memory-grid">
+          <div className="settings-memory-defaults">
+            <div className="settings-memory-grid">
           <label htmlFor="settings_default_template">
             <span>{t("settings.memory.defaultTemplate")}</span>
             <select
@@ -1059,8 +1096,8 @@ function SettingsDialog({
               }))}
             />
           </label>
-        </div>
-        <div className="settings-memory-actions">
+            </div>
+            <div className="settings-memory-actions">
           <button
             type="button"
             className="btn btn-primary"
@@ -1099,6 +1136,8 @@ function SettingsDialog({
               </button>
             </div>
           )}
+            </div>
+          </div>
         </div>
         {experiencePreferenceState === "blocked" ? (
           <p className="settings-memory-message" role="status">
@@ -1231,6 +1270,34 @@ function SettingsDialog({
                     <span>{t("settings.model.outputTokens")}</span>
                     <strong>{numberFormatter.format(managedUsage.usage.output_tokens)}</strong>
                   </div>
+                </div>
+                <div className="settings-model-reset-row">
+                  <div>
+                    <span>{locale === "zh-CN" ? "额度重置卡" : "Allowance reset cards"}</span>
+                    <strong>{allowanceResetCards?.length ?? 0}</strong>
+                  </div>
+                  <label htmlFor="settings_allowance_reset_card">
+                    <span>{locale === "zh-CN" ? "准备使用" : "Ready to use"}</span>
+                    <select
+                      id="settings_allowance_reset_card"
+                      value={selectedAllowanceResetCardId}
+                      disabled={!allowanceResetCards?.length}
+                      onChange={(event) => setSelectedAllowanceResetCardId(event.target.value)}
+                    >
+                      {!allowanceResetCards?.length ? (
+                        <option value="">
+                          {locale === "zh-CN" ? "暂无可用重置卡" : "No reset cards available"}
+                        </option>
+                      ) : allowanceResetCards.map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {numberFormatter.format(card.credits)} {t("settings.model.credits")}
+                          {" · "}
+                          {locale === "zh-CN" ? "有效期至" : "expires"}{" "}
+                          {allowanceResetCardFormatter.format(new Date(card.expires_at))}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
               </>
             ) : (

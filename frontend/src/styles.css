@@ -6602,8 +6602,8 @@ a {
 .launcher-settings-dialog {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  width: min(920px, calc(100vw - 24px));
-  height: min(700px, calc(100dvh - 24px));
+  width: min(860px, calc(100vw - 32px));
+  height: min(500px, calc(100dvh - 32px));
   max-height: none;
   overflow: hidden;
   padding: 0.9rem;
@@ -7266,8 +7266,8 @@ a {
 
 .settings-model-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 0.75rem;
+  grid-template-rows: auto auto auto;
+  gap: 0.42rem;
   height: 100%;
   margin-top: 0;
   padding-top: 0;
@@ -7276,8 +7276,8 @@ a {
 
 .settings-memory-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-  gap: 0.72rem;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 0.52rem;
   height: 100%;
   align-content: start;
   margin-top: 0;
@@ -7363,8 +7363,8 @@ a {
 
 .settings-general-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 0.8rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
   height: 100%;
 }
 
@@ -7372,9 +7372,9 @@ a {
 .settings-memory-switches {
   display: grid;
   align-content: start;
-  gap: 0.7rem;
+  gap: 0.55rem;
   min-width: 0;
-  padding: 1rem;
+  padding: 0.72rem;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, var(--border));
   border-radius: 15px;
   background: color-mix(in srgb, var(--panel) 94%, transparent);
@@ -7395,9 +7395,41 @@ a {
   color: var(--dd-brand-middle);
 }
 
+.settings-language-card,
+.settings-interface-card {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.settings-language-card .launcher-language-options,
+.settings-interface-card .settings-appearance-options {
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  height: 100%;
+}
+
+.settings-interface-card .settings-appearance-options button {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  justify-content: initial;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgba(206, 174, 255, 0.14);
+  border-radius: 13px;
+  text-align: left;
+}
+
+.settings-interface-card .settings-appearance-options button i {
+  color: transparent;
+  font-style: normal;
+}
+
+.settings-interface-card .settings-appearance-options button.selected i {
+  color: var(--dd-brand-start);
+}
+
 .settings-notification-card {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: auto repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+  grid-template-rows: auto repeat(4, auto);
 }
 
 .settings-notification-card .settings-card-heading {
@@ -7407,11 +7439,11 @@ a {
 .settings-toggle-row {
   position: relative;
   display: flex;
-  min-height: 45px;
+  min-height: 38px;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.55rem 0.65rem;
+  padding: 0.38rem 0.55rem;
   border-radius: 11px;
   background: color-mix(in srgb, var(--muted) 7%, transparent);
   font-size: 0.78rem;
@@ -7466,13 +7498,27 @@ a {
 }
 
 .settings-memory-switches {
-  grid-template-columns: minmax(200px, 0.72fr) minmax(0, 1.28fr);
-  align-items: stretch;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.settings-memory-body {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.78fr) minmax(0, 1.42fr);
+  gap: 0.6rem;
+  min-height: 0;
+}
+
+.settings-memory-defaults {
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
 .settings-memory-scope-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.45rem;
 }
 
@@ -7490,10 +7536,10 @@ a {
 
 .settings-memory-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
   min-height: 0;
-  padding: 0.8rem;
+  padding: 0.58rem;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, var(--border));
   border-radius: 15px;
   background: color-mix(in srgb, var(--panel) 94%, transparent);
@@ -7515,7 +7561,7 @@ a {
 .settings-memory-grid select {
   width: 100%;
   min-width: 0;
-  min-height: 38px;
+  min-height: 34px;
   padding: 0.45rem 0.58rem;
   border: 1px solid rgba(206, 174, 255, 0.2);
   border-radius: 9px;
@@ -7586,8 +7632,8 @@ a {
 .settings-model-access-mode > button {
   display: grid;
   gap: 0.18rem;
-  min-height: 68px;
-  padding: 0.72rem 0.85rem;
+  min-height: 42px;
+  padding: 0.38rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: 14px;
   color: var(--text);
@@ -7612,10 +7658,10 @@ a {
 
 .settings-model-usage {
   display: grid;
-  grid-template-rows: auto auto auto auto 1fr auto;
-  gap: 0.78rem;
+  grid-template-rows: repeat(7, auto);
+  gap: 0.3rem;
   min-height: 0;
-  padding: 1rem;
+  padding: 0.5rem 0.58rem;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: color-mix(in srgb, var(--panel) 94%, transparent);
@@ -7641,7 +7687,7 @@ a {
 .settings-managed-model-row .assistant-model-button {
   min-width: 0;
   justify-content: flex-start;
-  padding: 0.58rem 0.72rem;
+  padding: 0.38rem 0.58rem;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, var(--border));
   background: color-mix(in srgb, var(--muted) 8%, transparent);
   color: inherit;
@@ -7675,7 +7721,7 @@ a {
 }
 
 .settings-model-quota-track {
-  height: 9px;
+  height: 7px;
   overflow: hidden;
   border-radius: 999px;
   background: color-mix(in srgb, var(--muted) 18%, transparent);
@@ -7699,7 +7745,7 @@ a {
   display: grid;
   gap: 0.12rem;
   min-width: 0;
-  padding: 0.55rem;
+  padding: 0.25rem 0.42rem;
   border-radius: 11px;
   background: color-mix(in srgb, var(--muted) 8%, transparent);
 }
@@ -7723,25 +7769,52 @@ a {
   min-width: 0;
 }
 
+.settings-model-reset-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+}
+
+.settings-model-reset-row > div,
+.settings-model-reset-row > label {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.settings-model-reset-row span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 680;
+}
+
+.settings-model-reset-row strong {
+  font-size: 0.9rem;
+}
+
+.settings-model-reset-row select {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, var(--border));
+  border-radius: 8px;
+  color: inherit;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  font: inherit;
+  font-size: 0.74rem;
+}
+
 @media (max-width: 720px) {
-  .settings-general-panel,
-  .settings-memory-switches {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-general-panel {
-    gap: 0.48rem;
-  }
-
-  .settings-notification-card {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto repeat(4, minmax(0, 1fr));
-  }
+  .settings-general-panel { gap: 0.48rem; }
 
   .settings-general-card,
-  .settings-memory-switches {
-    padding: 0.62rem;
-  }
+  .settings-memory-switches { padding: 0.62rem; }
 
   .settings-toggle-row {
     min-height: 37px;
@@ -7760,6 +7833,26 @@ a {
 }
 
 @media (max-width: 520px) {
+  .launcher-settings-panel {
+    overflow-y: auto;
+  }
+
+  .settings-general-panel,
+  .settings-memory-body {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .settings-general-card {
+    min-height: 0;
+  }
+
+  .settings-language-card .launcher-language-options,
+  .settings-interface-card .settings-appearance-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: 1fr;
+  }
+
   .settings-course-panel {
     grid-template-columns: auto minmax(0, 1fr);
     align-content: center;
@@ -7773,7 +7866,7 @@ a {
   }
 
   .settings-memory-scope-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .settings-managed-model-row {
@@ -7784,6 +7877,7 @@ a {
     right: -0.25rem;
     width: min(19rem, calc(100vw - 3rem));
   }
+
 }
 
 .settings-model-refresh {
@@ -9540,6 +9634,7 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
 
 .model-provider-logo,
 .model-provider-custom-logo {
+  --model-provider-color: currentColor;
   width: 1.12rem;
   height: 1.12rem;
   flex: 0 0 auto;
@@ -13993,7 +14088,8 @@ body {
 
 .app-shell:not(.app-shell-launcher) .settings-general-card,
 .app-shell:not(.app-shell-launcher) .settings-memory-switches,
-.app-shell:not(.app-shell-launcher) .settings-memory-grid {
+.app-shell:not(.app-shell-launcher) .settings-memory-grid,
+.app-shell:not(.app-shell-launcher) .settings-model-reset-row {
   border-color: color-mix(in srgb, var(--dd-brand-middle) 26%, #d9cddd);
   color: #251b28;
   background: linear-gradient(
@@ -14006,7 +14102,8 @@ body {
 .app-shell:not(.app-shell-launcher) .settings-general-card .settings-toggle-row,
 .app-shell:not(.app-shell-launcher) .settings-memory-scope-grid span,
 .app-shell:not(.app-shell-launcher) .settings-memory-grid input,
-.app-shell:not(.app-shell-launcher) .settings-memory-grid select {
+.app-shell:not(.app-shell-launcher) .settings-memory-grid select,
+.app-shell:not(.app-shell-launcher) .settings-model-reset-row select {
   color: #2c2130;
   background: rgba(255, 255, 255, 0.72);
 }

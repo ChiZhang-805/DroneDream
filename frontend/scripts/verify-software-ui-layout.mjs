@@ -471,8 +471,11 @@ async function verifySettings(page, testCase) {
   assert.equal(metrics.accessModeColor, "rgb(30, 23, 33)");
   assert.equal(metrics.headingColor, "rgb(30, 23, 33)");
   const manage = usage.locator(".settings-model-plan-row .btn");
+  const resetCards = usage.locator("#settings_allowance_reset_card");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
+  await page.keyboard.press("Tab");
+  assert(await resetCards.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("Tab");
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");

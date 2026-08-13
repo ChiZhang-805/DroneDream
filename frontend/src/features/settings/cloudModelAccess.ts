@@ -47,6 +47,12 @@ export interface ManagedModelUsageRequest {
   settled_at: string | null;
 }
 
+export interface ManagedAllowanceResetCard {
+  id: string;
+  credits: number;
+  expires_at: string;
+}
+
 export interface ManagedModelUsageSnapshot {
   plan: ManagedModelPlan;
   account?: {
@@ -61,6 +67,7 @@ export interface ManagedModelUsageSnapshot {
   };
   usage: ManagedModelUsageTotals;
   recent_requests: ManagedModelUsageRequest[];
+  allowance_reset_cards?: ManagedAllowanceResetCard[];
 }
 
 export interface ManagedModelGrant {
