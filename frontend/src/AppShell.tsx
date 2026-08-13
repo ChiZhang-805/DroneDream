@@ -536,7 +536,7 @@ function SettingsDialog({
     );
   const [managedUsageError, setManagedUsageError] = useState<string | null>(null);
   const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
-    docsPreview ? DOCS_PREVIEW_MANAGED_MODELS : [],
+    docsPreview ? DOCS_PREVIEW_MANAGED_MODELS : DEFAULT_MANAGED_MODEL_CATALOG,
   );
   const [managedModelsError, setManagedModelsError] = useState<string | null>(null);
   const [subscriptionOpenError, setSubscriptionOpenError] =
@@ -612,7 +612,7 @@ function SettingsDialog({
       })
       .catch((error) => {
         if (!active) return;
-        setManagedModels([]);
+        setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
         setManagedModelsError(error instanceof Error ? error.message : t("settings.model.usageUnavailable"));
       });
     return () => {

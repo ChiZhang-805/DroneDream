@@ -341,7 +341,7 @@ describe("conversational experiment drafting", () => {
       screen.getByRole("menuitem", { name: "Import files" }),
     ).toBeVisible();
     expect(screen.getByRole("combobox", { name: "Model" }))
-      .toHaveValue("default");
+      .toHaveTextContent("qwen-plus");
   });
 
   it("shows only centrally available managed models without exposing a key", () => {
@@ -357,19 +357,19 @@ describe("conversational experiment drafting", () => {
     );
 
     const selector = screen.getByRole("combobox", { name: "Model" });
-    expect(selector).toHaveValue("managed:openai:gpt-4.1");
-    expect(selector).toHaveTextContent("GPT 4.1 · gpt-4.1");
-    expect(selector).toHaveTextContent("DeepSeek V4 Flash · deepseek-v4-flash");
-    expect(selector).toHaveTextContent("Kimi K3 · kimi-k3");
+    expect(selector).toHaveTextContent("GPT 4.1");
+    fireEvent.click(selector);
+    expect(screen.getAllByRole("option")).toHaveLength(7);
+    expect(screen.getByRole("option", { name: /DeepSeek V4 Flash/ })).toBeVisible();
+    expect(screen.getByRole("option", { name: /Kimi K2.6/ })).toBeVisible();
+    expect(screen.getByRole("option", { name: /Kimi K3/ })).toBeVisible();
     expect(selector).not.toHaveTextContent("key required");
 
-    fireEvent.change(selector, {
-      target: { value: "managed:deepseek:deepseek-v4-pro" },
-    });
-    expect(selector).toHaveValue("managed:deepseek:deepseek-v4-pro");
+    fireEvent.click(screen.getByRole("option", { name: /DeepSeek V4 Pro/ }));
+    expect(selector).toHaveTextContent("DeepSeek V4 Pro");
   });
 
-  it("fails closed when a signed-out build has no managed model policy", () => {
+  it("shows the default catalog while signed out without granting execution", () => {
     render(
       <I18nProvider>
         <MemoryRouter>
@@ -381,11 +381,10 @@ describe("conversational experiment drafting", () => {
     );
 
     const selector = screen.getByRole("combobox", { name: "Model" });
-    expect(selector).toBeDisabled();
-    expect(selector).toHaveValue("none");
-    expect(selector).toHaveTextContent(
-      "No managed conversation model is currently available.",
-    );
+    expect(selector).toBeEnabled();
+    expect(selector).toHaveTextContent("GPT 4.1");
+    fireEvent.click(selector);
+    expect(screen.getAllByRole("option")).toHaveLength(7);
   });
 
   it("inserts only a template body and keeps its heading out of the prompt", () => {

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,11 +33,18 @@ describe("public web assistant model boundary", () => {
 
     const modelSelector = screen.getByRole("combobox", { name: "Model" });
     expect(modelSelector).toBeEnabled();
-    expect(modelSelector).toHaveValue("managed:openai:gpt-4.1");
-    expect(modelSelector.querySelectorAll("option")).toHaveLength(7);
-    expect(modelSelector).toHaveTextContent("GPT");
-    expect(modelSelector).toHaveTextContent("DeepSeek");
-    expect(modelSelector).toHaveTextContent("Kimi K3");
-    expect(modelSelector).not.toHaveTextContent("Qwen");
+    expect(modelSelector).toHaveTextContent("GPT 4.1");
+    fireEvent.click(modelSelector);
+    const defaultModels = screen.getAllByRole("option");
+    expect(defaultModels).toHaveLength(7);
+    expect(defaultModels.map((item) => item.textContent)).toEqual(expect.arrayContaining([
+      expect.stringContaining("GPT 5.4"),
+      expect.stringContaining("DeepSeek V4 Pro"),
+      expect.stringContaining("Kimi K2.6"),
+      expect.stringContaining("Kimi K3"),
+    ]));
+    expect(screen.getByText("Default")).toBeVisible();
+    expect(screen.getByText("Custom")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Add custom model/ })).toBeVisible();
   });
 });

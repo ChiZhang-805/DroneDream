@@ -38,9 +38,9 @@ process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 
 const cases = [
   { id: "desktop-en", locale: "en", edition: "universal", viewport: { width: 1440, height: 1000 } },
-  { id: "desktop-zh", locale: "zh-CN", edition: "sim", viewport: { width: 1440, height: 1000 } },
+  { id: "desktop-zh", locale: "zh-CN", edition: "field", viewport: { width: 1440, height: 1000 } },
   { id: "tablet-en", locale: "en", edition: "lab", viewport: { width: 760, height: 900 } },
-  { id: "tablet-zh", locale: "zh-CN", edition: "field", viewport: { width: 760, height: 900 } },
+  { id: "tablet-zh", locale: "zh-CN", edition: "sim", viewport: { width: 760, height: 900 } },
   { id: "mobile-en", locale: "en", edition: "universal", viewport: { width: 390, height: 844 } },
   { id: "mobile-zh", locale: "zh-CN", edition: "field", viewport: { width: 390, height: 844 } },
 ].filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
@@ -159,6 +159,77 @@ async function openAccountCropper(page, avatarBytes) {
   return { account, cropper };
 }
 
+async function verifyEditionSwitcher(page, testCase) {
+  const trigger = page.locator(".universal-mode-switch-trigger");
+  await trigger.waitFor();
+  const triggerMetrics = await trigger.evaluate((element) => {
+    const image = element.querySelector(".workspace-switch-brand img");
+    const chevron = element.querySelector(".universal-mode-switch-chevron");
+    if (!(image instanceof HTMLImageElement) || !(chevron instanceof SVGElement)) {
+      throw new Error("Edition switch trigger is missing its lockup or chevron");
+    }
+    const imageBounds = image.getBoundingClientRect();
+    const chevronBounds = chevron.getBoundingClientRect();
+    return {
+      imageHeight: imageBounds.height,
+      imageWidth: imageBounds.width,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      gapToChevron: chevronBounds.left - imageBounds.right,
+      fitsTrigger: imageBounds.right <= chevronBounds.left - 8,
+    };
+  });
+  const minimumHeight = testCase.viewport.width <= 520 ? 18 : 30;
+  assert(
+    triggerMetrics.imageHeight >= minimumHeight,
+    `${testCase.id}: edition lockup is still too small: ${JSON.stringify(triggerMetrics)}`,
+  );
+  assert(triggerMetrics.naturalWidth > 0 && triggerMetrics.naturalHeight > 0);
+  assert(triggerMetrics.fitsTrigger, `${testCase.id}: edition lockup overlaps the chevron`);
+  if (testCase.edition === "field" && testCase.viewport.width >= 1000) {
+    assert(
+      triggerMetrics.gapToChevron <= 48,
+      `${testCase.id}: FIELD lockup leaves excessive space before the chevron`,
+    );
+  }
+
+  await trigger.click();
+  const menu = page.locator(".universal-mode-switch-menu");
+  await menu.waitFor();
+  const menuMetrics = await menu.locator('[role="menuitemradio"]').evaluateAll((items) => (
+    items.map((item) => {
+      const image = item.querySelector(".workspace-switch-brand img");
+      if (!(image instanceof HTMLImageElement)) {
+        throw new Error("Edition menu item is missing its natural lockup image");
+      }
+      const itemBounds = item.getBoundingClientRect();
+      const imageBounds = image.getBoundingClientRect();
+      const check = item.querySelector(":scope > svg");
+      const checkBounds = check?.getBoundingClientRect();
+      return {
+        edition: item.querySelector(".workspace-switch-brand")?.getAttribute("data-brand-edition"),
+        imageHeight: imageBounds.height,
+        imageWidth: imageBounds.width,
+        rightClearance: (checkBounds?.left ?? itemBounds.right) - imageBounds.right,
+        fitsItem: imageBounds.right <= (checkBounds?.left ?? itemBounds.right) - 8,
+      };
+    })
+  ));
+  assert.deepEqual(
+    menuMetrics.map((metric) => metric.edition),
+    ["universal", "sim", "lab", "field"],
+  );
+  const menuMinimumHeight = testCase.viewport.width <= 520 ? 18 : 27;
+  assert(
+    menuMetrics.every((metric) => metric.imageHeight >= menuMinimumHeight && metric.fitsItem),
+    `${testCase.id}: one or more edition lockups do not fit after enlargement: ${JSON.stringify(menuMetrics)}`,
+  );
+  const image = await screenshot(page, testCase.id, "edition-switcher-lockups");
+  await trigger.click();
+  await menu.waitFor({ state: "detached" });
+  return { trigger: triggerMetrics, menu: menuMetrics, image };
+}
+
 async function verifySettings(page, testCase) {
   const settingsViewport = testCase.viewport.width === 1440
     ? { width: 1440, height: 900 }
@@ -170,6 +241,7 @@ async function verifySettings(page, testCase) {
     ? "/vehicle-studio"
     : "/assistant";
   await page.goto(`${origin}${settingsSurface}?docsPreview=1`, { waitUntil: "networkidle" });
+  const editionSwitcher = await verifyEditionSwitcher(page, testCase);
   const themeBinding = await page.locator("html").evaluate((element) => {
     const style = getComputedStyle(element);
     return {
@@ -191,7 +263,11 @@ async function verifySettings(page, testCase) {
   if (testCase.edition !== "universal") {
     const assistantModel = page.locator(".assistant-model-button");
     await assistantModel.waitFor();
-    const assistantModelLabels = await assistantModel.locator("option").allTextContents();
+    await assistantModel.click();
+    const modelMenu = page.locator(".assistant-model-menu");
+    await modelMenu.waitFor();
+    const defaultModelOptions = modelMenu.locator('[role="option"][data-model-type="default"]');
+    const assistantModelLabels = await defaultModelOptions.allTextContents();
     assert.equal(assistantModelLabels.length, 7);
     for (const expectedLabel of ["GPT 4.1", "GPT 5.1", "GPT 5.4", "DeepSeek V4 Flash", "DeepSeek V4 Pro", "Kimi K2.6", "Kimi K3"]) {
       assert(
@@ -203,8 +279,14 @@ async function verifySettings(page, testCase) {
       await assistantModel.getAttribute("aria-label"),
       testCase.locale === "en" ? "Model" : "模型",
     );
+    assert.equal(await modelMenu.locator(".model-provider-logo-openai").count(), 3);
+    assert.equal(await modelMenu.locator(".model-provider-logo-deepseek").count(), 2);
+    assert.equal(await modelMenu.locator(".model-provider-logo-kimi").count(), 2);
+    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: "Default" }).count(), 1);
+    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: "Custom" }).count(), 1);
     await assistantModel.scrollIntoViewIfNeeded();
     assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
+    await assistantModel.click();
   } else {
     await page.locator(".vehicle-studio-page").waitFor();
   }
@@ -354,6 +436,7 @@ async function verifySettings(page, testCase) {
   await dialog.locator(".launcher-settings-close").click();
   await page.setViewportSize(testCase.viewport);
   return {
+    editionSwitcher,
     ...metrics,
     themeBinding,
     layerBinding,

@@ -64,10 +64,8 @@ import {
   saveVehicleModel,
 } from "../features/vehicleStudio/storage";
 import { useVoiceInput } from "../features/experiment/useVoiceInput";
-import {
-  modelProviderLabel,
-  useModelAccess,
-} from "../features/settings/ModelAccessContext";
+import { useModelAccess } from "../features/settings/ModelAccessContext";
+import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   CloudModelAccessError,
   DEFAULT_MANAGED_MODEL_CATALOG,
@@ -586,15 +584,16 @@ export function ExperimentAssistant() {
     settings: modelAccess,
     profiles: modelProfiles,
     activeProfileId,
+    selectAccessMode,
     selectManagedModel,
     selectProfile,
   } = useModelAccess();
   const docsPreview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).has("docsPreview");
   const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
-    docsPreview ? DEFAULT_MANAGED_MODEL_CATALOG : [],
+    DEFAULT_MANAGED_MODEL_CATALOG,
   );
-  const [managedModelsReady, setManagedModelsReady] = useState(docsPreview);
+  const [managedModelsReady, setManagedModelsReady] = useState(true);
   const assistantManagedModels = managedModels;
   const configuredModelProfiles = modelProfiles.filter((profile) =>
     profile.apiKey.trim(),
@@ -603,15 +602,10 @@ export function ExperimentAssistant() {
     (model) => model.provider === modelAccess.managedProvider
       && model.model === modelAccess.managedModel,
   );
-  const selectedModelProfileId = modelAccess.accessMode === "platform"
-    ? selectedManagedModel
-      ? `managed:${selectedManagedModel.provider}:${selectedManagedModel.model}`
-      : "none"
-    : configuredModelProfiles.some(
-    (profile) => profile.id === activeProfileId,
-  )
+  const selectedCustomProfileId = modelAccess.accessMode === "byok"
+    && configuredModelProfiles.some((profile) => profile.id === activeProfileId)
       ? activeProfileId
-      : "none";
+      : null;
   const [draft, setDraft] = useState<AssistantDraft>(() =>
     initialWorkspace
       ? loadAssistantDraft(initialWorkspace.id)
@@ -639,14 +633,14 @@ export function ExperimentAssistant() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (modelAccess.accessMode !== "platform") return;
     if (docsPreview) {
+      setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
       setManagedModelsReady(true);
       return;
     }
     if (!auth?.account) {
-      setManagedModels([]);
-      setManagedModelsReady(false);
+      setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
+      setManagedModelsReady(true);
       return;
     }
     let active = true;
@@ -662,7 +656,7 @@ export function ExperimentAssistant() {
       })
       .catch(() => {
         if (!active) return;
-        setManagedModels([]);
+        setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
         setManagedModelsReady(true);
       });
     return () => {
@@ -671,7 +665,6 @@ export function ExperimentAssistant() {
   }, [
     auth?.account,
     docsPreview,
-    modelAccess.accessMode,
   ]);
 
   useEffect(() => {
@@ -1270,50 +1263,26 @@ export function ExperimentAssistant() {
             ) : null}
           </div>
           <span className="assistant-composer-spacer" />
-          <select
-            className="assistant-model-button"
-            aria-label={copy.model}
-            value={selectedModelProfileId}
+          <AssistantModelPicker
+            ariaLabel={copy.model}
+            defaultModels={assistantManagedModels}
+            customProfiles={configuredModelProfiles}
+            selectedDefault={modelAccess.accessMode === "platform" ? selectedManagedModel ?? null : null}
+            selectedCustomId={selectedCustomProfileId}
             disabled={
               pending
               || (modelAccess.accessMode === "platform" && !managedModelsReady)
             }
-            onChange={(event) => {
-              if (event.target.value.startsWith("managed:")) {
-                const selected = assistantManagedModels.find((model) =>
-                  `managed:${model.provider}:${model.model}` === event.target.value
-                );
-                if (selected) selectManagedModel(selected.provider, selected.model);
-              } else if (event.target.value !== "none") {
-                selectProfile(event.target.value);
-              }
+            onSelectDefault={(model) => {
+              selectAccessMode("platform");
+              selectManagedModel(model.provider, model.model);
             }}
-          >
-            {modelAccess.accessMode === "platform" ? (
-              assistantManagedModels.length ? (
-                assistantManagedModels.map((model) => (
-                  <option
-                    key={`${model.provider}:${model.model}`}
-                    value={`managed:${model.provider}:${model.model}`}
-                  >
-                    {model.display_name} · {model.model}
-                  </option>
-                ))
-              ) : (
-                <option value="none">{copy.managedUnavailable}</option>
-              )
-            ) : (
-              <>
-                <option value="none">{copy.noModel}</option>
-                {configuredModelProfiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {modelProviderLabel(profile.provider)} ·{" "}
-                    {profile.model.trim() || "default"}
-                  </option>
-                ))}
-              </>
-            )}
-          </select>
+            onSelectCustom={(profileId) => {
+              selectProfile(profileId);
+              selectAccessMode("byok");
+            }}
+            onOpenSettings={openAppSettings}
+          />
           <button
             type="button"
             className={`assistant-voice-button ${

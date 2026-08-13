@@ -14,6 +14,7 @@ import { useVoiceInput } from "../features/experiment/useVoiceInput";
 import {
   CloudModelAccessError,
   completeManagedModelChat,
+  DEFAULT_MANAGED_MODEL_CATALOG,
   getManagedModelCatalog,
   issueManagedModelGrant,
   type ManagedModelCatalogEntry,
@@ -273,8 +274,8 @@ export function FieldAssistantWorkspace({
 }) {
   const copy = COPY[locale];
   const modelAccess = useModelAccess();
-  const [models, setModels] = useState<ManagedModelCatalogEntry[]>([]);
-  const [catalogReady, setCatalogReady] = useState(false);
+  const [models, setModels] = useState<ManagedModelCatalogEntry[]>(DEFAULT_MANAGED_MODEL_CATALOG);
+  const [catalogReady, setCatalogReady] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [composer, setComposer] = useState("");
   const [plan, setPlan] = useState<FieldAssistantPlan | null>(null);
@@ -298,7 +299,7 @@ export function FieldAssistantWorkspace({
         setModels(catalog.models.filter((model) => model.enabled && model.assistant_enabled));
       })
       .catch(() => {
-        if (active) setModels([]);
+        if (active) setModels(DEFAULT_MANAGED_MODEL_CATALOG);
       })
       .finally(() => {
         if (active) setCatalogReady(true);
