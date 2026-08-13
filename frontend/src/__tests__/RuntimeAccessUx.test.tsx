@@ -183,7 +183,7 @@ afterEach(() => {
 
     expect(await screen.findByText("Runtime data is not available yet"))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Experiment Builder" }))
+    expect(screen.getByRole("link", { name: "Experiment" }))
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");
@@ -206,8 +206,6 @@ afterEach(() => {
       .toHaveTextContent(/course page could not be opened/i);
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByRole("link", { name: "Experiment" }))
-      .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
@@ -297,9 +295,6 @@ afterEach(() => {
     });
     expect(await screen.findByRole("link", { name: "+ New experiment" }))
       .toHaveAttribute("href", "/jobs/new");
-    expect(screen.queryByRole("link", { name: "Experiment" }))
-      .not.toBeInTheDocument();
-
     router.dispose();
     queryClient.clear();
   });

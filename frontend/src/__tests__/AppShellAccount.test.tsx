@@ -129,22 +129,22 @@ describe("workspace account entry", () => {
       "Vehicle Studio",
       "Dashboard",
       "Run History",
-      "Fixed Scenarios",
+      "Scenarios",
     ]);
 
     selectEdition(/DroneDream.*SIM/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Experiment Builder",
+      "Experiment",
       "Dashboard",
-      "Fixed Scenarios",
+      "Scenarios",
       "Run History",
     ]);
 
     selectEdition(/DroneDream.*LAB/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Experiment Builder",
+      "Experiment",
       "Lab workspace",
       "Hardware Lab",
       "Evidence Review",
