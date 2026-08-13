@@ -6700,7 +6700,7 @@ a {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.68rem;
 }
 
 .settings-course-mark {
@@ -6715,7 +6715,7 @@ a {
 
 .settings-course-mark svg { width: 25px; height: 25px; }
 .settings-course-panel h3 { margin: 0; font-size: 1.12rem; }
-.settings-course-overview p { max-width: 620px; margin: 0.24rem 0 0; color: #a99caf; font-size: 0.73rem; line-height: 1.42; }
+.settings-course-overview p { width: min(100%, 780px); margin: 0.24rem 0 0; color: #a99caf; font-size: 0.73rem; line-height: 1.42; }
 .settings-course-overview > a {
   padding: 0.72rem 1rem;
   border-radius: 999px;
@@ -6734,7 +6734,7 @@ a {
 
 .settings-course-editions article {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   align-content: start;
   gap: 0.55rem;
   min-width: 0;
@@ -6747,25 +6747,110 @@ a {
 .settings-course-editions .brand-lockup {
   max-width: 100%;
   height: 32px;
-  justify-self: start;
+  justify-self: center;
 }
 
 .settings-course-editions p {
   margin: 0;
   color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.48;
-  max-width: 19ch;
-  justify-self: start;
+  font-size: 0.69rem;
+  line-height: 1.4;
+  width: 100%;
+  min-height: 14em;
+  justify-self: stretch;
   text-align: justify;
   text-align-last: left;
   text-wrap: pretty;
-  overflow-wrap: normal;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.settings-course-edition-link {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  justify-self: stretch;
+  padding: 0.38rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 32%, transparent);
+  border-radius: 9px;
+  color: #fff;
+  background: var(--dd-brand-gradient);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .app-shell:not(.app-shell-launcher) .settings-course-panel {
   color: #241a26;
   background: linear-gradient(135deg, #fff, color-mix(in srgb, var(--dd-brand-light-surface) 82%, #fff));
+}
+
+@media (min-width: 521px) and (max-width: 900px) {
+  .settings-course-panel {
+    gap: 0.42rem;
+    padding: 0.55rem;
+  }
+
+  .settings-course-overview {
+    gap: 0.45rem;
+  }
+
+  .settings-course-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: 13px;
+  }
+
+  .settings-course-mark svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .settings-course-panel h3 {
+    font-size: 0.94rem;
+  }
+
+  .settings-course-overview p {
+    margin-top: 0.12rem;
+    font-size: 0.61rem;
+    line-height: 1.25;
+  }
+
+  .settings-course-overview > a {
+    padding: 0.5rem 0.62rem;
+    font-size: 0.66rem;
+  }
+
+  .settings-course-editions {
+    gap: 0.36rem;
+  }
+
+  .settings-course-editions article {
+    gap: 0.32rem;
+    padding: 0.5rem;
+  }
+
+  .settings-course-editions .brand-lockup {
+    height: 24px;
+  }
+
+  .settings-course-editions p {
+    min-height: 9em;
+    max-height: 9em;
+    font-size: 0.57rem;
+    line-height: 1.28;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 9;
+  }
+
+  .settings-course-edition-link {
+    min-height: 25px;
+    padding: 0.28rem 0.36rem;
+    font-size: 0.58rem;
+  }
 }
 
 .launcher-settings-tabs button {
@@ -7318,6 +7403,13 @@ a {
   border-top: 0;
 }
 
+.settings-model-panel-byok {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+  scrollbar-gutter: stable;
+}
+
 .settings-memory-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
@@ -7507,19 +7599,14 @@ a {
   gap: 0.5rem;
 }
 
-.settings-custom-color {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 0.45rem;
+.settings-custom-color-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
-
-.settings-custom-color input {
-  min-width: 0;
-  height: 32px;
-  box-sizing: border-box;
-}
-
-.settings-custom-color input[type="text"] { width: 100%; }
 
 .settings-notification-card .settings-card-heading {
   grid-column: 1 / -1;
@@ -7620,8 +7707,8 @@ a {
 .settings-memory-scope-grid {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: repeat(9, minmax(0, 1fr));
-  gap: 0.18rem;
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: 0.22rem;
   min-height: 0;
 }
 
@@ -7630,18 +7717,23 @@ a {
   min-width: 0;
   align-items: center;
   gap: 0.42rem;
-  padding: 0.5rem;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--muted) 7%, transparent);
-  font-size: 0.7rem;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
 .settings-memory-scope-grid .settings-toggle-row {
-  min-height: 24px;
-  padding: 0.18rem 0.42rem;
-  background: color-mix(in srgb, var(--muted) 7%, transparent);
-  font-size: 0.7rem;
+  min-height: 30px;
+  padding: 0.28rem 0.42rem;
+  background: transparent;
+  font-size: 0.78rem;
+}
+
+.settings-memory-switches > .settings-toggle-row {
+  min-height: 34px;
+  font-size: 0.84rem;
 }
 
 .settings-memory-scope-grid .settings-toggle-row > span {
@@ -7651,7 +7743,7 @@ a {
   gap: 0.4rem;
   padding: 0;
   background: transparent;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -7744,9 +7836,18 @@ a {
 }
 
 .settings-memory-actions .btn {
-  min-height: 30px;
-  padding: 0.35rem 0.62rem;
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 0.72rem;
   font-size: 0.72rem;
+  line-height: 1;
+}
+
+.settings-memory-actions .btn > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
 }
 
 .settings-memory-delete-confirm {
@@ -7945,16 +8046,18 @@ a {
 
 .settings-model-reset-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 0.68fr) auto;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.45rem;
   padding: 0.3rem 0.45rem;
   border-radius: 11px;
   background: color-mix(in srgb, var(--muted) 8%, transparent);
 }
 
-.settings-model-reset-action {
-  min-height: 28px;
+.settings-model-reset-action,
+.settings-model-refresh {
+  width: 96px;
+  min-height: 30px;
   padding: 0.3rem 0.58rem;
   white-space: nowrap;
   font-size: 0.7rem;
@@ -7964,7 +8067,7 @@ a {
   display: flex;
   justify-content: flex-end;
   gap: 0.32rem;
-  min-width: max-content;
+  min-width: 96px;
 }
 
 .settings-model-reset-cancel {
@@ -7982,7 +8085,8 @@ a {
 
 .settings-model-reset-message[role="alert"] { color: #ff8ca7; }
 
-.settings-model-reset-row > div,
+.settings-model-reset-summary,
+.settings-model-reset-controls,
 .settings-reset-card-picker {
   display: flex;
   align-items: center;
@@ -7990,16 +8094,21 @@ a {
   min-width: 0;
 }
 
-.settings-reset-card-picker {
-  position: relative;
-  display: grid;
-  grid-template-columns: max-content minmax(125px, 190px);
-  justify-self: end;
+.settings-model-reset-summary {
+  white-space: nowrap;
 }
 
-.settings-reset-card-picker > span {
-  white-space: nowrap;
-  word-break: keep-all;
+.settings-model-reset-controls {
+  display: grid;
+  grid-template-columns: minmax(128px, 1fr) auto;
+  justify-self: end;
+  width: min(100%, 410px);
+  gap: 0.32rem;
+}
+
+.settings-reset-card-picker {
+  position: relative;
+  width: 100%;
 }
 
 .settings-reset-card-trigger {
@@ -8015,6 +8124,7 @@ a {
   background: color-mix(in srgb, var(--panel) 96%, transparent);
   font: inherit;
   cursor: pointer;
+  width: 100%;
 }
 
 .settings-reset-card-icon {
@@ -8140,14 +8250,22 @@ a {
     overflow-y: auto;
   }
 
-  .settings-general-panel,
   .settings-memory-body {
     grid-template-columns: 1fr;
     height: auto;
   }
 
+  .settings-general-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr) minmax(0, 0.92fr);
+    gap: 0.32rem;
+    height: 100%;
+  }
+
   .settings-general-card {
     min-height: 0;
+    gap: 0.22rem;
+    padding: 0.4rem;
   }
 
   .settings-language-card .launcher-language-options,
@@ -8156,11 +8274,60 @@ a {
   }
 
   .settings-language-card .launcher-language-options {
-    grid-template-rows: repeat(6, minmax(2.75rem, auto));
+    grid-template-rows: repeat(6, minmax(0, 1fr));
   }
 
   .settings-interface-card .settings-appearance-options {
-    grid-template-rows: repeat(4, minmax(3.25rem, auto)) !important;
+    grid-template-rows: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .settings-language-card .launcher-language-options button,
+  .settings-interface-card .settings-appearance-options button {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    gap: 0.2rem;
+    padding: 0.24rem 0.3rem;
+    border-radius: 9px;
+  }
+
+  .settings-language-card .launcher-language-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 0.7rem;
+  }
+
+  .settings-language-card .launcher-language-options button strong,
+  .settings-interface-card .settings-appearance-options button strong {
+    font-size: 0.58rem;
+  }
+
+  .settings-interface-card .settings-appearance-options button svg,
+  .settings-card-heading svg {
+    width: 0.82rem;
+    height: 0.82rem;
+  }
+
+  .settings-card-heading > span {
+    gap: 0.28rem;
+    font-size: 0.66rem;
+  }
+
+  .settings-notification-card {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto repeat(4, minmax(0, 1fr));
+    gap: 0.22rem;
+  }
+
+  .settings-notification-card .settings-card-heading {
+    grid-column: 1 / -1;
+  }
+
+  .settings-notification-card .settings-toggle-row {
+    min-height: 0;
+    gap: 0.28rem;
+    padding: 0.22rem 0.32rem;
+    font-size: 0.56rem;
+    line-height: 1.12;
   }
 
   .settings-course-panel {
@@ -9258,7 +9425,7 @@ a {
 
 .app-shell:not(.app-shell-launcher) {
   color-scheme: light;
-  --bg: #f7f7fb;
+  --bg: color-mix(in srgb, var(--dd-brand-light-surface) 88%, #ffffff);
   --bg-elev: #ffffff;
   --bg-elev-2: #faf6fb;
   --bg-subtle: #f3edf6;
@@ -9267,23 +9434,31 @@ a {
   --text: #1e1721;
   --text-muted: #756c79;
   --text-dim: #443b48;
-  --primary: #c642ad;
-  --primary-strong: #8d43cc;
+  --primary: var(--dd-brand-middle);
+  --primary-strong: var(--dd-brand-end);
   --success: #157e61;
   --warning: #a56500;
   --danger: #c83b67;
-  --active: #a43db1;
-  --focus-ring: 0 0 0 3px rgba(198, 66, 173, 0.18);
+  --active: var(--dd-brand-start);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--dd-brand-middle) 18%, transparent);
   min-height: 100vh;
   background:
-    radial-gradient(circle at 92% 5%, rgba(234, 157, 224, 0.14), transparent 28rem),
-    radial-gradient(circle at 8% 92%, rgba(141, 67, 204, 0.08), transparent 30rem),
+    radial-gradient(
+      circle at 92% 5%,
+      color-mix(in srgb, var(--dd-brand-start) 13%, transparent),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 8% 92%,
+      color-mix(in srgb, var(--dd-brand-middle) 8%, transparent),
+      transparent 30rem
+    ),
     var(--bg);
   color: var(--text);
 }
 
 .app-shell:not(.app-shell-launcher) a {
-  color: #8a319d;
+  color: var(--dd-brand-end);
 }
 
 .app-shell:not(.app-shell-launcher) .app-sidebar {
@@ -9304,15 +9479,19 @@ a {
 }
 
 .app-shell:not(.app-shell-launcher) .app-nav-link:hover {
-  background: #faf1f9;
-  color: #8b328f;
+  background: color-mix(in srgb, var(--dd-brand-start) 11%, #ffffff);
+  color: var(--dd-brand-end);
 }
 
 .app-shell:not(.app-shell-launcher) .app-nav-link-active,
 .app-shell:not(.app-shell-launcher) .app-nav a.active {
-  background: linear-gradient(90deg, #f9e9f6, #f2eafb);
-  color: #8b328f;
-  box-shadow: inset 3px 0 0 #cb4eb3;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--dd-brand-start) 16%, #ffffff),
+    color-mix(in srgb, var(--dd-brand-middle) 11%, #ffffff)
+  );
+  color: var(--dd-brand-end);
+  box-shadow: inset 3px 0 0 var(--dd-brand-middle);
 }
 
 .app-shell:not(.app-shell-launcher) .app-sidebar-footer,
@@ -9370,8 +9549,12 @@ a {
   padding: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 76% 12%, rgba(214, 108, 218, 0.08), transparent 30rem),
-    #fbfafd;
+    radial-gradient(
+      circle at 76% 12%,
+      color-mix(in srgb, var(--dd-brand-middle) 11%, transparent),
+      transparent 30rem
+    ),
+    color-mix(in srgb, var(--dd-brand-light-surface) 92%, #ffffff);
 }
 
 .app-shell-public-demo .app-main:has(> .fixed-scenarios-page),
@@ -9441,7 +9624,7 @@ html[data-brand-edition="lab"] .app-main:has(.experiment-assistant-page) {
   align-items: center;
   justify-content: center;
   margin-bottom: 0.8rem;
-  color: #aaa4ad;
+  color: color-mix(in srgb, var(--dd-brand-end) 70%, #aaa4ad);
 }
 
 .assistant-hero-icon svg {
@@ -9516,15 +9699,15 @@ html[data-brand-edition="lab"] .assistant-empty-state h1 {
 }
 
 .assistant-examples button:nth-child(1) {
-  color: #286f96;
+  color: var(--dd-brand-end);
 }
 
 .assistant-examples button:nth-child(2) {
-  color: #6f4cb8;
+  color: var(--dd-brand-middle);
 }
 
 .assistant-examples button:nth-child(3) {
-  color: #a13b88;
+  color: color-mix(in srgb, var(--dd-brand-start) 68%, var(--dd-brand-end));
 }
 
 .assistant-example-heading {
@@ -9549,9 +9732,9 @@ html[data-brand-edition="lab"] .assistant-empty-state h1 {
 }
 
 .assistant-examples button:hover {
-  border-color: #bd78c6;
+  border-color: var(--dd-brand-middle);
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(74, 32, 82, 0.09);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--dd-brand-end) 12%, transparent);
 }
 
 html[data-brand-edition="lab"] .assistant-examples button:hover,
@@ -14418,12 +14601,17 @@ body {
 }
 
 .app-shell:not(.app-shell-launcher) .settings-general-card .settings-toggle-row,
-.app-shell:not(.app-shell-launcher) .settings-memory-scope-grid span,
 .app-shell:not(.app-shell-launcher) .settings-memory-grid input,
 .app-shell:not(.app-shell-launcher) .settings-memory-grid select,
 .app-shell:not(.app-shell-launcher) .settings-model-reset-row select {
   color: #2c2130;
   background: rgba(255, 255, 255, 0.72);
+}
+
+.app-shell:not(.app-shell-launcher) .settings-memory-scope-grid .settings-toggle-row,
+.app-shell:not(.app-shell-launcher) .settings-memory-scope-grid .settings-toggle-row > span,
+.app-shell:not(.app-shell-launcher) .settings-memory-scope-grid .settings-toggle-row > span > span {
+  background: transparent;
 }
 
 .app-shell:not(.app-shell-launcher) .settings-memory-grid label > span {
@@ -14596,5 +14784,77 @@ body {
 
   .settings-course-editions {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .settings-course-panel {
+    gap: 0.32rem;
+    padding: 0.42rem;
+  }
+
+  .settings-course-overview {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.3rem;
+  }
+
+  .settings-course-mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+  }
+
+  .settings-course-mark svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .settings-course-panel h3 {
+    font-size: 0.78rem;
+  }
+
+  .settings-course-overview p {
+    margin-top: 0.05rem;
+    font-size: 0.5rem;
+    line-height: 1.18;
+  }
+
+  .settings-course-overview > a {
+    grid-column: auto;
+    width: auto;
+    padding: 0.38rem 0.42rem;
+    font-size: 0.54rem;
+  }
+
+  .settings-course-editions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.28rem;
+  }
+
+  .settings-course-editions article {
+    gap: 0.22rem;
+    padding: 0.38rem;
+    border-radius: 10px;
+  }
+
+  .settings-course-editions .brand-lockup {
+    height: 20px;
+  }
+
+  .settings-course-editions p {
+    min-height: 7.4em;
+    max-height: 7.4em;
+    font-size: 0.49rem;
+    line-height: 1.22;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 7;
+  }
+
+  .settings-course-edition-link {
+    min-height: 22px;
+    padding: 0.2rem 0.28rem;
+    font-size: 0.5rem;
   }
 }

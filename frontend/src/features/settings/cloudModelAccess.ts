@@ -130,6 +130,34 @@ export const DEFAULT_MANAGED_MODEL_CATALOG: ManagedModelCatalogEntry[] = [
   { provider: "kimi", display_name: "Kimi K3", model: "kimi-k3", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
 ];
 
+/**
+ * Keep the seven-product managed catalog stable even when a policy response is
+ * partial. Missing entries remain visible as unavailable instead of making an
+ * entire provider appear to have been removed from DroneDream.
+ */
+export function completeManagedModelCatalog(
+  models: readonly ManagedModelCatalogEntry[],
+): ManagedModelCatalogEntry[] {
+  const policies = new Map(
+    models.map((model) => [managedModelSelectionId(model), model]),
+  );
+  return DEFAULT_MANAGED_MODEL_CATALOG.map((fallback) => {
+    const configured = policies.get(managedModelSelectionId(fallback));
+    return configured ?? {
+      ...fallback,
+      enabled: false,
+      assistant_enabled: false,
+      job_enabled: false,
+    };
+  });
+}
+
+export function managedModelAvailableForAssistant(
+  model: ManagedModelCatalogEntry,
+): boolean {
+  return model.enabled && model.assistant_enabled;
+}
+
 export function managedModelSelectionId(
   model: Pick<ManagedModelCatalogEntry, "provider" | "model">,
 ): string {

@@ -588,6 +588,8 @@ function providerConfiguration(provider: ManagedProvider, model: string) {
     );
   }
   const apiKey = Deno.env.get(`${prefix}_API_KEY`)?.trim()
+    || (provider === "openai" ? Deno.env.get("OPENAI_API_KEY")?.trim() : "")
+    || (provider === "deepseek" ? Deno.env.get("DEEPSEEK_API_KEY")?.trim() : "")
     || (provider === "kimi" ? Deno.env.get("KIMI_API_KEY")?.trim() : "")
     || (provider === "kimi" ? Deno.env.get("MOONSHOT_API_KEY")?.trim() : "")
     ||

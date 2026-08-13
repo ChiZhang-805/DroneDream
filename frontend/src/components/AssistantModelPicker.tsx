@@ -159,11 +159,15 @@ export function AssistantModelPicker({
           {defaultModels.map((model) => {
             const selected = selectedDefault?.provider === model.provider
               && selectedDefault.model === model.model;
+            const available = model.enabled && model.assistant_enabled;
             return (
               <button
                 type="button"
                 role="option"
                 aria-selected={selected}
+                aria-disabled={!available}
+                disabled={!available}
+                title={available ? undefined : `${model.display_name} is temporarily unavailable`}
                 data-model-type="default"
                 data-model-id={`${model.provider}:${model.model}`}
                 key={`${model.provider}:${model.model}`}

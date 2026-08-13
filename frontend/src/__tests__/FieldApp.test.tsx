@@ -22,8 +22,9 @@ async function renderField(
     />,
   );
   await waitFor(() => {
-    expect(screen.getByRole("combobox", { name: locale === "en" ? "Model" : "模型" }))
-      .toBeDisabled();
+    const modelPicker = screen.getByRole("combobox", { name: locale === "en" ? "Model" : "模型" });
+    expect(modelPicker).toBeEnabled();
+    expect(within(modelPicker).getAllByRole("option")).toHaveLength(7);
   });
   return result;
 }

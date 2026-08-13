@@ -69,8 +69,10 @@ import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   CloudModelAccessError,
   DEFAULT_MANAGED_MODEL_CATALOG,
+  completeManagedModelCatalog,
   getManagedModelCatalog,
   issueManagedModelGrant,
+  managedModelAvailableForAssistant,
   type ManagedModelCatalogEntry,
 } from "../features/settings/cloudModelAccess";
 import { useI18n } from "../i18n/I18nProvider";
@@ -600,7 +602,8 @@ export function ExperimentAssistant() {
   );
   const selectedManagedModel = assistantManagedModels.find(
     (model) => model.provider === modelAccess.managedProvider
-      && model.model === modelAccess.managedModel,
+      && model.model === modelAccess.managedModel
+      && managedModelAvailableForAssistant(model),
   );
   const selectedCustomProfileId = modelAccess.accessMode === "byok"
     && configuredModelProfiles.some((profile) => profile.id === activeProfileId)
@@ -648,10 +651,7 @@ export function ExperimentAssistant() {
     void getManagedModelCatalog()
       .then((catalog) => {
         if (!active) return;
-        const available = catalog.models.filter((model) =>
-          model.enabled && model.assistant_enabled
-        );
-        setManagedModels(available);
+        setManagedModels(completeManagedModelCatalog(catalog.models));
         setManagedModelsReady(true);
       })
       .catch(() => {
@@ -670,15 +670,18 @@ export function ExperimentAssistant() {
   useEffect(() => {
     if (
       modelAccess.accessMode === "platform"
-      && assistantManagedModels.length > 0
+      && assistantManagedModels.some(managedModelAvailableForAssistant)
       && !assistantManagedModels.some(
         (model) => model.provider === modelAccess.managedProvider
-          && model.model === modelAccess.managedModel,
+          && model.model === modelAccess.managedModel
+          && managedModelAvailableForAssistant(model),
       )
     ) {
+      const fallback = assistantManagedModels.find(managedModelAvailableForAssistant);
+      if (!fallback) return;
       selectManagedModel(
-        assistantManagedModels[0].provider,
-        assistantManagedModels[0].model,
+        fallback.provider,
+        fallback.model,
       );
     }
   }, [

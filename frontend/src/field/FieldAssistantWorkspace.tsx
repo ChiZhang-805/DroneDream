@@ -14,9 +14,11 @@ import { useVoiceInput } from "../features/experiment/useVoiceInput";
 import {
   CloudModelAccessError,
   completeManagedModelChat,
+  completeManagedModelCatalog,
   DEFAULT_MANAGED_MODEL_CATALOG,
   getManagedModelCatalog,
   issueManagedModelGrant,
+  managedModelAvailableForAssistant,
   type ManagedModelCatalogEntry,
   type ManagedModelChatMessage,
 } from "../features/settings/cloudModelAccess";
@@ -296,7 +298,7 @@ export function FieldAssistantWorkspace({
     void getManagedModelCatalog()
       .then((catalog) => {
         if (!active) return;
-        setModels(catalog.models.filter((model) => model.enabled && model.assistant_enabled));
+        setModels(completeManagedModelCatalog(catalog.models));
       })
       .catch(() => {
         if (active) setModels(DEFAULT_MANAGED_MODEL_CATALOG);
@@ -311,8 +313,9 @@ export function FieldAssistantWorkspace({
     () => models.find((model) =>
       model.provider === modelAccess.settings.managedProvider
         && model.model === modelAccess.settings.managedModel
+        && managedModelAvailableForAssistant(model)
     )
-      ?? models[0]
+      ?? models.find(managedModelAvailableForAssistant)
       ?? null,
     [
       modelAccess.settings.managedModel,
@@ -484,6 +487,7 @@ export function FieldAssistantWorkspace({
                   <option
                     key={`${model.provider}:${model.model}`}
                     value={`${model.provider}:${model.model}`}
+                    disabled={!managedModelAvailableForAssistant(model)}
                   >{model.display_name} · {model.model}</option>
                 )) : <option value="none">{copy.noModel}</option>}
               </select>

@@ -18,6 +18,7 @@ import {
   Download,
   Gift,
   GraduationCap,
+  Gauge,
   History,
   ImagePlus,
   LayoutDashboard,
@@ -107,8 +108,10 @@ import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
 import {
   CloudModelAccessError,
   DEFAULT_MANAGED_MODEL_CATALOG,
+  completeManagedModelCatalog,
   getManagedModelCatalog,
   getManagedModelUsage,
+  managedModelAvailableForAssistant,
   redeemManagedAllowanceResetCard,
   type ManagedAllowanceResetCard,
   type ManagedModelCatalogEntry,
@@ -440,6 +443,7 @@ type SettingsCopy = Readonly<{
   memoryDefaults: readonly [string, string, string, string, string];
   courseOverview: string;
   courseOpen: string;
+  courseActions: readonly [string, string];
   courseEditions: readonly [string, string, string, string];
 }>;
 
@@ -459,7 +463,8 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryDefaults: ["Default vehicle", "Default objective", "Default safety profile", "Default units", "Default report format"],
     courseOverview: "The course joins LLM reasoning with controls and aerospace engineering tools; DroneDream turns that foundation into practical UAV workflows that can be planned, executed, reviewed, and verified.",
     courseOpen: "Open course",
-    courseEditions: ["Shape vehicle models, design simulations, coordinate validation, and package traceable, reviewable engineering evidence inside one integrated delivery workspace.", "Build repeatable PX4 and Gazebo studies, search bounded parameter spaces, compare candidates, and preserve reproducible simulation evidence.", "Connect simulated and captured hardware evidence through calibration, mismatch diagnosis, safety gates, repeatable qualification, and controlled validation workflows.", "Prepare real-device tuning plans with compatibility checks, operator approval, live telemetry boundaries, snapshots, and dependable rollback safeguards."],
+    courseActions: ["Read manual", "Explore product"],
+    courseEditions: ["Shape vehicle models, design repeatable simulations, coordinate laboratory and field validation, and keep every decision connected to traceable engineering evidence. The integrated workspace carries requirements, parameters, reviews, reports, and delivery records through one coherent UAV workflow.", "Build reproducible PX4 and Gazebo studies with bounded scenarios, parameter domains, budgets, objectives, and safety constraints. Compare candidates against common metrics, preserve holdout evidence, explain failures, and turn each simulation result into a reviewable experiment record.", "Connect simulation evidence with captured hardware data through calibration, mismatch diagnosis, controlled trials, and safety gates. Track Sim-to-Real and Real-to-Sim updates, qualify each change, record approvals, and preserve the evidence required for dependable validation.", "Prepare real-device tuning with compatibility checks, operator approvals, telemetry boundaries, parameter snapshots, abort rules, and reliable rollback plans. Every field task remains reviewable before execution and produces an auditable record for safe follow-up decisions."],
   },
   "zh-CN": {
     title: "设置",
@@ -476,7 +481,8 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryDefaults: ["默认机型", "默认优化目标", "默认安全配置", "默认单位制", "默认报告格式"],
     courseOverview: "课程把大模型推理与控制、航空航天工程工具紧密结合，DroneDream 将这些基础能力落实为可规划、可执行、可复核、可验收的无人机工程工作流。",
     courseOpen: "打开课程",
-    courseEditions: ["在统一工作区完成机型建模、仿真实验、跨阶段验证，并沉淀可追踪、可复核的工程交付证据。", "围绕 PX4 与 Gazebo 设计可重复实验，搜索有边界的参数空间，比较候选方案并保留仿真证据。", "贯通仿真与硬件采集证据，完成标定、差异诊断、安全门检查以及受控的验证闭环。", "通过兼容性检查、操作员审批、遥测边界、参数快照与可靠回滚，安全准备真机调优任务。"],
+    courseActions: ["阅读说明书", "查看产品"],
+    courseEditions: ["在统一工作区中完成无人机机型建模、可重复仿真实验、实验室验证和现场交付。需求、参数、审批、报告与版本记录始终关联，并把每次判断沉淀为可追踪、可复核、可验收的完整无人机工程证据链。", "围绕 PX4 与 Gazebo 设计可重复的飞行研究，明确场景、参数边界、试验预算、优化目标和安全约束。统一比较候选方案与留出证据，解释失败原因，并把每次仿真结果保存为可继续审查的结构化实验记录。", "贯通仿真证据与真实硬件采集数据，完成标定、差异诊断、受控试验和安全门检查。持续记录 Sim-to-Real 与 Real-to-Sim 更新、审批和资格验证，让每次模型变化都有可靠依据并可以回溯。", "通过兼容性检查、操作员审批、遥测边界、参数快照、中止规则和可靠回滚方案准备真机调优。所有现场任务在执行前都可复核，执行后形成可审计记录，为下一轮安全决策提供完整依据。"],
   },
   "zh-TW": {
     title: "設定",
@@ -493,7 +499,8 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryDefaults: ["預設機型", "預設最佳化目標", "預設安全設定", "預設單位制", "預設報告格式"],
     courseOverview: "課程結合大型語言模型推理、控制與航太工程工具，DroneDream 將這些能力落實為可規劃、可執行、可複核、可驗收的無人機工程流程。",
     courseOpen: "開啟課程",
-    courseEditions: ["在統一工作區完成機型建模、模擬實驗、跨階段驗證，並沉澱可追蹤、可複核的工程交付證據。", "圍繞 PX4 與 Gazebo 設計可重複實驗，搜尋有邊界的參數空間、比較候選並保存模擬證據。", "貫通模擬與硬體採集證據，完成校準、差異診斷、安全門檢查以及受控的驗證閉環。", "透過相容性檢查、操作員審批、遙測邊界、參數快照與可靠回復，安全準備實機調校任務。"],
+    courseActions: ["閱讀說明書", "查看產品"],
+    courseEditions: ["在統一工作區完成無人機機型建模、可重複模擬、實驗室驗證與現場交付。需求、參數、審批、報告及版本記錄持續關聯，讓每次工程判斷都成為可追蹤、可複核、可驗收的完整證據鏈。", "圍繞 PX4 與 Gazebo 建立可重複飛行研究，明確場景、參數邊界、預算、目標與安全限制。統一比較候選與留出證據、解釋失敗原因，並把每次模擬保存為可延續審查的結構化實驗記錄。", "串聯模擬證據與真實硬體採集資料，完成校準、差異診斷、受控試驗及安全門檢查。持續記錄 Sim-to-Real、Real-to-Sim 更新、審批與資格驗證，使每次模型變化都有可靠依據。", "透過相容性檢查、操作員審批、遙測邊界、參數快照、中止規則和可靠回復方案準備實機調校。所有現場任務執行前皆可複核，完成後形成可稽核記錄以支援安全決策。"],
   },
   es: {
     title: "Ajustes",
@@ -510,7 +517,8 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryDefaults: ["Vehículo predeterminado", "Objetivo predeterminado", "Perfil de seguridad", "Unidades predeterminadas", "Formato del informe"],
     courseOverview: "El curso une razonamiento con modelos, control y herramientas de ingeniería aeroespacial; DroneDream lo convierte en flujos UAV prácticos, planificables, revisables y verificables.",
     courseOpen: "Abrir curso",
-    courseEditions: ["Modela vehículos, diseña simulaciones, coordina validaciones y entrega evidencias de ingeniería revisables desde un espacio integrado.", "Construye estudios PX4 y Gazebo repetibles, explora parámetros acotados, compara candidatos y conserva evidencia reproducible.", "Une simulación y hardware mediante calibración, diagnóstico de diferencias, puertas de seguridad y validaciones controladas.", "Prepara ajustes reales con compatibilidad, aprobación del operador, límites de telemetría, instantáneas y reversión fiable."],
+    courseActions: ["Leer manual", "Ver producto"],
+    courseEditions: ["Modela vehículos, diseña simulaciones repetibles y coordina validaciones de laboratorio y campo en un solo espacio. Requisitos, parámetros, revisiones, informes y versiones permanecen unidos para crear una evidencia técnica trazable, verificable y lista para entregar.", "Construye estudios PX4 y Gazebo reproducibles con escenarios, límites, presupuestos, objetivos y restricciones definidos. Compara candidatos con métricas comunes, conserva pruebas independientes, explica fallos y convierte cada resultado en un experimento estructurado y revisable.", "Conecta evidencia simulada con datos del hardware mediante calibración, diagnóstico, ensayos controlados y puertas de seguridad. Registra cambios Sim-to-Real y Real-to-Sim, aprobaciones y calificación para que cada actualización tenga fundamento y trazabilidad.", "Prepara ajustes de dispositivos reales con compatibilidad, aprobación del operador, límites de telemetría, instantáneas, reglas de aborto y reversión fiable. Cada tarea se revisa antes de ejecutar y genera un registro auditable para decisiones posteriores seguras."],
   },
   ja: {
     title: "設定",
@@ -527,7 +535,8 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryDefaults: ["既定の機体", "既定の最適化目標", "既定の安全設定", "既定の単位", "既定のレポート形式"],
     courseOverview: "本講義はモデル推論、制御、航空宇宙工学ツールを結び、DroneDream で計画・実行・レビュー・検証できる実践的な UAV 工程へ展開します。",
     courseOpen: "講義を開く",
-    courseEditions: ["統合環境で機体モデル、シミュレーション、段階的検証をまとめ、追跡可能でレビュー可能な成果を整えます。", "PX4 と Gazebo の再現可能な実験を設計し、範囲付きパラメータを探索、比較して証拠を保存します。", "校正、差異診断、安全ゲート、制御された検証により、シミュレーションと実機証拠を接続します。", "互換性確認、操作者承認、テレメトリ境界、スナップショット、確実な復元を備えて実機調整を準備します。"],
+    courseActions: ["説明書を読む", "製品を見る"],
+    courseEditions: ["機体モデル、再現可能なシミュレーション、ラボ検証、現場での納品を一つの作業空間で統合します。要件、パラメータ、承認、レポート、版履歴を結び、すべての判断を追跡・レビュー・検証できる工学証拠として残します。", "PX4 と Gazebo を用いて、シナリオ、パラメータ範囲、予算、目的、安全制約を明確にした再現可能な研究を設計します。候補と独立証拠を共通指標で比較し、失敗を説明し、結果を構造化された実験記録として保存します。", "シミュレーション証拠と実機データを、校正、差異診断、制御試験、安全ゲートで接続します。Sim-to-Real と Real-to-Sim の更新、承認、適格性確認を継続して記録し、各モデル変更の根拠と履歴を保ちます。", "互換性確認、操作者承認、テレメトリ境界、パラメータスナップショット、中止条件、確実な復元計画で実機調整を準備します。現場タスクは実行前にレビューでき、完了後は安全な判断に使える監査記録を残します。"],
   },
   ko: {
     title: "설정",
@@ -544,7 +553,8 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryDefaults: ["기본 기체", "기본 최적화 목표", "기본 안전 설정", "기본 단위", "기본 보고서 형식"],
     courseOverview: "이 과정은 모델 추론, 제어, 항공우주 공학 도구를 결합하고 DroneDream에서 계획·실행·검토·검증 가능한 실용적인 UAV 작업 흐름으로 구현합니다.",
     courseOpen: "강의 열기",
-    courseEditions: ["통합 공간에서 기체 모델, 시뮬레이션, 단계별 검증을 연결하고 추적·검토 가능한 엔지니어링 결과를 준비합니다.", "PX4와 Gazebo 반복 실험을 설계하고 제한된 매개변수를 탐색·비교하며 재현 가능한 시뮬레이션 증거를 보존합니다.", "보정, 차이 진단, 안전 게이트, 통제된 검증을 통해 시뮬레이션과 실제 하드웨어 증거를 연결합니다.", "호환성 확인, 운영자 승인, 텔레메트리 경계, 스냅샷과 신뢰할 롤백으로 실제 기체 튜닝을 준비합니다."],
+    courseActions: ["설명서 보기", "제품 보기"],
+    courseEditions: ["기체 모델링, 반복 가능한 시뮬레이션, 실험실 검증, 현장 전달을 하나의 작업 공간에서 연결합니다. 요구 사항, 매개변수, 승인, 보고서와 버전 기록을 유지하여 모든 판단을 추적·검토·검증할 수 있는 엔지니어링 증거로 만듭니다.", "PX4와 Gazebo에서 시나리오, 매개변수 범위, 예산, 목표와 안전 제약을 명확히 한 반복 연구를 설계합니다. 공통 지표로 후보와 독립 증거를 비교하고 실패를 설명하며 결과를 구조화된 실험 기록으로 보존합니다.", "시뮬레이션 증거와 실제 하드웨어 데이터를 보정, 차이 진단, 통제 시험과 안전 게이트로 연결합니다. Sim-to-Real 및 Real-to-Sim 변경, 승인과 자격 검증을 기록하여 모든 모델 업데이트의 근거와 이력을 유지합니다.", "호환성 확인, 운영자 승인, 텔레메트리 경계, 매개변수 스냅샷, 중단 규칙과 신뢰할 롤백 계획으로 실제 기체 튜닝을 준비합니다. 모든 현장 작업은 실행 전 검토되고 완료 후 안전한 후속 결정을 위한 감사 기록을 남깁니다."],
   },
 };
 
@@ -819,6 +829,7 @@ function SettingsDialog({
     useState<"idle" | "redeeming" | "success" | "error">("idle");
   const [allowanceResetConfirmationOpen, setAllowanceResetConfirmationOpen] = useState(false);
   const [allowanceResetMessage, setAllowanceResetMessage] = useState<string | null>(null);
+  const customColorInputRef = useRef<HTMLInputElement>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
     useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
   const [experiencePreferenceState, setExperiencePreferenceState] =
@@ -943,9 +954,7 @@ function SettingsDialog({
     void getManagedModelCatalog()
       .then((catalog) => {
         if (!active) return;
-        setManagedModels(catalog.models.filter((model) =>
-          model.enabled && model.assistant_enabled
-        ));
+        setManagedModels(completeManagedModelCatalog(catalog.models));
       })
       .catch(() => {
         if (!active) return;
@@ -956,12 +965,13 @@ function SettingsDialog({
     };
   }, [auth.account, docsPreview, modelAccess.accessMode, t]);
   useEffect(() => {
-    if (managedModels.length === 0) return;
-    if (!managedModels.some((model) =>
+    const availableModels = managedModels.filter(managedModelAvailableForAssistant);
+    if (availableModels.length === 0) return;
+    if (!availableModels.some((model) =>
       model.provider === modelAccess.managedProvider
         && model.model === modelAccess.managedModel
     )) {
-      selectManagedModel(managedModels[0].provider, managedModels[0].model);
+      selectManagedModel(availableModels[0].provider, availableModels[0].model);
     }
   }, [
     managedModels,
@@ -1159,8 +1169,8 @@ function SettingsDialog({
     : 0;
   const allowanceResetCards = managedUsage?.allowance_reset_cards;
   const allowanceResetCardFormatter = new Intl.DateTimeFormat(
-    locale === "zh-CN" ? "zh-CN" : "en",
-    { dateStyle: "medium" },
+    interfaceLocale,
+    { dateStyle: "medium", timeStyle: "short" },
   );
   useEffect(() => {
     if (!allowanceResetCards || allowanceResetCards.length === 0) {
@@ -1360,30 +1370,26 @@ function SettingsDialog({
                 type="button"
                 className={editionTheme.appearancePreference === "custom" ? "selected" : undefined}
                 aria-pressed={editionTheme.appearancePreference === "custom"}
-                onClick={() => editionTheme.setAppearance("custom")}
+                onClick={() => {
+                  editionTheme.setAppearance("custom");
+                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
+                }}
               >
                 <Sparkles aria-hidden="true" />
                 <strong>{settingsCopy.appearance[3]}</strong>
                 <i aria-hidden="true">✓</i>
               </button>
             </div>
-            {editionTheme.appearancePreference === "custom" ? (
-              <label className="settings-custom-color" htmlFor="settings_custom_accent">
-                <input
-                  id="settings_custom_accent"
-                  type="color"
-                  value={editionTheme.customAccent}
-                  onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-                />
-                <input
-                  aria-label={locale === "zh-CN" ? "十六进制主题色" : "Hex theme color"}
-                  value={editionTheme.customAccent.toUpperCase()}
-                  maxLength={7}
-                  pattern="#[0-9A-Fa-f]{6}"
-                  onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-                />
-              </label>
-            ) : null}
+            <input
+              ref={customColorInputRef}
+              id="settings_custom_accent"
+              className="settings-custom-color-input"
+              type="color"
+              tabIndex={-1}
+              aria-label={locale === "zh-CN" ? "选择自定义主题色" : "Choose a custom theme color"}
+              value={editionTheme.customAccent}
+              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
+            />
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">
@@ -1468,6 +1474,15 @@ function SettingsDialog({
               <article key={courseEdition}>
                 <BrandLockup edition={courseEdition} />
                 <p>{description}</p>
+                <Link
+                  className="settings-course-edition-link"
+                  to={courseEdition === "universal" ? "/manual/" : "/product/"}
+                  onClick={onClose}
+                >
+                  {courseEdition === "universal"
+                    ? settingsCopy.courseActions[0]
+                    : settingsCopy.courseActions[1]}
+                </Link>
               </article>
             ))}
           </div>
@@ -1499,7 +1514,7 @@ function SettingsDialog({
                 ["chat_preferences", Sparkles, settingsCopy.memoryScopes[0]],
                 ["experiment_defaults", SlidersHorizontal, settingsCopy.memoryScopes[1]],
                 ["device_vehicle", RadioTower, settingsCopy.memoryScopes[2]],
-                ["metrics_constraints", ShieldCheck, settingsCopy.memoryScopes[3]],
+                ["metrics_constraints", Gauge, settingsCopy.memoryScopes[3]],
                 ["safety_approvals", ShieldCheck, settingsCopy.memoryScopes[4]],
                 ["workflow_tools", BotMessageSquare, settingsCopy.memoryScopes[5]],
                 ["reports_delivery", Save, settingsCopy.memoryScopes[6]],
@@ -1668,6 +1683,7 @@ function SettingsDialog({
             disabled={experiencePreferenceControlsDisabled}
             onClick={() => void saveExperiencePreferences()}
           >
+            <Save aria-hidden="true" />
             {experiencePreferenceState === "saving"
               ? t("settings.memory.saving")
               : t("settings.memory.save")}
@@ -1719,7 +1735,10 @@ function SettingsDialog({
         </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "model"} id="model">
-        <section className="settings-model-panel" aria-labelledby="settings-model-title">
+        <section
+          className={`settings-model-panel${modelAccess.accessMode === "byok" ? " settings-model-panel-byok" : ""}`}
+          aria-labelledby="settings-model-title"
+        >
         <div className="settings-model-heading">
           <h3 id="settings-model-title">{t("settings.model.title")}</h3>
           <span className={
@@ -1768,9 +1787,10 @@ function SettingsDialog({
                 selectedDefault={managedModels.find((model) =>
                   model.provider === modelAccess.managedProvider
                     && model.model === modelAccess.managedModel
+                    && managedModelAvailableForAssistant(model)
                 ) ?? null}
                 selectedCustomId={null}
-                disabled={managedModels.length === 0}
+                disabled={!managedModels.some(managedModelAvailableForAssistant)}
                 onSelectDefault={(model) => selectManagedModel(model.provider, model.model)}
                 onSelectCustom={() => undefined}
                 onOpenSettings={() => undefined}
@@ -1836,33 +1856,33 @@ function SettingsDialog({
                   </div>
                 </div>
                 <div className="settings-model-reset-row">
-                  <div>
+                  <div className="settings-model-reset-summary">
                     <span>{locale === "zh-CN" ? "额度重置卡" : "Allowance reset cards"}</span>
                     <strong>{allowanceResetCards?.length ?? 0}</strong>
-                  </div>
-                  <div className="settings-reset-card-picker">
                     <span>{locale === "zh-CN" ? "准备使用" : "Ready to use"}</span>
-                    <button
-                      type="button"
-                      className="settings-reset-card-trigger"
-                      disabled={!allowanceResetCards?.length}
-                      aria-expanded={allowanceResetMenuOpen}
-                      aria-haspopup="listbox"
-                      onClick={() => setAllowanceResetMenuOpen((open) => !open)}
-                    >
-                      {(() => {
-                        const card = allowanceResetCards?.find((candidate) => candidate.id === selectedAllowanceResetCardId);
-                        return card ? (
-                          <><AllowanceCardIcon card={card} /><span>{card.kind === "full_refill"
-                            ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill")
-                            : `+${numberFormatter.format(card.credits)}`}</span></>
-                        ) : <span>{locale === "zh-CN" ? "暂无可用额度卡" : "No cards available"}</span>;
-                      })()}
-                    </button>
-                    {allowanceResetMenuOpen && allowanceResetCards?.length ? (
-                      <div className="settings-reset-card-menu" role="listbox">
-                        {allowanceResetCards.map((card) => {
-                          return (
+                  </div>
+                  <div className="settings-model-reset-controls">
+                    <div className="settings-reset-card-picker">
+                      <button
+                        type="button"
+                        className="settings-reset-card-trigger"
+                        disabled={!allowanceResetCards?.length}
+                        aria-expanded={allowanceResetMenuOpen}
+                        aria-haspopup="listbox"
+                        onClick={() => setAllowanceResetMenuOpen((open) => !open)}
+                      >
+                        {(() => {
+                          const card = allowanceResetCards?.find((candidate) => candidate.id === selectedAllowanceResetCardId);
+                          return card ? (
+                            <><AllowanceCardIcon card={card} /><span>{card.kind === "full_refill"
+                              ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill")
+                              : `+${numberFormatter.format(card.credits)}`}</span></>
+                          ) : <span>{locale === "zh-CN" ? "暂无可用额度卡" : "No cards available"}</span>;
+                        })()}
+                      </button>
+                      {allowanceResetMenuOpen && allowanceResetCards?.length ? (
+                        <div className="settings-reset-card-menu" role="listbox">
+                          {allowanceResetCards.map((card) => (
                             <button
                               key={card.id}
                               type="button"
@@ -1875,40 +1895,41 @@ function SettingsDialog({
                               }}
                             >
                               <AllowanceCardIcon card={card} />
-                              <span><strong>{card.kind === "full_refill"
-                                ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill card")
-                                : `+${numberFormatter.format(card.credits)} ${t("settings.model.credits")}`}</strong>
-                                <small>{card.number} · {locale === "zh-CN" ? "有效期至" : "Expires"} {allowanceResetCardFormatter.format(new Date(card.expires_at))}</small>
+                              <span>
+                                <strong>{card.kind === "full_refill"
+                                  ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill card")
+                                  : `+${numberFormatter.format(card.credits)} ${t("settings.model.credits")}`}</strong>
+                                <small>{locale === "zh-CN" ? "有效期至" : "Expires"} {allowanceResetCardFormatter.format(new Date(card.expires_at))}</small>
                               </span>
                               {card.id === selectedAllowanceResetCardId ? <i aria-hidden="true">✓</i> : null}
                             </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="settings-model-reset-actions">
-                    <button
-                      type="button"
-                      className="btn settings-model-reset-action"
-                      disabled={!selectedAllowanceResetCardId || allowanceResetState === "redeeming"}
-                      onClick={() => void redeemAllowanceResetCard()}
-                    >
-                      {allowanceResetState === "redeeming"
-                        ? locale === "zh-CN" ? "使用中…" : "Using…"
-                        : allowanceResetConfirmationOpen
-                          ? locale === "zh-CN" ? "确认兑换" : "Confirm"
-                          : locale === "zh-CN" ? "使用重置卡" : "Use card"}
-                    </button>
-                    {allowanceResetConfirmationOpen ? (
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="settings-model-reset-actions">
                       <button
                         type="button"
-                        className="btn settings-model-reset-cancel"
-                        onClick={() => setAllowanceResetConfirmationOpen(false)}
+                        className="btn settings-model-reset-action"
+                        disabled={!selectedAllowanceResetCardId || allowanceResetState === "redeeming"}
+                        onClick={() => void redeemAllowanceResetCard()}
                       >
-                        {locale === "zh-CN" ? "取消" : "Cancel"}
+                        {allowanceResetState === "redeeming"
+                          ? locale === "zh-CN" ? "使用中…" : "Using…"
+                          : allowanceResetConfirmationOpen
+                            ? locale === "zh-CN" ? "确认兑换" : "Confirm"
+                            : locale === "zh-CN" ? "使用重置卡" : "Use card"}
                       </button>
-                    ) : null}
+                      {allowanceResetConfirmationOpen ? (
+                        <button
+                          type="button"
+                          className="btn settings-model-reset-cancel"
+                          onClick={() => setAllowanceResetConfirmationOpen(false)}
+                        >
+                          {locale === "zh-CN" ? "取消" : "Cancel"}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
                 {allowanceResetMessage ? (

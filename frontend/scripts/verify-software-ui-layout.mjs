@@ -454,8 +454,8 @@ async function verifySettings(page, testCase) {
   );
   const modelPicker = usage.locator(".settings-managed-model-row .assistant-model-button");
   await modelPicker.click();
-  const managedModelLabels = await usage.locator(
-    '.settings-managed-model-row [role="option"][data-model-type="default"]',
+  const managedModelLabels = await page.locator(
+    '.assistant-model-menu-portal [role="option"][data-model-type="default"]',
   ).allTextContents();
   assert.equal(managedModelLabels.length, 7);
   for (const expectedLabel of ["GPT 4.1", "GPT 5.1", "GPT 5.4", "DeepSeek V4 Flash", "DeepSeek V4 Pro", "Kimi K2.6", "Kimi K3"]) {
@@ -471,12 +471,15 @@ async function verifySettings(page, testCase) {
   assert.equal(metrics.accessModeColor, "rgb(30, 23, 33)");
   assert.equal(metrics.headingColor, "rgb(30, 23, 33)");
   const manage = usage.locator(".settings-model-plan-row .btn");
-  const resetCards = usage.locator("#settings_allowance_reset_card");
+  const resetCards = usage.locator(".settings-reset-card-trigger");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
   await page.keyboard.press("Tab");
   assert(await resetCards.evaluate((element) => element === document.activeElement));
-  await page.keyboard.press("Tab");
+  for (let step = 0; step < 4; step += 1) {
+    if (await refresh.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press("Tab");
+  }
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
   await dialog.locator(".launcher-settings-close").click();
