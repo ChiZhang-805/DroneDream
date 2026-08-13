@@ -2947,7 +2947,6 @@ html[lang="zh-CN"] .site-hero h1 {
 @media (min-width: 1441px) {
   .site-product-demo { grid-template-columns: minmax(390px, 420px) minmax(0, 1fr); }
   .site-capability-grid { width: min(100%, 1400px); margin-inline: auto; }
-  .dd-site[data-locale="en"] .site-capability-summary { font-size: .97rem; }
   .site-phase-description { width: 98%; }
   .site-workflow-visual {
     width: calc(100% + clamp(4rem, 10vw, 12rem));
