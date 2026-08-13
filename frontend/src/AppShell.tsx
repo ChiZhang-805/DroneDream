@@ -16,7 +16,6 @@ import {
   Camera,
   CircleUserRound,
   Download,
-  FileArchive,
   Gift,
   GraduationCap,
   History,
@@ -40,7 +39,6 @@ import {
   Trophy,
   Sun,
   Trash2,
-  UsersRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -311,24 +309,28 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
   allowance_reset_cards: [
     {
       id: "preview-reset-full",
+      number: "DD-FULL-9Q7M",
       credits: 2_000,
       kind: "full_refill",
       expires_at: "2026-08-31T23:59:59Z",
     },
     {
       id: "preview-reset-1000",
+      number: "DD-1000-4N2K",
       credits: 1_000,
       kind: "fixed_credit",
       expires_at: "2026-10-31T23:59:59Z",
     },
     {
       id: "preview-reset-5000",
+      number: "DD-5000-7R8P",
       credits: 5_000,
       kind: "fixed_credit",
       expires_at: "2026-12-31T23:59:59Z",
     },
     {
       id: "preview-reset-10000",
+      number: "DD-10K-3X6T",
       credits: 10_000,
       kind: "fixed_credit",
       expires_at: "2027-02-28T23:59:59Z",
@@ -380,8 +382,6 @@ const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
     safety_approvals: true,
     workflow_tools: true,
     reports_delivery: true,
-    collaboration_organization: true,
-    files_artifacts: true,
   },
   default_template_key: null,
   default_vehicle: null,
@@ -401,7 +401,8 @@ type NotificationPreferenceKey =
   | "updates"
   | "approval"
   | "allowance"
-  | "security";
+  | "security"
+  | "runtime";
 type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
 
 const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
@@ -412,6 +413,7 @@ const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   approval: true,
   allowance: true,
   security: true,
+  runtime: true,
 };
 
 const SETTINGS_LOCALES = [
@@ -430,11 +432,11 @@ type SettingsCopy = Readonly<{
   interface: string;
   notifications: string;
   appearance: readonly [string, string, string, string];
-  notificationLabels: readonly [string, string, string, string, string, string, string];
+  notificationLabels: readonly [string, string, string, string, string, string, string, string];
   memoryTitle: string;
   memoryEnabled: readonly [string, string];
   crossSession: string;
-  memoryScopes: readonly [string, string, string, string, string, string, string, string, string];
+  memoryScopes: readonly [string, string, string, string, string, string, string];
   memoryDefaults: readonly [string, string, string, string, string];
   courseOverview: string;
   courseOpen: string;
@@ -449,15 +451,15 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     interface: "Interface",
     notifications: "Notifications",
     appearance: ["Dark", "Light", "System", "Customize"],
-    notificationLabels: ["Allow notifications", "Experiment and task completed", "AI response completed", "Product updates", "Approval required", "Allowance or card expiring", "Security and sign-in"],
+    notificationLabels: ["Allow notifications", "Experiment and task completed", "AI response completed", "Product updates", "Approval required", "Allowance or card expiring", "Security and sign-in", "Device or runtime status"],
     memoryTitle: "Memory",
     memoryEnabled: ["Memory off", "Memory on"],
     crossSession: "Cross-session memory",
-    memoryScopes: ["Chat preferences", "Experiment defaults", "Device and vehicle", "Metrics and constraints", "Safety and approvals", "Workflow and tools", "Reports and delivery", "Collaboration and organization", "Files and artifacts"],
+    memoryScopes: ["Chat preferences", "Experiment defaults", "Device and vehicle", "Metrics and constraints", "Safety and approvals", "Workflow and tools", "Reports and delivery"],
     memoryDefaults: ["Default vehicle", "Default objective", "Default safety profile", "Default units", "Default report format"],
     courseOverview: "The course joins LLM reasoning with controls and aerospace engineering tools; DroneDream turns that foundation into practical UAV workflows that can be planned, executed, reviewed, and verified.",
     courseOpen: "Open course",
-    courseEditions: ["Shape vehicle models, design simulations, coordinate validation, and package reviewable delivery evidence in one integrated workspace.", "Build repeatable PX4 and Gazebo studies, search bounded parameter spaces, compare candidates, and preserve reproducible simulation evidence.", "Connect simulated and captured hardware evidence through calibration, mismatch diagnosis, safety gates, and controlled validation workflows.", "Prepare real-device tuning plans with compatibility checks, operator approval, live telemetry boundaries, snapshots, and dependable rollback safeguards."],
+    courseEditions: ["Shape vehicle models, design simulations, coordinate validation, and package traceable, reviewable engineering evidence inside one integrated delivery workspace.", "Build repeatable PX4 and Gazebo studies, search bounded parameter spaces, compare candidates, and preserve reproducible simulation evidence.", "Connect simulated and captured hardware evidence through calibration, mismatch diagnosis, safety gates, repeatable qualification, and controlled validation workflows.", "Prepare real-device tuning plans with compatibility checks, operator approval, live telemetry boundaries, snapshots, and dependable rollback safeguards."],
   },
   "zh-CN": {
     title: "设置",
@@ -466,11 +468,11 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     interface: "界面",
     notifications: "通知",
     appearance: ["深色", "浅色", "跟随系统", "自定义"],
-    notificationLabels: ["允许通知", "实验与任务完成", "AI 回复完成", "产品更新", "需要审批", "额度或重置卡即将到期", "安全与登录提醒"],
+    notificationLabels: ["允许通知", "实验与任务完成", "AI 回复完成", "产品更新", "需要审批", "额度或重置卡即将到期", "安全与登录提醒", "设备或运行环境状态"],
     memoryTitle: "记忆",
     memoryEnabled: ["记忆已关闭", "记忆已开启"],
     crossSession: "跨会话记忆",
-    memoryScopes: ["对话偏好", "实验默认值", "设备与机型", "指标与约束", "安全与审批", "工作流与工具", "报告与交付", "协作与组织偏好", "文件与产物偏好"],
+    memoryScopes: ["对话偏好", "实验默认值", "设备与机型", "指标与约束", "安全与审批", "工作流与工具", "报告与交付"],
     memoryDefaults: ["默认机型", "默认优化目标", "默认安全配置", "默认单位制", "默认报告格式"],
     courseOverview: "课程把大模型推理与控制、航空航天工程工具紧密结合，DroneDream 将这些基础能力落实为可规划、可执行、可复核、可验收的无人机工程工作流。",
     courseOpen: "打开课程",
@@ -483,11 +485,11 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     interface: "介面",
     notifications: "通知",
     appearance: ["深色", "淺色", "跟隨系統", "自訂"],
-    notificationLabels: ["允許通知", "實驗與任務完成", "AI 回覆完成", "產品更新", "需要審批", "額度或重置卡即將到期", "安全與登入提醒"],
+    notificationLabels: ["允許通知", "實驗與任務完成", "AI 回覆完成", "產品更新", "需要審批", "額度或重置卡即將到期", "安全與登入提醒", "裝置或執行環境狀態"],
     memoryTitle: "記憶",
     memoryEnabled: ["記憶已關閉", "記憶已開啟"],
     crossSession: "跨工作階段記憶",
-    memoryScopes: ["對話偏好", "實驗預設值", "裝置與機型", "指標與限制", "安全與審批", "工作流程與工具", "報告與交付", "協作與組織偏好", "檔案與產物偏好"],
+    memoryScopes: ["對話偏好", "實驗預設值", "裝置與機型", "指標與限制", "安全與審批", "工作流程與工具", "報告與交付"],
     memoryDefaults: ["預設機型", "預設最佳化目標", "預設安全設定", "預設單位制", "預設報告格式"],
     courseOverview: "課程結合大型語言模型推理、控制與航太工程工具，DroneDream 將這些能力落實為可規劃、可執行、可複核、可驗收的無人機工程流程。",
     courseOpen: "開啟課程",
@@ -500,11 +502,11 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     interface: "Interfaz",
     notifications: "Notificaciones",
     appearance: ["Oscuro", "Claro", "Sistema", "Personalizar"],
-    notificationLabels: ["Permitir notificaciones", "Experimento o tarea completada", "Respuesta de IA completada", "Actualizaciones del producto", "Aprobación requerida", "Créditos o tarjeta por vencer", "Seguridad e inicio de sesión"],
+    notificationLabels: ["Permitir notificaciones", "Experimento o tarea completada", "Respuesta de IA completada", "Actualizaciones del producto", "Aprobación requerida", "Créditos o tarjeta por vencer", "Seguridad e inicio de sesión", "Estado del dispositivo o entorno"],
     memoryTitle: "Memoria",
     memoryEnabled: ["Memoria desactivada", "Memoria activada"],
     crossSession: "Memoria entre sesiones",
-    memoryScopes: ["Preferencias de chat", "Valores del experimento", "Dispositivo y vehículo", "Métricas y límites", "Seguridad y aprobaciones", "Flujo y herramientas", "Informes y entrega", "Colaboración y organización", "Archivos y resultados"],
+    memoryScopes: ["Preferencias de chat", "Valores del experimento", "Dispositivo y vehículo", "Métricas y límites", "Seguridad y aprobaciones", "Flujo y herramientas", "Informes y entrega"],
     memoryDefaults: ["Vehículo predeterminado", "Objetivo predeterminado", "Perfil de seguridad", "Unidades predeterminadas", "Formato del informe"],
     courseOverview: "El curso une razonamiento con modelos, control y herramientas de ingeniería aeroespacial; DroneDream lo convierte en flujos UAV prácticos, planificables, revisables y verificables.",
     courseOpen: "Abrir curso",
@@ -517,11 +519,11 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     interface: "表示",
     notifications: "通知",
     appearance: ["ダーク", "ライト", "システム", "カスタム"],
-    notificationLabels: ["通知を許可", "実験・タスク完了", "AI 応答完了", "製品アップデート", "承認が必要", "利用枠・カード期限", "セキュリティとログイン"],
+    notificationLabels: ["通知を許可", "実験・タスク完了", "AI 応答完了", "製品アップデート", "承認が必要", "利用枠・カード期限", "セキュリティとログイン", "デバイス・実行環境の状態"],
     memoryTitle: "メモリ",
     memoryEnabled: ["メモリ オフ", "メモリ オン"],
     crossSession: "セッション間メモリ",
-    memoryScopes: ["チャット設定", "実験の既定値", "デバイスと機体", "指標と制約", "安全と承認", "ワークフローとツール", "レポートと納品", "共同作業と組織", "ファイルと成果物"],
+    memoryScopes: ["チャット設定", "実験の既定値", "デバイスと機体", "指標と制約", "安全と承認", "ワークフローとツール", "レポートと納品"],
     memoryDefaults: ["既定の機体", "既定の最適化目標", "既定の安全設定", "既定の単位", "既定のレポート形式"],
     courseOverview: "本講義はモデル推論、制御、航空宇宙工学ツールを結び、DroneDream で計画・実行・レビュー・検証できる実践的な UAV 工程へ展開します。",
     courseOpen: "講義を開く",
@@ -534,11 +536,11 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     interface: "화면",
     notifications: "알림",
     appearance: ["다크", "라이트", "시스템", "사용자 지정"],
-    notificationLabels: ["알림 허용", "실험 및 작업 완료", "AI 응답 완료", "제품 업데이트", "승인 필요", "할당량 또는 카드 만료", "보안 및 로그인"],
+    notificationLabels: ["알림 허용", "실험 및 작업 완료", "AI 응답 완료", "제품 업데이트", "승인 필요", "할당량 또는 카드 만료", "보안 및 로그인", "장치 또는 런타임 상태"],
     memoryTitle: "메모리",
     memoryEnabled: ["메모리 꺼짐", "메모리 켜짐"],
     crossSession: "세션 간 메모리",
-    memoryScopes: ["대화 기본 설정", "실험 기본값", "장치 및 기체", "지표 및 제약", "안전 및 승인", "워크플로 및 도구", "보고서 및 전달", "협업 및 조직", "파일 및 결과물"],
+    memoryScopes: ["대화 기본 설정", "실험 기본값", "장치 및 기체", "지표 및 제약", "안전 및 승인", "워크플로 및 도구", "보고서 및 전달"],
     memoryDefaults: ["기본 기체", "기본 최적화 목표", "기본 안전 설정", "기본 단위", "기본 보고서 형식"],
     courseOverview: "이 과정은 모델 추론, 제어, 항공우주 공학 도구를 결합하고 DroneDream에서 계획·실행·검토·검증 가능한 실용적인 UAV 작업 흐름으로 구현합니다.",
     courseOpen: "강의 열기",
@@ -815,6 +817,7 @@ function SettingsDialog({
   const [allowanceResetMenuOpen, setAllowanceResetMenuOpen] = useState(false);
   const [allowanceResetState, setAllowanceResetState] =
     useState<"idle" | "redeeming" | "success" | "error">("idle");
+  const [allowanceResetConfirmationOpen, setAllowanceResetConfirmationOpen] = useState(false);
   const [allowanceResetMessage, setAllowanceResetMessage] = useState<string | null>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
     useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
@@ -883,9 +886,9 @@ function SettingsDialog({
     checked: boolean,
   ) => {
     setNotificationPreferences((current) => {
-      const next = key === "master" && !checked
+      const next = key === "master"
         ? Object.fromEntries(
-            Object.keys(current).map((preference) => [preference, false]),
+            Object.keys(current).map((preference) => [preference, checked]),
           ) as NotificationPreferences
         : { ...current, [key]: checked };
       window.localStorage.setItem("dd.notification-preferences.v1", JSON.stringify(next));
@@ -1170,6 +1173,10 @@ function SettingsDialog({
   }, [allowanceResetCards, selectedAllowanceResetCardId]);
   const redeemAllowanceResetCard = async () => {
     if (!selectedAllowanceResetCardId || allowanceResetState === "redeeming") return;
+    if (!allowanceResetConfirmationOpen) {
+      setAllowanceResetConfirmationOpen(true);
+      return;
+    }
     setAllowanceResetState("redeeming");
     setAllowanceResetMessage(null);
     try {
@@ -1200,6 +1207,7 @@ function SettingsDialog({
         setManagedUsage(await redeemManagedAllowanceResetCard(selectedAllowanceResetCardId));
       }
       setAllowanceResetState("success");
+      setAllowanceResetConfirmationOpen(false);
       setAllowanceResetMessage(
         locale === "zh-CN" ? "额度卡已成功兑换。" : "The allowance card was redeemed.",
       );
@@ -1422,6 +1430,12 @@ function SettingsDialog({
               label={settingsCopy.notificationLabels[6]}
               onChange={(checked) => updateNotificationPreference("security", checked)}
             />
+            <SettingsToggle
+              checked={notificationPreferences.runtime}
+              disabled={!notificationPreferences.master}
+              label={settingsCopy.notificationLabels[7]}
+              onChange={(checked) => updateNotificationPreference("runtime", checked)}
+            />
           </div>
         </section>
       </EditionSettingsPanel>
@@ -1489,8 +1503,6 @@ function SettingsDialog({
                 ["safety_approvals", ShieldCheck, settingsCopy.memoryScopes[4]],
                 ["workflow_tools", BotMessageSquare, settingsCopy.memoryScopes[5]],
                 ["reports_delivery", Save, settingsCopy.memoryScopes[6]],
-                ["collaboration_organization", UsersRound, settingsCopy.memoryScopes[7]],
-                ["files_artifacts", FileArchive, settingsCopy.memoryScopes[8]],
               ] as const).map(([scope, ScopeIcon, label]) => (
                 <SettingsToggle
                   key={scope}
@@ -1858,6 +1870,7 @@ function SettingsDialog({
                               aria-selected={card.id === selectedAllowanceResetCardId}
                               onClick={() => {
                                 setSelectedAllowanceResetCardId(card.id);
+                                setAllowanceResetConfirmationOpen(false);
                                 setAllowanceResetMenuOpen(false);
                               }}
                             >
@@ -1865,7 +1878,7 @@ function SettingsDialog({
                               <span><strong>{card.kind === "full_refill"
                                 ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill card")
                                 : `+${numberFormatter.format(card.credits)} ${t("settings.model.credits")}`}</strong>
-                                <small>{locale === "zh-CN" ? "有效期至" : "Expires"} {allowanceResetCardFormatter.format(new Date(card.expires_at))}</small>
+                                <small>{card.number} · {locale === "zh-CN" ? "有效期至" : "Expires"} {allowanceResetCardFormatter.format(new Date(card.expires_at))}</small>
                               </span>
                               {card.id === selectedAllowanceResetCardId ? <i aria-hidden="true">✓</i> : null}
                             </button>
@@ -1874,16 +1887,29 @@ function SettingsDialog({
                       </div>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className="btn settings-model-reset-action"
-                    disabled={!selectedAllowanceResetCardId || allowanceResetState === "redeeming"}
-                    onClick={() => void redeemAllowanceResetCard()}
-                  >
-                    {allowanceResetState === "redeeming"
-                      ? locale === "zh-CN" ? "使用中…" : "Using…"
-                      : locale === "zh-CN" ? "使用重置卡" : "Use card"}
-                  </button>
+                  <div className="settings-model-reset-actions">
+                    <button
+                      type="button"
+                      className="btn settings-model-reset-action"
+                      disabled={!selectedAllowanceResetCardId || allowanceResetState === "redeeming"}
+                      onClick={() => void redeemAllowanceResetCard()}
+                    >
+                      {allowanceResetState === "redeeming"
+                        ? locale === "zh-CN" ? "使用中…" : "Using…"
+                        : allowanceResetConfirmationOpen
+                          ? locale === "zh-CN" ? "确认兑换" : "Confirm"
+                          : locale === "zh-CN" ? "使用重置卡" : "Use card"}
+                    </button>
+                    {allowanceResetConfirmationOpen ? (
+                      <button
+                        type="button"
+                        className="btn settings-model-reset-cancel"
+                        onClick={() => setAllowanceResetConfirmationOpen(false)}
+                      >
+                        {locale === "zh-CN" ? "取消" : "Cancel"}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 {allowanceResetMessage ? (
                   <p

@@ -46,8 +46,6 @@ const CONSOLE_MEMORY_SCOPES = [
   "safety_approvals",
   "workflow_tools",
   "reports_delivery",
-  "collaboration_organization",
-  "files_artifacts",
 ] as const;
 type ConsoleMemoryScope = typeof CONSOLE_MEMORY_SCOPES[number];
 
@@ -332,6 +330,7 @@ function requestMessage(value: unknown): string {
 }
 
 const SENSITIVE_CONTEXT_KEY = /(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|client[_-]?secret|secret|token)/iu;
+const SENSITIVE_TEXT_VALUE = /(?:\bsk-[a-z0-9_-]{10,}\b|\b(?:api[_ -]?key|authorization|credential|password|private[_ -]?key|client[_ -]?secret|secret|token)\s*[:=]\s*[^\s,;]+)/giu;
 
 function isSensitiveContextKey(key: string): boolean {
   const normalized = key.trim().toLocaleLowerCase().replace(/[^a-z0-9]/gu, "");
@@ -342,7 +341,7 @@ export function sanitizedContextValue(value: unknown, depth = 0): unknown {
   if (depth > 5) return null;
   if (value == null || typeof value === "boolean") return value ?? null;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string") return value.slice(0, 2_000);
+  if (typeof value === "string") return value.replace(SENSITIVE_TEXT_VALUE, "[redacted]").slice(0, 2_000);
   if (Array.isArray(value)) {
     return value.slice(0, 64).map((item) => sanitizedContextValue(item, depth + 1));
   }
@@ -359,7 +358,9 @@ function sanitizedRequestContext(body: JsonRecord): JsonRecord {
   const currentValues = isRecord(body.current_values)
     ? sanitizedContextValue(body.current_values)
     : {};
-  const locale = body.locale === "zh-CN" ? "zh-CN" : "en";
+  const locale = ["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(String(body.locale))
+    ? String(body.locale)
+    : "en";
   const referenceDocuments = Array.isArray(body.reference_documents)
     ? body.reference_documents.slice(0, 4).map((item) => {
       if (!isRecord(item)) return null;
@@ -537,7 +538,6 @@ async function loadBoundedConsoleMemory(
   tenantId: string,
   organizationId: string | null,
   selectedEdition: AssistantEdition,
-  selectedWorkspace: string,
 ): Promise<JsonRecord> {
   const storedOrganization = organizationId ?? PERSONAL_ORGANIZATION_ID;
   const { data: preferences, error: preferenceError } = await adminClient()
@@ -560,7 +560,7 @@ async function loadBoundedConsoleMemory(
     .eq("user_id", userId)
     .eq("tenant_id", tenantId)
     .eq("organization_id", storedOrganization)
-    .eq("workspace_id", selectedWorkspace)
+    .eq("workspace_id", `console-${selectedEdition}`)
     .eq("edition", selectedEdition)
     .in("scope", enabledScopes)
     .gt("expires_at", new Date().toISOString())
@@ -584,12 +584,29 @@ function memoryScopeForArtifact(kind: ArtifactKind): ConsoleMemoryScope {
   return "experiment_defaults";
 }
 
+const MEMORY_SCOPE_FIELD_PATTERNS: Readonly<Partial<Record<ConsoleMemoryScope, RegExp>>> = {
+  device_vehicle: /(?:vehicle|airframe|geometry|propulsion|mass|sensor|firmware)/iu,
+  metrics_constraints: /(?:metric|objective|constraint|budget|trajectory|scenario|seed|altitude|track)/iu,
+  safety_approvals: /(?:safety|approval|abort|rollback|holdout|qualification|hardware|evidence)/iu,
+  workflow_tools: /(?:workflow|step|tool|source_edition|target_edition|handoff|calibration|gap|model_update)/iu,
+  reports_delivery: /(?:report|delivery|format|export|acceptance)/iu,
+};
+
+function memoryDraftSubset(draft: JsonRecord, scope: ConsoleMemoryScope): JsonRecord {
+  const pattern = MEMORY_SCOPE_FIELD_PATTERNS[scope];
+  if (!pattern) return {};
+  return Object.fromEntries(
+    Object.entries(draft)
+      .filter(([key]) => pattern.test(key))
+      .map(([key, value]) => [key, sanitizedContextValue(value)]),
+  );
+}
+
 async function persistBoundedConsoleMemory(
   userId: string,
   tenantId: string,
   organizationId: string | null,
   selectedEdition: AssistantEdition,
-  selectedWorkspace: string,
   conversationId: string,
   plan: AssistantPlan,
 ): Promise<void> {
@@ -611,56 +628,28 @@ async function persistBoundedConsoleMemory(
     user_id: userId,
     tenant_id: tenantId,
     organization_id: storedOrganization,
-    workspace_id: selectedWorkspace,
+    workspace_id: `console-${selectedEdition}`,
     edition: selectedEdition,
     conversation_id: conversationId,
   };
   const rows: Array<typeof baseRow & { scope: ConsoleMemoryScope; payload: JsonRecord }> = [];
-  if (enabledScopes[scope] === true) {
+  for (const enabledScope of CONSOLE_MEMORY_SCOPES) {
+    if (enabledScopes[enabledScope] !== true) continue;
+    const draftDefaults = memoryDraftSubset(plan.draft, enabledScope);
+    const isPrimaryScope = enabledScope === scope;
+    const isChatPreference = enabledScope === "chat_preferences";
+    if (!isPrimaryScope && !isChatPreference && Object.keys(draftDefaults).length === 0) continue;
     rows.push({
       ...baseRow,
-      scope,
+      scope: enabledScope,
       payload: {
         artifact_kind: plan.artifact_kind,
-        artifact_title: plan.artifact_title,
-        intent: plan.intent,
-        conversation_summary: plan.conversation_summary.slice(0, 4000),
+        ...(isPrimaryScope
+          ? { artifact_title: sanitizedContextValue(plan.artifact_title) }
+          : {}),
+        ...(Object.keys(draftDefaults).length > 0 ? { defaults: draftDefaults } : {}),
       },
     });
-  }
-  if (enabledScopes.files_artifacts === true) {
-    rows.push({
-      ...baseRow,
-      scope: "files_artifacts",
-      payload: {
-        artifact_kind: plan.artifact_kind,
-        artifact_title: plan.artifact_title,
-        generated_file: `${plan.artifact_kind}.json`,
-        source_version: 1,
-      },
-    });
-  }
-  if (enabledScopes.collaboration_organization === true) {
-    const collaborationKeys = [
-      "organization", "team", "roles", "reviewers", "approvers", "stakeholders",
-      "operator", "owner", "collaborators", "approval",
-    ];
-    const collaboration = Object.fromEntries(
-      Object.entries(plan.draft).filter(([key]) => collaborationKeys.some((candidate) => (
-        key.toLowerCase().includes(candidate)
-      ))),
-    );
-    if (Object.keys(collaboration).length > 0) {
-      rows.push({
-        ...baseRow,
-        scope: "collaboration_organization",
-        payload: {
-          artifact_kind: plan.artifact_kind,
-          artifact_title: plan.artifact_title,
-          collaboration,
-        },
-      });
-    }
   }
   if (rows.length === 0) return;
   const { error } = await adminClient().from("console_memory_records").insert(rows);
@@ -1125,7 +1114,6 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
       tenantId,
       organizationId,
       selectedEdition,
-      selectedWorkspace,
     );
     await updateStage(userId, runId, leaseToken, "planning", null, [
       { step: "isolate", label: "Bound tenant, account, edition, workspace, and conversation", status: "completed" },
@@ -1200,7 +1188,6 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
         tenantId,
         organizationId,
         selectedEdition,
-        selectedWorkspace,
         String(run.conversation_id),
         plan,
       );

@@ -12,9 +12,7 @@ export type ConsoleMemoryScope =
   | "metrics_constraints"
   | "safety_approvals"
   | "workflow_tools"
-  | "reports_delivery"
-  | "collaboration_organization"
-  | "files_artifacts";
+  | "reports_delivery";
 
 export interface ConsolePreferenceBoundary {
   userId: string;
@@ -88,6 +86,7 @@ export async function deleteConsolePreferencesAndMemory(
     .eq("user_id", columns.user_id)
     .eq("tenant_id", columns.tenant_id)
     .eq("organization_id", columns.organization_id)
+    .eq("workspace_id", columns.workspace_id)
     .eq("edition", columns.edition);
   if (memoryDelete.error) throw memoryDelete.error;
   const preferencesDelete = await client().from("console_preferences")

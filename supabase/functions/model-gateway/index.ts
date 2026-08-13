@@ -379,6 +379,10 @@ function validScopeReference(value: unknown): string | null {
 }
 
 async function usageSnapshot(userId: string): Promise<JsonRecord> {
+  const { error: expiryError } = await adminClient().rpc("model_allowance_expire_cards", {
+    p_user_id: userId,
+  });
+  if (expiryError) throw expiryError;
   const { data, error } = await adminClient().rpc("model_access_snapshot", {
     p_user_id: userId,
   });
@@ -387,7 +391,7 @@ async function usageSnapshot(userId: string): Promise<JsonRecord> {
   }
   const { data: cards, error: cardsError } = await adminClient()
     .from("model_allowance_reset_cards")
-    .select("card_id,credits,card_kind,expires_at")
+    .select("card_id,card_number,credits,card_kind,expires_at")
     .eq("user_id", userId)
     .eq("status", "available")
     .gt("expires_at", new Date().toISOString())
@@ -399,6 +403,7 @@ async function usageSnapshot(userId: string): Promise<JsonRecord> {
     ...data,
     allowance_reset_cards: cards.map((card) => ({
       id: card.card_id,
+      number: card.card_number,
       credits: card.credits,
       kind: card.card_kind,
       expires_at: card.expires_at,
@@ -420,7 +425,7 @@ async function handleResetAllowance(request: Request): Promise<Response> {
   ) {
     throw new GatewayError("INVALID_REQUEST", "card_id is invalid.", 400);
   }
-  const { error } = await adminClient().rpc("model_allowance_reset_redeem", {
+  const { data: redemption, error } = await adminClient().rpc("model_allowance_reset_redeem", {
     p_user_id: user.id,
     p_card_id: body.card_id,
   });
@@ -428,6 +433,9 @@ async function handleResetAllowance(request: Request): Promise<Response> {
     const code = typeof error.message === "string" ? error.message : "RESET_CARD_REDEEM_FAILED";
     const status = code.includes("NOT_FOUND") ? 404 : code.includes("IN_FLIGHT") ? 409 : 400;
     throw new GatewayError(code, code, status);
+  }
+  if (isRecord(redemption) && typeof redemption.error_code === "string") {
+    throw new GatewayError(redemption.error_code, redemption.error_code, 400);
   }
   return jsonResponse(request, 200, { data: await usageSnapshot(user.id) });
 }

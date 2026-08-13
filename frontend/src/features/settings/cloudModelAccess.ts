@@ -49,6 +49,7 @@ export interface ManagedModelUsageRequest {
 
 export interface ManagedAllowanceResetCard {
   id: string;
+  number: string;
   credits: number;
   kind: "full_refill" | "fixed_credit";
   expires_at: string;
@@ -305,6 +306,7 @@ export function redeemManagedAllowanceResetCard(
     "/allowance/reset",
     {
       method: "POST",
+      headers: { "Idempotency-Key": `allowance-reset:${cardId}` },
       body: JSON.stringify({ card_id: cardId }),
     },
   );

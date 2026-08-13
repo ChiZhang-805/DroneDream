@@ -18,6 +18,19 @@ function LanguageProbe() {
   );
 }
 
+function InterfaceLanguageProbe() {
+  const { interfaceLocale, setLocale, t } = useI18n();
+  return (
+    <div>
+      <span data-testid="interface-locale">{interfaceLocale}</span>
+      <span data-testid="settings-label">{t("app.settings")}</span>
+      {(["en", "zh-CN", "zh-TW", "es", "ja", "ko"] as const).map((next) => (
+        <button key={next} type="button" onClick={() => setLocale(next)}>{next}</button>
+      ))}
+    </div>
+  );
+}
+
 describe("I18nProvider", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -115,5 +128,26 @@ describe("I18nProvider", () => {
 
     expect(screen.getByText("新建调优实验")).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("zh-CN");
+  });
+
+  it.each([
+    ["en", "Settings"],
+    ["zh-CN", "设置"],
+    ["zh-TW", "設定"],
+    ["es", "Ajustes"],
+    ["ja", "設定"],
+    ["ko", "설정"],
+  ] as const)("renders and persists the %s console interface", (next, expected) => {
+    render(
+      <I18nProvider>
+        <InterfaceLanguageProbe />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: next }));
+    expect(screen.getByTestId("interface-locale")).toHaveTextContent(next);
+    expect(screen.getByTestId("settings-label")).toHaveTextContent(expected);
+    expect(window.localStorage.getItem("drone-dream:locale")).toBe(next);
+    expect(document.documentElement.lang).toBe(next);
   });
 });

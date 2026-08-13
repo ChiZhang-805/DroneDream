@@ -3,58 +3,80 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1337, height: 800 } });
+const viewports = [
+  { name: "desktop", width: 1337, height: 800 },
+  { name: "tablet", width: 1024, height: 768 },
+  { name: "mobile", width: 390, height: 844 },
+];
+const page = await browser.newPage({ viewport: viewports[0] });
 const locales = ["en", "zh-CN", "zh-TW", "es", "ja", "ko"];
 const failures = [];
 const textFailures = [];
 const behaviorFailures = [];
 const captureDirectory = process.env.DD_SETTINGS_CAPTURE_DIR;
 
-try {
-  await page.goto("http://127.0.0.1:4317/console/assistant?docsPreview=1", { waitUntil: "networkidle" });
-  await page.locator(".app-header .launcher-settings-button").click();
+async function openSettings(page) {
+  await page.locator(".app-shell").waitFor({ state: "visible" });
+  await page.evaluate(() => window.dispatchEvent(new Event("dronedream:open-settings")));
   await page.locator(".launcher-settings-dialog").waitFor({ state: "visible" });
+}
 
-  for (let localeIndex = 0; localeIndex < locales.length; localeIndex += 1) {
-    await page.locator(".launcher-settings-tabs button").first().click();
-    await page.locator(".launcher-language-options button").nth(localeIndex).click();
-    await page.waitForTimeout(100);
+try {
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto("http://127.0.0.1:4317/console/assistant?docsPreview=1", { waitUntil: "networkidle" });
+    await openSettings(page);
 
-    for (let tabIndex = 0; tabIndex < 4; tabIndex += 1) {
-      const tabs = page.locator(".launcher-settings-tabs button");
-      await tabs.nth(tabIndex).click();
-      await page.waitForTimeout(60);
-      const metrics = await page.locator(".launcher-settings-panel:not([hidden])").evaluate((panel) => ({
-        clientHeight: panel.clientHeight,
-        scrollHeight: panel.scrollHeight,
-        clientWidth: panel.clientWidth,
-        scrollWidth: panel.scrollWidth,
-      }));
-      if (metrics.scrollHeight > metrics.clientHeight + 1 || metrics.scrollWidth > metrics.clientWidth + 1) {
-        failures.push({ locale: locales[localeIndex], tabIndex, metrics });
-      }
-      const clippedText = await page.locator(".launcher-settings-panel:not([hidden])").evaluate((panel) => (
-        [...panel.querySelectorAll("button, label, strong, p, span")]
-          .filter((node) => {
-            const element = /** @type {HTMLElement} */ (node);
-            const text = element.innerText?.trim();
-            if (!text || element.children.length > 0) return false;
-            return element.scrollWidth > element.clientWidth + 1
-              || element.scrollHeight > element.clientHeight + 1;
-          })
-          .map((node) => ({
-            text: /** @type {HTMLElement} */ (node).innerText.trim().slice(0, 80),
-            clientWidth: /** @type {HTMLElement} */ (node).clientWidth,
-            scrollWidth: /** @type {HTMLElement} */ (node).scrollWidth,
-            clientHeight: /** @type {HTMLElement} */ (node).clientHeight,
-            scrollHeight: /** @type {HTMLElement} */ (node).scrollHeight,
-          }))
-      ));
-      if (clippedText.length > 0) {
-        textFailures.push({ locale: locales[localeIndex], tabIndex, clippedText });
+    for (let localeIndex = 0; localeIndex < locales.length; localeIndex += 1) {
+      await page.locator(".launcher-settings-tabs button").first().click();
+      await page.locator(".launcher-language-options button").nth(localeIndex).click();
+      await page.waitForTimeout(100);
+
+      for (let tabIndex = 0; tabIndex < 4; tabIndex += 1) {
+        const tabs = page.locator(".launcher-settings-tabs button");
+        await tabs.nth(tabIndex).click();
+        await page.waitForTimeout(60);
+        const metrics = await page.locator(".launcher-settings-panel:not([hidden])").evaluate((panel) => ({
+          clientHeight: panel.clientHeight,
+          scrollHeight: panel.scrollHeight,
+          clientWidth: panel.clientWidth,
+          scrollWidth: panel.scrollWidth,
+        }));
+        // Tablet/mobile may scroll vertically inside the bounded dialog, but
+        // horizontal overflow is never acceptable at any viewport.
+        if ((viewport.name === "desktop" && metrics.scrollHeight > metrics.clientHeight + 1)
+          || metrics.scrollWidth > metrics.clientWidth + 1) {
+          failures.push({ viewport: viewport.name, locale: locales[localeIndex], tabIndex, metrics });
+        }
+        const clippedText = await page.locator(".launcher-settings-panel:not([hidden])").evaluate((panel) => (
+          [...panel.querySelectorAll("button, label, strong, p, span")]
+            .filter((node) => {
+              const element = /** @type {HTMLElement} */ (node);
+              const text = element.innerText?.trim();
+              if (!text || element.children.length > 0) return false;
+              return element.scrollWidth > element.clientWidth + 1
+                || (getComputedStyle(element).whiteSpace === "nowrap"
+                  && element.scrollHeight > element.clientHeight + 1);
+            })
+            .map((node) => ({
+              text: /** @type {HTMLElement} */ (node).innerText.trim().slice(0, 80),
+              clientWidth: /** @type {HTMLElement} */ (node).clientWidth,
+              scrollWidth: /** @type {HTMLElement} */ (node).scrollWidth,
+              clientHeight: /** @type {HTMLElement} */ (node).clientHeight,
+              scrollHeight: /** @type {HTMLElement} */ (node).scrollHeight,
+            }))
+        ));
+        if (clippedText.length > 0) {
+          textFailures.push({ viewport: viewport.name, locale: locales[localeIndex], tabIndex, clippedText });
+        }
       }
     }
+    await page.locator(".launcher-settings-close").click();
   }
+
+  await page.setViewportSize(viewports[0]);
+  await page.goto("http://127.0.0.1:4317/console/assistant?docsPreview=1", { waitUntil: "networkidle" });
+  await openSettings(page);
 
   await page.locator(".launcher-settings-tabs button").first().click();
   await page.locator(".settings-appearance-options button").last().click();
@@ -106,7 +128,11 @@ try {
   const resetCardCount = await resetCardMenu.locator("button").count();
   const resetCardIconCount = await resetCardMenu.locator(".settings-reset-card-icon").count();
   const resetCardExpiryCount = await resetCardMenu.locator("small").count();
+  const resetCardNumberCount = await resetCardMenu.locator("small").evaluateAll((nodes) => (
+    nodes.filter((node) => /DD-[A-Z0-9-]+/u.test(node.textContent ?? "")).length
+  ));
   if (resetCardCount !== 4 || resetCardIconCount !== 4 || resetCardExpiryCount !== 4
+    || resetCardNumberCount !== 4
     || resetCardMetrics.top < 0 || resetCardMetrics.left < 0
     || resetCardMetrics.right > resetCardMetrics.viewportWidth
     || resetCardMetrics.bottom > resetCardMetrics.viewportHeight) {
@@ -115,10 +141,18 @@ try {
       resetCardCount,
       resetCardIconCount,
       resetCardExpiryCount,
+      resetCardNumberCount,
       resetCardMetrics,
     });
   }
   await resetCardMenu.locator("button").first().click();
+  await page.locator(".settings-model-reset-action").click();
+  const confirmVisible = await page.locator(".settings-model-reset-action").getAttribute("class");
+  const confirmText = await page.locator(".settings-model-reset-action").innerText();
+  const cancelCount = await page.locator(".settings-model-reset-cancel").count();
+  if (!confirmVisible || confirmText !== "Confirm" || cancelCount !== 1) {
+    behaviorFailures.push({ check: "reset-card-second-confirmation", confirmText, cancelCount });
+  }
 
   if (captureDirectory) {
     await mkdir(captureDirectory, { recursive: true });

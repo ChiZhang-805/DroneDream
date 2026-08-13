@@ -113,3 +113,13 @@ Deno.test("removes nested and camel-case credential fields from model context", 
     list: [{ metric: "rmse" }],
   });
 });
+
+Deno.test("redacts credential values embedded in otherwise safe text fields", () => {
+  assertEquals(sanitizedContextValue({
+    notes: "hover test; API key: sk-this-must-never-enter-memory; keep 3 m altitude",
+    label: "token=temporary-secret, stable hover",
+  }), {
+    notes: "hover test; [redacted] keep 3 m altitude",
+    label: "[redacted] stable hover",
+  });
+});

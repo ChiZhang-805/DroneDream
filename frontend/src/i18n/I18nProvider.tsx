@@ -9,9 +9,9 @@ import {
 import type { ReactNode } from "react";
 import { getInstallerLocale, isDesktopRuntime } from "../desktop/bridge";
 
-// The interface remembers six selectable locales. Existing product views still
-// consume a two-dictionary compatibility locale until their authored copy is
-// ready, so selecting a new locale never indexes a missing translation map.
+// Settings offers six authored locales. Product views that do not yet have an
+// authored dictionary use English rather than pretending that a different
+// language has been translated.
 export type Locale = "en" | "zh-CN";
 export type InterfaceLocale = Locale | "zh-TW" | "es" | "ja" | "ko";
 
@@ -3083,6 +3083,53 @@ const translations = {
   "zh-CN": zhTranslations,
 } as const;
 
+const interfaceTranslationOverrides: Readonly<Record<Exclude<InterfaceLocale, Locale>, Partial<Record<TranslationKey, string>>>> = {
+  "zh-TW": {
+    "app.conversation": "調校對話", "app.dashboard": "任務總覽", "app.newExperiment": "調校實驗",
+    "app.history": "歷史報告", "app.fixedScenarios": "固定場景", "app.vehicleStudio": "無人機建模",
+    "app.experimentBuilder": "實驗設計", "app.labValidation": "驗證與證據", "app.fieldDeviceSetup": "裝置與機型",
+    "app.fieldTuning": "調校計畫", "app.fieldSafety": "安全與回復", "app.labWorkspace": "實驗室工作區",
+    "app.hardwareLab": "實機實驗室", "app.fieldWorkspace": "現場工作區", "app.platform": "無人機控制參數自動調校平台",
+    "app.primaryNav": "主導覽", "app.openMenu": "開啟導覽選單", "app.closeMenu": "關閉導覽選單",
+    "app.language": "語言", "app.settings": "設定", "app.settingsTitle": "設定", "app.closeSettings": "關閉設定",
+    "app.interfaceLanguage": "介面語言", "app.dismiss": "關閉提示", "app.accountOptions": "帳戶選項",
+    "app.author": "作者", "app.contact": "聯絡方式", "app.skipToContent": "跳至主要內容",
+  },
+  es: {
+    "app.conversation": "Chat de ajuste", "app.dashboard": "Panel", "app.newExperiment": "Experimento",
+    "app.history": "Historial", "app.fixedScenarios": "Escenarios", "app.vehicleStudio": "Modelado UAV",
+    "app.experimentBuilder": "Diseño de experimento", "app.labValidation": "Validación y evidencia", "app.fieldDeviceSetup": "Dispositivo y vehículo",
+    "app.fieldTuning": "Plan de ajuste", "app.fieldSafety": "Seguridad y reversión", "app.labWorkspace": "Laboratorio",
+    "app.hardwareLab": "Validación física", "app.fieldWorkspace": "Operación de campo", "app.platform": "Plataforma de ajuste automático UAV",
+    "app.primaryNav": "Navegación principal", "app.openMenu": "Abrir navegación", "app.closeMenu": "Cerrar navegación",
+    "app.language": "Idioma", "app.settings": "Ajustes", "app.settingsTitle": "Ajustes", "app.closeSettings": "Cerrar ajustes",
+    "app.interfaceLanguage": "Idioma de interfaz", "app.dismiss": "Cerrar", "app.accountOptions": "Opciones de cuenta",
+    "app.author": "Autor", "app.contact": "Contacto", "app.skipToContent": "Ir al contenido",
+  },
+  ja: {
+    "app.conversation": "調整チャット", "app.dashboard": "ダッシュボード", "app.newExperiment": "実験",
+    "app.history": "実行履歴", "app.fixedScenarios": "固定シナリオ", "app.vehicleStudio": "機体モデリング",
+    "app.experimentBuilder": "実験設計", "app.labValidation": "検証と証拠", "app.fieldDeviceSetup": "デバイスと機体",
+    "app.fieldTuning": "調整計画", "app.fieldSafety": "安全と復元", "app.labWorkspace": "ラボ ワークスペース",
+    "app.hardwareLab": "実機検証", "app.fieldWorkspace": "フィールド ワークスペース", "app.platform": "UAV 制御パラメータ自動調整プラットフォーム",
+    "app.primaryNav": "メイン ナビゲーション", "app.openMenu": "ナビゲーションを開く", "app.closeMenu": "ナビゲーションを閉じる",
+    "app.language": "言語", "app.settings": "設定", "app.settingsTitle": "設定", "app.closeSettings": "設定を閉じる",
+    "app.interfaceLanguage": "表示言語", "app.dismiss": "閉じる", "app.accountOptions": "アカウント オプション",
+    "app.author": "作成者", "app.contact": "連絡先", "app.skipToContent": "本文へ移動",
+  },
+  ko: {
+    "app.conversation": "튜닝 대화", "app.dashboard": "대시보드", "app.newExperiment": "실험",
+    "app.history": "실행 기록", "app.fixedScenarios": "고정 시나리오", "app.vehicleStudio": "기체 모델링",
+    "app.experimentBuilder": "실험 설계", "app.labValidation": "검증 및 증거", "app.fieldDeviceSetup": "장치 및 기체",
+    "app.fieldTuning": "튜닝 계획", "app.fieldSafety": "안전 및 복구", "app.labWorkspace": "랩 작업 공간",
+    "app.hardwareLab": "실기체 검증", "app.fieldWorkspace": "현장 작업 공간", "app.platform": "UAV 제어 파라미터 자동 튜닝 플랫폼",
+    "app.primaryNav": "기본 탐색", "app.openMenu": "탐색 메뉴 열기", "app.closeMenu": "탐색 메뉴 닫기",
+    "app.language": "언어", "app.settings": "설정", "app.settingsTitle": "설정", "app.closeSettings": "설정 닫기",
+    "app.interfaceLanguage": "인터페이스 언어", "app.dismiss": "닫기", "app.accountOptions": "계정 옵션",
+    "app.author": "작성자", "app.contact": "연락처", "app.skipToContent": "본문으로 이동",
+  },
+};
+
 export type TranslationParams = Record<string, string | number>;
 
 interface I18nValue {
@@ -3092,11 +3139,13 @@ interface I18nValue {
   t: (key: TranslationKey, params?: TranslationParams) => string;
 }
 
-function translate(locale: Locale, key: TranslationKey, params?: TranslationParams): string {
-  const dictionary = locale === "zh-CN"
-    ? translations["zh-CN"]
-    : translations.en;
-  const template = String(dictionary[key]);
+function translate(locale: InterfaceLocale, key: TranslationKey, params?: TranslationParams): string {
+  const baseTemplate = locale === "zh-CN"
+    ? translations["zh-CN"][key]
+    : translations.en[key];
+  const template = locale === "en" || locale === "zh-CN"
+    ? String(baseTemplate)
+    : String(interfaceTranslationOverrides[locale][key] ?? baseTemplate);
   if (!params) return template;
   return Object.entries(params).reduce<string>(
     (result, [name, value]) => result.replaceAll(`{{${name}}}`, String(value)),
@@ -3127,9 +3176,7 @@ function initialLocale(): InterfaceLocale {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [interfaceLocale, setLocaleState] = useState<InterfaceLocale>(initialLocale);
-  const locale: Locale = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW"
-    ? "zh-CN"
-    : "en";
+  const locale: Locale = interfaceLocale === "zh-CN" ? "zh-CN" : "en";
 
   useEffect(() => {
     if (!isDesktopRuntime()) return;
@@ -3178,7 +3225,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       locale,
       interfaceLocale,
       setLocale,
-      t: (key, params) => translate(locale, key, params),
+      t: (key, params) => translate(interfaceLocale, key, params),
     }),
     [interfaceLocale, locale, setLocale],
   );
