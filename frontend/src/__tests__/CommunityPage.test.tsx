@@ -25,11 +25,32 @@ vi.mock("../features/auth/supabaseClient", () => ({
   supabaseClient: supabaseMock.client,
 }));
 
-import { CommunityPage } from "../site/CommunityPage";
+import {
+  CommunityPage,
+  isLongCommunityTopicTitle,
+  packCommunityTopicPages,
+  type CommunityTopic,
+} from "../site/CommunityPage";
 
 function rpcResult(data: unknown) {
   return {
     abortSignal: vi.fn().mockResolvedValue({ data, error: null }),
+  };
+}
+
+function makeTopic(index: number, title = `Topic ${index}`): CommunityTopic {
+  return {
+    id: `00000000-0000-0000-0000-${String(index).padStart(12, "0")}`,
+    author_id: "00000000-0000-0000-0000-000000000002",
+    author_name: "Pilot",
+    title,
+    body: "A compact evidence summary.",
+    tags: ["PX4"],
+    image_urls: [],
+    created_at: "2026-07-25T12:00:00Z",
+    comment_count: index,
+    like_count: index,
+    liked_by_viewer: false,
   };
 }
 
@@ -44,7 +65,7 @@ describe("CommunityPage public data loading", () => {
     supabaseMock.deleteAuthorEq.mockResolvedValue({ error: null });
     supabaseMock.rpc.mockImplementation((name: string) => {
       if (name === "community_list_comments") return rpcResult([]);
-      if (name === "community_count_topics") return rpcResult(17);
+      if (name === "community_count_topics") return rpcResult(1);
       return rpcResult([
         {
           id: "00000000-0000-0000-0000-000000000001",
@@ -73,26 +94,30 @@ describe("CommunityPage public data loading", () => {
     })).toBeVisible();
     expect(supabaseMock.rpc).toHaveBeenCalledWith(
       "community_list_topics",
-      expect.objectContaining({ p_offset: 0, p_limit: 11 }),
+      expect.objectContaining({ p_offset: 0, p_limit: 50 }),
     );
     expect(screen.getByText("7")).toBeVisible();
     expect(screen.getByText("4")).toBeVisible();
   });
 
-  it("loads the second ten-card discovery page from a numbered pager", async () => {
+  it("paginates the locally packed discovery topics without another server page request", async () => {
+    const topics = Array.from({ length: 19 }, (_, index) =>
+      makeTopic(index + 1, `Evidence topic ${index + 1}`)
+    );
+    supabaseMock.rpc.mockImplementation((name: string) => {
+      if (name === "community_list_comments") return rpcResult([]);
+      if (name === "community_count_topics") return rpcResult(topics.length);
+      return rpcResult(topics);
+    });
     render(
       <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
     );
 
-    await screen.findByRole("heading", { name: "Stable hover evidence" });
+    await screen.findByRole("heading", { name: "Evidence topic 1" });
     fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
 
-    await waitFor(() =>
-      expect(supabaseMock.rpc).toHaveBeenCalledWith(
-        "community_list_topics",
-        expect.objectContaining({ p_offset: 10, p_limit: 11 }),
-      )
-    );
+    expect(await screen.findByRole("heading", { name: "Evidence topic 11" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Evidence topic 1" })).not.toBeInTheDocument();
   });
 
   it("shows exactly five featured cards on the community landing page", async () => {
@@ -172,6 +197,52 @@ describe("CommunityPage public data loading", () => {
 
     expect(screen.getByRole("button", { name: "# Wind tunnel" })).toHaveClass("is-active");
     expect(customTag).toHaveValue("");
+  });
+
+  it("classifies long titles and packs them as two visual units after page one", () => {
+    expect(isLongCommunityTopicTitle("一二三四五六七八九十一二三四五六七八")).toBe(false);
+    expect(isLongCommunityTopicTitle("一二三四五六七八九十一二三四五六七八九")).toBe(true);
+    expect(isLongCommunityTopicTitle("1234567890123456789012345678")).toBe(false);
+    expect(isLongCommunityTopicTitle("12345678901234567890123456789")).toBe(true);
+
+    const topics = [
+      ...Array.from({ length: 10 }, (_, index) => makeTopic(index + 1, `First page ${index + 1}`)),
+      makeTopic(11, "This title is deliberately longer than twenty eight characters"),
+      ...Array.from({ length: 8 }, (_, index) => makeTopic(index + 12, `Short ${index + 1}`)),
+    ];
+    const pages = packCommunityTopicPages(topics);
+
+    expect(pages).toHaveLength(2);
+    expect(pages[0]).toHaveLength(10);
+    expect(pages[0].every(({ isLong }) => !isLong)).toBe(true);
+    expect(pages[1]).toHaveLength(9);
+    expect(pages[1].reduce((units, topic) => units + (topic.isLong ? 2 : 1), 0)).toBe(10);
+  });
+
+  it("uses the signed-in author's avatar and does not render a redundant owner badge", async () => {
+    const avatarUrl = "data:image/png;base64,avatar";
+    const { container } = render(
+      <CommunityPage
+        locale="en"
+        account={{
+          id: "00000000-0000-0000-0000-000000000002",
+          email: "pilot@example.com",
+          displayName: "Pilot",
+          avatarUrl,
+        }}
+        onRequireAccount={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole("heading", { name: "Stable hover evidence" });
+    expect(container.querySelector(".community-topic-author img")).toHaveAttribute("src", avatarUrl);
+    expect(screen.queryByText("Your topic")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Open discussion: Stable hover evidence",
+    }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.querySelector(".community-topic-author img")).toHaveAttribute("src", avatarUrl);
   });
 
   it("lets only the topic owner delete a topic", async () => {

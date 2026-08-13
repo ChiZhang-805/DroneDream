@@ -1360,7 +1360,12 @@ html[lang="zh-CN"] .community-cover-art > strong {
 
 .community-page .community-hero {
   flex: 0 0 auto;
-  padding: clamp(0.75rem, 1.6vh, 1.15rem) 0 clamp(0.65rem, 1.1vh, 0.85rem);
+  padding: clamp(0.58rem, 1.05vh, 0.82rem) 0 clamp(0.52rem, 0.9vh, 0.72rem);
+}
+
+.community-page .community-hero .site-eyebrow {
+  margin-bottom: clamp(0.18rem, 0.35vh, 0.3rem);
+  transform: translateY(0.08rem);
 }
 
 .community-page .community-feed {
@@ -1406,8 +1411,8 @@ html[lang="zh-CN"] .community-cover-art > strong {
 }
 
 .community-page.is-all-topics .community-hero {
-  padding-top: clamp(0.55rem, 1vh, 0.75rem);
-  padding-bottom: clamp(0.45rem, 0.8vh, 0.65rem);
+  padding-top: clamp(0.42rem, 0.7vh, 0.6rem);
+  padding-bottom: clamp(0.38rem, 0.65vh, 0.52rem);
 }
 
 .community-page.is-all-topics .community-hero h1 {
@@ -1416,13 +1421,18 @@ html[lang="zh-CN"] .community-cover-art > strong {
 
 .community-page.is-all-topics .community-topic-grid {
   height: 100%;
+  grid-auto-flow: row dense;
   grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
 .community-page.is-all-topics .community-topic-grid article {
   min-height: 0 !important;
   height: 100%;
-  grid-template-rows: minmax(0, 1.35fr) minmax(108px, 0.9fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.community-page.is-all-topics .community-topic-grid article.is-long {
+  grid-row: span 2;
 }
 
 .community-page.is-all-topics .community-topic-cover {
@@ -1433,11 +1443,12 @@ html[lang="zh-CN"] .community-cover-art > strong {
 }
 
 .community-page.is-all-topics .community-topic-card-body {
-  padding: 0.58rem 0.68rem;
+  gap: 0;
+  padding: 0.46rem 0.62rem 0.38rem;
 }
 
 .community-page.is-all-topics .community-topic-author {
-  grid-template-columns: 27px minmax(0, 1fr) auto;
+  grid-template-columns: 27px minmax(0, 1fr);
 }
 
 .community-page.is-all-topics .community-topic-author > span {
@@ -1445,24 +1456,60 @@ html[lang="zh-CN"] .community-cover-art > strong {
   height: 27px;
 }
 
-.community-page.is-all-topics .community-topic-grid h3 {
-  margin-top: 0.48rem;
-  font-size: 0.92rem;
+.community-topic-author > span img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 
+.community-page.is-all-topics .community-topic-grid h3,
 .community-page.is-all-topics .community-topic-card-body > p {
-  margin-top: 0.28rem;
-  font-size: 0.7rem;
-  line-height: 1.35;
-  -webkit-line-clamp: 1;
+  display: none;
 }
 
 .community-page.is-all-topics .community-topic-tags {
-  margin-top: 0.35rem;
+  display: none;
 }
 
 .community-page.is-all-topics .community-topic-card-body > footer {
-  padding-top: 0.35rem;
+  margin-top: 0.26rem;
+  padding-top: 0;
+}
+
+.community-page.is-all-topics .community-topic-cover .community-cover-art {
+  justify-content: flex-start;
+  padding: clamp(0.7rem, 0.9vw, 0.9rem);
+}
+
+.community-page.is-all-topics .community-topic-cover .community-cover-art > header {
+  margin-bottom: clamp(0.52rem, 0.75vh, 0.68rem);
+  font-size: clamp(0.56rem, 0.52vw, 0.66rem);
+}
+
+.community-page.is-all-topics .community-topic-cover .community-cover-art > header svg {
+  width: 19px;
+  height: 19px;
+}
+
+.community-page.is-all-topics .community-topic-cover .community-cover-art > strong {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: clamp(1rem, 1.28vw, 1.42rem);
+  line-height: 1.1;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.community-page.is-all-topics .community-topic-grid article.is-long .community-cover-art > strong {
+  font-size: clamp(1.18rem, 1.55vw, 1.68rem);
+  line-height: 1.08;
+  -webkit-line-clamp: 7;
+}
+
+.community-page.is-all-topics .community-topic-grid article.is-long .community-cover-art > p {
+  margin: auto 0 0;
 }
 
 @media (max-width: 900px) {
@@ -1499,6 +1546,10 @@ html[lang="zh-CN"] .community-cover-art > strong {
     flex: 0 0 min(74vw, 270px);
     scroll-snap-align: start;
     scroll-snap-stop: always;
+  }
+
+  .community-page.is-all-topics .community-topic-grid article.is-long {
+    grid-row: auto;
   }
 }
 

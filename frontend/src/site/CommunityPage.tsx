@@ -50,7 +50,7 @@ interface CommunityPageProps {
   sensitiveCloudActionsEnabled?: boolean;
 }
 
-interface CommunityTopic {
+export interface CommunityTopic {
   id: string;
   author_id: string;
   author_name: string;
@@ -79,8 +79,57 @@ interface CommunityComment {
 
 const RECENT_TOPIC_POOL_SIZE = 24;
 const DISCOVERY_PAGE_SIZE = 10;
+const DISCOVERY_BATCH_SIZE = 50;
 const RECENT_TOPIC_COUNT = 5;
 const COMMENT_PAGE_SIZE = 100;
+const CHINESE_TOPIC_TITLE_LIMIT = 18;
+const ENGLISH_TOPIC_TITLE_LIMIT = 28;
+const HAN_CHARACTER_PATTERN = /\p{Script=Han}/u;
+
+export function isLongCommunityTopicTitle(value: string): boolean {
+  const limit = HAN_CHARACTER_PATTERN.test(value)
+    ? CHINESE_TOPIC_TITLE_LIMIT
+    : ENGLISH_TOPIC_TITLE_LIMIT;
+  return Array.from(value.trim()).length > limit;
+}
+
+export interface CommunityTopicPlacement {
+  topic: CommunityTopic;
+  isLong: boolean;
+}
+
+export function packCommunityTopicPages(
+  topics: CommunityTopic[],
+): CommunityTopicPlacement[][] {
+  if (topics.length === 0) return [];
+
+  const pages: CommunityTopicPlacement[][] = [
+    topics.slice(0, DISCOVERY_PAGE_SIZE).map((topic) => ({ topic, isLong: false })),
+  ];
+  const remaining = topics.slice(DISCOVERY_PAGE_SIZE).map((topic) => ({
+    topic,
+    isLong: isLongCommunityTopicTitle(topic.title),
+  }));
+
+  while (remaining.length > 0) {
+    const page: CommunityTopicPlacement[] = [];
+    let unitsLeft = DISCOVERY_PAGE_SIZE;
+
+    while (remaining.length > 0 && unitsLeft > 0) {
+      const fittingIndex = remaining.findIndex(({ isLong }) =>
+        (isLong ? 2 : 1) <= unitsLeft
+      );
+      if (fittingIndex < 0) break;
+      const [placement] = remaining.splice(fittingIndex, 1);
+      page.push(placement);
+      unitsLeft -= placement.isLong ? 2 : 1;
+    }
+
+    pages.push(page);
+  }
+
+  return pages;
+}
 
 const tagOptions = {
   en: [
@@ -281,10 +330,14 @@ function topicCoverPresentation(
 function TopicCoverArtwork({
   topic,
   locale,
+  isLong = false,
+  heading = false,
   dialog = false,
 }: {
   topic: CommunityTopic;
   locale: SiteLocale;
+  isLong?: boolean;
+  heading?: boolean;
   dialog?: boolean;
 }) {
   const presentation = topicCoverPresentation(topic, locale);
@@ -299,12 +352,21 @@ function TopicCoverArtwork({
         <Icon aria-hidden="true" />
         <span>{presentation.kicker}</span>
       </header>
-      <strong>{topic.title}</strong>
-      <p><span># {presentation.emphasis}</span></p>
-      <footer>
-        <time dateTime={topic.created_at}>{presentation.issue}</time>
-        <span>DRONEDREAM · 1.0</span>
-      </footer>
+      <strong
+        role={heading ? "heading" : undefined}
+        aria-level={heading ? 3 : undefined}
+      >
+        {topic.title}
+      </strong>
+      {isLong || dialog ? (
+        <p><span className="community-cover-tag"># {presentation.emphasis}</span></p>
+      ) : null}
+      {dialog ? (
+        <footer>
+          <time dateTime={topic.created_at}>{presentation.issue}</time>
+          <span>DRONEDREAM · 1.0</span>
+        </footer>
+      ) : null}
     </div>
   );
 }
@@ -389,23 +451,23 @@ export function CommunityPage({
       setFeedError(copy.unavailable);
       return;
     }
+    const client = supabaseClient;
     setLoading(true);
     setFeedError(null);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
-      const pageSize = allTopicsView ? DISCOVERY_PAGE_SIZE : RECENT_TOPIC_POOL_SIZE;
-      const offset = allTopicsView ? topicPage * DISCOVERY_PAGE_SIZE : 0;
-      const listRequest = supabaseClient
+      const pageSize = allTopicsView ? DISCOVERY_BATCH_SIZE : RECENT_TOPIC_POOL_SIZE;
+      const listRequest = client
         .rpc("community_list_topics", {
           p_search: settledQuery.trim() || null,
           p_tag: activeTag,
-          p_offset: offset,
-          p_limit: pageSize + 1,
+          p_offset: 0,
+          p_limit: pageSize,
         })
         .abortSignal(controller.signal);
       const countRequest = allTopicsView
-        ? supabaseClient
+        ? client
             .rpc("community_count_topics", {
               p_search: settledQuery.trim() || null,
               p_tag: activeTag,
@@ -415,18 +477,47 @@ export function CommunityPage({
       const [listResponse, countResponse] = await Promise.all([listRequest, countRequest]);
       const { data, error: requestError } = listResponse;
       if (requestError) throw requestError;
-      const page = ((data ?? []) as CommunityTopic[]).map((topic) => ({
+      const firstBatch = ((data ?? []) as CommunityTopic[]).map((topic) => ({
         ...topic,
         comment_count: Number(topic.comment_count),
         like_count: Number(topic.like_count),
       }));
-      const boundedPage = page.slice(0, pageSize);
-      setHasMoreTopics(page.length > pageSize);
-      setTopics(boundedPage);
+      const topicCount = allTopicsView && !countResponse.error
+        ? Number(countResponse.data ?? firstBatch.length)
+        : firstBatch.length;
+      const additionalOffsets = allTopicsView
+        ? Array.from(
+            { length: Math.max(0, Math.ceil(topicCount / DISCOVERY_BATCH_SIZE) - 1) },
+            (_, index) => (index + 1) * DISCOVERY_BATCH_SIZE,
+          )
+        : [];
+      const additionalResponses = await Promise.all(
+        additionalOffsets.map((offset) =>
+          client
+            .rpc("community_list_topics", {
+              p_search: settledQuery.trim() || null,
+              p_tag: activeTag,
+              p_offset: offset,
+              p_limit: DISCOVERY_BATCH_SIZE,
+            })
+            .abortSignal(controller.signal)
+        ),
+      );
+      const additionalTopics = additionalResponses.flatMap((response) => {
+        if (response.error) throw response.error;
+        return ((response.data ?? []) as CommunityTopic[]).map((topic) => ({
+          ...topic,
+          comment_count: Number(topic.comment_count),
+          like_count: Number(topic.like_count),
+        }));
+      });
+      const loadedTopics = allTopicsView
+        ? [...firstBatch.slice(0, DISCOVERY_BATCH_SIZE), ...additionalTopics]
+        : firstBatch.slice(0, RECENT_TOPIC_POOL_SIZE);
+      setHasMoreTopics(loadedTopics.length < topicCount);
+      setTopics(loadedTopics);
       setTotalTopicCount(
-        allTopicsView && !countResponse.error
-          ? Number(countResponse.data ?? 0)
-          : null,
+        allTopicsView ? topicCount : null,
       );
     } catch {
       setFeedError(copy.unavailable);
@@ -434,7 +525,7 @@ export function CommunityPage({
       window.clearTimeout(timeout);
       setLoading(false);
     }
-  }, [activeTag, allTopicsView, copy.unavailable, settledQuery, topicPage]);
+  }, [activeTag, allTopicsView, copy.unavailable, settledQuery]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -481,18 +572,36 @@ export function CommunityPage({
     }
   }, [copy.unavailable]);
 
+  const discoveryPages = useMemo(
+    () => allTopicsView ? packCommunityTopicPages(topics) : [],
+    [allTopicsView, topics],
+  );
+
+  const visibleTopicPlacements = useMemo(
+    () => allTopicsView
+      ? (discoveryPages[topicPage] ?? [])
+      : selectRecentTopics(topics, recentSampleSeed).map((topic) => ({
+          topic,
+          isLong: false,
+        })),
+    [allTopicsView, discoveryPages, recentSampleSeed, topicPage, topics],
+  );
+
   const visibleTopics = useMemo(
-    () => allTopicsView ? topics : selectRecentTopics(topics, recentSampleSeed),
-    [allTopicsView, recentSampleSeed, topics],
+    () => visibleTopicPlacements.map(({ topic }) => topic),
+    [visibleTopicPlacements],
   );
 
   const totalPages = useMemo(() => {
     if (!allTopicsView) return 1;
-    if (totalTopicCount !== null) {
-      return Math.max(1, Math.ceil(totalTopicCount / DISCOVERY_PAGE_SIZE));
-    }
+    if (discoveryPages.length > 0) return discoveryPages.length;
+    if (totalTopicCount !== null) return Math.max(1, Math.ceil(totalTopicCount / DISCOVERY_PAGE_SIZE));
     return Math.max(1, topicPage + 1 + (hasMoreTopics ? 1 : 0));
-  }, [allTopicsView, hasMoreTopics, topicPage, totalTopicCount]);
+  }, [allTopicsView, discoveryPages.length, hasMoreTopics, topicPage, totalTopicCount]);
+
+  useEffect(() => {
+    if (topicPage >= totalPages) setTopicPage(Math.max(0, totalPages - 1));
+  }, [topicPage, totalPages]);
 
   const pageNumbers = useMemo(() => {
     const windowSize = 5;
@@ -615,6 +724,7 @@ export function CommunityPage({
       || !account
       || !supabaseClient
       || publishing
+      || !title.trim()
     ) return;
     setPublishing(true);
     setComposerError(null);
@@ -885,10 +995,16 @@ export function CommunityPage({
         ) : null}
 
         <div className="community-topic-grid">
-          {visibleTopics.map((topic) => {
+          {visibleTopicPlacements.map(({ topic, isLong }) => {
             const liked = Boolean(account && topic.liked_by_viewer);
+            const authorAvatarUrl = account?.id === topic.author_id
+              ? account.avatarUrl
+              : null;
             return (
-              <article key={topic.id}>
+              <article
+                key={topic.id}
+                className={allTopicsView && isLong ? "is-long" : "is-short"}
+              >
                 <button
                   type="button"
                   className="community-topic-cover"
@@ -903,19 +1019,29 @@ export function CommunityPage({
                       decoding="async"
                     />
                   ) : (
-                    <TopicCoverArtwork topic={topic} locale={locale} />
+                    <TopicCoverArtwork
+                      topic={topic}
+                      locale={locale}
+                      isLong={allTopicsView && isLong}
+                      heading={allTopicsView}
+                    />
                   )}
                 </button>
                 <div className="community-topic-card-body">
                   <div className="community-topic-author">
-                    <span><UserRound aria-hidden="true" /></span>
+                    <span>
+                      {authorAvatarUrl ? (
+                        <img src={authorAvatarUrl} alt="" />
+                      ) : (
+                        <UserRound aria-hidden="true" />
+                      )}
+                    </span>
                     <div>
                       <strong>{topic.author_name}</strong>
                       <time dateTime={topic.created_at}>{dateLabel(locale, topic.created_at)}</time>
                     </div>
-                    {account?.id === topic.author_id ? <em>{copy.owner}</em> : null}
                   </div>
-                  <h3>{topic.title}</h3>
+                  {!allTopicsView ? <h3>{topic.title}</h3> : null}
                   <p>{topic.body}</p>
                   <div className="community-topic-tags">
                     {topic.tags.slice(0, 3).map((tagName) => (
@@ -1211,7 +1337,13 @@ export function CommunityPage({
             <div className="community-topic-dialog-content">
               <header>
                 <div className="community-topic-author">
-                  <span><UserRound aria-hidden="true" /></span>
+                  <span>
+                    {account?.id === selectedTopic.author_id && account.avatarUrl ? (
+                      <img src={account.avatarUrl} alt="" />
+                    ) : (
+                      <UserRound aria-hidden="true" />
+                    )}
+                  </span>
                   <div>
                     <strong>{selectedTopic.author_name}</strong>
                     <time dateTime={selectedTopic.created_at}>
