@@ -37,6 +37,19 @@ const MAX_MESSAGE_BYTES = 12_000;
 const MAX_HISTORY_MESSAGES = 24;
 const PROCESSING_TIMEOUT_MS = 110_000;
 const MAX_RETRY_WAIT_MS = 300_000;
+const PERSONAL_ORGANIZATION_ID = "00000000-0000-0000-0000-000000000000";
+const CONSOLE_MEMORY_SCOPES = [
+  "chat_preferences",
+  "experiment_defaults",
+  "device_vehicle",
+  "metrics_constraints",
+  "safety_approvals",
+  "workflow_tools",
+  "reports_delivery",
+  "collaboration_organization",
+  "files_artifacts",
+] as const;
+type ConsoleMemoryScope = typeof CONSOLE_MEMORY_SCOPES[number];
 
 const MANAGED_MODELS: Readonly<Record<ManagedProvider, readonly string[]>> = {
   openai: ["gpt-4.1", "gpt-5.1", "gpt-5.4"],
@@ -422,6 +435,7 @@ function plannerPrompt(
   messages: JsonRecord[],
   requestContext: JsonRecord,
   previousSummary: string,
+  boundedMemory: JsonRecord,
 ): string {
   return JSON.stringify({
     task: "Produce the next reviewable DroneDream draft artifact.",
@@ -512,9 +526,145 @@ function plannerPrompt(
       },
     },
     previous_summary: previousSummary.slice(0, 8000),
+    bounded_memory: boundedMemory,
     conversation: messages,
     request_context: requestContext,
   });
+}
+
+async function loadBoundedConsoleMemory(
+  userId: string,
+  tenantId: string,
+  organizationId: string | null,
+  selectedEdition: AssistantEdition,
+  selectedWorkspace: string,
+): Promise<JsonRecord> {
+  const storedOrganization = organizationId ?? PERSONAL_ORGANIZATION_ID;
+  const { data: preferences, error: preferenceError } = await adminClient()
+    .from("console_preferences")
+    .select("memory_enabled,memory_scopes,defaults")
+    .eq("user_id", userId)
+    .eq("tenant_id", tenantId)
+    .eq("organization_id", storedOrganization)
+    .eq("workspace_id", `console-${selectedEdition}`)
+    .eq("edition", selectedEdition)
+    .maybeSingle();
+  if (preferenceError) throw preferenceError;
+  if (!isRecord(preferences) || preferences.memory_enabled !== true) return {};
+  const configuredScopes = isRecord(preferences.memory_scopes) ? preferences.memory_scopes : {};
+  const enabledScopes = CONSOLE_MEMORY_SCOPES.filter((scope) => configuredScopes[scope] === true);
+  if (enabledScopes.length === 0) return {};
+  const { data: memories, error: memoryError } = await adminClient()
+    .from("console_memory_records")
+    .select("scope,payload,updated_at")
+    .eq("user_id", userId)
+    .eq("tenant_id", tenantId)
+    .eq("organization_id", storedOrganization)
+    .eq("workspace_id", selectedWorkspace)
+    .eq("edition", selectedEdition)
+    .in("scope", enabledScopes)
+    .gt("expires_at", new Date().toISOString())
+    .order("updated_at", { ascending: false })
+    .limit(32);
+  if (memoryError) throw memoryError;
+  return {
+    enabled_scopes: enabledScopes,
+    saved_defaults: isRecord(preferences.defaults) ? preferences.defaults : {},
+    records: (memories ?? []).filter(isRecord).map((memory) => ({
+      scope: memory.scope,
+      payload: isRecord(memory.payload) ? memory.payload : {},
+    })),
+  };
+}
+
+function memoryScopeForArtifact(kind: ArtifactKind): ConsoleMemoryScope {
+  if (kind === "universal_vehicle_model") return "device_vehicle";
+  if (kind === "field_task_plan" || kind === "lab_hardware_validation") return "safety_approvals";
+  if (kind.includes("workflow")) return "workflow_tools";
+  return "experiment_defaults";
+}
+
+async function persistBoundedConsoleMemory(
+  userId: string,
+  tenantId: string,
+  organizationId: string | null,
+  selectedEdition: AssistantEdition,
+  selectedWorkspace: string,
+  conversationId: string,
+  plan: AssistantPlan,
+): Promise<void> {
+  const storedOrganization = organizationId ?? PERSONAL_ORGANIZATION_ID;
+  const scope = memoryScopeForArtifact(plan.artifact_kind);
+  const { data: preferences, error: preferenceError } = await adminClient()
+    .from("console_preferences")
+    .select("memory_enabled,memory_scopes")
+    .eq("user_id", userId)
+    .eq("tenant_id", tenantId)
+    .eq("organization_id", storedOrganization)
+    .eq("workspace_id", `console-${selectedEdition}`)
+    .eq("edition", selectedEdition)
+    .maybeSingle();
+  if (preferenceError) throw preferenceError;
+  const enabledScopes = isRecord(preferences?.memory_scopes) ? preferences.memory_scopes : {};
+  if (!isRecord(preferences) || preferences.memory_enabled !== true) return;
+  const baseRow = {
+    user_id: userId,
+    tenant_id: tenantId,
+    organization_id: storedOrganization,
+    workspace_id: selectedWorkspace,
+    edition: selectedEdition,
+    conversation_id: conversationId,
+  };
+  const rows: Array<typeof baseRow & { scope: ConsoleMemoryScope; payload: JsonRecord }> = [];
+  if (enabledScopes[scope] === true) {
+    rows.push({
+      ...baseRow,
+      scope,
+      payload: {
+        artifact_kind: plan.artifact_kind,
+        artifact_title: plan.artifact_title,
+        intent: plan.intent,
+        conversation_summary: plan.conversation_summary.slice(0, 4000),
+      },
+    });
+  }
+  if (enabledScopes.files_artifacts === true) {
+    rows.push({
+      ...baseRow,
+      scope: "files_artifacts",
+      payload: {
+        artifact_kind: plan.artifact_kind,
+        artifact_title: plan.artifact_title,
+        generated_file: `${plan.artifact_kind}.json`,
+        source_version: 1,
+      },
+    });
+  }
+  if (enabledScopes.collaboration_organization === true) {
+    const collaborationKeys = [
+      "organization", "team", "roles", "reviewers", "approvers", "stakeholders",
+      "operator", "owner", "collaborators", "approval",
+    ];
+    const collaboration = Object.fromEntries(
+      Object.entries(plan.draft).filter(([key]) => collaborationKeys.some((candidate) => (
+        key.toLowerCase().includes(candidate)
+      ))),
+    );
+    if (Object.keys(collaboration).length > 0) {
+      rows.push({
+        ...baseRow,
+        scope: "collaboration_organization",
+        payload: {
+          artifact_kind: plan.artifact_kind,
+          artifact_title: plan.artifact_title,
+          collaboration,
+        },
+      });
+    }
+  }
+  if (rows.length === 0) return;
+  const { error } = await adminClient().from("console_memory_records").insert(rows);
+  if (error) throw error;
 }
 
 function boundedText(value: unknown, field: string, maximum: number): string {
@@ -726,6 +876,7 @@ async function callManagedPlanner(
   messages: JsonRecord[],
   requestContext: JsonRecord,
   previousSummary: string,
+  boundedMemory: JsonRecord,
 ): Promise<AssistantPlan> {
   const grant = await issueInternalGrant(userId, provider, model, runId);
   const response = await fetch(
@@ -741,7 +892,7 @@ async function callManagedPlanner(
       body: JSON.stringify({
         messages: [
           { role: "system", content: commonSystemPrompt(selectedEdition) },
-          { role: "user", content: plannerPrompt(selectedEdition, messages, requestContext, previousSummary) },
+          { role: "user", content: plannerPrompt(selectedEdition, messages, requestContext, previousSummary, boundedMemory) },
         ],
         response_format: { type: "json_object" },
       }),
@@ -969,6 +1120,13 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
       selectedWorkspace,
       Number(run.sequence),
     );
+    const boundedMemory = await loadBoundedConsoleMemory(
+      userId,
+      tenantId,
+      organizationId,
+      selectedEdition,
+      selectedWorkspace,
+    );
     await updateStage(userId, runId, leaseToken, "planning", null, [
       { step: "isolate", label: "Bound tenant, account, edition, workspace, and conversation", status: "completed" },
       { step: "plan", label: "Classify intent and prepare an edition-specific workflow", status: "completed" },
@@ -984,6 +1142,7 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
       history.messages,
       isRecord(run.request_json) ? run.request_json : {},
       history.summary,
+      boundedMemory,
     );
     await recordStep(userId, runId, leaseToken, "plan", 2, "plan", "completed",
       "Classified intent and produced a bounded workflow", {
@@ -1032,6 +1191,27 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
       p_artifact_payload: plan.draft,
     });
     if (error || !isRecord(data)) throw error ?? new Error("ASSISTANT_COMPLETE_FAILED");
+    // Memory is a derived convenience record. The task/object commit above is the
+    // authoritative transaction; a memory write must never turn a completed run
+    // into a retry that could duplicate the artifact.
+    try {
+      await persistBoundedConsoleMemory(
+        userId,
+        tenantId,
+        organizationId,
+        selectedEdition,
+        selectedWorkspace,
+        String(run.conversation_id),
+        plan,
+      );
+    } catch (memoryError) {
+      console.error("console_memory_persist_failed", {
+        run_id: runId,
+        user_id: userId,
+        edition: selectedEdition,
+        error: memoryError instanceof Error ? memoryError.message : "unknown",
+      });
+    }
     return data;
   } catch (error) {
     if (transientProviderFailure(error)) {

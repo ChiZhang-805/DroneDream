@@ -50,6 +50,7 @@ export interface ManagedModelUsageRequest {
 export interface ManagedAllowanceResetCard {
   id: string;
   credits: number;
+  kind: "full_refill" | "fixed_credit";
   expires_at: string;
 }
 
@@ -294,6 +295,19 @@ async function cloudRequest<T>(
 
 export function getManagedModelUsage(): Promise<ManagedModelUsageSnapshot> {
   return cloudRequest<ManagedModelUsageSnapshot>(modelGatewayUrl, "/usage");
+}
+
+export function redeemManagedAllowanceResetCard(
+  cardId: string,
+): Promise<ManagedModelUsageSnapshot> {
+  return cloudRequest<ManagedModelUsageSnapshot>(
+    modelGatewayUrl,
+    "/allowance/reset",
+    {
+      method: "POST",
+      body: JSON.stringify({ card_id: cardId }),
+    },
+  );
 }
 
 export function getManagedModelCatalog(): Promise<ManagedModelCatalog> {

@@ -1,11 +1,12 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
-import type { ChangeEvent, MouseEvent, RefObject } from "react";
+import type { ChangeEvent, MouseEvent, ReactNode, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
@@ -15,6 +16,8 @@ import {
   Camera,
   CircleUserRound,
   Download,
+  FileArchive,
+  Gift,
   GraduationCap,
   History,
   ImagePlus,
@@ -24,15 +27,20 @@ import {
   MapPinned,
   Menu,
   Moon,
+  MonitorCog,
   MoreHorizontal,
   RadioTower,
+  RefreshCcw,
   Save,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  TicketCheck,
+  Trophy,
   Sun,
   Trash2,
+  UsersRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -103,6 +111,8 @@ import {
   DEFAULT_MANAGED_MODEL_CATALOG,
   getManagedModelCatalog,
   getManagedModelUsage,
+  redeemManagedAllowanceResetCard,
+  type ManagedAllowanceResetCard,
   type ManagedModelCatalogEntry,
   type ManagedModelUsageSnapshot,
 } from "./features/settings/cloudModelAccess";
@@ -120,19 +130,26 @@ import {
 import { publicDemoConsole } from "./features/demo/publicDemo";
 import { getOrganizationAccess } from "./features/organization/organizationConsole";
 import {
+  activeAssistantTenantContext,
   hydrateAssistantWorkspaceIndex,
   setActiveAssistantTenantContext,
 } from "./features/experiment/workspaceRegistry";
 import { getAssistantWorkspaceIndex } from "./features/experiment/assistantOrchestration";
 import { useI18n } from "./i18n/I18nProvider";
-import type { TranslationKey } from "./i18n/I18nProvider";
+import type { InterfaceLocale, TranslationKey } from "./i18n/I18nProvider";
 import type {
   Job,
   JobStatus,
   StarterExperienceTemplateKey,
   UserDefaultTrackType,
-  UserExperiencePreferences,
 } from "./types/api";
+import {
+  deleteConsolePreferencesAndMemory,
+  loadConsolePreferences,
+  saveConsolePreferences,
+  type ConsoleMemoryScope,
+  type ConsolePreferenceRecord,
+} from "./features/settings/consolePreferences";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
 import { EditionThemeProvider, useEditionTheme } from "./theme/EditionThemeProvider";
 import {
@@ -293,14 +310,28 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
   recent_requests: [],
   allowance_reset_cards: [
     {
-      id: "preview-reset-august",
+      id: "preview-reset-full",
       credits: 2_000,
+      kind: "full_refill",
       expires_at: "2026-08-31T23:59:59Z",
     },
     {
-      id: "preview-reset-december",
-      credits: 2_000,
+      id: "preview-reset-1000",
+      credits: 1_000,
+      kind: "fixed_credit",
+      expires_at: "2026-10-31T23:59:59Z",
+    },
+    {
+      id: "preview-reset-5000",
+      credits: 5_000,
+      kind: "fixed_credit",
       expires_at: "2026-12-31T23:59:59Z",
+    },
+    {
+      id: "preview-reset-10000",
+      credits: 10_000,
+      kind: "fixed_credit",
+      expires_at: "2027-02-28T23:59:59Z",
     },
   ],
 };
@@ -328,20 +359,49 @@ const MAX_ACTIVE_JOB_PAGES_PER_STATUS = 10;
 
 interface ExperiencePreferenceDraft {
   memory_enabled: boolean;
+  memory_scopes: Record<ConsoleMemoryScope, boolean>;
   default_template_key: StarterExperienceTemplateKey | null;
+  default_vehicle: string | null;
   default_track_type: UserDefaultTrackType | null;
   default_altitude_m: number | null;
+  default_objective: string | null;
+  default_safety_profile: string | null;
+  default_units: string | null;
+  default_report_format: string | null;
 }
 
 const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
   memory_enabled: false,
+  memory_scopes: {
+    chat_preferences: true,
+    experiment_defaults: true,
+    device_vehicle: true,
+    metrics_constraints: true,
+    safety_approvals: true,
+    workflow_tools: true,
+    reports_delivery: true,
+    collaboration_organization: true,
+    files_artifacts: true,
+  },
   default_template_key: null,
+  default_vehicle: null,
   default_track_type: null,
   default_altitude_m: null,
+  default_objective: null,
+  default_safety_profile: null,
+  default_units: null,
+  default_report_format: null,
 };
 const EXPERIENCE_PREFERENCE_LOAD_FAILED = "experience-preference-load-failed";
 
-type NotificationPreferenceKey = "master" | "experiment" | "assistant" | "updates";
+type NotificationPreferenceKey =
+  | "master"
+  | "experiment"
+  | "assistant"
+  | "updates"
+  | "approval"
+  | "allowance"
+  | "security";
 type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
 
 const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
@@ -349,6 +409,141 @@ const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   experiment: true,
   assistant: true,
   updates: false,
+  approval: true,
+  allowance: true,
+  security: true,
+};
+
+const SETTINGS_LOCALES = [
+  { id: "en", label: "English", region: "west" },
+  { id: "zh-CN", label: "简体中文", region: "east" },
+  { id: "zh-TW", label: "繁體中文", region: "east" },
+  { id: "es", label: "Español", region: "west" },
+  { id: "ja", label: "日本語", region: "east" },
+  { id: "ko", label: "한국어", region: "east" },
+] as const;
+
+type SettingsCopy = Readonly<{
+  title: string;
+  tabs: readonly [string, string, string, string];
+  language: string;
+  interface: string;
+  notifications: string;
+  appearance: readonly [string, string, string, string];
+  notificationLabels: readonly [string, string, string, string, string, string, string];
+  memoryTitle: string;
+  memoryEnabled: readonly [string, string];
+  crossSession: string;
+  memoryScopes: readonly [string, string, string, string, string, string, string, string, string];
+  memoryDefaults: readonly [string, string, string, string, string];
+  courseOverview: string;
+  courseOpen: string;
+  courseEditions: readonly [string, string, string, string];
+}>;
+
+const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
+  en: {
+    title: "Settings",
+    tabs: ["General", "Memory", "Model", "Runtime"],
+    language: "Language",
+    interface: "Interface",
+    notifications: "Notifications",
+    appearance: ["Dark", "Light", "System", "Customize"],
+    notificationLabels: ["Allow notifications", "Experiment and task completed", "AI response completed", "Product updates", "Approval required", "Allowance or card expiring", "Security and sign-in"],
+    memoryTitle: "Memory",
+    memoryEnabled: ["Memory off", "Memory on"],
+    crossSession: "Cross-session memory",
+    memoryScopes: ["Chat preferences", "Experiment defaults", "Device and vehicle", "Metrics and constraints", "Safety and approvals", "Workflow and tools", "Reports and delivery", "Collaboration and organization", "Files and artifacts"],
+    memoryDefaults: ["Default vehicle", "Default objective", "Default safety profile", "Default units", "Default report format"],
+    courseOverview: "The course joins LLM reasoning with controls and aerospace engineering tools; DroneDream turns that foundation into practical UAV workflows that can be planned, executed, reviewed, and verified.",
+    courseOpen: "Open course",
+    courseEditions: ["Shape vehicle models, design simulations, coordinate validation, and package reviewable delivery evidence in one integrated workspace.", "Build repeatable PX4 and Gazebo studies, search bounded parameter spaces, compare candidates, and preserve reproducible simulation evidence.", "Connect simulated and captured hardware evidence through calibration, mismatch diagnosis, safety gates, and controlled validation workflows.", "Prepare real-device tuning plans with compatibility checks, operator approval, live telemetry boundaries, snapshots, and dependable rollback safeguards."],
+  },
+  "zh-CN": {
+    title: "设置",
+    tabs: ["常规", "记忆", "模型", "运行环境"],
+    language: "语言",
+    interface: "界面",
+    notifications: "通知",
+    appearance: ["深色", "浅色", "跟随系统", "自定义"],
+    notificationLabels: ["允许通知", "实验与任务完成", "AI 回复完成", "产品更新", "需要审批", "额度或重置卡即将到期", "安全与登录提醒"],
+    memoryTitle: "记忆",
+    memoryEnabled: ["记忆已关闭", "记忆已开启"],
+    crossSession: "跨会话记忆",
+    memoryScopes: ["对话偏好", "实验默认值", "设备与机型", "指标与约束", "安全与审批", "工作流与工具", "报告与交付", "协作与组织偏好", "文件与产物偏好"],
+    memoryDefaults: ["默认机型", "默认优化目标", "默认安全配置", "默认单位制", "默认报告格式"],
+    courseOverview: "课程把大模型推理与控制、航空航天工程工具紧密结合，DroneDream 将这些基础能力落实为可规划、可执行、可复核、可验收的无人机工程工作流。",
+    courseOpen: "打开课程",
+    courseEditions: ["在统一工作区完成机型建模、仿真实验、跨阶段验证，并沉淀可追踪、可复核的工程交付证据。", "围绕 PX4 与 Gazebo 设计可重复实验，搜索有边界的参数空间，比较候选方案并保留仿真证据。", "贯通仿真与硬件采集证据，完成标定、差异诊断、安全门检查以及受控的验证闭环。", "通过兼容性检查、操作员审批、遥测边界、参数快照与可靠回滚，安全准备真机调优任务。"],
+  },
+  "zh-TW": {
+    title: "設定",
+    tabs: ["一般", "記憶", "模型", "執行環境"],
+    language: "語言",
+    interface: "介面",
+    notifications: "通知",
+    appearance: ["深色", "淺色", "跟隨系統", "自訂"],
+    notificationLabels: ["允許通知", "實驗與任務完成", "AI 回覆完成", "產品更新", "需要審批", "額度或重置卡即將到期", "安全與登入提醒"],
+    memoryTitle: "記憶",
+    memoryEnabled: ["記憶已關閉", "記憶已開啟"],
+    crossSession: "跨工作階段記憶",
+    memoryScopes: ["對話偏好", "實驗預設值", "裝置與機型", "指標與限制", "安全與審批", "工作流程與工具", "報告與交付", "協作與組織偏好", "檔案與產物偏好"],
+    memoryDefaults: ["預設機型", "預設最佳化目標", "預設安全設定", "預設單位制", "預設報告格式"],
+    courseOverview: "課程結合大型語言模型推理、控制與航太工程工具，DroneDream 將這些能力落實為可規劃、可執行、可複核、可驗收的無人機工程流程。",
+    courseOpen: "開啟課程",
+    courseEditions: ["在統一工作區完成機型建模、模擬實驗、跨階段驗證，並沉澱可追蹤、可複核的工程交付證據。", "圍繞 PX4 與 Gazebo 設計可重複實驗，搜尋有邊界的參數空間、比較候選並保存模擬證據。", "貫通模擬與硬體採集證據，完成校準、差異診斷、安全門檢查以及受控的驗證閉環。", "透過相容性檢查、操作員審批、遙測邊界、參數快照與可靠回復，安全準備實機調校任務。"],
+  },
+  es: {
+    title: "Ajustes",
+    tabs: ["General", "Memoria", "Modelos", "Entorno"],
+    language: "Idioma",
+    interface: "Interfaz",
+    notifications: "Notificaciones",
+    appearance: ["Oscuro", "Claro", "Sistema", "Personalizar"],
+    notificationLabels: ["Permitir notificaciones", "Experimento o tarea completada", "Respuesta de IA completada", "Actualizaciones del producto", "Aprobación requerida", "Créditos o tarjeta por vencer", "Seguridad e inicio de sesión"],
+    memoryTitle: "Memoria",
+    memoryEnabled: ["Memoria desactivada", "Memoria activada"],
+    crossSession: "Memoria entre sesiones",
+    memoryScopes: ["Preferencias de chat", "Valores del experimento", "Dispositivo y vehículo", "Métricas y límites", "Seguridad y aprobaciones", "Flujo y herramientas", "Informes y entrega", "Colaboración y organización", "Archivos y resultados"],
+    memoryDefaults: ["Vehículo predeterminado", "Objetivo predeterminado", "Perfil de seguridad", "Unidades predeterminadas", "Formato del informe"],
+    courseOverview: "El curso une razonamiento con modelos, control y herramientas de ingeniería aeroespacial; DroneDream lo convierte en flujos UAV prácticos, planificables, revisables y verificables.",
+    courseOpen: "Abrir curso",
+    courseEditions: ["Modela vehículos, diseña simulaciones, coordina validaciones y entrega evidencias de ingeniería revisables desde un espacio integrado.", "Construye estudios PX4 y Gazebo repetibles, explora parámetros acotados, compara candidatos y conserva evidencia reproducible.", "Une simulación y hardware mediante calibración, diagnóstico de diferencias, puertas de seguridad y validaciones controladas.", "Prepara ajustes reales con compatibilidad, aprobación del operador, límites de telemetría, instantáneas y reversión fiable."],
+  },
+  ja: {
+    title: "設定",
+    tabs: ["一般", "メモリ", "モデル", "実行環境"],
+    language: "言語",
+    interface: "表示",
+    notifications: "通知",
+    appearance: ["ダーク", "ライト", "システム", "カスタム"],
+    notificationLabels: ["通知を許可", "実験・タスク完了", "AI 応答完了", "製品アップデート", "承認が必要", "利用枠・カード期限", "セキュリティとログイン"],
+    memoryTitle: "メモリ",
+    memoryEnabled: ["メモリ オフ", "メモリ オン"],
+    crossSession: "セッション間メモリ",
+    memoryScopes: ["チャット設定", "実験の既定値", "デバイスと機体", "指標と制約", "安全と承認", "ワークフローとツール", "レポートと納品", "共同作業と組織", "ファイルと成果物"],
+    memoryDefaults: ["既定の機体", "既定の最適化目標", "既定の安全設定", "既定の単位", "既定のレポート形式"],
+    courseOverview: "本講義はモデル推論、制御、航空宇宙工学ツールを結び、DroneDream で計画・実行・レビュー・検証できる実践的な UAV 工程へ展開します。",
+    courseOpen: "講義を開く",
+    courseEditions: ["統合環境で機体モデル、シミュレーション、段階的検証をまとめ、追跡可能でレビュー可能な成果を整えます。", "PX4 と Gazebo の再現可能な実験を設計し、範囲付きパラメータを探索、比較して証拠を保存します。", "校正、差異診断、安全ゲート、制御された検証により、シミュレーションと実機証拠を接続します。", "互換性確認、操作者承認、テレメトリ境界、スナップショット、確実な復元を備えて実機調整を準備します。"],
+  },
+  ko: {
+    title: "설정",
+    tabs: ["일반", "메모리", "모델", "실행 환경"],
+    language: "언어",
+    interface: "화면",
+    notifications: "알림",
+    appearance: ["다크", "라이트", "시스템", "사용자 지정"],
+    notificationLabels: ["알림 허용", "실험 및 작업 완료", "AI 응답 완료", "제품 업데이트", "승인 필요", "할당량 또는 카드 만료", "보안 및 로그인"],
+    memoryTitle: "메모리",
+    memoryEnabled: ["메모리 꺼짐", "메모리 켜짐"],
+    crossSession: "세션 간 메모리",
+    memoryScopes: ["대화 기본 설정", "실험 기본값", "장치 및 기체", "지표 및 제약", "안전 및 승인", "워크플로 및 도구", "보고서 및 전달", "협업 및 조직", "파일 및 결과물"],
+    memoryDefaults: ["기본 기체", "기본 최적화 목표", "기본 안전 설정", "기본 단위", "기본 보고서 형식"],
+    courseOverview: "이 과정은 모델 추론, 제어, 항공우주 공학 도구를 결합하고 DroneDream에서 계획·실행·검토·검증 가능한 실용적인 UAV 작업 흐름으로 구현합니다.",
+    courseOpen: "강의 열기",
+    courseEditions: ["통합 공간에서 기체 모델, 시뮬레이션, 단계별 검증을 연결하고 추적·검토 가능한 엔지니어링 결과를 준비합니다.", "PX4와 Gazebo 반복 실험을 설계하고 제한된 매개변수를 탐색·비교하며 재현 가능한 시뮬레이션 증거를 보존합니다.", "보정, 차이 진단, 안전 게이트, 통제된 검증을 통해 시뮬레이션과 실제 하드웨어 증거를 연결합니다.", "호환성 확인, 운영자 승인, 텔레메트리 경계, 스냅샷과 신뢰할 롤백으로 실제 기체 튜닝을 준비합니다."],
+  },
 };
 
 function SettingsToggle({
@@ -359,7 +554,7 @@ function SettingsToggle({
 }: {
   checked: boolean;
   disabled?: boolean;
-  label: string;
+  label: ReactNode;
   onChange: (checked: boolean) => void;
 }) {
   return (
@@ -373,6 +568,28 @@ function SettingsToggle({
       />
       <i aria-hidden="true" />
     </label>
+  );
+}
+
+function AllowanceCardIcon({
+  card,
+}: {
+  card: ManagedAllowanceResetCard;
+}) {
+  const Icon = card.kind === "full_refill"
+    ? RefreshCcw
+    : card.credits >= 10_000
+      ? Trophy
+      : card.credits >= 5_000
+        ? TicketCheck
+        : Gift;
+  return (
+    <span
+      className={`settings-reset-card-icon settings-reset-card-icon-${card.kind === "full_refill" ? "full" : card.credits}`}
+      aria-hidden="true"
+    >
+      <Icon />
+    </span>
   );
 }
 
@@ -560,8 +777,11 @@ function SettingsDialog({
   onClose: () => void;
   onOpenExternal: (event: MouseEvent<HTMLAnchorElement>, url: string) => void;
 }) {
-  const { locale, setLocale, t } = useI18n();
+  const { locale, interfaceLocale, setLocale, t } = useI18n();
+  const settingsCopy = SETTINGS_COPY[interfaceLocale];
   const editionTheme = useEditionTheme();
+  const setAppearancePreference = editionTheme.setAppearance;
+  const setCustomAccentPreference = editionTheme.setCustomAccent;
   const auth = useAuth();
   const {
     settings: modelAccess,
@@ -577,6 +797,7 @@ function SettingsDialog({
   } = useModelAccess();
   const docsPreview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).has("docsPreview");
+  const legacyDesktopPreferences = !auth.account && !docsPreview && isDesktopRuntime();
   const [managedUsage, setManagedUsage] =
     useState<ManagedModelUsageSnapshot | null>(
       docsPreview ? DOCS_PREVIEW_MANAGED_USAGE : null,
@@ -591,18 +812,26 @@ function SettingsDialog({
   );
   const [selectedAllowanceResetCardId, setSelectedAllowanceResetCardId] =
     useState("");
-  const [, setExperiencePreferences] =
-    useState<UserExperiencePreferences | null>(null);
+  const [allowanceResetMenuOpen, setAllowanceResetMenuOpen] = useState(false);
+  const [allowanceResetState, setAllowanceResetState] =
+    useState<"idle" | "redeeming" | "success" | "error">("idle");
+  const [allowanceResetMessage, setAllowanceResetMessage] = useState<string | null>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
     useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
   const [experiencePreferenceState, setExperiencePreferenceState] =
     useState<"blocked" | "loading" | "ready" | "saving" | "saved" | "error">(
-      access.canUseRuntime ? "loading" : "blocked",
+      auth.account || docsPreview || legacyDesktopPreferences ? "loading" : "blocked",
     );
   const [experiencePreferenceMessage, setExperiencePreferenceMessage] =
     useState<string | null>(null);
   const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
     useState(false);
+  const preferenceHydratedRef = useRef(false);
+  const initialPreferencePresentationRef = useRef({
+    interfaceLocale,
+    appearanceMode: editionTheme.appearancePreference,
+    customAccent: editionTheme.customAccent,
+  });
   const [notificationPreferences, setNotificationPreferences] =
     useState<NotificationPreferences>(() => {
       try {
@@ -614,12 +843,51 @@ function SettingsDialog({
         return DEFAULT_NOTIFICATION_PREFERENCES;
       }
     });
+  const preferenceBoundary = useMemo(() => {
+    if (!auth.account || docsPreview) return null;
+    const tenant = activeAssistantTenantContext(auth.account.id);
+    return {
+      userId: auth.account.id,
+      tenantId: tenant.tenantId,
+      organizationId: tenant.organizationId,
+      workspaceId: `console-${edition}`,
+      edition,
+    };
+  }, [auth.account, docsPreview, edition]);
+  const consolePreferenceRecord = useCallback((): ConsolePreferenceRecord => ({
+    interface_locale: interfaceLocale,
+    appearance_mode: editionTheme.appearancePreference,
+    custom_accent: editionTheme.customAccent,
+    notifications: notificationPreferences,
+    memory_enabled: experiencePreferenceDraft.memory_enabled,
+    memory_scopes: experiencePreferenceDraft.memory_scopes,
+    defaults: {
+      template: experiencePreferenceDraft.default_template_key,
+      vehicle: experiencePreferenceDraft.default_vehicle,
+      track: experiencePreferenceDraft.default_track_type,
+      altitude_m: experiencePreferenceDraft.default_altitude_m,
+      objective: experiencePreferenceDraft.default_objective,
+      safety_profile: experiencePreferenceDraft.default_safety_profile,
+      units: experiencePreferenceDraft.default_units,
+      report_format: experiencePreferenceDraft.default_report_format,
+    },
+  }), [
+    editionTheme.appearancePreference,
+    editionTheme.customAccent,
+    experiencePreferenceDraft,
+    interfaceLocale,
+    notificationPreferences,
+  ]);
   const updateNotificationPreference = (
     key: NotificationPreferenceKey,
     checked: boolean,
   ) => {
     setNotificationPreferences((current) => {
-      const next = { ...current, [key]: checked };
+      const next = key === "master" && !checked
+        ? Object.fromEntries(
+            Object.keys(current).map((preference) => [preference, false]),
+          ) as NotificationPreferences
+        : { ...current, [key]: checked };
       window.localStorage.setItem("dd.notification-preferences.v1", JSON.stringify(next));
       return next;
     });
@@ -699,7 +967,8 @@ function SettingsDialog({
     selectManagedModel,
   ]);
   useEffect(() => {
-    if (!access.canUseRuntime) {
+    preferenceHydratedRef.current = false;
+    if (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) {
       setExperiencePreferenceState("blocked");
       setExperiencePreferenceMessage(null);
       setConfirmExperiencePreferenceDelete(false);
@@ -708,16 +977,62 @@ function SettingsDialog({
     let active = true;
     setExperiencePreferenceState("loading");
     setExperiencePreferenceMessage(null);
-    void apiClient.getUserExperiencePreferences()
+    const load = docsPreview
+      ? Promise.resolve(null)
+      : preferenceBoundary
+        ? loadConsolePreferences(preferenceBoundary)
+        : apiClient.getUserExperiencePreferences().then((preferences): ConsolePreferenceRecord => ({
+            interface_locale: initialPreferencePresentationRef.current.interfaceLocale,
+            appearance_mode: initialPreferencePresentationRef.current.appearanceMode,
+            custom_accent: initialPreferencePresentationRef.current.customAccent,
+            notifications: DEFAULT_NOTIFICATION_PREFERENCES,
+            memory_enabled: preferences.memory_enabled,
+            memory_scopes: {
+              ...EMPTY_EXPERIENCE_PREFERENCE_DRAFT.memory_scopes,
+              chat_preferences: preferences.memory_enabled,
+              experiment_defaults: preferences.memory_enabled,
+            },
+            defaults: {
+              template: preferences.default_template_key,
+              vehicle: null,
+              track: preferences.default_track_type,
+              altitude_m: preferences.default_altitude_m,
+              objective: null,
+              safety_profile: null,
+              units: null,
+              report_format: null,
+            },
+          }));
+    void load
       .then((preferences) => {
         if (!active) return;
-        setExperiencePreferences(preferences);
-        setExperiencePreferenceDraft({
-          memory_enabled: preferences.memory_enabled,
-          default_template_key: preferences.default_template_key,
-          default_track_type: preferences.default_track_type,
-          default_altitude_m: preferences.default_altitude_m,
-        });
+        if (preferences) {
+          const defaults = preferences.defaults ?? {};
+          setExperiencePreferenceDraft({
+            ...EMPTY_EXPERIENCE_PREFERENCE_DRAFT,
+            memory_enabled: preferences.memory_enabled,
+            memory_scopes: {
+              ...EMPTY_EXPERIENCE_PREFERENCE_DRAFT.memory_scopes,
+              ...preferences.memory_scopes,
+            },
+            default_template_key: (defaults.template ?? null) as StarterExperienceTemplateKey | null,
+            default_vehicle: typeof defaults.vehicle === "string" ? defaults.vehicle : null,
+            default_track_type: (defaults.track ?? null) as UserDefaultTrackType | null,
+            default_altitude_m: typeof defaults.altitude_m === "number" ? defaults.altitude_m : null,
+            default_objective: typeof defaults.objective === "string" ? defaults.objective : null,
+            default_safety_profile: typeof defaults.safety_profile === "string" ? defaults.safety_profile : null,
+            default_units: typeof defaults.units === "string" ? defaults.units : null,
+            default_report_format: typeof defaults.report_format === "string" ? defaults.report_format : null,
+          });
+          setNotificationPreferences({
+            ...DEFAULT_NOTIFICATION_PREFERENCES,
+            ...preferences.notifications,
+          });
+          setLocale(preferences.interface_locale);
+          setAppearancePreference(preferences.appearance_mode);
+          setCustomAccentPreference(preferences.custom_accent);
+        }
+        preferenceHydratedRef.current = true;
         setExperiencePreferenceState("ready");
       })
       .catch(() => {
@@ -728,10 +1043,40 @@ function SettingsDialog({
     return () => {
       active = false;
     };
-  }, [access.canUseRuntime]);
+  }, [
+    docsPreview,
+    legacyDesktopPreferences,
+    preferenceBoundary,
+    setAppearancePreference,
+    setCustomAccentPreference,
+    setLocale,
+  ]);
+  useEffect(() => {
+    if (
+      docsPreview ||
+      !preferenceBoundary ||
+      !preferenceHydratedRef.current ||
+      experiencePreferenceState === "blocked" ||
+      experiencePreferenceState === "loading" ||
+      experiencePreferenceState === "saving"
+    ) {
+      return undefined;
+    }
+    const pendingSave = window.setTimeout(() => {
+      void saveConsolePreferences(preferenceBoundary, consolePreferenceRecord())
+        .catch(() => setExperiencePreferenceMessage(t("settings.memory.saveFailed")));
+    }, 450);
+    return () => window.clearTimeout(pendingSave);
+  }, [
+    consolePreferenceRecord,
+    docsPreview,
+    experiencePreferenceState,
+    preferenceBoundary,
+    t,
+  ]);
   const saveExperiencePreferences = async () => {
     if (
-      !access.canUseRuntime ||
+      (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) ||
       experiencePreferenceState === "blocked" ||
       experiencePreferenceState === "loading" ||
       experiencePreferenceState === "saving"
@@ -741,19 +1086,20 @@ function SettingsDialog({
     setExperiencePreferenceState("saving");
     setExperiencePreferenceMessage(null);
     try {
-      const saved = await apiClient.updateUserExperiencePreferences({
-        ...experiencePreferenceDraft,
-        locale,
-      });
-      setExperiencePreferences(saved);
+      if (preferenceBoundary) {
+        await saveConsolePreferences(preferenceBoundary, consolePreferenceRecord());
+      } else if (legacyDesktopPreferences) {
+        await apiClient.updateUserExperiencePreferences({
+          memory_enabled: experiencePreferenceDraft.memory_enabled,
+          locale: interfaceLocale === "zh-CN" ? "zh-CN" : "en",
+          default_template_key: experiencePreferenceDraft.default_template_key,
+          default_track_type: experiencePreferenceDraft.default_track_type,
+          default_altitude_m: experiencePreferenceDraft.default_altitude_m,
+        });
+      }
+      preferenceHydratedRef.current = true;
       setExperiencePreferenceState("saved");
-      setExperiencePreferenceMessage(
-        saved.deleted_memory_count > 0
-          ? t("settings.memory.savedAndDeleted", {
-              count: saved.deleted_memory_count,
-            })
-          : t("settings.memory.saved"),
-      );
+      setExperiencePreferenceMessage(t("settings.memory.saved"));
     } catch {
       setExperiencePreferenceState("error");
       setExperiencePreferenceMessage(t("settings.memory.saveFailed"));
@@ -761,7 +1107,7 @@ function SettingsDialog({
   };
   const deleteExperiencePreferences = async () => {
     if (
-      !access.canUseRuntime ||
+      (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) ||
       experiencePreferenceState === "blocked" ||
       experiencePreferenceState === "loading" ||
       experiencePreferenceState === "saving"
@@ -771,14 +1117,18 @@ function SettingsDialog({
     setExperiencePreferenceState("saving");
     setExperiencePreferenceMessage(null);
     try {
-      const deleted = await apiClient.deleteUserExperiencePreferences();
-      setExperiencePreferences(null);
+      const deletedCount = preferenceBoundary
+        ? await deleteConsolePreferencesAndMemory(preferenceBoundary)
+        : legacyDesktopPreferences
+          ? (await apiClient.deleteUserExperiencePreferences()).deleted_memory_count
+          : 0;
+      preferenceHydratedRef.current = false;
       setExperiencePreferenceDraft(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
       setConfirmExperiencePreferenceDelete(false);
       setExperiencePreferenceState("ready");
       setExperiencePreferenceMessage(
         t("settings.memory.deleted", {
-          count: deleted.deleted_memory_count,
+          count: deletedCount,
         }),
       );
     } catch {
@@ -818,15 +1168,59 @@ function SettingsDialog({
       setSelectedAllowanceResetCardId(allowanceResetCards[0]?.id ?? "");
     }
   }, [allowanceResetCards, selectedAllowanceResetCardId]);
+  const redeemAllowanceResetCard = async () => {
+    if (!selectedAllowanceResetCardId || allowanceResetState === "redeeming") return;
+    setAllowanceResetState("redeeming");
+    setAllowanceResetMessage(null);
+    try {
+      if (docsPreview) {
+        const selectedCard = DOCS_PREVIEW_MANAGED_USAGE.allowance_reset_cards?.find(
+          (card) => card.id === selectedAllowanceResetCardId,
+        );
+        setManagedUsage((current) => current ? {
+          ...current,
+          usage: {
+            ...current.usage,
+            consumed_ai_credits: selectedCard?.kind === "full_refill"
+              ? 0
+              : Math.max(0, current.usage.consumed_ai_credits - (selectedCard?.credits ?? 0)),
+            remaining_ai_credits: selectedCard?.kind === "full_refill"
+              ? current.plan.included_ai_credits
+              : Math.min(
+                  current.plan.included_ai_credits,
+                  current.usage.remaining_ai_credits + (selectedCard?.credits ?? 0),
+                ),
+          },
+          allowance_reset_cards: current.allowance_reset_cards?.filter(
+            (card) => card.id !== selectedAllowanceResetCardId,
+          ),
+        } : current);
+        if (!selectedCard) throw new Error("RESET_CARD_NOT_FOUND");
+      } else {
+        setManagedUsage(await redeemManagedAllowanceResetCard(selectedAllowanceResetCardId));
+      }
+      setAllowanceResetState("success");
+      setAllowanceResetMessage(
+        locale === "zh-CN" ? "额度卡已成功兑换。" : "The allowance card was redeemed.",
+      );
+    } catch (error) {
+      setAllowanceResetState("error");
+      setAllowanceResetMessage(
+        error instanceof CloudModelAccessError
+          ? error.message
+          : locale === "zh-CN" ? "重置卡暂时无法使用。" : "The reset card could not be redeemed.",
+      );
+    }
+  };
   const [activeSettingsTab, setActiveSettingsTab] =
     useState<SettingsSurfaceTabId>("general");
   const settingsTabs: readonly SettingsSurfaceTab[] = [
-    { id: "general", label: locale === "zh-CN" ? "常规" : "General" },
-    { id: "memory", label: locale === "zh-CN" ? "记忆" : "Memory" },
-    { id: "model", label: locale === "zh-CN" ? "模型" : "Model" },
+    { id: "general", label: settingsCopy.tabs[0] },
+    { id: "memory", label: settingsCopy.tabs[1] },
+    { id: "model", label: settingsCopy.tabs[2] },
     { id: "course", label: "ECE498BH" },
     ...(access.desktopRuntime
-      ? [{ id: "runtime", label: locale === "zh-CN" ? "运行环境" : "Runtime" } as const]
+      ? [{ id: "runtime", label: settingsCopy.tabs[3] } as const]
       : []),
   ];
   const level = runtimeHealthLevel(access);
@@ -889,43 +1283,35 @@ function SettingsDialog({
       onClose={onClose}
       onTabChange={setActiveSettingsTab}
       tabs={settingsTabs}
-      title={t("app.settingsTitle")}
+      title={settingsCopy.title}
       consumerProfile={edition === "field" ? "field-lightweight" : edition}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
         <section className="settings-general-panel">
           <div className="settings-general-card settings-language-card">
             <div className="settings-card-heading">
-              <span><LanguageRegionIcon region="west" />{locale === "zh-CN" ? "语言" : "Language"}</span>
+              <span><LanguageRegionIcon region="west" />{settingsCopy.language}</span>
             </div>
             <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
-              <button
-                type="button"
-                className={locale === "en" ? "selected" : undefined}
-                aria-label={t("app.languageEnglish")}
-                aria-pressed={locale === "en"}
-                onClick={() => setLocale("en")}
-              >
-                <LanguageRegionIcon region="west" />
-                <strong>{t("app.languageEnglish")}</strong>
-                <i aria-hidden="true">✓</i>
-              </button>
-              <button
-                type="button"
-                className={locale === "zh-CN" ? "selected" : undefined}
-                aria-label={t("app.languageChinese")}
-                aria-pressed={locale === "zh-CN"}
-                onClick={() => setLocale("zh-CN")}
-              >
-                <LanguageRegionIcon region="east" />
-                <strong>{t("app.languageChinese")}</strong>
-                <i aria-hidden="true">✓</i>
-              </button>
+              {SETTINGS_LOCALES.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={interfaceLocale === option.id ? "selected" : undefined}
+                  aria-label={option.label}
+                  aria-pressed={interfaceLocale === option.id}
+                  onClick={() => setLocale(option.id)}
+                >
+                  <LanguageRegionIcon region={option.region} />
+                  <strong>{option.label}</strong>
+                  <i aria-hidden="true">✓</i>
+                </button>
+              ))}
             </fieldset>
           </div>
           <div className="settings-general-card settings-interface-card">
             <div className="settings-card-heading">
-              <span><SlidersHorizontal aria-hidden="true" />{locale === "zh-CN" ? "界面" : "Interface"}</span>
+              <span><SlidersHorizontal aria-hidden="true" />{settingsCopy.interface}</span>
             </div>
             <div
               className="settings-appearance-options"
@@ -934,89 +1320,153 @@ function SettingsDialog({
             >
               <button
                 type="button"
-                className={editionTheme.appearance === "dark" ? "selected" : undefined}
-                aria-pressed={editionTheme.appearance === "dark"}
+                className={editionTheme.appearancePreference === "dark" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "dark"}
                 onClick={() => editionTheme.setAppearance("dark")}
               >
                 <Moon aria-hidden="true" />
-                <strong>{t("settings.general.dark")}</strong>
+                <strong>{settingsCopy.appearance[0]}</strong>
                 <i aria-hidden="true">✓</i>
               </button>
               <button
                 type="button"
-                className={editionTheme.appearance === "light" ? "selected" : undefined}
-                aria-pressed={editionTheme.appearance === "light"}
+                className={editionTheme.appearancePreference === "light" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "light"}
                 onClick={() => editionTheme.setAppearance("light")}
               >
                 <Sun aria-hidden="true" />
-                <strong>{t("settings.general.light")}</strong>
+                <strong>{settingsCopy.appearance[1]}</strong>
+                <i aria-hidden="true">✓</i>
+              </button>
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "system" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "system"}
+                onClick={() => editionTheme.setAppearance("system")}
+              >
+                <MonitorCog aria-hidden="true" />
+                <strong>{settingsCopy.appearance[2]}</strong>
+                <i aria-hidden="true">✓</i>
+              </button>
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "custom" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "custom"}
+                onClick={() => editionTheme.setAppearance("custom")}
+              >
+                <Sparkles aria-hidden="true" />
+                <strong>{settingsCopy.appearance[3]}</strong>
                 <i aria-hidden="true">✓</i>
               </button>
             </div>
+            {editionTheme.appearancePreference === "custom" ? (
+              <label className="settings-custom-color" htmlFor="settings_custom_accent">
+                <input
+                  id="settings_custom_accent"
+                  type="color"
+                  value={editionTheme.customAccent}
+                  onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
+                />
+                <input
+                  aria-label={locale === "zh-CN" ? "十六进制主题色" : "Hex theme color"}
+                  value={editionTheme.customAccent.toUpperCase()}
+                  maxLength={7}
+                  pattern="#[0-9A-Fa-f]{6}"
+                  onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
+                />
+              </label>
+            ) : null}
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">
-              <span><Bell aria-hidden="true" />{locale === "zh-CN" ? "通知" : "Notifications"}</span>
+              <span><Bell aria-hidden="true" />{settingsCopy.notifications}</span>
             </div>
             <SettingsToggle
               checked={notificationPreferences.master}
-              label={locale === "zh-CN" ? "允许通知" : "Allow notifications"}
+              label={settingsCopy.notificationLabels[0]}
               onChange={(checked) => updateNotificationPreference("master", checked)}
             />
             <SettingsToggle
               checked={notificationPreferences.experiment}
               disabled={!notificationPreferences.master}
-              label={locale === "zh-CN" ? "实验与任务完成" : "Experiment and task completed"}
+              label={settingsCopy.notificationLabels[1]}
               onChange={(checked) => updateNotificationPreference("experiment", checked)}
             />
             <SettingsToggle
               checked={notificationPreferences.assistant}
               disabled={!notificationPreferences.master}
-              label={locale === "zh-CN" ? "AI 回复完成" : "AI response completed"}
+              label={settingsCopy.notificationLabels[2]}
               onChange={(checked) => updateNotificationPreference("assistant", checked)}
             />
             <SettingsToggle
               checked={notificationPreferences.updates}
               disabled={!notificationPreferences.master}
-              label={locale === "zh-CN" ? "产品更新" : "Product updates"}
+              label={settingsCopy.notificationLabels[3]}
               onChange={(checked) => updateNotificationPreference("updates", checked)}
+            />
+            <SettingsToggle
+              checked={notificationPreferences.approval}
+              disabled={!notificationPreferences.master}
+              label={settingsCopy.notificationLabels[4]}
+              onChange={(checked) => updateNotificationPreference("approval", checked)}
+            />
+            <SettingsToggle
+              checked={notificationPreferences.allowance}
+              disabled={!notificationPreferences.master}
+              label={settingsCopy.notificationLabels[5]}
+              onChange={(checked) => updateNotificationPreference("allowance", checked)}
+            />
+            <SettingsToggle
+              checked={notificationPreferences.security}
+              disabled={!notificationPreferences.master}
+              label={settingsCopy.notificationLabels[6]}
+              onChange={(checked) => updateNotificationPreference("security", checked)}
             />
           </div>
         </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "course"} id="course">
         <section className="settings-course-panel" aria-labelledby="settings-course-title">
-          <div className="settings-course-mark" aria-hidden="true">
-            <GraduationCap />
+          <div className="settings-course-overview">
+            <div className="settings-course-mark" aria-hidden="true">
+              <GraduationCap />
+            </div>
+            <div>
+              <h3 id="settings-course-title">ECE498BH</h3>
+              <p>{settingsCopy.courseOverview}</p>
+            </div>
+            <a
+              href={ECE498BH_COURSE_URL}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => onOpenExternal(event, ECE498BH_COURSE_URL)}
+            >
+              {settingsCopy.courseOpen}
+            </a>
           </div>
-          <div>
-            <h3 id="settings-course-title">ECE498BH</h3>
-            <p>{locale === "zh-CN"
-              ? "ECE498BH 探索大语言模型如何进行工程推理，并结合控制、航空航天等领域工具构建可验证的智能体；DroneDream 将这一课程理念转化为可规划、可执行、可验收的无人机调优工作流。"
-              : "ECE498BH explores LLM reasoning with engineering tools across controls, aerospace, and related domains. DroneDream carries that course idea into UAV tuning workflows that can be planned, executed, and verified."}</p>
+          <div className="settings-course-editions" aria-label={locale === "zh-CN" ? "DroneDream 四款软件" : "DroneDream editions"}>
+            {([
+              ["universal", settingsCopy.courseEditions[0]],
+              ["sim", settingsCopy.courseEditions[1]],
+              ["lab", settingsCopy.courseEditions[2]],
+              ["field", settingsCopy.courseEditions[3]],
+            ] as const).map(([courseEdition, description]) => (
+              <article key={courseEdition}>
+                <BrandLockup edition={courseEdition} />
+                <p>{description}</p>
+              </article>
+            ))}
           </div>
-          <a
-            href={ECE498BH_COURSE_URL}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(event) => onOpenExternal(event, ECE498BH_COURSE_URL)}
-          >
-            {locale === "zh-CN" ? "打开课程" : "Open course"}
-          </a>
         </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "memory"} id="memory">
         <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
         <div className="settings-memory-heading">
           <div>
-            <h3 id="settings-memory-title">{locale === "zh-CN" ? "记忆" : "Memory"}</h3>
+            <h3 id="settings-memory-title">{settingsCopy.memoryTitle}</h3>
           </div>
           <span className={experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
-            {t(
-              experiencePreferenceDraft.memory_enabled
-                ? "settings.memory.enabled"
-                : "settings.memory.disabled",
-            )}
+            {settingsCopy.memoryEnabled[experiencePreferenceDraft.memory_enabled ? 1 : 0]}
           </span>
         </div>
         <div className="settings-memory-body">
@@ -1024,17 +1474,35 @@ function SettingsDialog({
             <SettingsToggle
               checked={experiencePreferenceDraft.memory_enabled}
               disabled={experiencePreferenceControlsDisabled}
-              label={locale === "zh-CN" ? "跨会话记忆" : "Cross-session memory"}
+              label={settingsCopy.crossSession}
               onChange={(checked) => setExperiencePreferenceDraft((current) => ({
                 ...current,
                 memory_enabled: checked,
               }))}
             />
             <div className="settings-memory-scope-grid" aria-label={locale === "zh-CN" ? "记忆范围" : "Memory scope"}>
-              <span><Sparkles aria-hidden="true" />{locale === "zh-CN" ? "对话偏好" : "Chat preferences"}</span>
-              <span><SlidersHorizontal aria-hidden="true" />{locale === "zh-CN" ? "实验默认值" : "Experiment defaults"}</span>
-              <span><RadioTower aria-hidden="true" />{locale === "zh-CN" ? "设备与机型" : "Device and vehicle"}</span>
-              <span><ShieldCheck aria-hidden="true" />{locale === "zh-CN" ? "指标与约束" : "Metrics and constraints"}</span>
+              {([
+                ["chat_preferences", Sparkles, settingsCopy.memoryScopes[0]],
+                ["experiment_defaults", SlidersHorizontal, settingsCopy.memoryScopes[1]],
+                ["device_vehicle", RadioTower, settingsCopy.memoryScopes[2]],
+                ["metrics_constraints", ShieldCheck, settingsCopy.memoryScopes[3]],
+                ["safety_approvals", ShieldCheck, settingsCopy.memoryScopes[4]],
+                ["workflow_tools", BotMessageSquare, settingsCopy.memoryScopes[5]],
+                ["reports_delivery", Save, settingsCopy.memoryScopes[6]],
+                ["collaboration_organization", UsersRound, settingsCopy.memoryScopes[7]],
+                ["files_artifacts", FileArchive, settingsCopy.memoryScopes[8]],
+              ] as const).map(([scope, ScopeIcon, label]) => (
+                <SettingsToggle
+                  key={scope}
+                  checked={experiencePreferenceDraft.memory_scopes[scope]}
+                  disabled={experiencePreferenceControlsDisabled || !experiencePreferenceDraft.memory_enabled}
+                  label={<><ScopeIcon aria-hidden="true" /><span>{label}</span></>}
+                  onChange={(checked) => setExperiencePreferenceDraft((current) => ({
+                    ...current,
+                    memory_scopes: { ...current.memory_scopes, [scope]: checked },
+                  }))}
+                />
+              ))}
             </div>
           </div>
           <div className="settings-memory-defaults">
@@ -1056,6 +1524,23 @@ function SettingsDialog({
               <option value="hover-basics@1">{t("wizard.starter.hover.title")} · v1</option>
               <option value="first-circle@1">{t("wizard.starter.circle.title")} · v1</option>
               <option value="light-wind-circle@1">{t("wizard.starter.wind.title")} · v1</option>
+            </select>
+          </label>
+          <label htmlFor="settings_default_vehicle">
+            <span>{settingsCopy.memoryDefaults[0]}</span>
+            <select
+              id="settings_default_vehicle"
+              value={experiencePreferenceDraft.default_vehicle ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_vehicle: event.target.value || null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="x500">PX4 x500</option>
+              <option value="iris">PX4 Iris</option>
+              <option value="custom">{locale === "zh-CN" ? "自定义机型" : "Custom vehicle"}</option>
             </select>
           </label>
           <label htmlFor="settings_default_track">
@@ -1095,6 +1580,73 @@ function SettingsDialog({
                   : Number(event.target.value),
               }))}
             />
+          </label>
+          <label htmlFor="settings_default_objective">
+            <span>{settingsCopy.memoryDefaults[1]}</span>
+            <select
+              id="settings_default_objective"
+              value={experiencePreferenceDraft.default_objective ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_objective: event.target.value || null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="tracking">{locale === "zh-CN" ? "跟踪精度" : "Tracking accuracy"}</option>
+              <option value="robustness">{locale === "zh-CN" ? "抗扰鲁棒性" : "Disturbance robustness"}</option>
+              <option value="efficiency">{locale === "zh-CN" ? "能耗效率" : "Energy efficiency"}</option>
+            </select>
+          </label>
+          <label htmlFor="settings_default_safety">
+            <span>{settingsCopy.memoryDefaults[2]}</span>
+            <select
+              id="settings_default_safety"
+              value={experiencePreferenceDraft.default_safety_profile ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_safety_profile: event.target.value || null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="conservative">{locale === "zh-CN" ? "保守" : "Conservative"}</option>
+              <option value="standard">{locale === "zh-CN" ? "标准" : "Standard"}</option>
+              <option value="lab-guarded">{locale === "zh-CN" ? "实验室受控" : "Lab guarded"}</option>
+            </select>
+          </label>
+          <label htmlFor="settings_default_units">
+            <span>{settingsCopy.memoryDefaults[3]}</span>
+            <select
+              id="settings_default_units"
+              value={experiencePreferenceDraft.default_units ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_units: event.target.value || null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="metric">{locale === "zh-CN" ? "公制" : "Metric"}</option>
+              <option value="imperial">{locale === "zh-CN" ? "英制" : "Imperial"}</option>
+            </select>
+          </label>
+          <label htmlFor="settings_default_report">
+            <span>{settingsCopy.memoryDefaults[4]}</span>
+            <select
+              id="settings_default_report"
+              value={experiencePreferenceDraft.default_report_format ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_report_format: event.target.value || null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="pdf">PDF</option>
+              <option value="html">HTML</option>
+              <option value="both">{locale === "zh-CN" ? "PDF 与 HTML" : "PDF and HTML"}</option>
+            </select>
           </label>
             </div>
             <div className="settings-memory-actions">
@@ -1276,29 +1828,71 @@ function SettingsDialog({
                     <span>{locale === "zh-CN" ? "额度重置卡" : "Allowance reset cards"}</span>
                     <strong>{allowanceResetCards?.length ?? 0}</strong>
                   </div>
-                  <label htmlFor="settings_allowance_reset_card">
+                  <div className="settings-reset-card-picker">
                     <span>{locale === "zh-CN" ? "准备使用" : "Ready to use"}</span>
-                    <select
-                      id="settings_allowance_reset_card"
-                      value={selectedAllowanceResetCardId}
+                    <button
+                      type="button"
+                      className="settings-reset-card-trigger"
                       disabled={!allowanceResetCards?.length}
-                      onChange={(event) => setSelectedAllowanceResetCardId(event.target.value)}
+                      aria-expanded={allowanceResetMenuOpen}
+                      aria-haspopup="listbox"
+                      onClick={() => setAllowanceResetMenuOpen((open) => !open)}
                     >
-                      {!allowanceResetCards?.length ? (
-                        <option value="">
-                          {locale === "zh-CN" ? "暂无可用重置卡" : "No reset cards available"}
-                        </option>
-                      ) : allowanceResetCards.map((card) => (
-                        <option key={card.id} value={card.id}>
-                          {numberFormatter.format(card.credits)} {t("settings.model.credits")}
-                          {" · "}
-                          {locale === "zh-CN" ? "有效期至" : "expires"}{" "}
-                          {allowanceResetCardFormatter.format(new Date(card.expires_at))}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      {(() => {
+                        const card = allowanceResetCards?.find((candidate) => candidate.id === selectedAllowanceResetCardId);
+                        return card ? (
+                          <><AllowanceCardIcon card={card} /><span>{card.kind === "full_refill"
+                            ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill")
+                            : `+${numberFormatter.format(card.credits)}`}</span></>
+                        ) : <span>{locale === "zh-CN" ? "暂无可用额度卡" : "No cards available"}</span>;
+                      })()}
+                    </button>
+                    {allowanceResetMenuOpen && allowanceResetCards?.length ? (
+                      <div className="settings-reset-card-menu" role="listbox">
+                        {allowanceResetCards.map((card) => {
+                          return (
+                            <button
+                              key={card.id}
+                              type="button"
+                              role="option"
+                              aria-selected={card.id === selectedAllowanceResetCardId}
+                              onClick={() => {
+                                setSelectedAllowanceResetCardId(card.id);
+                                setAllowanceResetMenuOpen(false);
+                              }}
+                            >
+                              <AllowanceCardIcon card={card} />
+                              <span><strong>{card.kind === "full_refill"
+                                ? (locale === "zh-CN" ? "全额恢复卡" : "Full refill card")
+                                : `+${numberFormatter.format(card.credits)} ${t("settings.model.credits")}`}</strong>
+                                <small>{locale === "zh-CN" ? "有效期至" : "Expires"} {allowanceResetCardFormatter.format(new Date(card.expires_at))}</small>
+                              </span>
+                              {card.id === selectedAllowanceResetCardId ? <i aria-hidden="true">✓</i> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn settings-model-reset-action"
+                    disabled={!selectedAllowanceResetCardId || allowanceResetState === "redeeming"}
+                    onClick={() => void redeemAllowanceResetCard()}
+                  >
+                    {allowanceResetState === "redeeming"
+                      ? locale === "zh-CN" ? "使用中…" : "Using…"
+                      : locale === "zh-CN" ? "使用重置卡" : "Use card"}
+                  </button>
                 </div>
+                {allowanceResetMessage ? (
+                  <p
+                    className="settings-model-reset-message"
+                    role={allowanceResetState === "error" ? "alert" : "status"}
+                  >
+                    {allowanceResetMessage}
+                  </p>
+                ) : null}
               </>
             ) : (
               <p className="settings-model-usage-message" role="status">

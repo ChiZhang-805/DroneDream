@@ -1,10 +1,13 @@
 import { Check, ChevronDown, Plus } from "lucide-react";
 import {
+  useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
 } from "react";
+import { createPortal } from "react-dom";
 
 import type { ModelAccessProfile, ModelProvider } from "../features/settings/ModelAccessContext";
 import type { ManagedModelCatalogEntry } from "../features/settings/cloudModelAccess";
@@ -69,27 +72,64 @@ export function AssistantModelPicker({
 }: AssistantModelPickerProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const selectedCustom = customProfiles.find((profile) => profile.id === selectedCustomId) ?? null;
   const selectedProvider = selectedDefault?.provider ?? selectedCustom?.provider ?? "custom";
   const selectedLabel = selectedDefault?.display_name
     ?? selectedCustom?.model.trim()
     ?? "Choose model";
 
+  const positionMenu = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const trigger = root.querySelector<HTMLButtonElement>(".assistant-model-button");
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const viewportPadding = 8;
+    const width = Math.min(352, window.innerWidth - viewportPadding * 2);
+    const maxHeight = Math.min(496, window.innerHeight - viewportPadding * 2);
+    const renderedHeight = Math.min(menuRef.current?.scrollHeight ?? maxHeight, maxHeight);
+    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+    const openBelow = spaceBelow >= renderedHeight || rect.top < renderedHeight;
+    const top = openBelow
+      ? Math.min(rect.bottom + viewportPadding, window.innerHeight - renderedHeight - viewportPadding)
+      : Math.max(viewportPadding, rect.top - renderedHeight - viewportPadding);
+    const left = Math.min(
+      window.innerWidth - width - viewportPadding,
+      Math.max(viewportPadding, rect.right - width),
+    );
+    setMenuStyle({ top, left, width, maxHeight });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    positionMenu();
+  }, [open, positionMenu]);
+
   useEffect(() => {
     if (!open) return undefined;
     const closeOnOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target)
+        && !menuRef.current?.contains(target)
+      ) setOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("pointerdown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", positionMenu);
+    window.addEventListener("scroll", positionMenu, true);
     return () => {
       document.removeEventListener("pointerdown", closeOnOutside);
       document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", positionMenu);
+      window.removeEventListener("scroll", positionMenu, true);
     };
-  }, [open]);
+  }, [open, positionMenu]);
 
   return (
     <div className="assistant-model-picker" ref={rootRef}>
@@ -107,8 +147,14 @@ export function AssistantModelPicker({
         <span>{selectedLabel}</span>
         <ChevronDown aria-hidden="true" />
       </button>
-      {open ? (
-        <div className="assistant-model-menu" role="listbox" aria-label={ariaLabel}>
+      {open ? createPortal(
+        <div
+          className="assistant-model-menu assistant-model-menu-portal"
+          role="listbox"
+          aria-label={ariaLabel}
+          ref={menuRef}
+          style={menuStyle}
+        >
           <div className="assistant-model-group-label">Default</div>
           {defaultModels.map((model) => {
             const selected = selectedDefault?.provider === model.provider
@@ -168,7 +214,8 @@ export function AssistantModelPicker({
               </button>
             </>
           ) : null}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );

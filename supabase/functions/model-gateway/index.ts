@@ -385,11 +385,50 @@ async function usageSnapshot(userId: string): Promise<JsonRecord> {
   if (error || !isRecord(data)) {
     throw error ?? new Error("MODEL_USAGE_SNAPSHOT_INVALID");
   }
-  return data;
+  const { data: cards, error: cardsError } = await adminClient()
+    .from("model_allowance_reset_cards")
+    .select("card_id,credits,card_kind,expires_at")
+    .eq("user_id", userId)
+    .eq("status", "available")
+    .gt("expires_at", new Date().toISOString())
+    .order("expires_at", { ascending: true });
+  if (cardsError || !Array.isArray(cards)) {
+    throw cardsError ?? new Error("RESET_CARD_SNAPSHOT_INVALID");
+  }
+  return {
+    ...data,
+    allowance_reset_cards: cards.map((card) => ({
+      id: card.card_id,
+      credits: card.credits,
+      kind: card.card_kind,
+      expires_at: card.expires_at,
+    })),
+  };
 }
 
 async function handleUsage(request: Request): Promise<Response> {
   const user = await authenticatedUser(request);
+  return jsonResponse(request, 200, { data: await usageSnapshot(user.id) });
+}
+
+async function handleResetAllowance(request: Request): Promise<Response> {
+  const user = await authenticatedUser(request);
+  const body = await readJsonBody(request);
+  if (
+    typeof body.card_id !== "string"
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(body.card_id)
+  ) {
+    throw new GatewayError("INVALID_REQUEST", "card_id is invalid.", 400);
+  }
+  const { error } = await adminClient().rpc("model_allowance_reset_redeem", {
+    p_user_id: user.id,
+    p_card_id: body.card_id,
+  });
+  if (error) {
+    const code = typeof error.message === "string" ? error.message : "RESET_CARD_REDEEM_FAILED";
+    const status = code.includes("NOT_FOUND") ? 404 : code.includes("IN_FLIGHT") ? 409 : 400;
+    throw new GatewayError(code, code, status);
+  }
   return jsonResponse(request, 200, { data: await usageSnapshot(user.id) });
 }
 
@@ -804,6 +843,9 @@ export async function handleModelGatewayRequest(
     const path = endpointPath(request);
     if (request.method === "GET" && path === "/usage") {
       return await handleUsage(request);
+    }
+    if (request.method === "POST" && path === "/allowance/reset") {
+      return await handleResetAllowance(request);
     }
     if (request.method === "GET" && path === "/models") {
       return await handleModels(request);

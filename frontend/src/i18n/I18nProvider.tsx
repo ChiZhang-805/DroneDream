@@ -9,7 +9,11 @@ import {
 import type { ReactNode } from "react";
 import { getInstallerLocale, isDesktopRuntime } from "../desktop/bridge";
 
+// The interface remembers six selectable locales. Existing product views still
+// consume a two-dictionary compatibility locale until their authored copy is
+// ready, so selecting a new locale never indexes a missing translation map.
 export type Locale = "en" | "zh-CN";
+export type InterfaceLocale = Locale | "zh-TW" | "es" | "ja" | "ko";
 
 const enTranslations = {
     "app.conversation": "Tuning Chat",
@@ -3083,12 +3087,16 @@ export type TranslationParams = Record<string, string | number>;
 
 interface I18nValue {
   locale: Locale;
-  setLocale: (locale: Locale) => void;
+  interfaceLocale: InterfaceLocale;
+  setLocale: (locale: InterfaceLocale) => void;
   t: (key: TranslationKey, params?: TranslationParams) => string;
 }
 
 function translate(locale: Locale, key: TranslationKey, params?: TranslationParams): string {
-  const template = String(translations[locale][key]);
+  const dictionary = locale === "zh-CN"
+    ? translations["zh-CN"]
+    : translations.en;
+  const template = String(dictionary[key]);
   if (!params) return template;
   return Object.entries(params).reduce<string>(
     (result, [name, value]) => result.replaceAll(`{{${name}}}`, String(value)),
@@ -3098,15 +3106,18 @@ function translate(locale: Locale, key: TranslationKey, params?: TranslationPara
 
 const I18nContext = createContext<I18nValue>({
   locale: "en",
+  interfaceLocale: "en",
   setLocale: () => undefined,
   t: (key, params) => translate("en", key, params),
 });
 
-function initialLocale(): Locale {
+function initialLocale(): InterfaceLocale {
   if (typeof window === "undefined") return "en";
   try {
     const saved = window.localStorage.getItem("drone-dream:locale");
-    if (saved === "en" || saved === "zh-CN") return saved;
+    if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) {
+      return saved as InterfaceLocale;
+    }
   } catch {
     // Language preference storage is optional; the app must still start when
     // browser or WebView policy denies access to localStorage.
@@ -3115,13 +3126,16 @@ function initialLocale(): Locale {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale);
+  const [interfaceLocale, setLocaleState] = useState<InterfaceLocale>(initialLocale);
+  const locale: Locale = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW"
+    ? "zh-CN"
+    : "en";
 
   useEffect(() => {
     if (!isDesktopRuntime()) return;
     try {
       const saved = window.localStorage.getItem("drone-dream:locale");
-      if (saved === "en" || saved === "zh-CN") return;
+        if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) return;
     } catch {
       // The installer preference is still safe to use in memory.
     }
@@ -3132,7 +3146,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         try {
           const saved = window.localStorage.getItem("drone-dream:locale");
-          if (saved === "en" || saved === "zh-CN") return;
+          if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) return;
         } catch {
           // Apply the installer language without persistence.
         }
@@ -3146,7 +3160,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const setLocale = useCallback((next: Locale) => {
+  const setLocale = useCallback((next: InterfaceLocale) => {
     setLocaleState(next);
     try {
       window.localStorage.setItem("drone-dream:locale", next);
@@ -3156,16 +3170,17 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    document.documentElement.lang = locale;
-  }, [locale]);
+    document.documentElement.lang = interfaceLocale;
+  }, [interfaceLocale]);
 
   const value = useMemo<I18nValue>(
     () => ({
       locale,
+      interfaceLocale,
       setLocale,
       t: (key, params) => translate(locale, key, params),
     }),
-    [locale, setLocale],
+    [interfaceLocale, locale, setLocale],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
