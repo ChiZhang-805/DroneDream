@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe("fixed scenario library", () => {
-  it("groups four versioned common scenarios without creating a job", async () => {
+  it("paginates six groups of versioned scenarios without creating a job", async () => {
     const createSpy = vi.spyOn(apiClient, "createJob");
     const { router } = renderPage();
 
@@ -44,6 +44,9 @@ describe("fixed scenario library", () => {
     expect(document.querySelectorAll("[data-template-key]")).toHaveLength(4);
     expect(screen.getAllByText("Local track preview")).toHaveLength(4);
     expect(screen.getByText(/never creates or starts a job/i)).toBeVisible();
+    expect(screen.getByText("1 / 6")).toBeVisible();
+    expect(screen.queryByText("PX4 / GAZEBO STUDY")).not.toBeInTheDocument();
+    expect(screen.queryByText("Scenario catalog v1")).not.toBeInTheDocument();
 
     const combinedCard = screen.getByRole("heading", {
       name: "Wind and sensor-noise circle",
@@ -56,7 +59,21 @@ describe("fixed scenario library", () => {
       "href",
       "/jobs/new?scenario=wind-sensor-circle%401",
     );
-    fireEvent.click(useLink);
+
+    fireEvent.click(screen.getByRole("button", { name: "Next scenario page" }));
+    expect(screen.getByText("2 / 6")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Wide 8 m circle" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Precision U-turn" })).toBeVisible();
+    expect(document.querySelectorAll("[data-template-key]")).toHaveLength(4);
+    expect(createSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous scenario page" }));
+    const restoredCombinedCard = screen.getByRole("heading", {
+      name: "Wind and sensor-noise circle",
+    }).closest("article");
+    fireEvent.click(within(restoredCombinedCard as HTMLElement).getByRole("link", {
+      name: /Use this scenario/i,
+    }));
     expect(await screen.findByLabelText("location"))
       .toHaveTextContent("/jobs/new?scenario=wind-sensor-circle%401");
     expect(createSpy).not.toHaveBeenCalled();

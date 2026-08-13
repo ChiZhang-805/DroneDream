@@ -3704,19 +3704,72 @@ a {
   height: 100%;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 0.65rem;
+  gap: 0.48rem;
   width: 100%;
   min-width: 0;
 }
 
 .fixed-scenarios-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  min-height: 2.5rem;
+  margin: -0.18rem 0 0;
 }
 
-.fixed-scenarios-version,
+.fixed-scenarios-header h1 {
+  margin: 0;
+  line-height: 1.05;
+}
+
+.fixed-scenarios-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  flex: 0 0 auto;
+}
+
+.fixed-scenarios-pagination button,
+.fixed-scenarios-pagination span {
+  display: inline-grid;
+  height: 2.22rem;
+  border: 1px solid #dec6e5;
+  border-radius: 10px;
+  color: #6f2c7b;
+  background: rgba(255, 255, 255, 0.88);
+  place-items: center;
+}
+
+.fixed-scenarios-pagination button {
+  width: 2.22rem;
+  padding: 0;
+  cursor: pointer;
+}
+
+.fixed-scenarios-pagination button:hover:not(:disabled) {
+  border-color: #bd72d4;
+  color: #942eaa;
+  background: #fff7ff;
+}
+
+.fixed-scenarios-pagination button:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.fixed-scenarios-pagination button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.fixed-scenarios-pagination span {
+  min-width: 3.4rem;
+  padding: 0 0.55rem;
+  font-size: 0.76rem;
+  font-weight: 780;
+}
+
 .fixed-scenario-difficulty {
   display: inline-flex;
   align-items: center;
@@ -3755,7 +3808,7 @@ a {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
+  gap: 0.72rem;
   min-width: 0;
   min-height: 0;
 }
@@ -3763,10 +3816,10 @@ a {
 .fixed-scenario-card {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 0.5rem;
+  gap: 0.54rem;
   min-width: 0;
   min-height: 0;
-  padding: 0.72rem;
+  padding: 0.78rem;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.96);
@@ -3832,15 +3885,15 @@ a {
   display: grid;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
-  padding: 0.45rem;
+  padding: 0.52rem;
   border-color: #e5d8e7;
   background: #faf7fb;
 }
 
 .fixed-scenario-card .experience-preview-canvas {
   height: 100%;
-  min-height: 94px;
-  max-height: 150px;
+  min-height: 126px;
+  max-height: 205px;
 }
 
 .fixed-scenario-use {
@@ -3876,7 +3929,7 @@ a {
     flex-direction: column;
   }
 
-  .fixed-scenarios-version,
+  .fixed-scenarios-pagination,
   .fixed-scenario-card-heading code {
     align-self: flex-start;
   }
