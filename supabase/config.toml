@@ -1,0 +1,13 @@
+project_id = "dronedream-production"
+
+[edge_runtime]
+# Background assistant work uses EdgeRuntime.waitUntil.  The local runtime must
+# keep each request worker isolated so one conversation cannot share in-memory
+# state with another request while still allowing the scheduled task to finish.
+policy = "per_worker"
+
+[functions.model-gateway]
+verify_jwt = false
+
+[functions.assistant-orchestrator]
+verify_jwt = false

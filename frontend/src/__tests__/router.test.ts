@@ -268,7 +268,7 @@ describe("environment-aware routing", () => {
     router.dispose();
   });
 
-  it("exposes the integrated Lab workspace in Universal", async () => {
+  it("exposes the integrated Lab and primary Field workspaces in Universal", async () => {
     delete window.__TAURI__;
     window.history.replaceState(null, "", "/lab");
     vi.resetModules();
@@ -279,7 +279,9 @@ describe("environment-aware routing", () => {
       .toEqual(expect.any(Function));
     expect(children.find((route) => route.path === "lab/hardware")?.lazy)
       .toEqual(expect.any(Function));
-    expect(children.find((route) => route.path === "field")?.lazy)
+    expect(children.find((route) => route.path === "field")?.element)
+      .toBeDefined();
+    expect(children.find((route) => route.path === "field/:fieldPage")?.lazy)
       .toEqual(expect.any(Function));
     expect(router.state.location.pathname).toBe("/lab");
 

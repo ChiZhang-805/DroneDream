@@ -1,13 +1,12 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ChangeEvent,
   type FormEvent,
 } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowUp,
   FileText,
@@ -33,17 +32,27 @@ import {
   createEmptyAssistantDraft,
   explicitAssistantFields,
   loadAssistantDraft,
+  persistAssistantDraft,
   type AssistantDraft,
 } from "../features/experiment/assistantDraft";
-import { compileHostedAssistantTurn } from "../features/experiment/hostedAssistant";
+import {
+  completedAssistantResponseForArtifact,
+  getAssistantWorkspace,
+  latestCompletedAssistantResponse,
+  orchestrateAssistantTurn,
+  type AssistantRunStage,
+  type AssistantWorkflowStep,
+} from "../features/experiment/assistantOrchestration";
 import { clearExperimentDraft } from "../features/experiment/draftStorage";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import {
   createExperimentWorkspaceId,
+  activeAssistantTenantContext,
   listExperimentWorkspaces,
   registerExperimentWorkspace,
   removeExperimentWorkspace,
+  setActiveAssistantTenantContext,
 } from "../features/experiment/workspaceRegistry";
 import {
   createVehicleModelDraft,
@@ -61,6 +70,7 @@ import {
 } from "../features/settings/ModelAccessContext";
 import {
   CloudModelAccessError,
+  DEFAULT_MANAGED_MODEL_CATALOG,
   getManagedModelCatalog,
   issueManagedModelGrant,
   type ManagedModelCatalogEntry,
@@ -125,6 +135,8 @@ const COPY = {
     tokens: "tokens",
     newConversation: "Clear conversation",
     untitledExperiment: "Untitled experiment",
+    invalidArtifactLink:
+      "This result does not belong to the current account, edition, or workspace.",
     confirmClear:
       "Clear this conversation and discard its current experiment draft?",
     examples: [
@@ -143,6 +155,7 @@ const COPY = {
     ],
   },
   "zh-CN": {
+    invalidArtifactLink: "此结果不属于当前账号、软件版本或工作空间。",
     title: "想创建怎样的飞行调优实验？",
     subtitle:
       "直接说出轨迹、机型、调优目标、控制参数、仿真场景和次数预算，先生成可审查草案。",
@@ -513,6 +526,7 @@ function assistantErrorMessage(
 
 export function ExperimentAssistant() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { locale } = useI18n();
   const editionTheme = useEditionTheme();
   const auth = useOptionalAuth();
@@ -525,18 +539,34 @@ export function ExperimentAssistant() {
         openDraft: copy.openExperiment,
         examples: copy.examples,
       };
-  const [vehicleDraftId, setVehicleDraftId] = useState<string | null>(null);
-  const initialWorkspace = useRef(
-    listExperimentWorkspaces(ownerId, editionTheme.id).find(
-      (workspace) => workspace.source === "assistant" && !workspace.archived,
-    ) ?? null,
-  ).current;
+  const requestedWorkspaceId = (() => {
+    const value = searchParams.get("experiment")?.trim() ?? "";
+    return /^[a-zA-Z0-9_-]{8,128}$/u.test(value) ? value : null;
+  })();
+  const requestedArtifactId = (() => {
+    const value = searchParams.get("artifact")?.trim() ?? "";
+    return /^[0-9a-f]{8}-[0-9a-f-]{27}$/iu.test(value) ? value : null;
+  })();
+  const initialWorkspace = useRef((() => {
+    const workspaces = listExperimentWorkspaces(ownerId, editionTheme.id);
+    return (requestedWorkspaceId
+      ? workspaces.find((workspace) => workspace.id === requestedWorkspaceId)
+      : workspaces.find(
+        (workspace) => workspace.source === "assistant" && !workspace.archived,
+      )) ?? null;
+  })()).current;
+  const [vehicleDraftId, setVehicleDraftId] = useState<string | null>(
+    initialWorkspace?.vehicleDraftId ?? null,
+  );
 
   function openDraftPath(): string {
     if (editionTheme.id === "universal") {
-      return vehicleDraftId
+      return latest?.orchestration?.artifact_kind === "universal_vehicle_model"
+        && vehicleDraftId
         ? `/vehicle-studio?draft=${encodeURIComponent(vehicleDraftId)}`
-        : "/vehicle-studio";
+        : workspaceId
+        ? `/jobs/new?experiment=${encodeURIComponent(workspaceId)}`
+        : "/jobs/new";
     }
     if (editionTheme.id === "field") {
       return workspaceId
@@ -556,39 +586,26 @@ export function ExperimentAssistant() {
     settings: modelAccess,
     profiles: modelProfiles,
     activeProfileId,
-    selectManagedProvider,
+    selectManagedModel,
     selectProfile,
   } = useModelAccess();
   const docsPreview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).has("docsPreview");
   const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
-    docsPreview
-      ? [
-          { provider: "openai", display_name: "GPT", model: "gpt-4.1", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
-          { provider: "deepseek", display_name: "DeepSeek", model: "deepseek-chat", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
-          { provider: "qwen", display_name: "Qwen", model: "qwen-plus", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
-        ]
-      : [],
+    docsPreview ? DEFAULT_MANAGED_MODEL_CATALOG : [],
   );
   const [managedModelsReady, setManagedModelsReady] = useState(docsPreview);
-  const assistantManagedModels = useMemo(
-    () => publicDemoConsole
-      ? managedModels.filter((model) => model.provider === "openai")
-      : managedModels,
-    [managedModels],
-  );
-  const assistantManagedProvider = publicDemoConsole
-    ? "openai"
-    : modelAccess.managedProvider;
+  const assistantManagedModels = managedModels;
   const configuredModelProfiles = modelProfiles.filter((profile) =>
     profile.apiKey.trim(),
   );
   const selectedManagedModel = assistantManagedModels.find(
-    (model) => model.provider === assistantManagedProvider,
+    (model) => model.provider === modelAccess.managedProvider
+      && model.model === modelAccess.managedModel,
   );
   const selectedModelProfileId = modelAccess.accessMode === "platform"
     ? selectedManagedModel
-      ? `managed:${selectedManagedModel.provider}`
+      ? `managed:${selectedManagedModel.provider}:${selectedManagedModel.model}`
       : "none"
     : configuredModelProfiles.some(
     (profile) => profile.id === activeProfileId,
@@ -601,10 +618,11 @@ export function ExperimentAssistant() {
       : createEmptyAssistantDraft(),
   );
   const [workspaceId, setWorkspaceId] = useState<string | null>(
-    initialWorkspace?.id ?? null,
+    initialWorkspace?.id ?? requestedWorkspaceId,
   );
   const [composer, setComposer] = useState("");
   const [pending, setPending] = useState(false);
+  const [runStage, setRunStage] = useState<AssistantRunStage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [voiceConsentPending, setVoiceConsentPending] = useState(false);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
@@ -616,6 +634,7 @@ export function ExperimentAssistant() {
     null,
   );
   const pendingRef = useRef(false);
+  const restoredWorkspaceRef = useRef<string | null>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -660,16 +679,21 @@ export function ExperimentAssistant() {
       modelAccess.accessMode === "platform"
       && assistantManagedModels.length > 0
       && !assistantManagedModels.some(
-        (model) => model.provider === assistantManagedProvider,
+        (model) => model.provider === modelAccess.managedProvider
+          && model.model === modelAccess.managedModel,
       )
     ) {
-      selectManagedProvider(assistantManagedModels[0].provider);
+      selectManagedModel(
+        assistantManagedModels[0].provider,
+        assistantManagedModels[0].model,
+      );
     }
   }, [
     assistantManagedModels,
-    assistantManagedProvider,
+    modelAccess.managedModel,
+    modelAccess.managedProvider,
     modelAccess.accessMode,
-    selectManagedProvider,
+    selectManagedModel,
   ]);
 
   const appendTranscript = useCallback((transcript: string) => {
@@ -682,6 +706,87 @@ export function ExperimentAssistant() {
     onTranscript: appendTranscript,
   });
   const messages = draft.conversation.messages;
+
+  useEffect(() => {
+    if (!publicDemoConsole || !auth?.account || !workspaceId) return;
+    const restoreKey = `${editionTheme.id}:${workspaceId}`;
+    if (restoredWorkspaceRef.current === restoreKey) return;
+    restoredWorkspaceRef.current = restoreKey;
+    let active = true;
+    const tenantContext = activeAssistantTenantContext(ownerId);
+    void getAssistantWorkspace(
+      editionTheme.id,
+      workspaceId,
+      tenantContext.organizationId,
+    )
+      .then((snapshot) => {
+        if (!active || !snapshot) return;
+        setActiveAssistantTenantContext(ownerId, {
+          tenantId: snapshot.conversation.tenant_id,
+          organizationId: snapshot.conversation.organization_id,
+        });
+        const serverMessages = snapshot.messages.slice(-60).map((message) => ({
+          id: message.message_id,
+          role: message.role,
+          content: message.content,
+        }));
+        // A turn may have started while this snapshot was in flight. In that
+        // case neither the restored transcript nor its latest result is
+        // allowed to overwrite the newer local turn.
+        if (pendingRef.current) return;
+        setDraft((current) => {
+          const next = {
+            ...current,
+            conversation: {
+              ...current.conversation,
+              summary: snapshot.conversation.summary,
+              messages: serverMessages,
+            },
+          };
+          persistAssistantDraft(next, workspaceId);
+          return next;
+        });
+        const restoredLatest = requestedArtifactId
+          ? completedAssistantResponseForArtifact(snapshot, requestedArtifactId)
+          : latestCompletedAssistantResponse(snapshot);
+        if (requestedArtifactId && !restoredLatest) {
+          setError(copy.invalidArtifactLink);
+          return;
+        }
+        if (restoredLatest) {
+          registerExperimentWorkspace({
+            id: workspaceId,
+            ownerId,
+            tenantId: snapshot.conversation.tenant_id,
+            organizationId: snapshot.conversation.organization_id,
+            edition: editionTheme.id,
+            name:
+              restoredLatest.assistant_message?.trim()
+              || copy.untitledExperiment,
+            source: "assistant",
+            activeStep: 1,
+            completedSteps: [0],
+            assistantArtifactKind: restoredLatest.orchestration?.artifact_kind ?? null,
+          });
+          setLatest(restoredLatest);
+        }
+      })
+      .catch((reason) => {
+        if (!active) return;
+        restoredWorkspaceRef.current = null;
+        setError(assistantErrorMessage(reason, copy));
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    auth?.account,
+    copy,
+    editionTheme.id,
+    ownerId,
+    requestedArtifactId,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     if (!actionMenuOpen) return undefined;
@@ -780,28 +885,33 @@ export function ExperimentAssistant() {
     const id = messageId();
     pendingRef.current = true;
     setPending(true);
+    setRunStage("queued");
     setError(null);
     try {
-      const platformAccess = modelAccess.accessMode === "platform"
+      const targetWorkspaceId = workspaceId ?? createExperimentWorkspaceId();
+      const platformAccess = modelAccess.accessMode === "platform" && !publicDemoConsole
         ? await issueManagedModelGrant(
             "assistant",
-            workspaceId ?? `draft:${ownerId}`,
-            assistantManagedProvider,
+            targetWorkspaceId,
+            selectedManagedModel!.provider,
+            selectedManagedModel!.model,
           )
         : null;
       const documentContext = requestOnlyDocumentContext(referenceFiles);
       const result = publicDemoConsole
-        ? platformAccess
-          ? await compileHostedAssistantTurn({
-              grant: platformAccess,
+        ? modelAccess.accessMode === "platform" && selectedManagedModel
+          ? (await orchestrateAssistantTurn({
               edition: editionTheme.id,
+              workspaceId: targetWorkspaceId,
+              organizationId: activeAssistantTenantContext(ownerId).organizationId,
+              idempotencyKey: `assistant:${id}`,
+              selectedModel: selectedManagedModel,
               locale,
-              messageId: id,
               message: visibleMessage,
-              conversationSummary: draft.conversation.summary,
               currentValues: assistantCurrentValues(draft.form),
               documentContext,
-            })
+              onStage: setRunStage,
+            })).response
           : (() => {
               throw new CloudModelAccessError(
                 "PLATFORM_ACCESS_REQUIRED",
@@ -836,7 +946,6 @@ export function ExperimentAssistant() {
               base_url: modelAccess.baseUrl.trim() || null,
             },
       });
-      const targetWorkspaceId = workspaceId ?? createExperimentWorkspaceId();
       const next = applyAssistantTurn(
         draft,
         result,
@@ -851,17 +960,24 @@ export function ExperimentAssistant() {
         },
         targetWorkspaceId,
       );
-      if (editionTheme.id === "universal") {
+      let createdVehicleDraftId: string | null = null;
+      if (
+        editionTheme.id === "universal"
+        && result.orchestration?.artifact_kind === "universal_vehicle_model"
+      ) {
         const vehicleDraft = saveUniversalVehicleDraft(
           ownerId,
           result,
           vehicleDraftId,
         );
         setVehicleDraftId(vehicleDraft.draftId);
+        createdVehicleDraftId = vehicleDraft.draftId;
       }
       registerExperimentWorkspace({
         id: targetWorkspaceId,
         ownerId,
+        tenantId: result.orchestration?.tenant_id,
+        organizationId: result.orchestration?.organization_id,
         edition: editionTheme.id,
         name:
           next.form.display_name.trim()
@@ -870,6 +986,8 @@ export function ExperimentAssistant() {
         source: "assistant",
         activeStep: next.activeStep,
         completedSteps: next.completedSteps,
+        assistantArtifactKind: result.orchestration?.artifact_kind ?? null,
+        vehicleDraftId: createdVehicleDraftId,
       });
       if (!workspaceId) {
         setWorkspaceId(targetWorkspaceId);
@@ -883,8 +1001,11 @@ export function ExperimentAssistant() {
       void recordProductEvent("assistant_turn_succeeded", {
         access_mode: modelAccess.accessMode,
         provider: modelAccess.accessMode === "platform"
-          ? assistantManagedProvider
+          ? selectedManagedModel?.provider ?? modelAccess.managedProvider
           : modelAccess.provider,
+        model: modelAccess.accessMode === "platform"
+          ? selectedManagedModel?.model ?? modelAccess.managedModel
+          : modelAccess.model,
         has_reference_files: referenceFiles.length > 0,
       });
     } catch (reason) {
@@ -892,12 +1013,16 @@ export function ExperimentAssistant() {
       void recordProductEvent("assistant_turn_failed", {
         access_mode: modelAccess.accessMode,
         provider: modelAccess.accessMode === "platform"
-          ? assistantManagedProvider
+          ? selectedManagedModel?.provider ?? modelAccess.managedProvider
           : modelAccess.provider,
+        model: modelAccess.accessMode === "platform"
+          ? selectedManagedModel?.model ?? modelAccess.managedModel
+          : modelAccess.model,
       });
     } finally {
       pendingRef.current = false;
       setPending(false);
+      setRunStage(null);
     }
   }
 
@@ -983,11 +1108,45 @@ export function ExperimentAssistant() {
             ))}
             {pending ? (
               <article className="assistant-message assistant pending">
-                <p>{copy.sending}</p>
+                <p>{runStage
+                  ? locale === "zh-CN"
+                    ? {
+                        queued: "已进入当前对话队列…",
+                        analyzing: "正在分析意图与工作空间边界…",
+                        planning: "正在编排工作流程…",
+                        calling_tools: "正在生成并保存可审阅草稿…",
+                        validating: "正在校验草稿与安全边界…",
+                        retry_wait: "模型服务繁忙，任务已安全进入重试队列…",
+                        completed: "草稿已完成。",
+                        failed_recoverable: "任务失败，但可以安全恢复重试。",
+                        failed: "草稿创建失败。",
+                      }[runStage]
+                    : {
+                        queued: "Queued for this conversation…",
+                        analyzing: "Analyzing the intent and workspace boundary…",
+                        planning: "Planning the workflow…",
+                        calling_tools: "Creating and saving the reviewable draft…",
+                        validating: "Validating the draft and safety boundary…",
+                        retry_wait: "Provider busy; the task is safely queued for retry…",
+                        completed: "Draft completed.",
+                        failed_recoverable: "The task failed but can be safely retried.",
+                        failed: "Draft creation failed.",
+                      }[runStage]
+                  : copy.sending}</p>
               </article>
             ) : null}
             {latest ? (
               <div className="assistant-draft-result">
+                {latest.orchestration?.workflow.length ? (
+                  <ol className="assistant-workflow-receipt" aria-label={locale === "zh-CN" ? "任务步骤" : "Task steps"}>
+                    {latest.orchestration.workflow.map((step: AssistantWorkflowStep) => (
+                      <li key={step.step} data-status={step.status}>
+                        <span aria-hidden="true">{step.status === "completed" ? "✓" : "!"}</span>
+                        <span>{step.label}</span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
                 {configuredLabels.length ? (
                   <div>
                     <strong>{copy.recognized}</strong>
@@ -998,6 +1157,12 @@ export function ExperimentAssistant() {
                   <div>
                     <strong>{copy.needsReview}</strong>
                     <span>{remainingLabels.join(" · ")}</span>
+                  </div>
+                ) : null}
+                {latest.orchestration?.generated_files?.length ? (
+                  <div className="assistant-generated-file">
+                    <strong>{locale === "zh-CN" ? "已保存产物" : "Saved artifact"}</strong>
+                    <span>{latest.orchestration.generated_files[0].display_name} · v{latest.orchestration.generated_files[0].version}</span>
                   </div>
                 ) : null}
                 <button
@@ -1112,16 +1277,13 @@ export function ExperimentAssistant() {
             disabled={
               pending
               || (modelAccess.accessMode === "platform" && !managedModelsReady)
-              || (publicDemoConsole && modelAccess.accessMode === "platform")
             }
             onChange={(event) => {
               if (event.target.value.startsWith("managed:")) {
-                selectManagedProvider(
-                  event.target.value.slice("managed:".length) as
-                    | "openai"
-                    | "deepseek"
-                    | "qwen",
+                const selected = assistantManagedModels.find((model) =>
+                  `managed:${model.provider}:${model.model}` === event.target.value
                 );
+                if (selected) selectManagedModel(selected.provider, selected.model);
               } else if (event.target.value !== "none") {
                 selectProfile(event.target.value);
               }
@@ -1130,7 +1292,10 @@ export function ExperimentAssistant() {
             {modelAccess.accessMode === "platform" ? (
               assistantManagedModels.length ? (
                 assistantManagedModels.map((model) => (
-                  <option key={model.provider} value={`managed:${model.provider}`}>
+                  <option
+                    key={`${model.provider}:${model.model}`}
+                    value={`managed:${model.provider}:${model.model}`}
+                  >
                     {model.display_name} · {model.model}
                   </option>
                 ))

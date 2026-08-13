@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-export type ModelProvider = "openai" | "qwen" | "deepseek" | "custom";
+export type ModelProvider = "openai" | "qwen" | "deepseek" | "kimi" | "custom";
 export type ManagedModelProvider = Exclude<ModelProvider, "custom">;
 export type ModelAccessMode = "platform" | "byok";
 
@@ -9,6 +9,7 @@ export function modelProviderLabel(provider: ModelProvider): string {
     openai: "OpenAI",
     qwen: "Qwen",
     deepseek: "DeepSeek",
+    kimi: "Kimi",
     custom: "Custom",
   }[provider];
 }
@@ -16,6 +17,7 @@ export function modelProviderLabel(provider: ModelProvider): string {
 export interface ModelAccessSettings {
   accessMode: ModelAccessMode;
   managedProvider: ManagedModelProvider;
+  managedModel: string;
   provider: ModelProvider;
   apiKey: string;
   model: string;
@@ -33,6 +35,7 @@ export interface ModelAccessContextValue {
   updateSettings: (values: Partial<ModelAccessSettings>) => void;
   selectAccessMode: (mode: ModelAccessMode) => void;
   selectManagedProvider: (provider: ManagedModelProvider) => void;
+  selectManagedModel: (provider: ManagedModelProvider, model: string) => void;
   selectProvider: (provider: ModelProvider) => void;
   selectProfile: (profileId: string) => void;
   addProfile: () => void;

@@ -165,24 +165,12 @@ const simBridgeFixture = await readFile(
 const fieldBridgeFixture = await readFile(
   path.join(frontendRoot, "src", "lab", "__fixtures__", "field-harness-receipt.fake.json"),
 );
-let profile;
-try {
-  profile = JSON.parse(await readFile(
-    path.join(repoRoot, "distribution", "build-profiles", "lab-preview.v1.json"),
-    "utf8",
-  ));
-} catch (error) {
-  if (!(error instanceof Error) || !Object.hasOwn(error, "code") || error.code !== "ENOENT") {
-    throw error;
-  }
-  profile = JSON.parse(await readFile(
-    path.join(repoRoot, "distribution", "build-profiles", "universal-1.0.0.v1.json"),
-    "utf8",
-  ));
-}
-const commonCore = profile.commonCore ?? {
+// The consolidated repository no longer keeps edition-specific build-profile
+// copies. Bind the visual receipt directly to the authoritative tracked UI
+// tree instead of reviving a retired duplicate profile directory.
+const commonCore = {
   productSourceCommit: git("rev-parse", "HEAD"),
-  paths: profile.sharedUiContract.sourceFiles.map(({ path: sourcePath }) => sourcePath),
+  paths: ["frontend/src"],
 };
 const commonCoreListing = execFileSync(
   "git",
@@ -213,9 +201,9 @@ try {
       window.localStorage.setItem("drone-dream:locale", locale);
       window.localStorage.setItem("dronedream:universal-workspace:v2", "lab");
     }, testCase.locale);
-    await page.goto(`${origin}/assistant?docsPreview`, { waitUntil: "networkidle" });
+    await page.goto(`${origin}/assistant?edition=lab&docsPreview=1`, { waitUntil: "networkidle" });
     const assistantTitle = testCase.locale === "en"
-      ? "What flight experiment should we build?"
+      ? "What validation experiment should we build?"
       : "想创建怎样的飞行调优实验？";
     await page.getByRole("heading", { name: assistantTitle }).waitFor();
     const assistant = page.locator('.experiment-assistant-page[data-brand-edition="lab"]');
@@ -238,14 +226,14 @@ try {
       ? "Sim-to-Real calibration laboratory"
       : "Sim-to-Real 校准实验室";
     await page.getByRole("heading", { name: title }).waitFor();
-    const brandImage = page.locator('img[data-brand-edition="lab"]').first();
+    const brandImage = page.locator('.workspace-switch-brand[data-brand-edition="lab"] img').first();
     await brandImage.waitFor({ state: "attached" });
     const brandImageState = await brandImage.evaluate((image) => ({
       complete: image instanceof HTMLImageElement && image.complete,
       naturalWidth: image instanceof HTMLImageElement ? image.naturalWidth : 0,
       naturalHeight: image instanceof HTMLImageElement ? image.naturalHeight : 0,
     }));
-    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 2386, naturalHeight: 218 });
+    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 2648, naturalHeight: 480 });
     assert((await page.getByText("DroneDream · LAB", { exact: false }).count()) > 0);
     const palette = await page.locator(".lab-page").evaluate((element) => {
       const style = getComputedStyle(element);

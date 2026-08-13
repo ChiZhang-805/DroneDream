@@ -357,14 +357,16 @@ describe("conversational experiment drafting", () => {
     );
 
     const selector = screen.getByRole("combobox", { name: "Model" });
-    expect(selector).toHaveValue("managed:openai");
-    expect(selector).toHaveTextContent("GPT · gpt-4.1");
-    expect(selector).toHaveTextContent("DeepSeek · deepseek-chat");
-    expect(selector).toHaveTextContent("Qwen · qwen-plus");
+    expect(selector).toHaveValue("managed:openai:gpt-4.1");
+    expect(selector).toHaveTextContent("GPT 4.1 · gpt-4.1");
+    expect(selector).toHaveTextContent("DeepSeek V4 Flash · deepseek-v4-flash");
+    expect(selector).toHaveTextContent("Kimi K3 · kimi-k3");
     expect(selector).not.toHaveTextContent("key required");
 
-    fireEvent.change(selector, { target: { value: "managed:deepseek" } });
-    expect(selector).toHaveValue("managed:deepseek");
+    fireEvent.change(selector, {
+      target: { value: "managed:deepseek:deepseek-v4-pro" },
+    });
+    expect(selector).toHaveValue("managed:deepseek:deepseek-v4-pro");
   });
 
   it("fails closed when a signed-out build has no managed model policy", () => {

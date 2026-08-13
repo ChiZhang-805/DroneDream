@@ -99,7 +99,7 @@ describe("workspace account entry", () => {
     const { container, router } = renderWorkspace();
 
     const links = container.querySelectorAll(".app-nav a");
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(5);
     expect(screen.queryByRole("link", { name: "SIM" }))
       .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
@@ -107,6 +107,59 @@ describe("workspace account entry", () => {
     links.forEach((link) => {
       expect(link.querySelector(".app-nav-entry > svg")).not.toBeNull();
     });
+
+    router.dispose();
+  });
+
+  it("keeps every edition within the agreed five-to-six primary areas", () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "universal");
+    const { container, router } = renderWorkspace();
+    const navigationLabels = () => Array.from(
+      container.querySelectorAll<HTMLAnchorElement>(".app-nav a"),
+      (link) => link.textContent?.trim(),
+    );
+    const selectEdition = (name: RegExp) => {
+      fireEvent.click(screen.getByRole("button", { name: "Switch DroneDream edition" }));
+      fireEvent.click(screen.getByRole("menuitemradio", { name }));
+    };
+
+    expect(navigationLabels()).toEqual([
+      "Tuning Chat",
+      "Vehicle Studio",
+      "Dashboard",
+      "Run History",
+      "Fixed Scenarios",
+    ]);
+
+    selectEdition(/DroneDream.*SIM/);
+    expect(navigationLabels()).toEqual([
+      "Tuning Chat",
+      "Experiment Builder",
+      "Dashboard",
+      "Fixed Scenarios",
+      "Run History",
+    ]);
+
+    selectEdition(/DroneDream.*LAB/);
+    expect(navigationLabels()).toEqual([
+      "Tuning Chat",
+      "Experiment Builder",
+      "Lab workspace",
+      "Hardware laboratory",
+      "Validation & Evidence",
+      "Run History",
+    ]);
+
+    selectEdition(/DroneDream.*FIELD/);
+    expect(navigationLabels()).toEqual([
+      "Tuning Chat",
+      "Device & Vehicle",
+      "Tuning Plan",
+      "Safety & Recovery",
+      "Run History",
+    ]);
+    expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
 
     router.dispose();
   });
@@ -128,13 +181,20 @@ describe("workspace account entry", () => {
     expect(panel).not.toHaveAttribute("hidden");
     expect(within(panel!).getByRole("button", { name: "Account" }))
       .toHaveTextContent("Local user");
-    expect(within(panel!).getAllByRole("link")).toHaveLength(4);
+    expect(within(panel!).getAllByRole("link")).toHaveLength(5);
     expect(within(panel!).queryByRole("link", { name: "SIM" }))
       .not.toBeInTheDocument();
 
     fireEvent.click(within(panel!).getByRole("button", { name: "Settings" }));
     expect(panel).toHaveAttribute("hidden");
     expect(screen.getByRole("dialog", { name: "Settings" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "ECE498BH" }));
+    expect(screen.getByRole("link", { name: "Open course" }))
+      .toHaveAttribute(
+        "href",
+        "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+      );
     fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
     await waitFor(() => expect(trigger).toHaveFocus());
 

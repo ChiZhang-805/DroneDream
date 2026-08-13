@@ -245,6 +245,22 @@ try {
       document.querySelector(".drone-launch-scene")?.getAttribute("data-flight-state") ===
         "starflight"
     );
+    await page.locator(".launcher-settings-button").click();
+    const settingsDialog = page.locator(".launcher-settings-dialog");
+    await settingsDialog.waitFor();
+    const courseTab = settingsDialog.getByRole("tab", { name: "ECE498BH" });
+    await courseTab.click();
+    const courseLink = settingsDialog.locator(
+      'a[href="https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html"]',
+    );
+    await courseLink.waitFor();
+    const courseHref = await courseLink.getAttribute("href");
+    assert.equal(await courseLink.getAttribute("target"), "_blank");
+    assert.equal(await courseLink.getAttribute("rel"), "noreferrer");
+    const settingsScreenshotPath = path.join(outputRoot, `${testCase.id}-ece498-settings.png`);
+    await page.screenshot({ path: settingsScreenshotPath, fullPage: false });
+    await settingsDialog.locator(".launcher-settings-close").click();
+    await settingsDialog.waitFor({ state: "detached" });
     results.push({
       ...testCase,
       theme,
@@ -253,6 +269,13 @@ try {
       entryBounds,
       launcherTiming,
       droneInteraction: "hover-to-starflight",
+      ece498CourseEntry: {
+        href: courseHref,
+        screenshot: {
+          path: path.relative(repoRoot, settingsScreenshotPath).replaceAll("\\", "/"),
+          sha256: await sha256(settingsScreenshotPath),
+        },
+      },
       screenshot: {
         path: path.relative(repoRoot, screenshotPath).replaceAll("\\", "/"),
         sha256: await sha256(screenshotPath),

@@ -271,7 +271,7 @@ export function applyAssistantTurn(
   }
 
   const assistantContent = [
-    result.experiment_summary,
+    result.assistant_message?.trim() || result.experiment_summary,
     ...result.questions.map((question) => question.question),
   ].join("\n\n");
   const conversation: ExperimentConversationState = {

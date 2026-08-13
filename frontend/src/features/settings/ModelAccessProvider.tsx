@@ -20,6 +20,7 @@ interface PersistedModelAccessProfile {
   id: string;
   accessMode: ModelAccessMode;
   managedProvider: ManagedModelProvider;
+  managedModel: string;
   provider: ModelProvider;
   model: string;
   baseUrl: string;
@@ -49,6 +50,7 @@ function modelAccessStorageKey(accountScope: string | null | undefined): string 
 const DEFAULT_MODEL_ACCESS: ModelAccessSettings = {
   accessMode: "platform",
   managedProvider: "openai",
+  managedModel: "gpt-4.1",
   provider: "openai",
   apiKey: "",
   model: "",
@@ -68,15 +70,19 @@ const PROVIDER_DEFAULTS: Record<
     model: "deepseek-v4-flash",
     baseUrl: "https://api.deepseek.com",
   },
+  kimi: {
+    model: "kimi-k2.6",
+    baseUrl: "https://api.moonshot.ai/v1",
+  },
   custom: { model: "", baseUrl: "" },
 };
 
 function isModelProvider(value: unknown): value is ModelProvider {
-  return ["openai", "qwen", "deepseek", "custom"].includes(String(value));
+  return ["openai", "qwen", "deepseek", "kimi", "custom"].includes(String(value));
 }
 
 function isManagedModelProvider(value: unknown): value is ManagedModelProvider {
-  return ["openai", "qwen", "deepseek"].includes(String(value));
+  return ["openai", "qwen", "deepseek", "kimi"].includes(String(value));
 }
 
 function isModelAccessMode(value: unknown): value is ModelAccessMode {
@@ -120,6 +126,11 @@ function parsePersistedProfile(value: unknown): PersistedModelAccessProfile | nu
     managedProvider: isManagedModelProvider(candidate.managedProvider)
       ? candidate.managedProvider
       : "openai",
+    managedModel: typeof candidate.managedModel === "string"
+        && candidate.managedModel.length > 0
+        && candidate.managedModel.length <= 128
+      ? candidate.managedModel
+      : "gpt-4.1",
     provider: candidate.provider,
     model: candidate.model,
     baseUrl: candidate.baseUrl,
@@ -178,6 +189,7 @@ function loadModelAccessState(
           id: DEFAULT_PROFILE_ID,
           accessMode: "platform",
           managedProvider: "openai",
+          managedModel: "gpt-4.1",
           provider: candidate.provider,
           model: candidate.model,
           baseUrl: candidate.baseUrl,
@@ -264,6 +276,7 @@ export function ModelAccessProvider({
             id: profile.id,
             accessMode: profile.accessMode,
             managedProvider: profile.managedProvider,
+            managedModel: profile.managedModel,
             provider: profile.provider,
             model: profile.model,
             baseUrl: profile.baseUrl,
@@ -323,7 +336,31 @@ export function ModelAccessProvider({
       ...current,
       profiles: current.profiles.map((profile) =>
         profile.id === current.activeProfileId
-          ? { ...profile, managedProvider }
+          ? {
+              ...profile,
+              managedProvider,
+              managedModel: {
+                openai: "gpt-4.1",
+                deepseek: "deepseek-v4-flash",
+                qwen: "qwen-plus",
+                kimi: "kimi-k2.6",
+              }[managedProvider],
+            }
+          : profile
+      ),
+    }));
+  }, []);
+
+  const selectManagedModel = useCallback((
+    managedProvider: ManagedModelProvider,
+    managedModel: string,
+  ) => {
+    if (!managedModel.trim() || managedModel.length > 128) return;
+    setState((current) => ({
+      ...current,
+      profiles: current.profiles.map((profile) =>
+        profile.id === current.activeProfileId
+          ? { ...profile, managedProvider, managedModel }
           : profile
       ),
     }));
@@ -361,6 +398,7 @@ export function ModelAccessProvider({
             id,
             accessMode: "byok",
             managedProvider: "openai",
+            managedModel: "gpt-4.1",
             provider: "custom",
             apiKey: "",
             ...PROVIDER_DEFAULTS.custom,
@@ -391,6 +429,7 @@ export function ModelAccessProvider({
     updateSettings,
     selectAccessMode,
     selectManagedProvider,
+    selectManagedModel,
     selectProvider,
     selectProfile,
     addProfile,
@@ -400,6 +439,7 @@ export function ModelAccessProvider({
     removeActiveProfile,
     selectProfile,
     selectManagedProvider,
+    selectManagedModel,
     selectProvider,
     selectAccessMode,
     settings,

@@ -18,7 +18,6 @@ import {
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
-import { useI18n } from "../i18n/I18nProvider";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
 import {
   FieldAdapterCenter,
@@ -36,7 +35,7 @@ import {
 import { hardwareDomainEdition } from "./hardwareDomain";
 import "./field.css";
 
-type FieldPageId = "assistant" | "device" | "compatibility" | "tuning" | "recovery" | "operations";
+export type FieldPageId = "assistant" | "device" | "compatibility" | "tuning" | "recovery" | "operations";
 
 const COPY = {
   en: {
@@ -165,12 +164,13 @@ function savedLocale(): FieldLocale {
   }
 }
 
-interface FieldAppProps {
+export interface FieldAppProps {
   initialLocale?: FieldLocale;
   initialObservationState?: FieldObservationState;
   focusOnMount?: boolean;
   embeddedInLab?: boolean;
   embeddedInConsole?: boolean;
+  activePageOverride?: FieldPageId;
 }
 
 function FieldPageHeading({
@@ -201,6 +201,7 @@ function FieldWorkspace({
   focusOnMount = false,
   embeddedInLab = false,
   embeddedInConsole = false,
+  activePageOverride,
 }: FieldAppProps) {
   const presentationEdition = embeddedInLab ? "lab" as const : hardwareDomainEdition;
   const [locale, setLocale] = useState<FieldLocale>(initialLocale ?? savedLocale);
@@ -244,6 +245,10 @@ function FieldWorkspace({
   useEffect(() => {
     if (initialLocale) setLocale(initialLocale);
   }, [initialLocale]);
+
+  useEffect(() => {
+    if (activePageOverride) setActivePage(activePageOverride);
+  }, [activePageOverride]);
 
   useEffect(() => {
     if (focusOnMount) pageRef.current?.focus({ preventScroll: true });
@@ -365,7 +370,9 @@ function FieldWorkspace({
       <a className="field-skip-link" href="#field-page">{copy.skip}</a>
       <div className="field-layout">
         <aside className="field-sidebar">
-          <nav aria-label={navigationLabel}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
+          {!embeddedInConsole ? (
+            <nav aria-label={navigationLabel}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
+          ) : null}
           <div className="field-sidebar-status" title={`${copy.packs}: 0`}><Wrench aria-hidden="true" /><div><span>{copy.packs}</span><strong>0</strong></div><small>{copy.locked}</small></div>
         </aside>
         <main className="field-main" id="field-page">
@@ -383,15 +390,4 @@ export function FieldApp(props: FieldAppProps) {
       <FieldWorkspace {...props} />
     </ModelAccessProvider>
   );
-}
-
-/**
- * Universal owns the shared application locale. The standalone FIELD entry
- * keeps its edition-scoped preference, while this route adapter makes the
- * integrated workspace follow Universal without creating a second language
- * authority.
- */
-export function UniversalFieldApp() {
-  const { locale } = useI18n();
-  return <FieldApp initialLocale={locale} embeddedInConsole />;
 }

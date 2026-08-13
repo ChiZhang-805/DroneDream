@@ -8,6 +8,7 @@ function ModelAccessProbe() {
   const {
     settings,
     selectAccessMode,
+    selectManagedModel,
     selectManagedProvider,
     selectProvider,
     updateSettings,
@@ -18,6 +19,7 @@ function ModelAccessProbe() {
       <output aria-label="api-key">{settings.apiKey}</output>
       <output aria-label="access-mode">{settings.accessMode}</output>
       <output aria-label="managed-provider">{settings.managedProvider}</output>
+      <output aria-label="managed-model">{settings.managedModel}</output>
       <button type="button" onClick={() => selectAccessMode("byok")}>
         Use my key
       </button>
@@ -26,6 +28,12 @@ function ModelAccessProbe() {
       </button>
       <button type="button" onClick={() => selectManagedProvider("deepseek")}>
         Select managed DeepSeek
+      </button>
+      <button
+        type="button"
+        onClick={() => selectManagedModel("kimi", "kimi-k3")}
+      >
+        Select managed Kimi K3
       </button>
       <button
         type="button"
@@ -107,6 +115,25 @@ describe("ModelAccessProvider", () => {
       expect(stored).toContain("\"accessMode\":\"byok\"");
       expect(stored).toContain("\"managedProvider\":\"deepseek\"");
       expect(stored).not.toContain("never-persist");
+    });
+  });
+
+  it("persists an exact Kimi provider/model selection without a credential", async () => {
+    render(
+      <ModelAccessProvider initialSettings={{ apiKey: "never-persist-kimi" }}>
+        <ModelAccessProbe />
+      </ModelAccessProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select managed Kimi K3" }));
+
+    expect(screen.getByLabelText("managed-provider")).toHaveTextContent("kimi");
+    expect(screen.getByLabelText("managed-model")).toHaveTextContent("kimi-k3");
+    await waitFor(() => {
+      const stored = window.localStorage.getItem("dronedream:model-access:v1") ?? "";
+      expect(stored).toContain('"managedProvider":"kimi"');
+      expect(stored).toContain('"managedModel":"kimi-k3"');
+      expect(stored).not.toContain("never-persist-kimi");
     });
   });
 });

@@ -105,6 +105,8 @@ describe("cloud model access client", () => {
         body: JSON.stringify({
           scope: "job",
           scope_reference: "draft-42",
+          provider: "openai",
+          model: "gpt-4.1",
         }),
       }),
     );
@@ -211,7 +213,12 @@ describe("cloud model access client", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(cloud.getManagedModelCatalog()).resolves.toEqual(catalog);
-    await cloud.issueManagedModelGrant("assistant", "draft-84", "deepseek");
+    await cloud.issueManagedModelGrant(
+      "assistant",
+      "draft-84",
+      "deepseek",
+      "deepseek-v4-flash",
+    );
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       "https://cloud.example.test/functions/v1/model-gateway/models",
@@ -221,6 +228,7 @@ describe("cloud model access client", () => {
         scope: "assistant",
         scope_reference: "draft-84",
         provider: "deepseek",
+        model: "deepseek-v4-flash",
       }),
     }));
     expect(JSON.stringify(fetchMock.mock.calls)).not.toMatch(/api[_-]?key/iu);

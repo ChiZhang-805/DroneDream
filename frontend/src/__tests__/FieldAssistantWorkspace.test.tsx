@@ -124,6 +124,7 @@ describe("Field Chatting workspace", () => {
       "assistant",
       expect.stringMatching(/^field-plan:/),
       "openai",
+      "gpt-4.1",
     );
     const messages = completion.mock.calls[0]?.[1] ?? [];
     expect(messages[0]?.content).toContain("proposal-only Model");

@@ -28,6 +28,7 @@ import {
   Save,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Sun,
   X,
   type LucideIcon,
@@ -95,6 +96,7 @@ import {
 import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
 import {
   CloudModelAccessError,
+  DEFAULT_MANAGED_MODEL_CATALOG,
   getManagedModelCatalog,
   getManagedModelUsage,
   type ManagedModelCatalogEntry,
@@ -106,10 +108,18 @@ import {
 } from "./features/experiment/draftStorage";
 import {
   loadUniversalMode,
+  parseUniversalMode,
   persistUniversalMode,
+  UNIVERSAL_WORKSPACE_IDS,
   type UniversalWorkspaceId,
 } from "./features/distribution/universalMode";
 import { publicDemoConsole } from "./features/demo/publicDemo";
+import { getOrganizationAccess } from "./features/organization/organizationConsole";
+import {
+  hydrateAssistantWorkspaceIndex,
+  setActiveAssistantTenantContext,
+} from "./features/experiment/workspaceRegistry";
+import { getAssistantWorkspaceIndex } from "./features/experiment/assistantOrchestration";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
 import type {
@@ -163,20 +173,21 @@ const CORE_NAV_ITEMS: NavigationItem[] = [
     labelKey: "app.vehicleStudio",
     icon: Box,
   },
-  {
-    to: ECE498BH_COURSE_URL,
-    label: "ECE498BH",
-    externalUrl: ECE498BH_COURSE_URL,
-    icon: GraduationCap,
-  },
-];
-
-const SIM_NAV_ITEMS: NavigationItem[] = [
-  ...CORE_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio" && !item.externalUrl),
 ];
 
 const ASSISTANT_NAV_ITEM = CORE_NAV_ITEMS[0];
-const CORE_NAV_ITEMS_AFTER_ASSISTANT = CORE_NAV_ITEMS.slice(1);
+const DASHBOARD_NAV_ITEM = CORE_NAV_ITEMS[1];
+const HISTORY_NAV_ITEM = CORE_NAV_ITEMS[2];
+const SCENARIOS_NAV_ITEM = CORE_NAV_ITEMS[3];
+const VEHICLE_STUDIO_NAV_ITEM = CORE_NAV_ITEMS[4];
+
+const SIM_NAV_ITEMS: NavigationItem[] = [
+  ASSISTANT_NAV_ITEM,
+  { to: "/jobs/new", labelKey: "app.experimentBuilder", icon: SlidersHorizontal },
+  DASHBOARD_NAV_ITEM,
+  SCENARIOS_NAV_ITEM,
+  HISTORY_NAV_ITEM,
+];
 
 const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
   {
@@ -192,31 +203,48 @@ const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
   },
 ];
 
-const FIXED_LAB_NAV_ITEMS: NavigationItem[] = [
+const LAB_NAV_ITEMS: NavigationItem[] = [
   ASSISTANT_NAV_ITEM,
-  ...LAB_WORKSPACE_NAV_ITEMS,
-  ...CORE_NAV_ITEMS_AFTER_ASSISTANT.filter((item) => item.to !== "/vehicle-studio"),
+  { to: "/jobs/new", labelKey: "app.experimentBuilder", icon: SlidersHorizontal },
+  LAB_WORKSPACE_NAV_ITEMS[0],
+  LAB_WORKSPACE_NAV_ITEMS[1],
+  { to: "/lab/validation", labelKey: "app.labValidation", icon: ShieldCheck },
+  HISTORY_NAV_ITEM,
 ];
 
 const FIELD_NAV_ITEMS: NavigationItem[] = [
   ASSISTANT_NAV_ITEM,
   {
-    to: "/field",
-    labelKey: "app.fieldWorkspace",
+    to: "/field/device",
+    labelKey: "app.fieldDeviceSetup",
     end: true,
     icon: RadioTower,
   },
-  ...CORE_NAV_ITEMS.filter((item) => item.externalUrl),
+  {
+    to: "/field/tuning",
+    labelKey: "app.fieldTuning",
+    end: true,
+    icon: SlidersHorizontal,
+  },
+  {
+    to: "/field/operations",
+    labelKey: "app.fieldSafety",
+    end: true,
+    icon: ShieldCheck,
+  },
+  HISTORY_NAV_ITEM,
 ];
 
 const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
-  universal: CORE_NAV_ITEMS,
-  sim: SIM_NAV_ITEMS,
-  lab: [
+  universal: [
     ASSISTANT_NAV_ITEM,
-    ...LAB_WORKSPACE_NAV_ITEMS,
-    ...CORE_NAV_ITEMS_AFTER_ASSISTANT,
+    VEHICLE_STUDIO_NAV_ITEM,
+    DASHBOARD_NAV_ITEM,
+    HISTORY_NAV_ITEM,
+    SCENARIOS_NAV_ITEM,
   ],
+  sim: SIM_NAV_ITEMS,
+  lab: LAB_NAV_ITEMS,
   field: FIELD_NAV_ITEMS,
 };
 
@@ -261,11 +289,8 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
   recent_requests: [],
 };
 
-const DOCS_PREVIEW_MANAGED_MODELS: ManagedModelCatalogEntry[] = [
-  { provider: "openai", display_name: "GPT", model: "gpt-4.1", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
-  { provider: "deepseek", display_name: "DeepSeek", model: "deepseek-chat", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
-  { provider: "qwen", display_name: "Qwen", model: "qwen-plus", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
-];
+const DOCS_PREVIEW_MANAGED_MODELS: ManagedModelCatalogEntry[] =
+  DEFAULT_MANAGED_MODEL_CATALOG;
 const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
 const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
@@ -476,11 +501,13 @@ function SettingsDialog({
   closeRef,
   edition,
   onClose,
+  onOpenExternal,
 }: {
   access: DesktopRuntimeAccess;
   closeRef: RefObject<HTMLButtonElement>;
   edition: BrandEditionId;
   onClose: () => void;
+  onOpenExternal: (event: MouseEvent<HTMLAnchorElement>, url: string) => void;
 }) {
   const { locale, setLocale, t } = useI18n();
   const editionTheme = useEditionTheme();
@@ -493,7 +520,7 @@ function SettingsDialog({
     addProfile,
     removeActiveProfile,
     selectAccessMode,
-    selectManagedProvider,
+    selectManagedModel,
     selectProvider,
     updateSettings,
   } = useModelAccess();
@@ -594,10 +621,18 @@ function SettingsDialog({
   }, [auth.account, docsPreview, modelAccess.accessMode, t]);
   useEffect(() => {
     if (managedModels.length === 0) return;
-    if (!managedModels.some((model) => model.provider === modelAccess.managedProvider)) {
-      selectManagedProvider(managedModels[0].provider);
+    if (!managedModels.some((model) =>
+      model.provider === modelAccess.managedProvider
+        && model.model === modelAccess.managedModel
+    )) {
+      selectManagedModel(managedModels[0].provider, managedModels[0].model);
     }
-  }, [managedModels, modelAccess.managedProvider, selectManagedProvider]);
+  }, [
+    managedModels,
+    modelAccess.managedModel,
+    modelAccess.managedProvider,
+    selectManagedModel,
+  ]);
   useEffect(() => {
     if (!access.canUseRuntime) {
       setExperiencePreferenceState("blocked");
@@ -710,6 +745,7 @@ function SettingsDialog({
     { id: "general", label: locale === "zh-CN" ? "常规" : "General" },
     { id: "memory", label: locale === "zh-CN" ? "记忆" : "Memory" },
     { id: "model", label: locale === "zh-CN" ? "模型" : "Model" },
+    { id: "course", label: "ECE498BH" },
     ...(access.desktopRuntime
       ? [{ id: "runtime", label: locale === "zh-CN" ? "运行环境" : "Runtime" } as const]
       : []),
@@ -829,6 +865,26 @@ function SettingsDialog({
             </button>
           </div>
         </div>
+      </EditionSettingsPanel>
+      <EditionSettingsPanel active={activeSettingsTab === "course"} id="course">
+        <section className="settings-course-panel" aria-labelledby="settings-course-title">
+          <div className="settings-course-mark" aria-hidden="true">
+            <GraduationCap />
+          </div>
+          <div>
+            <span>{locale === "zh-CN" ? "课程入口" : "Course access"}</span>
+            <h3 id="settings-course-title">ECE498BH</h3>
+            <p>{locale === "zh-CN" ? "工程推理课程资源" : "Engineering reasoning course resources"}</p>
+          </div>
+          <a
+            href={ECE498BH_COURSE_URL}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => onOpenExternal(event, ECE498BH_COURSE_URL)}
+          >
+            {locale === "zh-CN" ? "打开课程" : "Open course"}
+          </a>
+        </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "memory"} id="memory">
         <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
@@ -1028,14 +1084,20 @@ function SettingsDialog({
                 <span>{locale === "zh-CN" ? "平台托管模型" : "Included model"}</span>
                 <select
                   id="settings_managed_model_provider"
-                  value={modelAccess.managedProvider}
+                  value={`${modelAccess.managedProvider}:${modelAccess.managedModel}`}
                   disabled={managedModels.length === 0}
-                  onChange={(event) => selectManagedProvider(
-                    event.target.value as ManagedModelCatalogEntry["provider"],
-                  )}
+                  onChange={(event) => {
+                    const selected = managedModels.find((model) =>
+                      `${model.provider}:${model.model}` === event.target.value
+                    );
+                    if (selected) selectManagedModel(selected.provider, selected.model);
+                  }}
                 >
                   {managedModels.map((model) => (
-                    <option key={model.provider} value={model.provider}>
+                    <option
+                      key={`${model.provider}:${model.model}`}
+                      value={`${model.provider}:${model.model}`}
+                    >
                       {model.display_name} · {model.model}
                     </option>
                   ))}
@@ -1192,6 +1254,7 @@ function SettingsDialog({
                   <option value="openai">OpenAI</option>
                   <option value="qwen">Qwen</option>
                   <option value="deepseek">DeepSeek</option>
+                  <option value="kimi">Kimi</option>
                   <option value="custom">{t("wizard.llm.customProvider")}</option>
                 </select>
               </label>
@@ -2149,6 +2212,52 @@ function AppShellContent() {
   const auth = useAuth();
   const adminAccess = useAdminAccess();
   const updater = useAppUpdaterState();
+
+  useEffect(() => {
+    const ownerId = auth.account?.id;
+    if (!ownerId) return;
+    let active = true;
+    const hydrateTenant = (organizationId: string | null) => {
+      void Promise.all(
+        (["universal", "sim", "lab", "field"] as const).map((edition) =>
+          getAssistantWorkspaceIndex(edition, ownerId, organizationId)
+        ),
+      ).then((indexes) => {
+        if (!active) return;
+        hydrateAssistantWorkspaceIndex(ownerId, indexes.flat());
+      }).catch(() => {
+        // The local registry remains usable while the authenticated server
+        // index is offline. No workspace from another boundary is adopted.
+      });
+    };
+    // Default to the personal tenant while the server-authoritative membership
+    // resolver is loading. A stale organization cache is never displayed.
+    setActiveAssistantTenantContext(ownerId, {
+      tenantId: ownerId,
+      organizationId: null,
+    });
+    if (desktopRuntime || !publicDemoConsole) return () => {
+      active = false;
+    };
+    hydrateTenant(null);
+    void getOrganizationAccess()
+      .then((access) => {
+        if (!active) return;
+        const organizationId = access.authorized ? access.organization_id : null;
+        setActiveAssistantTenantContext(ownerId, {
+          tenantId: organizationId ?? ownerId,
+          organizationId,
+        });
+        if (organizationId) hydrateTenant(organizationId);
+      })
+      .catch(() => {
+        // The personal boundary remains active. Organization workspaces are
+        // hidden until membership can be verified by the server.
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth.account?.id, desktopRuntime]);
   const { locale, t } = useI18n();
   const accountCopy = ACCOUNT_COPY[locale];
   const mobileNavigationEnabled = useSyncExternalStore(
@@ -2157,9 +2266,16 @@ function AppShellContent() {
     () => false,
   );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
-  const [universalMode, setUniversalMode] = useState(() =>
-    initialWorkspaceMode(loadUniversalMode()),
-  );
+  const [universalMode, setUniversalMode] = useState(() => {
+    const requestedEdition = new URLSearchParams(location.search).get("edition");
+    return initialWorkspaceMode(
+      requestedEdition && UNIVERSAL_WORKSPACE_IDS.includes(
+          requestedEdition as UniversalWorkspaceId,
+        )
+        ? parseUniversalMode(requestedEdition)
+        : loadUniversalMode(),
+    );
+  });
   const [accountOpen, setAccountOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
@@ -2221,6 +2337,16 @@ function AppShellContent() {
   useEffect(() => {
     if (!EDITION_IS_FIXED) persistUniversalMode(universalMode);
   }, [universalMode]);
+  useEffect(() => {
+    if (EDITION_IS_FIXED || location.pathname !== "/assistant") return;
+    const requestedEdition = new URLSearchParams(location.search).get("edition");
+    if (
+      requestedEdition
+      && UNIVERSAL_WORKSPACE_IDS.includes(requestedEdition as UniversalWorkspaceId)
+    ) {
+      setUniversalMode(parseUniversalMode(requestedEdition));
+    }
+  }, [location.pathname, location.search]);
   const handleUniversalModeChange = useCallback((mode: UniversalWorkspaceId) => {
     if (EDITION_IS_FIXED) return;
     setUniversalMode(mode);
@@ -2231,7 +2357,7 @@ function AppShellContent() {
     ? BUILD_EDITION === "sim"
       ? SIM_NAV_ITEMS
       : BUILD_EDITION === "lab"
-        ? FIXED_LAB_NAV_ITEMS
+        ? LAB_NAV_ITEMS
         : FIELD_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio")
     : MODE_NAV_ITEMS[universalMode];
   const sidebarUpdateLabel = updater.status === "available"
@@ -2715,6 +2841,7 @@ function AppShellContent() {
               closeRef={launcherSettingsCloseRef}
               edition={activeThemeEdition}
               onClose={closeSettings}
+              onOpenExternal={openExternalNavigation}
             />
           </div>
         ) : null}
@@ -2970,6 +3097,7 @@ function AppShellContent() {
               closeRef={launcherSettingsCloseRef}
               edition={activeThemeEdition}
               onClose={closeSettings}
+              onOpenExternal={openExternalNavigation}
             />
           </div>
         ) : null}

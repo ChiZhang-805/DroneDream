@@ -2,6 +2,7 @@ import {
   Activity,
   Bot,
   Database,
+  GraduationCap,
   SlidersHorizontal,
   X,
   type LucideIcon,
@@ -16,7 +17,7 @@ import {
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { BrandLockup } from "./BrandLockup";
 
-export type SettingsSurfaceTabId = "general" | "memory" | "model" | "runtime";
+export type SettingsSurfaceTabId = "general" | "memory" | "model" | "course" | "runtime";
 
 export type SettingsSurfaceTab = Readonly<{
   id: SettingsSurfaceTabId;
@@ -27,6 +28,7 @@ const TAB_ICONS: Readonly<Record<SettingsSurfaceTabId, LucideIcon>> = {
   general: SlidersHorizontal,
   memory: Database,
   model: Bot,
+  course: GraduationCap,
   runtime: Activity,
 };
 

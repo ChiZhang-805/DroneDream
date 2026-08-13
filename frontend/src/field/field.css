@@ -402,7 +402,7 @@ input:focus-visible {
 
 .field-settings-backdrop .launcher-settings-tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 10px;
 }
@@ -531,6 +531,35 @@ input:focus-visible {
   height: 17px;
   color: var(--dd-brand-start);
 }
+
+.field-settings-course {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 150px;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 30%, #443347);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 194, 71, 0.08), rgba(215, 70, 165, 0.08));
+}
+
+.field-settings-course > div { display: grid; gap: 4px; }
+.field-settings-course strong { font-size: 1.45rem; }
+.field-settings-course span { color: #c9bdcb; }
+.field-settings-course a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: 999px;
+  color: #181018;
+  background: var(--dd-brand-gradient);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.field-settings-course a svg { width: 17px; height: 17px; }
 
 .field-layout {
   display: grid;
@@ -1614,6 +1643,38 @@ input:focus-visible {
 
   .field-settings-backdrop .launcher-settings-heading h2 {
     font-size: 17px;
+  }
+
+  .launcher-settings-dialog[data-settings-consumer="field-lightweight"] .launcher-settings-tabs {
+    gap: 4px;
+  }
+
+  .launcher-settings-dialog[data-settings-consumer="field-lightweight"] .launcher-settings-tabs button {
+    min-height: 38px;
+    gap: 4px;
+    padding: 6px 5px;
+    font-size: 11px;
+  }
+
+  .launcher-settings-dialog[data-settings-consumer="field-lightweight"] .launcher-settings-tabs button svg {
+    display: none;
+  }
+
+  .field-settings-course {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    align-items: start;
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .field-settings-course span {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .field-settings-course a {
+    justify-content: center;
   }
 
   .field-sidebar {
@@ -2796,21 +2857,11 @@ body:has(.field-app),
 .field-app-embedded-console .field-layout {
   height: 100%;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .field-app-embedded-console .field-sidebar {
-  position: relative;
-  top: auto;
-  display: flex;
-  width: 100%;
-  height: auto;
-  min-height: 0;
-  align-items: center;
-  justify-content: stretch;
-  padding: 8px 12px;
-  border-right: 0;
-  border-bottom: 1px solid var(--field-line);
+  display: none;
 }
 
 .field-app-embedded-console .field-sidebar nav {
@@ -2840,7 +2891,7 @@ body:has(.field-app),
 }
 
 .field-app-embedded-console .field-main {
-  grid-row: 2;
+  grid-row: 1;
   height: 100%;
   min-height: 0;
 }

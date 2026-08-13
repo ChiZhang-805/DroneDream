@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { clearExperimentDraft, saveExperimentDraft } from "../features/experiment/draftStorage";
 import {
   experimentWorkspacePath,
+  hydrateAssistantWorkspaceIndex,
   isExperimentWorkspaceNameAvailable,
   listExperimentWorkspaces,
   reorderExperimentWorkspace,
   reorderExperimentWorkspaceItems,
   registerExperimentWorkspace,
+  setActiveAssistantTenantContext,
   updateExperimentWorkspace,
   type ExperimentWorkspace,
 } from "../features/experiment/workspaceRegistry";
@@ -34,6 +36,8 @@ describe("experiment workspace registry", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+    setActiveAssistantTenantContext(OWNER_A, { tenantId: OWNER_A, organizationId: null });
+    setActiveAssistantTenantContext(OWNER_B, { tenantId: OWNER_B, organizationId: null });
   });
 
   it("isolates workspaces by account and resumes each scoped draft", () => {
@@ -76,6 +80,30 @@ describe("experiment workspace registry", () => {
     ]);
     expect(experimentWorkspacePath(listExperimentWorkspaces(OWNER_A, "sim")[0]))
       .toBe(`/jobs/new?experiment=${FIRST_ID}`);
+  });
+
+  it("hides assistant workspaces when the active organization boundary changes", async () => {
+    setActiveAssistantTenantContext(OWNER_A, {
+      tenantId: "org-alpha",
+      organizationId: "org-alpha",
+    });
+    saveWorkspaceDraft(FIRST_ID, "Alpha tenant draft");
+    registerExperimentWorkspace({
+      id: FIRST_ID,
+      ownerId: OWNER_A,
+      tenantId: "org-alpha",
+      organizationId: "org-alpha",
+      edition: "sim",
+      name: "Alpha tenant draft",
+      source: "assistant",
+    });
+    expect(listExperimentWorkspaces(OWNER_A, "sim")).toHaveLength(1);
+
+    setActiveAssistantTenantContext(OWNER_A, {
+      tenantId: "org-beta",
+      organizationId: "org-beta",
+    });
+    expect(listExperimentWorkspaces(OWNER_A, "sim")).toEqual([]);
   });
 
   it("sorts pinned workspaces first and retains created jobs without a draft", () => {
@@ -296,7 +324,7 @@ describe("experiment workspace registry", () => {
     expect(listExperimentWorkspaces(OWNER_A, "field").map(({ id }) => id))
       .toEqual([fieldId]);
     expect(experimentWorkspacePath(listExperimentWorkspaces(OWNER_A, "field")[0]))
-      .toBe(`/field?experiment=${fieldId}`);
+      .toBe(`/assistant?experiment=${fieldId}`);
     expect(isExperimentWorkspaceNameAvailable(OWNER_A, "SIM experiment", "field"))
       .toBe(true);
     expect(updateExperimentWorkspace(OWNER_A, FIRST_ID, {
@@ -309,6 +337,103 @@ describe("experiment workspace registry", () => {
       name: "Cross-edition replacement",
       source: "assistant",
     })).toThrow(/cannot move between editions/u);
+  });
+
+  it("hydrates only completed server objects in the active tenant boundary", () => {
+    setActiveAssistantTenantContext(OWNER_A, {
+      tenantId: OWNER_A,
+      organizationId: null,
+    });
+    hydrateAssistantWorkspaceIndex(OWNER_A, [
+      {
+        conversation_id: "conversation-personal",
+        tenant_id: OWNER_A,
+        organization_id: null,
+        edition: "sim",
+        workspace_id: "server-sim-draft",
+        title: "Server hover draft",
+        summary: "Bounded hover draft",
+        status: "active",
+        latest_completed_sequence: 1,
+        created_at: "2026-08-13T00:00:00.000Z",
+        updated_at: "2026-08-13T00:00:01.000Z",
+        latest_artifact: {
+          artifact_id: "artifact-personal",
+          artifact_kind: "simulation_experiment",
+          title: "Server hover draft",
+          version: 1,
+          status: "draft",
+          created_at: "2026-08-13T00:00:01.000Z",
+          updated_at: "2026-08-13T00:00:01.000Z",
+        },
+      },
+      {
+        conversation_id: "conversation-other",
+        tenant_id: "organization-other",
+        organization_id: "organization-other",
+        edition: "field",
+        workspace_id: "server-field-task",
+        title: "Other tenant task",
+        summary: "Must not hydrate",
+        status: "active",
+        latest_completed_sequence: 1,
+        created_at: "2026-08-13T00:00:00.000Z",
+        updated_at: "2026-08-13T00:00:01.000Z",
+        latest_artifact: {
+          artifact_id: "artifact-other",
+          artifact_kind: "field_task_plan",
+          title: "Other tenant task",
+          version: 1,
+          status: "draft",
+          created_at: "2026-08-13T00:00:01.000Z",
+          updated_at: "2026-08-13T00:00:01.000Z",
+        },
+      },
+    ]);
+
+    expect(listExperimentWorkspaces(OWNER_A, "sim")).toMatchObject([{
+      id: "server-sim-draft",
+      tenantId: OWNER_A,
+      organizationId: null,
+      assistantArtifactKind: "simulation_experiment",
+      status: "created",
+    }]);
+    expect(listExperimentWorkspaces(OWNER_A, "field")).toEqual([]);
+    expect(experimentWorkspacePath(listExperimentWorkspaces(OWNER_A, "sim")[0]))
+      .toBe("/assistant?experiment=server-sim-draft");
+  });
+
+  it("routes Universal assistant artifacts to their own editors", () => {
+    const vehicleWorkspaceId = "universal-vehicle";
+    const simulationWorkspaceId = "universal-simulation";
+    saveWorkspaceDraft(vehicleWorkspaceId, "Vehicle model");
+    saveWorkspaceDraft(simulationWorkspaceId, "Universal simulation");
+    registerExperimentWorkspace({
+      id: vehicleWorkspaceId,
+      ownerId: OWNER_A,
+      edition: "universal",
+      name: "Vehicle model",
+      source: "assistant",
+      assistantArtifactKind: "universal_vehicle_model",
+      vehicleDraftId: "vehicle-draft-42",
+    });
+    registerExperimentWorkspace({
+      id: simulationWorkspaceId,
+      ownerId: OWNER_A,
+      edition: "universal",
+      name: "Universal simulation",
+      source: "assistant",
+      assistantArtifactKind: "universal_simulation_experiment",
+      vehicleDraftId: null,
+    });
+
+    const workspaces = listExperimentWorkspaces(OWNER_A, "universal");
+    const vehicle = workspaces.find(({ id }) => id === vehicleWorkspaceId);
+    const simulation = workspaces.find(({ id }) => id === simulationWorkspaceId);
+    expect(vehicle && experimentWorkspacePath(vehicle))
+      .toBe("/vehicle-studio?draft=vehicle-draft-42");
+    expect(simulation && experimentWorkspacePath(simulation))
+      .toBe(`/jobs/new?experiment=${simulationWorkspaceId}`);
   });
 
   it("migrates the legacy unscoped registry into SIM only", () => {

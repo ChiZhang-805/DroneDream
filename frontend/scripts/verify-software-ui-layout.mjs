@@ -191,7 +191,14 @@ async function verifySettings(page, testCase) {
   if (testCase.edition !== "universal") {
     const assistantModel = page.locator(".assistant-model-button");
     await assistantModel.waitFor();
-    assert.equal(await assistantModel.locator("option").count(), 3);
+    const assistantModelLabels = await assistantModel.locator("option").allTextContents();
+    assert.equal(assistantModelLabels.length, 7);
+    for (const expectedLabel of ["GPT 4.1", "GPT 5.1", "GPT 5.4", "DeepSeek V4 Flash", "DeepSeek V4 Pro", "Kimi K2.6", "Kimi K3"]) {
+      assert(
+        assistantModelLabels.some((label) => label.includes(expectedLabel)),
+        `${testCase.id}: missing managed assistant model ${expectedLabel}`,
+      );
+    }
     assert.equal(
       await assistantModel.getAttribute("aria-label"),
       testCase.locale === "en" ? "Model" : "模型",
@@ -294,6 +301,9 @@ async function verifySettings(page, testCase) {
       managedModelOptions: element.querySelectorAll(
         ".settings-managed-model-row select option",
       ).length,
+      managedModelLabels: Array.from(
+        element.querySelectorAll(".settings-managed-model-row select option"),
+      ).map((option) => option.textContent?.trim() ?? ""),
       usageValuesFit: Array.from(
         element.querySelectorAll(".settings-model-usage-grid strong"),
       ).every((value) => value.scrollWidth <= value.clientWidth + 1),
@@ -323,7 +333,13 @@ async function verifySettings(page, testCase) {
     metrics.documentWidth,
     `${testCase.id}: Settings caused horizontal document overflow`,
   );
-  assert.equal(metrics.managedModelOptions, 3);
+  assert.equal(metrics.managedModelOptions, 7);
+  for (const expectedLabel of ["GPT 4.1", "GPT 5.1", "GPT 5.4", "DeepSeek V4 Flash", "DeepSeek V4 Pro", "Kimi K2.6", "Kimi K3"]) {
+    assert(
+      metrics.managedModelLabels.some((label) => label.includes(expectedLabel)),
+      `${testCase.id}: settings catalog is missing ${expectedLabel}`,
+    );
+  }
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
   assert.equal(metrics.foregroundColor, "rgb(247, 242, 255)");
   assert.equal(metrics.mutedColor, "rgb(214, 183, 234)");
@@ -451,27 +467,32 @@ async function verifyEce498ExternalEntry(page, testCase) {
   const courseUrl =
     "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
   await page.goto(`${origin}/dashboard?docsPreview=1`, { waitUntil: "networkidle" });
-  await page.evaluate(() => {
-    const selector = document.querySelector(".universal-mode-switch select");
-    if (!(selector instanceof HTMLSelectElement)) {
-      throw new Error("Universal workspace selector is missing");
-    }
-    selector.value = "lab";
-    selector.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await page.locator(".universal-mode-switch-trigger").click();
+  await page.locator('.universal-mode-switch-menu [role="menuitemradio"]').nth(2).click();
   await page.waitForFunction(() => (
     document.documentElement.dataset.brandEdition === "lab"
     && window.localStorage.getItem("dronedream:universal-workspace:v2") === "lab"
   ));
   if (testCase.viewport.width <= 520) {
     await page.locator(".app-mobile-menu-button").click();
+    await page.locator(".app-mobile-settings-entry").click();
+  } else {
+    await page.locator(".launcher-settings-button").click();
   }
-  const courseLink = page.getByRole("link", { name: "ECE498BH" });
+  const dialog = page.locator(".launcher-settings-dialog");
+  await dialog.waitFor();
+  assert.equal(await page.getByRole("navigation", { name: /Primary navigation|主导航/ })
+    .getByRole("link", { name: "ECE498BH" }).count(), 0);
+  await dialog.getByRole("tab", { name: "ECE498BH" }).click();
+  const courseLink = dialog.getByRole("link", {
+    name: testCase.locale === "en" ? "Open course" : "打开课程",
+  });
   await courseLink.waitFor();
   assert.equal(await courseLink.getAttribute("href"), courseUrl);
   assert.equal(await courseLink.getAttribute("target"), "_blank");
   assert.equal(await courseLink.getAttribute("rel"), "noreferrer");
   assert.equal(await page.locator(".ece498-stage-detail").count(), 0);
+  const coursePanelImage = await screenshot(page, testCase.id, "ece498-settings-entry");
 
   await page.context().route(courseUrl, (route) => route.fulfill({
     status: 200,
@@ -490,14 +511,11 @@ async function verifyEce498ExternalEntry(page, testCase) {
   await popup.close();
   await page.context().unroute(courseUrl);
 
-  await page.evaluate(() => {
-    const selector = document.querySelector(".universal-mode-switch select");
-    if (!(selector instanceof HTMLSelectElement)) {
-      throw new Error("Universal workspace selector is missing");
-    }
-    selector.value = "sim";
-    selector.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await dialog.locator(".launcher-settings-close").click();
+  await dialog.waitFor({ state: "detached" });
+
+  await page.locator(".universal-mode-switch-trigger").click();
+  await page.locator('.universal-mode-switch-menu [role="menuitemradio"]').nth(1).click();
   await page.waitForFunction(() => (
     document.documentElement.dataset.brandEdition === "sim"
     && window.localStorage.getItem("dronedream:universal-workspace:v2") === "sim"
@@ -514,6 +532,7 @@ async function verifyEce498ExternalEntry(page, testCase) {
     target: "_blank",
     internalCoursePageRemoved: true,
     popupReachedExactUrl: true,
+    coursePanelImage,
     ...dimensions,
     image,
   };
@@ -1194,14 +1213,8 @@ try {
       // their presentation checks above separate avoids pretending that
       // Universal exposes a fourth "universal" tuning workspace.
       if (testCase.edition !== "sim") {
-        await page.evaluate(() => {
-          const selector = document.querySelector(".universal-mode-switch select");
-          if (!(selector instanceof HTMLSelectElement)) {
-            throw new Error("Universal workspace selector is missing");
-          }
-          selector.value = "sim";
-          selector.dispatchEvent(new Event("change", { bubbles: true }));
-        });
+        await page.locator(".universal-mode-switch-trigger").click();
+        await page.locator('.universal-mode-switch-menu [role="menuitemradio"]').nth(1).click();
         await page.waitForFunction(() => (
           document.documentElement.dataset.brandEdition === "sim"
           && window.localStorage.getItem("dronedream:universal-workspace:v2") === "sim"

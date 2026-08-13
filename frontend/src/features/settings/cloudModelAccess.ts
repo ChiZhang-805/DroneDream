@@ -111,6 +111,22 @@ export interface ManagedModelCatalog {
   models: ManagedModelCatalogEntry[];
 }
 
+export const DEFAULT_MANAGED_MODEL_CATALOG: ManagedModelCatalogEntry[] = [
+  { provider: "openai", display_name: "GPT 4.1", model: "gpt-4.1", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "openai", display_name: "GPT 5.1", model: "gpt-5.1", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "openai", display_name: "GPT 5.4", model: "gpt-5.4", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "deepseek", display_name: "DeepSeek V4 Flash", model: "deepseek-v4-flash", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "deepseek", display_name: "DeepSeek V4 Pro", model: "deepseek-v4-pro", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "kimi", display_name: "Kimi K2.6", model: "kimi-k2.6", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "kimi", display_name: "Kimi K3", model: "kimi-k3", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+];
+
+export function managedModelSelectionId(
+  model: Pick<ManagedModelCatalogEntry, "provider" | "model">,
+): string {
+  return `${model.provider}:${model.model}`;
+}
+
 export interface BillingAvailability {
   enabled: boolean;
   billing_mode: "manual_monthly_renewal";
@@ -281,13 +297,22 @@ export function issueManagedModelGrant(
   scope: ManagedModelGrantScope,
   scopeReference?: string | null,
   provider?: ManagedModelProvider,
+  model?: string,
 ): Promise<ManagedModelGrant> {
+  const selectedProvider = provider ?? "openai";
+  const selectedModel = model ?? {
+    openai: "gpt-4.1",
+    deepseek: "deepseek-v4-flash",
+    qwen: "qwen-plus",
+    kimi: "kimi-k2.6",
+  }[selectedProvider];
   return cloudRequest<ManagedModelGrant>(modelGatewayUrl, "/grants", {
     method: "POST",
     body: JSON.stringify({
       scope,
       scope_reference: scopeReference || null,
-      ...(provider ? { provider } : {}),
+      provider: selectedProvider,
+      model: selectedModel,
     }),
   });
 }

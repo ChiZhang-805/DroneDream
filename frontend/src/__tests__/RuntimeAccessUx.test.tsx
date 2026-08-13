@@ -183,22 +183,17 @@ afterEach(() => {
 
     expect(await screen.findByText("Runtime data is not available yet"))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Dashboard" }))
+    expect(screen.getByRole("link", { name: "Experiment Builder" }))
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "Fixed Scenarios" }))
-      .toHaveAttribute("href", "/scenarios");
-    const courseLink = screen.getByRole("link", { name: "ECE498BH" });
-    expect(courseLink)
-      .not.toHaveClass("runtime-locked");
-    expect(courseLink)
-      .toHaveAttribute(
-        "href",
-        "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
-      );
-    expect(courseLink)
-      .toHaveAttribute("target", "_blank");
+    expect(screen.getByRole("link", { name: "Validation & Evidence" }))
+      .toHaveAttribute("href", "/lab/validation");
+    expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("tab", { name: "ECE498BH" }));
+    const courseLink = screen.getByRole("link", { name: "Open course" });
+    expect(courseLink).toHaveAttribute("target", "_blank");
     fireEvent.click(courseLink);
     await waitFor(() => {
       expect(openerMocks.openUrl).toHaveBeenCalledWith(
@@ -216,10 +211,10 @@ afterEach(() => {
     expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Vehicle Studio" }))
-      .not.toHaveClass("runtime-locked");
+    expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
+      .not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(8);
+      .querySelectorAll("a")).toHaveLength(6);
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);

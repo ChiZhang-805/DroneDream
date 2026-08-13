@@ -1,4 +1,4 @@
-import { Check, Languages, ShieldCheck } from "lucide-react";
+import { Check, ExternalLink, Languages, ShieldCheck } from "lucide-react";
 import { useState, type RefObject } from "react";
 
 import {
@@ -9,12 +9,17 @@ import {
 } from "../components/EditionSettingsSurface";
 import type { FieldLocale } from "./catalog";
 
+const ECE498BH_COURSE_URL =
+  "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
+
 const COPY = {
   en: {
     title: "Field settings",
     close: "Close settings",
     general: "General",
     safety: "Safety",
+    course: "ECE498BH",
+    openCourse: "Open course",
     language: "Interface language",
     english: "English",
     chinese: "Simplified Chinese",
@@ -57,9 +62,12 @@ export function FieldSettingsDialog({
 }) {
   const [activeTab, setActiveTab] = useState<SettingsSurfaceTabId>("general");
   const copy = COPY[locale];
+  const courseLabel = locale === "zh-CN" ? "\u6253\u5f00\u8bfe\u7a0b" : "Open course";
+  const courseBody = locale === "zh-CN" ? "\u5de5\u7a0b\u63a8\u7406\u8bfe\u7a0b\u8d44\u6e90" : "Engineering reasoning course resources";
   const tabs: readonly SettingsSurfaceTab[] = [
     { id: "general", label: copy.general },
     { id: "runtime", label: copy.safety },
+    { id: "course", label: "ECE498BH" },
   ];
 
   return (
@@ -101,6 +109,14 @@ export function FieldSettingsDialog({
           <div><dt>{copy.quorum}</dt><dd>{copy.missing}</dd></div>
           <div><dt>{copy.authority}</dt><dd><ShieldCheck aria-hidden="true" />{copy.denied}</dd></div>
         </dl>
+      </EditionSettingsPanel>
+      <EditionSettingsPanel active={activeTab === "course"} id="course">
+        <div className="field-settings-course">
+          <div><strong>ECE498BH</strong><span>{courseBody}</span></div>
+          <a href={ECE498BH_COURSE_URL} target="_blank" rel="noreferrer">
+            {courseLabel}<ExternalLink aria-hidden="true" />
+          </a>
+        </div>
       </EditionSettingsPanel>
     </EditionSettingsSurface>
   );

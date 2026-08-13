@@ -137,11 +137,20 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             const { LabHardwareWorkspace } = await import("./lab/LabHardwareWorkspace");
             return { Component: LabHardwareWorkspace };
           },
+        }, {
+          path: "lab/validation",
+          lazy: async () => {
+            const { LabValidationWorkspace } = await import("./lab/LabValidationWorkspace");
+            return { Component: LabValidationWorkspace };
+          },
         }] : []),
         ...(BUILD_HAS_FIELD_WORKSPACE ? [{
           path: "field",
+          element: <Navigate to="/field/device" replace />,
+        }, {
+          path: "field/:fieldPage",
           lazy: async () => {
-            const { UniversalFieldApp } = await import("./field/FieldApp");
+            const { UniversalFieldApp } = await import("./field/UniversalFieldApp");
             return { Component: UniversalFieldApp };
           },
         }] : []),

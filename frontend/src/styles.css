@@ -6678,9 +6678,53 @@ a {
 
 .launcher-settings-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 0.45rem;
   margin-bottom: 0.65rem;
+}
+
+.settings-course-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 190px;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 32%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--dd-brand-start) 10%, transparent),
+    color-mix(in srgb, var(--dd-brand-end) 8%, transparent)
+  );
+}
+
+.settings-course-mark {
+  display: grid;
+  width: 62px;
+  height: 62px;
+  place-items: center;
+  border-radius: 17px;
+  color: var(--dd-brand-middle);
+  background: color-mix(in srgb, var(--dd-brand-middle) 14%, transparent);
+}
+
+.settings-course-mark svg { width: 30px; height: 30px; }
+.settings-course-panel span { color: #9a8ba7; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+.settings-course-panel h3 { margin: 0.25rem 0 0; font-size: 1.5rem; }
+.settings-course-panel p { margin: 0.3rem 0 0; color: #a99caf; }
+.settings-course-panel > a {
+  padding: 0.72rem 1rem;
+  border-radius: 999px;
+  color: #130d17;
+  background: var(--dd-brand-gradient);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-course-panel {
+  color: #241a26;
+  background: linear-gradient(135deg, #fff, color-mix(in srgb, var(--dd-brand-light-surface) 82%, #fff));
 }
 
 .launcher-settings-tabs button {
@@ -9001,6 +9045,40 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
   align-items: baseline;
 }
 
+.assistant-workflow-receipt {
+  grid-column: 1;
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assistant-workflow-receipt li {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+  color: #615566;
+  font-size: 0.84rem;
+}
+
+.assistant-workflow-receipt li > span:first-child {
+  display: grid;
+  width: 1.2rem;
+  height: 1.2rem;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, #55d8f4, #7c6df2 55%, #e454ca);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.assistant-workflow-receipt li[data-status="needs_input"] > span:first-child {
+  background: #d09136;
+}
+
 .assistant-draft-result strong {
   flex: none;
   color: #38273c;
@@ -9018,7 +9096,7 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
 
 .assistant-draft-result .btn {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 1 / -1;
   min-width: 8.5rem;
 }
 
@@ -9442,9 +9520,10 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
   }
 
   .assistant-examples button {
-    min-height: 6rem;
+    min-height: 7.25rem;
     gap: 0.35rem;
     padding: 0.55rem;
+    overflow: visible;
   }
 
   .assistant-example-icon {
@@ -9454,12 +9533,16 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
 
   .assistant-example-heading strong {
     font-size: 0.78rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .assistant-example-body {
     margin-top: 0.4rem;
     font-size: 0.72rem;
     line-height: 1.35;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .assistant-composer textarea {
@@ -13613,6 +13696,7 @@ body {
   }
 
   .launcher-settings-tabs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0.3rem;
   }
 

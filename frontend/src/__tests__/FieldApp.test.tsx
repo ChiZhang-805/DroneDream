@@ -197,12 +197,15 @@ describe("FieldApp", () => {
   });
 
   it("binds the integrated Universal route to the shared locale adapter", () => {
-    const fieldSource = readFileSync(resolve(process.cwd(), "src/field/FieldApp.tsx"), "utf8");
     const routerSource = readFileSync(resolve(process.cwd(), "src/router.tsx"), "utf8");
 
-    expect(fieldSource).toContain("export function UniversalFieldApp()");
-    expect(fieldSource).toContain("const { locale } = useI18n()");
-    expect(fieldSource).toContain("<FieldApp initialLocale={locale} embeddedInConsole />");
+    const adapterSource = readFileSync(
+      resolve(process.cwd(), "src/field/UniversalFieldApp.tsx"),
+      "utf8",
+    );
+    expect(adapterSource).toContain("export function UniversalFieldApp()");
+    expect(adapterSource).toContain("const { locale } = useI18n()");
+    expect(adapterSource).toContain("activePageOverride={activePageOverride}");
     expect(routerSource).toContain("const { UniversalFieldApp }");
     expect(routerSource).toContain("return { Component: UniversalFieldApp }");
   });

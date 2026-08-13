@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { createRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -7,6 +7,7 @@ import {
   EditionSettingsSurface,
   type SettingsSurfaceTabId,
 } from "../components/EditionSettingsSurface";
+import { FieldSettingsDialog } from "../field/FieldSettingsDialog";
 import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 
 const tabs = [
@@ -76,5 +77,25 @@ describe("EditionSettingsSurface", () => {
     fireEvent.keyDown(runtime, { key: "Home" });
     expect(general).toHaveFocus();
     expect(general).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("keeps ECE498BH inside the standalone Field settings surface", () => {
+    render(
+      <EditionThemeProvider edition="field">
+        <FieldSettingsDialog
+          closeRef={createRef<HTMLButtonElement>()}
+          locale="en"
+          onClose={() => undefined}
+          onLocaleChange={() => undefined}
+        />
+      </EditionThemeProvider>,
+    );
+
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("tab", { name: "ECE498BH" }));
+    expect(screen.getByRole("link", { name: "Open course" })).toHaveAttribute(
+      "href",
+      "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+    );
   });
 });

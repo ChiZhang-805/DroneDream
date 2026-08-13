@@ -307,10 +307,17 @@ export function FieldAssistantWorkspace({
   }, []);
 
   const selectedModel = useMemo(
-    () => models.find((model) => model.provider === modelAccess.settings.managedProvider)
+    () => models.find((model) =>
+      model.provider === modelAccess.settings.managedProvider
+        && model.model === modelAccess.settings.managedModel
+    )
       ?? models[0]
       ?? null,
-    [modelAccess.settings.managedProvider, models],
+    [
+      modelAccess.settings.managedModel,
+      modelAccess.settings.managedProvider,
+      models,
+    ],
   );
 
   async function submit(event: FormEvent): Promise<void> {
@@ -328,6 +335,7 @@ export function FieldAssistantWorkspace({
         "assistant",
         `field-plan:${userMessage.id}`,
         selectedModel.provider,
+        selectedModel.model,
       );
       const conversation: ManagedModelChatMessage[] = messages.slice(-8).map((message) => ({
         role: message.role,
@@ -458,14 +466,24 @@ export function FieldAssistantWorkspace({
               <Bot aria-hidden="true" />
               <select
                 aria-label={copy.model}
-                value={selectedModel?.provider ?? "none"}
+                value={selectedModel
+                  ? `${selectedModel.provider}:${selectedModel.model}`
+                  : "none"}
                 disabled={!catalogReady || models.length === 0 || pending}
-                onChange={(event) => modelAccess.selectManagedProvider(
-                  event.target.value as "openai" | "deepseek" | "qwen",
-                )}
+                onChange={(event) => {
+                  const selected = models.find((model) =>
+                    `${model.provider}:${model.model}` === event.target.value
+                  );
+                  if (selected) {
+                    modelAccess.selectManagedModel(selected.provider, selected.model);
+                  }
+                }}
               >
                 {models.length ? models.map((model) => (
-                  <option key={model.provider} value={model.provider}>{model.display_name} · {model.model}</option>
+                  <option
+                    key={`${model.provider}:${model.model}`}
+                    value={`${model.provider}:${model.model}`}
+                  >{model.display_name} · {model.model}</option>
                 )) : <option value="none">{copy.noModel}</option>}
               </select>
             </label>

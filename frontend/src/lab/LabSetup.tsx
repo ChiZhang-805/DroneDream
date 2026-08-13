@@ -27,7 +27,7 @@ import vehiclePackAdapterJson from "./vehicle-pack-adapter.v1.json";
 import "./lab.css";
 
 type Workspace = "simulation" | "hardware";
-type View = "calibration" | "setup" | "evidence" | "safety";
+export type LabSetupView = "calibration" | "setup" | "evidence" | "safety";
 
 interface VehicleController {
   vendor: string;
@@ -55,7 +55,7 @@ const vehiclePackAdapter = vehiclePackAdapterJson as {
   packs: VehiclePackOption[];
 };
 
-const VIEWS: View[] = ["calibration", "setup", "evidence", "safety"];
+const VIEWS: LabSetupView[] = ["calibration", "setup", "evidence", "safety"];
 const HARDWARE_ACTIONS = [
   "hardware.parameter.write",
   "hardware.arm",
@@ -228,11 +228,15 @@ function shortHash(value: string): string {
   return `${value.slice(0, 12)}…${value.slice(-8)}`;
 }
 
-export function LabSetup() {
+export function LabSetup({
+  initialView = "calibration",
+}: {
+  initialView?: LabSetupView;
+} = {}) {
   const { locale } = useI18n();
   const copy = COPY[locale];
   const [workspace, setWorkspace] = useState<Workspace>("simulation");
-  const [view, setView] = useState<View>("calibration");
+  const [view, setView] = useState<LabSetupView>(initialView);
   const [packId, setPackId] = useState(vehiclePackAdapter.packs[0]?.packId ?? "");
   const [controllerIndex, setControllerIndex] = useState(0);
   const [firmwareIndex, setFirmwareIndex] = useState(0);
@@ -268,11 +272,11 @@ export function LabSetup() {
     setFirmwareIndex(0);
   }
 
-  function selectView(next: View) {
+  function selectView(next: LabSetupView) {
     setView(next);
   }
 
-  function handleViewKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: View) {
+  function handleViewKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: LabSetupView) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     const currentIndex = VIEWS.indexOf(current);

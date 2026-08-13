@@ -551,6 +551,44 @@ export interface ExperimentAssistantTurnResponse {
   usage: ExperimentAssistantUsage;
   provider: string;
   model: string;
+  assistant_message?: string;
+  orchestration?: {
+    run_id: string;
+    conversation_id: string;
+    tenant_id: string;
+    organization_id: string | null;
+    workspace_id: string;
+    edition: "universal" | "sim" | "lab" | "field";
+    artifact_id: string;
+    artifact_version: number;
+    product_link: string;
+    artifact_kind:
+        | "universal_vehicle_model"
+        | "universal_simulation_experiment"
+        | "universal_cross_edition_workflow"
+        | "simulation_experiment"
+        | "lab_simulation_experiment"
+        | "lab_hardware_validation"
+        | "lab_calibration_workflow"
+        | "lab_sim_to_real_workflow"
+        | "lab_real_to_sim_workflow"
+        | "field_task_plan";
+    sequence: number;
+    intent: string | null;
+    workflow: Array<{
+      step: string;
+      label: string;
+      status: "completed" | "needs_input";
+    }>;
+    generated_files?: Array<{
+      file_id: string;
+      display_name: string;
+      content_type: string;
+      byte_size: number;
+      content_sha256: string;
+      version: number;
+    }>;
+  };
 }
 
 export interface VehicleProfileConfig {

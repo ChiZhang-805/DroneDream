@@ -525,9 +525,9 @@ describe("DesktopSetup", () => {
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
-    expect(screen.getByRole("button", {
+    expect(await screen.findByRole("button", {
       name: "Sign in and enter tuning workspace",
-    })).toBeEnabled();
+    }, { timeout: 7_000 })).toBeEnabled();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(invoke).toHaveBeenCalledTimes(2);
