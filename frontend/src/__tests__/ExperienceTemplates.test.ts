@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyStarterExperienceTemplate,
+  FIXED_SCENARIO_TEMPLATES,
   STARTER_EXPERIENCE_CATALOG_VERSION,
   STARTER_EXPERIENCE_TEMPLATES,
 } from "../features/experiment/experienceTemplates";
@@ -21,6 +22,16 @@ describe("starter experience templates", () => {
     expect(STARTER_EXPERIENCE_TEMPLATES.every((template) => Object.isFrozen(template.patch))).toBe(
       true,
     );
+  });
+
+  it("publishes six immutable fixed-scenario pages without changing the starter catalog", () => {
+    expect(FIXED_SCENARIO_TEMPLATES).toHaveLength(24);
+    expect(new Set(FIXED_SCENARIO_TEMPLATES.map((template) => template.key)).size).toBe(24);
+    expect(Object.isFrozen(FIXED_SCENARIO_TEMPLATES)).toBe(true);
+    expect(FIXED_SCENARIO_TEMPLATES.every((template) => Object.isFrozen(template.patch))).toBe(
+      true,
+    );
+    expect(STARTER_EXPERIENCE_TEMPLATES).toHaveLength(4);
   });
 
   it("applies only an allowlisted patch while preserving unrelated draft fields", () => {

@@ -8,6 +8,29 @@ export type StarterExperienceId =
   | "light-wind-circle"
   | "wind-sensor-circle";
 
+export type FixedScenarioId =
+  | StarterExperienceId
+  | "wide-circle"
+  | "tight-circle"
+  | "figure-eight"
+  | "u-turn"
+  | "steady-crosswind"
+  | "gust-circle"
+  | "windy-figure-eight"
+  | "recovery-u-turn"
+  | "gps-noise-circle"
+  | "baro-noise-hover"
+  | "imu-noise-figure-eight"
+  | "dropout-circle"
+  | "payload-hover"
+  | "payload-circle"
+  | "voltage-sag-circle"
+  | "low-battery-u-turn"
+  | "holdout-circle"
+  | "robust-figure-eight"
+  | "qualification-u-turn"
+  | "combined-qualification";
+
 type TemplateField =
   | "tuning_mode"
   | "track_type"
@@ -56,17 +79,22 @@ type TemplateField =
   | "trials_per_candidate"
   | "max_total_trials";
 
-export interface StarterExperienceTemplate {
-  id: StarterExperienceId;
+type TemplatePatch = Pick<ExperimentFormState, TemplateField>;
+
+interface ExperienceTemplate<TId extends FixedScenarioId> {
+  id: TId;
   version: number;
-  key: `${StarterExperienceId}@${number}`;
+  key: `${TId}@${number}`;
   patch: Readonly<Pick<ExperimentFormState, TemplateField>>;
 }
 
-function freezeTemplate(
-  id: StarterExperienceId,
-  patch: Pick<ExperimentFormState, TemplateField>,
-): StarterExperienceTemplate {
+export type StarterExperienceTemplate = ExperienceTemplate<StarterExperienceId>;
+export type FixedScenarioTemplate = ExperienceTemplate<FixedScenarioId>;
+
+function freezeTemplate<TId extends FixedScenarioId>(
+  id: TId,
+  patch: TemplatePatch,
+): ExperienceTemplate<TId> {
   return Object.freeze({
     id,
     version: STARTER_EXPERIENCE_CATALOG_VERSION,
@@ -185,11 +213,185 @@ export const STARTER_EXPERIENCE_TEMPLATES: readonly StarterExperienceTemplate[] 
     }),
   ]);
 
+const FIXED_SCENARIO_BASE = {
+  ...COMMON_BEGINNER_FIELDS,
+  ...ROBUST_OBJECTIVE,
+  track_type: "circle",
+  circle_radius_m: "5",
+  wind_north: "0",
+  wind_east: "0",
+  wind_south: "0",
+  wind_west: "0",
+  wind_search_enabled: false,
+  scenario_preset: "nominal",
+} as const satisfies TemplatePatch;
+
+function freezeFixedScenario(
+  id: FixedScenarioId,
+  patch: Partial<TemplatePatch>,
+): FixedScenarioTemplate {
+  return freezeTemplate(id, { ...FIXED_SCENARIO_BASE, ...patch } as TemplatePatch);
+}
+
+/**
+ * The fixed-scenario catalog is intentionally broader than the four starter
+ * experiences shown in the experiment wizard. Every entry remains a pure,
+ * versioned draft patch and cannot create or run a Job by itself.
+ */
+export const FIXED_SCENARIO_TEMPLATES: readonly FixedScenarioTemplate[] =
+  Object.freeze([
+    ...STARTER_EXPERIENCE_TEMPLATES,
+    freezeFixedScenario("wide-circle", {
+      circle_radius_m: "8",
+      objective_weight_tracking: "0.85",
+      objective_weight_speed: "0.4",
+    }),
+    freezeFixedScenario("tight-circle", {
+      circle_radius_m: "3",
+      objective_weight_tracking: "1.15",
+      objective_weight_smoothness: "0.5",
+    }),
+    freezeFixedScenario("figure-eight", {
+      track_type: "lemniscate",
+      objective_weight_tracking: "1.1",
+      objective_weight_smoothness: "0.55",
+    }),
+    freezeFixedScenario("u-turn", {
+      track_type: "u_turn",
+      objective_weight_tracking: "1.05",
+      objective_weight_speed: "0.35",
+    }),
+    freezeFixedScenario("steady-crosswind", {
+      wind_east: "2.5",
+      wind_search_enabled: true,
+      scenario_preset: "wind",
+    }),
+    freezeFixedScenario("gust-circle", {
+      wind_north: "1.5",
+      wind_search_enabled: true,
+      gust_enabled: true,
+      gust_magnitude_mps: "3",
+      gust_direction_deg: "45",
+      gust_period_s: "8",
+      scenario_preset: "wind",
+    }),
+    freezeFixedScenario("windy-figure-eight", {
+      track_type: "lemniscate",
+      wind_west: "3",
+      wind_search_enabled: true,
+      combined_holdout_enabled: true,
+      scenario_preset: "wind",
+    }),
+    freezeFixedScenario("recovery-u-turn", {
+      track_type: "u_turn",
+      wind_south: "3.5",
+      wind_search_enabled: true,
+      gust_enabled: true,
+      gust_magnitude_mps: "2.5",
+      gust_direction_deg: "180",
+      gust_period_s: "9",
+      combined_holdout_enabled: true,
+      scenario_preset: "stress",
+    }),
+    freezeFixedScenario("gps-noise-circle", {
+      sensor_noise_level: "medium",
+      gps_noise_m: "0.8",
+      noise_search_enabled: true,
+      scenario_preset: "sensor",
+    }),
+    freezeFixedScenario("baro-noise-hover", {
+      track_type: "hover",
+      sensor_noise_level: "medium",
+      baro_noise_m: "0.6",
+      noise_search_enabled: true,
+      scenario_preset: "sensor",
+    }),
+    freezeFixedScenario("imu-noise-figure-eight", {
+      track_type: "lemniscate",
+      sensor_noise_level: "high",
+      imu_noise_scale: "1.8",
+      noise_search_enabled: true,
+      combined_holdout_enabled: true,
+      scenario_preset: "sensor",
+    }),
+    freezeFixedScenario("dropout-circle", {
+      sensor_noise_level: "high",
+      dropout_rate: "0.08",
+      noise_search_enabled: true,
+      combined_holdout_enabled: true,
+      scenario_preset: "stress",
+    }),
+    freezeFixedScenario("payload-hover", {
+      track_type: "hover",
+      mass_payload_kg: "0.5",
+      objective_weight_smoothness: "0.8",
+    }),
+    freezeFixedScenario("payload-circle", {
+      mass_payload_kg: "0.8",
+      objective_weight_tracking: "1.2",
+      combined_holdout_enabled: true,
+    }),
+    freezeFixedScenario("voltage-sag-circle", {
+      battery_initial_percent: "65",
+      battery_voltage_sag: true,
+      combined_holdout_enabled: true,
+      scenario_preset: "stress",
+    }),
+    freezeFixedScenario("low-battery-u-turn", {
+      track_type: "u_turn",
+      battery_initial_percent: "35",
+      battery_voltage_sag: true,
+      objective_weight_smoothness: "0.7",
+      combined_holdout_enabled: true,
+      scenario_preset: "stress",
+    }),
+    freezeFixedScenario("holdout-circle", {
+      search_seeds: "111, 222, 333",
+      holdout_seeds: "911, 922, 933",
+      combined_holdout_enabled: true,
+      max_total_trials: "260",
+    }),
+    freezeFixedScenario("robust-figure-eight", {
+      track_type: "lemniscate",
+      wind_north: "2",
+      wind_search_enabled: true,
+      noise_search_enabled: true,
+      sensor_noise_level: "medium",
+      combined_holdout_enabled: true,
+      scenario_preset: "stress",
+      max_total_trials: "280",
+    }),
+    freezeFixedScenario("qualification-u-turn", {
+      track_type: "u_turn",
+      wind_east: "2",
+      wind_search_enabled: true,
+      holdout_seeds: "941, 942, 943",
+      combined_holdout_enabled: true,
+      max_total_trials: "300",
+    }),
+    freezeFixedScenario("combined-qualification", {
+      track_type: "lemniscate",
+      wind_west: "3",
+      wind_search_enabled: true,
+      gust_enabled: true,
+      gust_magnitude_mps: "2",
+      sensor_noise_level: "high",
+      gps_noise_m: "0.6",
+      baro_noise_m: "0.4",
+      imu_noise_scale: "1.5",
+      noise_search_enabled: true,
+      combined_holdout_enabled: true,
+      scenario_preset: "stress",
+      max_iterations: "16",
+      max_total_trials: "320",
+    }),
+  ]);
+
 export function findStarterExperienceTemplate(
   key: string | null,
-): StarterExperienceTemplate | null {
+): FixedScenarioTemplate | null {
   if (!key) return null;
-  return STARTER_EXPERIENCE_TEMPLATES.find((template) => template.key === key) ?? null;
+  return FIXED_SCENARIO_TEMPLATES.find((template) => template.key === key) ?? null;
 }
 
 /**
@@ -198,7 +400,7 @@ export function findStarterExperienceTemplate(
  */
 export function applyStarterExperienceTemplate(
   current: ExperimentFormState,
-  template: StarterExperienceTemplate,
+  template: FixedScenarioTemplate,
 ): ExperimentFormState {
   return {
     ...current,

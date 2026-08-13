@@ -1,12 +1,12 @@
-import { ArrowRight, Gauge, Wind } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Gauge, Wind } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { recordProductEvent } from "../features/analytics/productEvents";
 import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
 import {
-  STARTER_EXPERIENCE_CATALOG_VERSION,
-  STARTER_EXPERIENCE_TEMPLATES,
-  type StarterExperienceId,
+  FIXED_SCENARIO_TEMPLATES,
+  type FixedScenarioId,
 } from "../features/experiment/experienceTemplates";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
@@ -15,46 +15,58 @@ import { generateReferenceTrack } from "../utils/referenceTrack";
 type ScenarioDifficulty = "simple" | "medium";
 
 interface FixedScenarioDefinition {
-  id: StarterExperienceId;
+  id: FixedScenarioId;
   difficulty: ScenarioDifficulty;
   titleKey: TranslationKey;
-  descriptionKey: TranslationKey;
-  goalKey: TranslationKey;
 }
+
+const SCENARIOS_PER_PAGE = 4;
 
 const FIXED_SCENARIO_DEFINITIONS: readonly FixedScenarioDefinition[] = Object.freeze([
   {
     id: "hover-basics",
     difficulty: "simple",
     titleKey: "scenarioLibrary.hover.title",
-    descriptionKey: "scenarioLibrary.hover.description",
-    goalKey: "scenarioLibrary.hover.goal",
   },
   {
     id: "first-circle",
     difficulty: "simple",
     titleKey: "scenarioLibrary.circle.title",
-    descriptionKey: "scenarioLibrary.circle.description",
-    goalKey: "scenarioLibrary.circle.goal",
   },
   {
     id: "light-wind-circle",
     difficulty: "medium",
     titleKey: "scenarioLibrary.wind.title",
-    descriptionKey: "scenarioLibrary.wind.description",
-    goalKey: "scenarioLibrary.wind.goal",
   },
   {
     id: "wind-sensor-circle",
     difficulty: "medium",
     titleKey: "scenarioLibrary.combined.title",
-    descriptionKey: "scenarioLibrary.combined.description",
-    goalKey: "scenarioLibrary.combined.goal",
   },
+  { id: "wide-circle", difficulty: "simple", titleKey: "scenarioLibrary.wideCircle.title" },
+  { id: "tight-circle", difficulty: "medium", titleKey: "scenarioLibrary.tightCircle.title" },
+  { id: "figure-eight", difficulty: "medium", titleKey: "scenarioLibrary.figureEight.title" },
+  { id: "u-turn", difficulty: "medium", titleKey: "scenarioLibrary.uTurn.title" },
+  { id: "steady-crosswind", difficulty: "medium", titleKey: "scenarioLibrary.steadyCrosswind.title" },
+  { id: "gust-circle", difficulty: "medium", titleKey: "scenarioLibrary.gustCircle.title" },
+  { id: "windy-figure-eight", difficulty: "medium", titleKey: "scenarioLibrary.windyFigureEight.title" },
+  { id: "recovery-u-turn", difficulty: "medium", titleKey: "scenarioLibrary.recoveryUTurn.title" },
+  { id: "gps-noise-circle", difficulty: "medium", titleKey: "scenarioLibrary.gpsNoiseCircle.title" },
+  { id: "baro-noise-hover", difficulty: "medium", titleKey: "scenarioLibrary.baroNoiseHover.title" },
+  { id: "imu-noise-figure-eight", difficulty: "medium", titleKey: "scenarioLibrary.imuNoiseFigureEight.title" },
+  { id: "dropout-circle", difficulty: "medium", titleKey: "scenarioLibrary.dropoutCircle.title" },
+  { id: "payload-hover", difficulty: "medium", titleKey: "scenarioLibrary.payloadHover.title" },
+  { id: "payload-circle", difficulty: "medium", titleKey: "scenarioLibrary.payloadCircle.title" },
+  { id: "voltage-sag-circle", difficulty: "medium", titleKey: "scenarioLibrary.voltageSagCircle.title" },
+  { id: "low-battery-u-turn", difficulty: "medium", titleKey: "scenarioLibrary.lowBatteryUTurn.title" },
+  { id: "holdout-circle", difficulty: "medium", titleKey: "scenarioLibrary.holdoutCircle.title" },
+  { id: "robust-figure-eight", difficulty: "medium", titleKey: "scenarioLibrary.robustFigureEight.title" },
+  { id: "qualification-u-turn", difficulty: "medium", titleKey: "scenarioLibrary.qualificationUTurn.title" },
+  { id: "combined-qualification", difficulty: "medium", titleKey: "scenarioLibrary.combinedQualification.title" },
 ]);
 
-function scenarioPreviewPoints(id: StarterExperienceId) {
-  const template = STARTER_EXPERIENCE_TEMPLATES.find((candidate) => candidate.id === id);
+function scenarioPreviewPoints(id: FixedScenarioId) {
+  const template = FIXED_SCENARIO_TEMPLATES.find((candidate) => candidate.id === id);
   if (!template || template.patch.track_type === "custom") return [];
   return generateReferenceTrack(
     template.patch.track_type,
@@ -72,25 +84,42 @@ function scenarioPreviewPoints(id: StarterExperienceId) {
 
 export function FixedScenarios() {
   const { t } = useI18n();
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageCount = Math.ceil(FIXED_SCENARIO_DEFINITIONS.length / SCENARIOS_PER_PAGE);
+  const visibleDefinitions = FIXED_SCENARIO_DEFINITIONS.slice(
+    pageIndex * SCENARIOS_PER_PAGE,
+    (pageIndex + 1) * SCENARIOS_PER_PAGE,
+  );
 
   return (
     <div className="fixed-scenarios-page">
       <header className="page-header fixed-scenarios-header">
-        <div>
-          <div className="page-eyebrow">PX4 / GAZEBO STUDY</div>
-          <h1>{t("scenarioLibrary.title")}</h1>
+        <h1>{t("scenarioLibrary.title")}</h1>
+        <div className="fixed-scenarios-pagination" role="group" aria-label={t("scenarioLibrary.paginationLabel")}>
+          <button
+            type="button"
+            onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
+            disabled={pageIndex === 0}
+            aria-label={t("scenarioLibrary.previousPage")}
+          >
+            <ChevronLeft aria-hidden="true" />
+          </button>
+          <span aria-live="polite">{pageIndex + 1} / {pageCount}</span>
+          <button
+            type="button"
+            onClick={() => setPageIndex((current) => Math.min(pageCount - 1, current + 1))}
+            disabled={pageIndex === pageCount - 1}
+            aria-label={t("scenarioLibrary.nextPage")}
+          >
+            <ChevronRight aria-hidden="true" />
+          </button>
         </div>
-        <span className="fixed-scenarios-version">
-          {t("scenarioLibrary.catalogVersion", {
-            version: STARTER_EXPERIENCE_CATALOG_VERSION,
-          })}
-        </span>
       </header>
       <p className="sr-only">{t("scenarioLibrary.safeHandoff")}</p>
 
       <div className="fixed-scenarios-grid">
-        {FIXED_SCENARIO_DEFINITIONS.map((definition) => {
-          const template = STARTER_EXPERIENCE_TEMPLATES.find(
+        {visibleDefinitions.map((definition) => {
+          const template = FIXED_SCENARIO_TEMPLATES.find(
             (candidate) => candidate.id === definition.id,
           );
           if (!template) return null;
@@ -127,7 +156,11 @@ export function FixedScenarios() {
                   <dt>{t("scenarioLibrary.track")}</dt>
                   <dd>{template.patch.track_type === "hover"
                     ? t("scenarioLibrary.track.hover")
-                    : t("scenarioLibrary.track.circle")}</dd>
+                    : template.patch.track_type === "u_turn"
+                      ? t("scenarioLibrary.track.uTurn")
+                      : template.patch.track_type === "lemniscate"
+                        ? t("scenarioLibrary.track.figureEight")
+                        : t("scenarioLibrary.track.circle")}</dd>
                 </div>
                 <div>
                   <dt>{t("scenarioLibrary.altitude")}</dt>
