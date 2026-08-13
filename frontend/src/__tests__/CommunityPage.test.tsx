@@ -216,6 +216,7 @@ describe("CommunityPage public data loading", () => {
     expect(pages[0]).toHaveLength(10);
     expect(pages[0].every(({ isLong }) => !isLong)).toBe(true);
     expect(pages[1]).toHaveLength(9);
+    expect(pages[1][0].isLong).toBe(true);
     expect(pages[1].reduce((units, topic) => units + (topic.isLong ? 2 : 1), 0)).toBe(10);
   });
 

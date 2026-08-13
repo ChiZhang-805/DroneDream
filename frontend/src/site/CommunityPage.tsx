@@ -125,6 +125,9 @@ export function packCommunityTopicPages(
       unitsLeft -= placement.isLong ? 2 : 1;
     }
 
+    // Place tall cards before short cards so every tall card starts in the
+    // first grid row and can span both rows without creating an implicit row.
+    page.sort((left, right) => Number(right.isLong) - Number(left.isLong));
     pages.push(page);
   }
 
