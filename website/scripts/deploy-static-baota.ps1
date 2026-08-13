@@ -305,6 +305,9 @@ try {
             $publicConfig
         )) {
         $scpArguments = @()
+        # Windows OpenSSH can stall while negotiating the default SFTP transport
+        # against this Baota host. The legacy SCP transport is deterministic here.
+        $scpArguments += '-O'
         $scpArguments += $sshOptions
         $scpArguments += $uploadPath
         $scpArguments += "${Remote}:$remoteDirectory/"

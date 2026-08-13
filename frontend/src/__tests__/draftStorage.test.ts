@@ -5,6 +5,7 @@ import {
   LEGACY_EXPERIMENT_DRAFT_KEY,
   V2_EXPERIMENT_DRAFT_KEY,
   loadExperimentDraft,
+  persistExperimentDraftsForExit,
   saveExperimentDraft,
 } from "../features/experiment/draftStorage";
 import type { ExperimentDraftSchema } from "../features/experiment/draftStorage";
@@ -162,14 +163,124 @@ describe("experiment draft storage migration", () => {
     expect(window.sessionStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
   });
 
-  it("purges old persistent drafts instead of restoring them in a new app session", () => {
+  it("keeps raw conversation messages in session storage only", () => {
+    expect(saveExperimentDraft({
+      active_step: 2,
+      completed_steps: [0, 1],
+      form: { name: "private-chat", llm_api_key: "" },
+      selections: { MPC_XY_P: 2 },
+      conversation: {
+        summary: "Compressed circular-track intent.",
+        field_provenance: {
+          altitude_m: { source: "explicit", message_id: "turn-1" },
+        },
+        messages: [
+          {
+            id: "turn-1",
+            role: "user",
+            content: "raw-chat-must-not-persist",
+          },
+        ],
+      },
+    })).not.toBeNull();
+
+    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .toContain("raw-chat-must-not-persist");
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .not.toContain("raw-chat-must-not-persist");
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .toContain("Compressed circular-track intent.");
+
+    window.sessionStorage.clear();
+    const restored = loadExperimentDraft(schema);
+    expect(restored?.conversation).toMatchObject({
+      summary: "Compressed circular-track intent.",
+      messages: [],
+    });
+  });
+
+  it("scrubs raw messages from an older persistent v3 draft on load", () => {
     window.localStorage.setItem(
       EXPERIMENT_DRAFT_KEY,
-      envelope(2, 3, "stale-from-closed-app"),
+      JSON.stringify({
+        schema_version: 3,
+        saved_at: "2026-07-28T00:00:00.000Z",
+        active_step: 1,
+        completed_steps: [0],
+        form: { name: "older-draft", llm_api_key: "" },
+        selections: { MPC_XY_P: 1 },
+        conversation: {
+          summary: "Safe compact summary.",
+          field_provenance: {},
+          messages: [
+            {
+              id: "turn-old",
+              role: "user",
+              content: "old-raw-chat",
+            },
+          ],
+        },
+      }),
     );
 
-    expect(loadExperimentDraft(schema)).toBeNull();
-    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toBeNull();
-    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).toBeNull();
+    expect(loadExperimentDraft(schema)?.conversation?.messages).toEqual([]);
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .not.toContain("old-raw-chat");
+  });
+
+  it("restores a redacted persistent draft in a new app session", () => {
+    window.localStorage.setItem(
+      EXPERIMENT_DRAFT_KEY,
+      envelope(3, 3, "saved-from-closed-app", "sk-never-restore"),
+    );
+
+    expect(loadExperimentDraft(schema)).toMatchObject({
+      schema_version: 3,
+      active_step: 3,
+      form: { name: "saved-from-closed-app", llm_api_key: "" },
+    });
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toBeNull();
+    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toBeNull();
+  });
+
+  it("preserves, redacts, and restores a legacy draft closed before migration", () => {
+    window.sessionStorage.setItem(
+      LEGACY_EXPERIMENT_DRAFT_KEY,
+      envelope(1, 4, "legacy-before-upgrade", "sk-never-persist"),
+    );
+
+    expect(persistExperimentDraftsForExit()).toBe(true);
+    expect(window.localStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY))
+      .toContain("legacy-before-upgrade");
+    expect(window.localStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY))
+      .not.toContain("sk-never-persist");
+
+    window.sessionStorage.clear();
+    expect(loadExperimentDraft(schema)).toMatchObject({
+      schema_version: 3,
+      active_step: 0,
+      form: { name: "legacy-before-upgrade", llm_api_key: "" },
+    });
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .toContain("legacy-before-upgrade");
+    expect(window.localStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
+  });
+
+  it("restores a redacted v2 draft persisted during exit", () => {
+    window.sessionStorage.setItem(
+      V2_EXPERIMENT_DRAFT_KEY,
+      envelope(2, 3, "v2-before-upgrade", "sk-also-never-persist"),
+    );
+
+    expect(persistExperimentDraftsForExit()).toBe(true);
+    window.sessionStorage.clear();
+    expect(loadExperimentDraft(schema)).toMatchObject({
+      schema_version: 3,
+      active_step: 3,
+      form: { name: "v2-before-upgrade", llm_api_key: "" },
+    });
+    expect(window.localStorage.getItem(V2_EXPERIMENT_DRAFT_KEY)).toBeNull();
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .not.toContain("sk-also-never-persist");
   });
 });

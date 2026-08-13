@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "../api/client";
 import { SectionCard } from "../components/SectionCard";
 import { Loading, ErrorState } from "../components/States";
+import { StatusBadge } from "../components/StatusBadge";
+import { optimizerStrategyLabel } from "../features/experiment/optimizerStrategies";
 import type { JobCompareItem } from "../types/api";
 import { useI18n } from "../i18n/I18nProvider";
 
@@ -15,8 +17,36 @@ const HIGHER_IS_BETTER_METRICS = new Set([
   "passing_trial_count",
 ]);
 
-function lowerIsBetter(metric: string): boolean {
-  return !HIGHER_IS_BETTER_METRICS.has(metric.toLowerCase());
+const LOWER_IS_BETTER_METRICS = new Set([
+  "rmse",
+  "max_error",
+  "max_error_mean",
+  "max_error_worst",
+  "overshoot_count",
+  "completion_time",
+  "score",
+  "failure_rate",
+]);
+
+function metricDirection(metric: string): "lower" | "higher" | null {
+  const normalized = metric.toLowerCase();
+  if (LOWER_IS_BETTER_METRICS.has(normalized)) return "lower";
+  if (HIGHER_IS_BETTER_METRICS.has(normalized)) return "higher";
+  return null;
+}
+
+function outcomeLabel(
+  outcome: JobCompareItem["optimization_outcome"],
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  switch (outcome) {
+    case "success": return t("jobCompare.outcomeSuccess");
+    case "max_iterations_reached": return t("jobCompare.outcomeMaxIterations");
+    case "no_usable_candidate": return t("jobCompare.outcomeNoWinner");
+    case "llm_failed": return t("jobCompare.outcomeModelFailed");
+    case "simulator_unavailable": return t("jobCompare.outcomeSimulatorFailed");
+    default: return t("jobCompare.outcomePending");
+  }
 }
 
 function useJobIds(): string[] {
@@ -51,11 +81,13 @@ export function JobCompare() {
   const bestByMetric = useMemo(() => {
     const best: Record<string, number> = {};
     for (const key of metricKeys) {
+      const direction = metricDirection(key);
+      if (!direction) continue;
       const values = items
         .map((item) => getNumericMetric(item, "optimized_metrics", key))
         .filter((value): value is number => value !== null);
       if (values.length > 0) {
-        best[key] = lowerIsBetter(key) ? Math.min(...values) : Math.max(...values);
+        best[key] = direction === "lower" ? Math.min(...values) : Math.max(...values);
       }
     }
     return best;
@@ -87,31 +119,42 @@ export function JobCompare() {
       </header>
       {downloadError ? <p className="form-error" role="alert">{t("jobCompare.downloadFailed")}</p> : null}
       <SectionCard title={t("jobCompare.tableTitle")}>
-        <table className="data-table">
-          <thead><tr><th>{t("jobCompare.job")}</th><th>{t("jobCompare.status")}</th><th>{t("jobCompare.backend")}</th><th>{t("jobCompare.strategy")}</th>{metricKeys.map((key) => <th key={key}>{t("jobCompare.bestMetric", { metric: key })}</th>)}<th>{t("jobCompare.trials")}</th></tr></thead>
-          <tbody>
-            {items.map((item) => {
-              return (
-                <tr key={item.job_id}>
-                  <td><code>{item.job_id}</code></td>
-                  <td>{item.status}</td>
-                  <td>{item.simulator_backend}</td>
-                  <td>{item.optimizer_strategy}</td>
-                  {metricKeys.map((metric) => {
-                    const value = getNumericMetric(item, "optimized_metrics", metric);
-                    const isBest = value !== null && value === bestByMetric[metric];
-                    return (
-                      <td key={metric} style={{ fontWeight: isBest ? 700 : 400 }}>
-                        {value ?? "—"}
-                      </td>
-                    );
-                  })}
-                  <td>{item.completed_trial_count}/{item.trial_count}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead><tr><th>{t("jobCompare.job")}</th><th>{t("jobCompare.status")}</th><th>{t("jobCompare.outcome")}</th><th>{t("jobCompare.backend")}</th><th>{t("jobCompare.strategy")}</th>{metricKeys.map((key) => <th key={key}>{t("jobCompare.bestMetric", { metric: key })}</th>)}<th>{t("jobCompare.trials")}</th></tr></thead>
+            <tbody>
+              {items.map((item) => {
+                return (
+                  <tr key={item.job_id}>
+                    <td><code>{item.job_id}</code></td>
+                    <td><StatusBadge status={item.status} /></td>
+                    <td>{outcomeLabel(item.optimization_outcome, t)}</td>
+                    <td>{t(
+                      item.simulator_backend === "real_cli"
+                        ? "wizard.simulator.realCli"
+                        : "wizard.simulator.mock",
+                    )}</td>
+                    <td>{optimizerStrategyLabel(item.optimizer_strategy, t)}</td>
+                    {metricKeys.map((metric) => {
+                      const value = getNumericMetric(item, "optimized_metrics", metric);
+                      const isBest = (
+                        metricDirection(metric) !== null
+                        && value !== null
+                        && value === bestByMetric[metric]
+                      );
+                      return (
+                        <td key={metric} style={{ fontWeight: isBest ? 700 : 400 }}>
+                          {value ?? "—"}
+                        </td>
+                      );
+                    })}
+                    <td>{item.completed_trial_count}/{item.trial_count}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </SectionCard>
     </section>
   );

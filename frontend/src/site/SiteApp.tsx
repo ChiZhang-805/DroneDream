@@ -1,13 +1,31 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import appIcon from "../../../desktop/src-tauri/icons/128x128.png";
+import { BrandLockup } from "../components/BrandLockup";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
+import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
+import { getManagedModelUsage } from "../features/settings/cloudModelAccess";
+import {
+  getOrganizationAccess,
+  type OrganizationAccess,
+} from "../features/organization/organizationConsole";
+import {
+  captchaProtectionConfigured,
+  turnstileSiteKey,
+} from "../features/auth/supabaseClient";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
 import { ManualPage } from "./ManualPage";
+import { OAuthConsentPage } from "./OAuthConsentPage";
+import { OrganizationPage } from "./OrganizationPage";
 import { PricingPage } from "./PricingPage";
+import { ProductPage } from "./ProductPage";
+import {
+  fallbackEditionAvailability,
+  isEditionAvailabilityDocument,
+  type EditionAvailabilityDocument,
+} from "./editionAvailability";
 import {
   compareReleaseVersions,
   fallbackRelease,
@@ -19,6 +37,16 @@ import {
 const GITHUB_URL = "https://github.com/ChiZhang-805/DroneDream";
 const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`;
 const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
+const COMMUNITY_GUIDELINES_URL = `${GITHUB_URL}/blob/main/COMMUNITY_GUIDELINES.md`;
+
+const WEBSITE_DRONE_THEME = Object.freeze({
+  primary: 0x68e8ff,
+  secondary: 0x9b72ff,
+  tertiary: 0xf166d8,
+  darkSurface: 0x070913,
+  fog: 0x070913,
+  gridMinor: 0x34244f,
+});
 
 const content = {
   en: {
@@ -27,8 +55,8 @@ const content = {
     metaDescription: "Configure, optimize, simulate, and compare PX4 control parameters in one local Windows workflow.",
     navLabel: "Primary navigation",
     nav: [
-      ["Product", "/pricing/"],
-      ["Workflow", "/"],
+      ["Product", "/product/"],
+      ["Pricing", "/pricing/"],
       ["Manual", "/manual/"],
       ["Community", "/community/"],
     ],
@@ -38,6 +66,8 @@ const content = {
     closeMenu: "Close navigation",
     downloadShort: "Download",
     console: "Console",
+    organization: "Manage organization",
+    accountPlan: "Plan",
     signIn: "Sign in",
     register: "Register",
     account: "Account",
@@ -57,12 +87,13 @@ const content = {
     passwordTooShort: "Password must contain at least 8 characters.",
     passwordMismatch: "The two passwords do not match.",
     codeRequired: "Send and enter the verification code before creating the account.",
+    completeCaptcha: "Complete the security check before continuing.",
     registerNow: "New to DroneDream? Register now",
     backToSignIn: "Already registered? Sign in",
     openConsole: "Open console",
     signOut: "Sign out",
     closeAuth: "Close account dialog",
-    eyebrow: "LOCAL-FIRST PX4 / GAZEBO TUNING",
+    eyebrow: "AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION",
     heroLead: "Tune with evidence.",
     heroAccent: "Fly with confidence.",
     downloadWindows: "Download for Windows",
@@ -74,7 +105,7 @@ const content = {
     productEyebrow: "ONE CONTINUOUS WORKFLOW",
     productTitle: "From question to defensible result.",
     productBody:
-      "Parameters, simulations, decisions, and reports stay together in one reproducible experiment.",
+      "Keep parameters, simulations, decisions, and reports in one reproducible study.",
     demoPhases: [
       {
         label: "01 · Define",
@@ -91,14 +122,14 @@ const content = {
       },
       {
         label: "02 · Search",
-        title: "Choose the next candidate",
+        title: "Choose the next trial",
         body: [
           "Read history, failed trials, and new feedback.",
           "Keep bounds, coupling, and feasibility active.",
           "Let Bayesian, trust-region, evolution compete.",
           "Spend budget where the model still learns.",
           "Propose candidates with clear information value.",
-          "Turn gain guessing into disciplined, evidence-led search.",
+          "Turn gain guesses into evidence-led search.",
         ],
         status: "Candidate 24 / 60",
       },
@@ -106,12 +137,12 @@ const content = {
         label: "03 · Verify",
         title: "Compare the evidence",
         body: [
-          "Check feasibility, error, overshoot, and settling.",
-          "Compare repeats, robustness, and Pareto trade-offs.",
+          "Check feasibility, error, overshoot, and settle time.",
+          "Compare repeats, robustness, and Pareto fronts.",
           "Reject winners that break hidden constraints.",
-          "Keep logs, metrics, seeds, and snapshots together.",
+          "Keep logs, metrics, seeds, and snapshots linked.",
           "Preserve evidence for accepted control settings.",
-          "Make every result auditable by the entire flight team.",
+          "Make every result auditable by the flight team.",
         ],
         status: "Acceptance passed",
       },
@@ -131,10 +162,10 @@ const content = {
     capabilitiesEyebrow: "BUILT FOR ITERATION",
     capabilitiesTitle: "A local flight lab, not a parameter form.",
     capabilities: [
-      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore only the control surface your experiment needs, leaving unrelated dimensions untouched."], "sliders"],
-      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain before ranking the final winner under the same independent validation suite."], "orbit"],
-      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Resume, diagnose, and clean failed simulations before the next isolated trial begins safely."], "shield"],
-      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce every decision from evidence together with its complete experiment history."], "report"],
+      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore the needed control surface; leave unrelated dimensions safely untouched."], "sliders"],
+      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain under the same independent suite before ranking the final winner."], "orbit"],
+      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Diagnose and clean failed simulations before the next isolated trial begins safely."], "shield"],
+      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce each decision from its complete, fully linked evidence trail."], "report"],
     ],
     capabilityOpen: "Open details for",
     capabilityBack: "Return to overview",
@@ -161,14 +192,14 @@ const content = {
         ["Dedicated WSL2", "Runs the DroneDream distribution independently and never reuses or modifies a personal Ubuntu environment."],
         ["Trial isolation", "Assigns each PX4 / Gazebo run its own ports, process group, temporary files, and termination boundary safely."],
         ["Pinned inputs", "Records firmware, model, world, route, parameters, seeds, and environment effects before repeatable execution."],
-        ["Recovery and cleanup", "Exports failure diagnostics, preserves artifacts, and safely removes abandoned processes before the next clean launch."],
+        ["Recovery and cleanup", "Preserves failure evidence, then removes abandoned processes so the next isolated launch starts cleanly."],
       ],
       [
         ["Configuration snapshot", "Stores the vehicle, firmware, ranges, optimizer, constraints, and trial budget for every tested candidate."],
         ["Scenario identity", "Links each result to its world, route, disturbances, seeds, and acceptance criteria for direct comparison."],
         ["Logs and metrics", "Keeps telemetry, process logs, tracking metrics, failures, and artifacts together in one auditable result."],
         ["Pareto evidence", "Shows feasible trade-offs across error, overshoot, settling, robustness, and cost without hiding constraints."],
-        ["Reproducibility manifest", "Hashes critical inputs and identifies the runtime so another machine can audit the same decision later."],
+        ["Reproducibility manifest", "Records the runtime and hashes every critical input so another machine can reproduce the same decision."],
       ],
     ],
     manualEyebrow: "GET STARTED",
@@ -203,9 +234,10 @@ const content = {
     platform: "Platform",
     platformValue: "Windows x64",
     released: "Released",
-    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is published while code signing is being prepared.",
+    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is available now.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
+    communityGuidelines: "Community guidelines",
   },
   "zh-CN": {
     skip: "跳到主要内容",
@@ -213,8 +245,8 @@ const content = {
     metaDescription: "在 Windows 本地完成 PX4 控制参数选择、自动优化、可复现仿真与结果对比。",
     navLabel: "主导航",
     nav: [
-      ["产品", "/pricing/"],
-      ["工作流", "/"],
+      ["产品", "/product/"],
+      ["价格", "/pricing/"],
       ["说明书", "/manual/"],
       ["社区", "/community/"],
     ],
@@ -224,6 +256,8 @@ const content = {
     closeMenu: "关闭导航",
     downloadShort: "下载",
     console: "控制台",
+    organization: "企业管理",
+    accountPlan: "套餐",
     signIn: "登录",
     register: "注册",
     account: "账号",
@@ -243,6 +277,7 @@ const content = {
     passwordTooShort: "密码至少需要 8 个字符。",
     passwordMismatch: "两次输入的密码不一致。",
     codeRequired: "请先发送并填写邮箱验证码，再创建账号。",
+    completeCaptcha: "请先完成安全验证，再继续。",
     registerNow: "还没有账号？立即注册",
     backToSignIn: "已经注册？返回登录",
     openConsole: "进入控制台",
@@ -317,7 +352,7 @@ const content = {
     capabilitiesEyebrow: "为持续迭代而设计",
     capabilitiesTitle: "本地飞行实验室不只是参数表单",
     capabilities: [
-      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，不把预算浪费在无关维度上，并始终保持预算与搜索焦点集中。"], "sliders"],
+      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，不浪费试验预算，并始终保持搜索重点集中。"], "sliders"],
       ["七种实验算法", ["依据实验结构与搜索空间形态匹配合适的优化算法。", "融合约束、多保真、信赖域与进化搜索共同探索候选。", "复验每一项真实收益，再通过统一的独立验证流程确定最终优胜方案、可靠结论与复核依据。"], "orbit"],
       ["隔离运行环境", ["在专用 WSL2 中运行 PX4、Gazebo、任务进程与试验产物。", "让每次试验都与个人 Linux 文件及现有进程保持严格隔离。", "失败仿真也能安全续传、诊断和清理，并确保下一轮试验在干净环境中稳定启动与完整运行。"], "shield"],
       ["可追溯报告", ["把每个候选方案关联到对应场景、随机种子与参数快照。", "统一保留日志、评测指标、试验产物与完整运行环境清单。", "用完整证据复现每次调优决策，同时保留实验上下文、演进过程、最终判断与完整依据。"], "report"],
@@ -391,6 +426,7 @@ const content = {
     footerLine: "本地优先的 PX4/Gazebo 控制参数调优平台；1.0.0 正式版已经发布，代码签名正在按公开流程准备。",
     codeSigningPolicy: "代码签名政策",
     privacyPolicy: "隐私政策",
+    communityGuidelines: "社区规范",
   },
 } as const;
 
@@ -740,6 +776,8 @@ export function SiteApp() {
   const auth = useAuthOrLocal();
   const copy = content[locale];
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
+  const [editionAvailability, setEditionAvailability] =
+    useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -750,21 +788,63 @@ export function SiteApp() {
   const [authCodeSent, setAuthCodeSent] = useState(false);
   const [authPassword, setAuthPassword] = useState("");
   const [authPasswordConfirmation, setAuthPasswordConfirmation] = useState("");
+  const [authCaptchaToken, setAuthCaptchaToken] = useState<string | null>(null);
+  const [authCaptchaCycle, setAuthCaptchaCycle] = useState(0);
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [organizationAccess, setOrganizationAccess] =
+    useState<OrganizationAccess | null>(null);
+  const [accountPlan, setAccountPlan] = useState<{
+    name: string;
+    billingScope: "individual" | "business";
+  } | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
   const authDialogRef = useRef<HTMLElement>(null);
   const authCloseRef = useRef<HTMLButtonElement>(null);
+  const oauthPromptedRef = useRef(false);
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
-    : path === "/pricing"
-      ? "pricing"
+    : path === "/product"
+      ? "product"
+      : path === "/pricing"
+        ? "pricing"
+      : path === "/organization"
+        ? "organization"
       : path === "/community"
         ? "community"
+        : path === "/oauth/consent"
+          ? "oauth-consent"
         : "home";
+
+  useEffect(() => {
+    let active = true;
+    if (!auth.account) {
+      setOrganizationAccess(null);
+      setAccountPlan(null);
+      return () => { active = false; };
+    }
+    void Promise.allSettled([
+      getOrganizationAccess(),
+      getManagedModelUsage(),
+    ]).then(([organizationResult, usageResult]) => {
+      if (!active) return;
+      setOrganizationAccess(
+        organizationResult.status === "fulfilled" ? organizationResult.value : null,
+      );
+      setAccountPlan(
+        usageResult.status === "fulfilled"
+          ? {
+              name: usageResult.value.plan.name,
+              billingScope: usageResult.value.account?.billing_scope ?? "individual",
+            }
+          : null,
+      );
+    });
+    return () => { active = false; };
+  }, [auth.account]);
 
   useEffect(() => {
     document.title = copy.metaTitle;
@@ -790,6 +870,20 @@ export function SiteApp() {
         ) {
           setRelease(candidate);
         }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/downloads/editions.json", { signal: controller.signal, cache: "no-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`edition metadata: ${response.status}`);
+        return response.json() as Promise<unknown>;
+      })
+      .then((candidate) => {
+        if (isEditionAvailabilityDocument(candidate)) setEditionAvailability(candidate);
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -955,10 +1049,28 @@ export function SiteApp() {
     setAuthCodeSent(false);
     setAuthPassword("");
     setAuthPasswordConfirmation("");
+    setAuthCaptchaToken(null);
+    setAuthCaptchaCycle((current) => current + 1);
     setAuthError(null);
     setMenuOpen(false);
     setAuthOpen(true);
   };
+
+  useEffect(() => {
+    if (sitePage !== "oauth-consent") return;
+    if (auth.account && authOpen) {
+      setAuthOpen(false);
+    } else if (
+      auth.configured
+      && !auth.loading
+      && !auth.account
+      && !authOpen
+      && !oauthPromptedRef.current
+    ) {
+      oauthPromptedRef.current = true;
+      openAccount("sign-in");
+    }
+  }, [auth.account, auth.configured, auth.loading, authOpen, sitePage]);
 
   const openConsole = () => {
     if (auth.account) {
@@ -975,7 +1087,18 @@ export function SiteApp() {
     setAuthError(null);
     try {
       if (authMode === "sign-in") {
-        await auth.signInWithPassword(authEmail, authPassword);
+        if (captchaProtectionConfigured && !authCaptchaToken) {
+          throw new Error(copy.completeCaptcha);
+        }
+        if (authCaptchaToken) {
+          await auth.signInWithPassword(
+            authEmail,
+            authPassword,
+            authCaptchaToken,
+          );
+        } else {
+          await auth.signInWithPassword(authEmail, authPassword);
+        }
       } else {
         if (authPassword.length < 8) {
           throw new Error(copy.passwordTooShort);
@@ -998,6 +1121,10 @@ export function SiteApp() {
       );
     } finally {
       setAuthPending(false);
+      if (authMode === "sign-in" && captchaProtectionConfigured) {
+        setAuthCaptchaToken(null);
+        setAuthCaptchaCycle((current) => current + 1);
+      }
     }
   };
 
@@ -1012,9 +1139,17 @@ export function SiteApp() {
       setAuthError(copy.passwordMismatch);
       return;
     }
+    if (captchaProtectionConfigured && !authCaptchaToken) {
+      setAuthError(copy.completeCaptcha);
+      return;
+    }
     setAuthPending(true);
     try {
-      await auth.sendRegistrationCode(authEmail);
+      if (authCaptchaToken) {
+        await auth.sendRegistrationCode(authEmail, authCaptchaToken);
+      } else {
+        await auth.sendRegistrationCode(authEmail);
+      }
       setAuthCodeSent(true);
     } catch (reason) {
       setAuthError(
@@ -1022,6 +1157,10 @@ export function SiteApp() {
       );
     } finally {
       setAuthPending(false);
+      if (captchaProtectionConfigured) {
+        setAuthCaptchaToken(null);
+        setAuthCaptchaCycle((current) => current + 1);
+      }
     }
   };
 
@@ -1030,8 +1169,7 @@ export function SiteApp() {
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
         <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
-          <img src={appIcon} alt="" />
-          <span>DroneDream</span>
+          <BrandLockup />
         </a>
         <nav
           id="site-navigation"
@@ -1041,6 +1179,9 @@ export function SiteApp() {
           {copy.nav.map(([label, target]) => (
             <a key={target} href={target} onClick={closeMenu}>{label}</a>
           ))}
+          {organizationAccess?.authorized ? (
+            <a href="/organization/" onClick={closeMenu}>{copy.organization}</a>
+          ) : null}
           <button type="button" onClick={openConsole}>{copy.console}</button>
         </nav>
         <div className="site-header-actions">
@@ -1083,23 +1224,40 @@ export function SiteApp() {
       <main id="main-content">
         {sitePage === "manual" ? (
           <ManualPage locale={locale} />
+        ) : sitePage === "product" ? (
+          <ProductPage availability={editionAvailability} locale={locale} />
         ) : sitePage === "pricing" ? (
           <PricingPage
             locale={locale}
             authenticated={Boolean(auth.account)}
             onRequireAccount={() => openAccount("register")}
           />
+        ) : sitePage === "organization" ? (
+          <OrganizationPage locale={locale} accountId={auth.account?.id ?? null} />
         ) : sitePage === "community" ? (
           <CommunityPage
             locale={locale}
             account={auth.account}
             onRequireAccount={() => openAccount("sign-in")}
           />
+        ) : sitePage === "oauth-consent" ? (
+          <OAuthConsentPage
+            locale={locale}
+            account={auth.account}
+            authConfigured={auth.configured}
+            authLoading={auth.loading}
+            onRequireSignIn={() => openAccount("sign-in")}
+          />
         ) : (
           <>
         <section className="site-hero" id="home" aria-labelledby="hero-title">
           <div className="site-hero-scene" aria-hidden="true">
-            <DroneLaunchScene active starflightControllerRef={droneFlightRef} visualOffsetX={1.58} />
+            <DroneLaunchScene
+              active
+              starflightControllerRef={droneFlightRef}
+              themeOverride={WEBSITE_DRONE_THEME}
+              visualOffsetX={1.58}
+            />
           </div>
           <div className="site-hero-shade" aria-hidden="true" />
           <div className="site-shell site-hero-layout">
@@ -1364,10 +1522,21 @@ export function SiteApp() {
                 <AccountIcon />
                 <strong>{auth.account.displayName}</strong>
                 <span>{auth.account.email}</span>
+                {accountPlan ? (
+                  <span className="site-auth-plan">
+                    {copy.accountPlan}: {accountPlan.billingScope === "business" ? "Business " : ""}{accountPlan.name}
+                  </span>
+                ) : null}
                 <a className="site-button site-button-primary" href="/console/">
                   {copy.openConsole}
                   <ArrowRightIcon />
                 </a>
+                {organizationAccess?.authorized ? (
+                  <a className="site-button site-button-secondary" href="/organization/">
+                    {copy.organization}
+                    <ArrowRightIcon />
+                  </a>
+                ) : null}
                 <button
                   type="button"
                   className="site-auth-text-button"
@@ -1472,6 +1641,13 @@ export function SiteApp() {
                       </div>
                     </>
                   ) : null}
+                  {captchaProtectionConfigured ? (
+                    <AuthCaptcha
+                      key={authCaptchaCycle}
+                      siteKey={turnstileSiteKey}
+                      onTokenChange={setAuthCaptchaToken}
+                    />
+                  ) : null}
                   <button type="submit" disabled={authPending || auth.loading}>
                     {authMode === "register"
                       ? copy.createAccount
@@ -1490,6 +1666,8 @@ export function SiteApp() {
                     setAuthCodeSent(false);
                     setAuthPassword("");
                     setAuthPasswordConfirmation("");
+                    setAuthCaptchaToken(null);
+                    setAuthCaptchaCycle((current) => current + 1);
                     setAuthError(null);
                   }}
                 >
@@ -1504,23 +1682,31 @@ export function SiteApp() {
         </div>
       ) : null}
 
-      <footer className="site-footer">
-        <div className="site-shell">
-          <div className="site-footer-brand"><img src={appIcon} alt="" /><strong>DroneDream</strong></div>
-          <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
-          <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
-            <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
-              <FeatureIcon name="shield" />
-              {copy.codeSigningPolicy}
-            </a>
-            <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
-              <DocumentIcon />
-              {copy.privacyPolicy}
-            </a>
-          </nav>
-          <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
-        </div>
-      </footer>
+      {sitePage === "home" ? (
+        <footer className="site-footer">
+          <div className="site-shell">
+            <div className="site-footer-brand" role="img" aria-label="DroneDream">
+              <BrandLockup />
+            </div>
+            <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
+            <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
+              <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
+                <FeatureIcon name="shield" />
+                {copy.codeSigningPolicy}
+              </a>
+              <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
+                <DocumentIcon />
+                {copy.privacyPolicy}
+              </a>
+              <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
+                <FeatureIcon name="report" />
+                {copy.communityGuidelines}
+              </a>
+            </nav>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
+          </div>
+        </footer>
+      ) : null}
     </div>
   );
 }

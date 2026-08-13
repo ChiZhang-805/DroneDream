@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/brand/drone-dream-lockup-primary.png" alt="DroneDream" width="640" />
+  <img src="brand/commercial/universal-lockup.png" alt="DroneDream" width="640" />
 </p>
 
 <p align="center">

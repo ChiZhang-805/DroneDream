@@ -16,6 +16,18 @@ export function generateReferenceTrack(
 ): TrackPoint[] {
   const points: TrackPoint[] = [];
 
+  if (trackType === "hover") {
+    const sampleCount = 101;
+    for (let i = 0; i < sampleCount; i += 1) {
+      points.push({
+        x: startX,
+        y: startY,
+        z: altitudeM,
+      });
+    }
+    return points;
+  }
+
   if (trackType === "circle") {
     const radius = geometry.circle_radius_m;
     const n = 180;

@@ -65,6 +65,9 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const { ensureOverallDesktopReadiness } = await import("../desktop/readiness");
     await ensureOverallDesktopReadiness({ autoStart: false });
+    const { approveDesktopStartupGateWithoutCloudAuth } =
+      await import("../desktop/startupGate");
+    approveDesktopStartupGateWithoutCloudAuth();
     const { router } = await import("../router");
 
     expect(router.state.location.pathname).toBe("/desktop/setup");
@@ -118,10 +121,26 @@ describe("environment-aware routing", () => {
       .toBeUndefined();
     expect(children.find((route) => route.path === "batches/*")?.loader)
       .toEqual(expect.any(Function));
-    for (const path of ["dashboard", "history", "ece498"]) {
+    for (const path of ["dashboard", "history", "scenarios"]) {
       expect(children.find((route) => route.path === path)?.loader, path)
         .toBeUndefined();
     }
+    for (const path of [
+      "assistant",
+      "dashboard",
+      "jobs/new",
+      "jobs/:jobId",
+      "trials/:trialId",
+      "history",
+      "scenarios",
+      "compare",
+      "desktop/setup",
+    ]) {
+      const route = children.find((candidate) => candidate.path === path);
+      expect(route?.lazy, path).toEqual(expect.any(Function));
+      expect(route?.element, path).toBeUndefined();
+    }
+    expect(children.find((route) => route.path === "ece498")).toBeUndefined();
 
     router.dispose();
   });
@@ -245,6 +264,26 @@ describe("environment-aware routing", () => {
 
     await router.navigate("/batches/new");
     expect(router.state.location.pathname).toBe("/dashboard");
+
+    router.dispose();
+  });
+
+  it("exposes the integrated Lab and primary Field workspaces in Universal", async () => {
+    delete window.__TAURI__;
+    window.history.replaceState(null, "", "/lab");
+    vi.resetModules();
+    const { router } = await import("../router");
+    const children = router.routes[0]?.children ?? [];
+
+    expect(children.find((route) => route.path === "lab")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(children.find((route) => route.path === "lab/hardware")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(children.find((route) => route.path === "field")?.element)
+      .toBeDefined();
+    expect(children.find((route) => route.path === "field/:fieldPage")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(router.state.location.pathname).toBe("/lab");
 
     router.dispose();
   });

@@ -39,7 +39,7 @@ const isOptionalPreviewManifest = (value) => value.includes("/downloads/latest.j
 const isBenignStaticAbort = (request) =>
   request.failure()?.errorText === "net::ERR_ABORTED" &&
   (
-    request.url().endsWith("/drone-favicon.svg") ||
+    request.url().endsWith("/drone-favicon.png") ||
     request.url().includes("/assets/128x128-")
   );
 const browser = await chromium.launch({
@@ -69,6 +69,10 @@ try {
   if (locale === "en" || locale === "zh-CN") {
     await page.evaluate((nextLocale) => localStorage.setItem("drone-dream:locale", nextLocale), locale);
     await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+    // Requests started by the disposable pre-locale navigation are expected to
+    // be aborted by reload. Only diagnostics from the canonical locale render
+    // belong in the visual receipt.
+    diagnostics.length = 0;
   }
   if (actionBase64) {
     await page.waitForTimeout(300);
@@ -93,7 +97,9 @@ try {
     timeout: 60_000,
   });
   await page.evaluate(() => document.fonts.ready);
-  await page.locator(selector).scrollIntoViewIfNeeded();
+  if (selector !== "body" && selector !== "#root") {
+    await page.locator(selector).scrollIntoViewIfNeeded();
+  }
   await page.waitForTimeout(2_000);
   await page.screenshot({ path: output, fullPage: false });
   console.log(output);

@@ -62,6 +62,17 @@ worker/.venv/bin/python -m ruff check worker
 cd frontend && npm run typecheck && npm run lint && npm run build && npm test
 ```
 
+### Build verification lessons
+
+- Scope build-only `VITE_*` overrides to the individual build process. Do not
+  export them into the shell that runs Vitest: URL-contract tests intentionally
+  read the default test environment and will otherwise report misleading
+  failures even though the product code is unchanged.
+- After any build failure, run the affected test in a fresh process, identify
+  whether the failure is environmental or a product defect, and remove the
+  failed `dist`/`site-dist` output before rebuilding. Keep only the final
+  verified bundle; do not retain numbered or abandoned build copies.
+
 ## Current capabilities
 
 - Backend ships an Alembic migration chain for reviewed schema upgrades.

@@ -35,12 +35,18 @@ def test_registered_fields_cover_shared_form_contract() -> None:
         )
     )
     intentionally_local_fields = {
+        "llm_access_mode",
         "llm_provider",
         "llm_api_key",
         "llm_model",
         "llm_base_url",
         "reference_track_json",
         "obstacles_json",
+        "continue_exploration_after_qualified",
+        "exploration_additional_generations",
+        "exploration_additional_trials",
+        "exploration_additional_provider_turns",
+        "exploration_additional_time_minutes",
     }
 
     assert form_fields == set(assistant.FIELD_REGISTRY) | intentionally_local_fields

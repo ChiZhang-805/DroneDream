@@ -7,11 +7,13 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const serializedRelease = process.env.DRONEDREAM_RELEASE_JSON;
 if (serializedRelease) JSON.parse(serializedRelease);
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, isPreview }) => {
   const env = loadEnv(mode, projectRoot, "");
-  for (const key of ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"]) {
-    if (!env[key]?.trim()) {
-      throw new Error(`${key} is required for the public website account flow.`);
+  if (!isPreview) {
+    for (const key of ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"]) {
+      if (!env[key]?.trim()) {
+        throw new Error(`${key} is required for the public website account flow.`);
+      }
     }
   }
 
@@ -27,9 +29,12 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           main: `${projectRoot}site.html`,
+          product: `${projectRoot}product/index.html`,
           manual: `${projectRoot}manual/index.html`,
           pricing: `${projectRoot}pricing/index.html`,
           community: `${projectRoot}community/index.html`,
+          organization: `${projectRoot}organization/index.html`,
+          oauthConsent: `${projectRoot}oauth/consent/index.html`,
         },
         output: {
           manualChunks: {
@@ -42,6 +47,9 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "127.0.0.1",
       port: 4174,
+      fs: {
+        allow: [".."],
+      },
     },
     preview: {
       host: "127.0.0.1",

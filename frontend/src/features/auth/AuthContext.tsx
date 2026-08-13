@@ -10,8 +10,12 @@ import {
 } from "react";
 import type { Provider, User } from "@supabase/supabase-js";
 
-import { isDesktopRuntime } from "../../desktop/bridge";
+import {
+  clearBrowserAuthVault,
+  isDesktopRuntime,
+} from "../../desktop/bridge";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
+import { ACTIVATE_DESKTOP_AUTH_EVENT } from "./desktopAuthActivation";
 import { setAuthAccessToken } from "./authTokenStore";
 import {
   appleAuthEnabled,
@@ -33,8 +37,15 @@ interface AuthContextValue {
   account: DroneDreamAccount | null;
   googleEnabled: boolean;
   appleEnabled: boolean;
-  signInWithPassword: (email: string, password: string) => Promise<void>;
-  sendRegistrationCode: (email: string) => Promise<void>;
+  signInWithPassword: (
+    email: string,
+    password: string,
+    captchaToken?: string,
+  ) => Promise<void>;
+  sendRegistrationCode: (
+    email: string,
+    captchaToken?: string,
+  ) => Promise<void>;
   verifyRegistrationCode: (
     email: string,
     token: string,
@@ -67,14 +78,30 @@ const OPTIONAL_AUTH_FALLBACK: AuthContextValue = {
 const AVATAR_STORAGE_PREFIX = "drone-dream:account-avatar:";
 const MAX_AVATAR_DATA_URL_LENGTH = 600_000;
 
+function shouldDeferDesktopAuth(): boolean {
+  // Tauri uses a hash router and initially mounts the provider at `/` before
+  // the index redirect selects `#/desktop/setup`.  Looking only at pathname
+  // therefore lets account hydration race the environment-only launcher.
+  // Desktop auth is always a deliberate second stage and is activated by the
+  // single sign-in action after local readiness reaches 100%.
+  return isDesktopRuntime();
+}
+
 function avatarStorageKey(userId: string): string {
   return `${AVATAR_STORAGE_PREFIX}${userId}`;
 }
 
 function localAvatarForUser(userId: string): string | null {
   if (typeof window === "undefined") return null;
-  const stored = window.localStorage.getItem(avatarStorageKey(userId));
-  return stored?.startsWith("data:image/") ? stored : null;
+  try {
+    const stored = window.localStorage.getItem(avatarStorageKey(userId));
+    return stored?.startsWith("data:image/") ? stored : null;
+  } catch {
+    // Storage can be disabled by a hardened browser or WebView policy. A local
+    // avatar is optional and must never prevent the authenticated session from
+    // being adopted.
+    return null;
+  }
 }
 
 function metadataAvatar(user: User): string | null {
@@ -125,7 +152,11 @@ function providerRedirectUrl(): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const docsPreview = import.meta.env.DEV &&
     new URLSearchParams(window.location.search).has("docsPreview");
-  const [loading, setLoading] = useState(cloudAuthConfigured && !docsPreview);
+  const deferDesktopAuth = useRef(shouldDeferDesktopAuth()).current;
+  const [authActivated, setAuthActivated] = useState(!deferDesktopAuth);
+  const [loading, setLoading] = useState(
+    cloudAuthConfigured && !docsPreview && !deferDesktopAuth,
+  );
   const [account, setAccount] = useState<DroneDreamAccount | null>(
     docsPreview
       ? {
@@ -150,7 +181,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (docsPreview) return undefined;
+    if (!deferDesktopAuth || authActivated) return undefined;
+    const activate = () => {
+      setLoading(cloudAuthConfigured && !docsPreview);
+      setAuthActivated(true);
+    };
+    window.addEventListener(ACTIVATE_DESKTOP_AUTH_EVENT, activate, { once: true });
+    return () => window.removeEventListener(ACTIVATE_DESKTOP_AUTH_EVENT, activate);
+  }, [authActivated, deferDesktopAuth, docsPreview]);
+
+  useEffect(() => {
+    if (docsPreview || !authActivated) return undefined;
     if (!supabaseClient) {
       setLoading(false);
       return undefined;
@@ -175,23 +216,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [adoptUser, docsPreview]);
+  }, [adoptUser, authActivated, docsPreview]);
 
   const signInWithPassword = useCallback(async (
     email: string,
     password: string,
+    captchaToken?: string,
   ) => {
     const { error } = await requireClient().auth.signInWithPassword({
       email: email.trim(),
       password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
     });
     if (error) throw error;
   }, []);
 
-  const sendRegistrationCode = useCallback(async (email: string) => {
+  const sendRegistrationCode = useCallback(async (
+    email: string,
+    captchaToken?: string,
+  ) => {
     const { error } = await requireClient().auth.signInWithOtp({
       email: email.trim(),
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        ...(captchaToken ? { captchaToken } : {}),
+      },
     });
     if (error) throw error;
   }, []);
@@ -282,10 +331,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [account]);
 
   const signOut = useCallback(async () => {
-    clearAllExperimentDrafts();
-    const { error } = await requireClient().auth.signOut();
+    let vaultClearFailed = false;
+    if (isDesktopRuntime()) {
+      try {
+        await clearBrowserAuthVault();
+      } catch {
+        vaultClearFailed = true;
+      }
+    }
+    // This action means "sign out of this app". It must not revoke the shared
+    // account sessions belonging to the website or another desktop edition.
+    const { error } = await requireClient().auth.signOut({ scope: "local" });
     if (error) throw error;
     adoptUser(null, null);
+    if (vaultClearFailed) {
+      throw new Error("The desktop session closed, but its saved sign-in could not be removed.");
+    }
   }, [adoptUser]);
 
   const value = useMemo<AuthContextValue>(

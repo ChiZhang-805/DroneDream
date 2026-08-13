@@ -36,13 +36,58 @@ export type TrialStatus =
   | "FAILED"
   | "CANCELLED";
 
-export type TrackType = "circle" | "u_turn" | "lemniscate" | "custom";
+export type TrackType = "hover" | "circle" | "u_turn" | "lemniscate" | "custom";
 export const TRACK_TYPES: readonly TrackType[] = [
+  "hover",
   "circle",
   "u_turn",
   "lemniscate",
   "custom",
 ];
+
+export type StarterExperienceTemplateKey =
+  | "hover-basics@1"
+  | "first-circle@1"
+  | "light-wind-circle@1"
+  | "wind-sensor-circle@1";
+export type UserDefaultTrackType =
+  | "hover"
+  | "circle"
+  | "u_turn"
+  | "lemniscate";
+
+export interface UserExperiencePreferences {
+  schema_version: "1.0";
+  saved: boolean;
+  memory_enabled: boolean;
+  locale: "en" | "zh-CN" | null;
+  default_template_key: StarterExperienceTemplateKey | null;
+  default_track_type: UserDefaultTrackType | null;
+  default_altitude_m: number | null;
+  retention_days: number;
+  stored_content:
+    "allowlisted_preferences_and_verified_structured_job_outcomes_only";
+  updated_at: string | null;
+}
+
+export interface UserExperiencePreferencesUpdate {
+  memory_enabled?: boolean;
+  locale?: "en" | "zh-CN" | null;
+  default_template_key?: StarterExperienceTemplateKey | null;
+  default_track_type?: UserDefaultTrackType | null;
+  default_altitude_m?: number | null;
+}
+
+export interface UserExperiencePreferencesMutation
+  extends UserExperiencePreferences {
+  deleted_memory_count: number;
+}
+
+export interface DeleteUserExperiencePreferencesResponse {
+  deleted_preferences: boolean;
+  deleted_memory_count: number;
+  memory_enabled: false;
+}
 
 export type SensorNoiseLevel = "low" | "medium" | "high";
 export const SENSOR_NOISE_LEVELS: readonly SensorNoiseLevel[] = [
@@ -75,6 +120,7 @@ export type ScenarioType =
   | "payload_changed"
   | "battery_degraded"
   | "actuator_delay"
+  | "actuator_failure"
   | "custom";
 
 export interface StartPoint {
@@ -205,6 +251,10 @@ export interface JobCreateRequest {
   objective_config?: ObjectiveConfig;
   scenario_suite?: ScenarioSuiteConfig;
   max_total_trials?: number;
+  completion_policy?: CompletionPolicy;
+  provider_turn_cap?: number;
+  continue_exploration_after_qualified?: boolean;
+  exploration_budget?: ContinueExplorationBudget | null;
 }
 
 export interface JobUpdateRequest {
@@ -215,6 +265,25 @@ export interface JobRerunRequest {
   openai?: OpenAIConfig | null;
   llm?: LLMProviderConfig | null;
 }
+
+export type CompletionPolicy =
+  | "first_qualified_stop"
+  | "exploration_budget_stop";
+
+export type JobKind = "primary" | "continue_exploration";
+
+export interface ContinueExplorationBudget {
+  additional_generation_cap: number;
+  additional_trial_cap: number;
+  additional_provider_turn_cap: number;
+  additional_time_budget_seconds: number;
+}
+
+export interface ContinueExplorationRequest {
+  budget: ContinueExplorationBudget;
+  openai?: OpenAIConfig | null;
+  llm?: LLMProviderConfig | null;
+}
 export interface DeleteJobResponse {
   id: string;
   deleted: boolean;
@@ -222,6 +291,7 @@ export interface DeleteJobResponse {
 
 export interface Job {
   id: string;
+  control_version: number;
   track_type: TrackType;
   reference_track: TrackPoint[] | null;
   start_point: StartPoint;
@@ -259,6 +329,7 @@ export interface Job {
   current_generation: number;
   optimization_outcome: OptimizationOutcome | null;
   openai_model: string | null;
+  llm_access_mode?: "platform" | "byok" | null;
   llm_provider?: string | null;
   llm_base_url?: string | null;
   vehicle_profile?: VehicleProfileConfig;
@@ -267,6 +338,20 @@ export interface Job {
   objective_config?: ObjectiveConfig;
   scenario_suite?: ScenarioSuiteConfig;
   max_total_trials?: number;
+  completion_policy?: CompletionPolicy;
+  job_kind?: JobKind;
+  cognitive_policy_version?: string;
+  provider_turn_cap?: number;
+  provider_turns_attempted?: number;
+  provider_turns_succeeded?: number;
+  first_qualified_candidate_id?: string | null;
+  first_qualified_freeze_receipt_id?: string | null;
+  first_qualified_at?: string | null;
+  continue_exploration_requested?: boolean;
+  exploration_budget?: ContinueExplorationBudget | null;
+  continuation_parent_job_id?: string | null;
+  continuation_root_job_id?: string | null;
+  holdout_policy_version?: string;
 }
 
 export interface TrialMetrics {
@@ -338,7 +423,10 @@ export type OptimizationOutcome =
   | "max_iterations_reached"
   | "no_usable_candidate"
   | "simulator_unavailable"
-  | "llm_failed";
+  | "llm_failed"
+  | "exploration_improved"
+  | "exploration_no_improvement"
+  | "exploration_budget_exhausted";
 
 export interface AcceptanceCriteria {
   target_rmse: number | null;
@@ -353,8 +441,10 @@ export interface OpenAIConfig {
 }
 
 export interface LLMProviderConfig {
+  access_mode?: "platform" | "byok";
   provider: string;
-  api_key: string;
+  api_key?: string | null;
+  platform_grant?: string | null;
   model?: string | null;
   base_url?: string | null;
 }
@@ -410,6 +500,31 @@ export interface ExperimentAssistantCurrentParameter {
   scale: ParameterScale;
 }
 
+export interface ExperimentAssistantDocumentChunk {
+  schema_version: "1.0";
+  document_id: string;
+  chunk_id: string;
+  display_name: string;
+  content: string;
+  content_sha256: string;
+  retention: "request_only";
+}
+
+export interface ExperimentAssistantDocumentContext {
+  schema_version: "1.0";
+  purpose: "experiment_draft_reference";
+  chunks: ExperimentAssistantDocumentChunk[];
+}
+
+export interface ExperimentAssistantDocumentContextReceipt {
+  schema_version: "1.0";
+  retention: "request_only";
+  persisted: false;
+  chunk_count: number;
+  content_bytes: number;
+  context_sha256: string;
+}
+
 export interface ExperimentAssistantTurnRequest {
   message_id: string;
   message: string;
@@ -418,6 +533,7 @@ export interface ExperimentAssistantTurnRequest {
   current_values: Record<string, ExperimentAssistantFieldValue>;
   explicit_field_ids: string[];
   current_parameters: ExperimentAssistantCurrentParameter[];
+  document_context?: ExperimentAssistantDocumentContext | null;
   llm: LLMProviderConfig;
 }
 
@@ -431,9 +547,48 @@ export interface ExperimentAssistantTurnResponse {
   missing_field_ids: string[];
   review_field_ids: string[];
   questions: ExperimentAssistantQuestion[];
+  document_context_receipt?: ExperimentAssistantDocumentContextReceipt | null;
   usage: ExperimentAssistantUsage;
   provider: string;
   model: string;
+  assistant_message?: string;
+  orchestration?: {
+    run_id: string;
+    conversation_id: string;
+    tenant_id: string;
+    organization_id: string | null;
+    workspace_id: string;
+    edition: "universal" | "sim" | "lab" | "field";
+    artifact_id: string;
+    artifact_version: number;
+    product_link: string;
+    artifact_kind:
+        | "universal_vehicle_model"
+        | "universal_simulation_experiment"
+        | "universal_cross_edition_workflow"
+        | "simulation_experiment"
+        | "lab_simulation_experiment"
+        | "lab_hardware_validation"
+        | "lab_calibration_workflow"
+        | "lab_sim_to_real_workflow"
+        | "lab_real_to_sim_workflow"
+        | "field_task_plan";
+    sequence: number;
+    intent: string | null;
+    workflow: Array<{
+      step: string;
+      label: string;
+      status: "completed" | "needs_input";
+    }>;
+    generated_files?: Array<{
+      file_id: string;
+      display_name: string;
+      content_type: string;
+      byte_size: number;
+      content_sha256: string;
+      version: number;
+    }>;
+  };
 }
 
 export interface VehicleProfileConfig {
@@ -688,6 +843,11 @@ export interface BackendCapabilitiesResponse {
   };
 }
 
+export interface AuthenticatedSessionResponse {
+  status: "ready";
+  user_id: string;
+}
+
 export interface StudyParameterSelection {
   name: string;
   baseline: number;
@@ -751,6 +911,8 @@ export interface TrialSummary {
   candidate_is_baseline: boolean;
   candidate_is_best: boolean;
   candidate_generation_index: number;
+  failure_code: string | null;
+  failure_reason: string | null;
 }
 
 export interface Trial extends TrialSummary {
@@ -758,8 +920,6 @@ export interface Trial extends TrialSummary {
   attempt_count: number;
   worker_id: string | null;
   simulator_backend: string | null;
-  failure_code: string | null;
-  failure_reason: string | null;
   log_excerpt: string | null;
   metrics: TrialMetrics | null;
   queued_at: string | null;
@@ -815,6 +975,8 @@ export interface JobReport {
   optimized_metrics: AggregatedMetrics;
   comparison: ComparisonPoint[];
   best_parameters: BestParameters;
+  winner_evidence_id?: string | null;
+  winner_freeze_receipt_id?: string | null;
   report_status: "PENDING" | "READY" | "FAILED";
   created_at: string;
   updated_at: string;
@@ -877,6 +1039,7 @@ export interface BatchProgress {
 
 export interface BatchJob {
   id: string;
+  control_version: number;
   name: string;
   description: string | null;
   status: BatchStatus;

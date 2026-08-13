@@ -16,7 +16,9 @@ are kept behind dedicated adapters rather than mixed into API models.
 - `/history` and `/compare` — history, reports, and experiment comparison.
 - `/desktop/setup` — desktop-only prerequisite, Runtime install/repair, and
   readiness flow.
-- `/ece498` — one-screen bilingual ECE 498 BH course introduction and tribute.
+- `ECE498BH` sidebar entry — opens Professor Bin Hu's official Spring 2025
+  course website in the system browser; the console does not maintain a
+  separate course-content route.
 
 The retired batch pages redirect to the overview. Batch HTTP endpoints remain
 available only as an API compatibility surface; the desktop product creates and

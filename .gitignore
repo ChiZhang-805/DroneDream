@@ -43,5 +43,6 @@ tmp/
 /desktop/src-tauri/target/
 /desktop/src-tauri/gen/
 /frontend/site-dist/
+/supabase/.temp/
 /runtime/out/
 /output/

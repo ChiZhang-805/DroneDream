@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
+import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
 
 const authMock = vi.hoisted(() => {
   const state = {
@@ -11,11 +12,31 @@ const authMock = vi.hoisted(() => {
       user_metadata: {} as Record<string, unknown>,
     },
   };
+  const getSession = vi.fn(async () => ({
+    data: {
+      session: {
+        user: state.user,
+        access_token: "session-token",
+      },
+    },
+    error: null,
+  }));
+  const onAuthStateChange = vi.fn(() => ({
+    data: {
+      subscription: { unsubscribe: vi.fn() },
+    },
+  }));
   return {
     state,
+    getSession,
+    onAuthStateChange,
     signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
     signInWithOtp: vi.fn(async () => ({ data: {}, error: null })),
     verifyOtp: vi.fn(async () => ({ data: {}, error: null })),
+    signOut: vi.fn(async (): Promise<{
+      data: Record<string, never>;
+      error: Error | null;
+    }> => ({ data: {}, error: null })),
     updateUser: vi.fn(async (
       payload: { data?: Record<string, unknown>; password?: string },
     ) => {
@@ -37,23 +58,12 @@ vi.mock("../features/auth/supabaseClient", () => ({
   googleAuthEnabled: false,
   supabaseClient: {
     auth: {
-      getSession: vi.fn(async () => ({
-        data: {
-          session: {
-            user: authMock.state.user,
-            access_token: "session-token",
-          },
-        },
-        error: null,
-      })),
-      onAuthStateChange: vi.fn(() => ({
-        data: {
-          subscription: { unsubscribe: authMock.unsubscribe },
-        },
-      })),
+      getSession: authMock.getSession,
+      onAuthStateChange: authMock.onAuthStateChange,
       signInWithPassword: authMock.signInWithPassword,
       signInWithOtp: authMock.signInWithOtp,
       verifyOtp: authMock.verifyOtp,
+      signOut: authMock.signOut,
       updateUser: authMock.updateUser,
     },
   },
@@ -90,7 +100,9 @@ function AccountProbe() {
       </button>
       <button
         type="button"
-        onClick={() => void auth.sendRegistrationCode("new@example.com")}
+        onClick={() =>
+          void auth.sendRegistrationCode("new@example.com", "captcha-register")
+        }
       >
         Send registration code
       </button>
@@ -106,6 +118,12 @@ function AccountProbe() {
       >
         Finish registration
       </button>
+      <button
+        type="button"
+        onClick={() => void auth.signOut().catch(() => undefined)}
+      >
+        Sign out
+      </button>
     </>
   );
 }
@@ -118,10 +136,16 @@ describe("AuthContext account profile", () => {
       user_metadata: {},
     };
     authMock.updateUser.mockClear();
+    authMock.getSession.mockClear();
+    authMock.onAuthStateChange.mockClear();
     authMock.signInWithPassword.mockClear();
     authMock.signInWithOtp.mockClear();
     authMock.verifyOtp.mockClear();
+    authMock.signOut.mockReset();
+    authMock.signOut.mockResolvedValue({ data: {}, error: null });
     authMock.unsubscribe.mockClear();
+    delete window.__TAURI__;
+    window.history.replaceState(null, "", "/");
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -179,7 +203,10 @@ describe("AuthContext account profile", () => {
     await waitFor(() => {
       expect(authMock.signInWithOtp).toHaveBeenCalledWith({
         email: "new@example.com",
-        options: { shouldCreateUser: true },
+        options: {
+          shouldCreateUser: true,
+          captchaToken: "captcha-register",
+        },
       });
     });
 
@@ -195,6 +222,136 @@ describe("AuthContext account profile", () => {
       expect(authMock.updateUser).toHaveBeenCalledWith({
         password: "correct-horse",
       });
+    });
+  });
+
+  it.each(["/", "/#/desktop/setup"])(
+    "does not hydrate the desktop launcher at %s until the 100 percent sign-in action activates it",
+    async (launcherUrl) => {
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async () => undefined),
+      },
+    };
+    window.history.replaceState(null, "", launcherUrl);
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await Promise.resolve();
+    expect(authMock.getSession).not.toHaveBeenCalled();
+    expect(authMock.onAuthStateChange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("username")).toHaveTextContent("");
+
+    activateDesktopAuthSession();
+
+    await waitFor(() => {
+      expect(authMock.getSession).toHaveBeenCalledTimes(1);
+      expect(authMock.onAuthStateChange).toHaveBeenCalledTimes(1);
+      expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name");
+    });
+    },
+  );
+
+  it("adopts an authenticated account when optional avatar storage is unavailable", async () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new DOMException("storage disabled", "SecurityError");
+      });
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByLabelText("username"))
+      .toHaveTextContent("pilot.name");
+    expect(screen.getByLabelText("email"))
+      .toHaveTextContent("pilot.name@example.com");
+    expect(screen.getByLabelText("avatar")).toHaveTextContent("");
+    getItem.mockRestore();
+  });
+
+  it("preserves drafts when sign-out fails and clears them only after success", async () => {
+    const draftKey = "drone-dream:experiment-workspace-draft:v1:workspace-1";
+    window.localStorage.setItem(draftKey, "local-draft");
+    window.sessionStorage.setItem(draftKey, "session-draft");
+    authMock.signOut.mockResolvedValueOnce({
+      data: {},
+      error: new Error("network unavailable"),
+    });
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(authMock.signOut).toHaveBeenCalledTimes(1));
+    expect(authMock.signOut).toHaveBeenLastCalledWith({ scope: "local" });
+    expect(window.localStorage.getItem(draftKey)).toBe("local-draft");
+    expect(window.sessionStorage.getItem(draftKey)).toBe("session-draft");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(authMock.signOut).toHaveBeenCalledTimes(2);
+      expect(authMock.signOut).toHaveBeenLastCalledWith({ scope: "local" });
+      expect(window.localStorage.getItem(draftKey)).toBeNull();
+      expect(window.sessionStorage.getItem(draftKey)).toBeNull();
+    });
+  });
+
+  it("clears only the desktop edition vault before local sign-out", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "clear_browser_auth_vault") return true;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("clear_browser_auth_vault", undefined);
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+    });
+    expect(invoke.mock.invocationCallOrder[0])
+      .toBeLessThan(authMock.signOut.mock.invocationCallOrder[0]);
+  });
+
+  it("still closes the local WebView session when edition vault cleanup fails", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "clear_browser_auth_vault") {
+        throw new Error("credential manager unavailable");
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(screen.getByLabelText("username")).toHaveTextContent("");
     });
   });
 });

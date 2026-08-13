@@ -106,7 +106,7 @@ function builtinParameter(
   };
 }
 
-// Curated 28-parameter offline core subset. The backend r2 catalog exposes a
+// Curated 31-parameter offline core subset. The backend r2 catalog exposes a
 // broader 45-parameter set when reachable; the server always performs the
 // authoritative version, applicability, coupling, and range validation.
 export const BUILTIN_PARAMETER_CATALOG: ParameterCatalogResponse = {
@@ -271,6 +271,14 @@ export function normalizeApiCatalog(
     Array.isArray(response.parameters) ? response.parameters : []
   ).flatMap((item) => {
     try {
+      if (
+        !item
+        || typeof item !== "object"
+        || !["float", "int", "integer"].includes(item.type)
+        || typeof item.requires_reboot !== "boolean"
+      ) {
+        return [];
+      }
       const dependencies = Array.isArray(item.dependencies)
         ? item.dependencies
             .map((dependency) => dependency?.parameter)
@@ -346,7 +354,7 @@ export function normalizeApiCatalog(
           ? "log" as const
           : "linear" as const,
         risk: item.risk,
-        requires_reboot: Boolean(item.requires_reboot),
+        requires_reboot: item.requires_reboot,
         dependencies: [...new Set(dependencies)],
         supported_airframes: compatibility?.airframe_families.length
           ? compatibility.airframe_families

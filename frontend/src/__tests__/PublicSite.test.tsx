@@ -29,12 +29,16 @@ function expectContentLinksToUseIcons(container: HTMLElement) {
 }
 
 describe("DroneDream public website", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
     window.localStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "en");
+    vi.stubEnv("VITE_BILLING_CHECKOUT_URL", "https://billing.test/functions/v1/billing-checkout");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
   });
 
@@ -43,6 +47,7 @@ describe("DroneDream public website", () => {
 
     expect(document.title).toBe("DroneDream");
     expect(screen.getByRole("heading", { name: /Tune with evidence/i })).toBeVisible();
+    expect(screen.getByText("AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION")).toBeVisible();
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
     expect(starflightButton).not.toHaveTextContent("+");
@@ -76,13 +81,26 @@ describe("DroneDream public website", () => {
       "https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md",
     );
     expect(screen.getByText(
-      /Version 1\.0\.0 is published while code signing is being prepared\./i,
+      /Version 1\.0\.0 is available now\./i,
     )).toBeVisible();
-    expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/pricing/");
-    expect(screen.getByRole("link", { name: "Workflow" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/product/");
+    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute("href", "/pricing/");
+    expect(screen.queryByRole("link", { name: "Workflow" })).toBeNull();
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
     expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/community/");
     expect(screen.getByRole("button", { name: "Console" })).toBeVisible();
+    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
+      "data-theme-primary",
+      "#68e8ff",
+    );
+    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
+      "data-theme-secondary",
+      "#9b72ff",
+    );
+    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
+      "data-theme-tertiary",
+      "#f166d8",
+    );
     expectContentLinksToUseIcons(container);
 
     const downloads = screen.getAllByRole("link", { name: /Download/i });
@@ -91,7 +109,7 @@ describe("DroneDream public website", () => {
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "Choose the next candidate" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Choose the next trial" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Full manual" })).toHaveAttribute("href", "/manual/");
     expectContentLinksToUseIcons(container);
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(
@@ -115,34 +133,105 @@ describe("DroneDream public website", () => {
     await waitFor(() => expect(open).toHaveFocus());
   });
 
-  it("renders the full manual as a dedicated documentation page", () => {
+  it("renders the production manual reader with its chapter sidebar and offline editions", () => {
     window.history.replaceState(null, "", "/manual/");
 
-    renderSite();
+    const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "Build explainable tuning experiments." })).toBeVisible();
-    expect(screen.getByRole("complementary", { name: "On this page" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Complete the five-step experiment" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DroneDream 1.0.0 User Manual" })).toBeVisible();
+    expect(screen.getByRole("complementary", { name: "DroneDream manual contents" })).toBeVisible();
+    expect(screen.getByRole("searchbox", { name: "Search chapters" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Markdown" })).toHaveAttribute(
+      "href",
+      "/docs/downloads/DroneDream-Manual-en.md",
+    );
+    expect(screen.getByRole("link", { name: "PDF" })).toHaveAttribute(
+      "href",
+      "/docs/downloads/DroneDream-Manual-en.pdf",
+    );
+    expect(container.querySelector(".manual-sidebar")).not.toBeNull();
+    expect(container.querySelector(".manual-reader")).not.toBeNull();
     expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();
+    expect(container.querySelector(".site-footer")).toBeNull();
   });
 
-  it("renders personal and business plans on the dedicated pricing page", () => {
+  it("routes Product to the three focused software download entries", () => {
+    window.history.replaceState(null, "", "/product/");
+
+    const { container } = renderSite();
+
+    expect(screen.getByRole("heading", { name: "Choose Your DroneDream Edition" })).toBeVisible();
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
+    expect(container.querySelectorAll('[data-download-ready="false"]')).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /Download unavailable/i })).toHaveLength(3);
+    expect(container.querySelector(".site-footer")).toBeNull();
+  });
+
+  it("renders three directly comparable plans with the same ordered feature rows", async () => {
     window.history.replaceState(null, "", "/pricing/");
 
-    renderSite();
+    const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "Choose the right workspace for every flight." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Choose the optimization depth for every flight." })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Free" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Plus" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Pro" })).toBeVisible();
+    expect(container.querySelector(".site-footer")).toBeNull();
+    expect(screen.getByRole("tab", { name: "Individual" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     fireEvent.click(screen.getByRole("tab", { name: "Business" }));
-    expect(screen.getByRole("heading", { name: "Business Free" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Business Plus" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Business Pro" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "Business" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText(/300,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getByText(/3,000,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getByText(/15,000,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getAllByText(
+      "Team AURORA optimization Harness",
+    )).toHaveLength(3);
+    const expectedFeatureOrder = [
+      "workflow",
+      "harness",
+      "allowance",
+      "byok",
+      "reports",
+      "comparisonWorkspace",
+      "watermarkFree",
+      "premiumRouting",
+      "advancedHarness",
+    ];
+    container.querySelectorAll<HTMLElement>(".pricing-card").forEach((card) => {
+      expect(
+        Array.from(card.querySelectorAll<HTMLElement>("[data-feature]")).map(
+          (feature) => feature.dataset.feature,
+        ),
+      ).toEqual(expectedFeatureOrder);
+    });
+    expect(
+      container.querySelector('[data-plan="free"] [data-feature="watermarkFree"]'),
+    ).toHaveAttribute("data-available", "false");
+    expect(
+      container.querySelector('[data-plan="plus"] [data-feature="watermarkFree"]'),
+    ).toHaveAttribute("data-available", "true");
+    expect(
+      container.querySelector('[data-plan="pro"] [data-feature="watermarkFree"]'),
+    ).toHaveAttribute("data-available", "true");
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/billing-checkout/availability"),
+        expect.any(Object),
+      );
+    });
   });
 
-  it("shows honest inactive payment options without simulating a purchase", () => {
-    render(
+  it("shows honest inactive payment options without simulating a purchase", async () => {
+    const { container } = render(
       <PricingPage
         locale="en"
         authenticated
@@ -150,24 +239,37 @@ describe("DroneDream public website", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Upgrade Plus" }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Plus" }));
 
-    expect(screen.getByRole("dialog", { name: "Choose a payment method" })).toBeVisible();
+    expect(screen.getByRole("dialog", { name: "Payment" })).toBeVisible();
     expect(screen.getByRole("button", { name: "WeChat Pay" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    expect(
+      container.querySelector('[data-brand-mark="wechat-pay"]'),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "Alipay" })).toBeVisible();
+    expect(
+      container.querySelector('[data-brand-mark="alipay"]'),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "Continue to payment" })).toBeDisabled();
-    expect(screen.getByText("Merchant payment activation is in progress.")).toBeVisible();
+    await waitFor(() => {
+      expect(screen.queryByText(/Merchant payment activation/i)).toBeNull();
+    });
+    expect(screen.queryByText(/Review the selected plan/i)).toBeNull();
   });
 
   it("requires an account before a visitor can publish a community topic", () => {
     window.history.replaceState(null, "", "/community/");
 
-    renderSite();
+    const { container } = renderSite();
 
     expect(screen.getByRole("heading", { name: "Share questions. Compare flight evidence." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Recent topics" })).toBeVisible();
+    expect(container.querySelector(".community-feed")).not.toBeNull();
+    expect(container.querySelector(".community-topic-grid")).not.toBeNull();
+    expect(container.querySelector(".site-footer")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Sign in to publish" }));
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
   });
@@ -228,9 +330,9 @@ describe("DroneDream public website", () => {
     expect(fallbackRelease).toMatchObject({
       version: "1.0.0",
       fileName: "DroneDream_1.0.0_x64-setup.exe",
-      sha256: "c2018379a21fb72a7cf3c4a7f6381d3fa49cf54a03c167a196d950fd651225a4",
-      sizeBytes: 6_605_457,
-      publishedAt: "2026-07-25",
+      sha256: "84b6b5a25cfe0cd110d214b7849032624b93b2c529eca1f9923658aee93fe813",
+      sizeBytes: 12_888_384,
+      publishedAt: "2026-08-12",
     });
     expect(isWebsiteRelease(fallbackRelease)).toBe(true);
     expect(isWebsiteRelease({ ...fallbackRelease, sha256: "unsafe" })).toBe(false);
