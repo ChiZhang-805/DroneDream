@@ -52,6 +52,7 @@ interface AssistantModelPickerProps {
   onSelectDefault: (model: ManagedModelCatalogEntry) => void;
   onSelectCustom: (profileId: string) => void;
   onOpenSettings: () => void;
+  showCustomSection?: boolean;
 }
 
 export function AssistantModelPicker({
@@ -64,6 +65,7 @@ export function AssistantModelPicker({
   onSelectDefault,
   onSelectCustom,
   onOpenSettings,
+  showCustomSection = true,
 }: AssistantModelPickerProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -130,38 +132,42 @@ export function AssistantModelPicker({
               </button>
             );
           })}
-          <div className="assistant-model-group-label assistant-model-custom-heading">Custom</div>
-          {customProfiles.map((profile) => {
-            const selected = selectedCustomId === profile.id;
-            return (
+          {showCustomSection ? (
+            <>
+              <div className="assistant-model-group-label assistant-model-custom-heading">Custom</div>
+              {customProfiles.map((profile) => {
+                const selected = selectedCustomId === profile.id;
+                return (
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    data-model-type="custom"
+                    key={profile.id}
+                    onClick={() => {
+                      onSelectCustom(profile.id);
+                      setOpen(false);
+                    }}
+                  >
+                    <ModelProviderLogo provider={profile.provider} />
+                    <span><strong>{profile.model.trim() || "Provider default"}</strong></span>
+                    {selected ? <Check aria-hidden="true" /> : null}
+                  </button>
+                );
+              })}
               <button
                 type="button"
-                role="option"
-                aria-selected={selected}
-                data-model-type="custom"
-                key={profile.id}
+                className="assistant-model-settings-link"
                 onClick={() => {
-                  onSelectCustom(profile.id);
                   setOpen(false);
+                  onOpenSettings();
                 }}
               >
-                <ModelProviderLogo provider={profile.provider} />
-                <span><strong>{profile.model.trim() || "Provider default"}</strong></span>
-                {selected ? <Check aria-hidden="true" /> : null}
+                <Plus aria-hidden="true" />
+                <span><strong>Add custom model</strong></span>
               </button>
-            );
-          })}
-          <button
-            type="button"
-            className="assistant-model-settings-link"
-            onClick={() => {
-              setOpen(false);
-              onOpenSettings();
-            }}
-          >
-            <Plus aria-hidden="true" />
-            <span><strong>Add custom model</strong></span>
-          </button>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>

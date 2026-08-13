@@ -351,6 +351,7 @@ async function verifySettings(page, testCase) {
     `${testCase.id}: Settings modal must render above the mobile application header`,
   );
   const panelMeasurements = [];
+  const panelImages = [];
   for (const tab of await dialog.getByRole("tab").all()) {
     await tab.click();
     const measurement = await dialog.evaluate((element) => {
@@ -384,6 +385,11 @@ async function verifySettings(page, testCase) {
     assert(measurement.panelBottom <= measurement.dialogBottom + 1);
     assert.equal(measurement.grantsHardwareAuthority, "false");
     panelMeasurements.push(measurement);
+    panelImages.push(await screenshot(
+      page,
+      testCase.id,
+      `settings-${measurement.tab}`,
+    ));
   }
   await dialog.getByRole("tab", {
     name: testCase.locale === "en" ? "Model" : "模型",
@@ -417,12 +423,6 @@ async function verifySettings(page, testCase) {
       },
       documentWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
-      managedModelOptions: element.querySelectorAll(
-        ".settings-managed-model-row select option",
-      ).length,
-      managedModelLabels: Array.from(
-        element.querySelectorAll(".settings-managed-model-row select option"),
-      ).map((option) => option.textContent?.trim() ?? ""),
       usageValuesFit: Array.from(
         element.querySelectorAll(".settings-model-usage-grid strong"),
       ).every((value) => value.scrollWidth <= value.clientWidth + 1),
@@ -452,17 +452,23 @@ async function verifySettings(page, testCase) {
     metrics.documentWidth,
     `${testCase.id}: Settings caused horizontal document overflow`,
   );
-  assert.equal(metrics.managedModelOptions, 7);
+  const modelPicker = usage.locator(".settings-managed-model-row .assistant-model-button");
+  await modelPicker.click();
+  const managedModelLabels = await usage.locator(
+    '.settings-managed-model-row [role="option"][data-model-type="default"]',
+  ).allTextContents();
+  assert.equal(managedModelLabels.length, 7);
   for (const expectedLabel of ["GPT 4.1", "GPT 5.1", "GPT 5.4", "DeepSeek V4 Flash", "DeepSeek V4 Pro", "Kimi K2.6", "Kimi K3"]) {
     assert(
-      metrics.managedModelLabels.some((label) => label.includes(expectedLabel)),
+      managedModelLabels.some((label) => label.includes(expectedLabel)),
       `${testCase.id}: settings catalog is missing ${expectedLabel}`,
     );
   }
+  await modelPicker.click();
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
-  assert.equal(metrics.foregroundColor, "rgb(247, 242, 255)");
-  assert.equal(metrics.mutedColor, "rgb(214, 183, 234)");
-  assert.equal(metrics.accessModeColor, "rgb(247, 242, 255)");
+  assert.equal(metrics.foregroundColor, "rgb(30, 23, 33)");
+  assert.equal(metrics.mutedColor, "rgb(117, 108, 121)");
+  assert.equal(metrics.accessModeColor, "rgb(30, 23, 33)");
   assert.equal(metrics.headingColor, "rgb(30, 23, 33)");
   const manage = usage.locator(".settings-model-plan-row .btn");
   const refresh = usage.locator(".settings-model-refresh");
@@ -479,6 +485,7 @@ async function verifySettings(page, testCase) {
     layerBinding,
     settingsViewport,
     panelMeasurements,
+    panelImages,
     keyboardFocusOrder: "manage-subscription -> refresh-usage",
     assistantModelImage,
     image,

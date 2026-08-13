@@ -9,6 +9,7 @@ import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
+  Bell,
   BotMessageSquare,
   Box,
   Camera,
@@ -29,7 +30,9 @@ import {
   Settings,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Sun,
+  Trash2,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -44,6 +47,7 @@ import {
   type AvatarCropCopy,
 } from "./components/AvatarCropDialog";
 import { BrandLockup } from "./components/BrandLockup";
+import { AssistantModelPicker } from "./components/AssistantModelPicker";
 import {
   EditionSettingsPanel,
   EditionSettingsSurface,
@@ -325,6 +329,41 @@ const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
 };
 const EXPERIENCE_PREFERENCE_LOAD_FAILED = "experience-preference-load-failed";
 
+type NotificationPreferenceKey = "master" | "experiment" | "assistant" | "updates";
+type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
+
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  master: true,
+  experiment: true,
+  assistant: true,
+  updates: false,
+};
+
+function SettingsToggle({
+  checked,
+  disabled = false,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="settings-toggle-row">
+      <span>{label}</span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <i aria-hidden="true" />
+    </label>
+  );
+}
+
 interface ExitPromptState {
   hasDraft: boolean;
   draftPreserved: boolean;
@@ -538,10 +577,7 @@ function SettingsDialog({
   const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
     docsPreview ? DOCS_PREVIEW_MANAGED_MODELS : DEFAULT_MANAGED_MODEL_CATALOG,
   );
-  const [managedModelsError, setManagedModelsError] = useState<string | null>(null);
-  const [subscriptionOpenError, setSubscriptionOpenError] =
-    useState<string | null>(null);
-  const [experiencePreferences, setExperiencePreferences] =
+  const [, setExperiencePreferences] =
     useState<UserExperiencePreferences | null>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
     useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
@@ -553,20 +589,38 @@ function SettingsDialog({
     useState<string | null>(null);
   const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
     useState(false);
+  const [notificationPreferences, setNotificationPreferences] =
+    useState<NotificationPreferences>(() => {
+      try {
+        const stored = window.localStorage.getItem("dd.notification-preferences.v1");
+        return stored
+          ? { ...DEFAULT_NOTIFICATION_PREFERENCES, ...JSON.parse(stored) as Partial<NotificationPreferences> }
+          : DEFAULT_NOTIFICATION_PREFERENCES;
+      } catch {
+        return DEFAULT_NOTIFICATION_PREFERENCES;
+      }
+    });
+  const updateNotificationPreference = (
+    key: NotificationPreferenceKey,
+    checked: boolean,
+  ) => {
+    setNotificationPreferences((current) => {
+      const next = { ...current, [key]: checked };
+      window.localStorage.setItem("dd.notification-preferences.v1", JSON.stringify(next));
+      return next;
+    });
+  };
   const openSubscriptionPage = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
   ) => {
     if (!isDesktopRuntime()) return;
     event.preventDefault();
-    setSubscriptionOpenError(null);
     void import("@tauri-apps/plugin-opener")
       .then(({ openUrl }) =>
         openUrl("https://getdronedream.com/pricing/")
       )
-      .catch(() => {
-        setSubscriptionOpenError(t("settings.model.subscriptionOpenFailed"));
-      });
-  }, [t]);
+      .catch(() => undefined);
+  }, []);
   const refreshManagedUsage = useCallback(async () => {
     if (modelAccess.accessMode !== "platform") return;
     if (docsPreview) {
@@ -597,7 +651,6 @@ function SettingsDialog({
     if (modelAccess.accessMode !== "platform") return;
     if (docsPreview) {
       setManagedModels(DOCS_PREVIEW_MANAGED_MODELS);
-      setManagedModelsError(null);
       return;
     }
     if (!auth.account) return;
@@ -608,12 +661,10 @@ function SettingsDialog({
         setManagedModels(catalog.models.filter((model) =>
           model.enabled && model.assistant_enabled
         ));
-        setManagedModelsError(null);
       })
-      .catch((error) => {
+      .catch(() => {
         if (!active) return;
         setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
-        setManagedModelsError(error instanceof Error ? error.message : t("settings.model.usageUnavailable"));
       });
     return () => {
       active = false;
@@ -726,13 +777,13 @@ function SettingsDialog({
     experiencePreferenceState === "blocked" ||
     experiencePreferenceState === "loading" ||
     experiencePreferenceState === "saving";
-  const creditRatio = managedUsage
+  const remainingCreditRatio = managedUsage
     ? Math.min(
         100,
         Math.max(
           0,
           managedUsage.plan.included_ai_credits > 0
-            ? managedUsage.usage.consumed_ai_credits
+            ? managedUsage.usage.remaining_ai_credits
               / managedUsage.plan.included_ai_credits
               * 100
             : 0,
@@ -814,57 +865,89 @@ function SettingsDialog({
       consumerProfile={edition === "field" ? "field-lightweight" : edition}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
-        <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
-        <button
-          type="button"
-          className={locale === "en" ? "selected" : undefined}
-          aria-label={t("app.languageEnglish")}
-          aria-pressed={locale === "en"}
-          onClick={() => setLocale("en")}
-        >
-          <LanguageRegionIcon region="west" />
-          <strong>{t("app.languageEnglish")}</strong>
-          <i aria-hidden="true">✓</i>
-        </button>
-        <button
-          type="button"
-          className={locale === "zh-CN" ? "selected" : undefined}
-          aria-label={t("app.languageChinese")}
-          aria-pressed={locale === "zh-CN"}
-          onClick={() => setLocale("zh-CN")}
-        >
-          <LanguageRegionIcon region="east" />
-          <strong>{t("app.languageChinese")}</strong>
-          <i aria-hidden="true">✓</i>
-        </button>
-        </fieldset>
-        <div className="settings-general-section">
-          <span className="settings-section-label">{t("settings.general.appearance")}</span>
-          <div
-            className="settings-appearance-options"
-            role="group"
-            aria-label={t("settings.general.appearance")}
-          >
-            <button
-              type="button"
-              className={editionTheme.appearance === "dark" ? "selected" : undefined}
-              aria-pressed={editionTheme.appearance === "dark"}
-              onClick={() => editionTheme.setAppearance("dark")}
+        <section className="settings-general-panel">
+          <div className="settings-general-card">
+            <div className="settings-card-heading">
+              <span><SlidersHorizontal aria-hidden="true" />{locale === "zh-CN" ? "界面" : "Interface"}</span>
+            </div>
+            <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
+              <button
+                type="button"
+                className={locale === "en" ? "selected" : undefined}
+                aria-label={t("app.languageEnglish")}
+                aria-pressed={locale === "en"}
+                onClick={() => setLocale("en")}
+              >
+                <LanguageRegionIcon region="west" />
+                <strong>{t("app.languageEnglish")}</strong>
+                <i aria-hidden="true">✓</i>
+              </button>
+              <button
+                type="button"
+                className={locale === "zh-CN" ? "selected" : undefined}
+                aria-label={t("app.languageChinese")}
+                aria-pressed={locale === "zh-CN"}
+                onClick={() => setLocale("zh-CN")}
+              >
+                <LanguageRegionIcon region="east" />
+                <strong>{t("app.languageChinese")}</strong>
+                <i aria-hidden="true">✓</i>
+              </button>
+            </fieldset>
+            <div
+              className="settings-appearance-options"
+              role="group"
+              aria-label={t("settings.general.appearance")}
             >
-              <Moon aria-hidden="true" />
-              <span>{t("settings.general.dark")}</span>
-            </button>
-            <button
-              type="button"
-              className={editionTheme.appearance === "light" ? "selected" : undefined}
-              aria-pressed={editionTheme.appearance === "light"}
-              onClick={() => editionTheme.setAppearance("light")}
-            >
-              <Sun aria-hidden="true" />
-              <span>{t("settings.general.light")}</span>
-            </button>
+              <button
+                type="button"
+                className={editionTheme.appearance === "dark" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearance === "dark"}
+                onClick={() => editionTheme.setAppearance("dark")}
+              >
+                <Moon aria-hidden="true" />
+                <span>{t("settings.general.dark")}</span>
+              </button>
+              <button
+                type="button"
+                className={editionTheme.appearance === "light" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearance === "light"}
+                onClick={() => editionTheme.setAppearance("light")}
+              >
+                <Sun aria-hidden="true" />
+                <span>{t("settings.general.light")}</span>
+              </button>
+            </div>
           </div>
-        </div>
+          <div className="settings-general-card settings-notification-card">
+            <div className="settings-card-heading">
+              <span><Bell aria-hidden="true" />{locale === "zh-CN" ? "通知" : "Notifications"}</span>
+            </div>
+            <SettingsToggle
+              checked={notificationPreferences.master}
+              label={locale === "zh-CN" ? "允许通知" : "Allow notifications"}
+              onChange={(checked) => updateNotificationPreference("master", checked)}
+            />
+            <SettingsToggle
+              checked={notificationPreferences.experiment}
+              disabled={!notificationPreferences.master}
+              label={locale === "zh-CN" ? "实验与任务完成" : "Experiment and task completed"}
+              onChange={(checked) => updateNotificationPreference("experiment", checked)}
+            />
+            <SettingsToggle
+              checked={notificationPreferences.assistant}
+              disabled={!notificationPreferences.master}
+              label={locale === "zh-CN" ? "AI 回复完成" : "AI response completed"}
+              onChange={(checked) => updateNotificationPreference("assistant", checked)}
+            />
+            <SettingsToggle
+              checked={notificationPreferences.updates}
+              disabled={!notificationPreferences.master}
+              label={locale === "zh-CN" ? "产品更新" : "Product updates"}
+              onChange={(checked) => updateNotificationPreference("updates", checked)}
+            />
+          </div>
+        </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "course"} id="course">
         <section className="settings-course-panel" aria-labelledby="settings-course-title">
@@ -872,9 +955,10 @@ function SettingsDialog({
             <GraduationCap />
           </div>
           <div>
-            <span>{locale === "zh-CN" ? "课程入口" : "Course access"}</span>
             <h3 id="settings-course-title">ECE498BH</h3>
-            <p>{locale === "zh-CN" ? "工程推理课程资源" : "Engineering reasoning course resources"}</p>
+            <p>{locale === "zh-CN"
+              ? "ECE498BH 探索大语言模型如何进行工程推理，并结合控制、航空航天等领域工具构建可验证的智能体；DroneDream 将这一课程理念转化为可规划、可执行、可验收的无人机调优工作流。"
+              : "ECE498BH explores LLM reasoning with engineering tools across controls, aerospace, and related domains. DroneDream carries that course idea into UAV tuning workflows that can be planned, executed, and verified."}</p>
           </div>
           <a
             href={ECE498BH_COURSE_URL}
@@ -882,7 +966,7 @@ function SettingsDialog({
             rel="noreferrer"
             onClick={(event) => onOpenExternal(event, ECE498BH_COURSE_URL)}
           >
-            {locale === "zh-CN" ? "打开课程" : "Open course"}
+            {locale === "zh-CN" ? "访问课程网站" : "Visit course website"}
           </a>
         </section>
       </EditionSettingsPanel>
@@ -890,8 +974,7 @@ function SettingsDialog({
         <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
         <div className="settings-memory-heading">
           <div>
-            <h3 id="settings-memory-title">{t("settings.memory.title")}</h3>
-            <p>{t("settings.memory.description")}</p>
+            <h3 id="settings-memory-title">{locale === "zh-CN" ? "记忆" : "Memory"}</h3>
           </div>
           <span className={experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
             {t(
@@ -901,22 +984,23 @@ function SettingsDialog({
             )}
           </span>
         </div>
-        <label className="settings-memory-consent" htmlFor="settings_memory_enabled">
-          <input
-            id="settings_memory_enabled"
-            type="checkbox"
+        <div className="settings-memory-switches">
+          <SettingsToggle
             checked={experiencePreferenceDraft.memory_enabled}
             disabled={experiencePreferenceControlsDisabled}
-            onChange={(event) => setExperiencePreferenceDraft((current) => ({
+            label={locale === "zh-CN" ? "跨会话记忆" : "Cross-session memory"}
+            onChange={(checked) => setExperiencePreferenceDraft((current) => ({
               ...current,
-              memory_enabled: event.target.checked,
+              memory_enabled: checked,
             }))}
           />
-          <span>
-            <strong>{t("settings.memory.consent")}</strong>
-            <small>{t("settings.memory.consentDetail")}</small>
-          </span>
-        </label>
+          <div className="settings-memory-scope-grid" aria-label={locale === "zh-CN" ? "记忆范围" : "Memory scope"}>
+            <span><Sparkles aria-hidden="true" />{locale === "zh-CN" ? "对话偏好" : "Chat preferences"}</span>
+            <span><SlidersHorizontal aria-hidden="true" />{locale === "zh-CN" ? "实验默认值" : "Experiment defaults"}</span>
+            <span><RadioTower aria-hidden="true" />{locale === "zh-CN" ? "设备与机型" : "Device and vehicle"}</span>
+            <span><ShieldCheck aria-hidden="true" />{locale === "zh-CN" ? "指标与约束" : "Metrics and constraints"}</span>
+          </div>
+        </div>
         <div className="settings-memory-grid">
           <label htmlFor="settings_default_template">
             <span>{t("settings.memory.defaultTemplate")}</span>
@@ -976,11 +1060,6 @@ function SettingsDialog({
             />
           </label>
         </div>
-        <p className="settings-memory-policy">
-          {t("settings.memory.policy", {
-            days: experiencePreferences?.retention_days ?? 90,
-          })}
-        </p>
         <div className="settings-memory-actions">
           <button
             type="button"
@@ -999,7 +1078,7 @@ function SettingsDialog({
               disabled={experiencePreferenceControlsDisabled}
               onClick={() => setConfirmExperiencePreferenceDelete(true)}
             >
-              {t("settings.memory.delete")}
+              <Trash2 aria-hidden="true" />{t("settings.memory.delete")}
             </button>
           ) : (
             <div className="settings-memory-delete-confirm" role="group" aria-label={t("settings.memory.confirmDelete")}>
@@ -1026,14 +1105,12 @@ function SettingsDialog({
             {t("settings.memory.runtimeRequired")}
           </p>
         ) : null}
-        {experiencePreferenceMessage ? (
+        {experiencePreferenceMessage && experiencePreferenceMessage !== EXPERIENCE_PREFERENCE_LOAD_FAILED ? (
           <p
             className="settings-memory-message"
             role={experiencePreferenceState === "error" ? "alert" : "status"}
           >
-            {experiencePreferenceMessage === EXPERIENCE_PREFERENCE_LOAD_FAILED
-              ? t("settings.memory.loadFailed")
-              : experiencePreferenceMessage}
+            {experiencePreferenceMessage}
           </p>
         ) : null}
         </section>
@@ -1080,32 +1157,22 @@ function SettingsDialog({
         {modelAccess.accessMode === "platform" ? (
           <div className="settings-model-usage">
             <div className="settings-managed-model-row">
-              <label htmlFor="settings_managed_model_provider">
-                <span>{locale === "zh-CN" ? "平台托管模型" : "Included model"}</span>
-                <select
-                  id="settings_managed_model_provider"
-                  value={`${modelAccess.managedProvider}:${modelAccess.managedModel}`}
-                  disabled={managedModels.length === 0}
-                  onChange={(event) => {
-                    const selected = managedModels.find((model) =>
-                      `${model.provider}:${model.model}` === event.target.value
-                    );
-                    if (selected) selectManagedModel(selected.provider, selected.model);
-                  }}
-                >
-                  {managedModels.map((model) => (
-                    <option
-                      key={`${model.provider}:${model.model}`}
-                      value={`${model.provider}:${model.model}`}
-                    >
-                      {model.display_name} · {model.model}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {managedModelsError ? (
-                <p role="status">{managedModelsError}</p>
-              ) : null}
+              <span>{locale === "zh-CN" ? "包含的模型" : "Included model"}</span>
+              <AssistantModelPicker
+                ariaLabel={locale === "zh-CN" ? "包含的模型" : "Included model"}
+                defaultModels={managedModels}
+                customProfiles={[]}
+                selectedDefault={managedModels.find((model) =>
+                  model.provider === modelAccess.managedProvider
+                    && model.model === modelAccess.managedModel
+                ) ?? null}
+                selectedCustomId={null}
+                disabled={managedModels.length === 0}
+                onSelectDefault={(model) => selectManagedModel(model.provider, model.model)}
+                onSelectCustom={() => undefined}
+                onOpenSettings={() => undefined}
+                showCustomSection={false}
+              />
             </div>
             <div className="settings-model-plan-row">
               <div>
@@ -1122,11 +1189,6 @@ function SettingsDialog({
                 {t("settings.model.manageSubscription")}
               </a>
             </div>
-            {subscriptionOpenError ? (
-              <p className="settings-model-usage-message" role="alert">
-                {subscriptionOpenError}
-              </p>
-            ) : null}
             {!auth.account && !docsPreview ? (
               <p className="settings-model-usage-message">
                 {t("settings.model.signInForAllowance")}
@@ -1134,9 +1196,9 @@ function SettingsDialog({
             ) : managedUsage ? (
               <>
                 <div className="settings-model-quota-heading">
-                  <span>{t("settings.model.periodUsage")}</span>
+                  <span>{locale === "zh-CN" ? "剩余额度" : "Remaining allowance"}</span>
                   <strong>
-                    {numberFormatter.format(managedUsage.usage.consumed_ai_credits)}
+                    {numberFormatter.format(managedUsage.usage.remaining_ai_credits)}
                     {" / "}
                     {numberFormatter.format(managedUsage.plan.included_ai_credits)}
                     {" "}
@@ -1148,9 +1210,9 @@ function SettingsDialog({
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={managedUsage.plan.included_ai_credits}
-                  aria-valuenow={managedUsage.usage.consumed_ai_credits}
+                  aria-valuenow={managedUsage.usage.remaining_ai_credits}
                 >
-                  <span style={{ width: `${creditRatio}%` }} />
+                  <span style={{ width: `${remainingCreditRatio}%` }} />
                 </div>
                 <div className="settings-model-usage-grid">
                   <div>
@@ -1204,9 +1266,6 @@ function SettingsDialog({
                 </button>
               ) : null}
             </div>
-            <p className="settings-model-security-note">
-              {t("settings.model.platformSecurityNote")}
-            </p>
           </div>
         ) : (
           <>

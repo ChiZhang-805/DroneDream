@@ -6602,8 +6602,8 @@ a {
 .launcher-settings-dialog {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  width: min(840px, calc(100vw - 24px));
-  height: min(650px, calc(100dvh - 24px));
+  width: min(920px, calc(100vw - 24px));
+  height: min(700px, calc(100dvh - 24px));
   max-height: none;
   overflow: hidden;
   padding: 0.9rem;
@@ -6630,7 +6630,7 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.8rem;
 }
 
 .launcher-settings-title-lockup {
@@ -6640,17 +6640,9 @@ a {
   gap: 0.75rem;
 }
 
-.launcher-settings-title-lockup .brand-lockup {
-  width: auto;
-  height: 24px;
-  max-width: min(42vw, 240px);
-  object-fit: contain;
-  object-position: left center;
-}
-
 .launcher-settings-heading h2 {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.55rem;
 }
 
 .launcher-settings-close {
@@ -6685,16 +6677,17 @@ a {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 0.45rem;
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.8rem;
 }
 
 .settings-course-panel {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 190px;
+  height: 100%;
+  min-height: 0;
   align-items: center;
   gap: 1rem;
-  padding: 1.25rem;
+  padding: 1.5rem;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 32%, transparent);
   border-radius: 16px;
   background: linear-gradient(
@@ -6715,9 +6708,8 @@ a {
 }
 
 .settings-course-mark svg { width: 30px; height: 30px; }
-.settings-course-panel span { color: #9a8ba7; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
 .settings-course-panel h3 { margin: 0.25rem 0 0; font-size: 1.5rem; }
-.settings-course-panel p { margin: 0.3rem 0 0; color: #a99caf; }
+.settings-course-panel p { max-width: 650px; margin: 0.55rem 0 0; color: #a99caf; font-size: 0.94rem; line-height: 1.65; }
 .settings-course-panel > a {
   padding: 0.72rem 1rem;
   border-radius: 999px;
@@ -7274,7 +7266,9 @@ a {
 
 .settings-model-panel {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 0.75rem;
+  height: 100%;
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
@@ -7282,7 +7276,10 @@ a {
 
 .settings-memory-panel {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: 0.72rem;
+  height: 100%;
+  align-content: start;
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
@@ -7364,10 +7361,142 @@ a {
   line-height: 1.45;
 }
 
+.settings-general-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  height: 100%;
+}
+
+.settings-general-card,
+.settings-memory-switches {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, var(--border));
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+}
+
+.settings-card-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.settings-card-heading svg,
+.settings-memory-scope-grid svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--dd-brand-middle);
+}
+
+.settings-notification-card {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto repeat(2, minmax(0, 1fr));
+}
+
+.settings-notification-card .settings-card-heading {
+  grid-column: 1 / -1;
+}
+
+.settings-toggle-row {
+  position: relative;
+  display: flex;
+  min-height: 45px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--muted) 7%, transparent);
+  font-size: 0.78rem;
+  font-weight: 680;
+}
+
+.settings-toggle-row input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.settings-toggle-row i {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 34%, transparent);
+  transition: background 160ms ease;
+}
+
+.settings-toggle-row i::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(25, 14, 29, 0.28);
+  transition: transform 160ms ease;
+  content: "";
+}
+
+.settings-toggle-row input:checked + i {
+  background: var(--dd-brand-gradient);
+}
+
+.settings-toggle-row input:checked + i::after {
+  transform: translateX(16px);
+}
+
+.settings-toggle-row:has(input:disabled) {
+  opacity: 0.48;
+}
+
+.settings-toggle-row:has(input:focus-visible) {
+  outline: 2px solid var(--dd-brand-middle);
+  outline-offset: 2px;
+}
+
+.settings-memory-switches {
+  grid-template-columns: minmax(200px, 0.72fr) minmax(0, 1.28fr);
+  align-items: stretch;
+}
+
+.settings-memory-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.settings-memory-scope-grid span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.5rem;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--muted) 7%, transparent);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .settings-memory-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
+  min-height: 0;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, var(--border));
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
 }
 
 .settings-memory-grid label {
@@ -7483,34 +7612,45 @@ a {
 
 .settings-model-usage {
   display: grid;
-  gap: 0.66rem;
-  padding: 0.9rem;
+  grid-template-rows: auto auto auto auto 1fr auto;
+  gap: 0.78rem;
+  min-height: 0;
+  padding: 1rem;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: color-mix(in srgb, var(--panel) 94%, transparent);
 }
 
 .settings-managed-model-row {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.settings-managed-model-row label {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(210px, 0.8fr);
+  display: flex;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.settings-managed-model-row label > span,
+.settings-managed-model-row > span,
 .settings-managed-model-row p {
   color: var(--muted);
   font-size: 0.76rem;
 }
 
-.settings-managed-model-row select {
-  width: 100%;
+.settings-managed-model-row .assistant-model-picker {
+  z-index: 42;
+}
+
+.settings-managed-model-row .assistant-model-button {
   min-width: 0;
+  justify-content: flex-start;
+  padding: 0.58rem 0.72rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, var(--border));
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  color: inherit;
+}
+
+.settings-managed-model-row .assistant-model-menu {
+  top: calc(100% + 0.55rem);
+  bottom: auto;
+  color: #241a27;
 }
 
 .settings-managed-model-row p {
@@ -7584,8 +7724,28 @@ a {
 }
 
 @media (max-width: 720px) {
-  .settings-managed-model-row label {
-    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  .settings-general-panel,
+  .settings-memory-switches {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-general-panel {
+    gap: 0.48rem;
+  }
+
+  .settings-notification-card {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto repeat(4, minmax(0, 1fr));
+  }
+
+  .settings-general-card,
+  .settings-memory-switches {
+    padding: 0.62rem;
+  }
+
+  .settings-toggle-row {
+    min-height: 37px;
+    padding-block: 0.35rem;
   }
 
   .settings-model-usage-grid {
@@ -7599,9 +7759,42 @@ a {
   }
 }
 
+@media (max-width: 520px) {
+  .settings-course-panel {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-content: center;
+    padding: 0.8rem;
+  }
+
+  .settings-course-panel > a {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    text-align: center;
+  }
+
+  .settings-memory-scope-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-managed-model-row {
+    gap: 0.35rem;
+  }
+
+  .settings-managed-model-row .assistant-model-menu {
+    right: -0.25rem;
+    width: min(19rem, calc(100vw - 3rem));
+  }
+}
+
 .settings-model-refresh {
   justify-self: end;
   white-space: nowrap;
+}
+
+.settings-model-usage-footer .settings-model-period,
+.settings-model-usage-footer .settings-model-refresh {
+  align-self: center;
+  margin: 0;
 }
 
 .settings-model-heading h3 {
@@ -10210,7 +10403,7 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
    palette so headings elsewhere in the dialog stay dark on white. */
 .app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
 .app-shell:not(.app-shell-launcher) .settings-model-usage {
-  color: #f7f2ff;
+  color: var(--text);
 }
 
 .app-shell:not(.app-shell-launcher) .settings-model-access-mode > button span,
@@ -10221,7 +10414,7 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
 .app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-usage-grid span,
 .app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-period,
 .app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-security-note {
-  color: #d6b7ea;
+  color: var(--text-muted);
 }
 
 .app-shell:not(.app-shell-launcher) .settings-model-security-note {
@@ -13781,21 +13974,50 @@ body {
 
 .app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
 .app-shell:not(.app-shell-launcher) .settings-model-usage {
-  border-color: color-mix(in srgb, var(--dd-brand-middle) 58%, #33253d);
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 30%, #d9cddd);
   background: linear-gradient(
     145deg,
-    color-mix(in srgb, var(--dd-brand-dark-surface) 88%, var(--dd-brand-middle)),
-    color-mix(in srgb, var(--dd-brand-dark-surface) 92%, var(--dd-brand-end))
+    color-mix(in srgb, var(--dd-brand-light-surface) 88%, #ffffff),
+    color-mix(in srgb, var(--dd-brand-start) 7%, #ffffff)
   );
 }
 
 .app-shell:not(.app-shell-launcher) .settings-model-access-mode > button.selected {
-  border-color: color-mix(in srgb, var(--dd-brand-start) 78%, #ffffff);
+  border-color: color-mix(in srgb, var(--dd-brand-start) 60%, #d9cddd);
   background: linear-gradient(
     145deg,
-    color-mix(in srgb, var(--dd-brand-dark-surface) 78%, var(--dd-brand-start)),
-    color-mix(in srgb, var(--dd-brand-dark-surface) 88%, var(--dd-brand-middle))
+    color-mix(in srgb, var(--dd-brand-start) 14%, #ffffff),
+    color-mix(in srgb, var(--dd-brand-end) 10%, #ffffff)
   );
+}
+
+.app-shell:not(.app-shell-launcher) .settings-general-card,
+.app-shell:not(.app-shell-launcher) .settings-memory-switches,
+.app-shell:not(.app-shell-launcher) .settings-memory-grid {
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 26%, #d9cddd);
+  color: #251b28;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--dd-brand-light-surface) 88%, #ffffff),
+    color-mix(in srgb, var(--dd-brand-start) 5%, #ffffff)
+  );
+}
+
+.app-shell:not(.app-shell-launcher) .settings-general-card .settings-toggle-row,
+.app-shell:not(.app-shell-launcher) .settings-memory-scope-grid span,
+.app-shell:not(.app-shell-launcher) .settings-memory-grid input,
+.app-shell:not(.app-shell-launcher) .settings-memory-grid select {
+  color: #2c2130;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.app-shell:not(.app-shell-launcher) .settings-memory-grid label > span {
+  color: #67596d;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-memory-grid input,
+.app-shell:not(.app-shell-launcher) .settings-memory-grid select {
+  border-color: #ded1e2;
 }
 
 .launcher-settings-dialog input:focus,
@@ -13833,20 +14055,20 @@ body {
   }
 
   .launcher-settings-tabs {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0.3rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.22rem;
   }
 
   .launcher-settings-tabs button {
     min-height: 40px;
-    gap: 0.28rem;
-    padding-inline: 0.35rem;
-    font-size: 0.7rem;
+    gap: 0.2rem;
+    padding-inline: 0.2rem;
+    font-size: 0.64rem;
   }
 
   .launcher-settings-tabs button svg {
-    width: 15px;
-    height: 15px;
+    width: 13px;
+    height: 13px;
   }
 
   .settings-memory-panel,
