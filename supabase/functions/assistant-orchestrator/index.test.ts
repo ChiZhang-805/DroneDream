@@ -116,7 +116,7 @@ Deno.test("removes nested and camel-case credential fields from model context", 
 
 Deno.test("redacts credential values embedded in otherwise safe text fields", () => {
   assertEquals(sanitizedContextValue({
-    notes: "hover test; API key: sk-this-must-never-enter-memory; keep 3 m altitude",
+    notes: "hover test; API key: placeholder-value-for-redaction; keep 3 m altitude",
     label: "token=temporary-secret, stable hover",
   }), {
     notes: "hover test; [redacted] keep 3 m altitude",

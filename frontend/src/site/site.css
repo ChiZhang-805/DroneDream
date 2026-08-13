@@ -513,7 +513,7 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-product-demo {
   display: grid;
-  grid-template-columns: minmax(250px, 0.7fr) minmax(0, 1.6fr);
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.52fr);
   min-height: 580px;
   overflow: hidden;
   border: 1px solid rgba(32, 43, 75, 0.12);
@@ -2945,7 +2945,9 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 @media (min-width: 1441px) {
-  .dd-site[data-locale="en"] .site-capability-summary { font-size: .9rem; }
+  .site-product-demo { grid-template-columns: minmax(390px, 420px) minmax(0, 1fr); }
+  .site-capability-grid { width: min(100%, 1400px); margin-inline: auto; }
+  .dd-site[data-locale="en"] .site-capability-summary { font-size: .97rem; }
   .site-phase-description { width: 98%; }
   .site-workflow-visual {
     width: calc(100% + clamp(4rem, 10vw, 12rem));

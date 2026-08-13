@@ -165,7 +165,7 @@ const content = {
       ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore the needed control surface; leave unrelated dimensions safely untouched."], "sliders"],
       ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain under the same independent suite before ranking the final winner."], "orbit"],
       ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Diagnose and clean failed simulations before the next isolated trial begins safely."], "shield"],
-      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce every decision from evidence together with its complete experiment history."], "report"],
+      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce each decision from its complete, fully linked evidence trail."], "report"],
     ],
     capabilityOpen: "Open details for",
     capabilityBack: "Return to overview",
@@ -352,7 +352,7 @@ const content = {
     capabilitiesEyebrow: "为持续迭代而设计",
     capabilitiesTitle: "本地飞行实验室不只是参数表单",
     capabilities: [
-      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，不把预算浪费在无关维度上，并始终保持预算与搜索焦点集中。"], "sliders"],
+      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，不浪费试验预算，并始终保持搜索重点集中。"], "sliders"],
       ["七种实验算法", ["依据实验结构与搜索空间形态匹配合适的优化算法。", "融合约束、多保真、信赖域与进化搜索共同探索候选。", "复验每一项真实收益，再通过统一的独立验证流程确定最终优胜方案、可靠结论与复核依据。"], "orbit"],
       ["隔离运行环境", ["在专用 WSL2 中运行 PX4、Gazebo、任务进程与试验产物。", "让每次试验都与个人 Linux 文件及现有进程保持严格隔离。", "失败仿真也能安全续传、诊断和清理，并确保下一轮试验在干净环境中稳定启动与完整运行。"], "shield"],
       ["可追溯报告", ["把每个候选方案关联到对应场景、随机种子与参数快照。", "统一保留日志、评测指标、试验产物与完整运行环境清单。", "用完整证据复现每次调优决策，同时保留实验上下文、演进过程、最终判断与完整依据。"], "report"],
