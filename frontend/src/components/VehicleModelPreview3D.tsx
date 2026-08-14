@@ -27,6 +27,12 @@ interface VehicleModelPreview3DProps {
   showGrid?: boolean;
   manipulator?: "select" | "move" | "rotate" | "scale";
   viewPreset?: "isometric" | "top" | "front" | "side";
+  transformSpace?: "world" | "local";
+  snapEnabled?: boolean;
+  translationSnapM?: number;
+  showEngineeringOverlay?: boolean;
+  isolatedComponentId?: string | null;
+  frameMode?: "assembly" | "selection";
   onTransformComponent?: (componentId: string, transform: {
     positionM: { x: number; y: number; z: number };
     rotationDeg: { x: number; y: number; z: number };
@@ -49,12 +55,12 @@ function primitiveGeometry(component: VehiclePreviewComponent): THREE.BufferGeom
 }
 
 const ENGINEERING_PRIMITIVE_BY_KIND: Partial<Record<VehiclePreviewComponent["kind"], VehiclePreviewComponent["primitive"]>> = {
-  fuselage: "capsule",
+  fuselage: "rounded-box",
   frame: "rounded-box",
   arm: "rounded-box",
   motor: "cylinder",
   propeller: "rounded-box",
-  "landing-gear": "capsule",
+  "landing-gear": "rounded-box",
   battery: "rounded-box",
   "flight-controller": "rounded-box",
   sensor: "cylinder",
@@ -230,6 +236,12 @@ export function VehicleModelPreview3D({
   showGrid = true,
   manipulator = "select",
   viewPreset = "isometric",
+  transformSpace = "local",
+  snapEnabled = true,
+  translationSnapM = .01,
+  showEngineeringOverlay = true,
+  isolatedComponentId = null,
+  frameMode = "assembly",
   onTransformComponent,
 }: VehicleModelPreview3DProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -264,7 +276,7 @@ export function VehicleModelPreview3D({
     scene.add(model);
 
     for (const component of geometry.components) {
-      if (!component.visible) continue;
+      if (!component.visible || (isolatedComponentId && component.id !== isolatedComponentId)) continue;
       const mesh = buildEngineeringComponent(component, wireframe);
       const expansion = exploded ? 1.3 : 1;
       mesh.position.set(component.position.x * expansion, component.position.y * expansion, component.position.z * expansion);
@@ -284,6 +296,47 @@ export function VehicleModelPreview3D({
         (bounds.material as THREE.LineBasicMaterial).opacity = .88;
         model.add(bounds);
       }
+    }
+
+    if (showEngineeringOverlay) {
+      const overlay = new THREE.Group();
+      overlay.name = "engineering-overlays";
+      for (const component of geometry.components.filter((candidate) => candidate.visible && candidate.kind === "propeller")) {
+        if (isolatedComponentId && component.id !== isolatedComponentId) continue;
+        const radius = Math.max(component.size.x * component.scale.x, component.size.z * component.scale.z, component.radius * 2) / 2;
+        const disk = new THREE.Mesh(new THREE.RingGeometry(radius * .94, radius, 64), new THREE.MeshBasicMaterial({ color: 0xe548b7, transparent: true, opacity: .18, side: THREE.DoubleSide, depthWrite: false }));
+        disk.position.set(component.position.x, component.position.y, component.position.z);
+        disk.rotation.x = -Math.PI / 2;
+        overlay.add(disk);
+      }
+      const cgPosition = new THREE.Vector3(
+        diagnostics.centerOfMassM.x * geometry.scale,
+        diagnostics.centerOfMassM.y * geometry.scale,
+        diagnostics.centerOfMassM.z * geometry.scale,
+      );
+      const thrustPosition = new THREE.Vector3(
+        diagnostics.centerOfThrustM.x * geometry.scale,
+        diagnostics.centerOfThrustM.y * geometry.scale,
+        diagnostics.centerOfThrustM.z * geometry.scale,
+      );
+      const cg = new THREE.Mesh(
+        new THREE.SphereGeometry(.055, 20, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffca4f, depthTest: false }),
+      );
+      cg.position.copy(cgPosition); cg.renderOrder = 5; cg.userData.engineeringOverlay = true; overlay.add(cg);
+      const thrust = new THREE.Mesh(
+        new THREE.TorusGeometry(.07, .014, 12, 32),
+        new THREE.MeshBasicMaterial({ color: 0x45e0c5, depthTest: false }),
+      );
+      thrust.position.copy(thrustPosition); thrust.rotation.x = Math.PI / 2; thrust.renderOrder = 5; thrust.userData.engineeringOverlay = true; overlay.add(thrust);
+      if (cgPosition.distanceTo(thrustPosition) > .006) {
+        const line = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([cgPosition, thrustPosition]),
+          new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: .045, gapSize: .025, transparent: true, opacity: .8, depthTest: false }),
+        );
+        line.computeLineDistances(); line.renderOrder = 4; overlay.add(line);
+      }
+      scene.add(overlay);
     }
 
     const primary = new THREE.Color(cssColor("--dd-brand-start", "#ff5574"));
@@ -310,9 +363,15 @@ export function VehicleModelPreview3D({
       front: { yaw: 0, pitch: .08 },
       side: { yaw: Math.PI / 2, pitch: .08 },
     } as const;
+    const selectedObject = selectedComponentId ? componentObjects.get(selectedComponentId) : undefined;
+    const framedObject = frameMode === "selection" && selectedObject ? selectedObject : model;
+    const framedBounds = new THREE.Box3().setFromObject(framedObject);
+    const target = framedBounds.isEmpty() ? new THREE.Vector3() : framedBounds.getCenter(new THREE.Vector3());
+    const framedSize = framedBounds.isEmpty() ? new THREE.Vector3(2.8, 1, 2.8) : framedBounds.getSize(new THREE.Vector3());
+    const homeDistance = Math.max(frameMode === "selection" ? 2.35 : 3.7, Math.max(framedSize.x, framedSize.y, framedSize.z) * (frameMode === "selection" ? 3.15 : 1.72));
     let yaw: number = presetAngles[viewPreset].yaw;
     let pitch: number = presetAngles[viewPreset].pitch;
-    let distance = 4.9;
+    let distance = homeDistance;
     let pointerId: number | null = null;
     let pointerX = 0;
     let pointerY = 0;
@@ -322,13 +381,16 @@ export function VehicleModelPreview3D({
     const pointer = new THREE.Vector2();
     const render = () => {
       pitch = Math.max(-.15, Math.min(1.25, pitch));
-      distance = Math.max(2.6, Math.min(8, distance));
-      camera.position.set(Math.sin(yaw) * Math.cos(pitch) * distance, Math.sin(pitch) * distance, Math.cos(yaw) * Math.cos(pitch) * distance);
-      camera.lookAt(0, 0, 0);
+      distance = Math.max(.45, Math.min(12, distance));
+      camera.position.set(
+        target.x + Math.sin(yaw) * Math.cos(pitch) * distance,
+        target.y + Math.sin(pitch) * distance,
+        target.z + Math.cos(yaw) * Math.cos(pitch) * distance,
+      );
+      camera.lookAt(target);
       renderer.render(scene, camera);
     };
 
-    const selectedObject = selectedComponentId ? componentObjects.get(selectedComponentId) : undefined;
     const transformControl = selectedObject && manipulator !== "select"
       ? new TransformControls(camera, renderer.domElement)
       : null;
@@ -352,11 +414,11 @@ export function VehicleModelPreview3D({
     if (transformControl && transformHelper && selectedObject) {
       const transformMode: "translate" | "rotate" | "scale" = manipulator === "rotate" ? "rotate" : manipulator === "scale" ? "scale" : "translate";
       transformControl.setMode(transformMode);
-      transformControl.setSpace("local");
+      transformControl.setSpace(transformSpace);
       transformControl.setSize(.72);
-      transformControl.translationSnap = .01;
-      transformControl.rotationSnap = THREE.MathUtils.degToRad(5);
-      transformControl.scaleSnap = .05;
+      transformControl.translationSnap = snapEnabled ? Math.max(.0001, translationSnapM * geometry.scale) : null;
+      transformControl.rotationSnap = snapEnabled ? THREE.MathUtils.degToRad(5) : null;
+      transformControl.scaleSnap = snapEnabled ? .05 : null;
       transformControl.attach(selectedObject);
       transformControl.addEventListener("mouseDown", onTransformStart);
       transformControl.addEventListener("objectChange", onTransformChange);
@@ -403,7 +465,7 @@ export function VehicleModelPreview3D({
       if (event.key === "ArrowDown") pitch -= .12;
       if (event.key === "+" || event.key === "=") distance -= .32;
       if (event.key === "-" || event.key === "_") distance += .32;
-      if (event.key === "Home") { yaw = presetAngles[viewPreset].yaw; pitch = presetAngles[viewPreset].pitch; distance = 4.9; }
+      if (event.key === "Home") { yaw = presetAngles[viewPreset].yaw; pitch = presetAngles[viewPreset].pitch; distance = homeDistance; }
       render();
     };
     host.addEventListener("pointerdown", onPointerDown);
@@ -425,7 +487,7 @@ export function VehicleModelPreview3D({
           object.geometry.dispose();
           (Array.isArray(object.material) ? object.material : [object.material]).forEach((material) => material.dispose());
         }
-        if (object instanceof THREE.LineSegments) {
+        if (object instanceof THREE.LineSegments || object instanceof THREE.Line) {
           object.geometry.dispose();
           (Array.isArray(object.material) ? object.material : [object.material]).forEach((material) => material.dispose());
         }
@@ -440,7 +502,7 @@ export function VehicleModelPreview3D({
       }
       renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     };
-  }, [geometry, exploded, manipulator, onSelectComponent, onTransformComponent, selectedComponentId, showGrid, viewPreset, wireframe]);
+  }, [diagnostics, exploded, frameMode, geometry, isolatedComponentId, manipulator, onSelectComponent, onTransformComponent, selectedComponentId, showEngineeringOverlay, showGrid, snapEnabled, transformSpace, translationSnapM, viewPreset, wireframe]);
 
   return (
     <div className="vehicle-model-preview vehicle-model-preview-pro" data-testid="vehicle-model-preview">
@@ -455,6 +517,7 @@ export function VehicleModelPreview3D({
       >
         {webglUnavailable ? <FlatFallback draft={draft} /> : null}
       </div>
+      {showEngineeringOverlay ? <div className="vehicle-engineering-overlay-key" aria-hidden="true"><span className="is-cg" />CG <span className="is-thrust" />Thrust center <span className="is-rotor" />Rotor disk</div> : null}
       <div className="vehicle-model-preview-meta">
         <span>{diagnostics.componentCount} parts · {draft.propulsion.motorCount} {copy.motors}</span>
         <span id={hintId} className="vehicle-model-preview-hint">{webglUnavailable ? copy.unavailable : copy.interaction}</span>

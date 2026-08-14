@@ -1360,7 +1360,7 @@ body:has(.app-shell-public-demo),
 
 .vehicle-workbench {
   display: grid;
-  grid-template-columns: 216px minmax(390px, 1fr) 318px;
+  grid-template-columns: 258px minmax(440px, 1fr) 336px;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
@@ -1379,7 +1379,7 @@ body:has(.app-shell-public-demo),
 
 .vehicle-workbench-left {
   display: grid;
-  grid-template-rows: minmax(150px, 0.82fr) minmax(260px, 1.18fr);
+  grid-template-rows: minmax(116px, 0.55fr) minmax(320px, 1.45fr);
   border-right: 1px solid #e7dee9;
   background: color-mix(in srgb, var(--dd-brand-light-surface) 86%, #fff);
 }
@@ -1396,8 +1396,9 @@ body:has(.app-shell-public-demo),
 }
 
 .vehicle-component-palette {
-  overflow-y: auto;
-  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .vehicle-panel-heading {
@@ -1410,6 +1411,134 @@ body:has(.app-shell-public-demo),
   color: #2e2431;
   font-size: 0.78rem;
 }
+
+.vehicle-panel-heading > small {
+  color: #948697;
+  font-size: 0.54rem;
+  font-weight: 700;
+}
+
+.vehicle-catalog-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px;
+  gap: 0.3rem;
+  margin-bottom: 0.42rem;
+}
+
+.vehicle-catalog-tools label {
+  position: relative;
+  min-width: 0;
+}
+
+.vehicle-catalog-tools label > svg {
+  position: absolute;
+  top: 50%;
+  left: 0.42rem;
+  width: 12px;
+  height: 12px;
+  color: #938697;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.vehicle-catalog-tools input,
+.vehicle-catalog-tools select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 0.38rem;
+  border: 1px solid #e0d5e3;
+  border-radius: 8px;
+  outline: none;
+  color: #433647;
+  font-size: 0.56rem;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.vehicle-catalog-tools input { padding-left: 1.28rem; }
+.vehicle-catalog-tools input:focus,
+.vehicle-catalog-tools select:focus { border-color: var(--dd-brand-middle); }
+
+.vehicle-catalog-results {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 0.34rem;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  padding-right: 0.12rem;
+  scrollbar-width: thin;
+}
+
+.vehicle-catalog-card {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.48rem;
+  text-align: left;
+  border: 1px solid #e4d9e6;
+  border-radius: 10px;
+  color: #352a39;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.vehicle-catalog-card:hover {
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 48%, #e1d5e4);
+  background: color-mix(in srgb, var(--dd-brand-start) 7%, #fff);
+}
+
+.vehicle-catalog-card > span {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--dd-brand-middle);
+}
+
+.vehicle-catalog-card > span svg { width: 12px; height: 12px; }
+.vehicle-catalog-card > span small { font-size: 0.49rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }
+.vehicle-catalog-card > strong { font-size: 0.64rem; line-height: 1.14; }
+.vehicle-catalog-card > p { margin: 0; color: #857789; font-size: 0.52rem; line-height: 1.26; }
+.vehicle-catalog-card > div { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.08rem; }
+.vehicle-catalog-card > div small { padding: 0.16rem 0.26rem; border-radius: 5px; color: #69596e; font-size: 0.46rem; background: #f2edf4; }
+
+.vehicle-basic-parts {
+  flex: 0 0 auto;
+  margin-top: 0.42rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #e6dce8;
+}
+
+.vehicle-basic-parts > span {
+  display: block;
+  margin-bottom: 0.28rem;
+  color: #8a7d8d;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vehicle-basic-parts > div {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.22rem;
+}
+
+.vehicle-basic-parts button {
+  display: grid;
+  min-width: 0;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #e4d9e6;
+  border-radius: 7px;
+  color: #625466;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.vehicle-basic-parts button:hover { color: var(--dd-brand-middle); border-color: var(--dd-brand-middle); }
+.vehicle-basic-parts button svg { width: 12px; height: 12px; }
+.vehicle-basic-parts button small { display: none; }
 
 .vehicle-panel-heading > button,
 .vehicle-canvas-toolbar button,
@@ -1561,6 +1690,8 @@ body:has(.app-shell-public-demo),
   gap: 0.2rem;
 }
 
+.vehicle-canvas-toolbar > div:first-child { min-width: 0; }
+
 .vehicle-canvas-toolbar > div > span {
   width: 1px;
   height: 20px;
@@ -1582,6 +1713,25 @@ body:has(.app-shell-public-demo),
   font-size: 0.48rem;
   font-weight: 850;
   letter-spacing: 0.02em;
+}
+
+.vehicle-canvas-toolbar button.vehicle-space-toggle {
+  width: 34px;
+  font-size: 0.47rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+}
+
+.vehicle-snap-select {
+  width: 54px;
+  height: 28px;
+  padding: 0 0.22rem;
+  border: 1px solid #e1d6e4;
+  border-radius: 7px;
+  outline: none;
+  color: #6e6072;
+  font-size: 0.48rem;
+  background: rgba(255, 255, 255, 0.84);
 }
 
 .vehicle-canvas-toolbar button:hover,
@@ -1611,6 +1761,38 @@ body:has(.app-shell-public-demo),
   border-radius: 0;
 }
 
+.vehicle-viewport-stage .vehicle-model-preview { position: relative; }
+.vehicle-viewport-stage .vehicle-model-preview-meta { display: none; }
+
+.vehicle-engineering-overlay-key {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.3rem 0.42rem;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.48rem;
+  background: rgba(28, 20, 34, 0.62);
+  backdrop-filter: blur(9px);
+  pointer-events: none;
+}
+
+.vehicle-engineering-overlay-key span {
+  width: 7px;
+  height: 7px;
+  margin-left: 0.18rem;
+  border-radius: 50%;
+}
+
+.vehicle-engineering-overlay-key span:first-child { margin-left: 0; }
+.vehicle-engineering-overlay-key .is-cg { background: #ffca4f; }
+.vehicle-engineering-overlay-key .is-thrust { border: 2px solid #45e0c5; background: transparent; }
+.vehicle-engineering-overlay-key .is-rotor { border: 1px solid #e548b7; background: rgba(229, 72, 183, 0.24); }
+
 .vehicle-viewport-badge {
   position: absolute;
   left: 0.72rem;
@@ -1636,6 +1818,14 @@ body:has(.app-shell-public-demo),
   overflow: hidden;
   font-size: 0.68rem;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vehicle-viewport-badge small {
+  padding-left: 0.42rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.24);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.48rem;
   white-space: nowrap;
 }
 
@@ -1903,8 +2093,20 @@ body:has(.app-shell-public-demo),
 }
 .vehicle-com-diagram::before { left: 50%; top: 0; width: 1px; height: 100%; }
 .vehicle-com-diagram::after { left: 0; top: 50%; width: 100%; height: 1px; }
-.vehicle-com-diagram i { position: absolute; z-index: 1; width: 11px; height: 11px; border: 3px solid #fff; border-radius: 50%; background: var(--dd-brand-middle); box-shadow: 0 0 0 2px var(--dd-brand-middle); }
-.vehicle-com-diagram span { z-index: 1; margin: 0.4rem; padding: 0.22rem 0.38rem; border-radius: 6px; color: #fff; font-size: 0.52rem; background: rgba(37, 25, 42, 0.72); }
+.vehicle-com-diagram i { position: absolute; z-index: 1; width: 11px; height: 11px; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); }
+.vehicle-com-diagram .vehicle-com-cg { background: #f4af2b; box-shadow: 0 0 0 2px #f4af2b; }
+.vehicle-com-diagram .vehicle-com-thrust { background: #23bfa4; box-shadow: 0 0 0 2px #23bfa4; }
+.vehicle-com-diagram span { z-index: 1; display: flex; align-items: center; gap: 0.25rem; margin: 0.4rem; padding: 0.22rem 0.38rem; border-radius: 6px; color: #fff; font-size: 0.52rem; background: rgba(37, 25, 42, 0.72); }
+.vehicle-com-diagram span b { width: 6px; height: 6px; margin-left: 0.18rem; border-radius: 50%; background: #f4af2b; }
+.vehicle-com-diagram span b:first-child { margin-left: 0; }
+.vehicle-com-diagram span b:nth-child(2) { background: #23bfa4; }
+
+.vehicle-system-parameters {
+  padding: 0.58rem;
+  border: 1px solid #e1d5e4;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.64);
+}
 
 .vehicle-studio-ready,
 .vehicle-studio-issues {
@@ -2004,6 +2206,27 @@ body:has(.app-shell-public-demo),
   background: #fff;
 }
 
+.vehicle-inspector-section-title > div {
+  display: flex;
+  gap: 0.24rem;
+}
+
+.vehicle-inspector-section-title > div > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  min-height: 26px;
+  padding: 0.26rem 0.38rem;
+  border: 1px solid #dfd3e3;
+  border-radius: 7px;
+  color: #59475e;
+  font-size: 0.52rem;
+  font-weight: 750;
+  cursor: pointer;
+  background: #fff;
+}
+
 .vehicle-assembly-branch,
 .vehicle-assembly-root {
   width: 10px !important;
@@ -2048,6 +2271,10 @@ body:has(.app-shell-public-demo),
   color: var(--dd-brand-middle);
   background: color-mix(in srgb, var(--dd-brand-start) 12%, #fff);
 }
+
+.vehicle-constraint-row.is-satisfied > span > strong { color: #087e69; }
+.vehicle-constraint-row.is-violated > span > strong { color: #b52a4f; }
+.vehicle-constraint-row.is-suppressed { opacity: .62; }
 
 .vehicle-constraint-row strong,
 .vehicle-constraint-row small {
@@ -2279,15 +2506,17 @@ body:has(.app-shell-public-demo),
 }
 
 @media (max-width: 1280px) {
-  .vehicle-workbench { grid-template-columns: 190px minmax(350px, 1fr) 286px; }
+  .vehicle-workbench { grid-template-columns: 220px minmax(350px, 1fr) 296px; }
   .vehicle-component-group > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vehicle-studio-v2-header p { max-width: 630px; }
+  .vehicle-snap-select { display: none; }
+  .vehicle-basic-parts > div { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 980px) {
   .vehicle-studio-v2 { height: auto; min-height: calc(100dvh - 64px); overflow: visible; }
   .vehicle-studio-v2-header { align-items: flex-start; }
-  .vehicle-workbench { grid-template-columns: 180px minmax(0, 1fr); grid-template-rows: minmax(540px, 70dvh) 480px; overflow: visible; }
+  .vehicle-workbench { grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: minmax(540px, 70dvh) 480px; overflow: visible; }
   .vehicle-workbench-center { grid-column: 2; grid-row: 1; }
   .vehicle-workbench-right { grid-column: 1 / -1; grid-row: 2; border-top: 1px solid #e6dce8; border-left: 0; }
 }

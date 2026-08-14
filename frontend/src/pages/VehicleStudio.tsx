@@ -13,15 +13,19 @@ import {
   Gauge,
   GitBranch,
   History,
+  Crosshair,
   Layers3,
   Lock,
+  Magnet,
   Move3d,
   PackageCheck,
+  PackagePlus,
   Plus,
   Redo2,
   Rotate3d,
   Save,
   Scale3d,
+  Search,
   ShieldCheck,
   Sparkles,
   Target,
@@ -48,18 +52,27 @@ import {
   type VehiclePackDraftEnvelope,
 } from "../features/vehicleStudio/pack";
 import {
+  applyVehicleCatalogEntry,
+  applyVehicleMaterialPreset,
+  VEHICLE_COMPONENT_CATALOG,
+  VEHICLE_MATERIAL_PRESETS,
+  type VehicleCatalogGroup,
+} from "../features/vehicleStudio/catalog";
+import {
   addVehicleConstraint,
   addVehicleComponent,
   calculateVehicleDiagnostics,
   createVehicleModelFromBrief,
   createVehicleModelDraft,
   duplicateVehicleComponent,
+  evaluateVehicleConstraints,
   mirrorVehicleComponent,
   radialArrayVehicleComponent,
   removeVehicleConstraint,
   removeVehicleComponent,
   setVehicleComponentParent,
   setVehicleComponentLocked,
+  solveVehicleConstraints,
   updateVehicleComponent,
   validateVehicleModel,
   type VehicleComponentDraft,
@@ -137,6 +150,15 @@ const COMPONENT_GROUPS: Array<{ title: string; entries: Array<{ kind: VehicleCom
   ] },
 ];
 
+const CATALOG_GROUPS: Array<{ id: "all" | VehicleCatalogGroup; label: string }> = [
+  { id: "all", label: "All systems" },
+  { id: "airframe", label: "Airframe" },
+  { id: "propulsion", label: "Propulsion" },
+  { id: "energy", label: "Energy" },
+  { id: "avionics", label: "Avionics" },
+  { id: "mission", label: "Mission" },
+];
+
 const EN = {
   eyebrow: "UNIVERSAL / PARAMETRIC VEHICLE DESIGN",
   title: "Vehicle Studio",
@@ -153,7 +175,7 @@ const EN = {
   ai: "Design with AI",
   empty: "No saved aircraft yet.",
   noSelection: "Select a component in the tree or viewport to edit its geometry and engineering properties.",
-  ready: "The current engineering contract is internally consistent.",
+  ready: "Required export checks pass; review any engineering advisories above.",
   issues: "Engineering issues",
   export: "Export verified draft",
   import: "Import draft",
@@ -175,7 +197,7 @@ const ZH: typeof EN = {
   ai: "AI 协同设计",
   empty: "还没有保存的无人机。",
   noSelection: "请在装配树或三维视口中选择组件，精调其几何、位置、材料和质量。",
-  ready: "当前工程合同内部一致。",
+  ready: "必需的导出校核已通过；仍请复核上方工程建议。",
   issues: "工程问题",
   export: "导出已校核草稿",
   import: "导入草稿",
@@ -252,6 +274,13 @@ export function VehicleStudio() {
   const [exploded, setExploded] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [viewPreset, setViewPreset] = useState<ViewPreset>("isometric");
+  const [transformSpace, setTransformSpace] = useState<"world" | "local">("local");
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [showEngineeringOverlay, setShowEngineeringOverlay] = useState(true);
+  const [isolateSelected, setIsolateSelected] = useState(false);
+  const [frameMode, setFrameMode] = useState<"assembly" | "selection">("assembly");
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogGroup, setCatalogGroup] = useState<"all" | VehicleCatalogGroup>("all");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [aiDesignerOpen, setAiDesignerOpen] = useState(false);
@@ -281,6 +310,17 @@ export function VehicleStudio() {
   const selected = draft.components.find((component) => component.id === selectedId) ?? null;
   const currentRecord = models.find((model) => model.draftId === draft.draftId);
   const assemblyRows = useMemo(() => buildAssemblyRows(draft.components), [draft.components]);
+  const constraintEvaluations = useMemo(() => evaluateVehicleConstraints(draft), [draft]);
+  const constraintEvaluationById = useMemo(() => new Map(constraintEvaluations.map((evaluation) => [evaluation.constraintId, evaluation])), [constraintEvaluations]);
+  const filteredCatalog = useMemo(() => {
+    const query = catalogQuery.trim().toLocaleLowerCase();
+    return VEHICLE_COMPONENT_CATALOG.filter((entry) => (
+      (catalogGroup === "all" || entry.group === catalogGroup)
+      && (!query || [entry.name, entry.summary, entry.group, entry.kind, ...entry.tags, ...entry.metrics].join(" ").toLocaleLowerCase().includes(query))
+    ));
+  }, [catalogGroup, catalogQuery]);
+  const analysisDiagramSpanM = Math.max(.12, diagnostics.spanM * .64);
+  const analysisPoint = (value: number) => `${Math.max(5, Math.min(95, 50 + value / analysisDiagramSpanM * 45))}%`;
 
   useEffect(() => {
     let cancelled = false;
@@ -345,6 +385,26 @@ export function VehicleStudio() {
     commit(next);
     setSelectedId(next.components.at(-1)?.id ?? null);
     setInspectorTab("properties");
+  };
+  const applyCatalogEntry = (entryId: string) => {
+    const result = applyVehicleCatalogEntry(draft, entryId);
+    if (!result.affectedCount) return;
+    commit(result.draft);
+    if (result.selectedComponentId) setSelectedId(result.selectedComponentId);
+    setFrameMode("assembly");
+    setInspectorTab("properties");
+    setMessage(locale === "zh-CN" ? `已应用工程规格，更新 ${result.affectedCount} 个组件。` : `Engineering preset applied to ${result.affectedCount} component${result.affectedCount === 1 ? "" : "s"}.`);
+  };
+  const applyMaterial = (presetId: string) => {
+    if (!selected) return;
+    commit(applyVehicleMaterialPreset(draft, selected.id, presetId));
+  };
+  const solveConstraints = () => {
+    const result = solveVehicleConstraints(draft);
+    if (result.solvedCount) commit(result.draft);
+    setMessage(result.solvedCount
+      ? (locale === "zh-CN" ? `已重新求解 ${result.solvedCount} 个镜像/阵列约束。` : `Solved ${result.solvedCount} mirror and pattern constraints.`)
+      : (locale === "zh-CN" ? "没有可自动求解的启用约束。" : "No enabled geometric constraints are available to solve."));
   };
   const duplicateSelected = () => {
     if (!selected) return;
@@ -445,8 +505,15 @@ export function VehicleStudio() {
           }}><Box /><span><strong>{model.revisions[0].name}</strong><small>r{model.revisions[0].revision} · {model.revisions[0].components.length} parts</small></span><ChevronRight /></button>) : <p>{copy.empty}</p>}</div>
         </section>
         <section className="vehicle-component-palette">
-          <div className="vehicle-panel-heading"><strong>{copy.parts}</strong></div>
-          {COMPONENT_GROUPS.map((group) => <div className="vehicle-component-group" key={group.title}><span>{group.title}</span><div>{group.entries.map((entry) => <button type="button" key={entry.kind} onClick={() => addPart(entry.kind)}>{entry.icon}<small>{entry.label}</small></button>)}</div></div>)}
+          <div className="vehicle-panel-heading"><strong>{copy.parts}</strong><small>{filteredCatalog.length} specs</small></div>
+          <div className="vehicle-catalog-tools">
+            <label><Search /><input aria-label="Search engineering component catalog" value={catalogQuery} placeholder="Search parts or specs" onChange={(event) => setCatalogQuery(event.target.value)} /></label>
+            <select aria-label="Filter engineering component catalog" value={catalogGroup} onChange={(event) => setCatalogGroup(event.target.value as typeof catalogGroup)}>{CATALOG_GROUPS.map((group) => <option value={group.id} key={group.id}>{group.label}</option>)}</select>
+          </div>
+          <div className="vehicle-catalog-results">{filteredCatalog.map((entry) => <button type="button" className="vehicle-catalog-card" key={entry.id} onClick={() => applyCatalogEntry(entry.id)}>
+            <span><PackagePlus /><small>{entry.group}</small></span><strong>{entry.name}</strong><p>{entry.summary}</p><div>{entry.metrics.map((metric) => <small key={metric}>{metric}</small>)}</div>
+          </button>)}</div>
+          <div className="vehicle-basic-parts"><span>Basic solids</span><div>{COMPONENT_GROUPS.flatMap((group) => group.entries).map((entry) => <button type="button" title={`Add ${entry.label}`} aria-label={`Add ${entry.label}`} key={entry.kind} onClick={() => addPart(entry.kind)}>{entry.icon}<small>{entry.label}</small></button>)}</div></div>
         </section>
       </aside>
 
@@ -457,6 +524,11 @@ export function VehicleStudio() {
             <button type="button" aria-label="Redo" disabled={!redoRef.current.length} onClick={redo}><Redo2 /></button>
             <span />
             {(["select", "move", "rotate", "scale"] as Manipulator[]).map((tool) => <button type="button" className={manipulator === tool ? "is-active" : ""} aria-label={tool} key={tool} onClick={() => setManipulator(tool)}>{tool === "select" ? <Box /> : tool === "move" ? <Move3d /> : tool === "rotate" ? <Rotate3d /> : <Scale3d />}</button>)}
+            <button type="button" className={`vehicle-space-toggle ${transformSpace === "world" ? "is-active" : ""}`} aria-label={`Transform in ${transformSpace} coordinates`} title={`Transform in ${transformSpace} coordinates`} onClick={() => setTransformSpace((space) => space === "local" ? "world" : "local")}>{transformSpace === "local" ? "LOC" : "WLD"}</button>
+            <button type="button" className={snapEnabled ? "is-active" : ""} aria-label="Toggle precision snapping" title="Toggle precision snapping" onClick={() => setSnapEnabled((value) => !value)}><Magnet /></button>
+            <select className="vehicle-snap-select" aria-label="Translation snap spacing" value={draft.designParameters.gridM} onChange={(event) => commit({ ...cloneDraft(draft), designParameters: { ...draft.designParameters, gridM: Number(event.target.value) } })}>
+              <option value={.001}>1 mm</option><option value={.005}>5 mm</option><option value={.01}>10 mm</option><option value={.025}>25 mm</option><option value={.05}>50 mm</option>
+            </select>
             <span />
             <button type="button" aria-label="Duplicate selected component" disabled={!selected} onClick={duplicateSelected}><Copy /></button>
             <button type="button" aria-label="Mirror selected component on X" disabled={!selected} onClick={mirrorSelected}><Move3d /></button>
@@ -465,19 +537,22 @@ export function VehicleStudio() {
           <div>
             {(["isometric", "top", "front", "side"] as ViewPreset[]).map((preset) => <button type="button" className={`vehicle-view-preset ${viewPreset === preset ? "is-active" : ""}`} aria-label={`${preset} view`} key={preset} onClick={() => setViewPreset(preset)}>{preset === "isometric" ? "ISO" : preset === "front" ? "F" : preset === "side" ? "R" : "T"}</button>)}
             <span />
+            <button type="button" className={frameMode === "selection" ? "is-active" : ""} aria-label="Frame selected component" title="Frame selected component" disabled={!selected} onClick={() => setFrameMode((mode) => mode === "selection" ? "assembly" : "selection")}><Crosshair /></button>
+            <button type="button" className={isolateSelected ? "is-active" : ""} aria-label="Isolate selected component" title="Isolate selected component" disabled={!selected} onClick={() => setIsolateSelected((value) => !value)}>{isolateSelected ? <Eye /> : <EyeOff />}</button>
+            <button type="button" className={showEngineeringOverlay ? "is-active" : ""} aria-label="Toggle engineering overlays" title="Toggle center and rotor overlays" onClick={() => setShowEngineeringOverlay((value) => !value)}><Target /></button>
             <button type="button" className={showGrid ? "is-active" : ""} aria-label="Toggle grid" onClick={() => setShowGrid((value) => !value)}><Grid3X3 /></button>
             <button type="button" className={wireframe ? "is-active" : ""} aria-label="Toggle wireframe" onClick={() => setWireframe((value) => !value)}><Wrench /></button>
             <button type="button" className={exploded ? "is-active" : ""} aria-label="Exploded view" onClick={() => setExploded((value) => !value)}><Move3d /></button>
           </div>
         </div>
         <div className="vehicle-viewport-stage">
-          <VehicleModelPreview3D draft={draft} selectedComponentId={selectedId} onSelectComponent={setSelectedId} wireframe={wireframe} exploded={exploded} showGrid={showGrid} manipulator={manipulator} viewPreset={viewPreset} onTransformComponent={(componentId, transform) => commit(updateVehicleComponent(draft, componentId, (part) => { part.transform = transform; }))} copy={{
+          <VehicleModelPreview3D draft={draft} selectedComponentId={selectedId} onSelectComponent={setSelectedId} wireframe={wireframe} exploded={exploded} showGrid={showGrid} manipulator={manipulator} viewPreset={viewPreset} transformSpace={transformSpace} snapEnabled={snapEnabled} translationSnapM={draft.designParameters.gridM} showEngineeringOverlay={showEngineeringOverlay} isolatedComponentId={isolateSelected ? selectedId : null} frameMode={frameMode} onTransformComponent={(componentId, transform) => commit(updateVehicleComponent(draft, componentId, (part) => { part.transform = transform; }))} copy={{
             ariaLabel: "Interactive component-level vehicle modeling viewport",
             unavailable: "3D unavailable · showing engineering plan view",
             interaction: "Select parts · Drag to orbit · Scroll to zoom",
             motors: "motors", ratio: "thrust / weight",
           }} />
-          <div className="vehicle-viewport-badge"><span>{manipulator.toUpperCase()}</span><strong>{selected?.name ?? "Assembly"}</strong></div>
+          <div className="vehicle-viewport-badge"><span>{manipulator.toUpperCase()}</span><strong>{selected?.name ?? "Assembly"}</strong><small>{transformSpace.toUpperCase()} · {snapEnabled ? `${Math.round(draft.designParameters.gridM * 1_000)} mm SNAP` : "FREE"}</small></div>
         </div>
         <div className="vehicle-diagnostics-strip">
           <span><small>Parts</small><strong>{diagnostics.componentCount}</strong></span>
@@ -503,6 +578,7 @@ export function VehicleStudio() {
             <label className="vehicle-property-field vehicle-property-wide"><span>Name</span><input value={selected.name} onChange={(event) => updateSelected((part) => { part.name = event.target.value; })} /></label>
             <label className="vehicle-property-field"><span>Primitive</span><select value={selected.geometry.primitive} onChange={(event) => updateSelected((part) => { part.geometry.primitive = event.target.value as VehiclePrimitive; })}>{["box", "rounded-box", "cylinder", "sphere", "capsule", "cone"].map((primitive) => <option key={primitive}>{primitive}</option>)}</select></label>
             <label className="vehicle-property-field"><span>Base color</span><input type="color" value={selected.material.baseColor} onChange={(event) => updateSelected((part) => { part.material.baseColor = event.target.value; })} /></label>
+            <label className="vehicle-property-field vehicle-property-wide"><span>Physical material preset</span><select value={selected.tags.find((tag) => tag.startsWith("material:"))?.slice(9) ?? ""} onChange={(event) => applyMaterial(event.target.value)}><option value="">Custom / explicit properties</option>{VEHICLE_MATERIAL_PRESETS.map((preset) => <option value={preset.id} key={preset.id}>{preset.name} · {preset.densityKgM3} kg/m³</option>)}</select></label>
             <label className="vehicle-property-field vehicle-property-wide"><span>Assembly parent</span><select value={selected.parentId ?? ""} onChange={(event) => commit(setVehicleComponentParent(draft, selected.id, event.target.value || null))}><option value="">Assembly root</option>{draft.components.filter((component) => component.id !== selected.id).map((component) => <option key={component.id} value={component.id}>{component.name}</option>)}</select></label>
             <label className="vehicle-property-field vehicle-property-wide"><span>External mesh / CAD asset</span><input value={selected.geometry.meshUri} placeholder="glTF, GLB, OBJ, STEP-derived asset URI" onChange={(event) => updateSelected((part) => { part.geometry.meshUri = event.target.value; })} /></label>
             <VectorFields label="Position (m)" value={selected.transform.positionM} onChange={(axis, value) => updateSelected((part) => { part.transform.positionM[axis] = value; })} />
@@ -520,10 +596,11 @@ export function VehicleStudio() {
           </div> : <p className="vehicle-inspector-empty">{copy.noSelection}</p> : null}
 
           {inspectorTab === "analysis" ? <div className="vehicle-analysis-panel">
-            <div className="vehicle-analysis-metrics"><span><Scale3d /><small>Total mass</small><strong>{diagnostics.totalMassKg.toFixed(3)} kg</strong></span><span><Move3d /><small>Span</small><strong>{diagnostics.spanM.toFixed(3)} m</strong></span><span><Zap /><small>Thrust margin</small><strong>{diagnostics.thrustToWeight.toFixed(2)}×</strong></span><span><Gauge /><small>Hover estimate</small><strong>{diagnostics.estimatedHoverMinutes.toFixed(1)} min</strong></span><span><Target /><small>Balance score</small><strong>{diagnostics.balanceScore.toFixed(0)} / 100</strong></span><span><Rotate3d /><small>Rotor clearance</small><strong>{Math.round(diagnostics.minimumRotorClearanceM * 1_000)} mm</strong></span><span><BatteryCharging /><small>Battery energy</small><strong>{diagnostics.batteryEnergyWh.toFixed(0)} Wh</strong></span><span><Grid3X3 /><small>Disk area</small><strong>{diagnostics.rotorDiskAreaM2.toFixed(2)} m²</strong></span></div>
-            <div className="vehicle-com-diagram"><i style={{ left: `${50 + diagnostics.centerOfMassM.x * 100}%`, top: `${50 + diagnostics.centerOfMassM.z * 100}%` }} /><span>Projected center of mass</span></div>
+            <div className="vehicle-analysis-metrics"><span><Scale3d /><small>Total mass</small><strong>{diagnostics.totalMassKg.toFixed(3)} kg</strong></span><span><Move3d /><small>Span</small><strong>{diagnostics.spanM.toFixed(3)} m</strong></span><span><Zap /><small>Thrust margin</small><strong>{diagnostics.thrustToWeight.toFixed(2)}×</strong></span><span><Gauge /><small>Hover estimate</small><strong>{diagnostics.estimatedHoverMinutes.toFixed(1)} min</strong></span><span><Target /><small>CG ↔ thrust</small><strong>{Math.round(diagnostics.thrustCenterOffsetM * 1_000)} mm</strong></span><span><Rotate3d /><small>Rotor clearance</small><strong>{Math.round(diagnostics.minimumRotorClearanceM * 1_000)} mm</strong></span><span><BatteryCharging /><small>Battery energy</small><strong>{diagnostics.batteryEnergyWh.toFixed(0)} Wh</strong></span><span><Grid3X3 /><small>Rotor / body</small><strong>{Math.round(diagnostics.minimumRotorBodyClearanceM * 1_000)} mm</strong></span><span><ShieldCheck /><small>Landing margin</small><strong>{Math.round(diagnostics.staticStabilityMarginM * 1_000)} mm</strong></span><span><Crosshair /><small>Balance score</small><strong>{diagnostics.balanceScore.toFixed(0)} / 100</strong></span></div>
+            <div className="vehicle-com-diagram"><i className="vehicle-com-cg" style={{ left: analysisPoint(diagnostics.centerOfMassM.x), top: analysisPoint(diagnostics.centerOfMassM.z) }} /><i className="vehicle-com-thrust" style={{ left: analysisPoint(diagnostics.centerOfThrustM.x), top: analysisPoint(diagnostics.centerOfThrustM.z) }} /><span><b />CG <b />Thrust center</span></div>
+            <div className="vehicle-system-parameters"><div className="vehicle-inspector-section-title"><span><Gauge />System parameters</span><small>propulsion contract</small></div><div className="vehicle-property-grid"><NumericField label="Max thrust / motor (N)" value={draft.propulsion.maximumThrustPerMotorN} step={.5} onChange={(value) => commit({ ...cloneDraft(draft), propulsion: { ...draft.propulsion, maximumThrustPerMotorN: value } })} /><NumericField label="Battery cells" value={draft.propulsion.batteryCells} step={1} onChange={(value) => commit({ ...cloneDraft(draft), propulsion: { ...draft.propulsion, batteryCells: value } })} /><NumericField label="Capacity (mAh)" value={draft.propulsion.batteryCapacityMah} step={100} onChange={(value) => commit({ ...cloneDraft(draft), propulsion: { ...draft.propulsion, batteryCapacityMah: value } })} /><NumericField label="Design grid (m)" value={draft.designParameters.gridM} step={.001} onChange={(value) => commit({ ...cloneDraft(draft), designParameters: { ...draft.designParameters, gridM: value } })} /></div></div>
             {aiDecisions.length ? <div className="vehicle-ai-decisions"><div className="vehicle-inspector-section-title"><span><Sparkles />Design rationale</span><small>AI draft · editable</small></div>{aiDecisions.map((decision, index) => <p key={`${index}:${decision}`}><span>{String(index + 1).padStart(2, "0")}</span>{decision}</p>)}</div> : null}
-            <div className="vehicle-constraint-panel"><div className="vehicle-inspector-section-title"><span><Cable />Assembly constraints</span><button type="button" onClick={() => commit(addVehicleConstraint(draft, { type: "balance", componentIds: draft.components.map((component) => component.id), axis: "y", value: .015, enabled: true }))}><Plus />Balance</button></div>{draft.constraints.map((constraint) => <div className="vehicle-constraint-row" key={constraint.id}><button type="button" aria-label="Toggle constraint" className={constraint.enabled ? "is-enabled" : ""} onClick={() => commit({ ...cloneDraft(draft), constraints: draft.constraints.map((candidate) => candidate.id === constraint.id ? { ...candidate, enabled: !candidate.enabled } : candidate) })}><CircleDot /></button><span><strong>{constraint.type.replaceAll("-", " ")}</strong><small>{constraint.componentIds.length} components · {constraint.axis.toUpperCase()} · {constraint.value}</small></span><button type="button" aria-label="Remove constraint" onClick={() => commit(removeVehicleConstraint(draft, constraint.id))}><X /></button></div>)}</div>
+            <div className="vehicle-constraint-panel"><div className="vehicle-inspector-section-title"><span><Cable />Assembly constraints</span><div><button type="button" onClick={solveConstraints}><Wrench />Solve</button><button type="button" onClick={() => commit(addVehicleConstraint(draft, { type: "balance", componentIds: draft.components.map((component) => component.id), axis: "y", value: .015, enabled: true }))}><Plus />Balance</button></div></div>{draft.constraints.map((constraint) => { const evaluation = constraintEvaluationById.get(constraint.id); return <div className={`vehicle-constraint-row is-${evaluation?.status ?? "suppressed"}`} key={constraint.id}><button type="button" aria-label="Toggle constraint" className={constraint.enabled ? "is-enabled" : ""} onClick={() => commit({ ...cloneDraft(draft), constraints: draft.constraints.map((candidate) => candidate.id === constraint.id ? { ...candidate, enabled: !candidate.enabled } : candidate) })}><CircleDot /></button><span><strong>{constraint.type.replaceAll("-", " ")}</strong><small>{evaluation?.summary ?? `${constraint.componentIds.length} components · ${constraint.axis.toUpperCase()}`}</small></span><button type="button" aria-label="Remove constraint" onClick={() => commit(removeVehicleConstraint(draft, constraint.id))}><X /></button></div>; })}</div>
             {diagnostics.engineeringWarnings.length ? <div className="vehicle-engineering-warnings">{diagnostics.engineeringWarnings.map((warning) => <p key={warning}><ShieldCheck />{warning}</p>)}</div> : null}
             {issues.length ? <div className="vehicle-studio-issues"><strong>{copy.issues} · {issues.length}</strong><ul>{issues.map((issue) => <li key={`${issue.field}:${issue.code}`}><code>{issue.field}</code>{issue.message}</li>)}</ul></div> : <p className="vehicle-studio-ready"><ShieldCheck />{copy.ready}</p>}
           </div> : null}

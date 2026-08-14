@@ -122,11 +122,16 @@ export interface VehicleEngineeringDiagnostics {
   componentCount: number;
   totalMassKg: number;
   centerOfMassM: VehicleVector3;
+  centerOfThrustM: VehicleVector3;
   centerOfMassOffsetM: number;
+  thrustCenterOffsetM: number;
   balanceScore: number;
   thrustToWeight: number;
   spanM: number;
   minimumRotorClearanceM: number;
+  minimumRotorBodyClearanceM: number;
+  rotorInterferenceCount: number;
+  staticStabilityMarginM: number;
   rotorDiskAreaM2: number;
   batteryEnergyWh: number;
   estimatedHoverMinutes: number;
@@ -138,6 +143,18 @@ export interface VehicleEngineeringDiagnostics {
 export interface VehicleComponentMassProperties {
   volumeM3: number;
   massKg: number;
+}
+
+export interface VehicleConstraintEvaluation {
+  constraintId: string;
+  status: "satisfied" | "violated" | "suppressed";
+  residual: number;
+  summary: string;
+}
+
+export interface VehicleConstraintSolveResult {
+  draft: VehicleModelDraft;
+  solvedCount: number;
 }
 
 const ZERO = (): VehicleVector3 => ({ x: 0, y: 0, z: 0 });
@@ -165,12 +182,12 @@ function makeComponent(input: Partial<VehicleComponentDraft> & Pick<VehicleCompo
 export function createVehicleComponent(kind: VehicleComponentKind, name?: string): VehicleComponentDraft {
   const component = makeComponent({ name: name ?? kind.replaceAll("-", " "), kind });
   const geometry = component.geometry;
-  if (kind === "fuselage") Object.assign(geometry, { primitive: "capsule", sizeM: { x: .34, y: .14, z: .2 }, radiusM: .1, lengthM: .34 });
+  if (kind === "fuselage") Object.assign(geometry, { primitive: "rounded-box", sizeM: { x: .34, y: .09, z: .2 }, radiusM: .1, lengthM: .34 });
   if (kind === "frame") Object.assign(geometry, { primitive: "rounded-box", sizeM: { x: .24, y: .035, z: .18 } });
   if (kind === "arm") Object.assign(geometry, { primitive: "rounded-box", sizeM: { x: .28, y: .028, z: .035 } });
   if (kind === "motor") Object.assign(geometry, { primitive: "cylinder", sizeM: { x: .055, y: .055, z: .055 }, radiusM: .028, lengthM: .055 });
   if (kind === "propeller") Object.assign(geometry, { primitive: "rounded-box", sizeM: { x: .254, y: .008, z: .026 } });
-  if (kind === "landing-gear") Object.assign(geometry, { primitive: "capsule", sizeM: { x: .3, y: .025, z: .025 }, radiusM: .012, lengthM: .3 });
+  if (kind === "landing-gear") Object.assign(geometry, { primitive: "rounded-box", sizeM: { x: .3, y: .025, z: .025 }, radiusM: .012, lengthM: .3 });
   if (kind === "battery") Object.assign(geometry, { primitive: "rounded-box", sizeM: { x: .14, y: .045, z: .055 } });
   if (kind === "flight-controller") Object.assign(geometry, { primitive: "rounded-box", sizeM: { x: .05, y: .012, z: .05 } });
   if (kind === "sensor") Object.assign(geometry, { primitive: "cylinder", sizeM: { x: .025, y: .018, z: .025 }, radiusM: .013, lengthM: .018 });
@@ -198,13 +215,13 @@ function appendRotorLayout(
     const motor = createVehicleComponent("motor", `Motor ${index + 1}`);
     motor.parentId = arm.id;
     motor.mass.massKg = .055;
-    motor.transform.positionM = { x: Math.cos(rad) * armLengthM, y: .025, z: Math.sin(rad) * armLengthM };
+    motor.transform.positionM = { x: Math.cos(rad) * armLengthM, y: .035, z: Math.sin(rad) * armLengthM };
     parts.push(motor);
     const prop = createVehicleComponent("propeller", `Propeller ${index + 1}`);
     prop.parentId = motor.id;
     prop.mass.massKg = .014;
     prop.geometry.sizeM.x = propellerDiameterM;
-    prop.transform.positionM = { x: Math.cos(rad) * armLengthM, y: .062, z: Math.sin(rad) * armLengthM };
+    prop.transform.positionM = { x: Math.cos(rad) * armLengthM, y: .12, z: Math.sin(rad) * armLengthM };
     prop.transform.rotationDeg.y = angle;
     parts.push(prop);
   }
@@ -349,25 +366,78 @@ export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEn
   // Components are the physical source of truth used by diagnostics and SDF.
   // body.massKg is a compatibility summary and may lag a component edit.
   const engineeringMassKg = totalMassKg;
-  const centerOfMassOffsetM = Math.hypot(centerOfMassM.x, centerOfMassM.z);
-  const balanceReferenceM = Math.max(.02, spanM * .08);
-  const balanceScore = Math.max(0, Math.min(100, 100 * (1 - centerOfMassOffsetM / balanceReferenceM)));
   const rotors = physicalComponents.filter((component) => component.kind === "propeller").map((component) => {
     const geometry = scaledGeometry(component);
     return {
+      id: component.id,
       x: component.transform.positionM.x,
+      y: component.transform.positionM.y,
       z: component.transform.positionM.z,
       radius: Math.max(geometry.x, geometry.z, component.geometry.radiusM * 2) / 2,
+      halfThickness: Math.max(.001, geometry.y / 2),
     };
   });
+  const centerOfThrustM = rotors.length ? {
+    x: rotors.reduce((sum, rotor) => sum + rotor.x, 0) / rotors.length,
+    y: rotors.reduce((sum, rotor) => sum + rotor.y, 0) / rotors.length,
+    z: rotors.reduce((sum, rotor) => sum + rotor.z, 0) / rotors.length,
+  } : ZERO();
+  const centerOfMassOffsetM = Math.hypot(centerOfMassM.x, centerOfMassM.z);
+  const thrustCenterOffsetM = Math.hypot(centerOfMassM.x - centerOfThrustM.x, centerOfMassM.z - centerOfThrustM.z);
+  const balanceReferenceM = Math.max(.02, spanM * .08);
+  const balanceScore = Math.max(0, Math.min(100, 100 * (1 - thrustCenterOffsetM / balanceReferenceM)));
   let minimumRotorClearanceM = Number.POSITIVE_INFINITY;
+  let rotorInterferenceCount = 0;
   for (let first = 0; first < rotors.length; first += 1) {
     for (let second = first + 1; second < rotors.length; second += 1) {
       const distance = Math.hypot(rotors[first].x - rotors[second].x, rotors[first].z - rotors[second].z);
-      minimumRotorClearanceM = Math.min(minimumRotorClearanceM, distance - rotors[first].radius - rotors[second].radius);
+      const clearance = distance - rotors[first].radius - rotors[second].radius;
+      minimumRotorClearanceM = Math.min(minimumRotorClearanceM, clearance);
+      if (clearance < 0) rotorInterferenceCount += 1;
     }
   }
   if (!Number.isFinite(minimumRotorClearanceM)) minimumRotorClearanceM = 0;
+  let minimumRotorBodyClearanceM = Number.POSITIVE_INFINITY;
+  const rotorExcludedKinds: VehicleComponentKind[] = ["propeller", "motor", "arm"];
+  for (const rotor of rotors) {
+    for (const component of physicalComponents) {
+      if (rotorExcludedKinds.includes(component.kind)) continue;
+      const geometry = scaledGeometry(component);
+      const halfX = Math.max(geometry.x / 2, ["sphere", "cylinder", "capsule", "cone"].includes(component.geometry.primitive) ? geometry.radius : 0);
+      const halfY = Math.max(geometry.y / 2, ["cylinder", "capsule", "cone"].includes(component.geometry.primitive) ? geometry.length / 2 : component.geometry.primitive === "sphere" ? geometry.radius : 0);
+      const halfZ = Math.max(geometry.z / 2, ["sphere", "cylinder", "capsule", "cone"].includes(component.geometry.primitive) ? geometry.radius : 0);
+      const dx = Math.max(Math.abs(rotor.x - component.transform.positionM.x) - halfX, 0);
+      const dz = Math.max(Math.abs(rotor.z - component.transform.positionM.z) - halfZ, 0);
+      const horizontalGap = Math.hypot(dx, dz) - rotor.radius;
+      const verticalGap = Math.abs(rotor.y - component.transform.positionM.y) - halfY - rotor.halfThickness;
+      const clearance = horizontalGap <= 0 && verticalGap <= 0
+        ? Math.max(horizontalGap, verticalGap)
+        : horizontalGap <= 0 ? verticalGap : verticalGap <= 0 ? horizontalGap : Math.hypot(horizontalGap, verticalGap);
+      minimumRotorBodyClearanceM = Math.min(minimumRotorBodyClearanceM, clearance);
+    }
+  }
+  if (!Number.isFinite(minimumRotorBodyClearanceM)) minimumRotorBodyClearanceM = 0;
+  const landingGear = physicalComponents.filter((component) => component.kind === "landing-gear");
+  let staticStabilityMarginM = 0;
+  if (landingGear.length) {
+    const support = landingGear.reduce((bounds, component) => {
+      const geometry = scaledGeometry(component);
+      const halfX = Math.max(geometry.x / 2, geometry.radius);
+      const halfZ = Math.max(geometry.z / 2, geometry.radius);
+      return {
+        minX: Math.min(bounds.minX, component.transform.positionM.x - halfX),
+        maxX: Math.max(bounds.maxX, component.transform.positionM.x + halfX),
+        minZ: Math.min(bounds.minZ, component.transform.positionM.z - halfZ),
+        maxZ: Math.max(bounds.maxZ, component.transform.positionM.z + halfZ),
+      };
+    }, { minX: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY, minZ: Number.POSITIVE_INFINITY, maxZ: Number.NEGATIVE_INFINITY });
+    staticStabilityMarginM = Math.min(
+      centerOfMassM.x - support.minX,
+      support.maxX - centerOfMassM.x,
+      centerOfMassM.z - support.minZ,
+      support.maxZ - centerOfMassM.z,
+    );
+  }
   const rotorDiskAreaM2 = rotors.reduce((sum, rotor) => sum + Math.PI * rotor.radius ** 2, 0);
   const batteryEnergyWh = draft.propulsion.batteryCells * 3.7 * draft.propulsion.batteryCapacityMah / 1_000;
   const weightN = engineeringMassKg * 9.80665;
@@ -384,7 +454,9 @@ export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEn
   }, 0);
   const engineeringWarnings: string[] = [];
   if (minimumRotorClearanceM < .01) engineeringWarnings.push("Rotor disk clearance is below 10 mm.");
-  if (centerOfMassOffsetM > balanceReferenceM * .5) engineeringWarnings.push("The projected center of mass is materially off the thrust centroid.");
+  if (thrustCenterOffsetM > balanceReferenceM * .5) engineeringWarnings.push("The projected center of mass is materially off the thrust centroid.");
+  if (minimumRotorBodyClearanceM < .005) engineeringWarnings.push("Rotor-to-body clearance is below 5 mm.");
+  if (landingGear.length && staticStabilityMarginM < .01) engineeringWarnings.push("The center of mass has less than 10 mm of static landing support margin.");
   if (estimatedHoverMinutes > 0 && estimatedHoverMinutes < 8) engineeringWarnings.push("Estimated hover endurance is below eight minutes.");
   const physicalMotorCount = physicalComponents.filter((component) => component.kind === "motor").length;
   const thrustToWeight = engineeringMassKg > 0 ? physicalMotorCount * draft.propulsion.maximumThrustPerMotorN / (engineeringMassKg * 9.80665) : 0;
@@ -393,10 +465,127 @@ export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEn
     componentCount: draft.components.length,
     visibleComponentCount: draft.components.filter((component) => component.visible).length,
     totalMassKg,
-    centerOfMassM, centerOfMassOffsetM, balanceScore, spanM, minimumRotorClearanceM,
+    centerOfMassM, centerOfThrustM, centerOfMassOffsetM, thrustCenterOffsetM, balanceScore, spanM, minimumRotorClearanceM,
+    minimumRotorBodyClearanceM, rotorInterferenceCount, staticStabilityMarginM,
     rotorDiskAreaM2, batteryEnergyWh, estimatedHoverMinutes, projectedAreaM2, engineeringWarnings,
     thrustToWeight,
   };
+}
+
+function constraintPlane(axis: VehicleConstraintDraft["axis"]): [keyof VehicleVector3, keyof VehicleVector3] {
+  if (axis === "x") return ["y", "z"];
+  if (axis === "z") return ["x", "y"];
+  return ["x", "z"];
+}
+
+function componentPlanarRadius(component: VehicleComponentDraft, axis: VehicleConstraintDraft["axis"]): number {
+  const geometry = scaledGeometry(component);
+  if (axis === "x") return Math.max(geometry.y, geometry.z, geometry.radius * 2) / 2;
+  if (axis === "z") return Math.max(geometry.x, geometry.y, geometry.radius * 2) / 2;
+  return Math.max(geometry.x, geometry.z, geometry.radius * 2) / 2;
+}
+
+function minimumComponentClearance(
+  components: VehicleComponentDraft[],
+  axis: VehicleConstraintDraft["axis"],
+): number {
+  const [firstAxis, secondAxis] = constraintPlane(axis);
+  let minimum = Number.POSITIVE_INFINITY;
+  for (let first = 0; first < components.length; first += 1) {
+    for (let second = first + 1; second < components.length; second += 1) {
+      const distance = Math.hypot(
+        components[first].transform.positionM[firstAxis] - components[second].transform.positionM[firstAxis],
+        components[first].transform.positionM[secondAxis] - components[second].transform.positionM[secondAxis],
+      );
+      minimum = Math.min(minimum, distance - componentPlanarRadius(components[first], axis) - componentPlanarRadius(components[second], axis));
+    }
+  }
+  return Number.isFinite(minimum) ? minimum : 0;
+}
+
+export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleConstraintEvaluation[] {
+  const componentsById = new Map(draft.components.map((component) => [component.id, component]));
+  const diagnostics = calculateVehicleDiagnostics(draft);
+  const tolerance = Math.max(.0005, draft.designParameters.gridM / 2);
+  return draft.constraints.map((constraint) => {
+    if (!constraint.enabled) return { constraintId: constraint.id, status: "suppressed", residual: 0, summary: "Suppressed" };
+    const components = constraint.componentIds.map((id) => componentsById.get(id)).filter((component): component is VehicleComponentDraft => Boolean(component));
+    if (components.length !== constraint.componentIds.length) return { constraintId: constraint.id, status: "violated", residual: Number.POSITIVE_INFINITY, summary: "Missing component reference" };
+    if (constraint.type === "attach") {
+      const satisfied = components.length === 2 && components[1].parentId === components[0].id;
+      return { constraintId: constraint.id, status: satisfied ? "satisfied" : "violated", residual: satisfied ? 0 : 1, summary: satisfied ? "Assembly link resolved" : "Parent link differs" };
+    }
+    if (constraint.type === "mirror") {
+      if (components.length !== 2) return { constraintId: constraint.id, status: "violated", residual: Number.POSITIVE_INFINITY, summary: "Mirror pair is incomplete" };
+      const [first, second] = components;
+      const [planeA, planeB] = constraintPlane(constraint.axis);
+      const residual = Math.max(
+        Math.abs(first.transform.positionM[constraint.axis] + second.transform.positionM[constraint.axis]),
+        Math.abs(first.transform.positionM[planeA] - second.transform.positionM[planeA]),
+        Math.abs(first.transform.positionM[planeB] - second.transform.positionM[planeB]),
+      );
+      return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: `Mirror residual ${(residual * 1_000).toFixed(1)} mm` };
+    }
+    if (constraint.type === "radial-array") {
+      const [planeA, planeB] = constraintPlane(constraint.axis);
+      const radii = components.map((component) => Math.hypot(component.transform.positionM[planeA], component.transform.positionM[planeB]));
+      const meanRadius = radii.reduce((sum, radius) => sum + radius, 0) / Math.max(1, radii.length);
+      const angles = components.map((component) => Math.atan2(component.transform.positionM[planeB], component.transform.positionM[planeA])).sort((left, right) => left - right);
+      const expectedStep = Math.PI * 2 / Math.max(1, components.length);
+      const angularResidual = angles.reduce((maximum, angle, index) => {
+        const next = index === angles.length - 1 ? angles[0] + Math.PI * 2 : angles[index + 1];
+        return Math.max(maximum, Math.abs(next - angle - expectedStep));
+      }, 0) * Math.max(meanRadius, .01);
+      const radialResidual = Math.max(...radii.map((radius) => Math.abs(radius - meanRadius)), 0);
+      const countResidual = Number(constraint.value) === components.length ? 0 : Math.abs(Number(constraint.value) - components.length);
+      const residual = countResidual ? Number.POSITIVE_INFINITY : Math.max(angularResidual, radialResidual);
+      return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: countResidual ? "Array count differs" : `Pattern residual ${(residual * 1_000).toFixed(1)} mm` };
+    }
+    if (constraint.type === "clearance") {
+      const actual = minimumComponentClearance(components, constraint.axis);
+      const residual = constraint.value - actual;
+      return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: `${(actual * 1_000).toFixed(1)} mm actual / ${(constraint.value * 1_000).toFixed(1)} mm required` };
+    }
+    const actual = constraint.axis === "y"
+      ? diagnostics.thrustCenterOffsetM
+      : Math.abs(diagnostics.centerOfMassM[constraint.axis] - diagnostics.centerOfThrustM[constraint.axis]);
+    const residual = actual - constraint.value;
+    return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: `${(actual * 1_000).toFixed(1)} mm offset / ${(constraint.value * 1_000).toFixed(1)} mm limit` };
+  });
+}
+
+export function solveVehicleConstraints(draft: VehicleModelDraft): VehicleConstraintSolveResult {
+  const next = structuredClone(draft);
+  const componentsById = new Map(next.components.map((component) => [component.id, component]));
+  let solvedCount = 0;
+  for (const constraint of next.constraints) {
+    if (!constraint.enabled || !["mirror", "radial-array"].includes(constraint.type)) continue;
+    const components = constraint.componentIds.map((id) => componentsById.get(id)).filter((component): component is VehicleComponentDraft => Boolean(component));
+    if (constraint.type === "mirror" && components.length === 2 && !components[1].locked) {
+      const [source, target] = components;
+      const [planeA, planeB] = constraintPlane(constraint.axis);
+      target.transform.positionM[constraint.axis] = -source.transform.positionM[constraint.axis];
+      target.transform.positionM[planeA] = source.transform.positionM[planeA];
+      target.transform.positionM[planeB] = source.transform.positionM[planeB];
+      solvedCount += 1;
+    }
+    if (constraint.type === "radial-array" && components.length > 1) {
+      const [planeA, planeB] = constraintPlane(constraint.axis);
+      const source = components[0];
+      const radius = Math.max(.001, Math.hypot(source.transform.positionM[planeA], source.transform.positionM[planeB]));
+      const startAngle = Math.atan2(source.transform.positionM[planeB], source.transform.positionM[planeA]);
+      components.forEach((component, index) => {
+        if (component.locked) return;
+        const angle = startAngle + index * Math.PI * 2 / components.length;
+        component.transform.positionM[planeA] = Math.cos(angle) * radius;
+        component.transform.positionM[planeB] = Math.sin(angle) * radius;
+      });
+      solvedCount += 1;
+    }
+  }
+  next.body.massKg = calculateVehicleDiagnostics(next).totalMassKg;
+  next.updatedAt = new Date().toISOString();
+  return { draft: next, solvedCount };
 }
 
 export function validateVehicleModel(draft: VehicleModelDraft): VehicleModelValidationIssue[] {
@@ -474,6 +663,9 @@ export function validateVehicleModel(draft: VehicleModelDraft): VehicleModelVali
     if (!Number.isFinite(constraint.value)) issues.push({ field: `constraints.${constraint.id}.value`, code: "invalid-constraint-value", message: "Constraint value must be finite" });
     if (constraint.type === "mirror" && constraint.componentIds.length !== 2) issues.push({ field: `constraints.${constraint.id}.componentIds`, code: "mirror-pair-required", message: "Mirror constraints require exactly two components" });
     if (constraint.type === "radial-array" && constraint.componentIds.length < 2) issues.push({ field: `constraints.${constraint.id}.componentIds`, code: "array-members-required", message: "Radial arrays require at least two components" });
+  }
+  for (const evaluation of evaluateVehicleConstraints(draft)) {
+    if (evaluation.status === "violated") issues.push({ field: `constraints.${evaluation.constraintId}`, code: "unsatisfied-constraint", message: evaluation.summary });
   }
   const diagnostics = calculateVehicleDiagnostics(draft);
   if (!finitePositive(diagnostics.thrustToWeight) || diagnostics.thrustToWeight < 1.6) issues.push({ field: "propulsion.maximumThrustPerMotorN", code: "insufficient-thrust-margin", message: "Total thrust-to-weight ratio must be at least 1.6 for this draft contract" });
