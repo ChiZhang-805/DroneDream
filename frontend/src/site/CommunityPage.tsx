@@ -93,12 +93,13 @@ const ENGLISH_TOPIC_TITLE_LIMIT = 28;
 const HAN_CHARACTER_PATTERN = /\p{Script=Han}/u;
 
 export function isLongCommunityTopicTitle(value: string): boolean {
-  const explicitLineCount = value.split(/\r?\n/u).length;
+  const normalizedValue = value.trim();
+  const explicitLineCount = normalizedValue.split(/\r?\n/u).length;
   if (explicitLineCount > 2) return true;
-  const limit = HAN_CHARACTER_PATTERN.test(value)
+  const limit = HAN_CHARACTER_PATTERN.test(normalizedValue)
     ? CHINESE_TOPIC_TITLE_LIMIT
     : ENGLISH_TOPIC_TITLE_LIMIT;
-  return Array.from(value.replace(/\s/gu, "")).length > limit;
+  return Array.from(normalizedValue.replace(/\s/gu, "")).length > limit;
 }
 
 function isLongCommunityTopic(topic: CommunityTopic): boolean {

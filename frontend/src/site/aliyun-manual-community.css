@@ -1778,6 +1778,7 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   font-size: clamp(1.12rem, 1.42vw, 1.56rem);
   line-height: 1.08;
   text-align: left;
+  -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
 }
 
