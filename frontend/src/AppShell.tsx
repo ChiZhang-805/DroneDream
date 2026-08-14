@@ -3165,7 +3165,8 @@ function AppShellContent() {
   const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
-  const autonomyLabMode = location.pathname === "/autonomy";
+  const autonomyLabMode = location.pathname === "/autonomy"
+    || location.pathname.startsWith("/autonomy/");
   const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
     ? BUILD_EDITION
     : launcherMode || location.pathname === "/vehicle-studio"
