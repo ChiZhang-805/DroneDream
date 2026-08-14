@@ -401,6 +401,19 @@ describe("Vehicle Studio engineering generator", () => {
     expect(result.draft).toBe(frameless);
   });
 
+  it("rejects an architecture preset without looping on a locked parent cycle", () => {
+    const draft = createVehicleModelDraft();
+    const battery = draft.components.find((component) => component.kind === "battery")!;
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    battery.parentId = camera.id;
+    camera.parentId = battery.id;
+    camera.locked = true;
+    const result = applyVehicleCatalogEntry(draft, "airframe-hexa-680");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft).toBe(draft);
+  });
+
   it("can leave a physical material preset without retaining density mode", () => {
     const draft = createVehicleModelDraft();
     const frame = draft.components.find((component) => component.kind === "frame")!;

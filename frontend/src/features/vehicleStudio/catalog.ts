@@ -192,7 +192,10 @@ function architectureTouchesLockedComponent(draft: VehicleModelDraft): boolean {
     if (!component.locked) return false;
     if (component.kind === "frame") return true;
     let current: VehicleComponentDraft | undefined = component;
+    const visited = new Set<string>();
     while (current) {
+      if (visited.has(current.id)) return true;
+      visited.add(current.id);
       if (["arm", "motor", "propeller"].includes(current.kind)) return true;
       current = current.parentId ? componentsById.get(current.parentId) : undefined;
     }
