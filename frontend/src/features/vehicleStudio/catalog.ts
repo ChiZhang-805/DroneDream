@@ -175,6 +175,20 @@ function ensureSensor(draft: VehicleModelDraft, entry: VehicleCatalogEntry) {
   if (!exists) draft.sensors.push({ id: crypto.randomUUID(), ...entry.sensor, enabled: true });
 }
 
+function architectureTouchesLockedComponent(draft: VehicleModelDraft): boolean {
+  const componentsById = new Map(draft.components.map((component) => [component.id, component]));
+  return draft.components.some((component) => {
+    if (!component.locked) return false;
+    if (component.kind === "frame") return true;
+    let current: VehicleComponentDraft | undefined = component;
+    while (current) {
+      if (["arm", "motor", "propeller"].includes(current.kind)) return true;
+      current = current.parentId ? componentsById.get(current.parentId) : undefined;
+    }
+    return false;
+  });
+}
+
 export function applyVehicleCatalogEntry(
   draft: VehicleModelDraft,
   entryId: string,
@@ -186,9 +200,13 @@ export function applyVehicleCatalogEntry(
   let entryApplied = true;
 
   if (entry.applyMode === "architecture" && entry.architecture) {
-    next = rebuildVehicleRotorArchitecture(next, entry.architecture);
-    const frame = next.components.find((component) => component.kind === "frame");
-    if (frame) { applyComponentPreset(frame, entry); affected = [frame]; }
+    if (architectureTouchesLockedComponent(next)) {
+      entryApplied = false;
+    } else {
+      next = rebuildVehicleRotorArchitecture(next, entry.architecture);
+      const frame = next.components.find((component) => component.kind === "frame");
+      if (frame) { applyComponentPreset(frame, entry); affected = [frame]; }
+    }
   } else if (entry.applyMode === "fleet") {
     const fleet = next.components.filter((component) => component.kind === entry.kind);
     // Propulsion figures describe the complete motor/rotor fleet. A partial
@@ -201,7 +219,12 @@ export function applyVehicleCatalogEntry(
     }
     const instanceName = entry.name.replace(/\s+set$/iu, "");
     affected.forEach((component, index) => {
+      const armLengthM = entry.id === "arm-carbon-25" ? component.geometry.sizeM.x : null;
       applyComponentPreset(component, entry);
+      if (armLengthM !== null) {
+        component.geometry.sizeM.x = armLengthM;
+        if (entry.component.mass?.massKg) component.mass.massKg = entry.component.mass.massKg * armLengthM / .28;
+      }
       component.name = `${instanceName} ${index + 1}`;
     });
     if (entry.kind === "landing-gear") {

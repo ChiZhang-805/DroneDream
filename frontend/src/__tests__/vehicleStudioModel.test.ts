@@ -261,6 +261,40 @@ describe("Vehicle Studio engineering generator", () => {
     expect(result.draft.components.find((component) => component.id === battery.id)?.mass.massKg).toBe(battery.mass.massKg);
   });
 
+  it("does not rebuild a rotor architecture that contains a locked member", () => {
+    const draft = createVehicleModelDraft();
+    const arm = draft.components.find((component) => component.kind === "arm")!;
+    arm.locked = true;
+    const result = applyVehicleCatalogEntry(draft, "airframe-hexa-680");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft).toBe(draft);
+    expect(result.draft.propulsion.motorCount).toBe(4);
+    expect(result.draft.components.some((component) => component.id === arm.id && component.locked)).toBe(true);
+  });
+
+  it("preserves architecture-specific arm lengths when applying a tube profile", () => {
+    const draft = applyVehicleCatalogEntry(createVehicleModelDraft(), "airframe-octo-900").draft;
+    const lengthsBefore = draft.components.filter((component) => component.kind === "arm").map((arm) => arm.geometry.sizeM.x);
+    const result = applyVehicleCatalogEntry(draft, "arm-carbon-25");
+
+    expect(result.affectedCount).toBe(8);
+    expect(result.draft.components.filter((component) => component.kind === "arm").map((arm) => arm.geometry.sizeM.x)).toEqual(lengthsBefore);
+  });
+
+  it("evaluates and solves radial-array axial offsets", () => {
+    const draft = createVehicleModelDraft();
+    const motors = draft.components.filter((component) => component.kind === "motor");
+    const constraint = { id: crypto.randomUUID(), type: "radial-array" as const, componentIds: motors.map((motor) => motor.id), axis: "y" as const, value: motors.length, enabled: true };
+    draft.constraints = [constraint];
+    motors[1].transform.positionM.y += .03;
+
+    expect(evaluateVehicleConstraints(draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("violated");
+    const solved = solveVehicleConstraints(draft);
+    expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("satisfied");
+    expect(solved.draft.components.find((component) => component.id === motors[1].id)?.transform.positionM.y).toBe(motors[0].transform.positionM.y);
+  });
+
   it("can leave a physical material preset without retaining density mode", () => {
     const draft = createVehicleModelDraft();
     const frame = draft.components.find((component) => component.kind === "frame")!;

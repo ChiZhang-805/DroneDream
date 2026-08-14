@@ -554,7 +554,9 @@ export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleCon
     if (constraint.type === "radial-array") {
       const [planeA, planeB] = constraintPlane(constraint.axis);
       const radii = components.map((component) => Math.hypot(component.transform.positionM[planeA], component.transform.positionM[planeB]));
+      const axialPositions = components.map((component) => component.transform.positionM[constraint.axis]);
       const meanRadius = radii.reduce((sum, radius) => sum + radius, 0) / Math.max(1, radii.length);
+      const meanAxialPosition = axialPositions.reduce((sum, position) => sum + position, 0) / Math.max(1, axialPositions.length);
       const angles = components.map((component) => Math.atan2(component.transform.positionM[planeB], component.transform.positionM[planeA])).sort((left, right) => left - right);
       const expectedStep = Math.PI * 2 / Math.max(1, components.length);
       const angularResidual = angles.reduce((maximum, angle, index) => {
@@ -562,8 +564,9 @@ export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleCon
         return Math.max(maximum, Math.abs(next - angle - expectedStep));
       }, 0) * Math.max(meanRadius, .01);
       const radialResidual = Math.max(...radii.map((radius) => Math.abs(radius - meanRadius)), 0);
+      const axialResidual = Math.max(...axialPositions.map((position) => Math.abs(position - meanAxialPosition)), 0);
       const countResidual = Number(constraint.value) === components.length ? 0 : Math.abs(Number(constraint.value) - components.length);
-      const residual = countResidual ? Number.POSITIVE_INFINITY : Math.max(angularResidual, radialResidual);
+      const residual = countResidual ? Number.POSITIVE_INFINITY : Math.max(angularResidual, radialResidual, axialResidual);
       return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: countResidual ? "Array count differs" : `Pattern residual ${(residual * 1_000).toFixed(1)} mm` };
     }
     if (constraint.type === "clearance") {
@@ -612,6 +615,7 @@ export function solveVehicleConstraints(draft: VehicleModelDraft): VehicleConstr
         const angle = startAngle + index * Math.PI * 2 / components.length;
         component.transform.positionM[planeA] = Math.cos(angle) * radius;
         component.transform.positionM[planeB] = Math.sin(angle) * radius;
+        component.transform.positionM[constraint.axis] = source.transform.positionM[constraint.axis];
       });
       solvedCount += 1;
     }
