@@ -10,6 +10,7 @@ from app.autonomy.catalog import SCENES, get_scene
 from app.autonomy.models import (
     AutonomyCompileRequest,
     AutonomyCompileResponse,
+    ExecutionAdapter,
     ExecutionPolicy,
     MissionContract,
     MissionMetrics,
@@ -130,7 +131,7 @@ def _route_metrics(points: list[RoutePoint]) -> tuple[float, float]:
 
 def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
     target = request.execution_target
-    adapter = {
+    adapter: ExecutionAdapter = {
         "simulation": "px4_gazebo_contract",
         "hitl": "hitl_contract",
         "hardware": "hardware_contract",

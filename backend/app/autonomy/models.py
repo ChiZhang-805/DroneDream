@@ -10,6 +10,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Edition = Literal["universal", "sim", "lab", "field"]
 ExecutionTarget = Literal["simulation", "hitl", "hardware"]
 PerceptionMode = Literal["map", "vision", "fusion"]
+ExecutionAdapter = Literal[
+    "px4_gazebo_contract",
+    "hitl_contract",
+    "hardware_contract",
+]
 
 
 class StrictModel(BaseModel):
@@ -170,7 +175,7 @@ class MissionMetrics(StrictModel):
 
 class ExecutionPolicy(StrictModel):
     readiness: Literal["simulation_ready", "preview_only", "denied"]
-    adapter: Literal["px4_gazebo_contract", "hitl_contract", "hardware_contract"]
+    adapter: ExecutionAdapter
     can_execute: bool
     validated_signed_pack_count: int = 0
     blockers: list[str]
