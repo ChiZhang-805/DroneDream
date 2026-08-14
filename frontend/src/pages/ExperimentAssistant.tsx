@@ -56,6 +56,7 @@ import {
 } from "../features/experiment/workspaceRegistry";
 import {
   createVehicleModelFromBrief,
+  rebuildVehicleRotorArchitecture,
   type VehicleDesignMission,
   type VehicleModelDraft,
 } from "../features/vehicleStudio/model";
@@ -64,6 +65,7 @@ import {
   loadVehicleModels,
   nextVehicleRevision,
   saveVehicleModel,
+  vehicleModelStorageScope,
 } from "../features/vehicleStudio/storage";
 import {
   loadCloudVehicleModels,
@@ -394,13 +396,20 @@ async function saveUniversalVehicleDraft(
   const activeBoundary = activeAssistantTenantContext(ownerId);
   const tenantId = result.orchestration?.tenant_id ?? activeBoundary.tenantId;
   const organizationId = result.orchestration?.organization_id ?? activeBoundary.organizationId;
+  const localStorageScope = vehicleModelStorageScope({
+    userId: ownerId,
+    tenantId,
+    organizationId,
+    workspaceId: "console-universal",
+    edition: "universal",
+  });
   const cloudBoundary = vehicleModelBoundaryFor(ownerId, tenantId, organizationId);
-  let storedModels = loadVehicleModels(ownerId);
+  let storedModels = loadVehicleModels(localStorageScope);
   if (cloudBoundary) {
     try {
       const cloudModels = await loadCloudVehicleModels(cloudBoundary);
       if (cloudModels) {
-        storedModels = cacheVehicleModels(ownerId, mergeVehicleModelStores(storedModels, cloudModels));
+        storedModels = cacheVehicleModels(localStorageScope, mergeVehicleModelStores(storedModels, cloudModels));
       }
     } catch {
       // Preserve the local-first workflow when the network or cloud store is unavailable.
@@ -424,30 +433,35 @@ async function saveUniversalVehicleDraft(
     lidar: universalVehiclePatch(result, "lidar_payload") === true,
     operatingEnvironment: /wind|gust|风/.test(result.experiment_summary.toLowerCase()) ? "windy" : "outdoor",
   });
-  const draft = current ? nextVehicleRevision(current) : generated.draft;
+  let draft = current ? nextVehicleRevision(current) : generated.draft;
   draft.name = universalVehicleName(result) ?? draft.name;
   draft.notes = [result.experiment_summary.trim(), ...(!current ? generated.decisions : [])]
     .filter(Boolean)
     .join("\n\n")
     .slice(0, 4096);
+  let rotorArchitectureChanged = false;
+  let requestedVehicleMassKg: number | null = null;
   for (const accepted of result.accepted_patches) {
     if (accepted.field_id === "vehicle_mass_kg" && typeof accepted.value === "number") {
-      draft.body.massKg = accepted.value;
+      requestedVehicleMassKg = accepted.value;
     }
     if (
       accepted.field_id === "motor_count"
       && (accepted.value === 4 || accepted.value === 6 || accepted.value === 8)
     ) {
       draft.propulsion.motorCount = accepted.value;
+      rotorArchitectureChanged = true;
     }
     if (accepted.field_id === "arm_length_m" && typeof accepted.value === "number") {
       draft.propulsion.armLengthM = accepted.value;
+      rotorArchitectureChanged = true;
     }
     if (
       accepted.field_id === "propeller_diameter_m"
       && typeof accepted.value === "number"
     ) {
       draft.propulsion.propellerDiameterM = accepted.value;
+      rotorArchitectureChanged = true;
     }
     if (accepted.field_id === "camera_payload" && accepted.value === true) {
       const camera = draft.sensors.find((sensor) => sensor.type === "camera");
@@ -462,8 +476,16 @@ async function saveUniversalVehicleDraft(
       }
     }
   }
+  if (rotorArchitectureChanged) {
+    draft = rebuildVehicleRotorArchitecture(draft, {
+      motorCount: draft.propulsion.motorCount,
+      armLengthM: draft.propulsion.armLengthM,
+      propellerDiameterM: draft.propulsion.propellerDiameterM,
+    });
+  }
+  if (requestedVehicleMassKg !== null) draft.body.massKg = requestedVehicleMassKg;
   draft.updatedAt = new Date().toISOString();
-  saveVehicleModel(ownerId, draft);
+  saveVehicleModel(localStorageScope, draft);
   if (cloudBoundary) {
     try {
       await saveCloudVehicleModel(cloudBoundary, draft);

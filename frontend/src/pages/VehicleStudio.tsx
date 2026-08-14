@@ -72,6 +72,7 @@ import {
   restoreVehicleRevision,
   saveVehicleModel,
   type StoredVehicleModel,
+  vehicleModelStorageScope,
 } from "../features/vehicleStudio/storage";
 import {
   deleteCloudVehicleModel,
@@ -215,11 +216,18 @@ export function VehicleStudio() {
   const { account } = useAuth();
   const ownerId = account?.id ?? "local";
   const tenantContext = activeAssistantTenantContext(ownerId);
+  const localStorageScope = useMemo(() => vehicleModelStorageScope({
+    userId: ownerId,
+    tenantId: tenantContext.tenantId,
+    organizationId: tenantContext.organizationId,
+    workspaceId: "console-universal",
+    edition: "universal",
+  }), [ownerId, tenantContext.organizationId, tenantContext.tenantId]);
   const cloudBoundary = useMemo(
     () => vehicleModelBoundaryFor(ownerId, tenantContext.tenantId, tenantContext.organizationId),
     [ownerId, tenantContext.organizationId, tenantContext.tenantId],
   );
-  const [models, setModels] = useState<StoredVehicleModel[]>(() => loadVehicleModels(ownerId));
+  const [models, setModels] = useState<StoredVehicleModel[]>(() => loadVehicleModels(localStorageScope));
   const [draft, setDraft] = useState<VehicleModelDraft>(() => createVehicleModelDraft());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("assembly");
@@ -254,7 +262,7 @@ export function VehicleStudio() {
 
   useEffect(() => {
     let cancelled = false;
-    const ownerModels = loadVehicleModels(ownerId);
+    const ownerModels = loadVehicleModels(localStorageScope);
     const requestedModel = requestedDraftId ? ownerModels.find((model) => model.draftId === requestedDraftId) : null;
     const next = requestedModel?.revisions[0] ?? ownerModels[0]?.revisions[0] ?? createVehicleModelDraft();
     setModels(ownerModels);
@@ -265,7 +273,7 @@ export function VehicleStudio() {
     if (cloudBoundary) {
       void loadCloudVehicleModels(cloudBoundary).then((cloudModels) => {
         if (cancelled || !cloudModels) return;
-        const merged = cacheVehicleModels(ownerId, mergeVehicleModelStores(ownerModels, cloudModels));
+        const merged = cacheVehicleModels(localStorageScope, mergeVehicleModelStores(ownerModels, cloudModels));
         const requestedCloudModel = requestedDraftId
           ? merged.find((model) => model.draftId === requestedDraftId)
           : null;
@@ -278,7 +286,7 @@ export function VehicleStudio() {
       });
     }
     return () => { cancelled = true; };
-  }, [cloudBoundary, ownerId, requestedDraftId]);
+  }, [cloudBoundary, localStorageScope, requestedDraftId]);
 
   const commit = (next: VehicleModelDraft) => {
     undoRef.current = [...undoRef.current.slice(-49), cloneDraft(draft)];
@@ -327,7 +335,7 @@ export function VehicleStudio() {
     commit(radialArrayVehicleComponent(draft, selected.id, 4));
   };
   const persistRevision = async (revision: VehicleModelDraft) => {
-    const localModels = saveVehicleModel(ownerId, revision);
+    const localModels = saveVehicleModel(localStorageScope, revision);
     setModels(localModels);
     setDraft(revision);
     if (!cloudBoundary) return true;
@@ -505,13 +513,30 @@ export function VehicleStudio() {
                 ? `Restored locally as r${restored.revision}; cloud sync is pending.`
                 : `Restored as r${restored.revision}.`));
             }}><strong>r{revision.revision}</strong><span>{new Date(revision.updatedAt).toLocaleString(locale)}</span></button>)}</div> : null}
-            {currentRecord ? <button type="button" className="btn btn-danger" onClick={() => {
-              const draftId = draft.draftId;
-              setModels(removeVehicleModel(ownerId, draftId));
-              if (cloudBoundary) void deleteCloudVehicleModel(cloudBoundary, draftId);
-              const next = createVehicleModelDraft();
-              setDraft(next);
-              setSelectedId(next.components[0]?.id ?? null);
+            {currentRecord ? <button type="button" className="btn btn-danger" disabled={busy} onClick={() => {
+              void (async () => {
+                const draftId = draft.draftId;
+                setBusy(true);
+                setMessage(null);
+                try {
+                  if (cloudBoundary) {
+                    const cloudDeleted = await deleteCloudVehicleModel(cloudBoundary, draftId);
+                    if (!cloudDeleted) {
+                      setMessage("Cloud deletion is unavailable. The aircraft was kept locally so it cannot reappear later.");
+                      return;
+                    }
+                  }
+                  setModels(removeVehicleModel(localStorageScope, draftId));
+                  const next = createVehicleModelDraft();
+                  setDraft(next);
+                  setSelectedId(next.components[0]?.id ?? null);
+                  setMessage("Aircraft deleted.");
+                } catch {
+                  setMessage("Cloud deletion failed. Nothing was removed locally.");
+                } finally {
+                  setBusy(false);
+                }
+              })();
             }}><Trash2 />Delete aircraft</button> : null}
           </div> : null}
         </div>

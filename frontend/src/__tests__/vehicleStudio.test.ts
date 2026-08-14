@@ -2,7 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildVehiclePreviewGeometry } from "../features/vehicleStudio/preview";
+import {
+  buildVehiclePreviewGeometry,
+  previewPositionToModel,
+} from "../features/vehicleStudio/preview";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { VehicleStudio } from "../pages/VehicleStudio";
 import {
@@ -24,6 +27,7 @@ import {
   removeVehicleModel,
   restoreVehicleRevision,
   saveVehicleModel,
+  vehicleModelStorageScope,
 } from "../features/vehicleStudio/storage";
 import {
   mergeVehicleModelStores,
@@ -80,15 +84,29 @@ describe("Universal Vehicle Studio contract", () => {
       .mockReturnValueOnce("00000000-0000-4000-8000-000000000004");
     const draft = createVehicleModelDraft(new Date("2026-08-07T00:00:00.000Z"));
     expect(validateVehicleModel(draft)).toEqual([]);
+    const hiddenCone = draft.components.find((component) => component.kind === "fuselage")!;
+    hiddenCone.visible = false;
+    hiddenCone.geometry.primitive = "cone";
     const sdf = generateGazeboSdf(draft);
-    const visibleComponentCount = draft.components.filter((component) => component.visible).length;
     expect(sdf).toContain('<sdf version="1.10">');
-    expect(sdf.match(/<link name="part_/g)).toHaveLength(visibleComponentCount);
-    expect(sdf.match(/type="fixed"/g)).toHaveLength(visibleComponentCount);
+    expect(sdf.match(/<link name="part_/g)).toHaveLength(draft.components.length);
+    expect(sdf.match(/type="fixed"/g)).toHaveLength(draft.components.length);
     expect(sdf).toContain("carbon-center-frame");
     expect(sdf).toContain("motor-1");
+    expect(sdf).toContain("aerodynamic-canopy");
+    expect(sdf).toContain("<cone>");
+    expect(sdf).not.toContain("<cylinder><radius>0.1</radius><length>0.34</length></cylinder>");
     expect(sdf).toContain('<model name="custom-quadrotor">');
     vi.restoreAllMocks();
+  });
+
+  it("normalizes preview transforms through both expansion and scene scale", () => {
+    expect(previewPositionToModel({ x: 18, y: -9, z: 4.5 }, 1.5, 3)).toEqual({
+      x: 4,
+      y: -2,
+      z: 1,
+    });
+    expect(() => previewPositionToModel({ x: 1, y: 1, z: 1 }, 1, 0)).toThrow(/positive/);
   });
 
   it("blocks unsafe or incomplete model drafts before export", async () => {
@@ -250,6 +268,38 @@ describe("Universal Vehicle Studio contract", () => {
     expect(restored.draftId).toBe(original.draftId);
     expect(restored.updatedAt).toBe("2026-08-07T03:00:00.000Z");
     expect(removeVehicleModel("owner-a", original.draftId, storage)).toEqual([]);
+  });
+
+  it("partitions local model caches by the complete tenant boundary", () => {
+    const storage = memoryStorage();
+    const draft = createVehicleModelDraft(new Date("2026-08-14T04:00:00.000Z"));
+    const personalScope = vehicleModelStorageScope({
+      userId: "owner-a",
+      tenantId: "tenant-a",
+      organizationId: null,
+      workspaceId: "console-universal",
+      edition: "universal",
+    });
+    const organizationScope = vehicleModelStorageScope({
+      userId: "owner-a",
+      tenantId: "tenant-b",
+      organizationId: "organization-b",
+      workspaceId: "console-universal",
+      edition: "universal",
+    });
+    const simScope = vehicleModelStorageScope({
+      userId: "owner-a",
+      tenantId: "tenant-a",
+      organizationId: null,
+      workspaceId: "console-sim",
+      edition: "sim",
+    });
+
+    saveVehicleModel(personalScope, draft, storage);
+
+    expect(loadVehicleModels(personalScope, storage)).toHaveLength(1);
+    expect(loadVehicleModels(organizationScope, storage)).toEqual([]);
+    expect(loadVehicleModels(simScope, storage)).toEqual([]);
   });
 
   it("builds only complete Universal cloud boundaries", () => {

@@ -4,6 +4,7 @@ import {
   calculateVehicleDiagnostics,
   createVehicleModelFromBrief,
   radialArrayVehicleComponent,
+  rebuildVehicleRotorArchitecture,
   validateVehicleModel,
 } from "../features/vehicleStudio/model";
 import { assertVehicleModelShape } from "../features/vehicleStudio/pack";
@@ -83,5 +84,38 @@ describe("Vehicle Studio engineering generator", () => {
 
     expect(arrayed.components.some((component) => component.id === referencedId)).toBe(true);
     expect(() => assertVehicleModelShape(arrayed)).not.toThrow();
+  });
+
+  it("rebuilds the editable rotor assembly when an assistant changes propulsion", () => {
+    const { draft } = createVehicleModelFromBrief({
+      name: "Assistant architecture rig",
+      mission: "agility",
+      motorCount: 4,
+    });
+    const originalRotorIds = new Set(draft.components
+      .filter((component) => ["arm", "motor", "propeller"].includes(component.kind))
+      .map((component) => component.id));
+
+    const rebuilt = rebuildVehicleRotorArchitecture(draft, {
+      motorCount: 6,
+      armLengthM: .48,
+      propellerDiameterM: .31,
+    }, new Date("2026-08-14T05:00:00.000Z"));
+
+    expect(rebuilt.propulsion).toMatchObject({
+      motorCount: 6,
+      armLengthM: .48,
+      propellerDiameterM: .31,
+    });
+    expect(rebuilt.components.filter((component) => component.kind === "arm")).toHaveLength(6);
+    expect(rebuilt.components.filter((component) => component.kind === "motor")).toHaveLength(6);
+    expect(rebuilt.components.filter((component) => component.kind === "propeller")).toHaveLength(6);
+    expect(rebuilt.components.some((component) => originalRotorIds.has(component.id))).toBe(false);
+    expect(rebuilt.components.some((component) => component.kind === "camera-gimbal")).toBe(true);
+    expect(rebuilt.constraints.every((constraint) => constraint.componentIds.every((id) => (
+      rebuilt.components.some((component) => component.id === id)
+    )))).toBe(true);
+    expect(rebuilt.updatedAt).toBe("2026-08-14T05:00:00.000Z");
+    expect(() => assertVehicleModelShape(rebuilt)).not.toThrow();
   });
 });

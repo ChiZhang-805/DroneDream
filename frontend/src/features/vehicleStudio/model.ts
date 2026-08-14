@@ -453,6 +453,42 @@ function createEngineeringConstraints(components: VehicleComponentDraft[]): Vehi
   return constraints;
 }
 
+export function rebuildVehicleRotorArchitecture(
+  draft: VehicleModelDraft,
+  propulsion: Pick<VehicleModelDraft["propulsion"], "motorCount" | "armLengthM" | "propellerDiameterM">,
+  now = new Date(),
+): VehicleModelDraft {
+  const next = structuredClone(draft);
+  const removedIds = new Set(next.components
+    .filter((component) => ["arm", "motor", "propeller"].includes(component.kind))
+    .map((component) => component.id));
+  let discoveredChild = true;
+  while (discoveredChild) {
+    discoveredChild = false;
+    for (const component of next.components) {
+      if (component.parentId && removedIds.has(component.parentId) && !removedIds.has(component.id)) {
+        removedIds.add(component.id);
+        discoveredChild = true;
+      }
+    }
+  }
+  next.components = next.components.filter((component) => !removedIds.has(component.id));
+  const frame = next.components.find((component) => component.kind === "frame");
+  if (!frame) throw new Error("A frame component is required before rebuilding the rotor architecture.");
+  appendRotorLayout(
+    next.components,
+    propulsion.motorCount,
+    propulsion.armLengthM,
+    propulsion.propellerDiameterM,
+    frame.id,
+  );
+  next.propulsion = { ...next.propulsion, ...propulsion };
+  next.constraints = createEngineeringConstraints(next.components);
+  next.body.massKg = calculateVehicleDiagnostics(next).totalMassKg;
+  next.updatedAt = now.toISOString();
+  return next;
+}
+
 export function createVehicleModelFromBrief(brief: VehicleDesignBrief, now = new Date()): VehicleAiDesignResult {
   const motorCount = brief.motorCount ?? (brief.mission === "payload" ? 8 : brief.mission === "survey" || brief.mission === "endurance" ? 6 : 4);
   const targetFlightMinutes = Math.max(6, Math.min(60, brief.targetFlightMinutes ?? (brief.mission === "endurance" ? 32 : 18)));

@@ -5,6 +5,7 @@ import { TransformControls } from "three/examples/jsm/controls/TransformControls
 import { calculateVehicleDiagnostics, type VehicleModelDraft } from "../features/vehicleStudio/model";
 import {
   buildVehiclePreviewGeometry,
+  previewPositionToModel,
   type VehiclePreviewComponent,
 } from "../features/vehicleStudio/preview";
 
@@ -315,7 +316,7 @@ export function VehicleModelPreview3D({
       if (!selectedObject || !selectedComponentId || !onTransformComponent) return;
       const expansion = exploded ? 1.3 : 1;
       onTransformComponent(selectedComponentId, {
-        positionM: { x: selectedObject.position.x / expansion, y: selectedObject.position.y / expansion, z: selectedObject.position.z / expansion },
+        positionM: previewPositionToModel(selectedObject.position, expansion, geometry.scale),
         rotationDeg: {
           x: THREE.MathUtils.radToDeg(selectedObject.rotation.x),
           y: THREE.MathUtils.radToDeg(selectedObject.rotation.y),

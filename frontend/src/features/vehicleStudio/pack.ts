@@ -173,7 +173,10 @@ function componentGeometry(component: VehicleComponentDraft): string {
   if (primitive === "capsule") {
     return `<capsule><radius>${number(scaled.radius)}</radius><length>${number(scaled.length)}</length></capsule>`;
   }
-  if (["cylinder", "cone"].includes(primitive)) {
+  if (primitive === "cone") {
+    return `<cone><radius>${number(scaled.radius)}</radius><length>${number(scaled.length)}</length></cone>`;
+  }
+  if (primitive === "cylinder") {
     return `<cylinder><radius>${number(scaled.radius)}</radius><length>${number(scaled.length)}</length></cylinder>`;
   }
   return `<box><size>${number(scaled.size.x)} ${number(scaled.size.z)} ${number(scaled.size.y)}</size></box>`;
@@ -207,10 +210,10 @@ function componentLink(component: VehicleComponentDraft, linkName: string): stri
 }
 
 export function generateGazeboSdf(draft: VehicleModelDraft): string {
-  const visible = draft.components.filter((component) => component.visible);
-  const names = new Map(visible.map((component, index) => [component.id, `part_${String(index + 1).padStart(3, "0")}_${safeId(component.name)}`]));
-  const links = visible.map((component) => componentLink(component, names.get(component.id)!));
-  const joints = visible.map((component) => {
+  const components = draft.components;
+  const names = new Map(components.map((component, index) => [component.id, `part_${String(index + 1).padStart(3, "0")}_${safeId(component.name)}`]));
+  const links = components.map((component) => componentLink(component, names.get(component.id)!));
+  const joints = components.map((component) => {
     const child = names.get(component.id)!;
     const parent = component.parentId ? names.get(component.parentId) : undefined;
     return `    <joint name="joint_${child}" type="fixed"><parent>${parent ?? "base_link"}</parent><child>${child}</child></joint>`;

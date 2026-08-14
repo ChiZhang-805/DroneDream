@@ -31,6 +31,16 @@ export interface VehiclePreviewGeometry {
   bounds: { span: number; height: number };
 }
 
+export function previewPositionToModel(
+  position: VehicleVector3,
+  expansion: number,
+  geometryScale: number,
+): VehicleVector3 {
+  const divisor = expansion * geometryScale;
+  if (!Number.isFinite(divisor) || divisor <= 0) throw new Error("Preview scale must be positive.");
+  return { x: position.x / divisor, y: position.y / divisor, z: position.z / divisor };
+}
+
 function componentExtent(component: VehicleComponentDraft): number {
   const geometryExtent = Math.max(
     component.geometry.sizeM.x * component.transform.scale.x,

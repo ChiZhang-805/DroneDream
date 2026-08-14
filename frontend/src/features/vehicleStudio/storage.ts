@@ -11,8 +11,26 @@ export interface StoredVehicleModel {
   revisions: VehicleModelDraft[];
 }
 
-function storageKey(ownerId: string): string {
-  return `${STORAGE_PREFIX}:${ownerId || "local"}`;
+export interface VehicleModelLocalBoundary {
+  userId: string;
+  tenantId: string;
+  organizationId: string | null;
+  workspaceId: string;
+  edition: string;
+}
+
+export function vehicleModelStorageScope(boundary: VehicleModelLocalBoundary): string {
+  return [
+    boundary.userId || "local",
+    boundary.tenantId || "personal",
+    boundary.organizationId || "personal",
+    boundary.workspaceId || "console-universal",
+    boundary.edition || "universal",
+  ].map((part) => encodeURIComponent(part)).join(":");
+}
+
+function storageKey(storageScope: string): string {
+  return `${STORAGE_PREFIX}:${storageScope || "local"}`;
 }
 
 export function loadVehicleModels(
