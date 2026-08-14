@@ -298,7 +298,10 @@ export function VehicleModelPreview3D({
       }
     }
 
-    if (showEngineeringOverlay) {
+    // Exploded view is a presentation transform rather than physical state.
+    // Hide assembly-level engineering markers there instead of detaching them
+    // from their authoritative assembled coordinates.
+    if (showEngineeringOverlay && !exploded) {
       const overlay = new THREE.Group();
       overlay.name = "engineering-overlays";
       for (const component of geometry.components.filter((candidate) => candidate.visible && candidate.kind === "propeller")) {
@@ -517,7 +520,7 @@ export function VehicleModelPreview3D({
       >
         {webglUnavailable ? <FlatFallback draft={draft} /> : null}
       </div>
-      {showEngineeringOverlay ? <div className="vehicle-engineering-overlay-key" aria-hidden="true"><span className="is-cg" />CG <span className="is-thrust" />Thrust center <span className="is-rotor" />Rotor disk</div> : null}
+      {showEngineeringOverlay && !exploded ? <div className="vehicle-engineering-overlay-key" aria-hidden="true"><span className="is-cg" />CG <span className="is-thrust" />Thrust center <span className="is-rotor" />Rotor disk</div> : null}
       <div className="vehicle-model-preview-meta">
         <span>{diagnostics.componentCount} parts · {draft.propulsion.motorCount} {copy.motors}</span>
         <span id={hintId} className="vehicle-model-preview-hint">{webglUnavailable ? copy.unavailable : copy.interaction}</span>

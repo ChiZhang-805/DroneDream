@@ -1,6 +1,7 @@
 import {
   calculateVehicleDiagnostics,
   createVehicleComponent,
+  getVehicleComponentMassProperties,
   rebuildVehicleRotorArchitecture,
   type VehicleComponentDraft,
   type VehicleComponentKind,
@@ -188,7 +189,7 @@ export function applyVehicleCatalogEntry(
     const frame = next.components.find((component) => component.kind === "frame");
     if (frame) { applyComponentPreset(frame, entry); affected = [frame]; }
   } else if (entry.applyMode === "fleet") {
-    affected = next.components.filter((component) => component.kind === entry.kind);
+    affected = next.components.filter((component) => component.kind === entry.kind && !component.locked);
     const instanceName = entry.name.replace(/\s+set$/iu, "");
     affected.forEach((component, index) => {
       applyComponentPreset(component, entry);
@@ -223,10 +224,18 @@ export function applyVehicleMaterialPreset(
   presetId: string,
 ): VehicleModelDraft {
   const preset = VEHICLE_MATERIAL_PRESETS.find((candidate) => candidate.id === presetId);
-  if (!preset) return draft;
   const next = structuredClone(draft);
   const component = next.components.find((candidate) => candidate.id === componentId);
   if (!component || component.locked) return draft;
+  if (!preset) {
+    if (presetId) return draft;
+    component.mass.massKg = getVehicleComponentMassProperties(component).massKg;
+    component.mass.mode = "explicit";
+    component.tags = component.tags.filter((tag) => !tag.startsWith("material:"));
+    next.body.massKg = calculateVehicleDiagnostics(next).totalMassKg;
+    next.updatedAt = new Date().toISOString();
+    return next;
+  }
   component.mass.mode = "density";
   component.mass.densityKgM3 = preset.densityKgM3;
   component.material.baseColor = preset.baseColor;

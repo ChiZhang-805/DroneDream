@@ -4,13 +4,20 @@ import {
   calculateVehicleDiagnostics,
   createVehicleModelDraft,
   createVehicleModelFromBrief,
+  evaluateVehicleConstraints,
   migrateVehicleModelDraft,
+  mirrorVehicleComponent,
   radialArrayVehicleComponent,
   rebuildVehicleRotorArchitecture,
   setVehicleComponentLocked,
+  solveVehicleConstraints,
   validateVehicleModel,
 } from "../features/vehicleStudio/model";
 import { assertVehicleModelShape } from "../features/vehicleStudio/pack";
+import {
+  applyVehicleCatalogEntry,
+  applyVehicleMaterialPreset,
+} from "../features/vehicleStudio/catalog";
 
 describe("Vehicle Studio engineering generator", () => {
   it("turns a payload brief into an editable redundant assembly", () => {
@@ -191,5 +198,62 @@ describe("Vehicle Studio engineering generator", () => {
 
     expect(locked.components.find((component) => component.id === componentId)?.locked).toBe(true);
     expect(unlocked.components.find((component) => component.id === componentId)?.locked).toBe(false);
+  });
+
+  it("evaluates balance constraints from only their referenced components", () => {
+    const draft = createVehicleModelDraft();
+    const frame = draft.components.find((component) => component.kind === "frame")!;
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    camera.transform.positionM.x = 4;
+    draft.constraints = [{ id: crypto.randomUUID(), type: "balance", componentIds: [frame.id], axis: "y", value: .001, enabled: true }];
+
+    expect(evaluateVehicleConstraints(draft)[0].status).toBe("satisfied");
+  });
+
+  it("keeps constraint validation tolerance independent from a coarse design grid", () => {
+    const draft = createVehicleModelDraft();
+    const props = draft.components.filter((component) => component.kind === "propeller");
+    const clearance = calculateVehicleDiagnostics(draft).minimumRotorClearanceM;
+    draft.designParameters.gridM = .1;
+    draft.constraints = [{ id: crypto.randomUUID(), type: "clearance", componentIds: props.map((component) => component.id), axis: "y", value: clearance + .01, enabled: true }];
+
+    expect(evaluateVehicleConstraints(draft)[0].status).toBe("violated");
+  });
+
+  it("evaluates and solves mirrored orientation as well as position", () => {
+    const draft = createVehicleModelDraft();
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    camera.transform.rotationDeg.y = 18;
+    const mirrored = mirrorVehicleComponent(draft, camera.id, "x");
+    const mirrorConstraint = mirrored.constraints.find((constraint) => constraint.type === "mirror")!;
+    mirrored.components.find((component) => component.id === mirrorConstraint.componentIds[1])!.transform.rotationDeg.y = 9;
+
+    expect(evaluateVehicleConstraints(mirrored).find((evaluation) => evaluation.constraintId === mirrorConstraint.id)?.status).toBe("violated");
+    const solved = solveVehicleConstraints(mirrored);
+    expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === mirrorConstraint.id)?.status).toBe("satisfied");
+  });
+
+  it("preserves locked fleet members when a catalog preset is applied", () => {
+    const draft = createVehicleModelDraft();
+    const motors = draft.components.filter((component) => component.kind === "motor");
+    motors[0].locked = true;
+    const lockedMass = motors[0].mass.massKg;
+    const result = applyVehicleCatalogEntry(draft, "motor-2814");
+
+    expect(result.affectedCount).toBe(3);
+    expect(result.draft.components.find((component) => component.id === motors[0].id)?.mass.massKg).toBe(lockedMass);
+    expect(result.draft.components.find((component) => component.id === motors[1].id)?.mass.massKg).toBe(.132);
+  });
+
+  it("can leave a physical material preset without retaining density mode", () => {
+    const draft = createVehicleModelDraft();
+    const frame = draft.components.find((component) => component.kind === "frame")!;
+    const materialized = applyVehicleMaterialPreset(draft, frame.id, "aluminum-6061");
+    const customized = applyVehicleMaterialPreset(materialized, frame.id, "");
+    const customizedFrame = customized.components.find((component) => component.id === frame.id)!;
+
+    expect(customizedFrame.mass.mode).toBe("explicit");
+    expect(customizedFrame.tags.some((tag) => tag.startsWith("material:"))).toBe(false);
+    expect(customizedFrame.mass.massKg).toBeGreaterThan(0);
   });
 });

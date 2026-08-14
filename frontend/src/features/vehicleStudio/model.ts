@@ -505,8 +505,11 @@ function minimumComponentClearance(
 
 export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleConstraintEvaluation[] {
   const componentsById = new Map(draft.components.map((component) => [component.id, component]));
-  const diagnostics = calculateVehicleDiagnostics(draft);
-  const tolerance = Math.max(.0005, draft.designParameters.gridM / 2);
+  // Constraint validity is an engineering contract, not a viewport snap
+  // preference. Keep its numerical tolerance bounded even when a coarse grid
+  // is selected for fast layout work.
+  const tolerance = .0005;
+  const rotationToleranceDeg = .1;
   return draft.constraints.map((constraint) => {
     if (!constraint.enabled) return { constraintId: constraint.id, status: "suppressed", residual: 0, summary: "Suppressed" };
     const components = constraint.componentIds.map((id) => componentsById.get(id)).filter((component): component is VehicleComponentDraft => Boolean(component));
@@ -519,12 +522,14 @@ export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleCon
       if (components.length !== 2) return { constraintId: constraint.id, status: "violated", residual: Number.POSITIVE_INFINITY, summary: "Mirror pair is incomplete" };
       const [first, second] = components;
       const [planeA, planeB] = constraintPlane(constraint.axis);
-      const residual = Math.max(
+      const positionResidual = Math.max(
         Math.abs(first.transform.positionM[constraint.axis] + second.transform.positionM[constraint.axis]),
         Math.abs(first.transform.positionM[planeA] - second.transform.positionM[planeA]),
         Math.abs(first.transform.positionM[planeB] - second.transform.positionM[planeB]),
       );
-      return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: `Mirror residual ${(residual * 1_000).toFixed(1)} mm` };
+      const rotationResidualDeg = Math.abs(first.transform.rotationDeg.y + second.transform.rotationDeg.y);
+      const satisfied = positionResidual <= tolerance && rotationResidualDeg <= rotationToleranceDeg;
+      return { constraintId: constraint.id, status: satisfied ? "satisfied" : "violated", residual: Math.max(positionResidual, rotationResidualDeg * Math.PI / 180), summary: `Mirror residual ${(positionResidual * 1_000).toFixed(1)} mm / ${rotationResidualDeg.toFixed(1)}°` };
     }
     if (constraint.type === "radial-array") {
       const [planeA, planeB] = constraintPlane(constraint.axis);
@@ -546,9 +551,16 @@ export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleCon
       const residual = constraint.value - actual;
       return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: `${(actual * 1_000).toFixed(1)} mm actual / ${(constraint.value * 1_000).toFixed(1)} mm required` };
     }
+    const constrainedMasses = components.map((component) => getVehicleComponentMassProperties(component).massKg);
+    const constrainedMassKg = constrainedMasses.reduce((sum, massKg) => sum + massKg, 0);
+    const constrainedCenterOfMass = constrainedMassKg > 0 ? components.reduce((center, component, index) => ({
+      x: center.x + component.transform.positionM.x * constrainedMasses[index] / constrainedMassKg,
+      y: center.y + component.transform.positionM.y * constrainedMasses[index] / constrainedMassKg,
+      z: center.z + component.transform.positionM.z * constrainedMasses[index] / constrainedMassKg,
+    }), ZERO()) : ZERO();
     const actual = constraint.axis === "y"
-      ? diagnostics.thrustCenterOffsetM
-      : Math.abs(diagnostics.centerOfMassM[constraint.axis] - diagnostics.centerOfThrustM[constraint.axis]);
+      ? Math.hypot(constrainedCenterOfMass.x, constrainedCenterOfMass.z)
+      : Math.abs(constrainedCenterOfMass[constraint.axis]);
     const residual = actual - constraint.value;
     return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: `${(actual * 1_000).toFixed(1)} mm offset / ${(constraint.value * 1_000).toFixed(1)} mm limit` };
   });
@@ -567,6 +579,7 @@ export function solveVehicleConstraints(draft: VehicleModelDraft): VehicleConstr
       target.transform.positionM[constraint.axis] = -source.transform.positionM[constraint.axis];
       target.transform.positionM[planeA] = source.transform.positionM[planeA];
       target.transform.positionM[planeB] = source.transform.positionM[planeB];
+      target.transform.rotationDeg.y = -source.transform.rotationDeg.y;
       solvedCount += 1;
     }
     if (constraint.type === "radial-array" && components.length > 1) {
