@@ -40,9 +40,11 @@ const topics = Array.from({ length: 28 }, (_, index) => {
     author_avatar_url: rankedIndex % 2
       ? null
       : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Crect width='32' height='32' rx='16' fill='%238a4ad0'/%3E%3C/svg%3E",
-    title: isLong
-      ? `Cross-scenario recovery evidence with a deliberately detailed engineering title ${rankedIndex}`
-      : `${shortTitles[index % shortTitles.length]} ${rankedIndex}`,
+    title: rankedIndex === 1
+      ? "圆形航迹调优：精度与能耗如何平衡"
+      : isLong
+        ? `Cross-scenario recovery evidence with a deliberately detailed engineering title ${rankedIndex}`
+        : `${shortTitles[index % shortTitles.length]} ${rankedIndex}`,
     body: "Reproducible local evidence with the aircraft, route, parameters, and observed result.",
     tags: ["PX4", "Evidence", "Flight track"],
     image_urls: [],
@@ -157,11 +159,63 @@ try {
     await page.screenshot({ path: path.join(outputRoot, `${testCase.id}.png`) });
 
     let mixedPage = null;
+    let shortTitleParity = null;
+    let longDialog = null;
     if (testCase.id === "all-zh") {
+      await page.locator(".community-topic-grid article").first().locator(".community-topic-cover").click();
+      await page.locator(".community-topic-dialog").waitFor();
+      shortTitleParity = await page.evaluate(() => {
+        const titleMetrics = (selector) => {
+          const element = document.querySelector(selector);
+          if (!(element instanceof HTMLElement)) return null;
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const lineRects = Array.from(range.getClientRects())
+            .filter((rect) => rect.width > 0 && rect.height > 0)
+            .map((rect) => ({
+              top: Number(rect.top.toFixed(2)),
+              width: Number(rect.width.toFixed(2)),
+            }));
+          const distinctLines = [];
+          for (const rect of lineRects) {
+            const existing = distinctLines.find((line) => Math.abs(line.top - rect.top) < 1);
+            if (existing) existing.width += rect.width;
+            else distinctLines.push({ ...rect });
+          }
+          const style = getComputedStyle(element);
+          return {
+            text: element.textContent,
+            textAlign: style.textAlign,
+            lines: distinctLines.length,
+            lineWidths: distinctLines.map((line) => Number(line.width.toFixed(2))),
+          };
+        };
+        const artwork = document.querySelector(".community-topic-dialog-visual .community-cover-art");
+        return {
+          card: titleMetrics(".community-topic-grid article:first-child .community-cover-copy > strong"),
+          dialog: titleMetrics(".community-topic-dialog-visual .community-cover-copy > strong"),
+          dialogIsShort: artwork instanceof HTMLElement
+            && artwork.classList.contains("is-dialog")
+            && !artwork.classList.contains("is-long"),
+        };
+      });
+      await page.screenshot({ path: path.join(outputRoot, "short-title-parity-zh.png") });
+      await page.locator(".community-dialog-close").click();
       await page.getByRole("button", { name: "第 2" }).click();
       await page.locator(".community-topic-grid article.is-long").first().waitFor();
       mixedPage = await measure(page);
       await page.screenshot({ path: path.join(outputRoot, "all-zh-mixed.png") });
+      await page.locator(".community-topic-grid article.is-long .community-topic-cover").click();
+      await page.locator(".community-topic-dialog").waitFor();
+      longDialog = await page.evaluate(() => {
+        const artwork = document.querySelector(".community-topic-dialog-visual .community-cover-art");
+        const title = document.querySelector(".community-topic-dialog-visual .community-cover-copy > strong");
+        return {
+          isLong: artwork instanceof HTMLElement && artwork.classList.contains("is-long"),
+          textAlign: title instanceof HTMLElement ? getComputedStyle(title).textAlign : null,
+        };
+      });
+      await page.locator(".community-dialog-close").click();
     }
 
     const aligned = initial.heroTitle && initial.feed
@@ -173,10 +227,21 @@ try {
       && aligned
       && initial.document.scrollWidth <= initial.document.clientWidth + 1
       && initial.document.scrollHeight <= initial.document.clientHeight + 1
+      && (!shortTitleParity || (
+        shortTitleParity.dialogIsShort
+        && shortTitleParity.card?.text === shortTitleParity.dialog?.text
+        && shortTitleParity.card?.textAlign === "center"
+        && shortTitleParity.dialog?.textAlign === "center"
+        && shortTitleParity.card?.lines === 2
+        && shortTitleParity.dialog?.lines === 2
+        && Math.min(...shortTitleParity.card.lineWidths) / Math.max(...shortTitleParity.card.lineWidths) >= 0.55
+        && Math.min(...shortTitleParity.dialog.lineWidths) / Math.max(...shortTitleParity.dialog.lineWidths) >= 0.55
+      ))
+      && (!longDialog || (longDialog.isLong && longDialog.textAlign === "left"))
       && (!mixedPage || (mixedPage.longCards > 0 && mixedPage.cards <= 10 && mixedPage.maxTags <= 3))
       && consoleErrors.length === 0
       && pageErrors.length === 0;
-    results.push({ ...testCase, passed, initial, mixedPage, aligned, consoleErrors, pageErrors });
+    results.push({ ...testCase, passed, initial, mixedPage, shortTitleParity, longDialog, aligned, consoleErrors, pageErrors });
     await context.close();
   }
 
