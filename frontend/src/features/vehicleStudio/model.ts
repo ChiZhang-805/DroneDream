@@ -882,6 +882,7 @@ export function createVehicleModelFromBrief(brief: VehicleDesignBrief, now = new
     components.push(payload);
     missionPayload = payload;
   }
+  let lidarComponent: VehicleComponentDraft | undefined;
   if (brief.lidar) {
     const lidar = createVehicleComponent("sensor", "360-degree lidar");
     lidar.parentId = frame?.id ?? null;
@@ -890,6 +891,7 @@ export function createVehicleModelFromBrief(brief: VehicleDesignBrief, now = new
     lidar.mass.massKg = .19;
     lidar.tags = ["lidar", "navigation", "obstacle-avoidance"];
     components.push(lidar);
+    lidarComponent = lidar;
   }
   if (missionPayload) {
     const balanceComponents = components.filter((component) => !["propeller", "arm", "payload"].includes(component.kind));
@@ -919,8 +921,8 @@ export function createVehicleModelFromBrief(brief: VehicleDesignBrief, now = new
       { id: uuid(), type: "imu", model: "Triple-redundant IMU", enabled: true },
       { id: uuid(), type: "gps", model: "Dual-band RTK GNSS", enabled: brief.operatingEnvironment !== "indoor" },
       { id: uuid(), type: "barometer", model: "Temperature-compensated barometer", enabled: true },
-      ...(brief.camera === false ? [] : [{ id: uuid(), type: "camera" as const, model: "Stabilized mission camera", enabled: true }]),
-      ...(brief.lidar ? [{ id: uuid(), type: "lidar" as const, model: "360-degree ranging lidar", enabled: true }] : []),
+      ...(brief.camera === false ? [] : [{ id: uuid(), type: "camera" as const, model: "Stabilized mission camera", enabled: true, componentId: camera?.id }]),
+      ...(lidarComponent ? [{ id: uuid(), type: "lidar" as const, model: "360-degree ranging lidar", enabled: true, componentId: lidarComponent.id }] : []),
     ],
     components,
     constraints: createEngineeringConstraints(components),

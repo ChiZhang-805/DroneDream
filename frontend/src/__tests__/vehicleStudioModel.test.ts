@@ -57,6 +57,9 @@ describe("Vehicle Studio engineering generator", () => {
 
     expect(draft.components.some((component) => component.kind === "camera-gimbal")).toBe(true);
     expect(draft.components.some((component) => component.kind === "sensor" && component.tags.includes("lidar"))).toBe(true);
+    expect(draft.sensors.find((sensor) => sensor.type === "lidar")?.componentId).toBe(
+      draft.components.find((component) => component.kind === "sensor" && component.tags.includes("lidar"))?.id,
+    );
     expect(diagnostics.componentCount).toBeGreaterThan(25);
     expect(diagnostics.totalMassKg).toBeGreaterThan(0);
     expect(diagnostics.batteryEnergyWh).toBeGreaterThan(0);
