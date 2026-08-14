@@ -39,6 +39,7 @@ describe("Vehicle Studio engineering generator", () => {
     expect(draft.constraints.some((constraint) => constraint.type === "radial-array")).toBe(true);
     expect(calculateVehicleDiagnostics(draft).minimumRotorClearanceM).toBeGreaterThanOrEqual(.017);
     expect(validateVehicleModel(draft).some((issue) => issue.code === "rotor-disk-intersection")).toBe(false);
+    expect(validateVehicleModel(draft).some((issue) => issue.code === "unsatisfied-constraint")).toBe(false);
     expect(decisions).toHaveLength(4);
   });
 
@@ -322,11 +323,36 @@ describe("Vehicle Studio engineering generator", () => {
   it("removes catalog sensor metadata with its physical component", () => {
     const added = applyVehicleCatalogEntry(createVehicleModelDraft(), "sensor-lidar");
     const sensorComponent = added.draft.components.find((component) => component.id === added.selectedComponentId)!;
-    const boundSensorId = sensorComponent.tags.find((tag) => tag.startsWith("sensor-binding:"))!.slice("sensor-binding:".length);
+    const boundSensorId = added.draft.sensors.find((sensor) => sensor.componentId === sensorComponent.id)!.id;
     const removed = removeVehicleComponent(added.draft, sensorComponent.id);
 
     expect(added.draft.sensors.some((sensor) => sensor.id === boundSensorId)).toBe(true);
     expect(removed.sensors.some((sensor) => sensor.id === boundSensorId)).toBe(false);
+    expect(validateVehicleModel(added.draft).some((issue) => issue.code === "invalid-tags")).toBe(false);
+    expect(() => assertVehicleModelShape(added.draft)).not.toThrow();
+  });
+
+  it("preserves retained user constraints across an architecture rebuild", () => {
+    const draft = createVehicleModelDraft();
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    const battery = draft.components.find((component) => component.kind === "battery")!;
+    const constraint = { id: crypto.randomUUID(), type: "mirror" as const, componentIds: [camera.id, battery.id], axis: "x" as const, value: 0, enabled: false };
+    draft.constraints = [constraint];
+    const rebuilt = applyVehicleCatalogEntry(draft, "airframe-hexa-680").draft;
+
+    expect(rebuilt.constraints.some((candidate) => candidate.id === constraint.id)).toBe(true);
+  });
+
+  it("rejects an architecture preset cleanly when no frame remains", () => {
+    const draft = createVehicleModelDraft();
+    const battery = draft.components.find((component) => component.kind === "battery")!;
+    battery.parentId = null;
+    const frame = draft.components.find((component) => component.kind === "frame")!;
+    const frameless = removeVehicleComponent(draft, frame.id);
+    const result = applyVehicleCatalogEntry(frameless, "airframe-hexa-680");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft).toBe(frameless);
   });
 
   it("can leave a physical material preset without retaining density mode", () => {

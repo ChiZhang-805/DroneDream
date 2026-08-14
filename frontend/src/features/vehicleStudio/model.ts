@@ -2,7 +2,6 @@ export const VEHICLE_MODEL_SCHEMA_VERSION = 2 as const;
 export const MAX_VEHICLE_SENSORS = 32;
 export const MAX_PARAMETER_FAMILIES = 64;
 export const MAX_VEHICLE_COMPONENTS = 256;
-export const VEHICLE_SENSOR_BINDING_TAG_PREFIX = "sensor-binding:";
 export const VEHICLE_MODEL_LIMITS = Object.freeze({
   massKg: 1_000,
   bodyDimensionM: 50,
@@ -27,6 +26,7 @@ export interface VehicleSensorDraft {
   type: "imu" | "gps" | "barometer" | "magnetometer" | "camera" | "lidar";
   model: string;
   enabled: boolean;
+  componentId?: string;
 }
 export interface VehicleComponentDraft {
   id: string;
@@ -526,13 +526,6 @@ function radialOrientationPattern(
   return positive.residualDeg <= negative.residualDeg ? positive : negative;
 }
 
-function componentSensorBindingIds(component: VehicleComponentDraft): string[] {
-  return component.tags
-    .filter((tag) => tag.startsWith(VEHICLE_SENSOR_BINDING_TAG_PREFIX))
-    .map((tag) => tag.slice(VEHICLE_SENSOR_BINDING_TAG_PREFIX.length))
-    .filter(Boolean);
-}
-
 function componentPlanarRadius(component: VehicleComponentDraft, axis: VehicleConstraintDraft["axis"]): number {
   const geometry = scaledGeometry(component);
   if (axis === "x") return Math.max(geometry.y, geometry.z, geometry.radius * 2) / 2;
@@ -729,6 +722,9 @@ export function validateVehicleModel(draft: VehicleModelDraft): VehicleModelVali
     if (![component.material.metalness, component.material.roughness, component.material.opacity].every((value) => Number.isFinite(value) && value >= 0 && value <= 1)) issues.push({ field: `components.${component.id}.material`, code: "invalid-material-range", message: "Metalness, roughness, and opacity must be between zero and one" });
     if (!Array.isArray(component.tags) || component.tags.length > 16 || component.tags.some((tag) => !tag.trim() || tag.length > 32)) issues.push({ field: `components.${component.id}.tags`, code: "invalid-tags", message: "Use no more than 16 non-empty tags of at most 32 characters" });
   }
+  for (const sensor of draft.sensors) {
+    if (sensor.componentId && !ids.has(sensor.componentId)) issues.push({ field: `sensors.${sensor.id}.componentId`, code: "missing-sensor-component", message: "Associated physical sensor component is missing" });
+  }
   for (const component of draft.components) {
     if (component.parentId && !ids.has(component.parentId)) issues.push({ field: `components.${component.id}.parentId`, code: "missing-parent", message: "Parent component is missing" });
     if (component.parentId === component.id) issues.push({ field: `components.${component.id}.parentId`, code: "self-parent", message: "A component cannot be its own parent" });
@@ -817,11 +813,11 @@ export function rebuildVehicleRotorArchitecture(
     }
   }
   next.components = next.components.filter((component) => !removedIds.has(component.id));
-  const removedSensorIds = new Set(draft.components.filter((component) => removedIds.has(component.id)).flatMap(componentSensorBindingIds));
-  const retainedSensorIds = new Set(next.components.flatMap(componentSensorBindingIds));
-  next.sensors = next.sensors.filter((sensor) => !removedSensorIds.has(sensor.id) || retainedSensorIds.has(sensor.id));
+  next.sensors = next.sensors.filter((sensor) => !sensor.componentId || !removedIds.has(sensor.componentId));
   const frame = next.components.find((component) => component.kind === "frame");
   if (!frame) throw new Error("A frame component is required before rebuilding the rotor architecture.");
+  const retainedConstraints = next.constraints.filter((constraint) => constraint.componentIds.every((id) => !removedIds.has(id)));
+  const retainedComponentIds = new Set(next.components.map((component) => component.id));
   appendRotorLayout(
     next.components,
     propulsion.motorCount,
@@ -829,8 +825,11 @@ export function rebuildVehicleRotorArchitecture(
     propulsion.propellerDiameterM,
     frame.id,
   );
+  const newRotorIds = new Set(next.components.filter((component) => !retainedComponentIds.has(component.id)).map((component) => component.id));
   next.propulsion = { ...next.propulsion, ...propulsion };
-  next.constraints = createEngineeringConstraints(next.components);
+  const rebuiltConstraints = createEngineeringConstraints(next.components)
+    .filter((constraint) => constraint.componentIds.some((id) => newRotorIds.has(id)));
+  next.constraints = [...retainedConstraints, ...rebuiltConstraints];
   next.body.massKg = calculateVehicleDiagnostics(next).totalMassKg;
   next.updatedAt = now.toISOString();
   return next;
@@ -871,6 +870,7 @@ export function createVehicleModelFromBrief(brief: VehicleDesignBrief, now = new
     camera.mass.massKg = brief.mission === "survey" ? .28 : .16;
     camera.tags = ["payload", "stabilized", brief.mission];
   }
+  let missionPayload: VehicleComponentDraft | undefined;
   if (payloadKg > .45) {
     const payload = createVehicleComponent("payload", "Mission payload bay");
     payload.parentId = frame?.id ?? null;
@@ -880,6 +880,7 @@ export function createVehicleModelFromBrief(brief: VehicleDesignBrief, now = new
     payload.mass.massKg = payloadKg;
     payload.tags = ["payload", "quick-release"];
     components.push(payload);
+    missionPayload = payload;
   }
   if (brief.lidar) {
     const lidar = createVehicleComponent("sensor", "360-degree lidar");
@@ -889,6 +890,19 @@ export function createVehicleModelFromBrief(brief: VehicleDesignBrief, now = new
     lidar.mass.massKg = .19;
     lidar.tags = ["lidar", "navigation", "obstacle-avoidance"];
     components.push(lidar);
+  }
+  if (missionPayload) {
+    const balanceComponents = components.filter((component) => !["propeller", "arm", "payload"].includes(component.kind));
+    const otherMoment = balanceComponents.reduce((moment, component) => {
+      const massKg = getVehicleComponentMassProperties(component).massKg;
+      return {
+        x: moment.x + component.transform.positionM.x * massKg,
+        z: moment.z + component.transform.positionM.z * massKg,
+      };
+    }, { x: 0, z: 0 });
+    const payloadMassKg = getVehicleComponentMassProperties(missionPayload).massKg;
+    missionPayload.transform.positionM.x = Math.max(-.2, Math.min(.2, -otherMoment.x / payloadMassKg));
+    missionPayload.transform.positionM.z = Math.max(-.2, Math.min(.2, -otherMoment.z / payloadMassKg));
   }
   for (const component of components) component.source = "ai";
   const timestamp = now.toISOString();
@@ -1006,10 +1020,9 @@ export function setVehicleComponentLocked(draft: VehicleModelDraft, id: string, 
 export function removeVehicleComponent(draft: VehicleModelDraft, id: string): VehicleModelDraft {
   const next = structuredClone(draft); const removed = new Set([id]); let changed = true;
   while (changed) { changed = false; for (const component of next.components) if (component.parentId && removed.has(component.parentId) && !removed.has(component.id)) { removed.add(component.id); changed = true; } }
-  const removedSensorIds = new Set(next.components.filter((component) => removed.has(component.id)).flatMap(componentSensorBindingIds));
+  if (next.components.some((component) => removed.has(component.id) && component.locked)) return draft;
   next.components = next.components.filter((component) => !removed.has(component.id));
-  const retainedSensorIds = new Set(next.components.flatMap(componentSensorBindingIds));
-  next.sensors = next.sensors.filter((sensor) => !removedSensorIds.has(sensor.id) || retainedSensorIds.has(sensor.id));
+  next.sensors = next.sensors.filter((sensor) => !sensor.componentId || !removed.has(sensor.componentId));
   next.constraints = next.constraints.filter((constraint) => constraint.componentIds.every((componentId) => !removed.has(componentId))); next.updatedAt = new Date().toISOString(); return next;
 }
 export function setVehicleComponentParent(draft: VehicleModelDraft, id: string, parentId: string | null): VehicleModelDraft {
@@ -1027,7 +1040,7 @@ export function removeVehicleConstraint(draft: VehicleModelDraft, id: string): V
 }
 export function duplicateVehicleComponent(draft: VehicleModelDraft, id: string): VehicleModelDraft {
   const original = draft.components.find((component) => component.id === id); if (!original) return draft;
-  const next = structuredClone(draft); const copy = structuredClone(original); copy.id = uuid(); copy.name = `${original.name} copy`; copy.transform.positionM.x += .04; copy.locked = false; copy.source = "manual"; copy.tags = copy.tags.filter((tag) => !tag.startsWith(VEHICLE_SENSOR_BINDING_TAG_PREFIX)); next.components.push(copy); next.updatedAt = new Date().toISOString(); return next;
+  const next = structuredClone(draft); const copy = structuredClone(original); copy.id = uuid(); copy.name = `${original.name} copy`; copy.transform.positionM.x += .04; copy.locked = false; copy.source = "manual"; next.components.push(copy); next.updatedAt = new Date().toISOString(); return next;
 }
 export function mirrorVehicleComponent(draft: VehicleModelDraft, id: string, axis: "x" | "z" = "x"): VehicleModelDraft {
   const original = draft.components.find((component) => component.id === id); if (!original) return draft;

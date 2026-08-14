@@ -3,7 +3,6 @@ import {
   createVehicleComponent,
   getVehicleComponentMassProperties,
   rebuildVehicleRotorArchitecture,
-  VEHICLE_SENSOR_BINDING_TAG_PREFIX,
   type VehicleComponentDraft,
   type VehicleComponentKind,
   type VehicleModelDraft,
@@ -172,17 +171,10 @@ function applyComponentPreset(component: VehicleComponentDraft, entry: VehicleCa
 
 function ensureSensor(draft: VehicleModelDraft, entry: VehicleCatalogEntry, component: VehicleComponentDraft | undefined) {
   if (!entry.sensor) return;
-  let sensor = draft.sensors.find((candidate) => candidate.type === entry.sensor!.type && candidate.model === entry.sensor!.model);
-  if (!sensor) {
-    sensor = { id: crypto.randomUUID(), ...entry.sensor, enabled: true };
-    draft.sensors.push(sensor);
-  }
-  if (component) {
-    component.tags = [...new Set([
-      ...component.tags.filter((tag) => !tag.startsWith(VEHICLE_SENSOR_BINDING_TAG_PREFIX)),
-      `${VEHICLE_SENSOR_BINDING_TAG_PREFIX}${sensor.id}`,
-    ])];
-  }
+  const exists = draft.sensors.some((candidate) => candidate.type === entry.sensor!.type
+    && candidate.model === entry.sensor!.model
+    && candidate.componentId === component?.id);
+  if (!exists) draft.sensors.push({ id: crypto.randomUUID(), ...entry.sensor, enabled: true, componentId: component?.id });
 }
 
 function architectureTouchesLockedComponent(draft: VehicleModelDraft): boolean {
@@ -210,7 +202,7 @@ export function applyVehicleCatalogEntry(
   let entryApplied = true;
 
   if (entry.applyMode === "architecture" && entry.architecture) {
-    if (architectureTouchesLockedComponent(next)) {
+    if (!next.components.some((component) => component.kind === "frame") || architectureTouchesLockedComponent(next)) {
       entryApplied = false;
     } else {
       next = rebuildVehicleRotorArchitecture(next, entry.architecture);
