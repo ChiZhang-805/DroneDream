@@ -478,6 +478,21 @@ function constraintPlane(axis: VehicleConstraintDraft["axis"]): [keyof VehicleVe
   return ["x", "z"];
 }
 
+function mirroredRotation(
+  rotation: VehicleVector3,
+  planeAxis: VehicleConstraintDraft["axis"],
+): VehicleVector3 {
+  return {
+    x: rotation.x * (planeAxis === "x" ? 1 : -1),
+    y: rotation.y * (planeAxis === "y" ? 1 : -1),
+    z: rotation.z * (planeAxis === "z" ? 1 : -1),
+  };
+}
+
+function angularDistanceDeg(first: number, second: number): number {
+  return Math.abs(((first - second + 540) % 360) - 180);
+}
+
 function componentPlanarRadius(component: VehicleComponentDraft, axis: VehicleConstraintDraft["axis"]): number {
   const geometry = scaledGeometry(component);
   if (axis === "x") return Math.max(geometry.y, geometry.z, geometry.radius * 2) / 2;
@@ -527,7 +542,12 @@ export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleCon
         Math.abs(first.transform.positionM[planeA] - second.transform.positionM[planeA]),
         Math.abs(first.transform.positionM[planeB] - second.transform.positionM[planeB]),
       );
-      const rotationResidualDeg = Math.abs(first.transform.rotationDeg.y + second.transform.rotationDeg.y);
+      const expectedRotation = mirroredRotation(first.transform.rotationDeg, constraint.axis);
+      const rotationResidualDeg = Math.max(
+        angularDistanceDeg(second.transform.rotationDeg.x, expectedRotation.x),
+        angularDistanceDeg(second.transform.rotationDeg.y, expectedRotation.y),
+        angularDistanceDeg(second.transform.rotationDeg.z, expectedRotation.z),
+      );
       const satisfied = positionResidual <= tolerance && rotationResidualDeg <= rotationToleranceDeg;
       return { constraintId: constraint.id, status: satisfied ? "satisfied" : "violated", residual: Math.max(positionResidual, rotationResidualDeg * Math.PI / 180), summary: `Mirror residual ${(positionResidual * 1_000).toFixed(1)} mm / ${rotationResidualDeg.toFixed(1)}°` };
     }
@@ -579,7 +599,7 @@ export function solveVehicleConstraints(draft: VehicleModelDraft): VehicleConstr
       target.transform.positionM[constraint.axis] = -source.transform.positionM[constraint.axis];
       target.transform.positionM[planeA] = source.transform.positionM[planeA];
       target.transform.positionM[planeB] = source.transform.positionM[planeB];
-      target.transform.rotationDeg.y = -source.transform.rotationDeg.y;
+      target.transform.rotationDeg = mirroredRotation(source.transform.rotationDeg, constraint.axis);
       solvedCount += 1;
     }
     if (constraint.type === "radial-array" && components.length > 1) {
@@ -951,7 +971,7 @@ export function duplicateVehicleComponent(draft: VehicleModelDraft, id: string):
 }
 export function mirrorVehicleComponent(draft: VehicleModelDraft, id: string, axis: "x" | "z" = "x"): VehicleModelDraft {
   const original = draft.components.find((component) => component.id === id); if (!original) return draft;
-  const next = duplicateVehicleComponent(draft, id); const copy = next.components.at(-1)!; copy.name = `${original.name} mirror`; copy.transform.positionM[axis] = -original.transform.positionM[axis]; copy.transform.rotationDeg.y = -original.transform.rotationDeg.y;
+  const next = duplicateVehicleComponent(draft, id); const copy = next.components.at(-1)!; copy.name = `${original.name} mirror`; copy.transform.positionM[axis] = -original.transform.positionM[axis]; copy.transform.rotationDeg = mirroredRotation(original.transform.rotationDeg, axis);
   next.constraints.push({ id: uuid(), type: "mirror", componentIds: [id, copy.id], axis, value: 0, enabled: true }); return next;
 }
 export function radialArrayVehicleComponent(draft: VehicleModelDraft, id: string, count: 4 | 6 | 8): VehicleModelDraft {

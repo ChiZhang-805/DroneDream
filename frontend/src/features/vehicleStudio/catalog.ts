@@ -183,13 +183,22 @@ export function applyVehicleCatalogEntry(
   if (!entry) return { draft, selectedComponentId: null, affectedCount: 0 };
   let next = structuredClone(draft);
   let affected: VehicleComponentDraft[] = [];
+  let entryApplied = true;
 
   if (entry.applyMode === "architecture" && entry.architecture) {
     next = rebuildVehicleRotorArchitecture(next, entry.architecture);
     const frame = next.components.find((component) => component.kind === "frame");
     if (frame) { applyComponentPreset(frame, entry); affected = [frame]; }
   } else if (entry.applyMode === "fleet") {
-    affected = next.components.filter((component) => component.kind === entry.kind && !component.locked);
+    const fleet = next.components.filter((component) => component.kind === entry.kind);
+    // Propulsion figures describe the complete motor/rotor fleet. A partial
+    // preset would make the assembly-wide performance model disagree with its
+    // locked physical members, so keep the whole preset atomic.
+    if (entry.propulsion && fleet.some((component) => component.locked)) {
+      entryApplied = false;
+    } else {
+      affected = fleet.filter((component) => !component.locked);
+    }
     const instanceName = entry.name.replace(/\s+set$/iu, "");
     affected.forEach((component, index) => {
       applyComponentPreset(component, entry);
@@ -202,15 +211,20 @@ export function applyVehicleCatalogEntry(
     const existing = entry.applyMode === "replace-or-add"
       ? next.components.find((component) => component.kind === entry.kind)
       : undefined;
-    const component = existing ?? createVehicleComponent(entry.kind, entry.name);
-    if (!existing) {
-      component.parentId = next.components.find((candidate) => candidate.kind === "frame")?.id ?? null;
-      next.components.push(component);
+    if (existing?.locked) {
+      entryApplied = false;
+    } else {
+      const component = existing ?? createVehicleComponent(entry.kind, entry.name);
+      if (!existing) {
+        component.parentId = next.components.find((candidate) => candidate.kind === "frame")?.id ?? null;
+        next.components.push(component);
+      }
+      applyComponentPreset(component, entry);
+      affected = [component];
     }
-    applyComponentPreset(component, entry);
-    affected = [component];
   }
 
+  if (!entryApplied) return { draft, selectedComponentId: null, affectedCount: 0 };
   if (entry.propulsion) next.propulsion = { ...next.propulsion, ...entry.propulsion };
   ensureSensor(next, entry);
   next.body.massKg = calculateVehicleDiagnostics(next).totalMassKg;

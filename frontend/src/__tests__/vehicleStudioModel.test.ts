@@ -220,29 +220,45 @@ describe("Vehicle Studio engineering generator", () => {
     expect(evaluateVehicleConstraints(draft)[0].status).toBe("violated");
   });
 
-  it("evaluates and solves mirrored orientation as well as position", () => {
+  it("evaluates and solves every mirrored rotation axis as well as position", () => {
     const draft = createVehicleModelDraft();
     const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
-    camera.transform.rotationDeg.y = 18;
+    camera.transform.rotationDeg = { x: 11, y: 18, z: 23 };
     const mirrored = mirrorVehicleComponent(draft, camera.id, "x");
     const mirrorConstraint = mirrored.constraints.find((constraint) => constraint.type === "mirror")!;
-    mirrored.components.find((component) => component.id === mirrorConstraint.componentIds[1])!.transform.rotationDeg.y = 9;
+    const mirroredCamera = mirrored.components.find((component) => component.id === mirrorConstraint.componentIds[1])!;
+    expect(mirroredCamera.transform.rotationDeg).toEqual({ x: 11, y: -18, z: -23 });
+    mirroredCamera.transform.rotationDeg.z = 9;
 
     expect(evaluateVehicleConstraints(mirrored).find((evaluation) => evaluation.constraintId === mirrorConstraint.id)?.status).toBe("violated");
     const solved = solveVehicleConstraints(mirrored);
     expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === mirrorConstraint.id)?.status).toBe("satisfied");
+    expect(solved.draft.components.find((component) => component.id === mirrorConstraint.componentIds[1])?.transform.rotationDeg).toEqual({ x: 11, y: -18, z: -23 });
   });
 
-  it("preserves locked fleet members when a catalog preset is applied", () => {
+  it("keeps propulsion fleet presets atomic when a member is locked", () => {
     const draft = createVehicleModelDraft();
     const motors = draft.components.filter((component) => component.kind === "motor");
     motors[0].locked = true;
-    const lockedMass = motors[0].mass.massKg;
+    const motorMasses = motors.map((motor) => motor.mass.massKg);
+    const maximumThrustPerMotorN = draft.propulsion.maximumThrustPerMotorN;
     const result = applyVehicleCatalogEntry(draft, "motor-2814");
 
-    expect(result.affectedCount).toBe(3);
-    expect(result.draft.components.find((component) => component.id === motors[0].id)?.mass.massKg).toBe(lockedMass);
-    expect(result.draft.components.find((component) => component.id === motors[1].id)?.mass.massKg).toBe(.132);
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft.propulsion.maximumThrustPerMotorN).toBe(maximumThrustPerMotorN);
+    expect(result.draft.components.filter((component) => component.kind === "motor").map((motor) => motor.mass.massKg)).toEqual(motorMasses);
+  });
+
+  it("does not replace a locked singleton through the component catalog", () => {
+    const draft = createVehicleModelDraft();
+    const battery = draft.components.find((component) => component.kind === "battery")!;
+    battery.locked = true;
+    const result = applyVehicleCatalogEntry(draft, "battery-6s-10");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft).toBe(draft);
+    expect(result.draft.propulsion.batteryCapacityMah).toBe(draft.propulsion.batteryCapacityMah);
+    expect(result.draft.components.find((component) => component.id === battery.id)?.mass.massKg).toBe(battery.mass.massKg);
   });
 
   it("can leave a physical material preset without retaining density mode", () => {
