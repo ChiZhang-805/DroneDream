@@ -365,12 +365,15 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
   const sensorIds = new Set<string>();
   for (const sensor of value.sensors) {
     if (!isRecord(sensor)) throw new VehiclePackDraftError("Vehicle sensor is malformed");
-    assertExactKeys(sensor, ["id", "type", "model", "enabled"], "Vehicle sensor");
+    assertExactKeys(sensor, sensor.componentId === undefined
+      ? ["id", "type", "model", "enabled"]
+      : ["id", "type", "model", "enabled", "componentId"], "Vehicle sensor");
     if (
       typeof sensor.id !== "string"
       || !["imu", "gps", "barometer", "magnetometer", "camera", "lidar"].includes(String(sensor.type))
       || typeof sensor.model !== "string"
       || typeof sensor.enabled !== "boolean"
+      || !(sensor.componentId === undefined || typeof sensor.componentId === "string")
     ) throw new VehiclePackDraftError("Vehicle sensor is malformed");
     if (sensorIds.has(sensor.id)) {
       throw new VehiclePackDraftError("Vehicle sensor identities contain duplicates");
@@ -400,7 +403,11 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
     || new Set(value.targetEditions).size !== value.targetEditions.length
   ) throw new VehiclePackDraftError("Vehicle target Editions are malformed");
   assertComponentShape(value.components);
-  assertConstraintShape(value.constraints, new Set(value.components.map((component) => component.id)));
+  const componentIds = new Set(value.components.map((component) => component.id));
+  if (value.sensors.some((sensor) => sensor.componentId && !componentIds.has(sensor.componentId))) {
+    throw new VehiclePackDraftError("Vehicle sensor component association is malformed");
+  }
+  assertConstraintShape(value.constraints, componentIds);
   if (!isRecord(value.designParameters)) throw new VehiclePackDraftError("Vehicle design parameters are malformed");
   assertExactKeys(value.designParameters, ["units", "gridM", "symmetry"], "Vehicle design parameters");
   if (

@@ -146,7 +146,7 @@ describe("Universal Vehicle Studio contract", () => {
 
     const sdf = generateGazeboSdf(draft);
 
-    expect(sdf).toContain("<collision name=\"collision\"><geometry><capsule>");
+    expect(sdf).toContain("<collision name=\"collision\"><geometry><box><size>0.34 0.2 0.09</size></box>");
     expect(sdf).toContain("<visual name=\"visual\"><geometry><mesh><uri>model://custom/fuselage.glb</uri>");
   });
 

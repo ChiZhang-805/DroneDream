@@ -4,13 +4,21 @@ import {
   calculateVehicleDiagnostics,
   createVehicleModelDraft,
   createVehicleModelFromBrief,
+  evaluateVehicleConstraints,
   migrateVehicleModelDraft,
+  mirrorVehicleComponent,
   radialArrayVehicleComponent,
   rebuildVehicleRotorArchitecture,
+  removeVehicleComponent,
   setVehicleComponentLocked,
+  solveVehicleConstraints,
   validateVehicleModel,
 } from "../features/vehicleStudio/model";
 import { assertVehicleModelShape } from "../features/vehicleStudio/pack";
+import {
+  applyVehicleCatalogEntry,
+  applyVehicleMaterialPreset,
+} from "../features/vehicleStudio/catalog";
 
 describe("Vehicle Studio engineering generator", () => {
   it("turns a payload brief into an editable redundant assembly", () => {
@@ -31,6 +39,7 @@ describe("Vehicle Studio engineering generator", () => {
     expect(draft.constraints.some((constraint) => constraint.type === "radial-array")).toBe(true);
     expect(calculateVehicleDiagnostics(draft).minimumRotorClearanceM).toBeGreaterThanOrEqual(.017);
     expect(validateVehicleModel(draft).some((issue) => issue.code === "rotor-disk-intersection")).toBe(false);
+    expect(validateVehicleModel(draft).some((issue) => issue.code === "unsatisfied-constraint")).toBe(false);
     expect(decisions).toHaveLength(4);
   });
 
@@ -48,6 +57,9 @@ describe("Vehicle Studio engineering generator", () => {
 
     expect(draft.components.some((component) => component.kind === "camera-gimbal")).toBe(true);
     expect(draft.components.some((component) => component.kind === "sensor" && component.tags.includes("lidar"))).toBe(true);
+    expect(draft.sensors.find((sensor) => sensor.type === "lidar")?.componentId).toBe(
+      draft.components.find((component) => component.kind === "sensor" && component.tags.includes("lidar"))?.id,
+    );
     expect(diagnostics.componentCount).toBeGreaterThan(25);
     expect(diagnostics.totalMassKg).toBeGreaterThan(0);
     expect(diagnostics.batteryEnergyWh).toBeGreaterThan(0);
@@ -191,5 +203,226 @@ describe("Vehicle Studio engineering generator", () => {
 
     expect(locked.components.find((component) => component.id === componentId)?.locked).toBe(true);
     expect(unlocked.components.find((component) => component.id === componentId)?.locked).toBe(false);
+  });
+
+  it("evaluates balance constraints from only their referenced components", () => {
+    const draft = createVehicleModelDraft();
+    const frame = draft.components.find((component) => component.kind === "frame")!;
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    camera.transform.positionM.x = 4;
+    draft.constraints = [{ id: crypto.randomUUID(), type: "balance", componentIds: [frame.id], axis: "y", value: .001, enabled: true }];
+
+    expect(evaluateVehicleConstraints(draft)[0].status).toBe("satisfied");
+  });
+
+  it("keeps constraint validation tolerance independent from a coarse design grid", () => {
+    const draft = createVehicleModelDraft();
+    const props = draft.components.filter((component) => component.kind === "propeller");
+    const clearance = calculateVehicleDiagnostics(draft).minimumRotorClearanceM;
+    draft.designParameters.gridM = .1;
+    draft.constraints = [{ id: crypto.randomUUID(), type: "clearance", componentIds: props.map((component) => component.id), axis: "y", value: clearance + .01, enabled: true }];
+
+    expect(evaluateVehicleConstraints(draft)[0].status).toBe("violated");
+  });
+
+  it("evaluates and solves every mirrored rotation axis as well as position", () => {
+    const draft = createVehicleModelDraft();
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    camera.transform.rotationDeg = { x: 11, y: 18, z: 23 };
+    const mirrored = mirrorVehicleComponent(draft, camera.id, "x");
+    const mirrorConstraint = mirrored.constraints.find((constraint) => constraint.type === "mirror")!;
+    const mirroredCamera = mirrored.components.find((component) => component.id === mirrorConstraint.componentIds[1])!;
+    expect(mirroredCamera.transform.rotationDeg).toEqual({ x: 11, y: -18, z: -23 });
+    mirroredCamera.transform.rotationDeg.z = 9;
+
+    expect(evaluateVehicleConstraints(mirrored).find((evaluation) => evaluation.constraintId === mirrorConstraint.id)?.status).toBe("violated");
+    const solved = solveVehicleConstraints(mirrored);
+    expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === mirrorConstraint.id)?.status).toBe("satisfied");
+    expect(solved.draft.components.find((component) => component.id === mirrorConstraint.componentIds[1])?.transform.rotationDeg).toEqual({ x: 11, y: -18, z: -23 });
+  });
+
+  it("solves a mirror from the locked member when the other side is editable", () => {
+    const draft = createVehicleModelDraft();
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    const mirrored = mirrorVehicleComponent(draft, camera.id, "x");
+    const constraint = mirrored.constraints.find((candidate) => candidate.type === "mirror")!;
+    const locked = mirrored.components.find((component) => component.id === constraint.componentIds[1])!;
+    locked.locked = true;
+    const lockedTransform = structuredClone(locked.transform);
+    mirrored.components.find((component) => component.id === constraint.componentIds[0])!.transform.positionM.x += .08;
+    const solved = solveVehicleConstraints(mirrored);
+
+    expect(solved.solvedCount).toBe(1);
+    expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("satisfied");
+    expect(solved.draft.components.find((component) => component.id === locked.id)?.transform).toEqual(lockedTransform);
+  });
+
+  it("keeps propulsion fleet presets atomic when a member is locked", () => {
+    const draft = createVehicleModelDraft();
+    const motors = draft.components.filter((component) => component.kind === "motor");
+    motors[0].locked = true;
+    const motorMasses = motors.map((motor) => motor.mass.massKg);
+    const maximumThrustPerMotorN = draft.propulsion.maximumThrustPerMotorN;
+    const result = applyVehicleCatalogEntry(draft, "motor-2814");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft.propulsion.maximumThrustPerMotorN).toBe(maximumThrustPerMotorN);
+    expect(result.draft.components.filter((component) => component.kind === "motor").map((motor) => motor.mass.massKg)).toEqual(motorMasses);
+  });
+
+  it("does not replace a locked singleton through the component catalog", () => {
+    const draft = createVehicleModelDraft();
+    const battery = draft.components.find((component) => component.kind === "battery")!;
+    battery.locked = true;
+    const result = applyVehicleCatalogEntry(draft, "battery-6s-10");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft).toBe(draft);
+    expect(result.draft.propulsion.batteryCapacityMah).toBe(draft.propulsion.batteryCapacityMah);
+    expect(result.draft.components.find((component) => component.id === battery.id)?.mass.massKg).toBe(battery.mass.massKg);
+  });
+
+  it("does not rebuild a rotor architecture that contains a locked member", () => {
+    const draft = createVehicleModelDraft();
+    const arm = draft.components.find((component) => component.kind === "arm")!;
+    arm.locked = true;
+    const result = applyVehicleCatalogEntry(draft, "airframe-hexa-680");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft).toBe(draft);
+    expect(result.draft.propulsion.motorCount).toBe(4);
+    expect(result.draft.components.some((component) => component.id === arm.id && component.locked)).toBe(true);
+  });
+
+  it("preserves architecture-specific arm lengths when applying a tube profile", () => {
+    const draft = applyVehicleCatalogEntry(createVehicleModelDraft(), "airframe-octo-900").draft;
+    const lengthsBefore = draft.components.filter((component) => component.kind === "arm").map((arm) => arm.geometry.sizeM.x);
+    const result = applyVehicleCatalogEntry(draft, "arm-carbon-25");
+
+    expect(result.affectedCount).toBe(8);
+    expect(result.draft.components.filter((component) => component.kind === "arm").map((arm) => arm.geometry.sizeM.x)).toEqual(lengthsBefore);
+  });
+
+  it("evaluates and solves radial-array axial offsets", () => {
+    const draft = createVehicleModelDraft();
+    const motors = draft.components.filter((component) => component.kind === "motor");
+    const constraint = { id: crypto.randomUUID(), type: "radial-array" as const, componentIds: motors.map((motor) => motor.id), axis: "y" as const, value: motors.length, enabled: true };
+    draft.constraints = [constraint];
+    motors[1].transform.positionM.y += .03;
+
+    expect(evaluateVehicleConstraints(draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("violated");
+    const solved = solveVehicleConstraints(draft);
+    expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("satisfied");
+    expect(solved.draft.components.find((component) => component.id === motors[1].id)?.transform.positionM.y).toBe(motors[0].transform.positionM.y);
+  });
+
+  it("evaluates and solves radial-array member orientation", () => {
+    const draft = applyVehicleCatalogEntry(createVehicleModelDraft(), "airframe-hexa-680").draft;
+    const arms = draft.components.filter((component) => component.kind === "arm");
+    const constraint = draft.constraints.find((candidate) => candidate.type === "radial-array" && candidate.componentIds.includes(arms[0].id))!;
+    arms[2].transform.rotationDeg.y += 12;
+
+    expect(evaluateVehicleConstraints(draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("violated");
+    const solved = solveVehicleConstraints(draft);
+    expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("satisfied");
+  });
+
+  it("keeps landing skids on opposite sides during a partial fleet update", () => {
+    const draft = createVehicleModelDraft();
+    const skids = draft.components.filter((component) => component.kind === "landing-gear");
+    skids[0].locked = true;
+    const result = applyVehicleCatalogEntry(draft, "gear-tall");
+    const updatedSkids = result.draft.components.filter((component) => component.kind === "landing-gear");
+
+    expect(result.affectedCount).toBe(1);
+    expect(Math.sign(updatedSkids[0].transform.positionM.z)).toBe(-1);
+    expect(Math.sign(updatedSkids[1].transform.positionM.z)).toBe(1);
+  });
+
+  it("removes catalog sensor metadata with its physical component", () => {
+    const added = applyVehicleCatalogEntry(createVehicleModelDraft(), "sensor-lidar");
+    const sensorComponent = added.draft.components.find((component) => component.id === added.selectedComponentId)!;
+    const boundSensorId = added.draft.sensors.find((sensor) => sensor.componentId === sensorComponent.id)!.id;
+    const removed = removeVehicleComponent(added.draft, sensorComponent.id);
+
+    expect(added.draft.sensors.some((sensor) => sensor.id === boundSensorId)).toBe(true);
+    expect(removed.sensors.some((sensor) => sensor.id === boundSensorId)).toBe(false);
+    expect(validateVehicleModel(added.draft).some((issue) => issue.code === "invalid-tags")).toBe(false);
+    expect(() => assertVehicleModelShape(added.draft)).not.toThrow();
+  });
+
+  it("updates sensor metadata when a catalog preset replaces its bound component", () => {
+    const assisted = createVehicleModelFromBrief({ name: "Camera replacement", mission: "survey", camera: true }).draft;
+    const camera = assisted.components.find((component) => component.kind === "camera-gimbal")!;
+    const before = assisted.sensors.filter((sensor) => sensor.componentId === camera.id);
+    const replaced = applyVehicleCatalogEntry(assisted, "gimbal-survey").draft;
+    const after = replaced.sensors.filter((sensor) => sensor.componentId === camera.id);
+
+    expect(before).toHaveLength(1);
+    expect(after).toHaveLength(1);
+    expect(after[0].model).toBe("Stabilized survey camera");
+  });
+
+  it("solves a radial array around a locked member", () => {
+    const draft = applyVehicleCatalogEntry(createVehicleModelDraft(), "airframe-hexa-680").draft;
+    const arms = draft.components.filter((component) => component.kind === "arm");
+    const constraint = draft.constraints.find((candidate) => candidate.type === "radial-array" && candidate.componentIds.includes(arms[0].id))!;
+    draft.constraints = [constraint];
+    arms[2].locked = true;
+    const lockedPosition = structuredClone(arms[2].transform.positionM);
+    arms[0].transform.positionM.x += .07;
+    const solved = solveVehicleConstraints(draft);
+
+    expect(solved.solvedCount).toBe(1);
+    expect(evaluateVehicleConstraints(solved.draft)[0].status).toBe("satisfied");
+    expect(solved.draft.components.find((component) => component.id === arms[2].id)?.transform.positionM).toEqual(lockedPosition);
+  });
+
+  it("preserves retained user constraints across an architecture rebuild", () => {
+    const draft = createVehicleModelDraft();
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    const battery = draft.components.find((component) => component.kind === "battery")!;
+    const constraint = { id: crypto.randomUUID(), type: "mirror" as const, componentIds: [camera.id, battery.id], axis: "x" as const, value: 0, enabled: false };
+    draft.constraints = [constraint];
+    const rebuilt = applyVehicleCatalogEntry(draft, "airframe-hexa-680").draft;
+
+    expect(rebuilt.constraints.some((candidate) => candidate.id === constraint.id)).toBe(true);
+  });
+
+  it("rejects an architecture preset cleanly when no frame remains", () => {
+    const draft = createVehicleModelDraft();
+    const battery = draft.components.find((component) => component.kind === "battery")!;
+    battery.parentId = null;
+    const frame = draft.components.find((component) => component.kind === "frame")!;
+    const frameless = removeVehicleComponent(draft, frame.id);
+    const result = applyVehicleCatalogEntry(frameless, "airframe-hexa-680");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft).toBe(frameless);
+  });
+
+  it("rejects an architecture preset without looping on a locked parent cycle", () => {
+    const draft = createVehicleModelDraft();
+    const battery = draft.components.find((component) => component.kind === "battery")!;
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    battery.parentId = camera.id;
+    camera.parentId = battery.id;
+    camera.locked = true;
+    const result = applyVehicleCatalogEntry(draft, "airframe-hexa-680");
+
+    expect(result.affectedCount).toBe(0);
+    expect(result.draft).toBe(draft);
+  });
+
+  it("can leave a physical material preset without retaining density mode", () => {
+    const draft = createVehicleModelDraft();
+    const frame = draft.components.find((component) => component.kind === "frame")!;
+    const materialized = applyVehicleMaterialPreset(draft, frame.id, "aluminum-6061");
+    const customized = applyVehicleMaterialPreset(materialized, frame.id, "");
+    const customizedFrame = customized.components.find((component) => component.id === frame.id)!;
+
+    expect(customizedFrame.mass.mode).toBe("explicit");
+    expect(customizedFrame.tags.some((tag) => tag.startsWith("material:"))).toBe(false);
+    expect(customizedFrame.mass.massKg).toBeGreaterThan(0);
   });
 });
