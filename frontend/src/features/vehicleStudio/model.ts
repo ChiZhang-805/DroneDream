@@ -263,6 +263,52 @@ export function getVehicleComponentMassProperties(component: VehicleComponentDra
   return { volumeM3, massKg };
 }
 
+export function scaleVehicleModelMass(
+  draft: VehicleModelDraft,
+  targetMassKg: number,
+): VehicleModelDraft {
+  if (!Number.isFinite(targetMassKg) || targetMassKg <= 0 || targetMassKg > VEHICLE_MODEL_LIMITS.massKg) {
+    throw new Error(`Vehicle mass must be greater than zero and no more than ${VEHICLE_MODEL_LIMITS.massKg}.`);
+  }
+  if (draft.components.length === 0) throw new Error("Vehicle mass cannot be assigned without physical components.");
+  const currentMassKg = draft.components.reduce(
+    (sum, component) => sum + getVehicleComponentMassProperties(component).massKg,
+    0,
+  );
+  if (!Number.isFinite(currentMassKg) || currentMassKg <= 0) {
+    throw new Error("Vehicle component mass must be valid before it can be scaled.");
+  }
+
+  const next = structuredClone(draft);
+  const scale = targetMassKg / currentMassKg;
+  for (const component of next.components) {
+    if (component.mass.mode === "density") component.mass.densityKgM3 *= scale;
+    else component.mass.massKg *= scale;
+  }
+
+  // Put the floating-point remainder on one physical component so the summary
+  // mass and the assembly used by diagnostics and export remain the same fact.
+  const scaledMassKg = next.components.reduce(
+    (sum, component) => sum + getVehicleComponentMassProperties(component).massKg,
+    0,
+  );
+  const anchor = next.components[0];
+  const remainderKg = targetMassKg - scaledMassKg;
+  if (anchor.mass.mode === "density") {
+    const volumeM3 = getVehicleComponentMassProperties(anchor).volumeM3;
+    if (!Number.isFinite(volumeM3) || volumeM3 <= 0) throw new Error("Vehicle component volume must be valid before mass can be scaled.");
+    anchor.mass.densityKgM3 += remainderKg / volumeM3;
+  } else {
+    anchor.mass.massKg += remainderKg;
+  }
+  next.body.massKg = next.components.reduce(
+    (sum, component) => sum + getVehicleComponentMassProperties(component).massKg,
+    0,
+  );
+  next.updatedAt = new Date().toISOString();
+  return next;
+}
+
 export function getVehicleComponentDescendantIds(draft: VehicleModelDraft, componentId: string): Set<string> {
   const descendants = new Set<string>();
   let changed = true;

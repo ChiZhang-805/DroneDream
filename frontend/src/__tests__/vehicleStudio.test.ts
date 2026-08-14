@@ -17,7 +17,9 @@ import {
   verifyVehiclePackDraft,
 } from "../features/vehicleStudio/pack";
 import {
+  calculateVehicleDiagnostics,
   createVehicleModelDraft,
+  scaleVehicleModelMass,
   validateVehicleModel,
 } from "../features/vehicleStudio/model";
 import {
@@ -99,6 +101,42 @@ describe("Universal Vehicle Studio contract", () => {
     expect(sdf).not.toContain("<cylinder><radius>0.1</radius><length>0.34</length></cylinder>");
     expect(sdf).toContain('<model name="custom-quadrotor">');
     vi.restoreAllMocks();
+  });
+
+  it("scales the physical assembly when an AI brief requests a total vehicle mass", () => {
+    const draft = createVehicleModelDraft();
+    const original = structuredClone(draft);
+    const originalMasses = draft.components.map((component) =>
+      component.mass.mode === "density" ? component.mass.densityKgM3 : component.mass.massKg);
+
+    const scaled = scaleVehicleModelMass(draft, 3.2);
+
+    expect(calculateVehicleDiagnostics(scaled).totalMassKg).toBeCloseTo(3.2, 10);
+    expect(scaled.body.massKg).toBeCloseTo(3.2, 10);
+    expect(scaled.components.some((component, index) => {
+      const value = component.mass.mode === "density" ? component.mass.densityKgM3 : component.mass.massKg;
+      return value !== originalMasses[index];
+    })).toBe(true);
+    expect(draft).toEqual(original);
+  });
+
+  it("exports a solid cone with cone inertia instead of cylinder inertia", () => {
+    const draft = createVehicleModelDraft();
+    const cone = structuredClone(draft.components.find((component) => component.kind === "fuselage")!);
+    cone.id = "solid-cone";
+    cone.name = "Solid cone";
+    cone.parentId = null;
+    cone.geometry.primitive = "cone";
+    cone.geometry.radiusM = 0.2;
+    cone.geometry.lengthM = 0.6;
+    cone.geometry.meshUri = "";
+    cone.transform.scale = { x: 1, y: 1, z: 1 };
+    cone.mass = { mode: "explicit", massKg: 2, densityKgM3: 1_000 };
+    draft.components = [cone];
+    draft.constraints = [];
+
+    const sdf = generateGazeboSdf(draft);
+    expect(sdf).toContain("<ixx>0.039</ixx><iyy>0.039</iyy><izz>0.024</izz>");
   });
 
   it("normalizes preview transforms through both expansion and scene scale", () => {

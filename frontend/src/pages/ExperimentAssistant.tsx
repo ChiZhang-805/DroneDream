@@ -57,6 +57,7 @@ import {
 import {
   createVehicleModelFromBrief,
   rebuildVehicleRotorArchitecture,
+  scaleVehicleModelMass,
   type VehicleDesignMission,
   type VehicleModelDraft,
 } from "../features/vehicleStudio/model";
@@ -483,7 +484,7 @@ async function saveUniversalVehicleDraft(
       propellerDiameterM: draft.propulsion.propellerDiameterM,
     });
   }
-  if (requestedVehicleMassKg !== null) draft.body.massKg = requestedVehicleMassKg;
+  if (requestedVehicleMassKg !== null) draft = scaleVehicleModelMass(draft, requestedVehicleMassKg);
   draft.updatedAt = new Date().toISOString();
   saveVehicleModel(localStorageScope, draft);
   if (cloudBoundary) {

@@ -33,12 +33,15 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 
 import { VehicleModelPreview3D } from "../components/VehicleModelPreview3D";
 import { useAuth } from "../features/auth/AuthContext";
-import { activeAssistantTenantContext } from "../features/experiment/workspaceRegistry";
+import {
+  activeAssistantTenantContext,
+  subscribeActiveAssistantTenantContext,
+} from "../features/experiment/workspaceRegistry";
 import {
   buildVehiclePackDraft,
   verifyVehiclePackDraft,
@@ -216,7 +219,19 @@ export function VehicleStudio() {
   const copy = locale === "zh-CN" ? ZH : EN;
   const { account } = useAuth();
   const ownerId = account?.id ?? "local";
-  const tenantContext = activeAssistantTenantContext(ownerId);
+  const subscribeTenantContext = useCallback(
+    (listener: () => void) => subscribeActiveAssistantTenantContext(ownerId, listener),
+    [ownerId],
+  );
+  const readTenantContext = useCallback(
+    () => activeAssistantTenantContext(ownerId),
+    [ownerId],
+  );
+  const tenantContext = useSyncExternalStore(
+    subscribeTenantContext,
+    readTenantContext,
+    readTenantContext,
+  );
   const localStorageScope = useMemo(() => vehicleModelStorageScope({
     userId: ownerId,
     tenantId: tenantContext.tenantId,
@@ -254,6 +269,12 @@ export function VehicleStudio() {
   const undoRef = useRef<VehicleModelDraft[]>([]);
   const redoRef = useRef<VehicleModelDraft[]>([]);
   const importRef = useRef<HTMLInputElement>(null);
+  const draftRef = useRef(draft);
+  const loadGenerationRef = useRef(0);
+  const replaceDraft = useCallback((next: VehicleModelDraft) => {
+    draftRef.current = next;
+    setDraft(next);
+  }, []);
 
   const issues = useMemo(() => validateVehicleModel(draft), [draft]);
   const diagnostics = useMemo(() => calculateVehicleDiagnostics(draft), [draft]);
@@ -263,51 +284,57 @@ export function VehicleStudio() {
 
   useEffect(() => {
     let cancelled = false;
+    const loadGeneration = ++loadGenerationRef.current;
     const ownerModels = loadVehicleModels(localStorageScope);
     const requestedModel = requestedDraftId ? ownerModels.find((model) => model.draftId === requestedDraftId) : null;
     const next = requestedModel?.revisions[0] ?? ownerModels[0]?.revisions[0] ?? createVehicleModelDraft();
+    const initialDraft = cloneDraft(next);
+    const initialFingerprint = JSON.stringify(initialDraft);
     setModels(ownerModels);
-    setDraft(cloneDraft(next));
+    replaceDraft(initialDraft);
     setSelectedId(next.components[0]?.id ?? null);
     undoRef.current = [];
     redoRef.current = [];
     if (cloudBoundary) {
       void loadCloudVehicleModels(cloudBoundary).then((cloudModels) => {
-        if (cancelled || !cloudModels) return;
-        const merged = cacheVehicleModels(localStorageScope, mergeVehicleModelStores(ownerModels, cloudModels));
+        if (cancelled || loadGenerationRef.current !== loadGeneration || !cloudModels) return;
+        const latestLocalModels = loadVehicleModels(localStorageScope);
+        const merged = cacheVehicleModels(localStorageScope, mergeVehicleModelStores(latestLocalModels, cloudModels));
         const requestedCloudModel = requestedDraftId
           ? merged.find((model) => model.draftId === requestedDraftId)
           : null;
         const restored = requestedCloudModel?.revisions[0] ?? merged[0]?.revisions[0] ?? next;
         setModels(merged);
-        setDraft(cloneDraft(restored));
-        setSelectedId(restored.components[0]?.id ?? null);
+        if (JSON.stringify(draftRef.current) === initialFingerprint) {
+          replaceDraft(cloneDraft(restored));
+          setSelectedId(restored.components[0]?.id ?? null);
+        }
       }).catch(() => {
         if (!cancelled) setMessage("Cloud revisions are unavailable. Local editing remains active.");
       });
     }
     return () => { cancelled = true; };
-  }, [cloudBoundary, localStorageScope, requestedDraftId]);
+  }, [cloudBoundary, localStorageScope, replaceDraft, requestedDraftId]);
 
   const commit = (next: VehicleModelDraft) => {
     undoRef.current = [...undoRef.current.slice(-49), cloneDraft(draft)];
     redoRef.current = [];
     next.updatedAt = new Date().toISOString();
-    setDraft(next);
+    replaceDraft(next);
     setMessage(null);
   };
   const undo = () => {
     const previous = undoRef.current.pop();
     if (!previous) return;
     redoRef.current.push(cloneDraft(draft));
-    setDraft(previous);
+    replaceDraft(previous);
     if (selectedId && !previous.components.some((part) => part.id === selectedId)) setSelectedId(previous.components[0]?.id ?? null);
   };
   const redo = () => {
     const next = redoRef.current.pop();
     if (!next) return;
     undoRef.current.push(cloneDraft(draft));
-    setDraft(next);
+    replaceDraft(next);
   };
   const updateSelected = (mutator: (component: VehicleComponentDraft) => void) => {
     if (!selectedId) return;
@@ -338,7 +365,7 @@ export function VehicleStudio() {
   const persistRevision = async (revision: VehicleModelDraft) => {
     const localModels = saveVehicleModel(localStorageScope, revision);
     setModels(localModels);
-    setDraft(revision);
+    replaceDraft(revision);
     if (!cloudBoundary) return true;
     try {
       return await saveCloudVehicleModel(cloudBoundary, revision);
@@ -411,10 +438,10 @@ export function VehicleStudio() {
       <aside className="vehicle-workbench-left">
         <section className="vehicle-library-panel">
           <div className="vehicle-panel-heading"><strong>{copy.library}</strong><button type="button" aria-label={copy.newModel} onClick={() => {
-            const next = createVehicleModelDraft(); setDraft(next); setSelectedId(next.components[0]?.id ?? null); undoRef.current = []; redoRef.current = [];
+            const next = createVehicleModelDraft(); replaceDraft(next); setSelectedId(next.components[0]?.id ?? null); undoRef.current = []; redoRef.current = [];
           }}><Plus /></button></div>
           <div className="vehicle-saved-list">{models.length ? models.map((model) => <button type="button" className={draft.draftId === model.draftId ? "is-active" : ""} key={model.draftId} onClick={() => {
-            const next = cloneDraft(model.revisions[0]); setDraft(next); setSelectedId(next.components[0]?.id ?? null); undoRef.current = []; redoRef.current = [];
+            const next = cloneDraft(model.revisions[0]); replaceDraft(next); setSelectedId(next.components[0]?.id ?? null); undoRef.current = []; redoRef.current = [];
           }}><Box /><span><strong>{model.revisions[0].name}</strong><small>r{model.revisions[0].revision} · {model.revisions[0].components.length} parts</small></span><ChevronRight /></button>) : <p>{copy.empty}</p>}</div>
         </section>
         <section className="vehicle-component-palette">
@@ -529,7 +556,7 @@ export function VehicleStudio() {
                   }
                   setModels(removeVehicleModel(localStorageScope, draftId));
                   const next = createVehicleModelDraft();
-                  setDraft(next);
+                  replaceDraft(next);
                   setSelectedId(next.components[0]?.id ?? null);
                   setMessage("Aircraft deleted.");
                 } catch {

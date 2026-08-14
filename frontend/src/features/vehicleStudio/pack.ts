@@ -123,7 +123,13 @@ function componentInertia(component: VehicleComponentDraft) {
     const moment = 2 * mass * scaled.radius ** 2 / 5;
     return { ixx: moment, iyy: moment, izz: moment };
   }
-  if (["cylinder", "capsule", "cone"].includes(component.geometry.primitive)) {
+  if (component.geometry.primitive === "cone") {
+    const axial = 3 * mass * scaled.radius ** 2 / 10;
+    const transverse = 3 * mass * scaled.radius ** 2 / 20 + 3 * mass * scaled.length ** 2 / 80;
+    // Primitive length is aligned to Vehicle Studio Y / SDF Z.
+    return { ixx: transverse, iyy: transverse, izz: axial };
+  }
+  if (["cylinder", "capsule"].includes(component.geometry.primitive)) {
     const axial = mass * scaled.radius ** 2 / 2;
     const transverse = mass * (3 * scaled.radius ** 2 + scaled.length ** 2) / 12;
     // Primitive length is aligned to Vehicle Studio Y / SDF Z.

@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearExperimentDraft, saveExperimentDraft } from "../features/experiment/draftStorage";
 import {
+  activeAssistantTenantContext,
   experimentWorkspacePath,
   hydrateAssistantWorkspaceIndex,
   isExperimentWorkspaceNameAvailable,
@@ -10,6 +11,7 @@ import {
   reorderExperimentWorkspaceItems,
   registerExperimentWorkspace,
   setActiveAssistantTenantContext,
+  subscribeActiveAssistantTenantContext,
   updateExperimentWorkspace,
   type ExperimentWorkspace,
 } from "../features/experiment/workspaceRegistry";
@@ -38,6 +40,30 @@ describe("experiment workspace registry", () => {
     window.sessionStorage.clear();
     setActiveAssistantTenantContext(OWNER_A, { tenantId: OWNER_A, organizationId: null });
     setActiveAssistantTenantContext(OWNER_B, { tenantId: OWNER_B, organizationId: null });
+  });
+
+  it("notifies reactive consumers when an account changes tenant boundaries", () => {
+    const ownerId = "reactive-tenant-owner";
+    const listener = vi.fn();
+    const unsubscribe = subscribeActiveAssistantTenantContext(ownerId, listener);
+
+    expect(activeAssistantTenantContext(ownerId)).toEqual({
+      tenantId: ownerId,
+      organizationId: null,
+    });
+    setActiveAssistantTenantContext(ownerId, {
+      tenantId: "organization-reactive",
+      organizationId: "organization-reactive",
+    });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(activeAssistantTenantContext(ownerId)).toEqual({
+      tenantId: "organization-reactive",
+      organizationId: "organization-reactive",
+    });
+    unsubscribe();
+    setActiveAssistantTenantContext(ownerId, { tenantId: ownerId, organizationId: null });
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("isolates workspaces by account and resumes each scoped draft", () => {

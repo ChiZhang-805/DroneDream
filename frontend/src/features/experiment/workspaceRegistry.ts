@@ -6,6 +6,7 @@ const WORKSPACE_REGISTRY_PREFIX = "drone-dream:experiment-workspaces:v3:";
 const V2_WORKSPACE_REGISTRY_PREFIX = "drone-dream:experiment-workspaces:v2:";
 const LEGACY_WORKSPACE_REGISTRY_PREFIX = "drone-dream:experiment-workspaces:v1:";
 const activeTenantContexts = new Map<string, AssistantTenantContext>();
+const activeTenantContextListeners = new Map<string, Set<() => void>>();
 export const EXPERIMENT_WORKSPACES_CHANGED_EVENT =
   "drone-dream:experiment-workspaces-changed";
 
@@ -110,8 +111,25 @@ export interface AssistantTenantContext {
 
 export function activeAssistantTenantContext(ownerId: string): AssistantTenantContext {
   const normalizedOwnerId = normalizeOwnerId(ownerId);
-  return activeTenantContexts.get(normalizedOwnerId)
-    ?? { tenantId: normalizedOwnerId, organizationId: null };
+  const existing = activeTenantContexts.get(normalizedOwnerId);
+  if (existing) return existing;
+  const fallback = { tenantId: normalizedOwnerId, organizationId: null };
+  activeTenantContexts.set(normalizedOwnerId, fallback);
+  return fallback;
+}
+
+export function subscribeActiveAssistantTenantContext(
+  ownerId: string,
+  listener: () => void,
+): () => void {
+  const normalizedOwnerId = normalizeOwnerId(ownerId);
+  const listeners = activeTenantContextListeners.get(normalizedOwnerId) ?? new Set<() => void>();
+  listeners.add(listener);
+  activeTenantContextListeners.set(normalizedOwnerId, listeners);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) activeTenantContextListeners.delete(normalizedOwnerId);
+  };
 }
 
 export function setActiveAssistantTenantContext(
@@ -126,7 +144,10 @@ export function setActiveAssistantTenantContext(
   }
   // This boundary is deliberately memory-only. A previous browser session may
   // not authorize a current organization after membership was revoked.
+  const previous = activeAssistantTenantContext(normalizedOwnerId);
+  if (previous.tenantId === tenantId && previous.organizationId === organizationId) return;
   activeTenantContexts.set(normalizedOwnerId, { tenantId, organizationId });
+  for (const listener of activeTenantContextListeners.get(normalizedOwnerId) ?? []) listener();
   emitRegistryChanged(normalizedOwnerId);
 }
 
