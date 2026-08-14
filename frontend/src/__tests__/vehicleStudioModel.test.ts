@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateVehicleDiagnostics,
+  createVehicleModelDraft,
   createVehicleModelFromBrief,
+  migrateVehicleModelDraft,
   radialArrayVehicleComponent,
   rebuildVehicleRotorArchitecture,
+  setVehicleComponentLocked,
   validateVehicleModel,
 } from "../features/vehicleStudio/model";
 import { assertVehicleModelShape } from "../features/vehicleStudio/pack";
@@ -134,5 +137,44 @@ describe("Vehicle Studio engineering generator", () => {
     )))).toBe(true);
     expect(rebuilt.updatedAt).toBe("2026-08-14T05:00:00.000Z");
     expect(() => assertVehicleModelShape(rebuilt)).not.toThrow();
+  });
+
+  it("preserves the exact legacy total mass when migrating a lightweight model", () => {
+    const draft = createVehicleModelDraft(new Date("2026-08-14T00:00:00.000Z"));
+    const legacyMassKg = .25;
+    const legacy = {
+      schemaVersion: 1,
+      draftId: draft.draftId,
+      revision: draft.revision,
+      name: draft.name,
+      manufacturer: draft.manufacturer,
+      vehicleClass: draft.vehicleClass,
+      body: { ...draft.body, massKg: legacyMassKg },
+      propulsion: draft.propulsion,
+      sensors: draft.sensors,
+      autopilot: draft.autopilot,
+      controlTarget: draft.controlTarget,
+      targetEditions: draft.targetEditions,
+      notes: draft.notes,
+      createdAt: draft.createdAt,
+      updatedAt: draft.updatedAt,
+    };
+
+    const migrated = migrateVehicleModelDraft(legacy);
+    const migratedMassKg = migrated.components.reduce((sum, component) => sum + component.mass.massKg, 0);
+
+    expect(migratedMassKg).toBeCloseTo(legacyMassKg, 12);
+    expect(migrated.components.every((component) => component.mass.massKg > 0)).toBe(true);
+  });
+
+  it("allows an assembly component to be unlocked through the lock operation", () => {
+    const draft = createVehicleModelDraft();
+    const componentId = draft.components[0].id;
+
+    const locked = setVehicleComponentLocked(draft, componentId, true);
+    const unlocked = setVehicleComponentLocked(locked, componentId, false);
+
+    expect(locked.components.find((component) => component.id === componentId)?.locked).toBe(true);
+    expect(unlocked.components.find((component) => component.id === componentId)?.locked).toBe(false);
   });
 });

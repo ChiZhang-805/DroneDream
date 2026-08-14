@@ -48,6 +48,20 @@ function primitiveGeometry(component: VehiclePreviewComponent): THREE.BufferGeom
   return new THREE.BoxGeometry(Math.max(size.x, .012), Math.max(size.y, .012), Math.max(size.z, .012), 2, 2, 2);
 }
 
+const ENGINEERING_PRIMITIVE_BY_KIND: Partial<Record<VehiclePreviewComponent["kind"], VehiclePreviewComponent["primitive"]>> = {
+  fuselage: "capsule",
+  frame: "rounded-box",
+  arm: "rounded-box",
+  motor: "cylinder",
+  propeller: "rounded-box",
+  "landing-gear": "capsule",
+  battery: "rounded-box",
+  "flight-controller": "rounded-box",
+  sensor: "cylinder",
+  "camera-gimbal": "sphere",
+  payload: "rounded-box",
+};
+
 function materialFor(component: VehiclePreviewComponent, options: Partial<THREE.MeshStandardMaterialParameters> = {}) {
   return new THREE.MeshStandardMaterial({
     color: component.color,
@@ -86,6 +100,16 @@ function buildEngineeringComponent(component: VehiclePreviewComponent, wireframe
   const dark = materialFor(component, { color: new THREE.Color(component.color).multiplyScalar(.34), metalness: .72, roughness: .3, wireframe });
   const light = materialFor(component, { color: new THREE.Color(component.color).lerp(new THREE.Color(0xffffff), .42), metalness: .24, roughness: .28, wireframe });
   const carbon = new THREE.MeshStandardMaterial({ color: 0x171421, metalness: .62, roughness: .32, wireframe });
+
+  // The detailed meshes below are visualizations of each built-in part's default
+  // primitive. Once the user chooses a different primitive, the viewport must
+  // render that exact engineering selection instead of retaining the decoration.
+  if (ENGINEERING_PRIMITIVE_BY_KIND[component.kind] !== component.primitive) {
+    addPart(group, primitiveGeometry(component), main);
+    group.userData.componentId = component.id;
+    group.traverse((object) => { object.userData.componentId = component.id; });
+    return group;
+  }
 
   switch (component.kind) {
     case "fuselage": {

@@ -56,6 +56,7 @@ import {
   removeVehicleConstraint,
   removeVehicleComponent,
   setVehicleComponentParent,
+  setVehicleComponentLocked,
   updateVehicleComponent,
   validateVehicleModel,
   type VehicleComponentDraft,
@@ -468,7 +469,7 @@ export function VehicleStudio() {
         <div className="vehicle-inspector-body">
           {inspectorTab === "assembly" ? <div className="vehicle-assembly-panel">
             <div className="vehicle-inspector-section-title"><span><GitBranch />Hierarchical assembly</span><small>{draft.components.length} components</small></div>
-            <div className="vehicle-assembly-tree">{assemblyRows.map(({ component, depth }) => <button type="button" className={component.id === selectedId ? "is-active" : ""} style={{ paddingLeft: `${10 + depth * 15}px` }} key={component.id} onClick={() => setSelectedId(component.id)}>{depth ? <Cable className="vehicle-assembly-branch" /> : <Layers3 className="vehicle-assembly-root" />}<span className={`vehicle-kind-dot kind-${component.kind}`} /><span><strong>{component.name}</strong><small>{KIND_NAMES[component.kind]} · {component.source}</small></span><i onClick={(event) => { event.stopPropagation(); commit(updateVehicleComponent(draft, component.id, (part) => { part.visible = !part.visible; })); }}>{component.visible ? <Eye /> : <EyeOff />}</i><i onClick={(event) => { event.stopPropagation(); commit(updateVehicleComponent(draft, component.id, (part) => { part.locked = !part.locked; })); }}>{component.locked ? <Lock /> : <Unlock />}</i></button>)}</div>
+            <div className="vehicle-assembly-tree">{assemblyRows.map(({ component, depth }) => <button type="button" className={component.id === selectedId ? "is-active" : ""} style={{ paddingLeft: `${10 + depth * 15}px` }} key={component.id} onClick={() => setSelectedId(component.id)}>{depth ? <Cable className="vehicle-assembly-branch" /> : <Layers3 className="vehicle-assembly-root" />}<span className={`vehicle-kind-dot kind-${component.kind}`} /><span><strong>{component.name}</strong><small>{KIND_NAMES[component.kind]} · {component.source}</small></span><i onClick={(event) => { event.stopPropagation(); commit(updateVehicleComponent(draft, component.id, (part) => { part.visible = !part.visible; })); }}>{component.visible ? <Eye /> : <EyeOff />}</i><i onClick={(event) => { event.stopPropagation(); commit(setVehicleComponentLocked(draft, component.id, !component.locked)); }}>{component.locked ? <Lock /> : <Unlock />}</i></button>)}</div>
           </div> : null}
 
           {inspectorTab === "properties" ? selected ? <div className="vehicle-properties-panel">

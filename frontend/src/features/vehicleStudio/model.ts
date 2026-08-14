@@ -635,10 +635,14 @@ export function migrateVehicleModelDraft(value: unknown): VehicleModelDraft {
       y: legacy.body.heightM,
       z: legacy.body.widthM,
     };
-    fuselage.mass.massKg = Math.max(.001, legacy.body.massKg - components
-      .filter((component) => component.id !== fuselage.id)
-      .reduce((sum, component) => sum + component.mass.massKg, 0));
   }
+  const generatedMassKg = components.reduce((sum, component) => sum + component.mass.massKg, 0);
+  const massScale = legacy.body.massKg / generatedMassKg;
+  for (const component of components) component.mass.massKg *= massScale;
+  // Put the floating-point remainder on one component so the migrated assembly
+  // preserves the legacy total exactly rather than silently gaining mass.
+  const migratedMassKg = components.reduce((sum, component) => sum + component.mass.massKg, 0);
+  if (fuselage) fuselage.mass.massKg += legacy.body.massKg - migratedMassKg;
   return {
     ...legacy,
     schemaVersion: VEHICLE_MODEL_SCHEMA_VERSION,
@@ -653,6 +657,9 @@ export function addVehicleComponent(draft: VehicleModelDraft, kind: VehicleCompo
 }
 export function updateVehicleComponent(draft: VehicleModelDraft, id: string, updater: (component: VehicleComponentDraft) => void): VehicleModelDraft {
   const next = structuredClone(draft); const component = next.components.find((item) => item.id === id); if (component && !component.locked) updater(component); next.updatedAt = new Date().toISOString(); return next;
+}
+export function setVehicleComponentLocked(draft: VehicleModelDraft, id: string, locked: boolean): VehicleModelDraft {
+  const next = structuredClone(draft); const component = next.components.find((item) => item.id === id); if (component) component.locked = locked; next.updatedAt = new Date().toISOString(); return next;
 }
 export function removeVehicleComponent(draft: VehicleModelDraft, id: string): VehicleModelDraft {
   const next = structuredClone(draft); const removed = new Set([id]); let changed = true;
