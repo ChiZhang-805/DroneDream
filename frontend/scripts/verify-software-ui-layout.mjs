@@ -794,7 +794,13 @@ async function verifyFixedScenarios(page, testCase) {
     };
   });
 
-  assert(metrics.version, `${testCase.id}: scenario catalog version badge is missing`);
+  assert.equal(
+    metrics.version,
+    null,
+    `${testCase.id}: removed scenario catalog version badge returned`,
+  );
+  assert.equal(await page.getByText("PX4 / GAZEBO STUDY", { exact: true }).count(), 0);
+  assert.equal(await page.getByText("Scenario catalog v1", { exact: true }).count(), 0);
   assert.equal(metrics.navEntries.filter((entry) => entry.active).length, 1);
   assert.equal(
     metrics.navEntries.find((entry) => entry.active)?.href,
@@ -809,12 +815,6 @@ async function verifyFixedScenarios(page, testCase) {
     metrics.documentWidth,
     `${testCase.id}: fixed scenarios caused horizontal document overflow`,
   );
-  assert(
-    metrics.version.left >= metrics.page.left - 1
-      && metrics.version.right <= metrics.page.right + 1,
-    `${testCase.id}: catalog version badge escaped the page bounds`,
-  );
-
   if (testCase.viewport.width >= 1000) {
     assert(closeEnough(metrics.cards[0].top, metrics.cards[1].top, 1));
     assert(closeEnough(metrics.cards[2].top, metrics.cards[3].top, 1));

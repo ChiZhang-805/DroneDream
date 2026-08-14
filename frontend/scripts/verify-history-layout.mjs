@@ -10,30 +10,16 @@ import { createServer } from "vite";
 
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repoRoot = path.resolve(frontendRoot, "..");
+
 function parseArguments(argv) {
   const valueOptions = new Set(["--label", "--output", "--port"]);
-  const booleanOptions = new Set([
-    "--expect-overflow",
-    "--expect-job-id-collision",
-  ]);
   const parsed = new Map();
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     const separator = argument.indexOf("=");
     const key = separator >= 0 ? argument.slice(0, separator) : argument;
-    if (!valueOptions.has(key) && !booleanOptions.has(key)) {
-      throw new Error(`Unknown history layout option: ${argument}`);
-    }
-    if (parsed.has(key)) {
-      throw new Error(`Duplicate history layout option: ${key}`);
-    }
-    if (booleanOptions.has(key)) {
-      if (separator >= 0) {
-        throw new Error(`Boolean history layout option cannot have a value: ${key}`);
-      }
-      parsed.set(key, true);
-      continue;
-    }
+    if (!valueOptions.has(key)) throw new Error(`Unknown history layout option: ${argument}`);
+    if (parsed.has(key)) throw new Error(`Duplicate history layout option: ${key}`);
     const inlineValue = separator >= 0 ? argument.slice(separator + 1) : null;
     const value = inlineValue ?? argv[index + 1];
     if (!value || value.startsWith("--")) {
@@ -46,17 +32,12 @@ function parseArguments(argv) {
 }
 
 const args = parseArguments(process.argv.slice(2));
-const expectOverflow = args.has("--expect-overflow");
-const expectJobIdCollision = args.has("--expect-job-id-collision");
-const label = String(
-  args.get("--label")
-    || (expectOverflow || expectJobIdCollision ? "before" : "after"),
-);
+const label = String(args.get("--label") || "after");
 const outputRoot = path.resolve(
   repoRoot,
   String(
     args.get("--output")
-      || path.join("artifacts", "test-runs", "history-responsive-overflow", label),
+      || path.join("artifacts", "test-runs", "history-jobs-layout", label),
   ),
 );
 const host = "127.0.0.1";
@@ -67,15 +48,15 @@ process.env.VITE_API_BASE_URL = origin;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 
 const cases = [
-  { id: "desktop-en", locale: "en", viewport: { width: 1440, height: 1000 } },
-  { id: "desktop-zh", locale: "zh-CN", viewport: { width: 1440, height: 1000 } },
-  { id: "mobile-en", locale: "en", viewport: { width: 390, height: 844 } },
-  { id: "mobile-zh", locale: "zh-CN", viewport: { width: 390, height: 844 } },
+  { id: "compact-en-populated", locale: "en", viewport: { width: 1440, height: 900 }, populated: true },
+  { id: "compact-zh-empty", locale: "zh-CN", viewport: { width: 1440, height: 900 }, populated: false },
+  { id: "wide-zh-populated", locale: "zh-CN", viewport: { width: 2048, height: 1080 }, populated: true },
+  { id: "wide-en-empty", locale: "en", viewport: { width: 2048, height: 1080 }, populated: false },
 ];
 
-const jobs = [
+const jobTemplates = [
   {
-    id: "job_history_alpha_20260728_reflection_causal_intervention_online_evaluation_subject_65a33bbd70f999962afd1bea1e374dcd5e9de460",
+    id: "job_history_alpha_20260728",
     control_version: 4,
     display_name: "Aurora constrained MOBO validation",
     track_type: "circle",
@@ -112,36 +93,26 @@ const jobs = [
   },
 ];
 
+const jobs = Array.from({ length: 24 }, (_, index) => {
+  const template = jobTemplates[index % jobTemplates.length];
+  return {
+    ...template,
+    id: `${template.id}_${String(index + 1).padStart(2, "0")}`,
+    display_name: `${template.display_name} ${String(index + 1).padStart(2, "0")}`,
+    created_at: `2026-07-28T${String(7 + Math.floor(index / 4)).padStart(2, "0")}:${String((index % 4) * 12).padStart(2, "0")}:00Z`,
+  };
+});
+
 function git(...gitArgs) {
-  return execFileSync("git", gitArgs, {
-    cwd: repoRoot,
-    encoding: "utf8",
-  }).trim();
+  return execFileSync("git", gitArgs, { cwd: repoRoot, encoding: "utf8" }).trim();
 }
 
 async function sha256File(filePath) {
-  const bytes = await readFile(filePath);
-  return createHash("sha256").update(bytes).digest("hex");
-}
-
-async function sha256(relativePath) {
-  return sha256File(path.join(repoRoot, relativePath));
+  return createHash("sha256").update(await readFile(filePath)).digest("hex");
 }
 
 async function measure(page) {
   return page.evaluate(() => {
-    const rect = (element) => {
-      if (!(element instanceof Element)) return null;
-      const bounds = element.getBoundingClientRect();
-      return {
-        top: Number(bounds.top.toFixed(2)),
-        bottom: Number(bounds.bottom.toFixed(2)),
-        left: Number(bounds.left.toFixed(2)),
-        right: Number(bounds.right.toFixed(2)),
-        width: Number(bounds.width.toFixed(2)),
-        height: Number(bounds.height.toFixed(2)),
-      };
-    };
     const box = (selector) => {
       const element = document.querySelector(selector);
       if (!(element instanceof HTMLElement)) return null;
@@ -150,126 +121,67 @@ async function measure(page) {
       return {
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        top: Number(bounds.top.toFixed(2)),
+        bottom: Number(bounds.bottom.toFixed(2)),
         left: Number(bounds.left.toFixed(2)),
         right: Number(bounds.right.toFixed(2)),
         width: Number(bounds.width.toFixed(2)),
-        minWidth: style.minWidth,
+        height: Number(bounds.height.toFixed(2)),
         overflowX: style.overflowX,
+        overflowY: style.overflowY,
       };
     };
-    const action = (name, selector) => {
-      const element = document.querySelector(selector);
-      if (!(element instanceof HTMLElement)) {
-        return { name, selector, exists: false, horizontallyReachable: false };
-      }
-      const rect = element.getBoundingClientRect();
-      const style = getComputedStyle(element);
-      return {
-        name,
-        selector,
-        exists: true,
-        disabled: element instanceof HTMLButtonElement ? element.disabled : false,
-        display: style.display,
-        visibility: style.visibility,
-        left: Number(rect.left.toFixed(2)),
-        right: Number(rect.right.toFixed(2)),
-        width: Number(rect.width.toFixed(2)),
-        horizontallyReachable:
-          rect.width > 0
-          && rect.right > 0
-          && rect.left < document.documentElement.clientWidth
-          && rect.left >= -1
-          && rect.right <= document.documentElement.clientWidth + 1,
-      };
-    };
-
-    const firstRow = document.querySelector(
-      ".history-results tbody tr:first-child",
+    const headers = Array.from(
+      document.querySelectorAll(".history-results thead th"),
+      (header) => ({
+        text: header.textContent?.trim() ?? "",
+        clientWidth: header.clientWidth,
+        scrollWidth: header.scrollWidth,
+        whiteSpace: getComputedStyle(header).whiteSpace,
+      }),
     );
-    const jobIdCell = firstRow?.querySelector("td:nth-child(3)");
-    const jobIdLink = jobIdCell?.querySelector(".history-job-id-link");
-    const jobIdCode = jobIdLink?.querySelector("code");
-    const trackTypeCell = firstRow?.querySelector("td:nth-child(4)");
-    const jobIdCellRect = rect(jobIdCell);
-    const jobIdLinkRect = rect(jobIdLink);
-    const jobIdCodeRect = rect(jobIdCode);
-    const trackTypeCellRect = rect(trackTypeCell);
-    const verticalOverlap =
-      jobIdCodeRect
-      && trackTypeCellRect
-      && jobIdCodeRect.bottom > trackTypeCellRect.top
-      && jobIdCodeRect.top < trackTypeCellRect.bottom;
-    const jobIdCollision = {
-      fullText: jobIdCode?.textContent ?? null,
-      cell: jobIdCellRect,
-      link: jobIdLinkRect,
-      code: jobIdCodeRect,
-      trackTypeCell: trackTypeCellRect,
-      codeDisplay:
-        jobIdCode instanceof HTMLElement
-          ? getComputedStyle(jobIdCode).display
-          : null,
-      codeOverflowX:
-        jobIdCode instanceof HTMLElement
-          ? getComputedStyle(jobIdCode).overflowX
-          : null,
-      codeTextOverflow:
-        jobIdCode instanceof HTMLElement
-          ? getComputedStyle(jobIdCode).textOverflow
-          : null,
-      codeWhiteSpace:
-        jobIdCode instanceof HTMLElement
-          ? getComputedStyle(jobIdCode).whiteSpace
-          : null,
-      containedInJobIdCell:
-        Boolean(jobIdCellRect && jobIdCodeRect)
-        && jobIdCodeRect.left >= jobIdCellRect.left - 1
-        && jobIdCodeRect.right <= jobIdCellRect.right + 1,
-      overlapsTrackTypeCell:
-        Boolean(jobIdCodeRect && trackTypeCellRect && verticalOverlap)
-        && jobIdCodeRect.right > trackTypeCellRect.left + 1,
-    };
-
-    const documentWidth = {
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-    };
+    const rows = Array.from(document.querySelectorAll(".history-results tbody tr"));
+    const resultCard = box(".history-body > .section-card:last-child");
+    const historyBody = box(".history-body");
+    const historyResults = box(".history-results");
+    const columnWidths = Array.from(
+      document.querySelectorAll(".history-results thead th"),
+      (header) => Number(header.getBoundingClientRect().width.toFixed(2)),
+    );
     return {
       language: document.documentElement.lang,
-      document: documentWidth,
-      body: box("body"),
-      appShell: box(".app-shell"),
-      sidebar: box(".app-sidebar"),
-      appHeader: box(".app-header"),
+      document: {
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      },
       appMain: box(".app-main"),
       historyPage: box(".history-page"),
-      historyBody: box(".history-body"),
-      resultCard: box(".history-body > .section-card:last-child"),
-      resultCardBody: box(
-        ".history-body > .section-card:last-child > .section-card-body",
-      ),
-      historyResults: box(".history-results"),
+      historyBody,
+      resultCard,
+      resultCardBody: box(".history-body > .section-card:last-child > .section-card-body"),
+      historyResults,
       historyTable: box(".history-results > table"),
-      jobIdCollision,
-      actions: [
-        action("history navigation", '.app-nav a[href$="/history"]'),
-        action("application settings", ".app-header .launcher-settings-button"),
-        action("new job", ".history-header .btn-primary"),
-        action("clear filters", ".history-clear-filters"),
-        action("compare selected", ".history-compare-button"),
-      ],
+      headers,
+      columnWidths,
+      rowCount: rows.length,
+      hasEmptyState: Boolean(document.querySelector(".history-empty-row")),
+      resultBottomGap:
+        resultCard && historyBody
+          ? Number((historyBody.bottom - resultCard.bottom).toFixed(2))
+          : null,
+      tableHeaderPosition: getComputedStyle(
+        document.querySelector(".history-results thead"),
+      ).position,
     };
   });
 }
 
 function containmentViolations(metrics) {
   const violations = [];
-  const exceeds = (entry) =>
-    entry && entry.scrollWidth > entry.clientWidth + 1;
-  if (metrics.document.scrollWidth !== metrics.document.clientWidth) {
-    violations.push(
-      `document ${metrics.document.clientWidth}/${metrics.document.scrollWidth}`,
-    );
+  if (metrics.document.scrollWidth > metrics.document.clientWidth + 1) {
+    violations.push(`document ${metrics.document.clientWidth}/${metrics.document.scrollWidth}`);
   }
   for (const [name, entry] of [
     ["appMain", metrics.appMain],
@@ -277,78 +189,39 @@ function containmentViolations(metrics) {
     ["historyBody", metrics.historyBody],
     ["resultCard", metrics.resultCard],
     ["resultCardBody", metrics.resultCardBody],
+    ["historyResults", metrics.historyResults],
   ]) {
-    if (exceeds(entry)) {
+    if (entry && entry.scrollWidth > entry.clientWidth + 1) {
       violations.push(`${name} ${entry.clientWidth}/${entry.scrollWidth}`);
     }
   }
   return violations;
 }
 
-async function verifyMobileNavigation(page, viewportWidth) {
-  const trigger = page.locator(".app-mobile-menu-button");
-  const panel = page.locator("#app-mobile-navigation");
-  const wasClosed =
-    await trigger.isVisible()
-    && await trigger.getAttribute("aria-expanded") === "false"
-    && await panel.isHidden();
-  await trigger.click();
-  await panel.waitFor({ state: "visible" });
-
-  const actions = [];
-  for (const [name, selector] of [
-    ["history navigation", '.app-mobile-menu-panel .app-nav a[href$="/history"]'],
-    ["account", ".app-mobile-menu-panel .app-account-button"],
-    ["settings", ".app-mobile-menu-panel .app-mobile-settings-entry"],
-  ]) {
-    const locator = page.locator(selector);
-    const bounds = await locator.boundingBox();
-    actions.push({
-      name,
-      selector,
-      visible: await locator.isVisible(),
-      enabled: await locator.isEnabled(),
-      left: bounds ? Number(bounds.x.toFixed(2)) : null,
-      right: bounds ? Number((bounds.x + bounds.width).toFixed(2)) : null,
-      horizontallyReachable: Boolean(
-        bounds
-        && bounds.width > 0
-        && bounds.x >= -1
-        && bounds.x + bounds.width <= viewportWidth + 1,
-      ),
-    });
-  }
-
-  await page.locator(".app-mobile-menu-panel .app-mobile-settings-entry").focus();
-  await page.keyboard.press("Escape");
-  await panel.waitFor({ state: "hidden" });
-  await page.waitForFunction(
-    () => document.activeElement?.classList.contains("app-mobile-menu-button"),
-    null,
-    { timeout: 1_000 },
-  ).catch(() => undefined);
-  const focusReturned = await trigger.evaluate(
-    (element) => document.activeElement === element,
-  );
-  const closedAfterEscape =
-    await trigger.getAttribute("aria-expanded") === "false"
-    && await panel.isHidden();
-  return {
-    wasClosed,
-    opened: actions.every(
-      (entry) => entry.visible && entry.enabled && entry.horizontallyReachable,
-    ),
-    actions,
-    closedAfterEscape,
-    focusReturned,
-    passed:
-      wasClosed
-      && actions.every(
-        (entry) => entry.visible && entry.enabled && entry.horizontallyReachable,
-      )
-      && closedAfterEscape
-      && focusReturned,
-  };
+async function verifyVerticalScroll(page) {
+  return page.evaluate(() => {
+    const results = document.querySelector(".history-results");
+    const header = document.querySelector(".history-results thead");
+    const rows = Array.from(document.querySelectorAll(".history-results tbody tr"));
+    if (!(results instanceof HTMLElement) || !(header instanceof HTMLElement) || rows.length < 2) {
+      return null;
+    }
+    const firstBefore = rows[0].getBoundingClientRect();
+    const headerBefore = header.getBoundingClientRect();
+    results.scrollTop = results.scrollHeight;
+    const firstAfter = rows[0].getBoundingClientRect();
+    const lastAfter = rows.at(-1).getBoundingClientRect();
+    const headerAfter = header.getBoundingClientRect();
+    const resultsAfter = results.getBoundingClientRect();
+    return {
+      maxScrollTop: results.scrollHeight - results.clientHeight,
+      scrollTop: results.scrollTop,
+      reachedEnd: Math.abs(results.scrollTop - (results.scrollHeight - results.clientHeight)) <= 1,
+      firstRowMoved: firstAfter.top < firstBefore.top - 20,
+      lastRowVisible: lastAfter.bottom <= resultsAfter.bottom + 1 && lastAfter.top >= resultsAfter.top - 1,
+      stickyHeaderStable: Math.abs(headerAfter.top - headerBefore.top) <= 1,
+    };
+  });
 }
 
 await mkdir(path.dirname(outputRoot), { recursive: true });
@@ -356,13 +229,11 @@ try {
   await mkdir(outputRoot);
 } catch (error) {
   if (error && typeof error === "object" && error.code === "EEXIST") {
-    throw new Error(
-      `History layout evidence output already exists; use a new --label: ${outputRoot}`,
-      { cause: error },
-    );
+    throw new Error(`History layout evidence output already exists: ${outputRoot}`, { cause: error });
   }
   throw error;
 }
+
 const server = await createServer({
   configFile: path.join(frontendRoot, "vite.config.ts"),
   root: frontendRoot,
@@ -376,16 +247,11 @@ const results = [];
 try {
   await server.listen();
   browser = await chromium.launch({ channel: "msedge", headless: true });
-
   for (const testCase of cases) {
     const apiRequests = [];
     const consoleErrors = [];
     const pageErrors = [];
-    const context = await browser.newContext({
-      viewport: testCase.viewport,
-      deviceScaleFactor: 1,
-      colorScheme: "light",
-    });
+    const context = await browser.newContext({ viewport: testCase.viewport, colorScheme: "light" });
     await context.addInitScript((locale) => {
       window.localStorage.setItem("drone-dream:locale", locale);
     }, testCase.locale);
@@ -398,171 +264,79 @@ try {
       const request = route.request();
       apiRequests.push({ method: request.method(), url: request.url() });
       if (request.method() !== "GET") {
-        await route.fulfill({
-          status: 405,
-          contentType: "application/json",
-          body: JSON.stringify({
-            success: false,
-            error: { code: "READ_ONLY_FIXTURE", message: "Writes are forbidden." },
-          }),
-        });
+        await route.fulfill({ status: 405, contentType: "application/json", body: "{}" });
         return;
       }
+      const items = testCase.populated ? jobs : [];
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           success: true,
-          data: {
-            items: jobs,
-            page: 1,
-            page_size: 200,
-            total: jobs.length,
-          },
+          data: { items, page: 1, page_size: 200, total: items.length },
         }),
       });
     });
 
-    await page.goto(`${origin}/console/history?docsPreview=1`, {
-      waitUntil: "networkidle",
-    });
-    await page.locator(".history-results tbody tr").first().waitFor();
-    await page.evaluate(() => {
-      const checkboxes = document.querySelectorAll(
-        ".history-results tbody input[type=checkbox]",
-      );
-      for (const checkbox of Array.from(checkboxes).slice(0, 2)) {
-        if (checkbox instanceof HTMLInputElement) checkbox.click();
-      }
-      window.scrollTo(0, 0);
-    });
+    await page.goto(`${origin}/console/history?docsPreview=1`, { waitUntil: "networkidle" });
+    await page.locator(testCase.populated ? ".history-results tbody tr" : ".history-empty-row").first().waitFor();
     const initial = await measure(page);
     const violations = containmentViolations(initial);
-    const mobileNavigation = testCase.viewport.width <= 520
-      ? await verifyMobileNavigation(page, testCase.viewport.width)
-      : null;
-    await page.screenshot({
-      path: path.join(outputRoot, `${testCase.id}-initial.png`),
-      fullPage: false,
-    });
+    await page.screenshot({ path: path.join(outputRoot, `${testCase.id}-initial.png`) });
+    const verticalScroll = testCase.populated ? await verifyVerticalScroll(page) : null;
+    if (testCase.populated) {
+      await page.screenshot({ path: path.join(outputRoot, `${testCase.id}-scrolled.png`) });
+    }
 
-    const rightEdge = await page.evaluate(() => {
-      const resultsElement = document.querySelector(".history-results");
-      const lastHeader = document.querySelector(
-        ".history-results thead th:last-child",
-      );
-      const lastDeleteButton = document.querySelector(
-        ".history-results tbody tr:first-child td:last-child button",
-      );
-      if (
-        !(resultsElement instanceof HTMLElement)
-        || !(lastHeader instanceof HTMLElement)
-        || !(lastDeleteButton instanceof HTMLElement)
-      ) {
-        return null;
-      }
-      resultsElement.scrollIntoView({ block: "center", inline: "nearest" });
-      resultsElement.scrollLeft = resultsElement.scrollWidth;
-      const resultRect = resultsElement.getBoundingClientRect();
-      const headerRect = lastHeader.getBoundingClientRect();
-      const deleteRect = lastDeleteButton.getBoundingClientRect();
-      const maxScrollLeft =
-        resultsElement.scrollWidth - resultsElement.clientWidth;
-      lastDeleteButton.focus();
-      return {
-        clientWidth: resultsElement.clientWidth,
-        scrollWidth: resultsElement.scrollWidth,
-        maxScrollLeft,
-        scrollLeft: resultsElement.scrollLeft,
-        reachedEnd:
-          Math.abs(resultsElement.scrollLeft - maxScrollLeft) <= 1,
-        lastHeaderVisible:
-          headerRect.left >= Math.max(0, resultRect.left) - 1
-          && headerRect.right <= Math.min(innerWidth, resultRect.right) + 1,
-        lastDeleteVisible:
-          deleteRect.left >= Math.max(0, resultRect.left) - 1
-          && deleteRect.right <= Math.min(innerWidth, resultRect.right) + 1,
-        deleteFocused: document.activeElement === lastDeleteButton,
-      };
-    });
-    await page.screenshot({
-      path: path.join(outputRoot, `${testCase.id}-table-right.png`),
-      fullPage: false,
-    });
-    const screenshots = await Promise.all(
-      ["initial", "table-right"].map(async (view) => {
-        const filename = `${testCase.id}-${view}.png`;
-        return {
-          filename,
-          sha256: await sha256File(path.join(outputRoot, filename)),
-        };
-      }),
+    const headerTexts = initial.headers.map(({ text }) => text);
+    const headersSingleLine = initial.headers.every(({ whiteSpace }) => whiteSpace === "nowrap");
+    const headersNotClipped = initial.headers.every(
+      ({ clientWidth, scrollWidth }) => scrollWidth <= clientWidth + 1,
     );
-
-    const unsafeRequests = apiRequests.filter(({ method }) => method !== "GET");
+    const widthsArePurposeful = new Set(initial.columnWidths.map((width) => Math.round(width))).size >= 5
+      && initial.columnWidths[1] > initial.columnWidths[6]
+      && initial.columnWidths[1] > initial.columnWidths[7];
+    const internalVerticalScroll = testCase.populated
+      ? initial.historyResults.scrollHeight > initial.historyResults.clientHeight + 1
+        && ["auto", "scroll"].includes(initial.historyResults.overflowY)
+        && verticalScroll?.reachedEnd
+        && verticalScroll.firstRowMoved
+        && verticalScroll.lastRowVisible
+        && verticalScroll.stickyHeaderStable
+      : initial.hasEmptyState
+        && initial.historyResults.scrollHeight <= initial.historyResults.clientHeight + 1;
     const expectedLanguage = initial.language === testCase.locale;
-    const resultsOwnOverflow =
-      initial.historyResults
-      && initial.historyResults.scrollWidth > initial.historyResults.clientWidth
-      && ["auto", "scroll"].includes(initial.historyResults.overflowX);
-    const actionsReachable = mobileNavigation
-      ? mobileNavigation.passed
-      : initial.actions.every(
-        (entry) => entry.exists && entry.horizontallyReachable,
-      );
-    const commonChecksPassed =
-      expectedLanguage
-      && unsafeRequests.length === 0
+    const passed = expectedLanguage
+      && violations.length === 0
+      && headerTexts.length === 8
+      && !headerTexts.includes("Job ID")
+      && !headerTexts.includes("Updated at")
+      && !headerTexts.includes("任务 ID")
+      && !headerTexts.includes("更新时间")
+      && headersSingleLine
+      && headersNotClipped
+      && widthsArePurposeful
+      && initial.resultBottomGap !== null
+      && Math.abs(initial.resultBottomGap) <= 1
+      && initial.tableHeaderPosition === "sticky"
+      && internalVerticalScroll
+      && apiRequests.every(({ method }) => method === "GET")
       && consoleErrors.length === 0
       && pageErrors.length === 0;
-    const jobIdCollisionReproduced =
-      initial.jobIdCollision.fullText === jobs[0].id
-      && initial.jobIdCollision.overlapsTrackTypeCell
-      && !initial.jobIdCollision.containedInJobIdCell;
-    const jobIdContained =
-      initial.jobIdCollision.fullText === jobs[0].id
-      && initial.jobIdCollision.containedInJobIdCell
-      && !initial.jobIdCollision.overlapsTrackTypeCell;
-    const overflowReproduced =
-      violations.length > 0
-      && !resultsOwnOverflow
-      && rightEdge?.lastHeaderVisible === false;
-    const overflowContained =
-      violations.length === 0
-      && resultsOwnOverflow
-      && actionsReachable
-      && rightEdge?.reachedEnd === true
-      && rightEdge.lastHeaderVisible
-      && rightEdge.lastDeleteVisible
-      && rightEdge.deleteFocused;
-    const passed =
-      commonChecksPassed
-      && (
-        expectOverflow
-          ? overflowReproduced
-          : expectJobIdCollision
-            ? overflowContained && jobIdCollisionReproduced
-            : overflowContained && jobIdContained
-      );
 
     results.push({
       ...testCase,
-      expected:
-        expectOverflow
-          ? "overflow reproduced"
-          : expectJobIdCollision
-            ? "history overflow contained; long Job ID collision reproduced"
-            : "history overflow and long Job ID contained",
       passed,
-      containmentViolations: violations,
       initial,
-      mobileNavigation,
-      rightEdge,
+      containmentViolations: violations,
+      verticalScroll,
+      headersSingleLine,
+      headersNotClipped,
+      widthsArePurposeful,
+      internalVerticalScroll,
       apiRequests,
-      unsafeRequests,
       consoleErrors,
       pageErrors,
-      screenshots,
     });
     await context.close();
   }
@@ -573,28 +347,16 @@ try {
 
 const finishedAt = new Date().toISOString();
 const evidence = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   label,
-  expected:
-    expectOverflow
-      ? "overflow reproduced"
-      : expectJobIdCollision
-        ? "history overflow contained; long Job ID collision reproduced"
-        : "history overflow and long Job ID contained",
+  expected: "full-height Jobs card, non-equal eight-column table, and contained vertical scrolling",
   sourceCommit: git("rev-parse", "HEAD"),
   sourceDirty: git("status", "--short") !== "",
   sourceChanges: git("status", "--short").split(/\r?\n/).filter(Boolean),
-  stylesheetSha256: await sha256(path.join("frontend", "src", "styles.css")),
-  verifierSha256: await sha256(
-    path.join("frontend", "scripts", "verify-history-layout.mjs"),
-  ),
-  command: `npm run test:history-layout -- --label=${label}${
-    expectOverflow ? " --expect-overflow" : ""
-  }${expectJobIdCollision ? " --expect-job-id-collision" : ""}`,
-  browser: {
-    name: "Microsoft Edge",
-    version: browser?.version() ?? null,
-  },
+  stylesheetSha256: await sha256File(path.join(frontendRoot, "src", "styles.css")),
+  verifierSha256: await sha256File(path.join(frontendRoot, "scripts", "verify-history-layout.mjs")),
+  command: `npm run test:history-layout -- --label=${label}`,
+  browser: { name: "Microsoft Edge", version: browser?.version() ?? null },
   startedAt,
   finishedAt,
   durationMs: Date.parse(finishedAt) - Date.parse(startedAt),
@@ -608,13 +370,11 @@ await writeFile(
 );
 
 for (const result of results) {
-  const widths = result.initial;
   process.stdout.write(
     `${result.id}: ${result.passed ? "PASS" : "FAIL"} `
-      + `document=${widths.document.clientWidth}/${widths.document.scrollWidth} `
-      + `appMain=${widths.appMain?.clientWidth}/${widths.appMain?.scrollWidth} `
-      + `history=${widths.historyPage?.clientWidth}/${widths.historyPage?.scrollWidth} `
-      + `results=${widths.historyResults?.clientWidth}/${widths.historyResults?.scrollWidth} `
+      + `results=${result.initial.historyResults.clientWidth}/${result.initial.historyResults.scrollWidth} `
+      + `height=${result.initial.historyResults.clientHeight}/${result.initial.historyResults.scrollHeight} `
+      + `columns=${result.initial.columnWidths.join(",")} `
       + `violations=${result.containmentViolations.join(",") || "none"}\n`,
   );
 }

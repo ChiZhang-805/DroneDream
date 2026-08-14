@@ -55,14 +55,25 @@ import {
   setActiveAssistantTenantContext,
 } from "../features/experiment/workspaceRegistry";
 import {
-  createVehicleModelDraft,
+  createVehicleModelFromBrief,
+  rebuildVehicleRotorArchitecture,
+  scaleVehicleModelMass,
+  type VehicleDesignMission,
   type VehicleModelDraft,
 } from "../features/vehicleStudio/model";
 import {
+  cacheVehicleModels,
   loadVehicleModels,
   nextVehicleRevision,
   saveVehicleModel,
+  vehicleModelStorageScope,
 } from "../features/vehicleStudio/storage";
+import {
+  loadCloudVehicleModels,
+  mergeVehicleModelStores,
+  saveCloudVehicleModel,
+  vehicleModelBoundaryFor,
+} from "../features/vehicleStudio/cloudStorage";
 import { useVoiceInput } from "../features/experiment/useVoiceInput";
 import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
@@ -348,38 +359,110 @@ function universalVehicleName(
     : null;
 }
 
-function saveUniversalVehicleDraft(
+function universalVehiclePatch(
+  result: ExperimentAssistantTurnResponse,
+  fieldId: string,
+): unknown {
+  return result.accepted_patches.find((candidate) => candidate.field_id === fieldId)?.value;
+}
+
+function inferUniversalVehicleMission(result: ExperimentAssistantTurnResponse): VehicleDesignMission {
+  const text = [
+    result.experiment_summary,
+    ...result.accepted_patches.map((patch) => `${patch.field_id} ${String(patch.value ?? "")}`),
+  ].join(" ").toLowerCase();
+  if (/payload|cargo|delivery|载荷|运输|吊运/.test(text)) return "payload";
+  if (/endurance|long.range|flight.time|续航|长航时|航程/.test(text)) return "endurance";
+  if (/race|racing|agility|acro|敏捷|竞速|特技/.test(text)) return "agility";
+  if (/inspect|inspection|lidar|巡检|激光雷达|测量/.test(text)) return "inspection";
+  return "survey";
+}
+
+function numericUniversalVehiclePatch(
+  result: ExperimentAssistantTurnResponse,
+  fieldIds: string[],
+): number | undefined {
+  for (const fieldId of fieldIds) {
+    const value = universalVehiclePatch(result, fieldId);
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return undefined;
+}
+
+async function saveUniversalVehicleDraft(
   ownerId: string,
   result: ExperimentAssistantTurnResponse,
   currentDraftId: string | null,
-): VehicleModelDraft {
+): Promise<VehicleModelDraft> {
+  const activeBoundary = activeAssistantTenantContext(ownerId);
+  const tenantId = result.orchestration?.tenant_id ?? activeBoundary.tenantId;
+  const organizationId = result.orchestration?.organization_id ?? activeBoundary.organizationId;
+  const localStorageScope = vehicleModelStorageScope({
+    userId: ownerId,
+    tenantId,
+    organizationId,
+    workspaceId: "console-universal",
+    edition: "universal",
+  });
+  const cloudBoundary = vehicleModelBoundaryFor(ownerId, tenantId, organizationId);
+  let storedModels = loadVehicleModels(localStorageScope);
+  if (cloudBoundary) {
+    try {
+      const cloudModels = await loadCloudVehicleModels(cloudBoundary);
+      if (cloudModels) {
+        storedModels = cacheVehicleModels(localStorageScope, mergeVehicleModelStores(storedModels, cloudModels));
+      }
+    } catch {
+      // Preserve the local-first workflow when the network or cloud store is unavailable.
+    }
+  }
   const current = currentDraftId
-    ? loadVehicleModels(ownerId).find((model) => model.draftId === currentDraftId)
+    ? storedModels.find((model) => model.draftId === currentDraftId)
       ?.revisions[0]
     : null;
-  const draft = current
-    ? nextVehicleRevision(current)
-    : createVehicleModelDraft();
+  const proposedMotorCount = numericUniversalVehiclePatch(result, ["motor_count"]);
+  const motorCount = proposedMotorCount === 4 || proposedMotorCount === 6 || proposedMotorCount === 8
+    ? proposedMotorCount
+    : undefined;
+  const generated = createVehicleModelFromBrief({
+    name: universalVehicleName(result) ?? "AI-assisted aircraft",
+    mission: inferUniversalVehicleMission(result),
+    motorCount,
+    payloadKg: numericUniversalVehiclePatch(result, ["payload_mass_kg", "payload_kg"]),
+    targetFlightMinutes: numericUniversalVehiclePatch(result, ["target_flight_minutes", "flight_time_minutes"]),
+    camera: universalVehiclePatch(result, "camera_payload") === true,
+    lidar: universalVehiclePatch(result, "lidar_payload") === true,
+    operatingEnvironment: /wind|gust|风/.test(result.experiment_summary.toLowerCase()) ? "windy" : "outdoor",
+  });
+  let draft = current ? nextVehicleRevision(current) : generated.draft;
   draft.name = universalVehicleName(result) ?? draft.name;
-  draft.notes = result.experiment_summary.trim().slice(0, 4096);
+  draft.notes = [result.experiment_summary.trim(), ...(!current ? generated.decisions : [])]
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, 4096);
+  let rotorArchitectureChanged = false;
+  let requestedVehicleMassKg: number | null = null;
   for (const accepted of result.accepted_patches) {
     if (accepted.field_id === "vehicle_mass_kg" && typeof accepted.value === "number") {
-      draft.body.massKg = accepted.value;
+      requestedVehicleMassKg = accepted.value;
     }
     if (
       accepted.field_id === "motor_count"
       && (accepted.value === 4 || accepted.value === 6 || accepted.value === 8)
     ) {
       draft.propulsion.motorCount = accepted.value;
+      rotorArchitectureChanged = true;
     }
     if (accepted.field_id === "arm_length_m" && typeof accepted.value === "number") {
       draft.propulsion.armLengthM = accepted.value;
+      rotorArchitectureChanged = true;
     }
     if (
       accepted.field_id === "propeller_diameter_m"
       && typeof accepted.value === "number"
     ) {
       draft.propulsion.propellerDiameterM = accepted.value;
+      rotorArchitectureChanged = true;
     }
     if (accepted.field_id === "camera_payload" && accepted.value === true) {
       const camera = draft.sensors.find((sensor) => sensor.type === "camera");
@@ -394,8 +477,23 @@ function saveUniversalVehicleDraft(
       }
     }
   }
+  if (rotorArchitectureChanged) {
+    draft = rebuildVehicleRotorArchitecture(draft, {
+      motorCount: draft.propulsion.motorCount,
+      armLengthM: draft.propulsion.armLengthM,
+      propellerDiameterM: draft.propulsion.propellerDiameterM,
+    });
+  }
+  if (requestedVehicleMassKg !== null) draft = scaleVehicleModelMass(draft, requestedVehicleMassKg);
   draft.updatedAt = new Date().toISOString();
-  saveVehicleModel(ownerId, draft);
+  saveVehicleModel(localStorageScope, draft);
+  if (cloudBoundary) {
+    try {
+      await saveCloudVehicleModel(cloudBoundary, draft);
+    } catch {
+      // The local revision remains available and can be synchronized on a later save.
+    }
+  }
   return draft;
 }
 
@@ -1008,7 +1106,7 @@ export function ExperimentAssistant() {
         editionTheme.id === "universal"
         && result.orchestration?.artifact_kind === "universal_vehicle_model"
       ) {
-        const vehicleDraft = saveUniversalVehicleDraft(
+        const vehicleDraft = await saveUniversalVehicleDraft(
           ownerId,
           result,
           vehicleDraftId,

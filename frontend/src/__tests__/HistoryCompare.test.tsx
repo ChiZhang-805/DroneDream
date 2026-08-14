@@ -102,15 +102,14 @@ describe("History compare selection", () => {
     } as never);
     renderPage();
 
-    const jobId = await screen.findByText("job_real");
-    expect(jobId).toBeVisible();
-    expect(jobId.closest("a")).toHaveClass("history-job-id-link");
-    expect(jobId.closest("a")).toHaveAttribute("title", "job_real");
-    expect(screen.getByText("job_mock")).toBeVisible();
+    expect(await screen.findByText("Alpha flight")).toBeVisible();
+    expect(screen.getByText("Beta workflow")).toBeVisible();
+    expect(screen.queryByRole("columnheader", { name: "Job ID" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Updated at" })).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Search"), { target: { value: "Alpha" } });
-    expect(screen.getByText("job_real")).toBeVisible();
-    expect(screen.queryByText("job_mock")).toBeNull();
+    expect(screen.getByText("Alpha flight")).toBeVisible();
+    expect(screen.queryByText("Beta workflow")).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Simulator"), { target: { value: "real_cli" } });
     fireEvent.change(screen.getByLabelText("Optimizer"), { target: { value: "optimizer_portfolio" } });
@@ -119,7 +118,7 @@ describe("History compare selection", () => {
     expect(screen.getByLabelText("Search")).toHaveValue("");
     expect(screen.getByLabelText("Simulator")).toHaveValue("ALL");
     expect(screen.getByLabelText("Optimizer")).toHaveValue("ALL");
-    expect(screen.getByText("job_mock")).toBeVisible();
+    expect(screen.getByText("Beta workflow")).toBeVisible();
   });
 
   it("shows confirm modal and cancels deletion", async () => {
@@ -193,7 +192,7 @@ describe("History compare selection", () => {
       }) as never,
     );
     renderPage();
-    expect(await screen.findByText("job_delete_once")).toBeVisible();
+    expect(await screen.findByLabelText("Select job job_delete_once")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     const confirm = screen.getByRole("button", { name: "Delete job" });
     act(() => {
@@ -213,12 +212,12 @@ describe("History compare selection", () => {
       .mockResolvedValueOnce({ items: [], page: 1, page_size: 100, total: 0 } as never);
     const deleteSpy = vi.spyOn(apiClient, "deleteJob").mockResolvedValue({ id: "job_1", deleted: true });
     renderPage();
-    expect(await screen.findByText("job_1")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Select job job_1")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete job" }));
     expect(deleteSpy).toHaveBeenCalledWith("job_1", 4);
     await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByText("job_1")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByLabelText("Select job job_1")).not.toBeInTheDocument());
     listSpy.mockRestore();
     deleteSpy.mockRestore();
   });

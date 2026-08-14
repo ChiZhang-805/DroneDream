@@ -72,50 +72,32 @@ const DELETABLE_JOB_STATUSES: ReadonlySet<JobStatus> = new Set([
 
 function buildColumns(t: Translator): Column<Job>[] {
   return [
-  {
-    key: "id",
-    header: t("history.jobId"),
-    render: (j) => (
-      <Link
-        className="history-job-id-link"
-        title={j.id}
-        to={`/jobs/${j.id}`}
-      >
-        <code>{j.id}</code>
-      </Link>
-    ),
-  },
-  {
-    key: "track_type",
-    header: t("history.trackType"),
-    render: (j) => t(TRACK_LABELS[j.track_type]),
-  },
-  {
-    key: "objective_profile",
-    header: t("history.objectiveProfile"),
-    render: (j) => t(OBJECTIVE_LABELS[j.objective_profile]),
-  },
-  {
-    key: "status",
-    header: t("history.status"),
-    render: (j) => <StatusBadge status={j.status} />,
-  },
-  {
-    key: "created_at",
-    header: t("history.createdAt"),
-    render: (j) => formatDateTime(j.created_at),
-  },
-  {
-    key: "updated_at",
-    header: t("history.updatedAt"),
-    render: (j) => formatDateTime(j.updated_at),
-  },
-  {
-    key: "action",
-    header: t("history.action"),
-    align: "right",
-    render: (j) => <Link to={`/jobs/${j.id}`}>{t("history.view")}</Link>,
-  },
+    {
+      key: "track_type",
+      header: t("history.trackType"),
+      render: (j) => t(TRACK_LABELS[j.track_type]),
+    },
+    {
+      key: "objective_profile",
+      header: t("history.objectiveProfile"),
+      render: (j) => t(OBJECTIVE_LABELS[j.objective_profile]),
+    },
+    {
+      key: "status",
+      header: t("history.status"),
+      render: (j) => <StatusBadge status={j.status} />,
+    },
+    {
+      key: "created_at",
+      header: t("history.createdAt"),
+      render: (j) => formatDateTime(j.created_at),
+    },
+    {
+      key: "action",
+      header: t("history.action"),
+      align: "right",
+      render: (j) => <Link to={`/jobs/${j.id}`}>{t("history.view")}</Link>,
+    },
   ];
 }
 
@@ -436,16 +418,26 @@ export function History() {
           />
         ) : (
           <div className="data-table-wrapper history-results">
-          <table className="data-table history-table-centered">
-            <thead>
-              <tr>
-                <th>{t("history.select")}</th>
-                <th>{t("history.jobName")}</th>
-                {columns.map((c) => <th key={String(c.key)}>{c.header}</th>)}
-                <th>{t("history.delete")}</th>
-              </tr>
-            </thead>
-            <tbody>
+            <table className="data-table history-table-centered">
+              <colgroup>
+                <col className="history-col-select" />
+                <col className="history-col-name" />
+                <col className="history-col-track" />
+                <col className="history-col-objective" />
+                <col className="history-col-status" />
+                <col className="history-col-created" />
+                <col className="history-col-action" />
+                <col className="history-col-delete" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>{t("history.select")}</th>
+                  <th>{t("history.jobName")}</th>
+                  {columns.map((c) => <th key={String(c.key)}>{c.header}</th>)}
+                  <th>{t("history.delete")}</th>
+                </tr>
+              </thead>
+              <tbody>
               {filtered.map((j) => (
                 <tr key={j.id}>
                   <td>
@@ -503,8 +495,8 @@ export function History() {
                   <td colSpan={columns.length + 3}>{t("history.empty")}</td>
                 </tr>
               ) : null}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
           </div>
         )}
       </SectionCard>

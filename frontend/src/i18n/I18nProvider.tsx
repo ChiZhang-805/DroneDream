@@ -1610,9 +1610,9 @@ const zhTranslations = {
     "app.dashboard": "任务总览",
     "app.newExperiment": "调优实验",
     "app.history": "历史报告",
-    "app.fixedScenarios": "固定场景",
+    "app.fixedScenarios": "场景",
     "app.vehicleStudio": "无人机建模",
-    "app.experimentBuilder": "实验设计",
+    "app.experimentBuilder": "实验",
     "app.labValidation": "验证与证据",
     "app.fieldDeviceSetup": "设备与机型",
     "app.fieldTuning": "调优计划",
@@ -3136,8 +3136,8 @@ const translations = {
 const interfaceTranslationOverrides: Readonly<Record<Exclude<InterfaceLocale, Locale>, Partial<Record<TranslationKey, string>>>> = {
   "zh-TW": {
     "app.conversation": "調校對話", "app.dashboard": "任務總覽", "app.newExperiment": "調校實驗",
-    "app.history": "歷史報告", "app.fixedScenarios": "固定場景", "app.vehicleStudio": "無人機建模",
-    "app.experimentBuilder": "實驗設計", "app.labValidation": "驗證與證據", "app.fieldDeviceSetup": "裝置與機型",
+    "app.history": "歷史報告", "app.fixedScenarios": "場景", "app.vehicleStudio": "無人機建模",
+    "app.experimentBuilder": "實驗", "app.labValidation": "驗證與證據", "app.fieldDeviceSetup": "裝置與機型",
     "app.fieldTuning": "調校計畫", "app.fieldSafety": "安全與回復", "app.labWorkspace": "實驗室工作區",
     "app.hardwareLab": "實機實驗室", "app.fieldWorkspace": "現場工作區", "app.platform": "無人機控制參數自動調校平台",
     "app.primaryNav": "主導覽", "app.openMenu": "開啟導覽選單", "app.closeMenu": "關閉導覽選單",
@@ -3148,7 +3148,7 @@ const interfaceTranslationOverrides: Readonly<Record<Exclude<InterfaceLocale, Lo
   es: {
     "app.conversation": "Chat de ajuste", "app.dashboard": "Panel", "app.newExperiment": "Experimento",
     "app.history": "Historial", "app.fixedScenarios": "Escenarios", "app.vehicleStudio": "Modelado UAV",
-    "app.experimentBuilder": "Crear experimento", "app.labValidation": "Validación", "app.fieldDeviceSetup": "Equipo y vehículo",
+    "app.experimentBuilder": "Experimento", "app.labValidation": "Validación", "app.fieldDeviceSetup": "Equipo y vehículo",
     "app.fieldTuning": "Plan de ajuste", "app.fieldSafety": "Seguridad", "app.labWorkspace": "Laboratorio",
     "app.hardwareLab": "Prueba física", "app.fieldWorkspace": "Operación de campo", "app.platform": "Plataforma de ajuste automático UAV",
     "app.primaryNav": "Navegación principal", "app.openMenu": "Abrir navegación", "app.closeMenu": "Cerrar navegación",
@@ -3158,8 +3158,8 @@ const interfaceTranslationOverrides: Readonly<Record<Exclude<InterfaceLocale, Lo
   },
   ja: {
     "app.conversation": "調整チャット", "app.dashboard": "ダッシュボード", "app.newExperiment": "実験",
-    "app.history": "実行履歴", "app.fixedScenarios": "固定シナリオ", "app.vehicleStudio": "機体モデリング",
-    "app.experimentBuilder": "実験設計", "app.labValidation": "検証記録", "app.fieldDeviceSetup": "デバイスと機体",
+    "app.history": "実行履歴", "app.fixedScenarios": "シナリオ", "app.vehicleStudio": "機体モデリング",
+    "app.experimentBuilder": "実験", "app.labValidation": "検証記録", "app.fieldDeviceSetup": "デバイスと機体",
     "app.fieldTuning": "調整計画", "app.fieldSafety": "安全と復元", "app.labWorkspace": "ラボ作業",
     "app.hardwareLab": "実機検証", "app.fieldWorkspace": "フィールド ワークスペース", "app.platform": "UAV 制御パラメータ自動調整プラットフォーム",
     "app.primaryNav": "メイン ナビゲーション", "app.openMenu": "ナビゲーションを開く", "app.closeMenu": "ナビゲーションを閉じる",
@@ -3169,8 +3169,8 @@ const interfaceTranslationOverrides: Readonly<Record<Exclude<InterfaceLocale, Lo
   },
   ko: {
     "app.conversation": "튜닝 대화", "app.dashboard": "대시보드", "app.newExperiment": "실험",
-    "app.history": "실행 기록", "app.fixedScenarios": "고정 시나리오", "app.vehicleStudio": "기체 모델링",
-    "app.experimentBuilder": "실험 설계", "app.labValidation": "검증 기록", "app.fieldDeviceSetup": "장치 및 기체",
+    "app.history": "실행 기록", "app.fixedScenarios": "시나리오", "app.vehicleStudio": "기체 모델링",
+    "app.experimentBuilder": "실험", "app.labValidation": "검증 기록", "app.fieldDeviceSetup": "장치 및 기체",
     "app.fieldTuning": "튜닝 계획", "app.fieldSafety": "안전 및 복구", "app.labWorkspace": "랩 작업",
     "app.hardwareLab": "실기체 검증", "app.fieldWorkspace": "현장 작업 공간", "app.platform": "UAV 제어 파라미터 자동 튜닝 플랫폼",
     "app.primaryNav": "기본 탐색", "app.openMenu": "탐색 메뉴 열기", "app.closeMenu": "탐색 메뉴 닫기",
