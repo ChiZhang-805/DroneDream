@@ -139,6 +139,26 @@ describe("Universal Vehicle Studio contract", () => {
     expect(sdf).toContain("<ixx>0.039</ixx><iyy>0.039</iyy><izz>0.024</izz>");
   });
 
+  it("keeps an external mesh visual separate from primitive collision physics", () => {
+    const draft = createVehicleModelDraft();
+    const fuselage = draft.components.find((component) => component.kind === "fuselage")!;
+    fuselage.geometry.meshUri = "model://custom/fuselage.glb";
+
+    const sdf = generateGazeboSdf(draft);
+
+    expect(sdf).toContain("<collision name=\"collision\"><geometry><capsule>");
+    expect(sdf).toContain("<visual name=\"visual\"><geometry><mesh><uri>model://custom/fuselage.glb</uri>");
+  });
+
+  it("rejects primitive scales that cannot be represented by the physical export", () => {
+    const draft = createVehicleModelDraft();
+    const motor = draft.components.find((component) => component.kind === "motor")!;
+    motor.transform.scale = { x: 1.5, y: 1, z: 1 };
+
+    expect(validateVehicleModel(draft).map((issue) => issue.code))
+      .toContain("incompatible-primitive-scale");
+  });
+
   it("normalizes preview transforms through both expansion and scene scale", () => {
     expect(previewPositionToModel({ x: 18, y: -9, z: 4.5 }, 1.5, 3)).toEqual({
       x: 4,
@@ -149,8 +169,7 @@ describe("Universal Vehicle Studio contract", () => {
   });
 
   it("blocks unsafe or incomplete model drafts before export", async () => {
-    const draft = createVehicleModelDraft();
-    draft.body.massKg = 20;
+    const draft = scaleVehicleModelMass(createVehicleModelDraft(), 20);
     draft.sensors = draft.sensors.map((sensor) => ({ ...sensor, enabled: false }));
     draft.targetEditions = [];
     const codes = validateVehicleModel(draft).map((issue) => issue.code);

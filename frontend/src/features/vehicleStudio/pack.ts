@@ -169,11 +169,8 @@ function pose(component: VehicleComponentDraft): string {
   return `${number(position.x)} ${number(position.z)} ${number(position.y)} ${radians(rotation.x)} ${radians(rotation.z)} ${radians(rotation.y)}`;
 }
 
-function componentGeometry(component: VehicleComponentDraft): string {
-  const { primitive, meshUri } = component.geometry;
-  if (meshUri.trim()) {
-    return `<mesh><uri>${escapeXml(meshUri.trim())}</uri><scale>${number(component.transform.scale.x)} ${number(component.transform.scale.z)} ${number(component.transform.scale.y)}</scale></mesh>`;
-  }
+function physicalComponentGeometry(component: VehicleComponentDraft): string {
+  const { primitive } = component.geometry;
   const scaled = scaledComponentGeometry(component);
   if (primitive === "sphere") return `<sphere><radius>${number(scaled.radius)}</radius></sphere>`;
   if (primitive === "capsule") {
@@ -186,6 +183,12 @@ function componentGeometry(component: VehicleComponentDraft): string {
     return `<cylinder><radius>${number(scaled.radius)}</radius><length>${number(scaled.length)}</length></cylinder>`;
   }
   return `<box><size>${number(scaled.size.x)} ${number(scaled.size.z)} ${number(scaled.size.y)}</size></box>`;
+}
+
+function visualComponentGeometry(component: VehicleComponentDraft): string {
+  const meshUri = component.geometry.meshUri.trim();
+  if (!meshUri) return physicalComponentGeometry(component);
+  return `<mesh><uri>${escapeXml(meshUri)}</uri><scale>${number(component.transform.scale.x)} ${number(component.transform.scale.z)} ${number(component.transform.scale.y)}</scale></mesh>`;
 }
 
 function escapeXml(value: string): string {
@@ -205,13 +208,17 @@ function colorRgba(hex: string, opacity: number): string {
 function componentLink(component: VehicleComponentDraft, linkName: string): string {
   const inertia = componentInertia(component);
   const mass = getVehicleComponentMassProperties(component).massKg;
-  const geometry = componentGeometry(component);
+  const physicalGeometry = physicalComponentGeometry(component);
+  const visualGeometry = visualComponentGeometry(component);
   const color = colorRgba(component.material.baseColor, component.material.opacity);
-  const collision = component.kind === "propeller" ? "" : `\n      <collision name="collision"><geometry>${geometry}</geometry></collision>`;
+  // External meshes are presentation assets until the draft contract carries
+  // trusted bounds and inertial metadata. Keep collision and inertia tied to
+  // the explicit engineering primitive.
+  const collision = component.kind === "propeller" ? "" : `\n      <collision name="collision"><geometry>${physicalGeometry}</geometry></collision>`;
   return `    <link name="${linkName}">
       <pose>${pose(component)}</pose>
       <inertial><mass>${number(mass)}</mass><inertia><ixx>${number(inertia.ixx)}</ixx><iyy>${number(inertia.iyy)}</iyy><izz>${number(inertia.izz)}</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial>${collision}
-      <visual name="visual"><geometry>${geometry}</geometry><material><ambient>${color}</ambient><diffuse>${color}</diffuse><specular>${number(component.material.metalness)} ${number(component.material.metalness)} ${number(component.material.metalness)} 1</specular></material></visual>
+      <visual name="visual"><geometry>${visualGeometry}</geometry><material><ambient>${color}</ambient><diffuse>${color}</diffuse><specular>${number(component.material.metalness)} ${number(component.material.metalness)} ${number(component.material.metalness)} 1</specular></material></visual>
     </link>`;
 }
 

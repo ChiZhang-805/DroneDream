@@ -72,6 +72,21 @@ describe("Vehicle Studio engineering generator", () => {
     expect(after.projectedAreaM2).toBeCloseTo(before.projectedAreaM2, 10);
   });
 
+  it("derives mass and thrust from physical components instead of stale summaries", () => {
+    const draft = createVehicleModelDraft();
+    const baseline = calculateVehicleDiagnostics(draft);
+    draft.body.massKg = baseline.totalMassKg * 10;
+    expect(calculateVehicleDiagnostics(draft).thrustToWeight).toBeCloseTo(baseline.thrustToWeight, 10);
+
+    const removedMotor = draft.components.find((component) => component.kind === "motor")!;
+    draft.components = draft.components.filter((component) => component.id !== removedMotor.id);
+    const afterRemoval = calculateVehicleDiagnostics(draft);
+    const codes = validateVehicleModel(draft).map((issue) => issue.code);
+
+    expect(afterRemoval.thrustToWeight).toBeLessThan(baseline.thrustToWeight);
+    expect(codes).toContain("motor-count-mismatch");
+  });
+
   it("keeps explicit architecture choices instead of collapsing to a generic quadrotor", () => {
     const { draft } = createVehicleModelFromBrief({
       name: "Indoor agile platform",

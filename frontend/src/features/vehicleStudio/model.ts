@@ -346,7 +346,9 @@ export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEn
     Math.abs(component.transform.positionM.x) * 2 + scaledGeometry(component).x,
     Math.abs(component.transform.positionM.z) * 2 + scaledGeometry(component).z,
   ), 0);
-  const engineeringMassKg = Math.max(totalMassKg, Number.isFinite(draft.body.massKg) ? draft.body.massKg : 0);
+  // Components are the physical source of truth used by diagnostics and SDF.
+  // body.massKg is a compatibility summary and may lag a component edit.
+  const engineeringMassKg = totalMassKg;
   const centerOfMassOffsetM = Math.hypot(centerOfMassM.x, centerOfMassM.z);
   const balanceReferenceM = Math.max(.02, spanM * .08);
   const balanceScore = Math.max(0, Math.min(100, 100 * (1 - centerOfMassOffsetM / balanceReferenceM)));
@@ -384,7 +386,8 @@ export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEn
   if (minimumRotorClearanceM < .01) engineeringWarnings.push("Rotor disk clearance is below 10 mm.");
   if (centerOfMassOffsetM > balanceReferenceM * .5) engineeringWarnings.push("The projected center of mass is materially off the thrust centroid.");
   if (estimatedHoverMinutes > 0 && estimatedHoverMinutes < 8) engineeringWarnings.push("Estimated hover endurance is below eight minutes.");
-  const thrustToWeight = engineeringMassKg > 0 ? draft.propulsion.motorCount * draft.propulsion.maximumThrustPerMotorN / (engineeringMassKg * 9.80665) : 0;
+  const physicalMotorCount = physicalComponents.filter((component) => component.kind === "motor").length;
+  const thrustToWeight = engineeringMassKg > 0 ? physicalMotorCount * draft.propulsion.maximumThrustPerMotorN / (engineeringMassKg * 9.80665) : 0;
   if (thrustToWeight < 1.8) engineeringWarnings.push("Thrust margin is below the preferred 1.8:1 engineering target.");
   return {
     componentCount: draft.components.length,
@@ -423,12 +426,24 @@ export function validateVehicleModel(draft: VehicleModelDraft): VehicleModelVali
   if (draft.targetEditions.length === 0 || draft.targetEditions.length > 3 || new Set(draft.targetEditions).size !== draft.targetEditions.length) issues.push({ field: "targetEditions", code: "target-required", message: "Select at least one target Edition" });
   if (draft.targetEditions.includes("field") && draft.autopilot.family === "crazyflie") issues.push({ field: "targetEditions", code: "field-adapter-unavailable", message: "The Crazyflie Field adapter is planned and cannot be exported as compatible" });
   if (!Array.isArray(draft.components) || draft.components.length < 1 || draft.components.length > MAX_VEHICLE_COMPONENTS) issues.push({ field: "components", code: "invalid-component-count", message: `Use 1 to ${MAX_VEHICLE_COMPONENTS} components` });
+  const physicalMotorCount = draft.components.filter((component) => component.kind === "motor").length;
+  if (physicalMotorCount !== draft.propulsion.motorCount) issues.push({ field: "propulsion.motorCount", code: "motor-count-mismatch", message: "The propulsion motor count must match the physical motor assembly" });
   const ids = new Set<string>();
   for (const component of draft.components) {
     if (!component.id || ids.has(component.id)) issues.push({ field: "components", code: "duplicate-component", message: "Component identities must be unique" });
     ids.add(component.id); requireText(`components.${component.id}.name`, component.name, 96);
     if (!validVector(component.transform.positionM) || !validVector(component.transform.rotationDeg) || !validVector(component.transform.scale)) issues.push({ field: `components.${component.id}.transform`, code: "invalid-transform", message: "Transform values must be finite" });
     else if (![component.transform.scale.x, component.transform.scale.y, component.transform.scale.z].every(finitePositive)) issues.push({ field: `components.${component.id}.transform.scale`, code: "invalid-scale", message: "Scale values must be greater than zero" });
+    else {
+      const scale = component.transform.scale;
+      const close = (left: number, right: number) => Math.abs(left - right) <= Math.max(1, Math.abs(left), Math.abs(right)) * 1e-6;
+      const incompatibleScale = component.geometry.primitive === "sphere"
+        ? !(close(scale.x, scale.y) && close(scale.y, scale.z))
+        : ["cylinder", "capsule", "cone"].includes(component.geometry.primitive)
+          ? !close(scale.x, scale.z)
+          : false;
+      if (incompatibleScale) issues.push({ field: `components.${component.id}.transform.scale`, code: "incompatible-primitive-scale", message: "Spheres require uniform scaling; radial primitives require matching X and Z scale" });
+    }
     if (!validVector(component.geometry.sizeM) || ![component.geometry.sizeM.x, component.geometry.sizeM.y, component.geometry.sizeM.z].every(finitePositive)) issues.push({ field: `components.${component.id}.geometry`, code: "invalid-geometry", message: "Geometry dimensions must be positive" });
     if (![component.geometry.radiusM, component.geometry.lengthM].every(finitePositive)) issues.push({ field: `components.${component.id}.geometry`, code: "invalid-radius-or-length", message: "Radius and length must be greater than zero" });
     if (component.mass.mode === "density") bounded(`components.${component.id}.mass.densityKgM3`, component.mass.densityKgM3, 30_000);
