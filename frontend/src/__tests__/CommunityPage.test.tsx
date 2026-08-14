@@ -204,6 +204,8 @@ describe("CommunityPage public data loading", () => {
     expect(isLongCommunityTopicTitle("一二三四五六七八九十一二三四五六七八九")).toBe(true);
     expect(isLongCommunityTopicTitle("1234567890123456789012345678")).toBe(false);
     expect(isLongCommunityTopicTitle("12345678901234567890123456789")).toBe(true);
+    expect(isLongCommunityTopicTitle("One\nTwo")).toBe(false);
+    expect(isLongCommunityTopicTitle("One\nTwo\nThree")).toBe(true);
 
     const topics = [
       ...Array.from({ length: 10 }, (_, index) => makeTopic(index + 1, `First page ${index + 1}`)),
@@ -249,6 +251,9 @@ describe("CommunityPage public data loading", () => {
     }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog.querySelector(".community-topic-author img")).toHaveAttribute("src", avatarUrl);
+    const dialogArtwork = dialog.querySelector(".community-topic-dialog-visual .community-cover-art");
+    expect(dialogArtwork).toHaveClass("is-dialog");
+    expect(dialogArtwork).not.toHaveClass("is-long");
   });
 
   it("lets only the topic owner delete a topic", async () => {

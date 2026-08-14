@@ -93,10 +93,13 @@ const ENGLISH_TOPIC_TITLE_LIMIT = 28;
 const HAN_CHARACTER_PATTERN = /\p{Script=Han}/u;
 
 export function isLongCommunityTopicTitle(value: string): boolean {
-  const limit = HAN_CHARACTER_PATTERN.test(value)
+  const normalizedValue = value.trim();
+  const explicitLineCount = normalizedValue.split(/\r?\n/u).length;
+  if (explicitLineCount > 2) return true;
+  const limit = HAN_CHARACTER_PATTERN.test(normalizedValue)
     ? CHINESE_TOPIC_TITLE_LIMIT
     : ENGLISH_TOPIC_TITLE_LIMIT;
-  return Array.from(value.replace(/\s/gu, "")).length > limit;
+  return Array.from(normalizedValue.replace(/\s/gu, "")).length > limit;
 }
 
 function isLongCommunityTopic(topic: CommunityTopic): boolean {
@@ -385,18 +388,20 @@ function TopicCoverArtwork({
           <Icon aria-hidden="true" />
           <span>{presentation.kicker}</span>
         </header>
-        <strong
-          role={heading ? "heading" : undefined}
-          aria-level={heading ? 3 : undefined}
-        >
-          {topic.title}
-        </strong>
+        <div className="community-cover-title-group">
+          <strong
+            role={heading ? "heading" : undefined}
+            aria-level={heading ? 3 : undefined}
+          >
+            {topic.title}
+          </strong>
+          <p className="community-cover-tags">
+            {(topic.tags.length ? topic.tags : [presentation.emphasis]).slice(0, 3).map((tagName) => (
+              <span className="community-cover-tag" key={tagName}># {tagName}</span>
+            ))}
+          </p>
+        </div>
       </div>
-      <p className="community-cover-tags">
-        {(topic.tags.length ? topic.tags : [presentation.emphasis]).slice(0, 3).map((tagName) => (
-          <span className="community-cover-tag" key={tagName}># {tagName}</span>
-        ))}
-      </p>
       {dialog ? (
         <footer>
           <time dateTime={topic.created_at}>{presentation.issue}</time>
@@ -454,6 +459,7 @@ export function CommunityPage({
   });
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<CommunityTopic | null>(null);
+  const [selectedTopicIsLong, setSelectedTopicIsLong] = useState(false);
   const [title, setTitle] = useState("");
   const [cardVariant, setCardVariant] = useState<Exclude<CommunityCardVariant, "auto">>("short");
   const [body, setBody] = useState("");
@@ -664,10 +670,11 @@ export function CommunityPage({
     return Array.from({ length: end - start }, (_, index) => start + index);
   }, [topicPage, totalPages]);
 
-  const openTopic = (topic: CommunityTopic) => {
+  const openTopic = (topic: CommunityTopic, isLong: boolean) => {
     captureTopicTrigger();
     setDialogError(null);
     setSelectedTopic(topic);
+    setSelectedTopicIsLong(isLong);
     setComments([]);
     setHasMoreComments(false);
     void loadComments(topic.id);
@@ -1068,7 +1075,7 @@ export function CommunityPage({
                 <button
                   type="button"
                   className="community-topic-cover"
-                  onClick={() => openTopic(topic)}
+                  onClick={() => openTopic(topic, allTopicsView && isLong)}
                   aria-label={`${copy.open}: ${topic.title}`}
                 >
                   {topic.image_urls[0] ? (
@@ -1123,7 +1130,7 @@ export function CommunityPage({
                     <button
                       type="button"
                       aria-label={`${topic.comment_count} ${copy.comments}`}
-                      onClick={() => openTopic(topic)}
+                      onClick={() => openTopic(topic, allTopicsView && isLong)}
                     >
                       <MessageCircle aria-hidden="true" />
                       {topic.comment_count}
@@ -1145,7 +1152,7 @@ export function CommunityPage({
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => openTopic(topic)}
+                      onClick={() => openTopic(topic, allTopicsView && isLong)}
                     >
                       {copy.open}
                       <ArrowUpRight aria-hidden="true" />
@@ -1465,7 +1472,12 @@ export function CommunityPage({
                   />
                 ))
               ) : (
-                <TopicCoverArtwork topic={selectedTopic} locale={locale} dialog />
+                <TopicCoverArtwork
+                  topic={selectedTopic}
+                  locale={locale}
+                  isLong={selectedTopicIsLong}
+                  dialog
+                />
               )}
             </div>
             <div className="community-topic-dialog-content">

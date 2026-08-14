@@ -1685,7 +1685,7 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   grid-template-rows: minmax(0, 1fr) auto;
   justify-content: normal;
   padding: clamp(0.68rem, 0.9vw, 0.9rem);
-  text-align: center;
+  text-align: left;
 }
 
 .community-cover-copy {
@@ -1694,7 +1694,7 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   gap: clamp(0.46rem, 0.65vh, 0.62rem);
 }
@@ -1703,13 +1703,13 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   display: flex;
   max-width: 100%;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.42rem;
   font-size: clamp(0.54rem, 0.49vw, 0.64rem);
   font-weight: 820;
   letter-spacing: 0.11em;
   line-height: 1.15;
-  text-align: center;
+  text-align: left;
 }
 
 .community-cover-copy > header svg {
@@ -1718,9 +1718,19 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   flex: 0 0 auto;
 }
 
-.community-cover-copy > strong {
-  display: -webkit-box;
-  max-width: 100%;
+.community-cover-title-group {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(0.48rem, 0.65vh, 0.64rem);
+}
+
+.community-cover-title-group > strong {
+  display: block;
+  width: min(100%, 15em);
+  max-height: 2.2em;
   margin: 0;
   overflow: hidden;
   font-family: "Space Grotesk Variable", "Space Grotesk", Inter, sans-serif;
@@ -1728,19 +1738,19 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   letter-spacing: -0.045em;
   line-height: 1.1;
   overflow-wrap: anywhere;
+  text-align: left;
   text-wrap: balance;
   white-space: pre-line;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
-html[lang="zh-CN"] .community-cover-copy > strong {
+html[lang="zh-CN"] .community-cover-title-group > strong {
+  width: min(100%, 9em);
+  max-height: 2.32em;
   letter-spacing: -0.025em;
   line-height: 1.16;
 }
 
-.community-cover-art.is-long .community-cover-copy,
-.community-cover-art.is-dialog .community-cover-copy {
+.community-cover-art.is-long .community-cover-copy {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   align-items: stretch;
@@ -1749,44 +1759,51 @@ html[lang="zh-CN"] .community-cover-copy > strong {
   text-align: left;
 }
 
-.community-cover-art.is-long .community-cover-copy > header,
-.community-cover-art.is-dialog .community-cover-copy > header {
+.community-cover-art.is-long .community-cover-title-group {
+  align-self: center;
+  align-items: flex-start;
+}
+
+.community-cover-art.is-long .community-cover-copy > header {
   justify-content: flex-start;
   text-align: left;
 }
 
-.community-cover-art.is-long .community-cover-copy > strong,
-.community-cover-art.is-dialog .community-cover-copy > strong {
+.community-cover-art.is-long .community-cover-title-group > strong {
+  display: -webkit-box;
+  width: 100%;
+  max-height: none;
+  margin-inline: 0;
   align-self: center;
   font-size: clamp(1.12rem, 1.42vw, 1.56rem);
   line-height: 1.08;
   text-align: left;
+  -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
 }
 
-.community-cover-art.is-dialog .community-cover-copy > strong {
+.community-cover-art.is-dialog .community-cover-title-group > strong {
   font-size: clamp(2rem, 3.15vw, 3.45rem);
 }
 
-.community-cover-art > .community-cover-tags {
+.community-cover-title-group > .community-cover-tags {
   position: relative;
   z-index: 1;
   display: flex;
   min-width: 0;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.28rem;
   margin: 0;
-  padding-top: clamp(0.46rem, 0.62vh, 0.62rem);
+  padding-top: 0;
   overflow: hidden;
 }
 
-.community-cover-art.is-long > .community-cover-tags,
-.community-cover-art.is-dialog > .community-cover-tags {
+.community-cover-art.is-long .community-cover-title-group > .community-cover-tags {
   justify-content: flex-start;
 }
 
-.community-cover-art > .community-cover-tags .community-cover-tag {
+.community-cover-title-group > .community-cover-tags .community-cover-tag {
   display: block;
   min-width: 0;
   max-width: 100%;
