@@ -119,10 +119,7 @@ function buildEngineeringComponent(component: VehiclePreviewComponent, wireframe
 
   switch (component.kind) {
     case "fuselage": {
-      const hull = addPart(group, new THREE.CapsuleGeometry(Math.max(z * .42, .03), Math.max(.02, x - z * .84), 12, 32), main, [0, 0, 0], [0, 0, Math.PI / 2]);
-      hull.scale.set(1, Math.max(.65, y / z), 1);
-      addPart(group, new THREE.SphereGeometry(Math.max(z * .38, .025), 28, 16, 0, Math.PI * 2, 0, Math.PI / 2), light, [x * .08, y * .38, 0], [0, 0, 0]);
-      addPart(group, new THREE.BoxGeometry(x * .56, y * .08, z * .8), carbon, [-x * .03, -y * .48, 0]);
+      addPart(group, primitiveGeometry(component), main);
       break;
     }
     case "frame": {
@@ -159,8 +156,7 @@ function buildEngineeringComponent(component: VehiclePreviewComponent, wireframe
       break;
     }
     case "landing-gear": {
-      addPart(group, new THREE.CapsuleGeometry(Math.max(radius, z * .32), Math.max(.02, x - radius * 2), 8, 24), dark, [0, -y * .2, 0], [0, 0, Math.PI / 2]);
-      for (const px of [-x * .28, x * .28]) addPart(group, new THREE.CylinderGeometry(radius * .55, radius * .55, y * 3.2, 16), main, [px, y * 1.15, 0], [0, 0, px < 0 ? -.28 : .28]);
+      addPart(group, primitiveGeometry(component), main);
       break;
     }
     case "battery": {

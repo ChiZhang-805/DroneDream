@@ -633,14 +633,16 @@ export function solveVehicleConstraints(draft: VehicleModelDraft): VehicleConstr
   for (const constraint of next.constraints) {
     if (!constraint.enabled || !["mirror", "radial-array"].includes(constraint.type)) continue;
     const components = constraint.componentIds.map((id) => componentsById.get(id)).filter((component): component is VehicleComponentDraft => Boolean(component));
-    if (constraint.type === "mirror" && components.length === 2 && !components[1].locked) {
-      const [source, target] = components;
+    if (constraint.type === "mirror" && components.length === 2 && !components.every((component) => component.locked)) {
+      const [first, second] = components;
+      const source = second.locked ? second : first;
+      const target = second.locked ? first : second;
       const [planeA, planeB] = constraintPlane(constraint.axis);
       target.transform.positionM[constraint.axis] = -source.transform.positionM[constraint.axis];
       target.transform.positionM[planeA] = source.transform.positionM[planeA];
       target.transform.positionM[planeB] = source.transform.positionM[planeB];
       target.transform.rotationDeg = mirroredRotation(source.transform.rotationDeg, constraint.axis);
-      solvedCount += 1;
+      if (evaluateVehicleConstraints(next).find((evaluation) => evaluation.constraintId === constraint.id)?.status === "satisfied") solvedCount += 1;
     }
     if (constraint.type === "radial-array" && components.length > 1) {
       const [planeA, planeB] = constraintPlane(constraint.axis);

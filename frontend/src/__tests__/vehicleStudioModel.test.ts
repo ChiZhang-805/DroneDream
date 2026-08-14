@@ -241,6 +241,22 @@ describe("Vehicle Studio engineering generator", () => {
     expect(solved.draft.components.find((component) => component.id === mirrorConstraint.componentIds[1])?.transform.rotationDeg).toEqual({ x: 11, y: -18, z: -23 });
   });
 
+  it("solves a mirror from the locked member when the other side is editable", () => {
+    const draft = createVehicleModelDraft();
+    const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
+    const mirrored = mirrorVehicleComponent(draft, camera.id, "x");
+    const constraint = mirrored.constraints.find((candidate) => candidate.type === "mirror")!;
+    const locked = mirrored.components.find((component) => component.id === constraint.componentIds[1])!;
+    locked.locked = true;
+    const lockedTransform = structuredClone(locked.transform);
+    mirrored.components.find((component) => component.id === constraint.componentIds[0])!.transform.positionM.x += .08;
+    const solved = solveVehicleConstraints(mirrored);
+
+    expect(solved.solvedCount).toBe(1);
+    expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("satisfied");
+    expect(solved.draft.components.find((component) => component.id === locked.id)?.transform).toEqual(lockedTransform);
+  });
+
   it("keeps propulsion fleet presets atomic when a member is locked", () => {
     const draft = createVehicleModelDraft();
     const motors = draft.components.filter((component) => component.kind === "motor");
