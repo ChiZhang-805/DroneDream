@@ -33,12 +33,47 @@ function storageKey(storageScope: string): string {
   return `${STORAGE_PREFIX}:${storageScope || "local"}`;
 }
 
+type VehicleModelReadableStorage = Pick<Storage, "getItem"> & Partial<Pick<Storage, "setItem" | "removeItem">>;
+
+function legacyPersonalStorageKey(storageScope: string): string | null {
+  const encodedParts = storageScope.split(":");
+  if (encodedParts.length !== 5) return null;
+  try {
+    const [userId, tenantId, organizationId, workspaceId, edition] = encodedParts.map((part) => decodeURIComponent(part));
+    if (
+      !userId
+      || tenantId !== userId
+      || organizationId !== "personal"
+      || workspaceId !== "console-universal"
+      || edition !== "universal"
+    ) return null;
+    return storageKey(userId);
+  } catch {
+    return null;
+  }
+}
+
+function readVehicleModelStorageValue(storageScope: string, storage: VehicleModelReadableStorage): string | null {
+  const currentKey = storageKey(storageScope);
+  const current = storage.getItem(currentKey);
+  if (current !== null) return current;
+  const legacyKey = legacyPersonalStorageKey(storageScope);
+  if (!legacyKey) return null;
+  const legacy = storage.getItem(legacyKey);
+  if (legacy === null) return null;
+  if (storage.setItem) {
+    storage.setItem(currentKey, legacy);
+    if (storage.getItem(currentKey) === legacy) storage.removeItem?.(legacyKey);
+  }
+  return legacy;
+}
+
 export function loadVehicleModels(
   ownerId: string,
-  storage: Pick<Storage, "getItem"> = window.localStorage,
+  storage: VehicleModelReadableStorage = window.localStorage,
 ): StoredVehicleModel[] {
   try {
-    const value = JSON.parse(storage.getItem(storageKey(ownerId)) ?? "[]") as unknown;
+    const value = JSON.parse(readVehicleModelStorageValue(ownerId, storage) ?? "[]") as unknown;
     if (!Array.isArray(value)) return [];
     const loaded: StoredVehicleModel[] = [];
     for (const item of value.slice(0, MAX_MODELS)) {

@@ -47,6 +47,7 @@ function memoryStorage() {
   return {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); },
   };
 }
 
@@ -300,6 +301,33 @@ describe("Universal Vehicle Studio contract", () => {
     expect(loadVehicleModels(personalScope, storage)).toHaveLength(1);
     expect(loadVehicleModels(organizationScope, storage)).toEqual([]);
     expect(loadVehicleModels(simScope, storage)).toEqual([]);
+  });
+
+  it("migrates a legacy personal Universal cache exactly once without crossing a tenant boundary", () => {
+    const storage = memoryStorage();
+    const draft = createVehicleModelDraft(new Date("2026-08-14T04:30:00.000Z"));
+    const legacyKey = "dronedream:vehicle-studio:v1:owner-a";
+    storage.setItem(legacyKey, JSON.stringify([{ draftId: draft.draftId, revisions: [draft] }]));
+    const personalScope = vehicleModelStorageScope({
+      userId: "owner-a",
+      tenantId: "owner-a",
+      organizationId: null,
+      workspaceId: "console-universal",
+      edition: "universal",
+    });
+    const organizationScope = vehicleModelStorageScope({
+      userId: "owner-a",
+      tenantId: "organization-b",
+      organizationId: "organization-b",
+      workspaceId: "console-universal",
+      edition: "universal",
+    });
+
+    expect(loadVehicleModels(organizationScope, storage)).toEqual([]);
+    expect(storage.getItem(legacyKey)).not.toBeNull();
+    expect(loadVehicleModels(personalScope, storage)).toHaveLength(1);
+    expect(storage.getItem(legacyKey)).toBeNull();
+    expect(loadVehicleModels(personalScope, storage)).toHaveLength(1);
   });
 
   it("builds only complete Universal cloud boundaries", () => {

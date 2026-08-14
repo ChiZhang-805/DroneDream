@@ -8,6 +8,7 @@ const PERSONAL_ORGANIZATION_ID = "00000000-0000-0000-0000-000000000000";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const MAX_MODELS = 50;
 const MAX_REVISIONS = 40;
+const CLOUD_PAGE_SIZE = 1_000;
 
 export interface VehicleModelBoundary {
   userId: string;
@@ -76,19 +77,27 @@ export async function loadCloudVehicleModels(
   const database = client();
   if (!database) return null;
   const columns = cloudBoundary(boundary);
-  const { data, error } = await database.from("vehicle_model_revisions")
-    .select("draft_id,revision,model")
-    .eq("user_id", columns.user_id)
-    .eq("tenant_id", columns.tenant_id)
-    .eq("organization_id", columns.organization_id)
-    .eq("workspace_id", columns.workspace_id)
-    .eq("edition", columns.edition)
-    .order("updated_at", { ascending: false })
-    .limit(MAX_MODELS * MAX_REVISIONS);
-  if (error) throw error;
+  const rows: VehicleModelRevisionRow[] = [];
+  for (let offset = 0; ; offset += CLOUD_PAGE_SIZE) {
+    const { data, error } = await database.from("vehicle_model_revisions")
+      .select("draft_id,revision,model")
+      .eq("user_id", columns.user_id)
+      .eq("tenant_id", columns.tenant_id)
+      .eq("organization_id", columns.organization_id)
+      .eq("workspace_id", columns.workspace_id)
+      .eq("edition", columns.edition)
+      .order("updated_at", { ascending: false })
+      .order("draft_id", { ascending: true })
+      .order("revision", { ascending: false })
+      .range(offset, offset + CLOUD_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as VehicleModelRevisionRow[];
+    rows.push(...page);
+    if (page.length < CLOUD_PAGE_SIZE) break;
+  }
 
   const grouped = new Map<string, VehicleModelDraft[]>();
-  for (const row of (data ?? []) as VehicleModelRevisionRow[]) {
+  for (const row of rows) {
     if (typeof row.draft_id !== "string" || !Number.isInteger(row.revision)) continue;
     try {
       const revision = migrateVehicleModelDraft(row.model);
@@ -123,15 +132,16 @@ export async function saveCloudVehicleModel(
   if (!database) return false;
   assertVehicleModelShape(draft);
   const columns = cloudBoundary(boundary);
-  const { error } = await database.from("vehicle_model_revisions").upsert({
+  const { error } = await database.from("vehicle_model_revisions").insert({
     ...columns,
     draft_id: draft.draftId,
     revision: draft.revision,
     model: draft,
     updated_at: draft.updatedAt,
-  }, {
-    onConflict: "user_id,tenant_id,organization_id,workspace_id,edition,draft_id,revision",
   });
+  if (error?.code === "23505") {
+    throw new Error(`Vehicle-model revision ${draft.revision} already exists and cannot be overwritten.`);
+  }
   if (error) throw error;
   return true;
 }

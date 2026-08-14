@@ -285,15 +285,18 @@ export function canSetVehicleComponentParent(draft: VehicleModelDraft, component
 }
 
 export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEngineeringDiagnostics {
-  const visible = draft.components.filter((component) => component.visible);
-  const effectiveMasses = new Map(visible.map((component) => [component.id, getVehicleComponentMassProperties(component).massKg]));
-  const totalMassKg = visible.reduce((sum, component) => sum + (Number.isFinite(effectiveMasses.get(component.id)) ? effectiveMasses.get(component.id)! : 0), 0);
-  const centerOfMassM = totalMassKg > 0 ? visible.reduce((sum, component) => ({
+  // Visibility is a viewport concern. Hidden parts remain physical members of
+  // the saved/exported assembly and therefore must participate in every
+  // engineering calculation.
+  const physicalComponents = draft.components;
+  const effectiveMasses = new Map(physicalComponents.map((component) => [component.id, getVehicleComponentMassProperties(component).massKg]));
+  const totalMassKg = physicalComponents.reduce((sum, component) => sum + (Number.isFinite(effectiveMasses.get(component.id)) ? effectiveMasses.get(component.id)! : 0), 0);
+  const centerOfMassM = totalMassKg > 0 ? physicalComponents.reduce((sum, component) => ({
     x: sum.x + component.transform.positionM.x * effectiveMasses.get(component.id)! / totalMassKg,
     y: sum.y + component.transform.positionM.y * effectiveMasses.get(component.id)! / totalMassKg,
     z: sum.z + component.transform.positionM.z * effectiveMasses.get(component.id)! / totalMassKg,
   }), ZERO()) : ZERO();
-  const spanM = visible.reduce((maximum, component) => Math.max(maximum,
+  const spanM = physicalComponents.reduce((maximum, component) => Math.max(maximum,
     Math.abs(component.transform.positionM.x) * 2 + scaledGeometry(component).x,
     Math.abs(component.transform.positionM.z) * 2 + scaledGeometry(component).z,
   ), 0);
@@ -301,7 +304,7 @@ export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEn
   const centerOfMassOffsetM = Math.hypot(centerOfMassM.x, centerOfMassM.z);
   const balanceReferenceM = Math.max(.02, spanM * .08);
   const balanceScore = Math.max(0, Math.min(100, 100 * (1 - centerOfMassOffsetM / balanceReferenceM)));
-  const rotors = visible.filter((component) => component.kind === "propeller").map((component) => {
+  const rotors = physicalComponents.filter((component) => component.kind === "propeller").map((component) => {
     const geometry = scaledGeometry(component);
     return {
       x: component.transform.positionM.x,
@@ -327,7 +330,7 @@ export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEn
   const estimatedHoverMinutes = estimatedElectricalPowerW > 0
     ? batteryEnergyWh * .8 / estimatedElectricalPowerW * 60
     : 0;
-  const projectedAreaM2 = visible.reduce((sum, component) => {
+  const projectedAreaM2 = physicalComponents.reduce((sum, component) => {
     const geometry = scaledGeometry(component);
     return sum + geometry.x * geometry.z * (component.kind === "propeller" ? .08 : .72);
   }, 0);
@@ -338,7 +341,9 @@ export function calculateVehicleDiagnostics(draft: VehicleModelDraft): VehicleEn
   const thrustToWeight = engineeringMassKg > 0 ? draft.propulsion.motorCount * draft.propulsion.maximumThrustPerMotorN / (engineeringMassKg * 9.80665) : 0;
   if (thrustToWeight < 1.8) engineeringWarnings.push("Thrust margin is below the preferred 1.8:1 engineering target.");
   return {
-    componentCount: draft.components.length, visibleComponentCount: visible.length, totalMassKg,
+    componentCount: draft.components.length,
+    visibleComponentCount: draft.components.filter((component) => component.visible).length,
+    totalMassKg,
     centerOfMassM, centerOfMassOffsetM, balanceScore, spanM, minimumRotorClearanceM,
     rotorDiskAreaM2, batteryEnergyWh, estimatedHoverMinutes, projectedAreaM2, engineeringWarnings,
     thrustToWeight,

@@ -52,6 +52,23 @@ describe("Vehicle Studio engineering generator", () => {
     expect(validateVehicleModel(draft).filter((issue) => issue.code === "unsupported-schema")).toHaveLength(0);
   });
 
+  it("keeps hidden viewport parts in physical engineering diagnostics", () => {
+    const { draft } = createVehicleModelFromBrief({
+      name: "Visibility invariant rig",
+      mission: "inspection",
+      motorCount: 4,
+      payloadKg: 1.2,
+    });
+    const before = calculateVehicleDiagnostics(draft);
+    draft.components[0].visible = false;
+    const after = calculateVehicleDiagnostics(draft);
+
+    expect(after.visibleComponentCount).toBe(before.visibleComponentCount - 1);
+    expect(after.totalMassKg).toBeCloseTo(before.totalMassKg, 10);
+    expect(after.centerOfMassM).toEqual(before.centerOfMassM);
+    expect(after.projectedAreaM2).toBeCloseTo(before.projectedAreaM2, 10);
+  });
+
   it("keeps explicit architecture choices instead of collapsing to a generic quadrotor", () => {
     const { draft } = createVehicleModelFromBrief({
       name: "Indoor agile platform",
