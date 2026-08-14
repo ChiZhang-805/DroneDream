@@ -1685,7 +1685,7 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   grid-template-rows: minmax(0, 1fr) auto;
   justify-content: normal;
   padding: clamp(0.68rem, 0.9vw, 0.9rem);
-  text-align: center;
+  text-align: left;
 }
 
 .community-cover-copy {
@@ -1694,7 +1694,7 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   gap: clamp(0.46rem, 0.65vh, 0.62rem);
 }
@@ -1703,13 +1703,13 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   display: flex;
   max-width: 100%;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.42rem;
   font-size: clamp(0.54rem, 0.49vw, 0.64rem);
   font-weight: 820;
   letter-spacing: 0.11em;
   line-height: 1.15;
-  text-align: center;
+  text-align: left;
 }
 
 .community-cover-copy > header svg {
@@ -1723,7 +1723,7 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   width: 100%;
   min-width: 0;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: clamp(0.48rem, 0.65vh, 0.64rem);
 }
 
@@ -1731,14 +1731,14 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   display: block;
   width: min(100%, 15em);
   max-height: 2.2em;
-  margin: 0 auto;
+  margin: 0;
   overflow: hidden;
   font-family: "Space Grotesk Variable", "Space Grotesk", Inter, sans-serif;
   font-size: clamp(0.96rem, 1.12vw, 1.24rem);
   letter-spacing: -0.045em;
   line-height: 1.1;
   overflow-wrap: anywhere;
-  text-align: center;
+  text-align: left;
   text-wrap: balance;
   white-space: pre-line;
 }
@@ -1791,7 +1791,7 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   display: flex;
   min-width: 0;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.28rem;
   margin: 0;
   padding-top: 0;

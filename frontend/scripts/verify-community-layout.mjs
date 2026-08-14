@@ -249,8 +249,8 @@ try {
       && (!shortTitleParity || (
         shortTitleParity.dialogIsShort
         && shortTitleParity.card?.text === shortTitleParity.dialog?.text
-        && shortTitleParity.card?.textAlign === "center"
-        && shortTitleParity.dialog?.textAlign === "center"
+        && shortTitleParity.card?.textAlign === "left"
+        && shortTitleParity.dialog?.textAlign === "left"
         && shortTitleParity.card?.lines === 2
         && shortTitleParity.dialog?.lines === 2
         && Math.min(...shortTitleParity.card.lineWidths) / Math.max(...shortTitleParity.card.lineWidths) >= 0.55
