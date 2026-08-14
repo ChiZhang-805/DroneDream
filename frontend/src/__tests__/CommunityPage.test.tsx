@@ -93,7 +93,7 @@ describe("CommunityPage public data loading", () => {
       name: "Stable hover evidence",
     })).toBeVisible();
     expect(supabaseMock.rpc).toHaveBeenCalledWith(
-      "community_list_topics",
+      "community_list_topics_v2",
       expect.objectContaining({ p_offset: 0, p_limit: 50 }),
     );
     expect(screen.getByText("7")).toBeVisible();

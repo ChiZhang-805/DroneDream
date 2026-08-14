@@ -9,7 +9,9 @@ import {
   Gauge,
   Heart,
   ImagePlus,
+  Maximize2,
   MessageCircle,
+  Minimize2,
   PenLine,
   Reply,
   Search,
@@ -62,7 +64,11 @@ export interface CommunityTopic {
   comment_count: number;
   like_count: number;
   liked_by_viewer: boolean;
+  card_variant?: CommunityCardVariant;
+  author_avatar_url?: string | null;
 }
+
+type CommunityCardVariant = "auto" | "short" | "long";
 
 interface CommunityComment {
   id: string;
@@ -90,7 +96,13 @@ export function isLongCommunityTopicTitle(value: string): boolean {
   const limit = HAN_CHARACTER_PATTERN.test(value)
     ? CHINESE_TOPIC_TITLE_LIMIT
     : ENGLISH_TOPIC_TITLE_LIMIT;
-  return Array.from(value.trim()).length > limit;
+  return Array.from(value.replace(/\s/gu, "")).length > limit;
+}
+
+function isLongCommunityTopic(topic: CommunityTopic): boolean {
+  if (topic.card_variant === "long") return true;
+  if (topic.card_variant === "short") return false;
+  return isLongCommunityTopicTitle(topic.title);
 }
 
 export interface CommunityTopicPlacement {
@@ -108,7 +120,7 @@ export function packCommunityTopicPages(
   ];
   const remaining = topics.slice(DISCOVERY_PAGE_SIZE).map((topic) => ({
     topic,
-    isLong: isLongCommunityTopicTitle(topic.title),
+    isLong: isLongCommunityTopic(topic),
   }));
 
   while (remaining.length > 0) {
@@ -123,13 +135,15 @@ export function packCommunityTopicPages(
       visualUnits += placement.isLong ? 2 : 1;
     }
 
-    // Fill the second row only with the immediately following short cards. If
-    // the next ranked topic is long, start a new page so it can remain next in
-    // both DOM and visual order while still spanning exactly two rows.
-    while (remaining.length > 0 && visualUnits < DISCOVERY_PAGE_SIZE) {
-      const nextPlacement = remaining[0];
-      if (nextPlacement.isLong) break;
-      page.push(remaining.shift()!);
+    // Long cards must start in the top row. Fill any remaining lower-row slots
+    // with the next short cards and carry later long cards to the next page.
+    for (let index = 0; index < remaining.length && visualUnits < DISCOVERY_PAGE_SIZE;) {
+      const nextPlacement = remaining[index];
+      if (nextPlacement.isLong) {
+        index += 1;
+        continue;
+      }
+      page.push(...remaining.splice(index, 1));
       visualUnits += 1;
     }
 
@@ -170,6 +184,11 @@ const communityContent = {
     unavailable: "The community connection is temporarily unavailable.",
     titleLabel: "Topic title",
     titlePlaceholder: "What should the community help you understand?",
+    preview: "Live preview",
+    shortCard: "Short card",
+    longCard: "Long card",
+    longCardRequired: "This title needs a long card to remain fully readable.",
+    layoutUnavailable: "Long-card publishing is not available yet. Please retry after the community update completes.",
     bodyLabel: "Evidence and context",
     bodyPlaceholder:
       "Describe the aircraft, route, parameters, observed result, evidence already checked, and the exact comparison you want the community to review.",
@@ -224,6 +243,11 @@ const communityContent = {
     unavailable: "社区连接暂时不可用。",
     titleLabel: "话题标题",
     titlePlaceholder: "你希望社区帮助理解什么问题？",
+    preview: "实时预览",
+    shortCard: "短卡片",
+    longCard: "长卡片",
+    longCardRequired: "当前标题需要使用长卡片，才能完整清晰地展示。",
+    layoutUnavailable: "长卡片发布能力正在更新，请稍后重试。",
     bodyLabel: "证据与背景",
     bodyPlaceholder: "请描述飞行器、轨迹、参数、观察结果、已经核对过的证据，以及希望社区进一步比较或判断的具体问题。",
     tagsLabel: "标签",
@@ -352,23 +376,27 @@ function TopicCoverArtwork({
   const Icon = presentation.icon;
   return (
     <div
-      className={`community-cover-art is-${presentation.template}${dialog ? " is-dialog" : ""}`}
+      className={`community-cover-art is-${presentation.template}${isLong ? " is-long" : ""}${dialog ? " is-dialog" : ""}`}
       data-template={presentation.template}
     >
       <span className="community-cover-shape is-secondary" aria-hidden="true" />
-      <header>
-        <Icon aria-hidden="true" />
-        <span>{presentation.kicker}</span>
-      </header>
-      <strong
-        role={heading ? "heading" : undefined}
-        aria-level={heading ? 3 : undefined}
-      >
-        {topic.title}
-      </strong>
-      {isLong || dialog ? (
-        <p><span className="community-cover-tag"># {presentation.emphasis}</span></p>
-      ) : null}
+      <div className="community-cover-copy">
+        <header>
+          <Icon aria-hidden="true" />
+          <span>{presentation.kicker}</span>
+        </header>
+        <strong
+          role={heading ? "heading" : undefined}
+          aria-level={heading ? 3 : undefined}
+        >
+          {topic.title}
+        </strong>
+      </div>
+      <p className="community-cover-tags">
+        {(topic.tags.length ? topic.tags : [presentation.emphasis]).slice(0, 3).map((tagName) => (
+          <span className="community-cover-tag" key={tagName}># {tagName}</span>
+        ))}
+      </p>
       {dialog ? (
         <footer>
           <time dateTime={topic.created_at}>{presentation.issue}</time>
@@ -427,6 +455,7 @@ export function CommunityPage({
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<CommunityTopic | null>(null);
   const [title, setTitle] = useState("");
+  const [cardVariant, setCardVariant] = useState<Exclude<CommunityCardVariant, "auto">>("short");
   const [body, setBody] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
@@ -437,7 +466,7 @@ export function CommunityPage({
   const [commentBody, setCommentBody] = useState("");
   const [replyTo, setReplyTo] = useState<CommunityComment | null>(null);
   const composerRef = useRef<HTMLFormElement>(null);
-  const composerTitleRef = useRef<HTMLInputElement>(null);
+  const composerTitleRef = useRef<HTMLTextAreaElement>(null);
   const topicDialogRef = useRef<HTMLElement>(null);
   const topicCloseRef = useRef<HTMLButtonElement>(null);
   const captureComposerTrigger = useModalFocus({
@@ -453,6 +482,24 @@ export function CommunityPage({
     onClose: () => setSelectedTopic(null),
   });
 
+  const titleNeedsLongCard = isLongCommunityTopicTitle(title);
+  const effectiveCardVariant = titleNeedsLongCard ? "long" : cardVariant;
+  const previewTopic = useMemo<CommunityTopic>(() => ({
+    id: "community-composer-preview",
+    author_id: account?.id ?? "community-preview",
+    author_name: account?.displayName ?? "DroneDream Pilot",
+    author_avatar_url: account?.avatarUrl ?? null,
+    title: title || copy.titlePlaceholder,
+    body: body || copy.bodyPlaceholder,
+    tags,
+    image_urls: [],
+    created_at: new Date().toISOString(),
+    comment_count: 0,
+    like_count: 0,
+    liked_by_viewer: false,
+    card_variant: effectiveCardVariant,
+  }), [account, body, copy.bodyPlaceholder, copy.titlePlaceholder, effectiveCardVariant, tags, title]);
+
   const loadTopics = useCallback(async () => {
     if (!supabaseClient) {
       setLoading(false);
@@ -466,14 +513,22 @@ export function CommunityPage({
     const timeout = window.setTimeout(() => controller.abort(), 8000);
     try {
       const pageSize = allTopicsView ? DISCOVERY_BATCH_SIZE : RECENT_TOPIC_POOL_SIZE;
-      const listRequest = client
-        .rpc("community_list_topics", {
+      const listTopicsPage = async (offset: number, limit: number) => {
+        const parameters = {
           p_search: settledQuery.trim() || null,
           p_tag: activeTag,
-          p_offset: 0,
-          p_limit: pageSize,
-        })
-        .abortSignal(controller.signal);
+          p_offset: offset,
+          p_limit: limit,
+        };
+        const enhanced = await client
+          .rpc("community_list_topics_v2", parameters)
+          .abortSignal(controller.signal);
+        if (!enhanced.error) return enhanced;
+        return client
+          .rpc("community_list_topics", parameters)
+          .abortSignal(controller.signal);
+      };
+      const listRequest = listTopicsPage(0, pageSize);
       const countRequest = allTopicsView
         ? client
             .rpc("community_count_topics", {
@@ -500,16 +555,7 @@ export function CommunityPage({
           )
         : [];
       const additionalResponses = await Promise.all(
-        additionalOffsets.map((offset) =>
-          client
-            .rpc("community_list_topics", {
-              p_search: settledQuery.trim() || null,
-              p_tag: activeTag,
-              p_offset: offset,
-              p_limit: DISCOVERY_BATCH_SIZE,
-            })
-            .abortSignal(controller.signal)
-        ),
+        additionalOffsets.map((offset) => listTopicsPage(offset, DISCOVERY_BATCH_SIZE)),
       );
       const additionalTopics = additionalResponses.flatMap((response) => {
         if (response.error) throw response.error;
@@ -644,7 +690,7 @@ export function CommunityPage({
     const value = customTag.trim().replace(/^#/u, "").slice(0, 24);
     if (value) {
       setTags((current) =>
-        !current.includes(value) && current.length < 5
+        !current.includes(value) && current.length < 3
           ? [...current, value]
           : current
       );
@@ -740,16 +786,33 @@ export function CommunityPage({
     try {
       const uploaded = await uploadImages();
       uploadedPaths = uploaded.paths;
-      const { error: requestError } = await supabaseClient.from("community_topics").insert({
+      const baseTopic = {
         author_id: account.id,
         author_name: account.displayName,
         title: title.trim(),
         body: body.trim(),
         tags,
         image_urls: uploaded.urls,
+      };
+      let { error: requestError } = await supabaseClient.from("community_topics").insert({
+        ...baseTopic,
+        card_variant: effectiveCardVariant,
       });
+      const missingCardVariant = Boolean(
+        requestError
+        && (
+          requestError.code === "PGRST204"
+          || requestError.message?.includes("card_variant")
+        )
+      );
+      if (missingCardVariant && effectiveCardVariant === (titleNeedsLongCard ? "long" : "short")) {
+        ({ error: requestError } = await supabaseClient.from("community_topics").insert(baseTopic));
+      } else if (missingCardVariant) {
+        throw new Error(copy.layoutUnavailable);
+      }
       if (requestError) throw requestError;
       setTitle("");
+      setCardVariant("short");
       setBody("");
       setTags([]);
       setFiles([]);
@@ -923,17 +986,7 @@ export function CommunityPage({
   return (
     <div className={`site-portal community-page${allTopicsView ? " is-all-topics" : ""}`}>
       <header className="community-hero">
-        <div>
-          <p className="site-eyebrow">{copy.eyebrow}</p>
-          <h1 aria-label={allTopicsView ? copy.allTopics : copy.title}>
-            {allTopicsView ? copy.allTopics : (
-              <>
-                <span aria-hidden="true" className="portal-title-desktop">{copy.title}</span>
-                <span aria-hidden="true" className="portal-title-mobile">{copy.mobileTitle}</span>
-              </>
-            )}
-          </h1>
-        </div>
+        <h1 className="site-eyebrow">{copy.eyebrow}</h1>
         <button
           type="button"
           disabled={!sensitiveCloudActionsEnabled}
@@ -1005,9 +1058,8 @@ export function CommunityPage({
         <div className="community-topic-grid">
           {visibleTopicPlacements.map(({ topic, isLong }) => {
             const liked = Boolean(account && topic.liked_by_viewer);
-            const authorAvatarUrl = account?.id === topic.author_id
-              ? account.avatarUrl
-              : null;
+            const authorAvatarUrl = topic.author_avatar_url
+              || (account?.id === topic.author_id ? account.avatarUrl : null);
             return (
               <article
                 key={topic.id}
@@ -1091,7 +1143,10 @@ export function CommunityPage({
                         <Trash2 aria-hidden="true" />
                       </button>
                     ) : null}
-                    <button type="button" onClick={() => openTopic(topic)}>
+                    <button
+                      type="button"
+                      onClick={() => openTopic(topic)}
+                    >
                       {copy.open}
                       <ArrowUpRight aria-hidden="true" />
                     </button>
@@ -1168,136 +1223,207 @@ export function CommunityPage({
                 <X aria-hidden="true" />
               </button>
             </header>
-            <label>
-              <span>{copy.titleLabel}</span>
-              <input
-                ref={composerTitleRef}
-                required
-                maxLength={120}
-                value={title}
-                placeholder={copy.titlePlaceholder}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-            </label>
-            <label>
-              <span>{copy.bodyLabel}</span>
-              <textarea
-                required
-                minLength={12}
-                maxLength={4000}
-                value={body}
-                placeholder={copy.bodyPlaceholder}
-                onChange={(event) => setBody(event.target.value)}
-              />
-            </label>
-            <fieldset>
-              <legend><Tag aria-hidden="true" />{copy.tagsLabel}</legend>
-              <div className="community-composer-tags">
-                {presets.map((tagName) => (
-                  <button
-                    key={tagName}
-                    type="button"
-                    className={tags.includes(tagName) ? "is-active" : ""}
-                    aria-pressed={tags.includes(tagName)}
-                    onClick={() =>
-                      setTags(
-                        tags.includes(tagName)
-                          ? tags.filter((value) => value !== tagName)
-                          : tags.length < 5
-                            ? [...tags, tagName]
-                            : tags,
-                      )
-                    }
-                  >
-                    # {tagName}
-                  </button>
-                ))}
-                {tags
-                  .filter((tagName) =>
-                    !presets.some((preset) => preset === tagName)
-                  )
-                  .map((tagName) => (
-                    <button
-                      key={tagName}
-                      type="button"
-                      className="is-active"
-                      aria-pressed="true"
-                      onClick={() =>
-                        setTags((current) =>
-                          current.filter((value) => value !== tagName)
-                        )
-                      }
-                    >
-                      # {tagName}
-                    </button>
-                  ))}
-                <input
-                  aria-label={copy.customTag}
-                  value={customTag}
-                  onChange={(event) => setCustomTag(event.target.value)}
-                  onKeyDown={addCustomTag}
-                  placeholder={copy.customTag}
-                />
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend><ImagePlus aria-hidden="true" />{copy.mediaLabel}</legend>
-              <label className="community-file-picker">
-                <Upload aria-hidden="true" />
-                <span>{preparingMedia ? copy.preparingMedia : copy.mediaHint}</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  disabled={preparingMedia || publishing}
-                  onChange={(event) => {
-                    const selected = Array.from(event.target.files ?? []);
-                    event.target.value = "";
-                    void selectImages(selected);
-                  }}
-                />
-              </label>
-              {files.length ? (
-                <div className="community-file-list">
-                  {files.map((file) => (
-                    <span key={`${file.name}-${file.lastModified}`}>
-                      {file.name}
+            <div className="community-composer-layout">
+              <section className="community-composer-preview" aria-label={copy.preview}>
+                <header>
+                  <span>{copy.preview}</span>
+                  <strong>{effectiveCardVariant === "long" ? copy.longCard : copy.shortCard}</strong>
+                </header>
+                <div className="community-composer-preview-stage">
+                  <article className={effectiveCardVariant === "long" ? "is-long" : "is-short"}>
+                    <div className="community-topic-cover" aria-hidden="true">
+                      <TopicCoverArtwork
+                        topic={previewTopic}
+                        locale={locale}
+                        isLong={effectiveCardVariant === "long"}
+                      />
+                    </div>
+                    <div className="community-topic-card-body">
+                      <div className="community-topic-author">
+                        <span>
+                          {account.avatarUrl ? (
+                            <img src={account.avatarUrl} alt="" />
+                          ) : (
+                            <UserRound aria-hidden="true" />
+                          )}
+                        </span>
+                        <div>
+                          <strong>{account.displayName}</strong>
+                          <time>{dateLabel(locale, previewTopic.created_at)}</time>
+                        </div>
+                      </div>
+                      <footer>
+                        <span><Heart aria-hidden="true" />0</span>
+                        <span><MessageCircle aria-hidden="true" />0</span>
+                      </footer>
+                    </div>
+                  </article>
+                </div>
+              </section>
+
+              <div className="community-composer-fields">
+                <div className="community-composer-title-field">
+                  <div>
+                    <label htmlFor="community-topic-title-input">{copy.titleLabel}</label>
+                    <div className="community-card-variant" role="group" aria-label={copy.titleLabel}>
                       <button
                         type="button"
-                        aria-label={`${copy.removeImage}: ${file.name}`}
-                        onClick={() => setFiles(files.filter((candidate) => candidate !== file))}
+                        className={effectiveCardVariant === "short" ? "is-active" : ""}
+                        aria-label={copy.shortCard}
+                        aria-pressed={effectiveCardVariant === "short"}
+                        disabled={titleNeedsLongCard}
+                        onClick={() => setCardVariant("short")}
                       >
-                        <X aria-hidden="true" />
+                        <Minimize2 aria-hidden="true" />
                       </button>
-                    </span>
-                  ))}
+                      <button
+                        type="button"
+                        className={effectiveCardVariant === "long" ? "is-active" : ""}
+                        aria-label={copy.longCard}
+                        aria-pressed={effectiveCardVariant === "long"}
+                        onClick={() => setCardVariant("long")}
+                      >
+                        <Maximize2 aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    id="community-topic-title-input"
+                    ref={composerTitleRef}
+                    required
+                    rows={3}
+                    maxLength={120}
+                    value={title}
+                    placeholder={copy.titlePlaceholder}
+                    onChange={(event) => {
+                      const nextTitle = event.target.value;
+                      setTitle(nextTitle);
+                      if (isLongCommunityTopicTitle(nextTitle)) setCardVariant("long");
+                    }}
+                  />
+                  {titleNeedsLongCard ? <small>{copy.longCardRequired}</small> : null}
                 </div>
-              ) : null}
-            </fieldset>
-            {composerError ? (
-              <p className="community-form-error" role="alert">{composerError}</p>
-            ) : null}
-            <footer>
-              <button
-                type="button"
-                className="community-composer-cancel"
-                onClick={() => setComposerOpen(false)}
-              >
-                {copy.cancel}
-              </button>
-              <button
-                type="submit"
-                disabled={
-                  publishing ||
-                  preparingMedia ||
-                  !title.trim() ||
-                  !body.trim()
-                }
-              >
-                <Send aria-hidden="true" />
-                {publishing ? copy.publishing : copy.publish}
-              </button>
-            </footer>
+                <label>
+                  <span>{copy.bodyLabel}</span>
+                  <textarea
+                    required
+                    minLength={12}
+                    maxLength={4000}
+                    value={body}
+                    placeholder={copy.bodyPlaceholder}
+                    onChange={(event) => setBody(event.target.value)}
+                  />
+                </label>
+                <fieldset>
+                  <legend><Tag aria-hidden="true" />{copy.tagsLabel}</legend>
+                  <div className="community-composer-tags">
+                    {presets.map((tagName) => (
+                      <button
+                        key={tagName}
+                        type="button"
+                        className={tags.includes(tagName) ? "is-active" : ""}
+                        aria-pressed={tags.includes(tagName)}
+                        onClick={() =>
+                          setTags(
+                            tags.includes(tagName)
+                              ? tags.filter((value) => value !== tagName)
+                              : tags.length < 3
+                                ? [...tags, tagName]
+                                : tags,
+                          )
+                        }
+                      >
+                        # {tagName}
+                      </button>
+                    ))}
+                    {tags
+                      .filter((tagName) =>
+                        !presets.some((preset) => preset === tagName)
+                      )
+                      .map((tagName) => (
+                        <button
+                          key={tagName}
+                          type="button"
+                          className="is-active"
+                          aria-pressed="true"
+                          onClick={() =>
+                            setTags((current) =>
+                              current.filter((value) => value !== tagName)
+                            )
+                          }
+                        >
+                          # {tagName}
+                        </button>
+                      ))}
+                    <input
+                      aria-label={copy.customTag}
+                      value={customTag}
+                      onChange={(event) => setCustomTag(event.target.value)}
+                      onKeyDown={addCustomTag}
+                      placeholder={copy.customTag}
+                    />
+                  </div>
+                </fieldset>
+                <fieldset>
+                  <legend><ImagePlus aria-hidden="true" />{copy.mediaLabel}</legend>
+                  <label className="community-file-picker">
+                    <Upload aria-hidden="true" />
+                    <span>{preparingMedia ? copy.preparingMedia : copy.mediaHint}</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      disabled={preparingMedia || publishing}
+                      onChange={(event) => {
+                        const selected = Array.from(event.target.files ?? []);
+                        event.target.value = "";
+                        void selectImages(selected);
+                      }}
+                    />
+                  </label>
+                  {files.length ? (
+                    <div className="community-file-list">
+                      {files.map((file) => (
+                        <span key={`${file.name}-${file.lastModified}`}>
+                          {file.name}
+                          <button
+                            type="button"
+                            aria-label={`${copy.removeImage}: ${file.name}`}
+                            onClick={() => setFiles(files.filter((candidate) => candidate !== file))}
+                          >
+                            <X aria-hidden="true" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </fieldset>
+                {composerError ? (
+                  <p className="community-form-error" role="alert">{composerError}</p>
+                ) : null}
+                <footer>
+                  <button
+                    type="button"
+                    className="community-composer-cancel"
+                    onClick={() => setComposerOpen(false)}
+                  >
+                    {copy.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={
+                      publishing ||
+                      preparingMedia ||
+                      !title.trim() ||
+                      !body.trim()
+                    }
+                  >
+                    <Send aria-hidden="true" />
+                    {publishing ? copy.publishing : copy.publish}
+                  </button>
+                </footer>
+              </div>
+            </div>
           </form>
         </div>
       ) : null}
@@ -1346,8 +1472,11 @@ export function CommunityPage({
               <header>
                 <div className="community-topic-author">
                   <span>
-                    {account?.id === selectedTopic.author_id && account.avatarUrl ? (
-                      <img src={account.avatarUrl} alt="" />
+                    {selectedTopic.author_avatar_url || (account?.id === selectedTopic.author_id && account.avatarUrl) ? (
+                      <img
+                        src={selectedTopic.author_avatar_url || account?.avatarUrl || ""}
+                        alt=""
+                      />
                     ) : (
                       <UserRound aria-hidden="true" />
                     )}
