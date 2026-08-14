@@ -1085,6 +1085,109 @@ export interface JobCompareResponse {
   items: JobCompareItem[];
 }
 
+export type AutonomyEdition = "universal" | "sim" | "lab" | "field";
+export type AutonomyExecutionTarget = "simulation" | "hitl" | "hardware";
+export type AutonomyPerceptionMode = "map" | "vision" | "fusion";
+
+export interface AutonomyVehicleEnvelope {
+  dry_mass_kg: number;
+  launch_payload_kg: number;
+  pickup_payload_kg: number;
+  max_takeoff_mass_kg: number;
+  max_total_thrust_n: number;
+  radius_m: number;
+  max_speed_mps: number;
+  max_acceleration_mps2: number;
+  reserve_battery_percent: number;
+}
+
+export interface AutonomyRuntimeEvidence {
+  simulation_qualified: boolean;
+  signed_vehicle_pack_id: string | null;
+  operator_confirmed: boolean;
+  localization_ready: boolean;
+  link_ready: boolean;
+  geofence_ready: boolean;
+  battery_ready: boolean;
+}
+
+export interface AutonomyCompileRequest {
+  edition: AutonomyEdition;
+  execution_target: AutonomyExecutionTarget;
+  natural_language: string;
+  scene_id: string;
+  perception_mode: AutonomyPerceptionMode;
+  vehicle: AutonomyVehicleEnvelope;
+  evidence: AutonomyRuntimeEvidence;
+}
+
+export interface AutonomyRoutePoint {
+  x: number;
+  y: number;
+  z: number;
+  phase: "launch" | "transit" | "stairs" | "gate" | "pickup" | "return" | "land";
+  speed_limit_mps: number;
+}
+
+export interface AutonomyCompileResponse {
+  scene: {
+    id: string;
+    name: string;
+    summary: string;
+    bounds_m: { x: number; y: number; z: number };
+    floors: number;
+    minimum_clearance_m: number;
+    objects: Array<{
+      id: string;
+      kind: string;
+      center: { x: number; y: number; z: number };
+      size: { x: number; y: number; z: number };
+      traversable: boolean;
+      required_clearance_m: number;
+    }>;
+    reference_path: AutonomyRoutePoint[];
+    tags: string[];
+  };
+  contract: {
+    schema_version: "dronedream.autonomy.mission.v1";
+    contract_id: string;
+    edition: AutonomyEdition;
+    execution_target: AutonomyExecutionTarget;
+    scene_id: string;
+    perception_mode: AutonomyPerceptionMode;
+    intent: string;
+    steps: Array<{
+      order: number;
+      action: string;
+      label: string;
+      payload_delta_kg: number;
+    }>;
+    immutable_safety_rules: string[];
+  };
+  trajectory: AutonomyRoutePoint[];
+  feasible: boolean;
+  issues: Array<{ code: string; severity: "info" | "warning" | "error"; message: string }>;
+  metrics: {
+    route_length_m: number;
+    vertical_travel_m: number;
+    estimated_duration_s: number;
+    minimum_clearance_m: number;
+    launch_mass_kg: number;
+    post_pickup_mass_kg: number;
+    post_pickup_thrust_to_weight: number;
+    braking_distance_m: number;
+  };
+  execution_policy: {
+    readiness: "simulation_ready" | "preview_only" | "denied";
+    adapter: "px4_gazebo_contract" | "hitl_contract" | "hardware_contract";
+    can_execute: boolean;
+    validated_signed_pack_count: number;
+    blockers: string[];
+    required_next_steps: string[];
+  };
+  planner: Record<string, string>;
+}
+
 export type JobsCompareRequest = JobCompareRequest;
 export type JobsCompareResponse = JobCompareResponse;
 

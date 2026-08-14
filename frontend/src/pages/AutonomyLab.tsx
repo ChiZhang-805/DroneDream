@@ -1,10 +1,16 @@
 import {
+  AlertTriangle,
+  BadgeCheck,
   BrainCircuit,
   Camera,
   Check,
   CircleDotDashed,
   Coffee,
+  Cpu,
+  FileCheck2,
+  LockKeyhole,
   Map,
+  MessageSquareText,
   Navigation2,
   Pause,
   Play,
@@ -13,12 +19,27 @@ import {
   Route,
   ShieldCheck,
   Sparkles,
+  Weight,
   Waypoints,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { apiClient } from "../api/client";
+import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
+import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
+import { publicDemoConsole } from "../features/demo/publicDemo";
+import {
+  loadUniversalMode,
+  UNIVERSAL_WORKSPACE_CHANGED_EVENT,
+} from "../features/distribution/universalMode";
 import { useI18n } from "../i18n/I18nProvider";
 import type { InterfaceLocale } from "../i18n/I18nProvider";
+import type {
+  AutonomyCompileRequest,
+  AutonomyCompileResponse,
+  AutonomyEdition,
+  AutonomyExecutionTarget,
+} from "../types/api";
 
 type MissionId = "coffee" | "gates" | "narrow";
 type PerceptionMode = "fusion" | "vision" | "map";
@@ -43,6 +64,25 @@ interface AutonomyCopy {
   subtitle: string;
   simulationOnly: string;
   independent: string;
+  commandTitle: string;
+  commandHelp: string;
+  compileCommand: string;
+  compilingCommand: string;
+  compileFailed: string;
+  executionTarget: string;
+  targets: Record<AutonomyExecutionTarget, string>;
+  targetHelp: Record<AutonomyExecutionTarget, string>;
+  contract: string;
+  sourceBackend: string;
+  sourcePreview: string;
+  feasible: string;
+  blocked: string;
+  loadedMass: string;
+  thrustMargin: string;
+  payload: string;
+  safetyGate: string;
+  noBlockers: string;
+  signedPacks: string;
   mission: string;
   perception: string;
   perceptionHelp: string;
@@ -93,11 +133,34 @@ interface AutonomyCopy {
 }
 
 const EN_COPY: AutonomyCopy = {
-  kicker: "SIM · MISSION AUTONOMY",
-  title: "Autonomy Lab",
-  subtitle: "Give the aircraft a destination, a camera or a map. It builds a flyable trajectory, follows it smoothly, and replans when the world changes.",
-  simulationOnly: "INTERACTIVE SIMULATION",
-  independent: "Independent of parameter tuning",
+  kicker: "MISSION AUTONOMY",
+  title: "Mission Autonomy",
+  subtitle: "Describe a mission in ordinary language. DroneDream compiles a bounded task contract, validates terrain, payload and dynamics, then qualifies it for simulation before any hardware handoff.",
+  simulationOnly: "SHARED AUTONOMY CORE",
+  independent: "Language intent · deterministic safety kernel",
+  commandTitle: "Natural-language mission",
+  commandHelp: "The model may structure intent, but it never emits actuator commands. Every result passes the same geometric and physical checks.",
+  compileCommand: "Compile & qualify",
+  compilingCommand: "Checking mission…",
+  compileFailed: "The authoritative compiler did not approve this request. Check the runtime connection and mission inputs, then try again.",
+  executionTarget: "Execution target",
+  targets: { simulation: "Simulation", hitl: "HITL", hardware: "Aircraft" },
+  targetHelp: {
+    simulation: "PX4 / Gazebo qualification contract",
+    hitl: "Hardware-in-the-loop; signed vehicle identity required",
+    hardware: "Real aircraft; operator and live preflight authority required",
+  },
+  contract: "Mission contract",
+  sourceBackend: "BACKEND QUALIFIED",
+  sourcePreview: "LOCAL CONTRACT PREVIEW",
+  feasible: "Trajectory feasible",
+  blocked: "Execution blocked",
+  loadedMass: "Loaded mass",
+  thrustMargin: "Thrust / weight",
+  payload: "Pickup payload",
+  safetyGate: "Safety & authority gate",
+  noBlockers: "All simulation planning checks passed",
+  signedPacks: "Validated signed packs",
   mission: "Mission",
   perception: "What the drone knows",
   perceptionHelp: "Choose the evidence available before takeoff. Vision modes continue updating the local world model in flight.",
@@ -168,11 +231,34 @@ const EN_COPY: AutonomyCopy = {
 };
 
 const ZH_COPY: AutonomyCopy = {
-  kicker: "SIM · 任务级自主飞行",
-  title: "自主飞行",
-  subtitle: "只给无人机终点、摄像头画面或一张地图，由它生成可飞航迹、平稳执行，并在环境变化时实时重规划。",
-  simulationOnly: "交互式仿真",
-  independent: "独立于控制参数调优",
+  kicker: "任务级自主飞行",
+  title: "智能任务飞行",
+  subtitle: "用自然语言描述任务，由 DroneDream 编译受约束任务合同，检查地形、载荷与动力学；真机移交前必须先通过同一合同的仿真资格验证。",
+  simulationOnly: "四版本共享自主核心",
+  independent: "语言理解 · 确定性安全内核",
+  commandTitle: "自然语言任务",
+  commandHelp: "模型只负责把意图结构化，不直接输出电机或姿态指令；几何与物理安全检查不可绕过。",
+  compileCommand: "编译并验证",
+  compilingCommand: "正在检查任务…",
+  compileFailed: "权威后端未批准本次请求。请检查运行时连接和任务输入后重试。",
+  executionTarget: "执行目标",
+  targets: { simulation: "仿真", hitl: "半实物 HITL", hardware: "真机" },
+  targetHelp: {
+    simulation: "PX4 / Gazebo 仿真资格合同",
+    hitl: "半实物闭环，需要签名机型身份",
+    hardware: "真实飞行，需要操作员和实时预检授权",
+  },
+  contract: "任务合同",
+  sourceBackend: "后端已验证",
+  sourcePreview: "本地合同预演",
+  feasible: "航迹可行",
+  blocked: "执行已拒绝",
+  loadedMass: "取物后总重",
+  thrustMargin: "推重比",
+  payload: "取物载荷",
+  safetyGate: "安全与权限门",
+  noBlockers: "仿真规划检查全部通过",
+  signedPacks: "已验证签名机型包",
   mission: "任务",
   perception: "无人机已知信息",
   perceptionHelp: "选择起飞前可用的信息。使用视觉时，飞行中会持续更新局部环境模型。",
@@ -283,6 +369,45 @@ const BASE_MISSIONS: Readonly<Record<MissionId, Omit<MissionPreset, "name" | "de
   },
 };
 
+const SCENE_ID_BY_MISSION: Record<MissionId, string> = {
+  coffee: "stairwell-coffee-return",
+  gates: "forest-gate-inspection",
+  narrow: "service-corridor-dock",
+};
+
+const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
+  dry_mass_kg: 1.55,
+  launch_payload_kg: 0.10,
+  pickup_payload_kg: 0.35,
+  max_takeoff_mass_kg: 2.60,
+  max_total_thrust_n: 39.0,
+  radius_m: 0.28,
+  max_speed_mps: 1.30,
+  max_acceleration_mps2: 3.0,
+  reserve_battery_percent: 30,
+};
+
+function defaultTarget(edition: AutonomyEdition): AutonomyExecutionTarget {
+  if (edition === "field") return "hardware";
+  if (edition === "lab") return "hitl";
+  return "simulation";
+}
+
+function loadAutonomyEdition(): AutonomyEdition {
+  return EDITION_IS_FIXED ? BUILD_EDITION : loadUniversalMode();
+}
+
+function promptForMission(missionId: MissionId, chinese: boolean) {
+  if (chinese) {
+    if (missionId === "gates") return "仅使用实时视觉，从起点穿过树林中的三个圆门中心，遇到新障碍时局部重规划，最后在终点平稳降落。";
+    if (missionId === "narrow") return "从服务走廊起飞，绕过盲角、竖直告示牌和狭窄障碍，到指定停靠点精准降落。";
+    return "从三楼办公室起飞，穿过狭窄楼梯到一楼室外，避开树、建筑物、告示牌和立柱，取到 0.35 kg 咖啡后重新检查动力学并安全返回原起点。";
+  }
+  if (missionId === "gates") return "Using live vision only, fly from the start through the centers of three forest gates, locally replan around surprises, and land smoothly at the goal.";
+  if (missionId === "narrow") return "Launch in the service corridor, avoid blind corners, vertical signs and tight obstacles, then dock precisely at the target.";
+  return "Launch from the third-floor office, descend the narrow stairs, avoid trees, buildings, signs and poles, pick up a 0.35 kg coffee, recheck dynamics, and return safely to the launch point.";
+}
+
 function interpolatePath(points: readonly Point[], progress: number): Point {
   if (points.length === 0) return [0, 0];
   if (points.length === 1) return points[0];
@@ -305,8 +430,17 @@ function eventTime() {
 export function AutonomyLab() {
   const { interfaceLocale } = useI18n();
   const copy = COPY_BY_LOCALE[interfaceLocale] ?? EN_COPY;
+  const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
+  const [edition, setEdition] = useState<AutonomyEdition>(loadAutonomyEdition);
   const [missionId, setMissionId] = useState<MissionId>("coffee");
   const [perception, setPerception] = useState<PerceptionMode>("fusion");
+  const [target, setTarget] = useState<AutonomyExecutionTarget>(() => defaultTarget(loadAutonomyEdition()));
+  const [command, setCommand] = useState(() => promptForMission("coffee", chinese));
+  const [pickupPayloadKg, setPickupPayloadKg] = useState(DEFAULT_VEHICLE.pickup_payload_kg);
+  const [compileResult, setCompileResult] = useState<AutonomyCompileResponse | null>(null);
+  const [compileSource, setCompileSource] = useState<"backend" | "preview">("preview");
+  const [compileError, setCompileError] = useState<string | null>(null);
+  const compileGeneration = useRef(0);
   const [planned, setPlanned] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [running, setRunning] = useState(false);
@@ -316,11 +450,54 @@ export function AutonomyLab() {
   const [obstacleInjected, setObstacleInjected] = useState(false);
   const [events, setEvents] = useState(() => [{ time: eventTime(), text: copy.events.ready }]);
 
+  useEffect(() => {
+    if (EDITION_IS_FIXED) return undefined;
+    const handleMode = () => setEdition(loadAutonomyEdition());
+    window.addEventListener(UNIVERSAL_WORKSPACE_CHANGED_EVENT, handleMode);
+    return () => window.removeEventListener(UNIVERSAL_WORKSPACE_CHANGED_EVENT, handleMode);
+  }, []);
+
+  useEffect(() => {
+    setTarget(defaultTarget(edition));
+    setCompileResult(null);
+    setPlanned(false);
+  }, [edition]);
+
   const missions = useMemo(() => Object.values(BASE_MISSIONS).map((base) => ({
     ...base,
     ...copy.missions[base.id],
   })), [copy]);
   const mission = missions.find(({ id }) => id === missionId) ?? missions[0];
+  const compileRequest = useMemo<AutonomyCompileRequest>(() => ({
+    edition,
+    execution_target: target,
+    natural_language: command.trim() || promptForMission(missionId, chinese),
+    scene_id: SCENE_ID_BY_MISSION[missionId],
+    perception_mode: perception,
+    vehicle: { ...DEFAULT_VEHICLE, pickup_payload_kg: pickupPayloadKg },
+    evidence: {
+      simulation_qualified: false,
+      signed_vehicle_pack_id: null,
+      operator_confirmed: false,
+      localization_ready: false,
+      link_ready: false,
+      geofence_ready: false,
+      battery_ready: false,
+    },
+  }), [chinese, command, edition, missionId, perception, pickupPayloadKg, target]);
+  const latestCompileRequest = useRef(compileRequest);
+  latestCompileRequest.current = compileRequest;
+  const provisionalResult = useMemo(
+    () => createLocalAutonomyPreview(missionId, compileRequest),
+    [compileRequest, missionId],
+  );
+  const qualification = compileResult ?? provisionalResult;
+  const editionLabel = ({
+    universal: "UNIVERSAL",
+    sim: "SIM",
+    lab: "LAB",
+    field: "FIELD",
+  } as const)[edition];
   const activePoints = obstacleInjected ? mission.replanPoints : mission.points;
   const [droneX, droneY] = interpolatePath(activePoints, progress);
   const activeStage = complete ? 4 : !planned ? 0 : !running ? 2 : obstacleInjected ? 4 : progress < 0.18 ? 0 : progress < 0.36 ? 1 : progress < 0.56 ? 2 : 3;
@@ -349,12 +526,26 @@ export function AutonomyLab() {
     return () => window.clearInterval(interval);
   }, [copy.events.completed, paused, running]);
 
+  useEffect(() => {
+    compileGeneration.current += 1;
+    setCompileResult(null);
+    setCompileSource("preview");
+    setCompileError(null);
+    setPlanned(false);
+    setPlanning(false);
+    setRunning(false);
+    setComplete(false);
+    setProgress(0);
+  }, [compileRequest]);
+
   const appendEvent = (text: string) => {
     setEvents((current) => [{ time: eventTime(), text }, ...current].slice(0, 4));
   };
 
   const chooseMission = (id: MissionId) => {
     setMissionId(id);
+    setCommand(promptForMission(id, chinese));
+    setCompileResult(null);
     setPlanned(false);
     setPlanning(false);
     setRunning(false);
@@ -365,17 +556,45 @@ export function AutonomyLab() {
     setEvents([{ time: eventTime(), text: copy.events.ready }]);
   };
 
-  const planTrajectory = () => {
+  const planTrajectory = async () => {
+    const generation = ++compileGeneration.current;
+    const submittedRequest = compileRequest;
     setPlanning(true);
+    setCompileError(null);
     setRunning(false);
     setPaused(false);
     setComplete(false);
     setProgress(0);
-    window.setTimeout(() => {
-      setPlanning(false);
+    try {
+      let result: AutonomyCompileResponse;
+      let source: "backend" | "preview";
+      if (publicDemoConsole) {
+        result = createLocalAutonomyPreview(missionId, submittedRequest);
+        source = "preview";
+      } else {
+        result = await apiClient.compileAutonomyMission(submittedRequest);
+        source = "backend";
+      }
+      if (
+        generation !== compileGeneration.current
+        || latestCompileRequest.current !== submittedRequest
+      ) return;
+      setCompileResult(result);
+      setCompileSource(source);
       setPlanned(true);
       appendEvent(copy.events.planned);
-    }, 520);
+    } catch {
+      if (
+        generation !== compileGeneration.current
+        || latestCompileRequest.current !== submittedRequest
+      ) return;
+      setCompileResult(null);
+      setCompileSource("preview");
+      setCompileError(copy.compileFailed);
+      setPlanned(false);
+    } finally {
+      if (generation === compileGeneration.current) setPlanning(false);
+    }
   };
 
   const toggleFlight = () => {
@@ -411,7 +630,7 @@ export function AutonomyLab() {
     <div className="autonomy-lab-page">
       <header className="autonomy-hero">
         <div>
-          <span className="autonomy-kicker">{copy.kicker}</span>
+          <span className="autonomy-kicker">{editionLabel} · {copy.kicker}</span>
           <div className="autonomy-title-line">
             <h1>{copy.title}</h1>
             <span><Sparkles aria-hidden="true" />{copy.simulationOnly}</span>
@@ -424,6 +643,75 @@ export function AutonomyLab() {
           {complete ? copy.completed : running ? copy.running : planned ? copy.planned : copy.ready}
         </div>
       </header>
+
+      <section className="autonomy-command-center" data-execution-target={target}>
+        <div className="autonomy-command-input">
+          <div className="autonomy-command-heading">
+            <span><MessageSquareText aria-hidden="true" /><strong>{copy.commandTitle}</strong></span>
+            <small>{copy.commandHelp}</small>
+          </div>
+          <textarea
+            value={command}
+            maxLength={2000}
+            onChange={(event) => setCommand(event.target.value)}
+            aria-label={copy.commandTitle}
+          />
+          <div className="autonomy-command-actions">
+            <div className="autonomy-target-switch" role="group" aria-label={copy.executionTarget}>
+              {(Object.keys(copy.targets) as AutonomyExecutionTarget[]).map((candidate) => (
+                <button
+                  key={candidate}
+                  type="button"
+                  className={target === candidate ? "is-active" : ""}
+                  aria-pressed={target === candidate}
+                  onClick={() => setTarget(candidate)}
+                >
+                  {candidate === "simulation" ? <Cpu aria-hidden="true" /> : candidate === "hitl" ? <FileCheck2 aria-hidden="true" /> : <Navigation2 aria-hidden="true" />}
+                  {copy.targets[candidate]}
+                </button>
+              ))}
+            </div>
+            <span className="autonomy-target-help">{copy.targetHelp[target]}</span>
+            <button
+              className="btn btn-primary autonomy-compile-button"
+              type="button"
+              disabled={planning || command.trim().length < 3}
+              onClick={() => void planTrajectory()}
+            >
+              {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
+              {planning ? copy.compilingCommand : copy.compileCommand}
+            </button>
+          </div>
+          {compileError ? (
+            <div className="autonomy-compile-error" role="alert">
+              <AlertTriangle aria-hidden="true" />
+              <span>{compileError}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="autonomy-contract-summary">
+          <header>
+            <span><FileCheck2 aria-hidden="true" /><strong>{copy.contract}</strong></span>
+            <em className={compileSource === "backend" ? "is-backend" : ""}>
+              {compileSource === "backend" ? copy.sourceBackend : copy.sourcePreview}
+            </em>
+          </header>
+          <code>{qualification.contract.contract_id}</code>
+          <dl>
+            <div>
+              <dt>{qualification.feasible ? <BadgeCheck aria-hidden="true" /> : <AlertTriangle aria-hidden="true" />}{qualification.feasible ? copy.feasible : copy.blocked}</dt>
+              <dd>{qualification.metrics.route_length_m.toFixed(1)} m · {qualification.metrics.minimum_clearance_m.toFixed(2)} m</dd>
+            </div>
+            <div><dt><Weight aria-hidden="true" />{copy.loadedMass}</dt><dd>{qualification.metrics.post_pickup_mass_kg.toFixed(2)} kg</dd></div>
+            <div><dt><ShieldCheck aria-hidden="true" />{copy.thrustMargin}</dt><dd>{qualification.metrics.post_pickup_thrust_to_weight.toFixed(2)}</dd></div>
+            <div className={qualification.execution_policy.can_execute ? "is-ready" : "is-denied"}>
+              <dt>{qualification.execution_policy.can_execute ? <BadgeCheck aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}{qualification.execution_policy.can_execute ? copy.feasible : copy.blocked}</dt>
+              <dd>{qualification.execution_policy.adapter.replaceAll("_", " ")}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
 
       <section className="autonomy-workspace">
         <aside className="autonomy-panel autonomy-config-panel">
@@ -468,6 +756,21 @@ export function AutonomyLab() {
             <small className="autonomy-mode-description">{copy.modeDescriptions[perception]}</small>
           </div>
 
+          <div className="autonomy-config-section autonomy-payload-control">
+            <h2><Weight aria-hidden="true" />{copy.payload}</h2>
+            <label>
+              <input
+                type="range"
+                min="0"
+                max="1.2"
+                step="0.05"
+                value={pickupPayloadKg}
+                onChange={(event) => setPickupPayloadKg(Number(event.target.value))}
+              />
+              <strong>{pickupPayloadKg.toFixed(2)} kg</strong>
+            </label>
+          </div>
+
           <div className="autonomy-config-section autonomy-checkpoints">
             <h2><Waypoints aria-hidden="true" />{copy.taskFlow}</h2>
             <ol>
@@ -477,7 +780,7 @@ export function AutonomyLab() {
             </ol>
           </div>
 
-          <button className="btn btn-primary autonomy-plan-button" type="button" onClick={planTrajectory} disabled={planning}>
+          <button className="btn btn-primary autonomy-plan-button" type="button" onClick={() => void planTrajectory()} disabled={planning || command.trim().length < 3}>
             {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Route aria-hidden="true" />}
             {planning ? copy.planning : planned ? copy.replan : copy.plan}
           </button>
@@ -506,10 +809,26 @@ export function AutonomyLab() {
                 <rect x="28" y="30" width="844" height="456" rx="24" className="autonomy-world-boundary" />
                 {missionId === "coffee" ? (
                   <>
-                    <rect x="150" y="70" width="120" height="235" rx="8" className="autonomy-obstacle" />
+                    <g className="autonomy-floor-stack">
+                      <path d="M64 365 250 365 310 315 125 315Z" />
+                      <path d="M82 295 268 295 328 245 143 245Z" />
+                      <path d="M100 225 286 225 346 175 161 175Z" />
+                      <text x="118" y="205">FLOOR 3 · OFFICE</text>
+                      <text x="98" y="278">FLOOR 2</text>
+                      <text x="78" y="348">FLOOR 1 · LOBBY</text>
+                    </g>
+                    <rect x="150" y="70" width="120" height="92" rx="8" className="autonomy-obstacle" />
                     <rect x="385" y="330" width="180" height="110" rx="8" className="autonomy-obstacle" />
                     <rect x="615" y="52" width="220" height="78" rx="8" className="autonomy-obstacle" />
-                    <g className="autonomy-stairs"><path d="M285 350h80v-18h-64v-18h48v-18h-32v-18h16" /></g>
+                    <g className="autonomy-stairs">
+                      <path d="M286 354h78v-18h-62v-18h46v-18h-30v-18h16" />
+                      <text x="275" y="380">NARROW STAIR CORE</text>
+                    </g>
+                    <g className="autonomy-tree" transform="translate(520 192)"><rect x="-4" y="13" width="8" height="30" /><circle cy="0" r="24" /><circle cx="-17" cy="8" r="15" /><circle cx="17" cy="8" r="15" /></g>
+                    <g className="autonomy-tree" transform="translate(700 304)"><rect x="-4" y="13" width="8" height="30" /><circle cy="0" r="24" /><circle cx="-17" cy="8" r="15" /><circle cx="17" cy="8" r="15" /></g>
+                    <g className="autonomy-sign" transform="translate(615 342)"><line y1="0" y2="48" /><rect x="-22" y="-18" width="44" height="26" rx="3" /><text y="0">SIGN</text></g>
+                    <g className="autonomy-pole" transform="translate(750 218)"><line y1="-32" y2="34" /><circle cy="-34" r="6" /></g>
+                    <text className="autonomy-zone-label" x="570" y="458">OUTDOOR COURTYARD · LIVE OBSTACLES</text>
                     <g className="autonomy-destination"><rect x="778" y="130" width="58" height="50" rx="10" /><Coffee x="795" y="142" width="24" height="24" /></g>
                   </>
                 ) : missionId === "gates" ? (
@@ -552,8 +871,8 @@ export function AutonomyLab() {
             </div>
           </div>
           <div className="autonomy-map-controls">
-            <button className="btn btn-primary" type="button" disabled={!planned || complete} onClick={toggleFlight}>
-              {running && !paused ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+            <button className="btn btn-primary" type="button" disabled={!planned || complete || !qualification.execution_policy.can_execute} onClick={toggleFlight}>
+              {!qualification.execution_policy.can_execute ? <LockKeyhole aria-hidden="true" /> : running && !paused ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
               {running ? paused ? copy.resume : copy.pause : copy.run}
             </button>
             <button className="btn" type="button" onClick={resetMission}><RefreshCcw aria-hidden="true" />{copy.reset}</button>
@@ -589,6 +908,16 @@ export function AutonomyLab() {
               <div><dt>{copy.checkpoint}</dt><dd>{nextCheckpoint}</dd></div>
               <div><dt>{copy.confidence}</dt><dd>{confidence}</dd></div>
             </dl>
+          </div>
+
+          <div className={`autonomy-safety-gate ${qualification.execution_policy.can_execute ? "is-ready" : "is-denied"}`}>
+            <h2>{qualification.execution_policy.can_execute ? <BadgeCheck aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}{copy.safetyGate}</h2>
+            <div className="autonomy-safety-readout">
+              <span>{copy.signedPacks}</span><strong>{qualification.execution_policy.validated_signed_pack_count}</strong>
+            </div>
+            {qualification.execution_policy.blockers.length ? (
+              <ul>{qualification.execution_policy.blockers.slice(0, 4).map((blocker) => <li key={blocker}>{blocker.replaceAll(".", " · ")}</li>)}</ul>
+            ) : <p>{copy.noBlockers}</p>}
           </div>
 
           <div className="autonomy-event-log">
