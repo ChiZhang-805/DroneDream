@@ -95,7 +95,7 @@ try {
   await page.locator(".launcher-settings-tabs button").first().click();
   await page.locator(".launcher-language-options button").first().click();
   await page.locator(".launcher-settings-tabs button").nth(2).click();
-  const readyLabelMetrics = await page.locator(".settings-reset-card-picker > span").evaluate((label) => {
+  const readyLabelMetrics = await page.locator(".settings-model-reset-summary span").last().evaluate((label) => {
     const element = /** @type {HTMLElement} */ (label);
     const style = getComputedStyle(element);
     return {
@@ -131,8 +131,27 @@ try {
   const resetCardNumberCount = await resetCardMenu.locator("small").evaluateAll((nodes) => (
     nodes.filter((node) => /DD-[A-Z0-9-]+/u.test(node.textContent ?? "")).length
   ));
+  const selectedCardMetrics = await page.locator(".settings-reset-card-trigger").evaluate((trigger) => {
+    const rect = trigger.getBoundingClientRect();
+    const amount = trigger.querySelector("strong");
+    const expiry = trigger.querySelector("small");
+    return {
+      width: rect.width,
+      amountColor: amount ? getComputedStyle(amount).color : null,
+      expiryColor: expiry ? getComputedStyle(expiry).color : null,
+      arrowCount: trigger.querySelectorAll(".settings-reset-card-trigger-arrow").length,
+    };
+  });
+  const resetActionMetrics = await page.locator(".settings-model-reset-action").evaluate((button) => {
+    const rect = button.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, width: rect.width };
+  });
+  const refreshActionMetrics = await page.locator(".settings-model-refresh").evaluate((button) => {
+    const rect = button.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, width: rect.width };
+  });
   if (resetCardCount !== 4 || resetCardIconCount !== 4 || resetCardExpiryCount !== 4
-    || resetCardNumberCount !== 4
+    || resetCardNumberCount !== 0
     || resetCardMetrics.top < 0 || resetCardMetrics.left < 0
     || resetCardMetrics.right > resetCardMetrics.viewportWidth
     || resetCardMetrics.bottom > resetCardMetrics.viewportHeight) {
@@ -143,6 +162,20 @@ try {
       resetCardExpiryCount,
       resetCardNumberCount,
       resetCardMetrics,
+    });
+  }
+  if (selectedCardMetrics.amountColor !== "rgb(255, 255, 255)"
+    || selectedCardMetrics.arrowCount !== 1
+    || Math.abs(resetCardMetrics.right - resetCardMetrics.left - selectedCardMetrics.width) > 1
+    || Math.abs(resetActionMetrics.left - refreshActionMetrics.left) > 1
+    || Math.abs(resetActionMetrics.right - refreshActionMetrics.right) > 1
+    || Math.abs(resetActionMetrics.width - refreshActionMetrics.width) > 1) {
+    behaviorFailures.push({
+      check: "reset-card-trigger-and-actions-aligned",
+      selectedCardMetrics,
+      resetCardMetrics,
+      resetActionMetrics,
+      refreshActionMetrics,
     });
   }
   await resetCardMenu.locator("button").first().click();
@@ -179,6 +212,9 @@ try {
     customizeMetrics,
     readyLabelMetrics,
     resetCardMetrics,
+    selectedCardMetrics,
+    resetActionMetrics,
+    refreshActionMetrics,
   }, null, 2));
   if (failures.length > 0 || textFailures.length > 0 || behaviorFailures.length > 0) {
     process.exitCode = 1;

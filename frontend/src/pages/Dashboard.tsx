@@ -35,6 +35,8 @@ const OBJECTIVE_LABELS: Record<ObjectiveProfile, TranslationKey> = {
   custom: "wizard.objective.custom",
 };
 
+const DASHBOARD_RECENT_JOB_LIMIT = 50;
+
 function buildJobColumns(t: Translator): Column<Job>[] {
   return [
   {
@@ -87,7 +89,7 @@ export function Dashboard() {
     queryKey: ["jobs", "dashboard"],
     queryFn: async () => {
       const [recentPage, ...statusPages] = await Promise.all([
-        apiClient.listJobs({ page: 1, page_size: 5 }),
+        apiClient.listJobs({ page: 1, page_size: DASHBOARD_RECENT_JOB_LIMIT }),
         ...JOB_STATUSES.map((status) =>
           apiClient.listJobs({ page: 1, page_size: 1, status })
         ),
@@ -233,15 +235,17 @@ function DashboardBody({
           </Link>
         )}
       >
-        {recentJobs.length > 0 ? (
-          <DataTable
-            columns={columns}
-            rows={recentJobs}
-            rowKey={(j) => j.id}
-          />
-        ) : (
-          <div className="dashboard-empty-jobs" aria-hidden="true" />
-        )}
+        <div className="dashboard-recent-jobs-content">
+          {recentJobs.length > 0 ? (
+            <DataTable
+              columns={columns}
+              rows={recentJobs}
+              rowKey={(j) => j.id}
+            />
+          ) : (
+            <div className="dashboard-empty-jobs" aria-hidden="true" />
+          )}
+        </div>
       </SectionCard>
     </div>
   );

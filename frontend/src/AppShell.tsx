@@ -16,6 +16,7 @@ import {
   Box,
   BrainCircuit,
   Camera,
+  ChevronRight,
   CircleUserRound,
   Download,
   FlaskConical,
@@ -1953,7 +1954,7 @@ function SettingsDialog({
                     <div className="settings-reset-card-picker">
                       <button
                         type="button"
-                        className="settings-reset-card-trigger"
+                        className={`settings-reset-card-trigger${selectedAllowanceResetCardId ? " has-card" : ""}`}
                         disabled={!allowanceResetCards?.length}
                         aria-expanded={allowanceResetMenuOpen}
                         aria-haspopup="listbox"
@@ -1973,6 +1974,7 @@ function SettingsDialog({
                                   {allowanceResetCardFormatter.format(new Date(card.expires_at))}
                                 </small>
                               </span>
+                              <ChevronRight className="settings-reset-card-trigger-arrow" aria-hidden="true" />
                             </>
                           ) : <span>{allowanceResetCopy.empty}</span>;
                         })()}

@@ -1,15 +1,19 @@
 import type {
+  VehicleComponentDraft,
   VehicleModelDraft,
   VehiclePackTargetEdition,
+  VehicleVector3,
 } from "./model";
 import {
+  getVehicleComponentMassProperties,
+  MAX_VEHICLE_COMPONENTS,
   MAX_PARAMETER_FAMILIES,
   MAX_VEHICLE_SENSORS,
   validateVehicleModel,
 } from "./model";
 
 export const VEHICLE_PACK_DRAFT_KIND = "dronedream-vehicle-pack-draft-envelope" as const;
-export const VEHICLE_PACK_DRAFT_VERSION = "1.0.0" as const;
+export const VEHICLE_PACK_DRAFT_VERSION = "2.0.0" as const;
 const MAX_ARTIFACT_UTF8_BYTES = 1_048_576;
 
 export interface VehiclePackDraftArtifact {
@@ -21,7 +25,7 @@ export interface VehiclePackDraftArtifact {
 }
 
 export interface VehiclePackDraftPayload {
-  schemaVersion: 1;
+  schemaVersion: 2;
   kind: typeof VEHICLE_PACK_DRAFT_KIND;
   transportVersion: typeof VEHICLE_PACK_DRAFT_VERSION;
   sourceEdition: "universal";
@@ -107,36 +111,120 @@ function safeId(name: string): string {
   return normalized || "custom-vehicle";
 }
 
-function bodyInertia(draft: VehicleModelDraft, mass: number) {
-  if (draft.body.shape === "cylinder") {
-    const radius = draft.body.widthM / 2;
-    return {
-      ixx: mass * (3 * radius ** 2 + draft.body.heightM ** 2) / 12,
-      iyy: mass * (3 * radius ** 2 + draft.body.heightM ** 2) / 12,
-      izz: mass * radius ** 2 / 2,
-    };
+function componentInertia(component: VehicleComponentDraft) {
+  const mass = getVehicleComponentMassProperties(component).massKg;
+  const scaled = scaledComponentGeometry(component);
+  // Vehicle Studio uses X/right, Y/up, Z/forward. SDF uses X/right,
+  // Y/forward, Z/up, so keep the engineering axes mapped consistently.
+  const x = scaled.size.x;
+  const y = scaled.size.z;
+  const z = scaled.size.y;
+  if (component.geometry.primitive === "sphere") {
+    const moment = 2 * mass * scaled.radius ** 2 / 5;
+    return { ixx: moment, iyy: moment, izz: moment };
+  }
+  if (["cylinder", "capsule", "cone"].includes(component.geometry.primitive)) {
+    const axial = mass * scaled.radius ** 2 / 2;
+    const transverse = mass * (3 * scaled.radius ** 2 + scaled.length ** 2) / 12;
+    // Primitive length is aligned to Vehicle Studio Y / SDF Z.
+    return { ixx: transverse, iyy: transverse, izz: axial };
   }
   return {
-    ixx: mass * (draft.body.widthM ** 2 + draft.body.heightM ** 2) / 12,
-    iyy: mass * (draft.body.lengthM ** 2 + draft.body.heightM ** 2) / 12,
-    izz: mass * (draft.body.lengthM ** 2 + draft.body.widthM ** 2) / 12,
+    ixx: mass * (y ** 2 + z ** 2) / 12,
+    iyy: mass * (x ** 2 + z ** 2) / 12,
+    izz: mass * (x ** 2 + y ** 2) / 12,
   };
 }
 
+function scaledComponentGeometry(component: VehicleComponentDraft) {
+  const scale = component.transform.scale;
+  return {
+    size: {
+      x: Math.abs(component.geometry.sizeM.x * scale.x),
+      y: Math.abs(component.geometry.sizeM.y * scale.y),
+      z: Math.abs(component.geometry.sizeM.z * scale.z),
+    },
+    radius: Math.abs(component.geometry.radiusM * Math.max(scale.x, scale.z)),
+    length: Math.abs(component.geometry.lengthM * scale.y),
+  };
+}
+
+function number(value: number): string {
+  return Number(value.toFixed(8)).toString();
+}
+
+function radians(value: number): string {
+  return number(value * Math.PI / 180);
+}
+
+function pose(component: VehicleComponentDraft): string {
+  const position = component.transform.positionM;
+  const rotation = component.transform.rotationDeg;
+  return `${number(position.x)} ${number(position.z)} ${number(position.y)} ${radians(rotation.x)} ${radians(rotation.z)} ${radians(rotation.y)}`;
+}
+
+function componentGeometry(component: VehicleComponentDraft): string {
+  const { primitive, meshUri } = component.geometry;
+  if (meshUri.trim()) {
+    return `<mesh><uri>${escapeXml(meshUri.trim())}</uri><scale>${number(component.transform.scale.x)} ${number(component.transform.scale.z)} ${number(component.transform.scale.y)}</scale></mesh>`;
+  }
+  const scaled = scaledComponentGeometry(component);
+  if (primitive === "sphere") return `<sphere><radius>${number(scaled.radius)}</radius></sphere>`;
+  if (primitive === "capsule") {
+    return `<capsule><radius>${number(scaled.radius)}</radius><length>${number(scaled.length)}</length></capsule>`;
+  }
+  if (["cylinder", "cone"].includes(primitive)) {
+    return `<cylinder><radius>${number(scaled.radius)}</radius><length>${number(scaled.length)}</length></cylinder>`;
+  }
+  return `<box><size>${number(scaled.size.x)} ${number(scaled.size.z)} ${number(scaled.size.y)}</size></box>`;
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function colorRgba(hex: string, opacity: number): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  return `${number(((value >> 16) & 255) / 255)} ${number(((value >> 8) & 255) / 255)} ${number((value & 255) / 255)} ${number(opacity)}`;
+}
+
+function componentLink(component: VehicleComponentDraft, linkName: string): string {
+  const inertia = componentInertia(component);
+  const mass = getVehicleComponentMassProperties(component).massKg;
+  const geometry = componentGeometry(component);
+  const color = colorRgba(component.material.baseColor, component.material.opacity);
+  const collision = component.kind === "propeller" ? "" : `\n      <collision name="collision"><geometry>${geometry}</geometry></collision>`;
+  return `    <link name="${linkName}">
+      <pose>${pose(component)}</pose>
+      <inertial><mass>${number(mass)}</mass><inertia><ixx>${number(inertia.ixx)}</ixx><iyy>${number(inertia.iyy)}</iyy><izz>${number(inertia.izz)}</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial>${collision}
+      <visual name="visual"><geometry>${geometry}</geometry><material><ambient>${color}</ambient><diffuse>${color}</diffuse><specular>${number(component.material.metalness)} ${number(component.material.metalness)} ${number(component.material.metalness)} 1</specular></material></visual>
+    </link>`;
+}
+
 export function generateGazeboSdf(draft: VehicleModelDraft): string {
-  const rotorMass = Math.min(0.01, draft.body.massKg / (draft.propulsion.motorCount * 20));
-  const baseMass = draft.body.massKg - rotorMass * draft.propulsion.motorCount;
-  const inertia = bodyInertia(draft, baseMass);
-  const geometry = draft.body.shape === "box"
-    ? `<box><size>${draft.body.lengthM} ${draft.body.widthM} ${draft.body.heightM}</size></box>`
-    : `<cylinder><radius>${draft.body.widthM / 2}</radius><length>${draft.body.heightM}</length></cylinder>`;
-  const rotorLinks = Array.from({ length: draft.propulsion.motorCount }, (_, index) => {
-    const angle = (Math.PI * 2 * index) / draft.propulsion.motorCount;
-    const x = Math.cos(angle) * draft.propulsion.armLengthM;
-    const y = Math.sin(angle) * draft.propulsion.armLengthM;
-    return `    <link name="rotor_${index}"><pose>${x.toFixed(6)} ${y.toFixed(6)} 0 0 0 0</pose><inertial><mass>${rotorMass}</mass><inertia><ixx>0.00001</ixx><iyy>0.00001</iyy><izz>0.00002</izz></inertia></inertial><visual name="visual"><geometry><cylinder><radius>${(draft.propulsion.propellerDiameterM / 2).toFixed(6)}</radius><length>0.002</length></cylinder></geometry></visual></link>\n    <joint name="rotor_${index}_fixed" type="fixed"><parent>base_link</parent><child>rotor_${index}</child></joint>`;
-  }).join("\n");
-  return `<?xml version="1.0"?>\n<sdf version="1.10">\n  <model name="${safeId(draft.name)}">\n    <link name="base_link">\n      <inertial><mass>${baseMass}</mass><inertia><ixx>${inertia.ixx}</ixx><iyy>${inertia.iyy}</iyy><izz>${inertia.izz}</izz></inertia></inertial>\n      <collision name="collision"><geometry>${geometry}</geometry></collision>\n      <visual name="visual"><geometry>${geometry}</geometry></visual>\n    </link>\n${rotorLinks}\n  </model>\n</sdf>\n`;
+  const visible = draft.components.filter((component) => component.visible);
+  const names = new Map(visible.map((component, index) => [component.id, `part_${String(index + 1).padStart(3, "0")}_${safeId(component.name)}`]));
+  const links = visible.map((component) => componentLink(component, names.get(component.id)!));
+  const joints = visible.map((component) => {
+    const child = names.get(component.id)!;
+    const parent = component.parentId ? names.get(component.parentId) : undefined;
+    return `    <joint name="joint_${child}" type="fixed"><parent>${parent ?? "base_link"}</parent><child>${child}</child></joint>`;
+  });
+  return `<?xml version="1.0"?>
+<sdf version="1.10">
+  <model name="${safeId(draft.name)}">
+    <static>false</static>
+    <link name="base_link"><inertial><mass>0.001</mass><inertia><ixx>0.000001</ixx><iyy>0.000001</iyy><izz>0.000001</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial></link>
+${links.join("\n")}
+${joints.join("\n")}
+  </model>
+</sdf>
+`;
 }
 
 async function artifact(
@@ -163,7 +251,7 @@ export async function buildVehiclePackDraft(
     artifact("model/model.sdf", "model/sdf+xml", sdf),
   ]);
   const payload: VehiclePackDraftPayload = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: VEHICLE_PACK_DRAFT_KIND,
     transportVersion: VEHICLE_PACK_DRAFT_VERSION,
     sourceEdition: "universal",
@@ -219,10 +307,10 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
   assertExactKeys(value, [
     "schemaVersion", "draftId", "revision", "name", "manufacturer", "vehicleClass",
     "body", "propulsion", "sensors", "autopilot", "controlTarget", "targetEditions",
-    "notes", "createdAt", "updatedAt",
+    "components", "constraints", "designParameters", "notes", "createdAt", "updatedAt",
   ], "Vehicle model");
   if (
-    value.schemaVersion !== 1
+    value.schemaVersion !== 2
     || typeof value.draftId !== "string"
     || !Number.isInteger(value.revision)
     || Number(value.revision) < 1
@@ -295,6 +383,96 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
     || value.targetEditions.some((item) => !["sim", "lab", "field"].includes(String(item)))
     || new Set(value.targetEditions).size !== value.targetEditions.length
   ) throw new VehiclePackDraftError("Vehicle target Editions are malformed");
+  assertComponentShape(value.components);
+  assertConstraintShape(value.constraints, new Set(value.components.map((component) => component.id)));
+  if (!isRecord(value.designParameters)) throw new VehiclePackDraftError("Vehicle design parameters are malformed");
+  assertExactKeys(value.designParameters, ["units", "gridM", "symmetry"], "Vehicle design parameters");
+  if (
+    value.designParameters.units !== "metric"
+    || typeof value.designParameters.gridM !== "number"
+    || !Number.isFinite(value.designParameters.gridM)
+    || value.designParameters.gridM <= 0
+    || !["none", "x", "z"].includes(String(value.designParameters.symmetry))
+  ) throw new VehiclePackDraftError("Vehicle design parameters are malformed");
+}
+
+function assertVector(value: unknown, label: string): asserts value is VehicleVector3 {
+  if (!isRecord(value)) throw new VehiclePackDraftError(`${label} is malformed`);
+  assertExactKeys(value, ["x", "y", "z"], label);
+  if ([value.x, value.y, value.z].some((item) => typeof item !== "number" || !Number.isFinite(item))) {
+    throw new VehiclePackDraftError(`${label} is malformed`);
+  }
+}
+
+function assertComponentShape(value: unknown): asserts value is VehicleComponentDraft[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_VEHICLE_COMPONENTS) {
+    throw new VehiclePackDraftError("Vehicle components are malformed");
+  }
+  const ids = new Set<string>();
+  const parentIds: Array<string | null> = [];
+  for (const component of value) {
+    if (!isRecord(component)) throw new VehiclePackDraftError("Vehicle component is malformed");
+    assertExactKeys(component, ["id", "name", "kind", "parentId", "geometry", "transform", "material", "mass", "visible", "locked", "source", "tags"], "Vehicle component");
+    if (
+      typeof component.id !== "string" || !component.id || ids.has(component.id)
+      || typeof component.name !== "string" || !component.name
+      || !["fuselage", "frame", "arm", "motor", "propeller", "landing-gear", "battery", "flight-controller", "sensor", "payload", "camera-gimbal", "custom"].includes(String(component.kind))
+      || !(component.parentId === null || typeof component.parentId === "string")
+      || typeof component.visible !== "boolean" || typeof component.locked !== "boolean"
+      || !["manual", "template", "ai"].includes(String(component.source))
+      || !Array.isArray(component.tags) || component.tags.some((tag) => typeof tag !== "string")
+    ) throw new VehiclePackDraftError("Vehicle component identity is malformed");
+    ids.add(component.id); parentIds.push(component.parentId as string | null);
+    if (!isRecord(component.geometry)) throw new VehiclePackDraftError("Vehicle component geometry is malformed");
+    assertExactKeys(component.geometry, ["primitive", "sizeM", "radiusM", "lengthM", "meshUri"], "Vehicle component geometry");
+    assertVector(component.geometry.sizeM, "Vehicle component size");
+    if (
+      !["box", "rounded-box", "cylinder", "sphere", "capsule", "cone"].includes(String(component.geometry.primitive))
+      || typeof component.geometry.radiusM !== "number" || component.geometry.radiusM <= 0
+      || typeof component.geometry.lengthM !== "number" || component.geometry.lengthM <= 0
+      || typeof component.geometry.meshUri !== "string"
+      || Object.values(component.geometry.sizeM).some((item) => item <= 0)
+    ) throw new VehiclePackDraftError("Vehicle component geometry is malformed");
+    if (!isRecord(component.transform)) throw new VehiclePackDraftError("Vehicle component transform is malformed");
+    assertExactKeys(component.transform, ["positionM", "rotationDeg", "scale"], "Vehicle component transform");
+    assertVector(component.transform.positionM, "Vehicle component position");
+    assertVector(component.transform.rotationDeg, "Vehicle component rotation");
+    assertVector(component.transform.scale, "Vehicle component scale");
+    if (Object.values(component.transform.scale).some((item) => item <= 0)) throw new VehiclePackDraftError("Vehicle component scale is malformed");
+    if (!isRecord(component.material)) throw new VehiclePackDraftError("Vehicle component material is malformed");
+    assertExactKeys(component.material, ["baseColor", "metalness", "roughness", "opacity"], "Vehicle component material");
+    if (
+      typeof component.material.baseColor !== "string" || !/^#[0-9a-f]{6}$/i.test(component.material.baseColor)
+      || [component.material.metalness, component.material.roughness, component.material.opacity].some((item) => typeof item !== "number" || item < 0 || item > 1)
+    ) throw new VehiclePackDraftError("Vehicle component material is malformed");
+    if (!isRecord(component.mass)) throw new VehiclePackDraftError("Vehicle component mass is malformed");
+    assertExactKeys(component.mass, ["mode", "massKg", "densityKgM3"], "Vehicle component mass");
+    if (
+      !["explicit", "density"].includes(String(component.mass.mode))
+      || [component.mass.massKg, component.mass.densityKgM3].some((item) => typeof item !== "number" || !Number.isFinite(item) || item <= 0)
+    ) throw new VehiclePackDraftError("Vehicle component mass is malformed");
+  }
+  if (parentIds.some((parentId) => parentId !== null && !ids.has(parentId))) {
+    throw new VehiclePackDraftError("Vehicle component parent is missing");
+  }
+}
+
+function assertConstraintShape(value: unknown, componentIds: Set<string>) {
+  if (!Array.isArray(value)) throw new VehiclePackDraftError("Vehicle constraints are malformed");
+  const ids = new Set<string>();
+  for (const constraint of value) {
+    if (!isRecord(constraint)) throw new VehiclePackDraftError("Vehicle constraint is malformed");
+    assertExactKeys(constraint, ["id", "type", "componentIds", "axis", "value", "enabled"], "Vehicle constraint");
+    if (
+      typeof constraint.id !== "string" || !constraint.id || ids.has(constraint.id)
+      || !["attach", "mirror", "radial-array", "clearance", "balance"].includes(String(constraint.type))
+      || !Array.isArray(constraint.componentIds) || constraint.componentIds.some((id) => typeof id !== "string" || !componentIds.has(id))
+      || !["x", "y", "z"].includes(String(constraint.axis))
+      || typeof constraint.value !== "number" || !Number.isFinite(constraint.value)
+      || typeof constraint.enabled !== "boolean"
+    ) throw new VehiclePackDraftError("Vehicle constraint is malformed");
+    ids.add(constraint.id);
+  }
 }
 
 export async function verifyVehiclePackDraft(
@@ -312,7 +490,7 @@ export async function verifyVehiclePackDraft(
   const payload = value.payload as unknown as VehiclePackDraftPayload;
   const integrity = value.integrity as unknown as VehiclePackDraftEnvelope["integrity"];
   if (
-    payload.schemaVersion !== 1
+    payload.schemaVersion !== 2
     || payload.kind !== VEHICLE_PACK_DRAFT_KIND
     || payload.transportVersion !== VEHICLE_PACK_DRAFT_VERSION
     || payload.sourceEdition !== "universal"

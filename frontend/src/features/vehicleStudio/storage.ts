@@ -1,4 +1,5 @@
 import type { VehicleModelDraft } from "./model";
+import { migrateVehicleModelDraft } from "./model";
 import { assertVehicleModelShape } from "./pack";
 
 const STORAGE_PREFIX = "dronedream:vehicle-studio:v1";
@@ -31,7 +32,9 @@ export function loadVehicleModels(
         || record.revisions.length === 0
       ) continue;
       try {
-        const revisions = record.revisions.slice(0, MAX_REVISIONS);
+        const revisions = record.revisions
+          .slice(0, MAX_REVISIONS)
+          .map((revision) => migrateVehicleModelDraft(revision));
         for (const revision of revisions) assertVehicleModelShape(revision);
         if (!revisions.every((revision) => revision.draftId === record.draftId)) continue;
         if (new Set(revisions.map((revision) => revision.revision)).size !== revisions.length) continue;
@@ -54,10 +57,11 @@ export function saveVehicleModel(
   draft: VehicleModelDraft,
   storage: Pick<Storage, "getItem" | "setItem"> = window.localStorage,
 ): StoredVehicleModel[] {
+  assertVehicleModelShape(draft);
   const models = loadVehicleModels(ownerId, storage);
   const index = models.findIndex((model) => model.draftId === draft.draftId);
   const current = index >= 0 ? models[index] : { draftId: draft.draftId, revisions: [] };
-  const revisions = [draft, ...current.revisions.filter((item) => item.revision !== draft.revision)]
+  const revisions = [structuredClone(draft), ...current.revisions.filter((item) => item.revision !== draft.revision)]
     .sort((left, right) => right.revision - left.revision)
     .slice(0, MAX_REVISIONS);
   const next = { draftId: draft.draftId, revisions };
@@ -66,6 +70,25 @@ export function saveVehicleModel(
   models.splice(MAX_MODELS);
   storage.setItem(storageKey(ownerId), JSON.stringify(models));
   return models;
+}
+
+export function cacheVehicleModels(
+  ownerId: string,
+  models: StoredVehicleModel[],
+  storage: Pick<Storage, "setItem"> = window.localStorage,
+): StoredVehicleModel[] {
+  const retained = models.slice(0, MAX_MODELS).map((model) => ({
+    draftId: model.draftId,
+    revisions: model.revisions.slice(0, MAX_REVISIONS).map((revision) => {
+      assertVehicleModelShape(revision);
+      if (revision.draftId !== model.draftId) {
+        throw new Error("A cached vehicle-model revision crossed its draft boundary.");
+      }
+      return structuredClone(revision);
+    }),
+  })).filter((model) => model.revisions.length > 0);
+  storage.setItem(storageKey(ownerId), JSON.stringify(retained));
+  return retained;
 }
 
 export function removeVehicleModel(

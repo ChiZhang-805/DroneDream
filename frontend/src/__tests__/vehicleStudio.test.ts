@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -18,12 +18,17 @@ import {
   validateVehicleModel,
 } from "../features/vehicleStudio/model";
 import {
+  cacheVehicleModels,
   loadVehicleModels,
   nextVehicleRevision,
   removeVehicleModel,
   restoreVehicleRevision,
   saveVehicleModel,
 } from "../features/vehicleStudio/storage";
+import {
+  mergeVehicleModelStores,
+  vehicleModelBoundaryFor,
+} from "../features/vehicleStudio/cloudStorage";
 
 vi.mock("../features/auth/AuthContext", () => ({
   useAuth: () => ({ account: { id: "vehicle-studio-test-owner" } }),
@@ -47,14 +52,10 @@ describe("Universal Vehicle Studio contract", () => {
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
     render(createElement(I18nProvider, null, createElement(VehicleStudio)));
 
-    expect(screen.getByRole("heading", { name: "无人机建模工作室" })).toBeVisible();
-    const vehicleClass = screen.getByRole("combobox", { name: "机型类别" });
-    expect(within(vehicleClass).getByRole("option", { name: "小型多旋翼" }))
-      .toBeInTheDocument();
-    expect(within(vehicleClass).getByRole("option", { name: "中型多旋翼" }))
-      .toBeInTheDocument();
-    expect(within(vehicleClass).getByRole("option", { name: "研究级多旋翼" }))
-      .toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "无人机建模工作台" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "AI 协同设计" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "装配" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: /Carbon center frame/i })).toBeVisible();
   });
 
   it("builds normalized three-dimensional geometry for every supported rotor layout", () => {
@@ -80,9 +81,12 @@ describe("Universal Vehicle Studio contract", () => {
     const draft = createVehicleModelDraft(new Date("2026-08-07T00:00:00.000Z"));
     expect(validateVehicleModel(draft)).toEqual([]);
     const sdf = generateGazeboSdf(draft);
+    const visibleComponentCount = draft.components.filter((component) => component.visible).length;
     expect(sdf).toContain('<sdf version="1.10">');
-    expect(sdf.match(/<link name="rotor_/g)).toHaveLength(4);
-    expect(sdf.match(/type="fixed"/g)).toHaveLength(4);
+    expect(sdf.match(/<link name="part_/g)).toHaveLength(visibleComponentCount);
+    expect(sdf.match(/type="fixed"/g)).toHaveLength(visibleComponentCount);
+    expect(sdf).toContain("carbon-center-frame");
+    expect(sdf).toContain("motor-1");
     expect(sdf).toContain('<model name="custom-quadrotor">');
     vi.restoreAllMocks();
   });
@@ -123,12 +127,13 @@ describe("Universal Vehicle Studio contract", () => {
   it("freezes a model snapshot before asynchronous artifact hashing", async () => {
     const draft = createVehicleModelDraft();
     const originalName = draft.name;
+    const originalBodyMass = draft.body.massKg;
     const pending = buildVehiclePackDraft(draft);
     draft.name = "Mutated while hashing";
     draft.body.massKg = 900;
     const envelope = await pending;
     expect(envelope.payload.model.name).toBe(originalName);
-    expect(envelope.payload.model.body.massKg).toBe(1.5);
+    expect(envelope.payload.model.body.massKg).toBe(originalBodyMass);
     await expect(verifyVehiclePackDraft(envelope)).resolves.toBeDefined();
   });
 
@@ -245,6 +250,44 @@ describe("Universal Vehicle Studio contract", () => {
     expect(restored.draftId).toBe(original.draftId);
     expect(restored.updatedAt).toBe("2026-08-07T03:00:00.000Z");
     expect(removeVehicleModel("owner-a", original.draftId, storage)).toEqual([]);
+  });
+
+  it("builds only complete Universal cloud boundaries", () => {
+    const userId = "00000000-0000-4000-8000-000000000001";
+    expect(vehicleModelBoundaryFor(userId, userId, null)).toEqual({
+      userId,
+      tenantId: userId,
+      organizationId: null,
+      workspaceId: "console-universal",
+      edition: "universal",
+    });
+    expect(vehicleModelBoundaryFor("local", userId, null)).toBeNull();
+    expect(vehicleModelBoundaryFor(userId, "another-user", null)).toBeNull();
+  });
+
+  it("merges local and cloud revision chains without crossing draft identities", () => {
+    const draft = createVehicleModelDraft(new Date("2026-08-14T01:00:00.000Z"));
+    const localSecond = nextVehicleRevision(draft, new Date("2026-08-14T03:00:00.000Z"));
+    localSecond.name = "Newest local assembly";
+    const cloudSecond = nextVehicleRevision(draft, new Date("2026-08-14T02:00:00.000Z"));
+    cloudSecond.name = "Older cloud assembly";
+    const merged = mergeVehicleModelStores(
+      [{ draftId: draft.draftId, revisions: [localSecond] }],
+      [{ draftId: draft.draftId, revisions: [cloudSecond, draft] }],
+    );
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].revisions.map((revision) => revision.revision)).toEqual([2, 1]);
+    expect(merged[0].revisions[0].name).toBe("Newest local assembly");
+  });
+
+  it("refuses to cache a revision under another draft identity", () => {
+    const storage = memoryStorage();
+    const draft = createVehicleModelDraft();
+    expect(() => cacheVehicleModels("owner-a", [{
+      draftId: "00000000-0000-4000-8000-000000000099",
+      revisions: [draft],
+    }], storage)).toThrow(/crossed its draft boundary/);
   });
 
   it("drops malformed local records instead of allowing them to crash the editor", () => {
