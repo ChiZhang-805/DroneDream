@@ -131,11 +131,13 @@ def _route_metrics(points: list[RoutePoint]) -> tuple[float, float]:
 
 def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
     target = request.execution_target
-    adapter: ExecutionAdapter = {
-        "simulation": "px4_gazebo_contract",
-        "hitl": "hitl_contract",
-        "hardware": "hardware_contract",
-    }[target]
+    adapter: ExecutionAdapter
+    if target == "simulation":
+        adapter = "px4_gazebo_contract"
+    elif target == "hitl":
+        adapter = "hitl_contract"
+    else:
+        adapter = "hardware_contract"
     blockers: list[str] = []
     required: list[str] = []
 
