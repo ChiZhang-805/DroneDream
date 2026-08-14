@@ -81,7 +81,7 @@ class VehicleEnvelope(StrictModel):
     reserve_battery_percent: float = Field(default=30.0, ge=10.0, le=90.0)
 
     @model_validator(mode="after")
-    def validate_mass_contract(self) -> "VehicleEnvelope":
+    def validate_mass_contract(self) -> VehicleEnvelope:
         if self.dry_mass_kg + self.launch_payload_kg > self.max_takeoff_mass_kg:
             raise ValueError("launch mass exceeds max_takeoff_mass_kg")
         return self

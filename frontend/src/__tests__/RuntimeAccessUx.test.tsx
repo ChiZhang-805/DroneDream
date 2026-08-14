@@ -212,7 +212,7 @@ afterEach(() => {
     expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(6);
+      .querySelectorAll("a")).toHaveLength(7);
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);

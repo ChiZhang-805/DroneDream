@@ -127,6 +127,7 @@ describe("workspace account entry", () => {
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
       "Vehicle Studio",
+      "Autonomy Lab",
       "Dashboard",
       "Run History",
       "Scenarios",
@@ -146,6 +147,7 @@ describe("workspace account entry", () => {
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
       "Experiment",
+      "Autonomy Lab",
       "Lab workspace",
       "Hardware Lab",
       "Evidence Review",
@@ -155,6 +157,7 @@ describe("workspace account entry", () => {
     selectEdition(/DroneDream.*FIELD/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
+      "Autonomy Lab",
       "Device & Vehicle",
       "Tuning Plan",
       "Safety & Recovery",
