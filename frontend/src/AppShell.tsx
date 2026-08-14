@@ -33,6 +33,7 @@ import {
   Moon,
   MonitorCog,
   MoreHorizontal,
+  Navigation2,
   RadioTower,
   RefreshCcw,
   Save,
@@ -206,10 +207,16 @@ const DASHBOARD_NAV_ITEM = CORE_NAV_ITEMS[1];
 const HISTORY_NAV_ITEM = CORE_NAV_ITEMS[2];
 const SCENARIOS_NAV_ITEM = CORE_NAV_ITEMS[3];
 const VEHICLE_STUDIO_NAV_ITEM = CORE_NAV_ITEMS[4];
+const AUTONOMY_NAV_ITEM: NavigationItem = {
+  to: "/autonomy",
+  labelKey: "app.autonomyLab",
+  icon: Navigation2,
+};
 
 const SIM_NAV_ITEMS: NavigationItem[] = [
   ASSISTANT_NAV_ITEM,
   { to: "/jobs/new", labelKey: "app.experimentBuilder", icon: SlidersHorizontal },
+  AUTONOMY_NAV_ITEM,
   DASHBOARD_NAV_ITEM,
   SCENARIOS_NAV_ITEM,
   HISTORY_NAV_ITEM,
@@ -3158,6 +3165,7 @@ function AppShellContent() {
   const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
+  const autonomyLabMode = location.pathname === "/autonomy";
   const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
     ? BUILD_EDITION
     : launcherMode || location.pathname === "/vehicle-studio"
@@ -3930,7 +3938,7 @@ function AppShellContent() {
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">
-            {EDITION_BRAND_TOKENS[activeThemeEdition].productName} — {t("app.platform")}
+            {EDITION_BRAND_TOKENS[activeThemeEdition].productName} — {t(autonomyLabMode ? "app.autonomyPlatform" : "app.platform")}
           </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">
