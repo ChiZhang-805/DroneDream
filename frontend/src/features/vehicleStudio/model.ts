@@ -644,22 +644,28 @@ export function solveVehicleConstraints(draft: VehicleModelDraft): VehicleConstr
     }
     if (constraint.type === "radial-array" && components.length > 1) {
       const [planeA, planeB] = constraintPlane(constraint.axis);
-      const source = components[0];
-      const radius = Math.max(.001, Math.hypot(source.transform.positionM[planeA], source.transform.positionM[planeB]));
-      const startAngle = Math.atan2(source.transform.positionM[planeB], source.transform.positionM[planeA]);
+      const referenceIndex = Math.max(0, components.findIndex((component) => component.locked));
+      const reference = components[referenceIndex];
+      const expectedStep = Math.PI * 2 / components.length;
+      const radius = Math.max(.001, Math.hypot(reference.transform.positionM[planeA], reference.transform.positionM[planeB]));
+      const startAngle = Math.atan2(reference.transform.positionM[planeB], reference.transform.positionM[planeA]) - referenceIndex * expectedStep;
       const memberAngles = components.map((component) => Math.atan2(component.transform.positionM[planeB], component.transform.positionM[planeA]));
       const orientation = radialOrientationPattern(components, constraint.axis, memberAngles);
+      if (!isRadiallySymmetric(reference, constraint.axis)) {
+        orientation.offsetDeg = reference.transform.rotationDeg[constraint.axis]
+          - orientation.sign * (startAngle + referenceIndex * expectedStep) * 180 / Math.PI;
+      }
       components.forEach((component, index) => {
         if (component.locked) return;
-        const angle = startAngle + index * Math.PI * 2 / components.length;
+        const angle = startAngle + index * expectedStep;
         component.transform.positionM[planeA] = Math.cos(angle) * radius;
         component.transform.positionM[planeB] = Math.sin(angle) * radius;
-        component.transform.positionM[constraint.axis] = source.transform.positionM[constraint.axis];
+        component.transform.positionM[constraint.axis] = reference.transform.positionM[constraint.axis];
         if (!isRadiallySymmetric(component, constraint.axis)) {
           component.transform.rotationDeg[constraint.axis] = orientation.sign * angle * 180 / Math.PI + orientation.offsetDeg;
         }
       });
-      solvedCount += 1;
+      if (evaluateVehicleConstraints(next).find((evaluation) => evaluation.constraintId === constraint.id)?.status === "satisfied") solvedCount += 1;
     }
   }
   next.body.massKg = calculateVehicleDiagnostics(next).totalMassKg;

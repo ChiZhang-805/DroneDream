@@ -171,6 +171,15 @@ function applyComponentPreset(component: VehicleComponentDraft, entry: VehicleCa
 
 function ensureSensor(draft: VehicleModelDraft, entry: VehicleCatalogEntry, component: VehicleComponentDraft | undefined) {
   if (!entry.sensor) return;
+  const boundSensor = component
+    ? draft.sensors.find((candidate) => candidate.componentId === component.id)
+    : undefined;
+  if (boundSensor) {
+    boundSensor.type = entry.sensor.type;
+    boundSensor.model = entry.sensor.model;
+    boundSensor.enabled = true;
+    return;
+  }
   const exists = draft.sensors.some((candidate) => candidate.type === entry.sensor!.type
     && candidate.model === entry.sensor!.model
     && candidate.componentId === component?.id);

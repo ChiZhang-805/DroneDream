@@ -335,6 +335,33 @@ describe("Vehicle Studio engineering generator", () => {
     expect(() => assertVehicleModelShape(added.draft)).not.toThrow();
   });
 
+  it("updates sensor metadata when a catalog preset replaces its bound component", () => {
+    const assisted = createVehicleModelFromBrief({ name: "Camera replacement", mission: "survey", camera: true }).draft;
+    const camera = assisted.components.find((component) => component.kind === "camera-gimbal")!;
+    const before = assisted.sensors.filter((sensor) => sensor.componentId === camera.id);
+    const replaced = applyVehicleCatalogEntry(assisted, "gimbal-survey").draft;
+    const after = replaced.sensors.filter((sensor) => sensor.componentId === camera.id);
+
+    expect(before).toHaveLength(1);
+    expect(after).toHaveLength(1);
+    expect(after[0].model).toBe("Stabilized survey camera");
+  });
+
+  it("solves a radial array around a locked member", () => {
+    const draft = applyVehicleCatalogEntry(createVehicleModelDraft(), "airframe-hexa-680").draft;
+    const arms = draft.components.filter((component) => component.kind === "arm");
+    const constraint = draft.constraints.find((candidate) => candidate.type === "radial-array" && candidate.componentIds.includes(arms[0].id))!;
+    draft.constraints = [constraint];
+    arms[2].locked = true;
+    const lockedPosition = structuredClone(arms[2].transform.positionM);
+    arms[0].transform.positionM.x += .07;
+    const solved = solveVehicleConstraints(draft);
+
+    expect(solved.solvedCount).toBe(1);
+    expect(evaluateVehicleConstraints(solved.draft)[0].status).toBe("satisfied");
+    expect(solved.draft.components.find((component) => component.id === arms[2].id)?.transform.positionM).toEqual(lockedPosition);
+  });
+
   it("preserves retained user constraints across an architecture rebuild", () => {
     const draft = createVehicleModelDraft();
     const camera = draft.components.find((component) => component.kind === "camera-gimbal")!;
