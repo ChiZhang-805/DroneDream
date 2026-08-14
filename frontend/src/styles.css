@@ -5158,6 +5158,22 @@ a {
   height: 0.82rem;
 }
 
+.autonomy-compile-error {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 0.38rem;
+  color: #9c3d39;
+  font-size: 0.57rem;
+  line-height: 1.35;
+}
+
+.autonomy-compile-error svg {
+  flex: 0 0 auto;
+  width: 0.78rem;
+  height: 0.78rem;
+}
+
 .autonomy-contract-summary {
   display: grid;
   min-width: 0;

@@ -22,7 +22,7 @@ import {
   Weight,
   Waypoints,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
@@ -68,6 +68,7 @@ interface AutonomyCopy {
   commandHelp: string;
   compileCommand: string;
   compilingCommand: string;
+  compileFailed: string;
   executionTarget: string;
   targets: Record<AutonomyExecutionTarget, string>;
   targetHelp: Record<AutonomyExecutionTarget, string>;
@@ -141,6 +142,7 @@ const EN_COPY: AutonomyCopy = {
   commandHelp: "The model may structure intent, but it never emits actuator commands. Every result passes the same geometric and physical checks.",
   compileCommand: "Compile & qualify",
   compilingCommand: "Checking mission…",
+  compileFailed: "The authoritative compiler did not approve this request. Check the runtime connection and mission inputs, then try again.",
   executionTarget: "Execution target",
   targets: { simulation: "Simulation", hitl: "HITL", hardware: "Aircraft" },
   targetHelp: {
@@ -238,6 +240,7 @@ const ZH_COPY: AutonomyCopy = {
   commandHelp: "模型只负责把意图结构化，不直接输出电机或姿态指令；几何与物理安全检查不可绕过。",
   compileCommand: "编译并验证",
   compilingCommand: "正在检查任务…",
+  compileFailed: "权威后端未批准本次请求。请检查运行时连接和任务输入后重试。",
   executionTarget: "执行目标",
   targets: { simulation: "仿真", hitl: "半实物 HITL", hardware: "真机" },
   targetHelp: {
@@ -436,6 +439,8 @@ export function AutonomyLab() {
   const [pickupPayloadKg, setPickupPayloadKg] = useState(DEFAULT_VEHICLE.pickup_payload_kg);
   const [compileResult, setCompileResult] = useState<AutonomyCompileResponse | null>(null);
   const [compileSource, setCompileSource] = useState<"backend" | "preview">("preview");
+  const [compileError, setCompileError] = useState<string | null>(null);
+  const compileGeneration = useRef(0);
   const [planned, setPlanned] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [running, setRunning] = useState(false);
@@ -480,6 +485,8 @@ export function AutonomyLab() {
       battery_ready: false,
     },
   }), [chinese, command, edition, missionId, perception, pickupPayloadKg, target]);
+  const latestCompileRequest = useRef(compileRequest);
+  latestCompileRequest.current = compileRequest;
   const provisionalResult = useMemo(
     () => createLocalAutonomyPreview(missionId, compileRequest),
     [compileRequest, missionId],
@@ -520,8 +527,12 @@ export function AutonomyLab() {
   }, [copy.events.completed, paused, running]);
 
   useEffect(() => {
+    compileGeneration.current += 1;
     setCompileResult(null);
+    setCompileSource("preview");
+    setCompileError(null);
     setPlanned(false);
+    setPlanning(false);
     setRunning(false);
     setComplete(false);
     setProgress(0);
@@ -546,26 +557,43 @@ export function AutonomyLab() {
   };
 
   const planTrajectory = async () => {
+    const generation = ++compileGeneration.current;
+    const submittedRequest = compileRequest;
     setPlanning(true);
+    setCompileError(null);
     setRunning(false);
     setPaused(false);
     setComplete(false);
     setProgress(0);
     try {
+      let result: AutonomyCompileResponse;
+      let source: "backend" | "preview";
       if (publicDemoConsole) {
-        setCompileResult(createLocalAutonomyPreview(missionId, compileRequest));
-        setCompileSource("preview");
+        result = createLocalAutonomyPreview(missionId, submittedRequest);
+        source = "preview";
       } else {
-        setCompileResult(await apiClient.compileAutonomyMission(compileRequest));
-        setCompileSource("backend");
+        result = await apiClient.compileAutonomyMission(submittedRequest);
+        source = "backend";
       }
-    } catch {
-      setCompileResult(createLocalAutonomyPreview(missionId, compileRequest));
-      setCompileSource("preview");
-    } finally {
-      setPlanning(false);
+      if (
+        generation !== compileGeneration.current
+        || latestCompileRequest.current !== submittedRequest
+      ) return;
+      setCompileResult(result);
+      setCompileSource(source);
       setPlanned(true);
       appendEvent(copy.events.planned);
+    } catch {
+      if (
+        generation !== compileGeneration.current
+        || latestCompileRequest.current !== submittedRequest
+      ) return;
+      setCompileResult(null);
+      setCompileSource("preview");
+      setCompileError(copy.compileFailed);
+      setPlanned(false);
+    } finally {
+      if (generation === compileGeneration.current) setPlanning(false);
     }
   };
 
@@ -654,6 +682,12 @@ export function AutonomyLab() {
               {planning ? copy.compilingCommand : copy.compileCommand}
             </button>
           </div>
+          {compileError ? (
+            <div className="autonomy-compile-error" role="alert">
+              <AlertTriangle aria-hidden="true" />
+              <span>{compileError}</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="autonomy-contract-summary">

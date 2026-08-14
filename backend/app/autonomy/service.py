@@ -172,14 +172,26 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
             ],
         )
     if blockers:
-        required.extend([
-            (
-                "Complete and sign the simulation qualification for the identical mission "
-                "contract."
-            ),
-            "Bind a validated signed Vehicle Pack and firmware identity.",
-            "Obtain a short-lived operator confirmation after live preflight checks.",
-        ])
+        if target == "simulation":
+            required.extend([
+                (
+                    "Adjust payload, speed, acceleration, or the vehicle envelope until "
+                    "all trajectory feasibility checks pass."
+                ),
+                (
+                    "Recompile the same simulation mission and review every reported "
+                    "geometry or dynamics issue before qualification."
+                ),
+            ])
+        else:
+            required.extend([
+                (
+                    "Complete and sign the simulation qualification for the identical "
+                    "mission contract."
+                ),
+                "Bind a validated signed Vehicle Pack and firmware identity.",
+                "Obtain a short-lived operator confirmation after live preflight checks.",
+            ])
         return ExecutionPolicy(
             readiness="denied", adapter=adapter, can_execute=False,
             validated_signed_pack_count=VALIDATED_SIGNED_PACK_COUNT,
@@ -206,7 +218,18 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         )
     perception = _select_perception(request)
     steps = _steps(scene_id, request.vehicle.pickup_payload_kg)
-    points = [point.model_copy(deep=True) for point in scene.reference_path]
+    points = [
+        point.model_copy(
+            deep=True,
+            update={
+                "speed_limit_mps": min(
+                    point.speed_limit_mps,
+                    request.vehicle.max_speed_mps,
+                )
+            },
+        )
+        for point in scene.reference_path
+    ]
     route_length, vertical_travel = _route_metrics(points)
     launch_mass = request.vehicle.dry_mass_kg + request.vehicle.launch_payload_kg
     pickup_delta = (
@@ -288,6 +311,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
     canonical = {
         "edition": request.edition,
         "execution_target": request.execution_target,
+        "intent": request.natural_language,
         "scene_id": scene_id,
         "perception_mode": perception,
         "steps": [step.model_dump(mode="json") for step in steps],
