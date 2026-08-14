@@ -20,6 +20,8 @@ import { publicDemoConsole } from "../features/demo/publicDemo";
 import type {
   ApiEnvelope,
   Artifact,
+  AutonomyCompileRequest,
+  AutonomyCompileResponse,
   BackendCapabilitiesResponse,
   BatchCreateRequest,
   BatchJob,
@@ -382,6 +384,15 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async compileAutonomyMission(
+    req: AutonomyCompileRequest,
+  ): Promise<AutonomyCompileResponse> {
+    return request<AutonomyCompileResponse>("/autonomy/compile", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  },
+
   async compileExperimentAssistantTurn(
     req: ExperimentAssistantTurnRequest,
   ): Promise<ExperimentAssistantTurnResponse> {

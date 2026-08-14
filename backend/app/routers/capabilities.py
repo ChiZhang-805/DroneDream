@@ -173,6 +173,15 @@ def read_capabilities() -> dict[str, object]:
                     "schema_version": "1.0",
                     "draft_only": True,
                 },
+                "mission_autonomy": {
+                    "available": True,
+                    "mission_schema": "dronedream.autonomy.mission.v1",
+                    "scene_catalog": "dronedream.autonomy.scene-catalog.v1",
+                    "editions": ["universal", "sim", "lab", "field"],
+                    "simulation_adapter": "px4_gazebo_contract",
+                    "hardware_authority": False,
+                    "validated_signed_vehicle_packs": 0,
+                },
                 "llm_tool_harness": {
                     "available": True,
                     "decision_schema_version": "1.0",

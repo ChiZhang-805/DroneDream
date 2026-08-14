@@ -94,13 +94,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: FixedScenarios };
           },
         },
-        ...(BUILD_HAS_SIM_WORKSPACE ? [{
+        {
           path: "autonomy",
           lazy: async () => {
             const { AutonomyLab } = await import("./pages/AutonomyLab");
             return { Component: AutonomyLab };
           },
-        }] : []),
+        },
         ...(BUILD_HAS_VEHICLE_STUDIO ? [{
           path: "vehicle-studio",
           lazy: async () => {

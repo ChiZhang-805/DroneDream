@@ -239,6 +239,7 @@ const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
 const LAB_NAV_ITEMS: NavigationItem[] = [
   ASSISTANT_NAV_ITEM,
   { to: "/jobs/new", labelKey: "app.experimentBuilder", icon: SlidersHorizontal },
+  AUTONOMY_NAV_ITEM,
   LAB_WORKSPACE_NAV_ITEMS[0],
   LAB_WORKSPACE_NAV_ITEMS[1],
   { to: "/lab/validation", labelKey: "app.labValidation", icon: ShieldCheck },
@@ -247,6 +248,7 @@ const LAB_NAV_ITEMS: NavigationItem[] = [
 
 const FIELD_NAV_ITEMS: NavigationItem[] = [
   ASSISTANT_NAV_ITEM,
+  AUTONOMY_NAV_ITEM,
   {
     to: "/field/device",
     labelKey: "app.fieldDeviceSetup",
@@ -272,6 +274,7 @@ const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
   universal: [
     ASSISTANT_NAV_ITEM,
     VEHICLE_STUDIO_NAV_ITEM,
+    AUTONOMY_NAV_ITEM,
     DASHBOARD_NAV_ITEM,
     HISTORY_NAV_ITEM,
     SCENARIOS_NAV_ITEM,
