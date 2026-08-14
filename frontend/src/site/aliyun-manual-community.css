@@ -1718,7 +1718,16 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   flex: 0 0 auto;
 }
 
-.community-cover-copy > strong {
+.community-cover-title-group {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.48rem, 0.65vh, 0.64rem);
+}
+
+.community-cover-title-group > strong {
   display: block;
   width: min(100%, 15em);
   max-height: 2.2em;
@@ -1734,7 +1743,7 @@ html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
   white-space: pre-line;
 }
 
-html[lang="zh-CN"] .community-cover-copy > strong {
+html[lang="zh-CN"] .community-cover-title-group > strong {
   width: min(100%, 9em);
   max-height: 2.32em;
   letter-spacing: -0.025em;
@@ -1750,12 +1759,17 @@ html[lang="zh-CN"] .community-cover-copy > strong {
   text-align: left;
 }
 
+.community-cover-art.is-long .community-cover-title-group {
+  align-self: center;
+  align-items: flex-start;
+}
+
 .community-cover-art.is-long .community-cover-copy > header {
   justify-content: flex-start;
   text-align: left;
 }
 
-.community-cover-art.is-long .community-cover-copy > strong {
+.community-cover-art.is-long .community-cover-title-group > strong {
   display: -webkit-box;
   width: 100%;
   max-height: none;
@@ -1767,11 +1781,11 @@ html[lang="zh-CN"] .community-cover-copy > strong {
   -webkit-line-clamp: 5;
 }
 
-.community-cover-art.is-dialog .community-cover-copy > strong {
+.community-cover-art.is-dialog .community-cover-title-group > strong {
   font-size: clamp(2rem, 3.15vw, 3.45rem);
 }
 
-.community-cover-art > .community-cover-tags {
+.community-cover-title-group > .community-cover-tags {
   position: relative;
   z-index: 1;
   display: flex;
@@ -1780,15 +1794,15 @@ html[lang="zh-CN"] .community-cover-copy > strong {
   justify-content: center;
   gap: 0.28rem;
   margin: 0;
-  padding-top: clamp(0.46rem, 0.62vh, 0.62rem);
+  padding-top: 0;
   overflow: hidden;
 }
 
-.community-cover-art.is-long > .community-cover-tags {
+.community-cover-art.is-long .community-cover-title-group > .community-cover-tags {
   justify-content: flex-start;
 }
 
-.community-cover-art > .community-cover-tags .community-cover-tag {
+.community-cover-title-group > .community-cover-tags .community-cover-tag {
   display: block;
   min-width: 0;
   max-width: 100%;

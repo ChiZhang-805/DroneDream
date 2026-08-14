@@ -190,10 +190,25 @@ try {
             lineWidths: distinctLines.map((line) => Number(line.width.toFixed(2))),
           };
         };
+        const tagRelation = (rootSelector) => {
+          const root = document.querySelector(rootSelector);
+          const title = root?.querySelector(".community-cover-title-group > strong");
+          const tags = root?.querySelector(".community-cover-title-group > .community-cover-tags");
+          if (!(root instanceof HTMLElement) || !(title instanceof HTMLElement) || !(tags instanceof HTMLElement)) return null;
+          const rootBounds = root.getBoundingClientRect();
+          const titleBounds = title.getBoundingClientRect();
+          const tagBounds = tags.getBoundingClientRect();
+          return {
+            gapAfterTitle: Number((tagBounds.top - titleBounds.bottom).toFixed(2)),
+            bottomSpaceRatio: Number(((rootBounds.bottom - tagBounds.bottom) / rootBounds.height).toFixed(3)),
+          };
+        };
         const artwork = document.querySelector(".community-topic-dialog-visual .community-cover-art");
         return {
-          card: titleMetrics(".community-topic-grid article:first-child .community-cover-copy > strong"),
-          dialog: titleMetrics(".community-topic-dialog-visual .community-cover-copy > strong"),
+          card: titleMetrics(".community-topic-grid article:first-child .community-cover-title-group > strong"),
+          dialog: titleMetrics(".community-topic-dialog-visual .community-cover-title-group > strong"),
+          cardTags: tagRelation(".community-topic-grid article:first-child .community-cover-art"),
+          dialogTags: tagRelation(".community-topic-dialog-visual .community-cover-art"),
           dialogIsShort: artwork instanceof HTMLElement
             && artwork.classList.contains("is-dialog")
             && !artwork.classList.contains("is-long"),
@@ -209,10 +224,14 @@ try {
       await page.locator(".community-topic-dialog").waitFor();
       longDialog = await page.evaluate(() => {
         const artwork = document.querySelector(".community-topic-dialog-visual .community-cover-art");
-        const title = document.querySelector(".community-topic-dialog-visual .community-cover-copy > strong");
+        const title = document.querySelector(".community-topic-dialog-visual .community-cover-title-group > strong");
+        const tags = document.querySelector(".community-topic-dialog-visual .community-cover-title-group > .community-cover-tags");
+        const titleBounds = title?.getBoundingClientRect();
+        const tagBounds = tags?.getBoundingClientRect();
         return {
           isLong: artwork instanceof HTMLElement && artwork.classList.contains("is-long"),
           textAlign: title instanceof HTMLElement ? getComputedStyle(title).textAlign : null,
+          tagGap: titleBounds && tagBounds ? Number((tagBounds.top - titleBounds.bottom).toFixed(2)) : null,
         };
       });
       await page.locator(".community-dialog-close").click();
@@ -236,8 +255,19 @@ try {
         && shortTitleParity.dialog?.lines === 2
         && Math.min(...shortTitleParity.card.lineWidths) / Math.max(...shortTitleParity.card.lineWidths) >= 0.55
         && Math.min(...shortTitleParity.dialog.lineWidths) / Math.max(...shortTitleParity.dialog.lineWidths) >= 0.55
+        && shortTitleParity.cardTags?.gapAfterTitle >= 0
+        && shortTitleParity.cardTags?.gapAfterTitle <= 24
+        && shortTitleParity.cardTags?.bottomSpaceRatio >= 0.15
+        && shortTitleParity.dialogTags?.gapAfterTitle >= 0
+        && shortTitleParity.dialogTags?.gapAfterTitle <= 24
+        && shortTitleParity.dialogTags?.bottomSpaceRatio >= 0.15
       ))
-      && (!longDialog || (longDialog.isLong && longDialog.textAlign === "left"))
+      && (!longDialog || (
+        longDialog.isLong
+        && longDialog.textAlign === "left"
+        && longDialog.tagGap >= 0
+        && longDialog.tagGap <= 24
+      ))
       && (!mixedPage || (mixedPage.longCards > 0 && mixedPage.cards <= 10 && mixedPage.maxTags <= 3))
       && consoleErrors.length === 0
       && pageErrors.length === 0;

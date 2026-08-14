@@ -387,18 +387,20 @@ function TopicCoverArtwork({
           <Icon aria-hidden="true" />
           <span>{presentation.kicker}</span>
         </header>
-        <strong
-          role={heading ? "heading" : undefined}
-          aria-level={heading ? 3 : undefined}
-        >
-          {topic.title}
-        </strong>
+        <div className="community-cover-title-group">
+          <strong
+            role={heading ? "heading" : undefined}
+            aria-level={heading ? 3 : undefined}
+          >
+            {topic.title}
+          </strong>
+          <p className="community-cover-tags">
+            {(topic.tags.length ? topic.tags : [presentation.emphasis]).slice(0, 3).map((tagName) => (
+              <span className="community-cover-tag" key={tagName}># {tagName}</span>
+            ))}
+          </p>
+        </div>
       </div>
-      <p className="community-cover-tags">
-        {(topic.tags.length ? topic.tags : [presentation.emphasis]).slice(0, 3).map((tagName) => (
-          <span className="community-cover-tag" key={tagName}># {tagName}</span>
-        ))}
-      </p>
       {dialog ? (
         <footer>
           <time dateTime={topic.created_at}>{presentation.issue}</time>
