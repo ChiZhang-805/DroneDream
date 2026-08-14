@@ -239,8 +239,12 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
     )
     loaded_mass = launch_mass + pickup_delta
     thrust_to_weight = request.vehicle.max_total_thrust_n / (loaded_mass * GRAVITY)
+    trajectory_speed_mps = max(
+        (point.speed_limit_mps for point in points),
+        default=request.vehicle.max_speed_mps,
+    )
     braking_distance = (
-        request.vehicle.max_speed_mps**2 / (2 * request.vehicle.max_acceleration_mps2)
+        trajectory_speed_mps**2 / (2 * request.vehicle.max_acceleration_mps2)
         + request.vehicle.radius_m
     )
     issues: list[ValidationIssue] = []
