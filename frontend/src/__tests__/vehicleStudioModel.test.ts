@@ -9,6 +9,7 @@ import {
   mirrorVehicleComponent,
   radialArrayVehicleComponent,
   rebuildVehicleRotorArchitecture,
+  removeVehicleComponent,
   setVehicleComponentLocked,
   solveVehicleConstraints,
   validateVehicleModel,
@@ -293,6 +294,39 @@ describe("Vehicle Studio engineering generator", () => {
     const solved = solveVehicleConstraints(draft);
     expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("satisfied");
     expect(solved.draft.components.find((component) => component.id === motors[1].id)?.transform.positionM.y).toBe(motors[0].transform.positionM.y);
+  });
+
+  it("evaluates and solves radial-array member orientation", () => {
+    const draft = applyVehicleCatalogEntry(createVehicleModelDraft(), "airframe-hexa-680").draft;
+    const arms = draft.components.filter((component) => component.kind === "arm");
+    const constraint = draft.constraints.find((candidate) => candidate.type === "radial-array" && candidate.componentIds.includes(arms[0].id))!;
+    arms[2].transform.rotationDeg.y += 12;
+
+    expect(evaluateVehicleConstraints(draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("violated");
+    const solved = solveVehicleConstraints(draft);
+    expect(evaluateVehicleConstraints(solved.draft).find((evaluation) => evaluation.constraintId === constraint.id)?.status).toBe("satisfied");
+  });
+
+  it("keeps landing skids on opposite sides during a partial fleet update", () => {
+    const draft = createVehicleModelDraft();
+    const skids = draft.components.filter((component) => component.kind === "landing-gear");
+    skids[0].locked = true;
+    const result = applyVehicleCatalogEntry(draft, "gear-tall");
+    const updatedSkids = result.draft.components.filter((component) => component.kind === "landing-gear");
+
+    expect(result.affectedCount).toBe(1);
+    expect(Math.sign(updatedSkids[0].transform.positionM.z)).toBe(-1);
+    expect(Math.sign(updatedSkids[1].transform.positionM.z)).toBe(1);
+  });
+
+  it("removes catalog sensor metadata with its physical component", () => {
+    const added = applyVehicleCatalogEntry(createVehicleModelDraft(), "sensor-lidar");
+    const sensorComponent = added.draft.components.find((component) => component.id === added.selectedComponentId)!;
+    const boundSensorId = sensorComponent.tags.find((tag) => tag.startsWith("sensor-binding:"))!.slice("sensor-binding:".length);
+    const removed = removeVehicleComponent(added.draft, sensorComponent.id);
+
+    expect(added.draft.sensors.some((sensor) => sensor.id === boundSensorId)).toBe(true);
+    expect(removed.sensors.some((sensor) => sensor.id === boundSensorId)).toBe(false);
   });
 
   it("can leave a physical material preset without retaining density mode", () => {

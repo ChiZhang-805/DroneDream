@@ -3,6 +3,7 @@ import {
   createVehicleComponent,
   getVehicleComponentMassProperties,
   rebuildVehicleRotorArchitecture,
+  VEHICLE_SENSOR_BINDING_TAG_PREFIX,
   type VehicleComponentDraft,
   type VehicleComponentKind,
   type VehicleModelDraft,
@@ -169,10 +170,19 @@ function applyComponentPreset(component: VehicleComponentDraft, entry: VehicleCa
   component.tags = [...(preset.tags ?? entry.tags)];
 }
 
-function ensureSensor(draft: VehicleModelDraft, entry: VehicleCatalogEntry) {
+function ensureSensor(draft: VehicleModelDraft, entry: VehicleCatalogEntry, component: VehicleComponentDraft | undefined) {
   if (!entry.sensor) return;
-  const exists = draft.sensors.some((sensor) => sensor.type === entry.sensor!.type && sensor.model === entry.sensor!.model);
-  if (!exists) draft.sensors.push({ id: crypto.randomUUID(), ...entry.sensor, enabled: true });
+  let sensor = draft.sensors.find((candidate) => candidate.type === entry.sensor!.type && candidate.model === entry.sensor!.model);
+  if (!sensor) {
+    sensor = { id: crypto.randomUUID(), ...entry.sensor, enabled: true };
+    draft.sensors.push(sensor);
+  }
+  if (component) {
+    component.tags = [...new Set([
+      ...component.tags.filter((tag) => !tag.startsWith(VEHICLE_SENSOR_BINDING_TAG_PREFIX)),
+      `${VEHICLE_SENSOR_BINDING_TAG_PREFIX}${sensor.id}`,
+    ])];
+  }
 }
 
 function architectureTouchesLockedComponent(draft: VehicleModelDraft): boolean {
@@ -220,16 +230,17 @@ export function applyVehicleCatalogEntry(
     const instanceName = entry.name.replace(/\s+set$/iu, "");
     affected.forEach((component, index) => {
       const armLengthM = entry.id === "arm-carbon-25" ? component.geometry.sizeM.x : null;
+      const landingSide = entry.kind === "landing-gear"
+        ? Math.sign(component.transform.positionM.z) || (fleet.findIndex((candidate) => candidate.id === component.id) % 2 === 0 ? -1 : 1)
+        : 0;
       applyComponentPreset(component, entry);
       if (armLengthM !== null) {
         component.geometry.sizeM.x = armLengthM;
         if (entry.component.mass?.massKg) component.mass.massKg = entry.component.mass.massKg * armLengthM / .28;
       }
+      if (landingSide) component.transform.positionM.z = landingSide * .11;
       component.name = `${instanceName} ${index + 1}`;
     });
-    if (entry.kind === "landing-gear") {
-      affected.forEach((component, index) => { component.transform.positionM.z = index % 2 === 0 ? -.11 : .11; });
-    }
   } else {
     const existing = entry.applyMode === "replace-or-add"
       ? next.components.find((component) => component.kind === entry.kind)
@@ -249,7 +260,7 @@ export function applyVehicleCatalogEntry(
 
   if (!entryApplied) return { draft, selectedComponentId: null, affectedCount: 0 };
   if (entry.propulsion) next.propulsion = { ...next.propulsion, ...entry.propulsion };
-  ensureSensor(next, entry);
+  ensureSensor(next, entry, affected[0]);
   next.body.massKg = calculateVehicleDiagnostics(next).totalMassKg;
   next.updatedAt = new Date().toISOString();
   return { draft: next, selectedComponentId: affected[0]?.id ?? null, affectedCount: affected.length };

@@ -2,6 +2,7 @@ export const VEHICLE_MODEL_SCHEMA_VERSION = 2 as const;
 export const MAX_VEHICLE_SENSORS = 32;
 export const MAX_PARAMETER_FAMILIES = 64;
 export const MAX_VEHICLE_COMPONENTS = 256;
+export const VEHICLE_SENSOR_BINDING_TAG_PREFIX = "sensor-binding:";
 export const VEHICLE_MODEL_LIMITS = Object.freeze({
   massKg: 1_000,
   bodyDimensionM: 50,
@@ -493,6 +494,45 @@ function angularDistanceDeg(first: number, second: number): number {
   return Math.abs(((first - second + 540) % 360) - 180);
 }
 
+function isRadiallySymmetric(component: VehicleComponentDraft, axis: VehicleConstraintDraft["axis"]): boolean {
+  return component.geometry.primitive === "sphere"
+    || (axis === "y" && ["cylinder", "cone", "capsule"].includes(component.geometry.primitive));
+}
+
+function radialOrientationPattern(
+  components: VehicleComponentDraft[],
+  axis: VehicleConstraintDraft["axis"],
+  anglesRad: number[],
+): { sign: 1 | -1; offsetDeg: number; residualDeg: number } {
+  const orientedIndices = components
+    .map((component, index) => ({ component, index }))
+    .filter(({ component }) => !isRadiallySymmetric(component, axis))
+    .map(({ index }) => index);
+  if (orientedIndices.length < 2) return { sign: 1, offsetDeg: 0, residualDeg: 0 };
+  const referenceIndex = orientedIndices[0];
+  const score = (sign: 1 | -1) => {
+    const offsetDeg = components[referenceIndex].transform.rotationDeg[axis] - sign * anglesRad[referenceIndex] * 180 / Math.PI;
+    const residualDeg = orientedIndices.reduce((maximum, index) => Math.max(
+      maximum,
+      angularDistanceDeg(
+        components[index].transform.rotationDeg[axis],
+        sign * anglesRad[index] * 180 / Math.PI + offsetDeg,
+      ),
+    ), 0);
+    return { sign, offsetDeg, residualDeg };
+  };
+  const positive = score(1);
+  const negative = score(-1);
+  return positive.residualDeg <= negative.residualDeg ? positive : negative;
+}
+
+function componentSensorBindingIds(component: VehicleComponentDraft): string[] {
+  return component.tags
+    .filter((tag) => tag.startsWith(VEHICLE_SENSOR_BINDING_TAG_PREFIX))
+    .map((tag) => tag.slice(VEHICLE_SENSOR_BINDING_TAG_PREFIX.length))
+    .filter(Boolean);
+}
+
 function componentPlanarRadius(component: VehicleComponentDraft, axis: VehicleConstraintDraft["axis"]): number {
   const geometry = scaledGeometry(component);
   if (axis === "x") return Math.max(geometry.y, geometry.z, geometry.radius * 2) / 2;
@@ -558,6 +598,7 @@ export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleCon
       const meanRadius = radii.reduce((sum, radius) => sum + radius, 0) / Math.max(1, radii.length);
       const meanAxialPosition = axialPositions.reduce((sum, position) => sum + position, 0) / Math.max(1, axialPositions.length);
       const angles = components.map((component) => Math.atan2(component.transform.positionM[planeB], component.transform.positionM[planeA])).sort((left, right) => left - right);
+      const memberAngles = components.map((component) => Math.atan2(component.transform.positionM[planeB], component.transform.positionM[planeA]));
       const expectedStep = Math.PI * 2 / Math.max(1, components.length);
       const angularResidual = angles.reduce((maximum, angle, index) => {
         const next = index === angles.length - 1 ? angles[0] + Math.PI * 2 : angles[index + 1];
@@ -565,9 +606,12 @@ export function evaluateVehicleConstraints(draft: VehicleModelDraft): VehicleCon
       }, 0) * Math.max(meanRadius, .01);
       const radialResidual = Math.max(...radii.map((radius) => Math.abs(radius - meanRadius)), 0);
       const axialResidual = Math.max(...axialPositions.map((position) => Math.abs(position - meanAxialPosition)), 0);
+      const orientation = radialOrientationPattern(components, constraint.axis, memberAngles);
       const countResidual = Number(constraint.value) === components.length ? 0 : Math.abs(Number(constraint.value) - components.length);
-      const residual = countResidual ? Number.POSITIVE_INFINITY : Math.max(angularResidual, radialResidual, axialResidual);
-      return { constraintId: constraint.id, status: residual <= tolerance ? "satisfied" : "violated", residual, summary: countResidual ? "Array count differs" : `Pattern residual ${(residual * 1_000).toFixed(1)} mm` };
+      const positionResidual = Math.max(angularResidual, radialResidual, axialResidual);
+      const residual = countResidual ? Number.POSITIVE_INFINITY : Math.max(positionResidual, orientation.residualDeg * Math.PI / 180);
+      const satisfied = !countResidual && positionResidual <= tolerance && orientation.residualDeg <= rotationToleranceDeg;
+      return { constraintId: constraint.id, status: satisfied ? "satisfied" : "violated", residual, summary: countResidual ? "Array count differs" : `Pattern residual ${(positionResidual * 1_000).toFixed(1)} mm / ${orientation.residualDeg.toFixed(1)}°` };
     }
     if (constraint.type === "clearance") {
       const actual = minimumComponentClearance(components, constraint.axis);
@@ -610,12 +654,17 @@ export function solveVehicleConstraints(draft: VehicleModelDraft): VehicleConstr
       const source = components[0];
       const radius = Math.max(.001, Math.hypot(source.transform.positionM[planeA], source.transform.positionM[planeB]));
       const startAngle = Math.atan2(source.transform.positionM[planeB], source.transform.positionM[planeA]);
+      const memberAngles = components.map((component) => Math.atan2(component.transform.positionM[planeB], component.transform.positionM[planeA]));
+      const orientation = radialOrientationPattern(components, constraint.axis, memberAngles);
       components.forEach((component, index) => {
         if (component.locked) return;
         const angle = startAngle + index * Math.PI * 2 / components.length;
         component.transform.positionM[planeA] = Math.cos(angle) * radius;
         component.transform.positionM[planeB] = Math.sin(angle) * radius;
         component.transform.positionM[constraint.axis] = source.transform.positionM[constraint.axis];
+        if (!isRadiallySymmetric(component, constraint.axis)) {
+          component.transform.rotationDeg[constraint.axis] = orientation.sign * angle * 180 / Math.PI + orientation.offsetDeg;
+        }
       });
       solvedCount += 1;
     }
@@ -768,6 +817,9 @@ export function rebuildVehicleRotorArchitecture(
     }
   }
   next.components = next.components.filter((component) => !removedIds.has(component.id));
+  const removedSensorIds = new Set(draft.components.filter((component) => removedIds.has(component.id)).flatMap(componentSensorBindingIds));
+  const retainedSensorIds = new Set(next.components.flatMap(componentSensorBindingIds));
+  next.sensors = next.sensors.filter((sensor) => !removedSensorIds.has(sensor.id) || retainedSensorIds.has(sensor.id));
   const frame = next.components.find((component) => component.kind === "frame");
   if (!frame) throw new Error("A frame component is required before rebuilding the rotor architecture.");
   appendRotorLayout(
@@ -954,7 +1006,11 @@ export function setVehicleComponentLocked(draft: VehicleModelDraft, id: string, 
 export function removeVehicleComponent(draft: VehicleModelDraft, id: string): VehicleModelDraft {
   const next = structuredClone(draft); const removed = new Set([id]); let changed = true;
   while (changed) { changed = false; for (const component of next.components) if (component.parentId && removed.has(component.parentId) && !removed.has(component.id)) { removed.add(component.id); changed = true; } }
-  next.components = next.components.filter((component) => !removed.has(component.id)); next.constraints = next.constraints.filter((constraint) => constraint.componentIds.every((componentId) => !removed.has(componentId))); next.updatedAt = new Date().toISOString(); return next;
+  const removedSensorIds = new Set(next.components.filter((component) => removed.has(component.id)).flatMap(componentSensorBindingIds));
+  next.components = next.components.filter((component) => !removed.has(component.id));
+  const retainedSensorIds = new Set(next.components.flatMap(componentSensorBindingIds));
+  next.sensors = next.sensors.filter((sensor) => !removedSensorIds.has(sensor.id) || retainedSensorIds.has(sensor.id));
+  next.constraints = next.constraints.filter((constraint) => constraint.componentIds.every((componentId) => !removed.has(componentId))); next.updatedAt = new Date().toISOString(); return next;
 }
 export function setVehicleComponentParent(draft: VehicleModelDraft, id: string, parentId: string | null): VehicleModelDraft {
   if (!canSetVehicleComponentParent(draft, id, parentId)) return draft;
@@ -971,7 +1027,7 @@ export function removeVehicleConstraint(draft: VehicleModelDraft, id: string): V
 }
 export function duplicateVehicleComponent(draft: VehicleModelDraft, id: string): VehicleModelDraft {
   const original = draft.components.find((component) => component.id === id); if (!original) return draft;
-  const next = structuredClone(draft); const copy = structuredClone(original); copy.id = uuid(); copy.name = `${original.name} copy`; copy.transform.positionM.x += .04; copy.locked = false; copy.source = "manual"; next.components.push(copy); next.updatedAt = new Date().toISOString(); return next;
+  const next = structuredClone(draft); const copy = structuredClone(original); copy.id = uuid(); copy.name = `${original.name} copy`; copy.transform.positionM.x += .04; copy.locked = false; copy.source = "manual"; copy.tags = copy.tags.filter((tag) => !tag.startsWith(VEHICLE_SENSOR_BINDING_TAG_PREFIX)); next.components.push(copy); next.updatedAt = new Date().toISOString(); return next;
 }
 export function mirrorVehicleComponent(draft: VehicleModelDraft, id: string, axis: "x" | "z" = "x"): VehicleModelDraft {
   const original = draft.components.find((component) => component.id === id); if (!original) return draft;
