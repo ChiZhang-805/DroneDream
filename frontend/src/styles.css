@@ -4986,6 +4986,927 @@ a {
   height: 18px;
 }
 
+/* SIM mission autonomy: perception, trajectory planning and live local replanning. */
+.app-main:has(.autonomy-lab-page) {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  padding: clamp(0.75rem, 1.15vw, 1.1rem);
+  overflow: hidden;
+}
+
+.app-shell-public-demo .app-main:has(.autonomy-lab-page) {
+  overflow: hidden;
+}
+
+.autonomy-lab-page {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  color: #211827;
+}
+
+.autonomy-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0.15rem 0;
+}
+
+.autonomy-hero > div:first-child {
+  min-width: 0;
+}
+
+.autonomy-kicker {
+  display: block;
+  margin-bottom: 0.18rem;
+  color: var(--dd-brand-middle);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+}
+
+.autonomy-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.autonomy-title-line h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 2vw, 2.15rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.autonomy-title-line > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 1.65rem;
+  padding: 0.26rem 0.58rem;
+  border: 1px solid #bce8dc;
+  border-radius: 999px;
+  color: #13705b;
+  background: #f0fcf8;
+  font-size: 0.64rem;
+  font-weight: 820;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.autonomy-title-line > span svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.autonomy-title-line > .autonomy-independent {
+  border-color: #e6d8eb;
+  color: #76687c;
+  background: #fbf8fc;
+  letter-spacing: 0;
+}
+
+.autonomy-hero p {
+  max-width: 960px;
+  margin: 0.36rem 0 0;
+  color: #716478;
+  font-size: clamp(0.78rem, 0.9vw, 0.9rem);
+  line-height: 1.45;
+}
+
+.autonomy-flight-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  padding: 0.4rem 0.72rem;
+  border: 1px solid #e4d8e7;
+  border-radius: 999px;
+  color: #6c6072;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.73rem;
+  font-weight: 760;
+}
+
+.autonomy-flight-status > span {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #a99eae;
+  box-shadow: 0 0 0 4px rgba(169, 158, 174, 0.13);
+}
+
+.autonomy-flight-status.is-running > span {
+  background: #23baa0;
+  box-shadow: 0 0 0 4px rgba(35, 186, 160, 0.13), 0 0 15px rgba(35, 186, 160, 0.48);
+  animation: autonomy-pulse 1.25s ease-in-out infinite;
+}
+
+.autonomy-flight-status.is-complete > span {
+  background: #7358e8;
+  box-shadow: 0 0 0 4px rgba(115, 88, 232, 0.13);
+}
+
+.autonomy-workspace {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(230px, 0.68fr) minmax(540px, 2fr) minmax(250px, 0.76fr);
+  gap: 0.72rem;
+}
+
+.autonomy-panel {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid #e2d8e5;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 15px 38px rgba(68, 41, 76, 0.07);
+}
+
+.autonomy-config-panel,
+.autonomy-brain-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.68rem;
+  padding: 0.78rem;
+  overflow: hidden;
+}
+
+.autonomy-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 1.75rem;
+}
+
+.autonomy-panel-heading > div {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.84rem;
+  font-weight: 820;
+}
+
+.autonomy-panel-heading svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--dd-brand-middle);
+}
+
+.autonomy-panel-heading code {
+  flex: 0 0 auto;
+  color: #897b8e;
+  background: #f6f1f7;
+  font-size: 0.58rem;
+}
+
+.autonomy-mission-list {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.autonomy-mission-list button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.52rem;
+  width: 100%;
+  min-height: 3.45rem;
+  padding: 0.5rem 0.58rem;
+  border: 1px solid #eadfeb;
+  border-radius: 11px;
+  color: #493d4e;
+  background: #fcf9fc;
+  text-align: left;
+  cursor: pointer;
+}
+
+.autonomy-mission-list button:hover,
+.autonomy-mission-list button.is-active {
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 48%, #eadfeb);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 66%, white);
+}
+
+.autonomy-mission-list button > svg:first-child {
+  width: 1.12rem;
+  height: 1.12rem;
+  color: #9671c3;
+}
+
+.autonomy-mission-list button > svg:last-child {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: #7f52d8;
+}
+
+.autonomy-mission-list span {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.autonomy-mission-list strong {
+  overflow: hidden;
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-mission-list small {
+  overflow: hidden;
+  color: #847788;
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-config-section {
+  display: grid;
+  gap: 0.42rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid #eee6f0;
+}
+
+.autonomy-config-section h2,
+.autonomy-telemetry h2,
+.autonomy-event-log h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  margin: 0;
+  font-size: 0.76rem;
+}
+
+.autonomy-config-section h2 svg,
+.autonomy-telemetry h2 svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: #8c5dd5;
+}
+
+.autonomy-config-section > p {
+  margin: 0;
+  color: #857889;
+  font-size: 0.62rem;
+  line-height: 1.42;
+}
+
+.autonomy-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.28rem;
+}
+
+.autonomy-mode-switch button {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  gap: 0.2rem;
+  min-height: 2.65rem;
+  padding: 0.3rem 0.18rem;
+  border: 1px solid #e5d8e8;
+  border-radius: 9px;
+  color: #776b7b;
+  background: #fff;
+  font-size: 0.59rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.autonomy-mode-switch button svg {
+  width: 0.92rem;
+  height: 0.92rem;
+}
+
+.autonomy-mode-switch button.is-active {
+  border-color: #9b72de;
+  color: #6835b4;
+  background: #f6efff;
+  box-shadow: inset 0 0 0 1px rgba(155, 114, 222, 0.12);
+}
+
+.autonomy-mode-description {
+  min-height: 1.8rem;
+  color: #8a7e8f;
+  font-size: 0.59rem;
+  line-height: 1.38;
+}
+
+.autonomy-checkpoints ol {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 0.15rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.autonomy-checkpoints li {
+  position: relative;
+  display: grid;
+  flex: 1;
+  justify-items: center;
+  gap: 0.18rem;
+  min-width: 0;
+  color: #776b7b;
+  font-size: 0.58rem;
+}
+
+.autonomy-checkpoints li:not(:last-child)::after {
+  position: absolute;
+  top: 0.64rem;
+  left: calc(50% + 0.8rem);
+  width: calc(100% - 1.6rem);
+  height: 1px;
+  background: linear-gradient(90deg, #45c9dc, #9a65e4);
+  content: "";
+}
+
+.autonomy-checkpoints li span {
+  z-index: 1;
+  display: grid;
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 1px solid #cdb7e9;
+  border-radius: 50%;
+  color: #7444bc;
+  background: #fff;
+  place-items: center;
+  font-size: 0.58rem;
+  font-weight: 850;
+}
+
+.autonomy-checkpoints strong {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-plan-button {
+  justify-content: center;
+  width: 100%;
+  min-height: 2.45rem;
+  margin-top: auto;
+  border-radius: 10px;
+}
+
+.autonomy-plan-button svg,
+.autonomy-map-controls .btn svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.autonomy-map-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 0.78rem;
+  overflow: hidden;
+}
+
+.autonomy-map-heading {
+  margin-bottom: 0.55rem;
+}
+
+.autonomy-world-state,
+.autonomy-brain-rate {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid #d6e9ed;
+  border-radius: 999px;
+  color: #36777f;
+  background: #f1fbfc;
+  font-size: 0.56rem;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.autonomy-map-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #ded6e3;
+  border-radius: 14px;
+  color: rgba(104, 86, 111, 0.14);
+  background:
+    radial-gradient(circle at 60% 30%, rgba(90, 208, 222, 0.08), transparent 30%),
+    linear-gradient(160deg, #fbfcff, #f6f1f8);
+}
+
+.autonomy-map-stage > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.autonomy-world-boundary {
+  fill: rgba(255, 255, 255, 0.38);
+  stroke: #d4c8d8;
+  stroke-width: 2;
+  stroke-dasharray: 7 6;
+}
+
+.autonomy-map-known.is-vision {
+  opacity: 0.34;
+  filter: saturate(0.55);
+}
+
+.autonomy-obstacle {
+  fill: #e7e0e9;
+  stroke: #c8bccd;
+  stroke-width: 2;
+}
+
+.autonomy-stairs path {
+  fill: none;
+  stroke: #bcb0c2;
+  stroke-width: 8;
+}
+
+.autonomy-destination rect {
+  fill: #fff0dc;
+  stroke: #d9a968;
+  stroke-width: 2;
+}
+
+.autonomy-destination svg {
+  color: #a66d24;
+  fill: none;
+  stroke: currentColor;
+}
+
+.autonomy-gate ellipse {
+  fill: rgba(114, 90, 225, 0.06);
+  stroke: #785ee0;
+  stroke-width: 8;
+}
+
+.autonomy-gate line {
+  stroke: rgba(120, 94, 224, 0.28);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.autonomy-route-shadow,
+.autonomy-route {
+  fill: none;
+  opacity: 0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: opacity 260ms ease;
+}
+
+.autonomy-route-shadow {
+  stroke: rgba(100, 80, 180, 0.14);
+  stroke-width: 16;
+}
+
+.autonomy-route {
+  stroke: url(#autonomy-route-gradient);
+  stroke-width: 5;
+  stroke-dasharray: 0.018 0.012;
+}
+
+.autonomy-route.is-visible,
+.autonomy-route-shadow.is-visible {
+  opacity: 1;
+}
+
+.autonomy-map-marker circle {
+  fill: #fff;
+  stroke: #7555da;
+  stroke-width: 3;
+}
+
+.autonomy-map-marker text {
+  fill: #6846cb;
+  font-size: 12px;
+  font-weight: 850;
+  text-anchor: middle;
+}
+
+.autonomy-map-goal circle {
+  stroke: #da48ad;
+}
+
+.autonomy-map-goal text {
+  fill: #b12a8a;
+}
+
+.autonomy-drone circle:first-child {
+  fill: #21152d;
+  stroke: #62d4e5;
+  stroke-width: 3;
+}
+
+.autonomy-drone path {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.autonomy-drone circle:last-child {
+  fill: #ef59c3;
+}
+
+.autonomy-camera-cone {
+  fill: rgba(62, 203, 220, 0.08);
+  stroke: rgba(62, 203, 220, 0.28);
+  stroke-width: 1;
+  stroke-dasharray: 5 5;
+}
+
+.autonomy-surprise-obstacle circle:first-child {
+  fill: #ff7a77;
+  stroke: #dc3f51;
+  stroke-width: 3;
+}
+
+.autonomy-surprise-obstacle circle:last-child {
+  fill: none;
+  stroke: rgba(220, 63, 81, 0.4);
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+  animation: autonomy-spin 5s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.autonomy-camera-card {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  width: min(30%, 190px);
+  min-width: 150px;
+  padding: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 11px;
+  color: #f8f3ff;
+  background: rgba(24, 16, 31, 0.91);
+  box-shadow: 0 12px 30px rgba(28, 17, 34, 0.26);
+}
+
+.autonomy-camera-card > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0 0.1rem 0.36rem;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.autonomy-camera-card svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.autonomy-camera-card i {
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #ef4f7d;
+}
+
+.autonomy-camera-scene {
+  position: relative;
+  height: 82px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: linear-gradient(#567b92 0 47%, #36323a 47% 100%);
+}
+
+.autonomy-camera-horizon {
+  position: absolute;
+  top: 46%;
+  left: -10%;
+  width: 120%;
+  height: 3px;
+  background: rgba(87, 234, 236, 0.72);
+  transform: rotate(-2deg);
+}
+
+.autonomy-camera-box {
+  position: absolute;
+  top: 18%;
+  left: 35%;
+  display: grid;
+  width: 45%;
+  height: 54%;
+  border: 1px solid #6deaf2;
+  place-items: start center;
+}
+
+.autonomy-camera-box small {
+  padding: 0.1rem 0.2rem;
+  color: #17252a;
+  background: #6deaf2;
+  font-size: 0.42rem;
+  font-weight: 900;
+}
+
+.autonomy-camera-depth {
+  position: absolute;
+  right: 0.45rem;
+  bottom: 0.35rem;
+  width: 24%;
+  height: 5px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #39d7e7, #7959ea, #ec4caa);
+}
+
+.autonomy-map-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding-top: 0.62rem;
+}
+
+.autonomy-map-controls .btn {
+  min-height: 2.25rem;
+  border-radius: 9px;
+  font-size: 0.7rem;
+}
+
+.autonomy-inject-button {
+  border-color: #f0bdc4;
+  color: #a73951;
+  background: #fff6f7;
+}
+
+.autonomy-progress {
+  display: flex;
+  flex: 1;
+  min-width: 90px;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.autonomy-progress > span {
+  flex: 1;
+  height: 0.38rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eee7f0;
+}
+
+.autonomy-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #31cadc, #7a5de6, #da48b6);
+  transition: width 80ms linear;
+}
+
+.autonomy-progress strong {
+  width: 2.4rem;
+  color: #75697a;
+  font-size: 0.63rem;
+  text-align: right;
+}
+
+.autonomy-brain-copy {
+  margin: -0.15rem 0 0;
+  color: #847789;
+  font-size: 0.62rem;
+  line-height: 1.45;
+}
+
+.autonomy-brain-stages {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.autonomy-brain-stages li {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.48rem;
+  min-height: 2.25rem;
+  padding: 0.33rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #8b7f8f;
+}
+
+.autonomy-brain-stages li > span {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid #ded4e1;
+  border-radius: 7px;
+  background: #faf7fb;
+  place-items: center;
+  font-size: 0.58rem;
+  font-weight: 850;
+}
+
+.autonomy-brain-stages li > span svg {
+  width: 0.78rem;
+  height: 0.78rem;
+}
+
+.autonomy-brain-stages li > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+
+.autonomy-brain-stages strong {
+  color: #4e4253;
+  font-size: 0.7rem;
+}
+
+.autonomy-brain-stages small {
+  overflow: hidden;
+  color: #a195a5;
+  font-size: 0.48rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-brain-stages li.is-active {
+  border-color: #cdb9eb;
+  color: #7446c1;
+  background: #f7f1ff;
+  box-shadow: 0 7px 18px rgba(108, 70, 176, 0.08);
+}
+
+.autonomy-brain-stages li.is-active > span {
+  border-color: #855cce;
+  color: #fff;
+  background: linear-gradient(135deg, #55cfe0, #8b5dd8);
+}
+
+.autonomy-brain-stages li.is-complete > span {
+  border-color: #b9e3d9;
+  color: #16856b;
+  background: #effbf7;
+}
+
+.autonomy-telemetry,
+.autonomy-event-log {
+  display: grid;
+  gap: 0.45rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid #eee6f0;
+}
+
+.autonomy-telemetry dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem;
+  margin: 0;
+}
+
+.autonomy-telemetry dl > div {
+  min-width: 0;
+  padding: 0.38rem 0.42rem;
+  border: 1px solid #eee6ef;
+  border-radius: 8px;
+  background: #fcfafc;
+}
+
+.autonomy-telemetry dt,
+.autonomy-telemetry dd {
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-telemetry dt {
+  color: #938796;
+  font-size: 0.52rem;
+}
+
+.autonomy-telemetry dd {
+  margin-top: 0.1rem;
+  color: #433748;
+  font-size: 0.68rem;
+  font-weight: 780;
+}
+
+.autonomy-event-log {
+  min-height: 0;
+}
+
+.autonomy-event-log ul {
+  display: grid;
+  gap: 0.33rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.autonomy-event-log li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.4rem;
+  color: #746778;
+  font-size: 0.56rem;
+  line-height: 1.35;
+}
+
+.autonomy-event-log time {
+  color: #a092a4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.5rem;
+}
+
+.is-spinning {
+  animation: autonomy-spin 0.9s linear infinite;
+}
+
+@keyframes autonomy-pulse {
+  50% { transform: scale(0.78); opacity: 0.68; }
+}
+
+@keyframes autonomy-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1180px) {
+  .app-main:has(.autonomy-lab-page) {
+    overflow: auto;
+  }
+
+  .autonomy-lab-page {
+    height: auto;
+  }
+
+  .autonomy-workspace {
+    grid-template-columns: minmax(220px, 0.75fr) minmax(500px, 1.8fr);
+  }
+
+  .autonomy-brain-panel {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .autonomy-brain-panel > .autonomy-panel-heading,
+  .autonomy-brain-panel > .autonomy-brain-copy {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 780px) {
+  .autonomy-hero,
+  .autonomy-title-line,
+  .autonomy-map-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .autonomy-flight-status {
+    align-self: flex-start;
+  }
+
+  .autonomy-title-line {
+    display: flex;
+  }
+
+  .autonomy-workspace,
+  .autonomy-brain-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .autonomy-map-stage {
+    min-height: 440px;
+  }
+
+  .autonomy-progress {
+    width: 100%;
+  }
+}
+
 .fixed-scenarios-page {
   display: grid;
   height: 100%;

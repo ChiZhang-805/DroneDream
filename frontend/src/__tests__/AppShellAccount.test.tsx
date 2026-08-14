@@ -99,7 +99,7 @@ describe("workspace account entry", () => {
     const { container, router } = renderWorkspace();
 
     const links = container.querySelectorAll(".app-nav a");
-    expect(links).toHaveLength(5);
+    expect(links).toHaveLength(6);
     expect(screen.queryByRole("link", { name: "SIM" }))
       .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
@@ -136,6 +136,7 @@ describe("workspace account entry", () => {
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
       "Experiment",
+      "Autonomy Lab",
       "Dashboard",
       "Scenarios",
       "Run History",
@@ -181,7 +182,7 @@ describe("workspace account entry", () => {
     expect(panel).not.toHaveAttribute("hidden");
     expect(within(panel!).getByRole("button", { name: "Account" }))
       .toHaveTextContent("Local user");
-    expect(within(panel!).getAllByRole("link")).toHaveLength(5);
+    expect(within(panel!).getAllByRole("link")).toHaveLength(6);
     expect(within(panel!).queryByRole("link", { name: "SIM" }))
       .not.toBeInTheDocument();
 

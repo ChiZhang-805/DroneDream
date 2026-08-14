@@ -84,6 +84,7 @@ $consoleRoutes = @(
     "jobs\new",
     "history",
     "scenarios",
+    "autonomy",
     "vehicle-studio",
     "admin",
     "compare",
