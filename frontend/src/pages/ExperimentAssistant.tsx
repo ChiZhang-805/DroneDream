@@ -718,7 +718,7 @@ export function ExperimentAssistant() {
 
   function openDraftPath(): string {
     if (latest?.orchestration?.intent === "mission_autonomy") {
-      return "/autonomy?from=tuning-chat";
+      return "/autonomy/mission?from=tuning-chat";
     }
     if (editionTheme.id === "universal") {
       return latest?.orchestration?.artifact_kind === "universal_vehicle_model"
@@ -1027,7 +1027,7 @@ export function ExperimentAssistant() {
     }
     if (!publicDemoConsole && selectedTaskType === "mission_autonomy") {
       storeAutonomyHandoff(visibleMessage);
-      navigate("/autonomy?from=tuning-chat");
+      navigate("/autonomy/mission?from=tuning-chat");
       return;
     }
     if (visibleMessage.length > MAX_ASSISTANT_MESSAGE_LENGTH) {

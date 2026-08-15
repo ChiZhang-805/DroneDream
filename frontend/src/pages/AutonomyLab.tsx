@@ -484,7 +484,7 @@ function runtimeComponentLabel(
   return labels[id];
 }
 
-export function AutonomyLab() {
+export function AutonomyLab({ embedded = false }: { embedded?: boolean } = {}) {
   const { interfaceLocale } = useI18n();
   const copy = COPY_BY_LOCALE[interfaceLocale] ?? EN_COPY;
   const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
@@ -824,8 +824,8 @@ export function AutonomyLab() {
   };
 
   return (
-    <div className="autonomy-lab-page">
-      <header className="autonomy-hero">
+    <div className={`autonomy-lab-page${embedded ? " is-embedded" : ""}`}>
+      {!embedded ? <header className="autonomy-hero">
         <div>
           <span className="autonomy-kicker">{editionLabel} · {copy.kicker}</span>
           <div className="autonomy-title-line">
@@ -833,19 +833,17 @@ export function AutonomyLab() {
             <span><Sparkles aria-hidden="true" />{copy.simulationOnly}</span>
             <span className="autonomy-independent">{copy.independent}</span>
           </div>
-          <p>{copy.subtitle}</p>
         </div>
         <div className={`autonomy-flight-status ${complete ? "is-complete" : running ? "is-running" : ""}`}>
           <span />
           {complete ? copy.completed : running ? copy.running : planned ? copy.planned : copy.ready}
         </div>
-      </header>
+      </header> : null}
 
-      <section className="autonomy-command-center" data-execution-target={target}>
+      {!embedded ? <section className="autonomy-command-center" data-execution-target={target}>
         <div className="autonomy-command-input autonomy-intent-contract">
           <div className="autonomy-command-heading">
             <span><MessageSquareText aria-hidden="true" /><strong>{copy.intentSource}</strong></span>
-            <small>{copy.commandHelp}</small>
           </div>
           <p className="autonomy-intent-readout">{command}</p>
           <div className="autonomy-command-actions">
@@ -906,10 +904,10 @@ export function AutonomyLab() {
             </div>
           </dl>
         </div>
-      </section>
+      </section> : null}
 
       <section className="autonomy-workspace">
-        <aside className="autonomy-panel autonomy-config-panel">
+        {!embedded ? <aside className="autonomy-panel autonomy-config-panel">
           <div className="autonomy-panel-heading">
             <div><Route aria-hidden="true" /><span>{copy.mission}</span></div>
             <code>MISSION-01</code>
@@ -934,7 +932,6 @@ export function AutonomyLab() {
 
           <div className="autonomy-config-section">
             <h2><Radar aria-hidden="true" />{copy.perception}</h2>
-            <p>{copy.perceptionHelp}</p>
             <div className="autonomy-mode-switch" role="group" aria-label={copy.perception}>
               {(Object.keys(copy.modes) as PerceptionMode[]).map((mode) => (
                 <button
@@ -948,7 +945,6 @@ export function AutonomyLab() {
                 </button>
               ))}
             </div>
-            <small className="autonomy-mode-description">{copy.modeDescriptions[perception]}</small>
           </div>
 
           <div className="autonomy-config-section autonomy-payload-control">
@@ -979,7 +975,7 @@ export function AutonomyLab() {
             {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Route aria-hidden="true" />}
             {planning ? copy.planning : planned ? copy.replan : copy.plan}
           </button>
-        </aside>
+        </aside> : null}
 
         <section className="autonomy-panel autonomy-map-panel">
           <div className="autonomy-panel-heading autonomy-map-heading">
@@ -1083,7 +1079,6 @@ export function AutonomyLab() {
             <div><BrainCircuit aria-hidden="true" /><span>{copy.brain}</span></div>
             <span className="autonomy-brain-rate">20 Hz safety loop</span>
           </div>
-          <p className="autonomy-brain-copy">{copy.brainSubtitle}</p>
           <ol className="autonomy-brain-stages">
             {copy.brainStages.map((stage, index) => (
               <li key={stage} className={index === activeStage ? "is-active" : index < activeStage || complete ? "is-complete" : ""}>
