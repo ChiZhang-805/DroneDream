@@ -104,12 +104,17 @@ def autonomy_tool_registry() -> dict[str, dict[str, object]]:
     return copy.deepcopy(_TOOL_REGISTRY)
 
 
-def _aircraft_issues(asset: AutonomyHarnessAsset) -> list[str]:
-    issues: list[str] = []
+def _aircraft_issues(
+    asset: AutonomyHarnessAsset,
+    credential_issues: list[str],
+) -> list[str]:
+    issues: list[str] = list(credential_issues)
     if asset.status not in {"validated-unsigned", "signed"}:
         issues.append("aircraft.pack.not-validated")
     if not asset.qualification_receipt_id:
         issues.append("aircraft.qualification-receipt.missing")
+    if not asset.content_hash:
+        issues.append("aircraft.content-hash.missing")
     required = {
         "body_radius_m",
         "dry_mass_kg",
@@ -117,6 +122,7 @@ def _aircraft_issues(asset: AutonomyHarnessAsset) -> list[str]:
         "maximum_thrust_n",
         "maximum_speed_mps",
         "maximum_acceleration_mps2",
+        "maximum_pickup_payload_kg",
         "reserve_battery_percent",
         "localization_sources",
     }
@@ -128,8 +134,11 @@ def _aircraft_issues(asset: AutonomyHarnessAsset) -> list[str]:
     return issues
 
 
-def _map_issues(asset: AutonomyHarnessAsset) -> list[str]:
-    issues: list[str] = []
+def _map_issues(
+    asset: AutonomyHarnessAsset,
+    credential_issues: list[str],
+) -> list[str]:
+    issues: list[str] = list(credential_issues)
     if asset.status != "qualified":
         issues.append("map.pack.not-qualified")
     if not asset.content_hash:
@@ -138,7 +147,17 @@ def _map_issues(asset: AutonomyHarnessAsset) -> list[str]:
         issues.append("map.qualification-receipt.missing")
     required = {
         "coordinate_frame",
+        "representation",
         "resolution_m",
+        "floor_count",
+        "bounds_x_m",
+        "bounds_y_m",
+        "bounds_z_m",
+        "confidence_percent",
+        "live_updates",
+        "origin_latitude",
+        "origin_longitude",
+        "origin_altitude_m",
         "semantic_layers",
         "planning_layers",
         "compiler_scene_id",
@@ -174,11 +193,17 @@ def _receipt(
 
 def inspect_autonomy_harness(
     request: AutonomyHarnessInspectRequest,
+    *,
+    credential_issues: tuple[list[str], list[str]] | None = None,
 ) -> AutonomyHarnessInspectResponse:
     """Execute the initial read-only tool set before any model planning call."""
 
-    aircraft_issues = _aircraft_issues(request.aircraft)
-    map_issues = _map_issues(request.map_pack)
+    verified_issues = credential_issues or (
+        ["aircraft.qualification-registry.unavailable"],
+        ["map.qualification-registry.unavailable"],
+    )
+    aircraft_issues = _aircraft_issues(request.aircraft, verified_issues[0])
+    map_issues = _map_issues(request.map_pack, verified_issues[1])
     issues = sorted(set([*aircraft_issues, *map_issues]))
     planning_ready = not issues
     receipts = [
@@ -244,9 +269,7 @@ def inspect_autonomy_harness(
     if aircraft_issues:
         required_next_actions.append("Validate and save a qualified Vehicle Pack.")
     if map_issues:
-        required_next_actions.append(
-            "Import, compile, and qualify a planning-capable Map Pack."
-        )
+        required_next_actions.append("Import, compile, and qualify a planning-capable Map Pack.")
     return AutonomyHarnessInspectResponse(
         context_sha256=context_sha256,
         status="draft" if planning_ready else "needs_assets",

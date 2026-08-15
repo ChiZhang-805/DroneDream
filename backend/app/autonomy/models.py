@@ -247,6 +247,21 @@ class AutonomyHarnessInspectRequest(StrictModel):
         return self
 
 
+class AutonomyCompileAssetContext(StrictModel):
+    schema_version: Literal["dronedream.autonomy.compile-assets.v1"] = (
+        "dronedream.autonomy.compile-assets.v1"
+    )
+    harness_context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    aircraft: AutonomyHarnessAsset
+    map_pack: AutonomyHarnessAsset
+
+    @model_validator(mode="after")
+    def validate_asset_kinds(self) -> AutonomyCompileAssetContext:
+        if self.aircraft.kind != "aircraft" or self.map_pack.kind != "map":
+            raise ValueError("compile assets are bound to the wrong slots")
+        return self
+
+
 class AutonomyHarnessToolReceipt(StrictModel):
     tool_id: str = Field(
         min_length=1,
@@ -276,12 +291,8 @@ class AutonomyHarnessInspectResponse(StrictModel):
     schema_version: Literal["dronedream.autonomy.harness-context.v1"] = (
         "dronedream.autonomy.harness-context.v1"
     )
-    prompt_version: Literal["dronedream.autonomy.system.v1"] = (
-        "dronedream.autonomy.system.v1"
-    )
-    tool_registry_version: Literal["dronedream.autonomy.tools.v1"] = (
-        "dronedream.autonomy.tools.v1"
-    )
+    prompt_version: Literal["dronedream.autonomy.system.v1"] = "dronedream.autonomy.system.v1"
+    tool_registry_version: Literal["dronedream.autonomy.tools.v1"] = "dronedream.autonomy.tools.v1"
     context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     status: AutonomyHarnessStatus
     planning_ready: bool
@@ -289,9 +300,7 @@ class AutonomyHarnessInspectResponse(StrictModel):
     required_next_actions: list[str] = Field(default_factory=list, max_length=24)
     eligible_tool_ids: list[str] = Field(default_factory=list, max_length=24)
     tool_receipts: list[AutonomyHarnessToolReceipt] = Field(max_length=24)
-    repair_policy: AutonomyHarnessRepairPolicy = Field(
-        default_factory=AutonomyHarnessRepairPolicy
-    )
+    repair_policy: AutonomyHarnessRepairPolicy = Field(default_factory=AutonomyHarnessRepairPolicy)
 
 
 class AutonomyCompileRequest(StrictModel):
@@ -306,6 +315,7 @@ class AutonomyCompileRequest(StrictModel):
     perception_mode: PerceptionMode | None = None
     vehicle: VehicleEnvelope = Field(default_factory=VehicleEnvelope)
     evidence: RuntimeEvidence = Field(default_factory=RuntimeEvidence)
+    asset_context: AutonomyCompileAssetContext | None = None
 
     @field_validator("natural_language")
     @classmethod

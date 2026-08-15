@@ -94,7 +94,7 @@ export function autonomyHarnessRequest(
       name: workspace.aircraft.name,
       version: workspace.aircraft.version,
       status: workspace.aircraft.status,
-      content_hash: null,
+      content_hash: workspace.aircraft.qualificationContentHash,
       qualification_receipt_id: workspace.aircraft.qualificationReceiptId,
       capabilities: {
         body_radius_m: autonomyAircraftRadiusM(workspace.aircraft),
@@ -103,6 +103,7 @@ export function autonomyHarnessRequest(
         maximum_thrust_n: workspace.aircraft.maximumThrustN,
         maximum_speed_mps: workspace.aircraft.maximumSpeedMps,
         maximum_acceleration_mps2: workspace.aircraft.maximumAccelerationMps2,
+        maximum_pickup_payload_kg: workspace.aircraft.maximumPickupPayloadKg,
         reserve_battery_percent: workspace.aircraft.reserveBatteryPercent,
         localization_sources: localizationSources,
       },
@@ -116,8 +117,18 @@ export function autonomyHarnessRequest(
       content_hash: workspace.mapPack.contentHash,
       qualification_receipt_id: workspace.mapPack.qualificationReceiptId,
       capabilities: {
+        representation: workspace.mapPack.representation,
         coordinate_frame: workspace.mapPack.coordinateFrame,
         resolution_m: workspace.mapPack.resolutionM,
+        floor_count: workspace.mapPack.floorCount,
+        bounds_x_m: workspace.mapPack.boundsM.x,
+        bounds_y_m: workspace.mapPack.boundsM.y,
+        bounds_z_m: workspace.mapPack.boundsM.z,
+        confidence_percent: workspace.mapPack.confidencePercent,
+        live_updates: workspace.mapPack.liveUpdates,
+        origin_latitude: workspace.mapPack.origin.latitude,
+        origin_longitude: workspace.mapPack.origin.longitude,
+        origin_altitude_m: workspace.mapPack.origin.altitudeM,
         semantic_layers: workspace.mapPack.semanticLayers,
         planning_layers: workspace.mapPack.planningLayers,
         compiler_scene_id: workspace.mapPack.compilerSceneId,
@@ -138,6 +149,8 @@ function localIssues(request: AutonomyHarnessInspectRequest): {
   if (!request.aircraft.qualification_receipt_id) {
     aircraft.push("aircraft.qualification-receipt.missing");
   }
+  if (!request.aircraft.content_hash) aircraft.push("aircraft.content-hash.missing");
+  aircraft.push("aircraft.qualification-registry.unavailable");
   const localization = request.aircraft.capabilities.localization_sources;
   if (!Array.isArray(localization) || localization.length === 0) {
     aircraft.push("aircraft.localization-source.missing");
@@ -145,6 +158,7 @@ function localIssues(request: AutonomyHarnessInspectRequest): {
   if (request.map_pack.status !== "qualified") map.push("map.pack.not-qualified");
   if (!request.map_pack.content_hash) map.push("map.content-hash.missing");
   if (!request.map_pack.qualification_receipt_id) map.push("map.qualification-receipt.missing");
+  map.push("map.qualification-registry.unavailable");
   const planningLayers = request.map_pack.capabilities.planning_layers;
   if (
     !Array.isArray(planningLayers)

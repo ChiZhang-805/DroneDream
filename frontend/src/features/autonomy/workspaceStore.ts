@@ -48,6 +48,7 @@ export interface AutonomyAircraftProfile {
   version: number;
   status: "draft" | "validated-unsigned" | "signed";
   qualificationReceiptId: string | null;
+  qualificationContentHash: string | null;
   name: string;
   manufacturer: string;
   airframe: string;
@@ -439,6 +440,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       version: 1,
       status: "draft",
       qualificationReceiptId: null,
+      qualificationContentHash: null,
       name: "Primary research quadrotor",
       manufacturer: "Custom",
       airframe: "Quad X",
@@ -602,9 +604,15 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
   const normalizedControlInterface = normalizedAutopilot !== "px4" && requestedControlInterface === "px4-ros2"
     ? "mavlink"
     : requestedControlInterface;
+  const normalizedQualificationContentHash = typeof aircraft.qualificationContentHash === "string"
+    && /^[0-9a-f]{64}$/u.test(aircraft.qualificationContentHash)
+    ? aircraft.qualificationContentHash
+    : null;
   const qualificationContractMigrated = autopilotWasInferred
     || normalizedControlInterface !== requestedControlInterface
-    || sensorCalibrationContractMigrated;
+    || sensorCalibrationContractMigrated
+    || ((aircraft.status === "validated-unsigned" || aircraft.status === "signed")
+      && !normalizedQualificationContentHash);
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     schemaVersion: 2,
@@ -616,6 +624,9 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     qualificationReceiptId: !qualificationContractMigrated && typeof aircraft.qualificationReceiptId === "string"
       ? aircraft.qualificationReceiptId.slice(0, 160)
       : null,
+    qualificationContentHash: qualificationContractMigrated
+      ? null
+      : normalizedQualificationContentHash,
     name: boundedText(aircraft.name, fallback.aircraft.name),
     manufacturer: boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
     airframe: boundedText(aircraft.airframe, fallback.aircraft.airframe),

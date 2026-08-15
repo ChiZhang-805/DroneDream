@@ -15,7 +15,7 @@ def _aircraft(*, ready: bool) -> AutonomyHarnessAsset:
         name="Primary research quadrotor",
         version=2,
         status="validated-unsigned" if ready else "draft",
-        content_hash=None,
+        content_hash="b" * 64 if ready else None,
         qualification_receipt_id="vehicle-receipt-v2" if ready else None,
         capabilities={
             "body_radius_m": 0.44,
@@ -24,6 +24,7 @@ def _aircraft(*, ready: bool) -> AutonomyHarnessAsset:
             "maximum_thrust_n": 39.0,
             "maximum_speed_mps": 4.0,
             "maximum_acceleration_mps2": 3.0,
+            "maximum_pickup_payload_kg": 0.35,
             "reserve_battery_percent": 25.0,
             "localization_sources": ["gps", "vio"],
         },
@@ -40,8 +41,18 @@ def _map(*, ready: bool) -> AutonomyHarnessAsset:
         content_hash="a" * 64 if ready else None,
         qualification_receipt_id="map-receipt-v4" if ready else None,
         capabilities={
-            "coordinate_frame": "building-local",
+            "representation": "hybrid-3d",
+            "coordinate_frame": "ENU",
             "resolution_m": 0.1,
+            "floor_count": 3,
+            "bounds_x_m": 42.0,
+            "bounds_y_m": 28.0,
+            "bounds_z_m": 11.0,
+            "confidence_percent": 100.0,
+            "live_updates": "depth-fusion",
+            "origin_latitude": None,
+            "origin_longitude": None,
+            "origin_altitude_m": None,
             "semantic_layers": ["free-space", "stairs", "pickup-zones"],
             "planning_layers": ["collision-geometry", "occupancy", "esdf"],
             "compiler_scene_id": "stairwell-coffee-return" if ready else None,
@@ -59,7 +70,10 @@ def _request(*, aircraft_ready: bool, map_ready: bool) -> AutonomyHarnessInspect
 
 
 def test_harness_blocks_planning_when_assets_are_not_qualified() -> None:
-    result = inspect_autonomy_harness(_request(aircraft_ready=False, map_ready=False))
+    result = inspect_autonomy_harness(
+        _request(aircraft_ready=False, map_ready=False),
+        credential_issues=([], []),
+    )
 
     assert result.status == "needs_assets"
     assert result.planning_ready is False
@@ -74,7 +88,10 @@ def test_harness_blocks_planning_when_assets_are_not_qualified() -> None:
 
 
 def test_harness_exposes_planning_tools_only_after_asset_gates_pass() -> None:
-    result = inspect_autonomy_harness(_request(aircraft_ready=True, map_ready=True))
+    result = inspect_autonomy_harness(
+        _request(aircraft_ready=True, map_ready=True),
+        credential_issues=([], []),
+    )
 
     assert result.status == "draft"
     assert result.planning_ready is True
@@ -85,11 +102,25 @@ def test_harness_exposes_planning_tools_only_after_asset_gates_pass() -> None:
 
 
 def test_harness_context_hash_is_deterministic_and_prompt_has_no_actuator_authority() -> None:
-    first = inspect_autonomy_harness(_request(aircraft_ready=True, map_ready=True))
-    second = inspect_autonomy_harness(_request(aircraft_ready=True, map_ready=True))
+    first = inspect_autonomy_harness(
+        _request(aircraft_ready=True, map_ready=True),
+        credential_issues=([], []),
+    )
+    second = inspect_autonomy_harness(
+        _request(aircraft_ready=True, map_ready=True),
+        credential_issues=([], []),
+    )
 
     assert first.context_sha256 == second.context_sha256
     assert len(first.context_sha256) == 64
     assert "Never emit" in AUTONOMY_SYSTEM_PROMPT
     assert "actuator" in AUTONOMY_SYSTEM_PROMPT
     assert all(definition["read_only"] for definition in autonomy_tool_registry().values())
+
+
+def test_harness_fails_closed_without_authoritative_credential_registry() -> None:
+    result = inspect_autonomy_harness(_request(aircraft_ready=True, map_ready=True))
+
+    assert result.planning_ready is False
+    assert "aircraft.qualification-registry.unavailable" in result.blockers
+    assert "map.qualification-registry.unavailable" in result.blockers

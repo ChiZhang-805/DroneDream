@@ -28,6 +28,7 @@ import { Link } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
+import { autonomyHarnessRequest } from "../features/autonomy/missionHarness";
 import { AutonomyWorld3D } from "../features/autonomy/AutonomyWorld3D";
 import {
   autonomyAircraftRadiusM,
@@ -668,6 +669,7 @@ export function AutonomyLab({
   const [compileSource, setCompileSource] = useState<"backend" | "preview">("preview");
   const [compileError, setCompileError] = useState<string | null>(null);
   const compileGeneration = useRef(0);
+  const authorizedCompileRequest = useRef<AutonomyCompileRequest | null>(null);
   const [planned, setPlanned] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [running, setRunning] = useState(false);
@@ -718,6 +720,7 @@ export function AutonomyLab({
     setTarget(defaultTarget(edition));
     setCompileResult(null);
     setPlanned(false);
+    authorizedCompileRequest.current = null;
   }, [edition]);
 
   const missions = useMemo(() => Object.values(BASE_MISSIONS).map((base) => ({
@@ -727,10 +730,18 @@ export function AutonomyLab({
   const mission = missions.find(({ id }) => id === missionId) ?? missions[0];
   const hasWorkspace = workspace !== undefined;
   const workspaceCompilerSceneId = workspace?.mapPack.compilerSceneId;
-  const workspaceMapQualified = !hasWorkspace
-    || (workspace?.mapPack.calibrated === true && Boolean(workspaceCompilerSceneId));
-  const workspaceAircraftQualified = !workspace
-    || isAutonomyAircraftProfileValid(workspace.aircraft);
+  const workspaceMapQualified = Boolean(workspace)
+    && workspace?.mapPack.status === "qualified"
+    && workspace.mapPack.calibrated
+    && Boolean(workspaceCompilerSceneId)
+    && Boolean(workspace.mapPack.contentHash)
+    && Boolean(workspace.mapPack.qualificationReceiptId);
+  const workspaceAircraftQualified = workspace
+    ? isAutonomyAircraftProfileValid(workspace.aircraft)
+      && ["validated-unsigned", "signed"].includes(workspace.aircraft.status)
+      && Boolean(workspace.aircraft.qualificationReceiptId)
+      && Boolean(workspace.aircraft.qualificationContentHash)
+    : false;
   const compileRequest = useMemo<AutonomyCompileRequest>(() => ({
     edition,
     execution_target: target,
@@ -749,6 +760,7 @@ export function AutonomyLab({
       geofence_ready: false,
       battery_ready: false,
     },
+    asset_context: null,
   }), [chinese, command, edition, hasWorkspace, missionId, perception, pickupPayloadKg, target, workspace, workspaceCompilerSceneId, workspaceVehicle]);
   const latestCompileRequest = useRef(compileRequest);
   latestCompileRequest.current = compileRequest;
@@ -926,6 +938,7 @@ export function AutonomyLab({
     setComplete(false);
     setProgress(0);
     setRuntimeSession(null);
+    authorizedCompileRequest.current = null;
     runtimeRequestId.current = null;
     runtimeSequence.current = 0;
     runtimeTerminalSent.current = false;
@@ -966,7 +979,8 @@ export function AutonomyLab({
       return;
     }
     const generation = ++compileGeneration.current;
-    const submittedRequest = compileRequest;
+    const sourceRequest = compileRequest;
+    let submittedRequest = sourceRequest;
     previewRunId.current = null;
     evidenceReported.current = false;
     setPlanning(true);
@@ -982,23 +996,42 @@ export function AutonomyLab({
         result = createLocalAutonomyPreview(missionId, submittedRequest);
         source = "preview";
       } else {
+        if (!workspace) throw new Error("Qualified autonomy workspace required.");
+        const harnessRequest = autonomyHarnessRequest(
+          edition,
+          workspace,
+          submittedRequest.natural_language,
+        );
+        const inspection = await apiClient.inspectAutonomyHarness(harnessRequest);
+        if (!inspection.planning_ready) throw new Error("Autonomy asset gate blocked.");
+        submittedRequest = {
+          ...submittedRequest,
+          asset_context: {
+            schema_version: "dronedream.autonomy.compile-assets.v1",
+            harness_context_sha256: inspection.context_sha256,
+            aircraft: harnessRequest.aircraft,
+            map_pack: harnessRequest.map_pack,
+          },
+        };
         result = await apiClient.compileAutonomyMission(submittedRequest);
         source = "backend";
       }
       if (
         generation !== compileGeneration.current
-        || latestCompileRequest.current !== submittedRequest
+        || latestCompileRequest.current !== sourceRequest
       ) return;
       setCompileResult(result);
       setCompileSource(source);
+      authorizedCompileRequest.current = submittedRequest;
       setPlanned(true);
       appendEvent(copy.events.planned);
     } catch {
       if (
         generation !== compileGeneration.current
-        || latestCompileRequest.current !== submittedRequest
+        || latestCompileRequest.current !== sourceRequest
       ) return;
       setCompileResult(null);
+      authorizedCompileRequest.current = null;
       setCompileSource("preview");
       setCompileError(copy.compileFailed);
       setPlanned(false);
@@ -1017,8 +1050,10 @@ export function AutonomyLab({
         setLaunching(true);
         try {
           runtimeRequestId.current ??= crypto.randomUUID();
+          const runtimeMission = authorizedCompileRequest.current;
+          if (!runtimeMission) throw new Error("Qualified mission contract required.");
           const created = await apiClient.createAutonomyRuntimeSession(
-            compileRequest,
+            runtimeMission,
             runtimeRequestId.current,
           );
           const sequence = ++runtimeSequence.current;

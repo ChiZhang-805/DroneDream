@@ -108,6 +108,8 @@ import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type {
+  AutonomyBundledMapManifest,
+  AutonomyCompileAssetContext,
   AutonomyCompileRequest,
   AutonomyCompileResponse,
   AutonomyHarnessInspectResponse,
@@ -249,7 +251,7 @@ function compileRequestForWorkspace(
   edition: BrandEditionId,
   workspace: AutonomyWorkspaceState,
   intent: string,
-  planningBrief: string,
+  assetContext: AutonomyCompileAssetContext,
 ): AutonomyCompileRequest {
   const visualSensors = workspace.aircraft.sensors.some((sensor) => (
     sensor === "rgb"
@@ -258,13 +260,11 @@ function compileRequestForWorkspace(
     || sensor === "thermal"
     || sensor === "vio"
   ));
-  const mapReady = workspace.mapPack.calibrated && Boolean(workspace.mapPack.compilerSceneId);
+  const mapReady = autonomyMapPackQualified(workspace.mapPack);
   return {
     edition,
     execution_target: "simulation",
-    natural_language: planningBrief
-      ? `${intent}\n\nPlanning brief: ${planningBrief}`.slice(0, 2_000)
-      : intent,
+    natural_language: intent,
     scene_id: inferredSceneId(intent, workspace.mapPack),
     perception_mode: visualSensors && mapReady ? "fusion" : visualSensors ? "vision" : "map",
     vehicle: {
@@ -287,6 +287,7 @@ function compileRequestForWorkspace(
       geofence_ready: false,
       battery_ready: false,
     },
+    asset_context: assetContext,
   };
 }
 
@@ -333,7 +334,7 @@ function missionPlanSnapshot(
   source: AutonomyMissionPlanSnapshot["source"],
 ): AutonomyMissionPlanSnapshot {
   const aircraftReady = isAutonomyAircraftProfileValid(workspace.aircraft);
-  const mapReady = workspace.mapPack.calibrated && Boolean(workspace.mapPack.compilerSceneId);
+  const mapReady = autonomyMapPackQualified(workspace.mapPack);
   const assetIssues: AutonomyMissionPlanSnapshot["issues"] = [
     ...(!aircraftReady ? [{
       code: "asset.aircraft.not-qualified",
@@ -347,15 +348,16 @@ function missionPlanSnapshot(
     }] : []),
   ];
   const assetsReady = aircraftReady && mapReady;
+  const authoritative = source === "backend";
   return {
     schemaVersion: 1,
     source,
     contractId: response.contract.contract_id,
     sceneId: response.scene.id,
     sceneName: response.scene.name,
-    feasible: response.feasible && assetsReady,
-    readiness: assetsReady ? response.execution_policy.readiness : "denied",
-    canExecute: assetsReady && response.execution_policy.can_execute,
+    feasible: response.feasible && assetsReady && authoritative,
+    readiness: assetsReady && authoritative ? response.execution_policy.readiness : "denied",
+    canExecute: assetsReady && authoritative && response.execution_policy.can_execute,
     perceptionMode: response.contract.perception_mode,
     steps: response.contract.steps.map((step) => ({
       order: step.order,
@@ -863,7 +865,17 @@ export function AutonomyOverview() {
         }));
         return;
       }
-      const compileRequest = compileRequestForWorkspace(edition, missionWorkspace, revisedIntent, planningBrief);
+      const compileRequest = compileRequestForWorkspace(
+        edition,
+        missionWorkspace,
+        revisedIntent,
+        {
+          schema_version: "dronedream.autonomy.compile-assets.v1",
+          harness_context_sha256: harnessInspection.context_sha256,
+          aircraft: harnessRequest.aircraft,
+          map_pack: harnessRequest.map_pack,
+        },
+      );
       const localMissionId = missionIdForScene(compileRequest.scene_id);
       let compileResult: AutonomyCompileResponse;
       let compileSource: AutonomyMissionPlanSnapshot["source"];
@@ -1160,7 +1172,13 @@ export function AutonomyAircraft() {
     setQualificationState("idle");
   };
   const updateAircraft = (patch: Partial<AutonomyAircraftProfile>) => {
-    setForm((current) => ({ ...current, ...patch, status: "draft", qualificationReceiptId: null }));
+    setForm((current) => ({
+      ...current,
+      ...patch,
+      status: "draft",
+      qualificationReceiptId: null,
+      qualificationContentHash: null,
+    }));
     setSaved(false);
   };
   const numberField = (key: keyof AutonomyAircraftProfile, value: string) => {
@@ -1177,6 +1195,7 @@ export function AutonomyAircraft() {
       version: Math.max(workspace.aircraft.version + 1, form.version),
       status: "draft" as const,
       qualificationReceiptId: null,
+      qualificationContentHash: null,
       updatedAt: new Date().toISOString(),
     };
     persist(updatedWorkspace(workspace, {
@@ -1190,6 +1209,7 @@ export function AutonomyAircraft() {
       ...current,
       status: "draft",
       qualificationReceiptId: null,
+      qualificationContentHash: null,
       sensors: current.sensors.includes(sensor)
         ? current.sensors.filter((item) => item !== sensor)
         : [...current.sensors, sensor],
@@ -1213,6 +1233,7 @@ export function AutonomyAircraft() {
       ...current,
       status: "draft",
       qualificationReceiptId: null,
+      qualificationContentHash: null,
       sensorMounts: current.sensorMounts.map((sensor) => sensor.id === id ? { ...sensor, ...patch } : sensor),
     }));
     setSaved(false);
@@ -1267,6 +1288,7 @@ export function AutonomyAircraft() {
         ...form,
         status: receipt.status === "validated_unsigned" ? "validated-unsigned" as const : "draft" as const,
         qualificationReceiptId: receipt.receipt_id,
+        qualificationContentHash: receipt.status === "validated_unsigned" ? receipt.content_sha256 : null,
         updatedAt: new Date().toISOString(),
       };
       setForm(next);
@@ -1407,30 +1429,51 @@ const PLANNING_LAYER_LABELS: Record<AutonomyMapPack["planningLayers"][number], s
   confidence: "Confidence",
 };
 
-const BUILTIN_MAP_SCENE_MANIFESTS: Record<
+const FALLBACK_MAP_SCENE_MANIFESTS: Record<
   NonNullable<AutonomyMapPack["compilerSceneId"]>,
-  Pick<AutonomyMapPack, "name" | "boundsM" | "floorCount" | "semanticLayers" | "planningLayers">
+  AutonomyBundledMapManifest
 > = {
   "stairwell-coffee-return": {
+    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
+    compiler_scene_id: "stairwell-coffee-return",
     name: "Building stairwell · pickup · return",
-    boundsM: { x: 42, y: 28, z: 11 },
-    floorCount: 3,
-    semanticLayers: ["free-space", "stairs", "doors", "people", "pickup-zones"],
-    planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+    representation: "hybrid-3d",
+    coordinate_frame: "ENU",
+    resolution_m: 0.1,
+    bounds_m: { x: 42, y: 28, z: 11 },
+    floor_count: 3,
+    confidence_percent: 100,
+    semantic_layers: ["free-space", "stairs", "doors", "people", "pickup-zones"],
+    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+    manifest_sha256: "0".repeat(64),
   },
   "forest-gate-inspection": {
+    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
+    compiler_scene_id: "forest-gate-inspection",
     name: "Forest circular-gate inspection",
-    boundsM: { x: 48, y: 24, z: 8 },
-    floorCount: 1,
-    semanticLayers: ["free-space", "gates", "people"],
-    planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+    representation: "hybrid-3d",
+    coordinate_frame: "ENU",
+    resolution_m: 0.1,
+    bounds_m: { x: 48, y: 24, z: 8 },
+    floor_count: 1,
+    confidence_percent: 100,
+    semantic_layers: ["free-space", "gates", "people"],
+    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+    manifest_sha256: "0".repeat(64),
   },
   "service-corridor-dock": {
+    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
+    compiler_scene_id: "service-corridor-dock",
     name: "Service corridor · autonomous dock",
-    boundsM: { x: 34, y: 18, z: 5 },
-    floorCount: 1,
-    semanticLayers: ["free-space", "doors", "people"],
-    planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+    representation: "hybrid-3d",
+    coordinate_frame: "ENU",
+    resolution_m: 0.1,
+    bounds_m: { x: 34, y: 18, z: 5 },
+    floor_count: 1,
+    confidence_percent: 100,
+    semantic_layers: ["free-space", "doors", "people"],
+    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+    manifest_sha256: "0".repeat(64),
   },
 };
 
@@ -1453,11 +1496,27 @@ export function AutonomyMaps() {
   const [saved, setSaved] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [qualificationState, setQualificationState] = useState<"idle" | "working" | "qualified" | "blocked" | "unavailable">("idle");
+  const [sceneManifests, setSceneManifests] = useState(FALLBACK_MAP_SCENE_MANIFESTS);
   useEffect(() => {
     setForm(workspace.mapPack);
     setSaved(true);
     setQualificationState(autonomyMapPackQualified(workspace.mapPack) ? "qualified" : "idle");
   }, [workspace.mapPack]);
+  useEffect(() => {
+    if (publicDemoConsole) return;
+    let active = true;
+    void apiClient.listAutonomyScenes().then((catalog) => {
+      if (!active) return;
+      const next = { ...FALLBACK_MAP_SCENE_MANIFESTS };
+      for (const item of catalog.items) {
+        if (Object.hasOwn(next, item.id)) {
+          next[item.id as keyof typeof next] = item.map_pack_manifest;
+        }
+      }
+      setSceneManifests(next);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   const ready = autonomyMapPackQualified(form);
   const createMap = () => {
     const updatedAt = new Date().toISOString();
@@ -1528,7 +1587,7 @@ export function AutonomyMaps() {
     event.preventDefault();
     const next = {
       ...form,
-      version: Math.max(workspace.mapPack.version + 1, form.version),
+      version: saved ? form.version : Math.max(workspace.mapPack.version + 1, form.version),
       status: ready
         ? "qualified" as const
         : form.sourceFiles.length && form.sourceFiles.every((file) => file.admission === "admitted")
@@ -1586,7 +1645,7 @@ export function AutonomyMaps() {
   };
   const selectCompilerScene = (value: string) => {
     const compilerSceneId = value ? value as NonNullable<AutonomyMapPack["compilerSceneId"]> : null;
-    const manifest = compilerSceneId ? BUILTIN_MAP_SCENE_MANIFESTS[compilerSceneId] : null;
+    const manifest = compilerSceneId ? sceneManifests[compilerSceneId] : null;
     setForm((current) => ({
       ...current,
       name: manifest && current.name === "Unconfigured environment"
@@ -1597,14 +1656,14 @@ export function AutonomyMaps() {
       qualificationReceiptId: null,
       calibrated: false,
       compilerSceneId,
-      representation: manifest ? "hybrid-3d" : current.representation,
-      coordinateFrame: manifest ? "ENU" : current.coordinateFrame,
-      resolutionM: manifest ? 0.1 : current.resolutionM,
-      floorCount: manifest?.floorCount ?? current.floorCount,
-      boundsM: manifest?.boundsM ?? current.boundsM,
-      confidencePercent: manifest ? 100 : current.confidencePercent,
-      semanticLayers: manifest?.semanticLayers ?? current.semanticLayers,
-      planningLayers: manifest?.planningLayers ?? current.planningLayers,
+      representation: manifest?.representation ?? current.representation,
+      coordinateFrame: manifest?.coordinate_frame ?? current.coordinateFrame,
+      resolutionM: manifest?.resolution_m ?? current.resolutionM,
+      floorCount: manifest?.floor_count ?? current.floorCount,
+      boundsM: manifest?.bounds_m ?? current.boundsM,
+      confidencePercent: manifest?.confidence_percent ?? current.confidencePercent,
+      semanticLayers: manifest?.semantic_layers ?? current.semanticLayers,
+      planningLayers: manifest?.planning_layers ?? current.planningLayers,
     }));
     setSaved(false);
     setQualificationState("idle");
@@ -1637,6 +1696,7 @@ export function AutonomyMaps() {
     try {
       const receipt = await apiClient.qualifyAutonomyMapPack({
         schema_version: "dronedream.autonomy.map-pack-qualification.v1",
+        name: form.name,
         pack_id: form.id,
         version: form.version,
         compiler_scene_id: form.compilerSceneId,
@@ -1645,6 +1705,12 @@ export function AutonomyMaps() {
         resolution_m: form.resolutionM,
         floor_count: form.floorCount,
         bounds_m: form.boundsM,
+        origin: {
+          latitude: form.origin.latitude,
+          longitude: form.origin.longitude,
+          altitude_m: form.origin.altitudeM,
+        },
+        live_updates: form.liveUpdates,
         calibrated: form.calibrated,
         confidence_percent: form.confidencePercent,
         semantic_layers: form.semanticLayers,
@@ -1689,7 +1755,7 @@ export function AutonomyMaps() {
             <label><span>{chinese ? "原点纬度" : "Origin latitude"}</span><input type="number" min="-90" max="90" step="0.000001" placeholder={chinese ? "本地坐标可留空" : "Optional for local frames"} value={form.origin.latitude ?? ""} onChange={(event) => updateGeometry({ origin: { ...form.origin, latitude: event.target.value === "" ? null : Number(event.target.value) } })} /></label>
             <label><span>{chinese ? "原点经度" : "Origin longitude"}</span><input type="number" min="-180" max="180" step="0.000001" placeholder={chinese ? "本地坐标可留空" : "Optional for local frames"} value={form.origin.longitude ?? ""} onChange={(event) => updateGeometry({ origin: { ...form.origin, longitude: event.target.value === "" ? null : Number(event.target.value) } })} /></label>
             <label><span>{chinese ? "原点海拔 (m)" : "Origin altitude (m)"}</span><input type="number" step="0.1" value={form.origin.altitudeM ?? ""} onChange={(event) => updateGeometry({ origin: { ...form.origin, altitudeM: event.target.value === "" ? null : Number(event.target.value) } })} /></label>
-            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select disabled={form.sourceFiles.length > 0} value={form.compilerSceneId ?? ""} onChange={(event) => selectCompilerScene(event.target.value)}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
+            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select disabled={form.sourceFiles.length > 0} value={form.compilerSceneId ?? ""} onChange={(event) => selectCompilerScene(event.target.value)}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option>{Object.entries(sceneManifests).map(([sceneId, manifest]) => <option value={sceneId} key={sceneId}>{manifest.name}</option>)}</select></label>
              <label className="autonomy-check-control"><input type="checkbox" disabled={form.sourceFiles.length > 0 || !form.compilerSceneId} checked={form.calibrated} onChange={(event) => updateMap({ calibrated: event.target.checked })} /><span>{chinese ? "确认使用内置场景的固定比例与 ENU 坐标" : "Confirm the bundled scene's fixed scale and ENU frame"}</span></label>
           </div>
         </section>
@@ -1732,8 +1798,8 @@ export function AutonomyMaps() {
         <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "Map Pack 版本" : "Map Pack version"} value={`v${form.version}`} />
         <Metric icon={<Database aria-hidden="true" />} label={chinese ? "资产准入" : "Asset admission"} value={form.status.toUpperCase()} />
         <Metric icon={<Gauge aria-hidden="true" />} label={chinese ? "地图可信度" : "Map confidence"} value={`${form.confidencePercent.toFixed(0)}%`} />
-        <button className="btn btn-primary" type="submit"><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存 Map Pack" : "Save Map Pack")}</button>
-        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
+        <button className="btn btn-primary" type="submit" disabled={saved}><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存 Map Pack" : "Save Map Pack")}</button>
+        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
         {qualificationState === "blocked" ? <p className="autonomy-config-error">{chinese ? "地图配置与内置场景清单不一致，或导入资产仍缺少几何重建凭据。" : "The map configuration differs from the bundled manifest, or imported assets still lack a reconstruction receipt."}</p> : null}
         {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "当前控制台无法签发地图资格凭据。请连接 DroneDream 后端后重试。" : "This console cannot issue a map qualification receipt. Connect the DroneDream backend and retry."}</p> : null}
         <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.mapPack.updatedAt)}</small>

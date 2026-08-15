@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Literal
 
 from app.autonomy.models import RoutePoint, TerrainObject, TerrainScene, Vector3
@@ -31,51 +33,80 @@ SCENES: dict[str, TerrainScene] = {
         tags=["stairs", "indoor-outdoor", "trees", "signs", "payload", "return"],
         objects=[
             TerrainObject(
-                id="office-block", kind="building", center=Vector3(x=6, y=14, z=5.5),
+                id="office-block",
+                kind="building",
+                center=Vector3(x=6, y=14, z=5.5),
                 size=Vector3(x=10, y=24, z=11),
             ),
             TerrainObject(
-                id="stairwell", kind="stairwell", center=Vector3(x=14, y=10, z=5.5),
-                size=Vector3(x=5, y=8, z=11), traversable=True,
+                id="stairwell",
+                kind="stairwell",
+                center=Vector3(x=14, y=10, z=5.5),
+                size=Vector3(x=5, y=8, z=11),
+                traversable=True,
                 required_clearance_m=0.55,
             ),
             TerrainObject(
-                id="courtyard-building", kind="building", center=Vector3(x=31, y=23, z=5),
+                id="courtyard-building",
+                kind="building",
+                center=Vector3(x=31, y=23, z=5),
                 size=Vector3(x=17, y=7, z=10),
             ),
             TerrainObject(
-                id="tree-a", kind="tree", center=Vector3(x=24, y=8, z=3.5),
+                id="tree-a",
+                kind="tree",
+                center=Vector3(x=24, y=8, z=3.5),
                 size=Vector3(x=2.2, y=2.2, z=7),
             ),
             TerrainObject(
-                id="tree-b", kind="tree", center=Vector3(x=33, y=9, z=3.0),
+                id="tree-b",
+                kind="tree",
+                center=Vector3(x=33, y=9, z=3.0),
                 size=Vector3(x=2.0, y=2.0, z=6),
             ),
             TerrainObject(
-                id="sign-a", kind="sign", center=Vector3(x=27, y=15, z=1.3),
+                id="sign-a",
+                kind="sign",
+                center=Vector3(x=27, y=15, z=1.3),
                 size=Vector3(x=2.4, y=0.4, z=2.6),
             ),
             TerrainObject(
-                id="pole-a", kind="pole", center=Vector3(x=36, y=14, z=2.5),
+                id="pole-a",
+                kind="pole",
+                center=Vector3(x=36, y=14, z=2.5),
                 size=Vector3(x=0.5, y=0.5, z=5),
             ),
             TerrainObject(
-                id="coffee-dock", kind="pickup", center=Vector3(x=39, y=5, z=1.2),
-                size=Vector3(x=1.4, y=1.4, z=1.2), traversable=True,
+                id="coffee-dock",
+                kind="pickup",
+                center=Vector3(x=39, y=5, z=1.2),
+                size=Vector3(x=1.4, y=1.4, z=1.2),
+                traversable=True,
             ),
         ],
         reference_path=[
-            _p(3, 13, 8.6, "launch", 0.8), _p(8, 13, 8.6, "transit"),
-            _p(12, 12, 8.4, "transit"), _p(14, 12, 7.2, "stairs", 0.7),
-            _p(16, 10, 5.7, "stairs", 0.65), _p(14, 8, 4.3, "stairs", 0.65),
-            _p(16, 6, 2.8, "stairs", 0.65), _p(18, 5, 1.5, "stairs", 0.7),
-            _p(22, 4, 1.6, "transit"), _p(28, 4, 1.9, "transit"),
-            _p(34, 4, 1.8, "transit"), _p(39, 5, 1.2, "pickup", 0.45),
-            _p(35, 6, 1.8, "return", 1.0), _p(29, 6, 2.0, "return"),
-            _p(22, 5, 1.6, "return"), _p(18, 5, 1.5, "return", 0.8),
-            _p(16, 6, 2.8, "stairs", 0.6), _p(14, 8, 4.3, "stairs", 0.6),
-            _p(16, 10, 5.7, "stairs", 0.6), _p(14, 12, 7.2, "stairs", 0.6),
-            _p(12, 12, 8.4, "return", 0.9), _p(8, 13, 8.6, "return", 0.8),
+            _p(3, 13, 8.6, "launch", 0.8),
+            _p(8, 13, 8.6, "transit"),
+            _p(12, 12, 8.4, "transit"),
+            _p(14, 12, 7.2, "stairs", 0.7),
+            _p(16, 10, 5.7, "stairs", 0.65),
+            _p(14, 8, 4.3, "stairs", 0.65),
+            _p(16, 6, 2.8, "stairs", 0.65),
+            _p(18, 5, 1.5, "stairs", 0.7),
+            _p(22, 4, 1.6, "transit"),
+            _p(28, 4, 1.9, "transit"),
+            _p(34, 4, 1.8, "transit"),
+            _p(39, 5, 1.2, "pickup", 0.45),
+            _p(35, 6, 1.8, "return", 1.0),
+            _p(29, 6, 2.0, "return"),
+            _p(22, 5, 1.6, "return"),
+            _p(18, 5, 1.5, "return", 0.8),
+            _p(16, 6, 2.8, "stairs", 0.6),
+            _p(14, 8, 4.3, "stairs", 0.6),
+            _p(16, 10, 5.7, "stairs", 0.6),
+            _p(14, 12, 7.2, "stairs", 0.6),
+            _p(12, 12, 8.4, "return", 0.9),
+            _p(8, 13, 8.6, "return", 0.8),
             _p(3, 13, 8.4, "land", 0.4),
         ],
     ),
@@ -86,42 +117,63 @@ SCENES: dict[str, TerrainScene] = {
             "Unknown vegetation corridor with three centered gates, poles and a final "
             "inspection hover."
         ),
-        bounds_m=Vector3(x=48, y=24, z=8), floors=1, minimum_clearance_m=1.15,
+        bounds_m=Vector3(x=48, y=24, z=8),
+        floors=1,
+        minimum_clearance_m=1.15,
         tags=["vision", "gates", "trees", "unknown-space"],
         objects=[
             TerrainObject(
-                id="tree-1", kind="tree", center=Vector3(x=12, y=6, z=3),
+                id="tree-1",
+                kind="tree",
+                center=Vector3(x=12, y=6, z=3),
                 size=Vector3(x=2, y=2, z=6),
             ),
             TerrainObject(
-                id="tree-2", kind="tree", center=Vector3(x=21, y=17, z=3.5),
+                id="tree-2",
+                kind="tree",
+                center=Vector3(x=21, y=17, z=3.5),
                 size=Vector3(x=2.4, y=2.4, z=7),
             ),
             TerrainObject(
-                id="tree-3", kind="tree", center=Vector3(x=34, y=7, z=3),
+                id="tree-3",
+                kind="tree",
+                center=Vector3(x=34, y=7, z=3),
                 size=Vector3(x=2, y=2, z=6),
             ),
             TerrainObject(
-                id="gate-1", kind="gate", center=Vector3(x=15, y=12, z=2.4),
-                size=Vector3(x=0.4, y=3.4, z=3.4), traversable=True,
+                id="gate-1",
+                kind="gate",
+                center=Vector3(x=15, y=12, z=2.4),
+                size=Vector3(x=0.4, y=3.4, z=3.4),
+                traversable=True,
                 required_clearance_m=0.45,
             ),
             TerrainObject(
-                id="gate-2", kind="gate", center=Vector3(x=27, y=12, z=2.8),
-                size=Vector3(x=0.4, y=3.6, z=3.6), traversable=True,
+                id="gate-2",
+                kind="gate",
+                center=Vector3(x=27, y=12, z=2.8),
+                size=Vector3(x=0.4, y=3.6, z=3.6),
+                traversable=True,
                 required_clearance_m=0.5,
             ),
             TerrainObject(
-                id="gate-3", kind="gate", center=Vector3(x=39, y=12, z=2.3),
-                size=Vector3(x=0.4, y=3.2, z=3.2), traversable=True,
+                id="gate-3",
+                kind="gate",
+                center=Vector3(x=39, y=12, z=2.3),
+                size=Vector3(x=0.4, y=3.2, z=3.2),
+                traversable=True,
                 required_clearance_m=0.42,
             ),
         ],
         reference_path=[
-            _p(3, 12, 1.2, "launch", 0.8), _p(9, 12, 2.2, "transit"),
-            _p(15, 12, 2.4, "gate", 0.9), _p(21, 12, 2.6, "transit"),
-            _p(27, 12, 2.8, "gate", 0.9), _p(33, 12, 2.5, "transit"),
-            _p(39, 12, 2.3, "gate", 0.9), _p(45, 12, 2.0, "land", 0.5),
+            _p(3, 12, 1.2, "launch", 0.8),
+            _p(9, 12, 2.2, "transit"),
+            _p(15, 12, 2.4, "gate", 0.9),
+            _p(21, 12, 2.6, "transit"),
+            _p(27, 12, 2.8, "gate", 0.9),
+            _p(33, 12, 2.5, "transit"),
+            _p(39, 12, 2.3, "gate", 0.9),
+            _p(45, 12, 2.0, "land", 0.5),
         ],
     ),
     "service-corridor-dock": TerrainScene(
@@ -131,33 +183,127 @@ SCENES: dict[str, TerrainScene] = {
             "Confined indoor corridor with vertical signs, blind corners and a precision "
             "docking target."
         ),
-        bounds_m=Vector3(x=34, y=18, z=5), floors=1, minimum_clearance_m=0.78,
+        bounds_m=Vector3(x=34, y=18, z=5),
+        floors=1,
+        minimum_clearance_m=0.78,
         tags=["narrow", "indoor", "blind-corner", "docking"],
         objects=[
             TerrainObject(
-                id="wall-a", kind="wall", center=Vector3(x=10, y=4, z=2.5),
+                id="wall-a",
+                kind="wall",
+                center=Vector3(x=10, y=4, z=2.5),
                 size=Vector3(x=14, y=0.4, z=5),
             ),
             TerrainObject(
-                id="wall-b", kind="wall", center=Vector3(x=18, y=14, z=2.5),
+                id="wall-b",
+                kind="wall",
+                center=Vector3(x=18, y=14, z=2.5),
                 size=Vector3(x=18, y=0.4, z=5),
             ),
             TerrainObject(
-                id="sign-b", kind="sign", center=Vector3(x=19, y=8, z=1.4),
+                id="sign-b",
+                kind="sign",
+                center=Vector3(x=19, y=8, z=1.4),
                 size=Vector3(x=0.4, y=2.2, z=2.8),
             ),
             TerrainObject(
-                id="dock", kind="landing", center=Vector3(x=31, y=10, z=0.5),
-                size=Vector3(x=1.6, y=1.6, z=0.3), traversable=True,
+                id="dock",
+                kind="landing",
+                center=Vector3(x=31, y=10, z=0.5),
+                size=Vector3(x=1.6, y=1.6, z=0.3),
+                traversable=True,
             ),
         ],
         reference_path=[
-            _p(3, 9, 1.3, "launch", 0.7), _p(8, 9, 1.6, "transit", 1.0),
-            _p(14, 9, 1.7, "transit", 0.9), _p(19, 11, 1.6, "transit", 0.75),
-            _p(25, 11, 1.4, "transit", 0.9), _p(31, 10, 0.6, "land", 0.4),
+            _p(3, 9, 1.3, "launch", 0.7),
+            _p(8, 9, 1.6, "transit", 1.0),
+            _p(14, 9, 1.7, "transit", 0.9),
+            _p(19, 11, 1.6, "transit", 0.75),
+            _p(25, 11, 1.4, "transit", 0.9),
+            _p(31, 10, 0.6, "land", 0.4),
         ],
     ),
 }
+
+
+# The server owns the planning contract for every bundled scene.  Frontends may
+# render these values, but they must never invent or independently qualify them.
+_BUNDLED_MAP_PROFILES: dict[str, dict[str, object]] = {
+    "stairwell-coffee-return": {
+        "representation": "hybrid-3d",
+        "coordinate_frame": "ENU",
+        "resolution_m": 0.1,
+        "confidence_percent": 100.0,
+        "semantic_layers": ["free-space", "stairs", "doors", "people", "pickup-zones"],
+        "planning_layers": [
+            "collision-geometry",
+            "occupancy",
+            "esdf",
+            "dynamic-overlay",
+            "confidence",
+        ],
+    },
+    "forest-gate-inspection": {
+        "representation": "hybrid-3d",
+        "coordinate_frame": "ENU",
+        "resolution_m": 0.1,
+        "confidence_percent": 100.0,
+        "semantic_layers": ["free-space", "gates", "people"],
+        "planning_layers": [
+            "collision-geometry",
+            "occupancy",
+            "esdf",
+            "dynamic-overlay",
+            "confidence",
+        ],
+    },
+    "service-corridor-dock": {
+        "representation": "hybrid-3d",
+        "coordinate_frame": "ENU",
+        "resolution_m": 0.1,
+        "confidence_percent": 100.0,
+        "semantic_layers": ["free-space", "doors", "people"],
+        "planning_layers": [
+            "collision-geometry",
+            "occupancy",
+            "esdf",
+            "dynamic-overlay",
+            "confidence",
+        ],
+    },
+}
+
+
+def get_bundled_map_manifest(scene_id: str) -> dict[str, object] | None:
+    """Return the canonical, content-addressed Map Pack contract for one scene."""
+
+    scene = SCENES.get(scene_id)
+    profile = _BUNDLED_MAP_PROFILES.get(scene_id)
+    if scene is None or profile is None:
+        return None
+    canonical = {
+        "schema_version": "dronedream.autonomy.bundled-map-manifest.v1",
+        "compiler_scene_id": scene.id,
+        "scene": scene.model_dump(mode="json"),
+        "profile": profile,
+    }
+    digest = hashlib.sha256(
+        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return {
+        "schema_version": "dronedream.autonomy.bundled-map-manifest.v1",
+        "compiler_scene_id": scene.id,
+        "name": scene.name,
+        "representation": profile["representation"],
+        "coordinate_frame": profile["coordinate_frame"],
+        "resolution_m": profile["resolution_m"],
+        "floor_count": scene.floors,
+        "bounds_m": scene.bounds_m.model_dump(mode="json"),
+        "confidence_percent": profile["confidence_percent"],
+        "semantic_layers": list(profile["semantic_layers"]),
+        "planning_layers": list(profile["planning_layers"]),
+        "manifest_sha256": digest,
+    }
 
 
 def list_scenes() -> list[TerrainScene]:

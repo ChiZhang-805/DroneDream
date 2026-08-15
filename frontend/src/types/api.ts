@@ -1160,6 +1160,13 @@ export interface AutonomyHarnessInspectResponse {
   };
 }
 
+export interface AutonomyCompileAssetContext {
+  schema_version: "dronedream.autonomy.compile-assets.v1";
+  harness_context_sha256: string;
+  aircraft: AutonomyHarnessAsset;
+  map_pack: AutonomyHarnessAsset;
+}
+
 export interface AutonomyCompileRequest {
   edition: AutonomyEdition;
   execution_target: AutonomyExecutionTarget;
@@ -1168,6 +1175,7 @@ export interface AutonomyCompileRequest {
   perception_mode: AutonomyPerceptionMode;
   vehicle: AutonomyVehicleEnvelope;
   evidence: AutonomyRuntimeEvidence;
+  asset_context: AutonomyCompileAssetContext | null;
 }
 
 export interface AutonomyRoutePoint {
@@ -1464,6 +1472,7 @@ export interface AutonomyMapAssetAdmissionReceipt {
 
 export interface AutonomyMapPackQualificationRequest {
   schema_version: "dronedream.autonomy.map-pack-qualification.v1";
+  name: string;
   pack_id: string;
   version: number;
   compiler_scene_id: string;
@@ -1472,6 +1481,8 @@ export interface AutonomyMapPackQualificationRequest {
   resolution_m: number;
   floor_count: number;
   bounds_m: { x: number; y: number; z: number };
+  origin: { latitude: number | null; longitude: number | null; altitude_m: number | null };
+  live_updates: "vision-slam" | "depth-fusion" | "lidar-fusion" | "fixed";
   calibrated: boolean;
   confidence_percent: number;
   semantic_layers: Array<"free-space" | "stairs" | "doors" | "gates" | "people" | "pickup-zones">;
@@ -1486,6 +1497,7 @@ export interface AutonomyMapPackQualificationReceipt {
   version: number;
   status: "blocked" | "qualified";
   content_sha256: string;
+  manifest_sha256: string;
   compiler_scene_id: string;
   coordinate_frame: "ENU" | "NED" | "WGS84" | "building-local";
   resolution_m: number;
@@ -1494,6 +1506,30 @@ export interface AutonomyMapPackQualificationReceipt {
   issues: AutonomyQualificationIssue[];
   created_at: string;
   hardware_authority: false;
+}
+
+export interface AutonomyBundledMapManifest {
+  schema_version: "dronedream.autonomy.bundled-map-manifest.v1";
+  compiler_scene_id: string;
+  name: string;
+  representation: AutonomyMapPackQualificationRequest["representation"];
+  coordinate_frame: AutonomyMapPackQualificationRequest["coordinate_frame"];
+  resolution_m: number;
+  floor_count: number;
+  bounds_m: { x: number; y: number; z: number };
+  confidence_percent: number;
+  semantic_layers: AutonomyMapPackQualificationRequest["semantic_layers"];
+  planning_layers: AutonomyMapPackQualificationRequest["planning_layers"];
+  manifest_sha256: string;
+}
+
+export interface AutonomySceneCatalogResponse {
+  schema_version: "dronedream.autonomy.scene-catalog.v1";
+  items: Array<{
+    id: string;
+    name: string;
+    map_pack_manifest: AutonomyBundledMapManifest;
+  }>;
 }
 
 export type JobsCompareRequest = JobCompareRequest;

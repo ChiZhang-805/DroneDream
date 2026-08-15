@@ -28,10 +28,11 @@ describe("autonomy mission harness", () => {
     ]);
   });
 
-  it("exposes planning tools only after both selected assets are qualified", async () => {
+  it("requires the server registry even when local assets look qualified", async () => {
     const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
     workspace.aircraft.status = "signed";
     workspace.aircraft.qualificationReceiptId = "vehicle-receipt-1";
+    workspace.aircraft.qualificationContentHash = "b".repeat(64);
     workspace.mapPack.status = "qualified";
     workspace.mapPack.contentHash = "a".repeat(64);
     workspace.mapPack.qualificationReceiptId = "map-receipt-1";
@@ -44,11 +45,12 @@ describe("autonomy mission harness", () => {
 
     const inspection = await localAutonomyHarnessInspection(request);
 
-    expect(inspection.status).toBe("draft");
-    expect(inspection.planning_ready).toBe(true);
-    expect(inspection.blockers).toEqual([]);
-    expect(inspection.eligible_tool_ids).toContain("map.resolve_entity");
-    expect(inspection.eligible_tool_ids).toContain("mission.validate_plan");
+    expect(inspection.status).toBe("needs_assets");
+    expect(inspection.planning_ready).toBe(false);
+    expect(inspection.blockers).toContain("aircraft.qualification-registry.unavailable");
+    expect(inspection.blockers).toContain("map.qualification-registry.unavailable");
+    expect(inspection.eligible_tool_ids).not.toContain("map.resolve_entity");
+    expect(inspection.eligible_tool_ids).not.toContain("mission.validate_plan");
   });
 
   it("rejects planner output that weakens the safety or repair contract", () => {

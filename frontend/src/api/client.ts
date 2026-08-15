@@ -29,6 +29,7 @@ import type {
   AutonomyMapAssetAdmissionReceipt,
   AutonomyMapPackQualificationReceipt,
   AutonomyMapPackQualificationRequest,
+  AutonomySceneCatalogResponse,
   AutonomyVehiclePackQualificationReceipt,
   AutonomyVehiclePackQualificationRequest,
   BackendCapabilitiesResponse,
@@ -394,6 +395,10 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async listAutonomyScenes(): Promise<AutonomySceneCatalogResponse> {
+    return request<AutonomySceneCatalogResponse>("/autonomy/scenes");
+  },
+
   async compileAutonomyMission(
     req: AutonomyCompileRequest,
   ): Promise<AutonomyCompileResponse> {

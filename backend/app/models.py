@@ -18,10 +18,12 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -49,12 +51,8 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("usr"))
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    identity_provider: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, index=True
-    )
-    external_subject: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, index=True
-    )
+    identity_provider: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    external_subject: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -64,6 +62,49 @@ class User(Base):
 
     jobs: Mapped[list[Job]] = relationship(back_populates="user")
     batch_jobs: Mapped[list[BatchJob]] = relationship(back_populates="user")
+
+
+class AutonomyQualificationCredential(Base):
+    """Owner-scoped, revocable qualification evidence for autonomy assets."""
+
+    __tablename__ = "autonomy_qualification_credentials"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "asset_kind",
+            "asset_id",
+            "asset_version",
+            name="uq_autonomy_qualification_credentials_owner_asset_version",
+        ),
+        Index(
+            "uq_autonomy_qualification_credentials_active_asset",
+            "user_id",
+            "asset_kind",
+            "asset_id",
+            unique=True,
+            sqlite_where=text("revoked_at IS NULL"),
+            postgresql_where=text("revoked_at IS NULL"),
+        ),
+    )
+
+    receipt_id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    asset_kind: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    asset_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    asset_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    manifest_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    request_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    receipt_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
 
 class BatchJob(Base):
@@ -121,9 +162,7 @@ class Job(Base):
     parameter_catalog_version: Mapped[str] = mapped_column(
         String(128), nullable=False, default="builtin-v1"
     )
-    parameter_space_json: Mapped[list[dict[str, Any]] | None] = mapped_column(
-        JSON, nullable=True
-    )
+    parameter_space_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     objective_config_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     scenario_suite_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
@@ -139,9 +178,7 @@ class Job(Base):
     simulator_backend_requested: Mapped[str] = mapped_column(
         String(32), nullable=False, default="mock"
     )
-    optimizer_strategy: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="heuristic"
-    )
+    optimizer_strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="heuristic")
     max_iterations: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     trials_per_candidate: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     target_rmse: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -208,9 +245,7 @@ class CandidateParameterSet(Base):
     aggregated_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     aggregated_metric_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     proposal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    optimizer_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
+    optimizer_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     parent_candidate_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     llm_response_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     trial_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
