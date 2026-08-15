@@ -8,8 +8,8 @@ export type AutonomyMissionId = "coffee" | "gates" | "narrow";
 
 const SCENE_IDS: Record<AutonomyMissionId, string> = {
   coffee: "school-campus-v1",
-  gates: "forest-gate-inspection",
-  narrow: "service-corridor-dock",
+  gates: "school-campus-v1",
+  narrow: "school-campus-v1",
 };
 
 const SCENE_META: Record<AutonomyMissionId, {
@@ -35,26 +35,26 @@ const SCENE_META: Record<AutonomyMissionId, {
     duration: 186,
   },
   gates: {
-    name: "Forest gate inspection",
-    summary: "Unknown vegetation corridor with three centered gates and a final inspection hover.",
+    name: "School Map circular-gate course",
+    summary: "Campus road course with three centered training gates, trees, lights and live obstacle replanning.",
     floors: 1,
-    clearance: 1.15,
-    tags: ["vision", "gates", "trees", "unknown-space"],
-    objectKinds: ["tree", "tree", "tree", "gate", "gate", "gate"],
-    length: 43.2,
-    vertical: 3.4,
-    duration: 51,
+    clearance: 0.92,
+    tags: ["school", "vision", "gates", "roads", "trees", "people"],
+    objectKinds: ["road", "tree", "street-light", "gate", "gate", "gate", "building"],
+    length: 72.6,
+    vertical: 3.2,
+    duration: 78,
   },
   narrow: {
-    name: "Service corridor docking",
-    summary: "Confined corridor with vertical signs, blind corners and a precision docking target.",
-    floors: 1,
-    clearance: 0.78,
-    tags: ["narrow", "indoor", "blind-corner", "docking"],
-    objectKinds: ["wall", "wall", "sign", "landing"],
-    length: 30.6,
-    vertical: 1.8,
-    duration: 47,
+    name: "School Map stair-and-corridor passage",
+    summary: "Third-floor office, classroom corridor, 12+12 switchback stairs and a precision lobby landing.",
+    floors: 3,
+    clearance: 0.74,
+    tags: ["school", "narrow", "indoor", "stairs", "corridor", "doors", "landing"],
+    objectKinds: ["office", "corridor", "door", "stairwell", "wall", "landing"],
+    length: 61.4,
+    vertical: 8.2,
+    duration: 96,
   },
 };
 
@@ -120,14 +120,14 @@ function steps(missionId: AutonomyMissionId, pickupPayloadKg: number) {
     { order: 6, action: "land", label: "Land at the original launch point", payload_delta_kg: 0 },
   ];
   if (missionId === "gates") return [
-    { order: 1, action: "takeoff", label: "Launch into the vegetation corridor", payload_delta_kg: 0 },
-    { order: 2, action: "pass_gate", label: "Pass three gates through their geometric centers", payload_delta_kg: 0 },
-    { order: 3, action: "land", label: "Complete the inspection hover and land", payload_delta_kg: 0 },
+    { order: 1, action: "takeoff", label: "Launch from the School Map courtyard start pad", payload_delta_kg: 0 },
+    { order: 2, action: "pass_gate", label: "Follow the campus road and pass all three training gates through their geometric centers", payload_delta_kg: 0 },
+    { order: 3, action: "land", label: "Clear the final gate, verify the landing zone and land", payload_delta_kg: 0 },
   ];
   return [
-    { order: 1, action: "takeoff", label: "Launch in the service corridor", payload_delta_kg: 0 },
-    { order: 2, action: "transit", label: "Follow the narrow corridor around blind corners", payload_delta_kg: 0 },
-    { order: 3, action: "land", label: "Dock on the marked target", payload_delta_kg: 0 },
+    { order: 1, action: "takeoff", label: "Launch from the third-floor autonomy office", payload_delta_kg: 0 },
+    { order: 2, action: "transit", label: "Traverse the classroom corridor and both 12+12 switchback stair flights", payload_delta_kg: 0 },
+    { order: 3, action: "land", label: "Clear the lobby doorway and land on the marked indoor target", payload_delta_kg: 0 },
   ];
 }
 
@@ -394,7 +394,7 @@ export function createLocalAutonomyPreview(
       id: sceneId,
       name: meta.name,
       summary: meta.summary,
-      bounds_m: { x: missionId === "coffee" ? 120 : 48, y: missionId === "coffee" ? 90 : 28, z: missionId === "coffee" ? 12.6 : 8 },
+      bounds_m: { x: 120, y: 90, z: 12.6 },
       floors: meta.floors,
       minimum_clearance_m: meta.clearance,
       objects: objectList,

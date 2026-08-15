@@ -42,6 +42,7 @@ export const SCHOOL_MAP_CONTRACT = {
     externalDoors: 4,
     trees: 38,
     streetLights: 22,
+    trainingGates: 3,
     bicycleSpaces: 18,
     pickupZones: 1,
     launchZones: 1,
@@ -666,6 +667,55 @@ function addPickupZone(root: THREE.Group) {
   labelSprite(root, "TAKEOUT PICKUP", [48.5, 4.25, 1.5]);
 }
 
+function addTrainingGates(root: THREE.Group) {
+  const specifications = [
+    { x: -5, y: 2.4, radius: 1.55, color: 0x6e52e8 },
+    { x: 15, y: 2.5, radius: 1.65, color: COLORS.accent },
+    { x: 35, y: 2.25, radius: 1.5, color: COLORS.cyan },
+  ];
+  specifications.forEach(({ x, y, radius, color }, index) => {
+    const gate = tag(new THREE.Group(), "training-gate", `school-training-gate-${index + 1}`, {
+      routeOrder: index + 1,
+      center: { x, y, z: -18 },
+      innerRadiusM: radius - 0.09,
+      requiredClearanceM: 0.45,
+      traversable: true,
+    });
+    gate.position.set(x, 0, -18);
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, 0.09, 14, 64),
+      new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.46,
+        roughness: 0.3,
+        metalness: 0.25,
+      }),
+    );
+    ring.position.y = y;
+    ring.rotation.y = Math.PI / 2;
+    ring.castShadow = true;
+    tag(ring, "gate-opening", `school-training-gate-${index + 1}-ring`);
+    gate.add(ring);
+    [-1, 1].forEach((side) => {
+      const postHeight = Math.max(0.7, y - radius + 0.1);
+      cylinder(gate, 0.075, postHeight, [0, postHeight / 2, side * radius], COLORS.trim, {
+        id: `school-training-gate-${index + 1}-post-${side < 0 ? "north" : "south"}`,
+        kind: "gate-support",
+        radialSegments: 12,
+        metalness: 0.55,
+      });
+      box(gate, [0.52, 0.08, 0.42], [0, 0.04, side * radius], COLORS.safety, {
+        id: `school-training-gate-${index + 1}-foot-${side < 0 ? "north" : "south"}`,
+        kind: "gate-base",
+        metalness: 0.12,
+      });
+    });
+    root.add(gate);
+  });
+  labelSprite(root, "CAMPUS GATE COURSE", [15, 5.2, -18]);
+}
+
 function route(points: Array<[number, number, number]>) {
   return points.map(([x, y, z]) => new THREE.Vector3(x, y, z));
 }
@@ -710,6 +760,7 @@ export function buildSchoolMapScene(
   addCafeteria(campus, options);
   addBikeShelter(campus);
   addPickupZone(campus);
+  addTrainingGates(campus);
   if (options.xRay) {
     campus.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;

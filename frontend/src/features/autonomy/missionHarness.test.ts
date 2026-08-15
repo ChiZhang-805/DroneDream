@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { AutonomyCompileRequest } from "../../types/api";
+import { createLocalAutonomyPreview } from "./missionAutonomy";
 import { defaultAutonomyWorkspace } from "./workspaceStore";
 import {
   autonomyHarnessRequest,
@@ -8,6 +10,44 @@ import {
 } from "./missionHarness";
 
 describe("autonomy mission harness", () => {
+  it("keeps every public mission preset grounded in School Map", () => {
+    const request: AutonomyCompileRequest = {
+      edition: "sim",
+      execution_target: "simulation",
+      natural_language: "Use the selected School Map mission preset.",
+      scene_id: "school-campus-v1",
+      perception_mode: "fusion",
+      vehicle: {
+        dry_mass_kg: 1.86,
+        launch_payload_kg: 0.1,
+        pickup_payload_kg: 0.35,
+        max_takeoff_mass_kg: 2.8,
+        max_total_thrust_n: 44,
+        radius_m: 0.381,
+        max_speed_mps: 4,
+        max_acceleration_mps2: 2.5,
+        reserve_battery_percent: 30,
+      },
+      evidence: {
+        simulation_qualified: false,
+        signed_vehicle_pack_id: null,
+        operator_confirmed: false,
+        localization_ready: false,
+        link_ready: false,
+        geofence_ready: false,
+        battery_ready: false,
+      },
+      asset_context: null,
+    };
+
+    for (const missionId of ["coffee", "gates", "narrow"] as const) {
+      const preview = createLocalAutonomyPreview(missionId, request);
+      expect(preview.scene.id).toBe("school-campus-v1");
+      expect(preview.scene.bounds_m).toEqual({ x: 120, y: 90, z: 12.6 });
+      expect(preview.scene.name).not.toMatch(/forest|service corridor/i);
+    }
+  });
+
   it("recognizes the public assets but still fails closed without the server registry", async () => {
     const request = autonomyHarnessRequest(
       "universal",

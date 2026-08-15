@@ -419,14 +419,15 @@ const BASE_MISSIONS: Readonly<Record<MissionId, Omit<MissionPreset, "name" | "de
 
 const SCENE_ID_BY_MISSION: Record<MissionId, string> = {
   coffee: "school-campus-v1",
-  gates: "forest-gate-inspection",
-  narrow: "service-corridor-dock",
+  gates: "school-campus-v1",
+  narrow: "school-campus-v1",
 };
 
-const MISSION_BY_SCENE_ID = Object.fromEntries(
-  Object.entries(SCENE_ID_BY_MISSION).map(([missionId, sceneId]) => [sceneId, missionId as MissionId]),
-) as Record<string, MissionId>;
-MISSION_BY_SCENE_ID["stairwell-coffee-return"] = "coffee";
+const MISSION_BY_LEGACY_SCENE_ID: Record<string, MissionId> = {
+  "stairwell-coffee-return": "coffee",
+  "forest-gate-inspection": "gates",
+  "service-corridor-dock": "narrow",
+};
 
 const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
   dry_mass_kg: 1.86,
@@ -443,11 +444,11 @@ const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
 function missionForWorkspace(workspace?: AutonomyWorkspaceState): MissionId {
   if (!workspace) return "coffee";
   const boundMission = workspace.mapPack.compilerSceneId
-    ? MISSION_BY_SCENE_ID[workspace.mapPack.compilerSceneId]
+    ? MISSION_BY_LEGACY_SCENE_ID[workspace.mapPack.compilerSceneId]
     : undefined;
   if (boundMission) return boundMission;
   const intent = workspace.mission.intent.toLowerCase();
-  if (workspace.mapPack.semanticLayers.includes("gates") || /\bgates?\b|圆环|穿门/u.test(intent)) return "gates";
+  if (/\bgates?\b|圆环|圆门|穿门/u.test(intent)) return "gates";
   if (/narrow|corridor|passage|狭窄|走廊/u.test(intent)) return "narrow";
   return "coffee";
 }
@@ -495,12 +496,12 @@ function loadAutonomyEdition(): AutonomyEdition {
 
 function promptForMission(missionId: MissionId, chinese: boolean) {
   if (chinese) {
-    if (missionId === "gates") return "仅使用实时视觉，从起点穿过树林中的三个圆门中心，遇到新障碍时局部重规划，最后在终点平稳降落。";
-    if (missionId === "narrow") return "从服务走廊起飞，绕过盲角、竖直告示牌和狭窄障碍，到指定停靠点精准降落。";
+    if (missionId === "gates") return "在 School Map 校园道路起飞，依次穿过三座训练圆门的中心，避开树木、路灯和动态行人后平稳降落。";
+    if (missionId === "narrow") return "从 School Map 三楼办公室起飞，穿过教室走廊与两段 12+12 折返楼梯，在一楼大厅目标点精准降落。";
     return "从三楼办公室起飞，穿过狭窄楼梯到一楼室外，避开树、建筑物、告示牌和立柱，取到 0.35 kg 咖啡后重新检查动力学并安全返回原起点。";
   }
-  if (missionId === "gates") return "Using live vision only, fly from the start through the centers of three forest gates, locally replan around surprises, and land smoothly at the goal.";
-  if (missionId === "narrow") return "Launch in the service corridor, avoid blind corners, vertical signs and tight obstacles, then dock precisely at the target.";
+  if (missionId === "gates") return "Launch on the School Map campus road, cross the centers of all three training gates, avoid trees, lights and moving people, then land smoothly.";
+  if (missionId === "narrow") return "Launch from the School Map third-floor office, traverse the classroom corridor and both 12+12 switchback stairs, then land precisely in the lobby.";
   return "Launch from the third-floor office, descend the narrow stairs, avoid trees, buildings, signs and poles, pick up a 0.35 kg coffee, recheck dynamics, and return safely to the launch point.";
 }
 
