@@ -592,6 +592,7 @@ export function AutonomyLab({
   const runtimeObservationPending = useRef(false);
   const runtimeTerminalSent = useRef(false);
   const evidenceReported = useRef(false);
+  const previewRunId = useRef<string | null>(null);
   const workspaceBindingApplied = useRef<string | null>(null);
   const progressRef = useRef(0);
   const dronePositionRef = useRef<Point>([0, 0]);
@@ -779,7 +780,8 @@ export function AutonomyLab({
     if (!publicDemoConsole && !runtimeSession?.terminal) return;
     evidenceReported.current = true;
     const completedAt = new Date().toISOString();
-    const sessionId = runtimeSession?.session_id ?? `preview-${qualification.contract.contract_id}`;
+    const sessionId = runtimeSession?.session_id
+      ?? (previewRunId.current ??= `preview-run-${crypto.randomUUID()}`);
     onRunCompleted({
       schemaVersion: 1,
       id: sessionId,
@@ -811,6 +813,7 @@ export function AutonomyLab({
     runtimeSequence.current = 0;
     runtimeTerminalSent.current = false;
     evidenceReported.current = false;
+    previewRunId.current = null;
   }, [compileRequest]);
 
   const appendEvent = (text: string) => {
@@ -846,6 +849,8 @@ export function AutonomyLab({
     }
     const generation = ++compileGeneration.current;
     const submittedRequest = compileRequest;
+    previewRunId.current = null;
+    evidenceReported.current = false;
     setPlanning(true);
     setCompileError(null);
     setRunning(false);
@@ -887,6 +892,9 @@ export function AutonomyLab({
   const toggleFlight = async () => {
     if (!planned || complete) return;
     if (!running) {
+      if (publicDemoConsole) {
+        previewRunId.current ??= `preview-run-${crypto.randomUUID()}`;
+      }
       if (!publicDemoConsole && !runtimeSession) {
         try {
           runtimeRequestId.current ??= crypto.randomUUID();
@@ -949,6 +957,7 @@ export function AutonomyLab({
     runtimeSequence.current = 0;
     runtimeTerminalSent.current = false;
     evidenceReported.current = false;
+    previewRunId.current = null;
     setEvents([{ time: eventTime(), text: planned ? copy.events.planned : copy.events.ready }]);
   };
 
