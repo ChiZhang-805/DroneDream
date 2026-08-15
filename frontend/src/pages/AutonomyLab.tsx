@@ -29,6 +29,7 @@ import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
 import type {
+  AutonomyAircraftProfile,
   AutonomyEvidenceRecord,
   AutonomyWorkspaceState,
 } from "../features/autonomy/workspaceStore";
@@ -436,9 +437,8 @@ function perceptionForWorkspace(workspace?: AutonomyWorkspaceState): PerceptionM
   return hasVision ? "vision" : "map";
 }
 
-function vehicleForWorkspace(workspace?: AutonomyWorkspaceState): AutonomyCompileRequest["vehicle"] {
-  if (!workspace) return DEFAULT_VEHICLE;
-  const aircraft = workspace.aircraft;
+function vehicleForAircraft(aircraft?: AutonomyAircraftProfile): AutonomyCompileRequest["vehicle"] {
+  if (!aircraft) return DEFAULT_VEHICLE;
   const payloadMarginKg = Math.max(0, aircraft.maximumTakeoffMassKg - aircraft.dryMassKg);
   return {
     ...DEFAULT_VEHICLE,
@@ -533,7 +533,22 @@ export function AutonomyLab({
   const copy = COPY_BY_LOCALE[interfaceLocale] ?? EN_COPY;
   const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
   const workspaceMissionId = missionForWorkspace(workspace);
-  const workspaceVehicle = useMemo(() => vehicleForWorkspace(workspace), [workspace]);
+  const workspaceVehicleKey = workspace
+    ? [
+        workspace.aircraft.dryMassKg,
+        workspace.aircraft.maximumTakeoffMassKg,
+        workspace.aircraft.maximumThrustN,
+        workspace.aircraft.bodyLengthM,
+        workspace.aircraft.bodyWidthM,
+        workspace.aircraft.rotorRadiusM,
+        workspace.aircraft.reserveBatteryPercent,
+      ].join(":")
+    : "default";
+  const workspaceVehicleCache = useRef<{ key: string; value: AutonomyCompileRequest["vehicle"] } | null>(null);
+  if (workspaceVehicleCache.current?.key !== workspaceVehicleKey) {
+    workspaceVehicleCache.current = { key: workspaceVehicleKey, value: vehicleForAircraft(workspace?.aircraft) };
+  }
+  const workspaceVehicle = workspaceVehicleCache.current.value;
   const [edition, setEdition] = useState<AutonomyEdition>(loadAutonomyEdition);
   const [missionId, setMissionId] = useState<MissionId>(workspaceMissionId);
   const [perception, setPerception] = useState<PerceptionMode>(() => perceptionForWorkspace(workspace));
@@ -577,7 +592,7 @@ export function AutonomyLab({
     setCommand(workspace.mission.intent);
     setMissionId(missionForWorkspace(workspace));
     setPerception(perceptionForWorkspace(workspace));
-    setPickupPayloadKg(vehicleForWorkspace(workspace).pickup_payload_kg);
+    setPickupPayloadKg(vehicleForAircraft(workspace.aircraft).pickup_payload_kg);
   }, [workspace, workspaceBindingKey]);
 
   useEffect(() => {
