@@ -663,6 +663,32 @@ const SENSOR_LABELS: Record<AutonomySensorKind, string> = {
   vio: "VIO",
 };
 
+const AIRCRAFT_MANUFACTURERS = ["Self-built", "DJI", "Holybro", "Auterion", "ModalAI", "CUAV", "Inspired Flight"] as const;
+const AIRFRAMES = ["Quad X", "Quad +", "Hex X", "Hex +", "Octo X", "Coaxial Octo", "VTOL"] as const;
+const FLIGHT_CONTROLLERS = ["Pixhawk 6C", "Pixhawk 6X", "Cube Orange+", "CUAV X7+", "Auterion Skynode", "ModalAI VOXL 2"] as const;
+const COMPUTE_PLATFORMS = ["Jetson Orin NX", "Jetson Orin Nano", "Jetson AGX Orin", "Raspberry Pi 5", "ModalAI VOXL 2"] as const;
+const FIRMWARE_BY_AUTOPILOT: Record<AutonomyAircraftProfile["autopilot"], readonly string[]> = {
+  px4: ["PX4 v1.16", "PX4 v1.15", "PX4 main"],
+  ardupilot: ["ArduPilot Copter 4.6", "ArduPilot Copter 4.5", "ArduPilot master"],
+  custom: [],
+};
+const CUSTOM_FIRMWARE_OPTION = "__custom_firmware__";
+const CUSTOM_FLIGHT_CONTROLLER_OPTION = "__custom_flight_controller__";
+const CUSTOM_MANUFACTURER_OPTION = "__custom_manufacturer__";
+const CUSTOM_AIRFRAME_OPTION = "__custom_airframe__";
+const CUSTOM_COMPUTE_OPTION = "__custom_compute__";
+const CONTROL_INTERFACES_BY_AUTOPILOT: Record<AutonomyAircraftProfile["autopilot"], readonly AutonomyAircraftProfile["controlInterface"][]> = {
+  px4: ["px4-ros2", "mavsdk", "mavlink", "simulation-only"],
+  ardupilot: ["mavsdk", "mavlink", "simulation-only"],
+  custom: ["mavlink", "simulation-only"],
+};
+const CONTROL_INTERFACE_LABELS: Record<AutonomyAircraftProfile["controlInterface"], string> = {
+  "px4-ros2": "PX4 ROS 2",
+  mavsdk: "MAVSDK",
+  mavlink: "MAVLink",
+  "simulation-only": "Simulation only",
+};
+
 export function AutonomyAircraft() {
   const { chinese, workspace, persist, edition } = useAutonomyWorkspace();
   const [form, setForm] = useState(workspace.aircraft);
@@ -672,6 +698,12 @@ export function AutonomyAircraft() {
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
   const valid = isAutonomyAircraftProfileValid(form);
+  const manufacturerIsCustom = !AIRCRAFT_MANUFACTURERS.includes(form.manufacturer as typeof AIRCRAFT_MANUFACTURERS[number]);
+  const airframeIsCustom = !AIRFRAMES.includes(form.airframe as typeof AIRFRAMES[number]);
+  const flightControllerIsCustom = !FLIGHT_CONTROLLERS.includes(form.flightController as typeof FLIGHT_CONTROLLERS[number]);
+  const firmwareOptions = FIRMWARE_BY_AUTOPILOT[form.autopilot];
+  const firmwareIsCustom = !firmwareOptions.includes(form.firmware);
+  const computePlatformIsCustom = !COMPUTE_PLATFORMS.includes(form.computePlatform as typeof COMPUTE_PLATFORMS[number]);
   const updateAircraft = (patch: Partial<AutonomyAircraftProfile>) => {
     setForm((current) => ({ ...current, ...patch, status: "draft", qualificationReceiptId: null }));
     setSaved(false);
@@ -712,6 +744,7 @@ export function AutonomyAircraft() {
           id: `${sensor}-${current.sensorMounts.filter((item) => item.kind === sensor).length + 1}`,
           kind: sensor,
           calibrated: false,
+          calibrationStatus: "unverified",
           positionM: { x: 0, y: 0, z: 0 },
           rollPitchYawDeg: { x: 0, y: 0, z: 0 },
           rateHz: sensor === "gps" ? 10 : 30,
@@ -744,6 +777,7 @@ export function AutonomyAircraft() {
       const receipt = await apiClient.qualifyAutonomyVehiclePack({
         pack_id: form.id,
         version: form.version,
+        autopilot: form.autopilot,
         firmware: form.firmware,
         flight_controller: form.flightController,
         control_interface: form.controlInterface,
@@ -767,6 +801,7 @@ export function AutonomyAircraft() {
           sensor_id: sensor.id,
           kind: sensor.kind,
           calibrated: sensor.calibrated,
+          calibration_status: sensor.calibrationStatus,
           position_m: sensor.positionM,
           roll_pitch_yaw_deg: sensor.rollPitchYawDeg,
           rate_hz: sensor.rateHz,
@@ -792,14 +827,22 @@ export function AutonomyAircraft() {
       <div className="autonomy-config-main">
         <section className="autonomy-config-card">
           <header><Navigation2 aria-hidden="true" /><h2>{chinese ? "机型身份" : "Aircraft identity"}</h2></header>
-          <div className="autonomy-form-grid is-three">
+          <div className="autonomy-form-grid is-four autonomy-identity-grid">
             <label><span>{chinese ? "名称" : "Name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateAircraft({ name: event.target.value })} /></label>
-            <label><span>{chinese ? "制造商" : "Manufacturer"}</span><input value={form.manufacturer} maxLength={120} onChange={(event) => updateAircraft({ manufacturer: event.target.value })} /></label>
-            <label><span>{chinese ? "机架" : "Airframe"}</span><input value={form.airframe} maxLength={120} onChange={(event) => updateAircraft({ airframe: event.target.value })} /></label>
-            <label><span>{chinese ? "飞控" : "Flight controller"}</span><input value={form.flightController} maxLength={120} onChange={(event) => updateAircraft({ flightController: event.target.value })} /></label>
-            <label><span>{chinese ? "飞控固件" : "Firmware"}</span><input value={form.firmware} maxLength={120} onChange={(event) => updateAircraft({ firmware: event.target.value })} /></label>
-            <label><span>{chinese ? "控制接口" : "Control interface"}</span><select value={form.controlInterface} onChange={(event) => updateAircraft({ controlInterface: event.target.value as AutonomyAircraftProfile["controlInterface"] })}><option value="px4-ros2">PX4 ROS 2</option><option value="mavsdk">MAVSDK</option><option value="mavlink">MAVLink</option><option value="simulation-only">Simulation only</option></select></label>
-            <label><span>{chinese ? "机载计算" : "Onboard compute"}</span><input value={form.computePlatform} maxLength={120} onChange={(event) => updateAircraft({ computePlatform: event.target.value })} /></label>
+            <label><span>{chinese ? "制造商" : "Manufacturer"}</span><div className="autonomy-custom-select-control"><select value={manufacturerIsCustom ? CUSTOM_MANUFACTURER_OPTION : form.manufacturer} onChange={(event) => updateAircraft({ manufacturer: event.target.value === CUSTOM_MANUFACTURER_OPTION ? "" : event.target.value })}>{AIRCRAFT_MANUFACTURERS.map((value) => <option key={value} value={value}>{value}</option>)}<option value={CUSTOM_MANUFACTURER_OPTION}>{chinese ? "其他制造商…" : "Other manufacturer…"}</option></select>{manufacturerIsCustom ? <input value={form.manufacturer.trim().toLowerCase() === "custom" ? "" : form.manufacturer} maxLength={120} placeholder={chinese ? "制造商或自研团队" : "Manufacturer or builder"} aria-label={chinese ? "自定义制造商" : "Custom manufacturer"} onChange={(event) => updateAircraft({ manufacturer: event.target.value })} /> : null}</div></label>
+            <label><span>{chinese ? "机架" : "Airframe"}</span><div className="autonomy-custom-select-control"><select value={airframeIsCustom ? CUSTOM_AIRFRAME_OPTION : form.airframe} onChange={(event) => updateAircraft({ airframe: event.target.value === CUSTOM_AIRFRAME_OPTION ? "" : event.target.value })}>{AIRFRAMES.map((value) => <option key={value} value={value}>{value}</option>)}<option value={CUSTOM_AIRFRAME_OPTION}>{chinese ? "自定义机架…" : "Custom airframe…"}</option></select>{airframeIsCustom ? <input value={form.airframe.trim().toLowerCase() === "custom" ? "" : form.airframe} maxLength={120} placeholder={chinese ? "构型、型号或修订" : "Configuration, model, or revision"} aria-label={chinese ? "自定义机架标识" : "Custom airframe identity"} onChange={(event) => updateAircraft({ airframe: event.target.value })} /> : null}</div></label>
+            <label><span>{chinese ? "飞控" : "Flight controller"}</span><div className="autonomy-custom-select-control"><select value={flightControllerIsCustom ? CUSTOM_FLIGHT_CONTROLLER_OPTION : form.flightController} onChange={(event) => updateAircraft({ flightController: event.target.value === CUSTOM_FLIGHT_CONTROLLER_OPTION ? "" : event.target.value })}>{FLIGHT_CONTROLLERS.map((value) => <option key={value} value={value}>{value}</option>)}<option value={CUSTOM_FLIGHT_CONTROLLER_OPTION}>{chinese ? "自定义飞控…" : "Custom controller…"}</option></select>{flightControllerIsCustom ? <input value={form.flightController.trim().toLowerCase() === "custom" ? "" : form.flightController} maxLength={120} placeholder={chinese ? "型号与硬件修订" : "Model and hardware revision"} aria-label={chinese ? "自定义飞控标识" : "Custom flight-controller identity"} onChange={(event) => updateAircraft({ flightController: event.target.value })} /> : null}</div></label>
+            <label><span>{chinese ? "自动驾驶栈" : "Autopilot"}</span><select value={form.autopilot} onChange={(event) => {
+              const autopilot = event.target.value as AutonomyAircraftProfile["autopilot"];
+              const compatibleInterfaces = CONTROL_INTERFACES_BY_AUTOPILOT[autopilot];
+              const controlInterface = compatibleInterfaces.includes(form.controlInterface)
+                ? form.controlInterface
+                : compatibleInterfaces[0];
+              updateAircraft({ autopilot, firmware: FIRMWARE_BY_AUTOPILOT[autopilot][0] ?? "", controlInterface });
+            }}><option value="px4">PX4</option><option value="ardupilot">ArduPilot</option><option value="custom">{chinese ? "自定义" : "Custom"}</option></select></label>
+            <label><span>{chinese ? "固件版本" : "Firmware version"}</span><div className="autonomy-custom-select-control"><select value={firmwareIsCustom ? CUSTOM_FIRMWARE_OPTION : form.firmware} onChange={(event) => updateAircraft({ firmware: event.target.value === CUSTOM_FIRMWARE_OPTION ? "" : event.target.value })}>{firmwareOptions.map((value) => <option key={value} value={value}>{value}</option>)}<option value={CUSTOM_FIRMWARE_OPTION}>{chinese ? "自定义构建…" : "Custom build…"}</option></select>{firmwareIsCustom ? <input value={form.firmware.trim().toLowerCase() === "custom build" ? "" : form.firmware} maxLength={120} placeholder={chinese ? "版本、commit 或 build ID" : "Version, commit, or build ID"} aria-label={chinese ? "自定义固件标识" : "Custom firmware identity"} onChange={(event) => updateAircraft({ firmware: event.target.value })} /> : null}</div></label>
+            <label><span>{chinese ? "控制接口" : "Control interface"}</span><select value={form.controlInterface} onChange={(event) => updateAircraft({ controlInterface: event.target.value as AutonomyAircraftProfile["controlInterface"] })}>{CONTROL_INTERFACES_BY_AUTOPILOT[form.autopilot].map((value) => <option key={value} value={value}>{value === "simulation-only" && chinese ? "仅仿真" : CONTROL_INTERFACE_LABELS[value]}</option>)}</select></label>
+            <label><span>{chinese ? "机载计算" : "Onboard compute"}</span><div className="autonomy-custom-select-control"><select value={computePlatformIsCustom ? CUSTOM_COMPUTE_OPTION : form.computePlatform} onChange={(event) => updateAircraft({ computePlatform: event.target.value === CUSTOM_COMPUTE_OPTION ? "" : event.target.value })}>{COMPUTE_PLATFORMS.map((value) => <option key={value} value={value}>{value}</option>)}<option value={CUSTOM_COMPUTE_OPTION}>{chinese ? "自定义平台…" : "Custom platform…"}</option></select>{computePlatformIsCustom ? <input value={form.computePlatform.trim().toLowerCase() === "custom" ? "" : form.computePlatform} maxLength={120} placeholder={chinese ? "板卡型号与硬件修订" : "Board model and hardware revision"} aria-label={chinese ? "自定义机载计算平台" : "Custom onboard-compute platform"} onChange={(event) => updateAircraft({ computePlatform: event.target.value })} /> : null}</div></label>
           </div>
         </section>
 
@@ -853,8 +896,11 @@ export function AutonomyAircraft() {
           </div>
           <div className="autonomy-sensor-mounts">
             {form.sensorMounts.map((sensor) => <article key={sensor.id}>
-              <header><strong>{SENSOR_LABELS[sensor.kind]}</strong><label><input type="checkbox" checked={sensor.calibrated} onChange={(event) => updateSensorMount(sensor.id, { calibrated: event.target.checked })} />{chinese ? "已标定" : "Calibrated"}</label></header>
-              <label className="is-id"><span>ID</span><input value={sensor.id} maxLength={80} onChange={(event) => updateSensorMount(sensor.id, { id: event.target.value })} /></label>
+              <header><strong>{SENSOR_LABELS[sensor.kind]}</strong><label className="autonomy-calibration-state" data-state={sensor.calibrationStatus}><span>{chinese ? "标定状态" : "Calibration"}</span><select value={sensor.calibrationStatus} onChange={(event) => {
+                const calibrationStatus = event.target.value as AutonomyAircraftProfile["sensorMounts"][number]["calibrationStatus"];
+                updateSensorMount(sensor.id, { calibrationStatus, calibrated: calibrationStatus === "verified" });
+              }}><option value="unverified">{chinese ? "未标定" : "Not calibrated"}</option><option value="verified">{chinese ? "已验证" : "Verified"}</option><option value="expired">{chinese ? "已过期" : "Expired"}</option><option value="failed">{chinese ? "验证失败" : "Failed"}</option></select></label></header>
+              <label className="is-id"><span>{chinese ? "挂载 ID" : "Mount ID"}</span><input value={sensor.id} maxLength={80} onChange={(event) => updateSensorMount(sensor.id, { id: event.target.value })} /></label>
               <div>
                 {(["x", "y", "z"] as const).map((axis) => <label key={`position-${axis}`}><span>{axis.toUpperCase()} (m)</span><input type="number" step="0.001" value={sensor.positionM[axis]} onChange={(event) => updateSensorMount(sensor.id, { positionM: { ...sensor.positionM, [axis]: Number(event.target.value) } })} /></label>)}
                 {(["x", "y", "z"] as const).map((axis, index) => <label key={`rotation-${axis}`}><span>{["Roll", "Pitch", "Yaw"][index]} (°)</span><input type="number" step="0.1" value={sensor.rollPitchYawDeg[axis]} onChange={(event) => updateSensorMount(sensor.id, { rollPitchYawDeg: { ...sensor.rollPitchYawDeg, [axis]: Number(event.target.value) } })} /></label>)}
@@ -868,18 +914,22 @@ export function AutonomyAircraft() {
 
       <aside className="autonomy-config-summary">
         <header><Gauge aria-hidden="true" /><h2>{chinese ? "飞行包络" : "Flight envelope"}</h2></header>
-        <Metric icon={<Weight aria-hidden="true" />} label={chinese ? "可用载荷" : "Payload margin"} value={`${payloadMargin.toFixed(2)} kg`} />
-        <Metric icon={<Activity aria-hidden="true" />} label={chinese ? "满载推重比" : "Loaded thrust / weight"} value={thrustToWeight.toFixed(2)} />
-        <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "规划半径" : "Planning radius"} value={`${autonomyAircraftRadiusM(form).toFixed(2)} m`} />
-        <Metric icon={<Camera aria-hidden="true" />} label={chinese ? "感知设备" : "Perception devices"} value={String(form.sensors.length)} />
-        <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "Vehicle Pack 版本" : "Vehicle Pack version"} value={`v${form.version}`} />
-        <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "资格状态" : "Qualification"} value={form.status.toUpperCase()} />
-        {!valid ? <p className="autonomy-config-error">{chinese ? "请检查质量、推力、电量预留和 3 m 规划半径限制。" : "Check mass, thrust, reserve, and the 3 m planning-radius limit."}</p> : null}
-        <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"}><Save aria-hidden="true" />{form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
-        <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
-        {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "公开网页不签发资格凭据。请在连接 DroneDream 后端的桌面或私有控制台完成验证。" : "The public site cannot issue qualification receipts. Use a desktop or private console connected to the DroneDream backend."}</p> : null}
-        {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
-        <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.aircraft.updatedAt)}</small>
+        <div className="autonomy-config-summary-metrics">
+          <Metric icon={<Weight aria-hidden="true" />} label={chinese ? "可用载荷" : "Payload margin"} value={`${payloadMargin.toFixed(2)} kg`} />
+          <Metric icon={<Activity aria-hidden="true" />} label={chinese ? "满载推重比" : "Loaded thrust / weight"} value={thrustToWeight.toFixed(2)} />
+          <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "规划半径" : "Planning radius"} value={`${autonomyAircraftRadiusM(form).toFixed(2)} m`} />
+          <Metric icon={<Camera aria-hidden="true" />} label={chinese ? "感知设备" : "Perception devices"} value={String(form.sensors.length)} />
+          <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "Vehicle Pack 版本" : "Vehicle Pack version"} value={`v${form.version}`} />
+          <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "资格状态" : "Qualification"} value={form.status.toUpperCase()} />
+        </div>
+        <div className="autonomy-config-summary-actions">
+          {!valid ? <p className="autonomy-config-error">{chinese ? "请检查质量、推力、电量预留、定位传感器标定和 3 m 规划半径限制。" : "Check mass, thrust, reserve, positioning-sensor calibration, and the 3 m planning-radius limit."}</p> : null}
+          <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"}><Save aria-hidden="true" />{form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
+          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
+          {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "公开网页不签发资格凭据。请在连接 DroneDream 后端的桌面或私有控制台完成验证。" : "The public site cannot issue qualification receipts. Use a desktop or private console connected to the DroneDream backend."}</p> : null}
+          {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
+          <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.aircraft.updatedAt)}</small>
+        </div>
       </aside>
     </form>
   );

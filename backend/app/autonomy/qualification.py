@@ -33,15 +33,29 @@ class SensorCalibration(StrictModel):
     sensor_id: str = Field(min_length=1, max_length=80)
     kind: Literal["rgb", "depth", "stereo", "thermal", "lidar", "gps", "vio"]
     calibrated: bool
+    calibration_status: Literal["unverified", "verified", "expired", "failed"] | None = None
     position_m: Vector3
     roll_pitch_yaw_deg: Vector3
     rate_hz: float = Field(gt=0.0, le=1000.0)
     calibration_age_days: float = Field(ge=0.0, le=3650.0)
 
+    @model_validator(mode="after")
+    def validate_calibration_state(self) -> SensorCalibration:
+        if self.calibration_status is None:
+            object.__setattr__(
+                self,
+                "calibration_status",
+                "verified" if self.calibrated else "unverified",
+            )
+        if self.calibrated != (self.calibration_status == "verified"):
+            raise ValueError("calibrated must be true exactly when calibration_status is verified")
+        return self
+
 
 class VehiclePackQualificationRequest(StrictModel):
     pack_id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     version: int = Field(ge=1, le=1_000_000)
+    autopilot: Literal["px4", "ardupilot", "custom"] | None = None
     firmware: str = Field(min_length=1, max_length=120)
     flight_controller: str = Field(min_length=1, max_length=120)
     control_interface: Literal["px4-ros2", "mavsdk", "mavlink", "simulation-only"]
@@ -65,10 +79,21 @@ class VehiclePackQualificationRequest(StrictModel):
 
     @model_validator(mode="after")
     def validate_dimensions(self) -> VehiclePackQualificationRequest:
+        if self.autopilot is None:
+            inferred_autopilot = (
+                "px4"
+                if self.control_interface == "px4-ros2"
+                else "ardupilot"
+                if "ardu" in self.firmware.lower()
+                else "px4"
+            )
+            object.__setattr__(self, "autopilot", inferred_autopilot)
         if min(self.body_size_m.x, self.body_size_m.y, self.body_size_m.z) <= 0:
             raise ValueError("body_size_m must be positive")
         if min(self.inertia_kg_m2.x, self.inertia_kg_m2.y, self.inertia_kg_m2.z) <= 0:
             raise ValueError("inertia_kg_m2 must be positive")
+        if self.autopilot != "px4" and self.control_interface == "px4-ros2":
+            raise ValueError("px4-ros2 control_interface requires the PX4 autopilot")
         return self
 
 

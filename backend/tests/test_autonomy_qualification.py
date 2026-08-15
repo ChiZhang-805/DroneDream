@@ -15,6 +15,7 @@ def vehicle_payload() -> dict[str, object]:
     return {
         "pack_id": "lab-quad-01",
         "version": 3,
+        "autopilot": "px4",
         "firmware": "PX4 v1.16",
         "flight_controller": "Pixhawk 6X",
         "control_interface": "px4-ros2",
@@ -39,6 +40,7 @@ def vehicle_payload() -> dict[str, object]:
                 "sensor_id": "vio-front",
                 "kind": "vio",
                 "calibrated": True,
+                "calibration_status": "verified",
                 "position_m": {"x": 0.12, "y": 0.0, "z": -0.03},
                 "roll_pitch_yaw_deg": {"x": 0.0, "y": -8.0, "z": 0.0},
                 "rate_hz": 30.0,
@@ -57,6 +59,83 @@ def test_vehicle_pack_qualification_is_versioned_and_unsigned() -> None:
     assert receipt.hardware_authority is False
     assert receipt.loaded_thrust_to_weight > 1.35
     assert len(receipt.content_sha256) == 64
+
+
+def test_vehicle_pack_receipt_binds_the_autopilot_family() -> None:
+    px4_payload = vehicle_payload()
+    px4_payload["control_interface"] = "mavlink"
+    px4_receipt = qualify_vehicle_pack(VehiclePackQualificationRequest.model_validate(px4_payload))
+
+    ardupilot_payload = {**px4_payload, "autopilot": "ardupilot"}
+    ardupilot_receipt = qualify_vehicle_pack(
+        VehiclePackQualificationRequest.model_validate(ardupilot_payload)
+    )
+
+    assert px4_receipt.content_sha256 != ardupilot_receipt.content_sha256
+    assert px4_receipt.receipt_id != ardupilot_receipt.receipt_id
+
+
+def test_vehicle_pack_receipt_binds_the_full_calibration_state() -> None:
+    unverified_payload = vehicle_payload()
+    unverified_sensors = unverified_payload["sensors"]
+    assert isinstance(unverified_sensors, list)
+    rgb_sensor = {
+        "sensor_id": "rgb-front",
+        "kind": "rgb",
+        "calibrated": False,
+        "calibration_status": "unverified",
+        "position_m": {"x": 0.14, "y": 0.0, "z": -0.02},
+        "roll_pitch_yaw_deg": {"x": 0.0, "y": -6.0, "z": 0.0},
+        "rate_hz": 30.0,
+        "calibration_age_days": 0.0,
+    }
+    unverified_payload["sensors"] = [*unverified_sensors, rgb_sensor]
+    unverified_receipt = qualify_vehicle_pack(
+        VehiclePackQualificationRequest.model_validate(unverified_payload)
+    )
+
+    failed_payload = vehicle_payload()
+    failed_sensors = failed_payload["sensors"]
+    assert isinstance(failed_sensors, list)
+    failed_payload["sensors"] = [
+        *failed_sensors,
+        {**rgb_sensor, "calibration_status": "failed"},
+    ]
+    failed_receipt = qualify_vehicle_pack(
+        VehiclePackQualificationRequest.model_validate(failed_payload)
+    )
+
+    assert unverified_receipt.content_sha256 != failed_receipt.content_sha256
+    assert unverified_receipt.receipt_id != failed_receipt.receipt_id
+
+
+def test_vehicle_pack_qualification_migrates_legacy_v1_requests() -> None:
+    legacy_payload = vehicle_payload()
+    legacy_payload.pop("autopilot")
+    legacy_sensors = legacy_payload["sensors"]
+    assert isinstance(legacy_sensors, list)
+    for sensor in legacy_sensors:
+        assert isinstance(sensor, dict)
+        sensor.pop("calibration_status")
+
+    request = VehiclePackQualificationRequest.model_validate(legacy_payload)
+    receipt = qualify_vehicle_pack(request)
+
+    assert request.autopilot == "px4"
+    assert request.sensors[0].calibration_status == "verified"
+    assert receipt.status == "validated_unsigned"
+
+
+def test_legacy_px4_interface_remains_compatible_with_ardupilot_firmware_text() -> None:
+    legacy_payload = vehicle_payload()
+    legacy_payload.pop("autopilot")
+    legacy_payload["firmware"] = "ArduPilot-compatible custom build"
+
+    request = VehiclePackQualificationRequest.model_validate(legacy_payload)
+    receipt = qualify_vehicle_pack(request)
+
+    assert request.autopilot == "px4"
+    assert receipt.status == "validated_unsigned"
 
 
 def test_vehicle_pack_blocks_an_unqualified_localization_stack() -> None:

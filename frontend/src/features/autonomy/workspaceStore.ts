@@ -31,6 +31,7 @@ export interface AutonomySensorMount {
   id: string;
   kind: AutonomySensorKind;
   calibrated: boolean;
+  calibrationStatus: "unverified" | "verified" | "expired" | "failed";
   positionM: AutonomyVector3;
   rollPitchYawDeg: AutonomyVector3;
   rateHz: number;
@@ -47,6 +48,7 @@ export interface AutonomyAircraftProfile {
   manufacturer: string;
   airframe: string;
   flightController: string;
+  autopilot: "px4" | "ardupilot" | "custom";
   firmware: string;
   controlInterface: "px4-ros2" | "mavsdk" | "mavlink" | "simulation-only";
   computePlatform: string;
@@ -109,7 +111,13 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     return Number.isFinite(value) && value >= limit.min && value <= limit.max;
   };
   const radiusM = autonomyAircraftRadiusM(aircraft);
-  return within(aircraft.dryMassKg, "dryMassKg")
+  return aircraft.name.trim().length > 0
+    && aircraft.manufacturer.trim().length > 0
+    && aircraft.airframe.trim().length > 0
+    && aircraft.airframe.trim().toLowerCase() !== "custom"
+    && aircraft.computePlatform.trim().length > 0
+    && aircraft.computePlatform.trim().toLowerCase() !== "custom"
+    && within(aircraft.dryMassKg, "dryMassKg")
     && within(aircraft.maximumTakeoffMassKg, "maximumTakeoffMassKg")
     && aircraft.maximumTakeoffMassKg > aircraft.dryMassKg
     && within(aircraft.bodyLengthM, "bodyLengthM")
@@ -128,9 +136,18 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     && within(aircraft.maximumClimbMps, "maximumClimbMps")
     && within(aircraft.maximumDescentMps, "maximumDescentMps")
     && within(aircraft.maximumTiltDeg, "maximumTiltDeg")
+    && aircraft.flightController.trim().length > 0
+    && aircraft.flightController.trim().toLowerCase() !== "custom"
+    && aircraft.firmware.trim().length > 0
+    && aircraft.firmware.trim().toLowerCase() !== "custom build"
+    && (aircraft.autopilot === "px4" || aircraft.controlInterface !== "px4-ros2")
     && aircraft.commandLink.latencyMs >= 0
     && aircraft.commandLink.bandwidthMbps > 0
-    && aircraft.sensorMounts.some((sensor) => sensor.calibrated && (sensor.kind === "gps" || sensor.kind === "vio"));
+    && aircraft.sensorMounts.some((sensor) => (
+      sensor.calibrated
+      && sensor.calibrationStatus === "verified"
+      && (sensor.kind === "gps" || sensor.kind === "vio")
+    ));
 }
 
 export interface AutonomyMapSourceFile {
@@ -272,9 +289,10 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       status: "draft",
       qualificationReceiptId: null,
       name: "Primary research quadrotor",
-      manufacturer: "Custom",
+      manufacturer: "Self-built",
       airframe: "Quad X",
       flightController: "Pixhawk 6C",
+      autopilot: "px4",
       firmware: "PX4 v1.16",
       controlInterface: "px4-ros2",
       computePlatform: "Jetson Orin NX",
@@ -303,10 +321,10 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       },
       sensors: ["rgb", "depth", "gps", "vio"],
       sensorMounts: [
-        { id: "front-rgb", kind: "rgb", calibrated: true, positionM: { x: 0.18, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
-        { id: "front-depth", kind: "depth", calibrated: true, positionM: { x: 0.17, y: 0, z: -0.04 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
-        { id: "gps-primary", kind: "gps", calibrated: true, positionM: { x: 0, y: 0, z: 0.12 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 3 },
-        { id: "vio-primary", kind: "vio", calibrated: true, positionM: { x: 0.16, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
+        { id: "front-rgb", kind: "rgb", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.18, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
+        { id: "front-depth", kind: "depth", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.17, y: 0, z: -0.04 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
+        { id: "gps-primary", kind: "gps", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: 0, z: 0.12 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 3 },
+        { id: "vio-primary", kind: "vio", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.16, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
       ],
       updatedAt,
     },
@@ -393,13 +411,23 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const normalizedSensors = Array.isArray(aircraft.sensors)
     ? [...new Set(aircraft.sensors.filter((sensor): sensor is AutonomySensorKind => SENSOR_SET.has(sensor as AutonomySensorKind)))].slice(0, SENSOR_SET.size)
     : fallback.aircraft.sensors;
+  const sensorCalibrationContractMigrated = Array.isArray(aircraft.sensorMounts) && aircraft.sensorMounts.some((sensor) => (
+    !sensor
+    || typeof sensor !== "object"
+    || !["unverified", "verified", "expired", "failed"].includes(String(sensor.calibrationStatus))
+  ));
   const normalizedSensorMounts = Array.isArray(aircraft.sensorMounts)
     ? aircraft.sensorMounts.filter((sensor): sensor is AutonomySensorMount => Boolean(
       sensor && typeof sensor === "object" && SENSOR_SET.has(sensor.kind as AutonomySensorKind),
     )).slice(0, 64).map((sensor, index) => ({
       id: boundedText(sensor.id, `sensor-${index + 1}`, 80),
       kind: sensor.kind,
-      calibrated: sensor.calibrated === true,
+      calibrated: sensor.calibrationStatus
+        ? sensor.calibrationStatus === "verified"
+        : sensor.calibrated === true,
+      calibrationStatus: ["unverified", "verified", "expired", "failed"].includes(String(sensor.calibrationStatus))
+        ? sensor.calibrationStatus
+        : sensor.calibrated === true ? "verified" : "unverified",
       positionM: boundedVector(sensor.positionM, { x: 0, y: 0, z: 0 }, -10, 10),
       rollPitchYawDeg: boundedVector(sensor.rollPitchYawDeg, { x: 0, y: 0, z: 0 }, -360, 360),
       rateHz: boundedNumber(sensor.rateHz, 30, 0.1, 1_000),
@@ -409,21 +437,45 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const commandLink = aircraft.commandLink && typeof aircraft.commandLink === "object"
     ? aircraft.commandLink
     : fallback.aircraft.commandLink;
+  const autopilotWasInferred = !["px4", "ardupilot", "custom"].includes(String(aircraft.autopilot));
+  const normalizedAutopilot = !autopilotWasInferred
+    ? aircraft.autopilot as AutonomyAircraftProfile["autopilot"]
+    : aircraft.controlInterface === "px4-ros2"
+      ? "px4"
+      : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4";
+  const requestedControlInterface = ["px4-ros2", "mavsdk", "mavlink", "simulation-only"].includes(String(aircraft.controlInterface))
+    ? aircraft.controlInterface as AutonomyAircraftProfile["controlInterface"]
+    : fallback.aircraft.controlInterface;
+  const normalizedControlInterface = normalizedAutopilot !== "px4" && requestedControlInterface === "px4-ros2"
+    ? "mavlink"
+    : requestedControlInterface;
+  const qualificationContractMigrated = autopilotWasInferred
+    || normalizedControlInterface !== requestedControlInterface
+    || sensorCalibrationContractMigrated
+    || String(aircraft.flightController).trim().toLowerCase() === "custom"
+    || String(aircraft.firmware).trim().toLowerCase() === "custom build"
+    || String(aircraft.airframe).trim().toLowerCase() === "custom"
+    || String(aircraft.computePlatform).trim().toLowerCase() === "custom";
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     schemaVersion: 2,
     id: boundedText(aircraft.id, fallback.aircraft.id, 80),
     version: Math.round(boundedNumber(aircraft.version, fallback.aircraft.version, 1, 1_000_000)),
-    status: aircraft.status === "validated-unsigned" || aircraft.status === "signed" ? aircraft.status : "draft",
-    qualificationReceiptId: typeof aircraft.qualificationReceiptId === "string" ? aircraft.qualificationReceiptId.slice(0, 160) : null,
+    status: qualificationContractMigrated
+      ? "draft"
+      : aircraft.status === "validated-unsigned" || aircraft.status === "signed" ? aircraft.status : "draft",
+    qualificationReceiptId: !qualificationContractMigrated && typeof aircraft.qualificationReceiptId === "string"
+      ? aircraft.qualificationReceiptId.slice(0, 160)
+      : null,
     name: boundedText(aircraft.name, fallback.aircraft.name),
-    manufacturer: boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
+    manufacturer: String(aircraft.manufacturer).trim().toLowerCase() === "custom"
+      ? "Self-built"
+      : boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
     airframe: boundedText(aircraft.airframe, fallback.aircraft.airframe),
     flightController: boundedText(aircraft.flightController, fallback.aircraft.flightController),
+    autopilot: normalizedAutopilot,
     firmware: boundedText(aircraft.firmware, fallback.aircraft.firmware),
-    controlInterface: ["px4-ros2", "mavsdk", "mavlink", "simulation-only"].includes(String(aircraft.controlInterface))
-      ? aircraft.controlInterface as AutonomyAircraftProfile["controlInterface"]
-      : fallback.aircraft.controlInterface,
+    controlInterface: normalizedControlInterface,
     computePlatform: boundedText(aircraft.computePlatform, fallback.aircraft.computePlatform),
     dryMassKg: boundedNumber(aircraft.dryMassKg, fallback.aircraft.dryMassKg, AUTONOMY_AIRCRAFT_LIMITS.dryMassKg.min, AUTONOMY_AIRCRAFT_LIMITS.dryMassKg.max),
     maximumTakeoffMassKg: boundedNumber(aircraft.maximumTakeoffMassKg, fallback.aircraft.maximumTakeoffMassKg, AUTONOMY_AIRCRAFT_LIMITS.maximumTakeoffMassKg.min, AUTONOMY_AIRCRAFT_LIMITS.maximumTakeoffMassKg.max),
