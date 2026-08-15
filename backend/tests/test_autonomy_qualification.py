@@ -111,6 +111,35 @@ def test_vehicle_pack_receipt_binds_the_full_calibration_state() -> None:
     assert unverified_receipt.receipt_id != failed_receipt.receipt_id
 
 
+def test_vehicle_pack_qualification_migrates_legacy_v1_requests() -> None:
+    legacy_payload = vehicle_payload()
+    legacy_payload.pop("autopilot")
+    legacy_sensors = legacy_payload["sensors"]
+    assert isinstance(legacy_sensors, list)
+    for sensor in legacy_sensors:
+        assert isinstance(sensor, dict)
+        sensor.pop("calibration_status")
+
+    request = VehiclePackQualificationRequest.model_validate(legacy_payload)
+    receipt = qualify_vehicle_pack(request)
+
+    assert request.autopilot == "px4"
+    assert request.sensors[0].calibration_status == "verified"
+    assert receipt.status == "validated_unsigned"
+
+
+def test_legacy_px4_interface_remains_compatible_with_ardupilot_firmware_text() -> None:
+    legacy_payload = vehicle_payload()
+    legacy_payload.pop("autopilot")
+    legacy_payload["firmware"] = "ArduPilot-compatible custom build"
+
+    request = VehiclePackQualificationRequest.model_validate(legacy_payload)
+    receipt = qualify_vehicle_pack(request)
+
+    assert request.autopilot == "px4"
+    assert receipt.status == "validated_unsigned"
+
+
 def test_vehicle_pack_blocks_an_unqualified_localization_stack() -> None:
     payload = vehicle_payload()
     payload["sensors"] = []

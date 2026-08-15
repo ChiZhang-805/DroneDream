@@ -116,7 +116,13 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     return Number.isFinite(value) && value >= limit.min && value <= limit.max;
   };
   const radiusM = autonomyAircraftRadiusM(aircraft);
-  return within(aircraft.dryMassKg, "dryMassKg")
+  return aircraft.name.trim().length > 0
+    && aircraft.manufacturer.trim().length > 0
+    && aircraft.airframe.trim().length > 0
+    && aircraft.airframe.trim().toLowerCase() !== "custom"
+    && aircraft.computePlatform.trim().length > 0
+    && aircraft.computePlatform.trim().toLowerCase() !== "custom"
+    && within(aircraft.dryMassKg, "dryMassKg")
     && within(aircraft.maximumTakeoffMassKg, "maximumTakeoffMassKg")
     && aircraft.maximumTakeoffMassKg > aircraft.dryMassKg
     && within(aircraft.bodyLengthM, "bodyLengthM")
@@ -135,6 +141,10 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     && within(aircraft.maximumClimbMps, "maximumClimbMps")
     && within(aircraft.maximumDescentMps, "maximumDescentMps")
     && within(aircraft.maximumTiltDeg, "maximumTiltDeg")
+    && aircraft.flightController.trim().length > 0
+    && aircraft.flightController.trim().toLowerCase() !== "custom"
+    && aircraft.firmware.trim().length > 0
+    && aircraft.firmware.trim().toLowerCase() !== "custom build"
     && (aircraft.autopilot === "px4" || aircraft.controlInterface !== "px4-ros2")
     && aircraft.commandLink.latencyMs >= 0
     && aircraft.commandLink.bandwidthMbps > 0
@@ -442,7 +452,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       qualificationReceiptId: null,
       qualificationContentHash: null,
       name: "Primary research quadrotor",
-      manufacturer: "Custom",
+      manufacturer: "Self-built",
       airframe: "Quad X",
       flightController: "Pixhawk 6C",
       autopilot: "px4",
@@ -597,7 +607,9 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
   const autopilotWasInferred = !["px4", "ardupilot", "custom"].includes(String(aircraft.autopilot));
   const normalizedAutopilot = !autopilotWasInferred
     ? aircraft.autopilot as AutonomyAircraftProfile["autopilot"]
-    : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4";
+    : aircraft.controlInterface === "px4-ros2"
+      ? "px4"
+      : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4";
   const requestedControlInterface = ["px4-ros2", "mavsdk", "mavlink", "simulation-only"].includes(String(aircraft.controlInterface))
     ? aircraft.controlInterface as AutonomyAircraftProfile["controlInterface"]
     : fallback.aircraft.controlInterface;
@@ -611,6 +623,10 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
   const qualificationContractMigrated = autopilotWasInferred
     || normalizedControlInterface !== requestedControlInterface
     || sensorCalibrationContractMigrated
+    || String(aircraft.flightController).trim().toLowerCase() === "custom"
+    || String(aircraft.firmware).trim().toLowerCase() === "custom build"
+    || String(aircraft.airframe).trim().toLowerCase() === "custom"
+    || String(aircraft.computePlatform).trim().toLowerCase() === "custom"
     || ((aircraft.status === "validated-unsigned" || aircraft.status === "signed")
       && !normalizedQualificationContentHash);
   const normalizedAircraft: AutonomyAircraftProfile = {
@@ -628,7 +644,9 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       ? null
       : normalizedQualificationContentHash,
     name: boundedText(aircraft.name, fallback.aircraft.name),
-    manufacturer: boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
+    manufacturer: String(aircraft.manufacturer).trim().toLowerCase() === "custom"
+      ? "Self-built"
+      : boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
     airframe: boundedText(aircraft.airframe, fallback.aircraft.airframe),
     flightController: boundedText(aircraft.flightController, fallback.aircraft.flightController),
     autopilot: normalizedAutopilot,
