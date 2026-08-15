@@ -406,7 +406,7 @@ function AutonomyMissionPlanCard({
       </header>
       <div className="autonomy-inline-plan-bindings">
         <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机" : "Aircraft"}</small><strong>{workspace.aircraft.name} · v{workspace.aircraft.version}</strong></span>
-        <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{workspace.mapPack.name} · v{workspace.mapPack.version}</strong></span>
+        <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{workspace.mapPack.name}</strong></span>
         <span><Radar aria-hidden="true" /><small>{chinese ? "感知" : "Perception"}</small><strong>{plan.perceptionMode.toUpperCase()}</strong></span>
         <span><Route aria-hidden="true" /><small>{chinese ? "路线" : "Route"}</small><strong>{plan.metrics.routeLengthM.toFixed(1)} m · {Math.ceil(plan.metrics.estimatedDurationS)} s</strong></span>
       </div>
@@ -1033,7 +1033,7 @@ export function AutonomyOverview() {
                     <header><span><Layers3 aria-hidden="true" />{copy.map}</span><Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
                     {assetLibrary.maps.map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
                       <input type="radio" name="autonomy-map" value={mapPack.id} checked={mapPack.id === workspace.mapPack.id} onChange={() => selectMap(mapPack.id)} />
-                      <span><b>{mapPack.name}</b><small>{mapPack.representation} · {mapPack.coordinateFrame} · v{mapPack.version}</small></span>
+                      <span><b>{mapPack.name}</b><small>{mapPack.representation} · {mapPack.coordinateFrame}</small></span>
                       {mapPack.id === workspace.mapPack.id ? <em>{copy.selected}</em> : null}
                     </label>)}
                   </section>
@@ -1147,15 +1147,57 @@ const CONTROL_INTERFACE_LABELS: Record<AutonomyAircraftProfile["controlInterface
   "simulation-only": "Simulation only",
 };
 
+function aircraftValidationIssue(aircraft: AutonomyAircraftProfile, chinese: boolean): string | null {
+  if (!aircraft.name.trim()) return chinese ? "请填写机型名称" : "Add aircraft name";
+  if (!aircraft.manufacturer.trim()) return chinese ? "请选择或填写制造商" : "Select a manufacturer";
+  if (!aircraft.airframe.trim() || aircraft.airframe.trim().toLowerCase() === "custom") return chinese ? "请选择或填写机架" : "Select an airframe";
+  if (!aircraft.flightController.trim() || aircraft.flightController.trim().toLowerCase() === "custom") return chinese ? "请选择或填写飞控" : "Select a flight controller";
+  if (!aircraft.firmware.trim() || aircraft.firmware.trim().toLowerCase() === "custom build") return chinese ? "请选择或填写固件版本" : "Select a firmware build";
+  if (!aircraft.computePlatform.trim() || aircraft.computePlatform.trim().toLowerCase() === "custom") return chinese ? "请选择或填写机载计算平台" : "Select onboard compute";
+
+  const outsideLimit = (key: keyof typeof AUTONOMY_AIRCRAFT_LIMITS) => {
+    const value = aircraft[key];
+    const limit = AUTONOMY_AIRCRAFT_LIMITS[key];
+    return typeof value !== "number" || !Number.isFinite(value) || value < limit.min || value > limit.max;
+  };
+  if ((Object.keys(AUTONOMY_AIRCRAFT_LIMITS) as Array<keyof typeof AUTONOMY_AIRCRAFT_LIMITS>).some(outsideLimit)) {
+    return chinese ? "修正红框中的参数" : "Fix highlighted limits";
+  }
+  if (aircraft.maximumTakeoffMassKg <= aircraft.dryMassKg) return chinese ? "最大起飞重量须大于空机重量" : "Increase MTOM above dry mass";
+  if (aircraft.dryMassKg + aircraft.maximumPickupPayloadKg > aircraft.maximumTakeoffMassKg) return chinese ? "降低载荷或提高最大起飞重量" : "Reduce payload or increase MTOM";
+  if (autonomyAircraftRadiusM(aircraft) < 0.05) return chinese ? "增大机体或旋翼尺寸" : "Increase body or rotor size";
+  if (autonomyAircraftRadiusM(aircraft) > 3) return chinese ? "减小机体或旋翼尺寸" : "Reduce body or rotor size";
+  if (aircraft.autopilot !== "px4" && aircraft.controlInterface === "px4-ros2") return chinese ? "控制接口与自动驾驶栈不兼容" : "Choose a compatible control link";
+  if (aircraft.commandLink.latencyMs < 0 || aircraft.commandLink.bandwidthMbps <= 0) return chinese ? "修正通信链路参数" : "Fix command-link values";
+  if (!aircraft.sensorMounts.some((sensor) => sensor.calibrated && sensor.calibrationStatus === "verified" && (sensor.kind === "gps" || sensor.kind === "vio"))) {
+    return chinese ? "验证至少一个 GNSS 或 VIO" : "Verify one GNSS or VIO";
+  }
+  return null;
+}
+
 export function AutonomyAircraft() {
   const { chinese, workspace, assetLibrary, selectAircraft, persist, edition } = useAutonomyWorkspace();
   const [form, setForm] = useState(workspace.aircraft);
   const [saved, setSaved] = useState(false);
   const [qualificationState, setQualificationState] = useState<"idle" | "working" | "qualified" | "blocked" | "unavailable">("idle");
-  useEffect(() => setForm(workspace.aircraft), [workspace.aircraft]);
+  const [qualificationIssues, setQualificationIssues] = useState<string[]>([]);
+  const qualificationReceiptRef = useRef<string | null>(null);
+  useEffect(() => {
+    setForm(workspace.aircraft);
+    const preservesCurrentReceipt = Boolean(workspace.aircraft.qualificationReceiptId)
+      && workspace.aircraft.qualificationReceiptId === qualificationReceiptRef.current;
+    if (workspace.aircraft.status !== "draft") {
+      setQualificationState("qualified");
+      setQualificationIssues([]);
+    } else if (!preservesCurrentReceipt) {
+      setQualificationState("idle");
+      setQualificationIssues([]);
+    }
+  }, [workspace.aircraft]);
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
   const valid = isAutonomyAircraftProfileValid(form);
+  const validationIssue = aircraftValidationIssue(form, chinese);
   const createAircraft = () => {
     const updatedAt = new Date().toISOString();
     const next: AutonomyAircraftProfile = {
@@ -1175,6 +1217,7 @@ export function AutonomyAircraft() {
     }));
     setSaved(false);
     setQualificationState("idle");
+    setQualificationIssues([]);
   };
   const manufacturerIsCustom = !AIRCRAFT_MANUFACTURERS.includes(form.manufacturer as typeof AIRCRAFT_MANUFACTURERS[number]);
   const airframeIsCustom = !AIRFRAMES.includes(form.airframe as typeof AIRFRAMES[number]);
@@ -1191,6 +1234,8 @@ export function AutonomyAircraft() {
       qualificationContentHash: null,
     }));
     setSaved(false);
+    setQualificationState("idle");
+    setQualificationIssues([]);
   };
   const numberField = (key: keyof AutonomyAircraftProfile, value: string) => {
     const numeric = Number(value);
@@ -1238,6 +1283,8 @@ export function AutonomyAircraft() {
         }],
     }));
     setSaved(false);
+    setQualificationState("idle");
+    setQualificationIssues([]);
   };
   const updateSensorMount = (id: string, patch: Partial<AutonomyAircraftProfile["sensorMounts"][number]>) => {
     setForm((current) => ({
@@ -1249,6 +1296,7 @@ export function AutonomyAircraft() {
     }));
     setSaved(false);
     setQualificationState("idle");
+    setQualificationIssues([]);
   };
   const qualify = async () => {
     if (!valid) {
@@ -1302,11 +1350,14 @@ export function AutonomyAircraft() {
         qualificationContentHash: receipt.status === "validated_unsigned" ? receipt.content_sha256 : null,
         updatedAt: new Date().toISOString(),
       };
+      qualificationReceiptRef.current = receipt.receipt_id;
       setForm(next);
       persist(updatedWorkspace(workspace, { aircraft: next }));
       setSaved(true);
+      setQualificationIssues(receipt.issues.map((issue) => issue.message));
       setQualificationState(receipt.status === "validated_unsigned" ? "qualified" : "blocked");
     } catch {
+      setQualificationIssues([]);
       setQualificationState("unavailable");
     }
   };
@@ -1353,9 +1404,9 @@ export function AutonomyAircraft() {
               ["maximumDescentMps", chinese ? "最大下降 (m/s)" : "Maximum descent (m/s)"],
               ["maximumTiltDeg", chinese ? "最大倾角 (°)" : "Maximum tilt (°)"],
             ] as Array<[keyof typeof AUTONOMY_AIRCRAFT_LIMITS, string]>).map(([key, label]) => (
-              <label key={key}><span>{label}</span><input type="number" min={AUTONOMY_AIRCRAFT_LIMITS[key].min} max={AUTONOMY_AIRCRAFT_LIMITS[key].max} step="0.01" value={String(form[key])} onChange={(event) => numberField(key, event.target.value)} /></label>
+              <label key={key}><span>{label}</span><input type="number" min={AUTONOMY_AIRCRAFT_LIMITS[key].min} max={AUTONOMY_AIRCRAFT_LIMITS[key].max} step="0.01" value={String(form[key])} aria-invalid={typeof form[key] !== "number" || form[key] < AUTONOMY_AIRCRAFT_LIMITS[key].min || form[key] > AUTONOMY_AIRCRAFT_LIMITS[key].max} onChange={(event) => numberField(key, event.target.value)} /></label>
             ))}
-            <label><span>{chinese ? "返航保留电量 (%)" : "Reserve battery (%)"}</span><input type="number" min="10" max="90" step="1" value={form.reserveBatteryPercent} onChange={(event) => numberField("reserveBatteryPercent", event.target.value)} /></label>
+            <label><span>{chinese ? "返航保留电量 (%)" : "Reserve battery (%)"}</span><input type="number" min="10" max="90" step="1" value={form.reserveBatteryPercent} aria-invalid={form.reserveBatteryPercent < AUTONOMY_AIRCRAFT_LIMITS.reserveBatteryPercent.min || form.reserveBatteryPercent > AUTONOMY_AIRCRAFT_LIMITS.reserveBatteryPercent.max} onChange={(event) => numberField("reserveBatteryPercent", event.target.value)} /></label>
           </div>
         </section>
 
@@ -1411,12 +1462,9 @@ export function AutonomyAircraft() {
           <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "资格状态" : "Qualification"} value={form.status.toUpperCase()} />
         </div>
         <div className="autonomy-config-summary-actions">
-          {!valid ? <p className="autonomy-config-error">{chinese ? "请检查质量、推力、电量预留、定位传感器标定和 3 m 规划半径限制。" : "Check mass, thrust, reserve, positioning-sensor calibration, and the 3 m planning-radius limit."}</p> : null}
-          <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"}><Save aria-hidden="true" />{form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
-          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
-          {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "公开网页不签发资格凭据。请在连接 DroneDream 后端的桌面或私有控制台完成验证。" : "The public site cannot issue qualification receipts. Use a desktop or private console connected to the DroneDream backend."}</p> : null}
+          <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"} title={validationIssue ?? undefined}><Save aria-hidden="true" />{validationIssue ?? (form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft"))}</button>
+          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working" || (publicDemoConsole && qualificationState === "unavailable")} title={publicDemoConsole && qualificationState === "unavailable" ? (chinese ? "请在桌面端或私有控制台签发资格凭据" : "Qualify in the desktop or private console") : qualificationState === "blocked" ? qualificationIssues.join(" · ") || undefined : undefined} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "blocked" && qualificationIssues.length ? qualificationIssues[0] : qualificationState === "unavailable" && publicDemoConsole ? (chinese ? "请使用桌面端验证" : "Use desktop to qualify") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
           {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
-          <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.aircraft.updatedAt)}</small>
         </div>
       </aside>
     </form>
@@ -1507,11 +1555,21 @@ export function AutonomyMaps() {
   const [saved, setSaved] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [qualificationState, setQualificationState] = useState<"idle" | "working" | "qualified" | "blocked" | "unavailable">("idle");
+  const [qualificationIssues, setQualificationIssues] = useState<string[]>([]);
+  const qualificationReceiptRef = useRef<string | null>(null);
   const [sceneManifests, setSceneManifests] = useState(FALLBACK_MAP_SCENE_MANIFESTS);
   useEffect(() => {
     setForm(workspace.mapPack);
     setSaved(true);
-    setQualificationState(autonomyMapPackQualified(workspace.mapPack) ? "qualified" : "idle");
+    const preservesCurrentReceipt = Boolean(workspace.mapPack.qualificationReceiptId)
+      && workspace.mapPack.qualificationReceiptId === qualificationReceiptRef.current;
+    if (autonomyMapPackQualified(workspace.mapPack)) {
+      setQualificationState("qualified");
+      setQualificationIssues([]);
+    } else if (!preservesCurrentReceipt) {
+      setQualificationState("idle");
+      setQualificationIssues([]);
+    }
   }, [workspace.mapPack]);
   useEffect(() => {
     if (publicDemoConsole) return;
@@ -1590,6 +1648,7 @@ export function AutonomyMaps() {
       }));
       setSaved(false);
       setQualificationState("idle");
+      setQualificationIssues([]);
     } finally {
       setIngesting(false);
     }
@@ -1737,13 +1796,16 @@ export function AutonomyMaps() {
         qualificationReceiptId: receipt.receipt_id,
         updatedAt: receipt.created_at,
       };
+      qualificationReceiptRef.current = receipt.receipt_id;
       setForm(next);
       persist(updatedWorkspace(workspace, {
         mapPack: next,
         mission: { ...workspace.mission, mapPackId: next.id, compiledPlan: null, updatedAt: next.updatedAt },
       }));
       setQualificationState(receipt.status === "qualified" ? "qualified" : "blocked");
+      setQualificationIssues(receipt.issues.map((issue) => issue.message));
     } catch {
+      setQualificationIssues([]);
       setQualificationState("unavailable");
     }
   };
@@ -1751,7 +1813,7 @@ export function AutonomyMaps() {
     <form className="autonomy-config-page autonomy-maps-page" onSubmit={save}>
       <div className="autonomy-config-main">
         <section className="autonomy-config-card">
-          <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存地图" : "Saved maps"} value={workspace.mapPack.id} onChange={(event) => selectMap(event.target.value)}>{assetLibrary.maps.map((mapPack) => <option value={mapPack.id} key={mapPack.id}>{mapPack.name} · v{mapPack.version}</option>)}</select><button className="btn" type="button" onClick={createMap}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
+          <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存地图" : "Saved maps"} value={workspace.mapPack.id} onChange={(event) => selectMap(event.target.value)}>{assetLibrary.maps.map((mapPack) => <option value={mapPack.id} key={mapPack.id}>{mapPack.name}</option>)}</select><button className="btn" type="button" onClick={createMap}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
           <div className="autonomy-form-grid is-four">
             <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateMap({ name: event.target.value })} /></label>
             <label><span>{chinese ? "三维表示" : "3D representation"}</span><select value={form.representation} onChange={(event) => updateGeometry({ representation: event.target.value as AutonomyMapPack["representation"] })}><option value="hybrid-3d">Hybrid 3D</option><option value="mesh">Mesh</option><option value="point-cloud">Point cloud</option><option value="occupancy">Occupancy / ESDF</option><option value="terrain">Terrain / DEM</option></select></label>
@@ -1779,11 +1841,13 @@ export function AutonomyMaps() {
             <span>GLB · GLTF · PCD · PLY · GeoJSON</span>
             <input type="file" multiple accept=".glb,.gltf,.pcd,.ply,.json,.geojson" onChange={(event) => void addFiles(event.target.files)} />
           </label>
-          <div className="autonomy-map-assets">
-            {form.sourceFiles.length ? form.sourceFiles.map((file, index) => (
+          {form.sourceFiles.length ? (
+            <div className="autonomy-map-assets">
+              {form.sourceFiles.map((file, index) => (
                <div key={`${file.name}-${index}`} data-admission={file.admission}><HardDrive aria-hidden="true" /><span><strong>{file.name}</strong><small>{file.format.toUpperCase()} · {(file.bytes / 1_000_000).toFixed(2)} MB · {file.admission.toUpperCase()}{file.parser ? ` · ${file.parser}` : ""}</small>{file.sha256 ? <code>{file.sha256.slice(0, 20)}</code> : null}</span><button type="button" onClick={() => { setForm({ ...form, status: "draft", contentHash: null, qualificationReceiptId: null, calibrated: false, compilerSceneId: null, sourceFiles: form.sourceFiles.filter((_, itemIndex) => itemIndex !== index) }); setSaved(false); setQualificationState("idle"); }}>×</button></div>
-            )) : <p className="autonomy-honest-empty">{chinese ? "尚未登记地图资产。可选择经过验证的内置三维场景；导入文件必须由后端完成几何摄取后才会获得编译场景资格。" : "No map assets registered. Select a validated built-in 3D scene, or wait for backend geometry ingestion before an imported pack receives a compiled scene binding."}</p>}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <section className="autonomy-config-card">
@@ -1806,14 +1870,10 @@ export function AutonomyMaps() {
         <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "分辨率" : "Resolution"} value={`${form.resolutionM.toFixed(3)} m`} />
         <Metric icon={<Layers3 aria-hidden="true" />} label={chinese ? "语义图层" : "Semantic layers"} value={String(form.semanticLayers.length)} />
         <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "状态" : "Status"} value={ready ? "READY" : "BLOCKED"} />
-        <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "Map Pack 版本" : "Map Pack version"} value={`v${form.version}`} />
         <Metric icon={<Database aria-hidden="true" />} label={chinese ? "资产准入" : "Asset admission"} value={form.status.toUpperCase()} />
         <Metric icon={<Gauge aria-hidden="true" />} label={chinese ? "地图可信度" : "Map confidence"} value={`${form.confidencePercent.toFixed(0)}%`} />
         <button className="btn btn-primary" type="submit" disabled={saved}><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存 Map Pack" : "Save Map Pack")}</button>
-        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
-        {qualificationState === "blocked" ? <p className="autonomy-config-error">{chinese ? "地图配置与内置场景清单不一致，或导入资产仍缺少几何重建凭据。" : "The map configuration differs from the bundled manifest, or imported assets still lack a reconstruction receipt."}</p> : null}
-        {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "当前控制台无法签发地图资格凭据。请连接 DroneDream 后端后重试。" : "This console cannot issue a map qualification receipt. Connect the DroneDream backend and retry."}</p> : null}
-        <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.mapPack.updatedAt)}</small>
+        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified" || (publicDemoConsole && qualificationState === "unavailable")} title={publicDemoConsole && qualificationState === "unavailable" ? (chinese ? "请在桌面端或私有控制台签发资格凭据" : "Qualify in the desktop or private console") : qualificationState === "blocked" ? qualificationIssues.join(" · ") || undefined : undefined} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : qualificationState === "blocked" && qualificationIssues.length ? qualificationIssues[0] : qualificationState === "blocked" ? (chinese ? "资格验证未通过" : "Qualification blocked") : qualificationState === "unavailable" && publicDemoConsole ? (chinese ? "请使用桌面端验证" : "Use desktop to qualify") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
       </aside>
     </form>
   );

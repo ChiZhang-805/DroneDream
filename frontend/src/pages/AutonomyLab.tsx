@@ -625,6 +625,41 @@ function previewRuntimeTaskGraph(
   };
 }
 
+function embeddedTaskGraphNodes(graph: AutonomyTaskGraph): AutonomyTaskGraph["nodes"] {
+  if (graph.nodes.length <= 2) return graph.nodes;
+
+  const activeIds = new Set(graph.active_node_ids);
+  const relevantIndexes = graph.nodes
+    .map((node, index) => ({ node, index }))
+    .filter(({ node }) =>
+      activeIds.has(node.task_id)
+      || node.status === "active"
+      || node.status === "blocked"
+      || node.status === "failed",
+    );
+  const runtimeIndexes = relevantIndexes
+    .filter(({ node }) => node.inserted_by === "runtime")
+    .map(({ index }) => index);
+  const selected = new Set<number>(runtimeIndexes.slice(-2));
+
+  for (const { index } of [...relevantIndexes].reverse()) {
+    if (selected.size >= 2) break;
+    selected.add(index);
+  }
+
+  if (selected.size === 0) {
+    selected.add(graph.nodes.length - 1);
+  }
+  if (selected.size === 1) {
+    const [anchor] = selected;
+    selected.add(anchor > 0 ? anchor - 1 : Math.min(1, graph.nodes.length - 1));
+  }
+
+  return [...selected]
+    .sort((left, right) => left - right)
+    .map((index) => graph.nodes[index]);
+}
+
 export function AutonomyLab({
   embedded = false,
   onRunCompleted,
@@ -1342,19 +1377,19 @@ export function AutonomyLab({
             <div><BrainCircuit aria-hidden="true" /><span>{copy.brain}</span></div>
             <span className="autonomy-brain-rate">20 Hz safety loop</span>
           </div>
-          <div className="autonomy-task-graph-heading">
+          {!embedded ? <div className="autonomy-task-graph-heading">
             <span>GRAPH R{activeTaskGraph.revision} · {activeTaskGraph.change_reason}</span>
             <button type="button" onClick={() => setTaskGraphView((current) => current === "summary" ? "engineering" : "summary")}>
               {taskGraphView === "summary" ? (chinese ? "工程详情" : "Engineering") : (chinese ? "简洁视图" : "Summary")}
             </button>
-          </div>
+          </div> : null}
           <ol className={`autonomy-task-graph is-${taskGraphView}`}>
-            {activeTaskGraph.nodes.map((node, index) => (
+            {(embedded ? embeddedTaskGraphNodes(activeTaskGraph) : activeTaskGraph.nodes).map((node) => (
               <li key={node.task_id} data-status={node.status} data-source={node.inserted_by}>
-                <span>{node.status === "completed" ? <Check aria-hidden="true" /> : index + 1}</span>
+                <span>{node.status === "completed" ? <Check aria-hidden="true" /> : activeTaskGraph.nodes.findIndex((candidate) => candidate.task_id === node.task_id) + 1}</span>
                 <div>
                   <strong>{node.label}</strong>
-                  <small>{node.status.toUpperCase()} · {node.executor.replaceAll("_", " ")}</small>
+                  <small>{embedded ? node.status.toUpperCase() : `${node.status.toUpperCase()} · ${node.executor.replaceAll("_", " ")}`}</small>
                   {taskGraphView === "engineering" ? <em>{node.risk.toUpperCase()} · {node.timeout_s}s · {node.max_retries} {chinese ? "次重试" : "retries"} · {node.fallback.toUpperCase()}</em> : null}
                 </div>
               </li>
@@ -1364,13 +1399,13 @@ export function AutonomyLab({
           <div className="autonomy-live-perception">
             <header><h2><Radar aria-hidden="true" />{chinese ? "实时感知" : "Live perception"}</h2><span>{activeEntities.length} {chinese ? "个跟踪实体" : "tracked"}</span></header>
             <div className="autonomy-stream-health">
-              {(runtimeSession?.stream_health ?? simulatedStreamHealth()).map((stream) => <span key={stream.stream_id} data-status={stream.status}><i />{stream.kind.toUpperCase()}<small>{stream.rate_hz} Hz · {stream.latency_ms} ms</small></span>)}
+              {(runtimeSession?.stream_health ?? simulatedStreamHealth()).map((stream) => <span key={stream.stream_id} data-status={stream.status}><i />{stream.kind.toUpperCase()}{!embedded ? <small>{stream.rate_hz} Hz · {stream.latency_ms} ms</small> : null}</span>)}
             </div>
-            {activeEntities.map((entity) => <article key={entity.track_id}>
+            {!embedded ? activeEntities.map((entity) => <article key={entity.track_id}>
               <Radar aria-hidden="true" />
               <span><strong>{entity.kind.toUpperCase()} · {entity.track_id}</strong><small>{Math.round(entity.confidence * 100)}% · {entity.source_stream} · {entity.velocity_mps.y.toFixed(2)} m/s</small></span>
               <em>{entity.safety_radius_m.toFixed(1)} m</em>
-            </article>)}
+            </article>) : null}
           </div>
 
           <div className="autonomy-runtime-stack">
@@ -1385,15 +1420,15 @@ export function AutonomyLab({
                 <li key={component.id} data-status={component.status}>
                   <i aria-hidden="true" />
                   <strong>{runtimeComponentLabel(component.id, chinese)}</strong>
-                  <small>{component.rate_hz ? `${component.rate_hz} Hz` : "—"}</small>
+                  {!embedded ? <small>{component.rate_hz ? `${component.rate_hz} Hz` : "—"}</small> : null}
                 </li>
               ))}
             </ul>
-            <code className="autonomy-runtime-receipt">
+            {!embedded ? <code className="autonomy-runtime-receipt">
               {runtimeSession
                 ? `${runtimeSession.phase.toUpperCase()} · ${runtimeSession.session_id.slice(0, 18)} · ${runtimeSession.evidence_chain_head.slice(0, 12)}`
                 : copy.runtimeAwaiting}
-            </code>
+            </code> : null}
           </div>
 
           <div className="autonomy-telemetry">
@@ -1408,22 +1443,22 @@ export function AutonomyLab({
             </dl>
           </div>
 
-          <div className={`autonomy-safety-gate ${qualification.execution_policy.can_execute ? "is-ready" : "is-denied"}`}>
+          <div className={`autonomy-safety-gate ${qualification.execution_policy.can_execute ? "is-ready" : "is-denied"}${embedded ? " is-embedded" : ""}`}>
             <h2>{qualification.execution_policy.can_execute ? <BadgeCheck aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}{copy.safetyGate}</h2>
             <div className="autonomy-safety-readout">
               <span>{copy.signedPacks}</span><strong>{qualification.execution_policy.validated_signed_pack_count}</strong>
             </div>
             {qualification.execution_policy.blockers.length ? (
-              <ul>{qualification.execution_policy.blockers.slice(0, 4).map((blocker) => <li key={blocker}>{blocker.replaceAll(".", " · ")}</li>)}</ul>
+              <ul>{qualification.execution_policy.blockers.slice(0, embedded ? 2 : 4).map((blocker) => <li key={blocker}>{blocker.replaceAll(".", " · ")}</li>)}</ul>
             ) : <p>{copy.noBlockers}</p>}
           </div>
 
-          <div className="autonomy-event-log">
+          {!embedded ? <div className="autonomy-event-log">
             <h2>{copy.eventLog}</h2>
             <ul aria-live="polite">
               {events.map((event, index) => <li key={`${event.time}-${index}`}><time>{event.time}</time><span>{event.text}</span></li>)}
             </ul>
-          </div>
+          </div> : null}
         </aside>
       </section>
     </div>
