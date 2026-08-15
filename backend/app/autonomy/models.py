@@ -62,6 +62,23 @@ TaskExecutor = Literal[
     "px4_bridge",
     "operator",
 ]
+TaskRisk = Literal["low", "medium", "high", "critical"]
+MissionAction = Literal[
+    "takeoff",
+    "transit",
+    "traverse_stairs",
+    "pass_gate",
+    "pickup",
+    "return",
+    "land",
+]
+RuntimeDecisionKind = Literal[
+    "session",
+    "task_transition",
+    "dynamic_entity",
+    "safety",
+    "operator",
+]
 
 
 class StrictModel(BaseModel):
@@ -108,15 +125,7 @@ class RoutePoint(StrictModel):
 
 class MissionStep(StrictModel):
     order: int = Field(ge=1, le=64)
-    action: Literal[
-        "takeoff",
-        "transit",
-        "traverse_stairs",
-        "pass_gate",
-        "pickup",
-        "return",
-        "land",
-    ]
+    action: MissionAction
     label: str = Field(min_length=1, max_length=160)
     payload_delta_kg: float = Field(default=0.0, ge=0.0, le=10.0)
 
@@ -131,7 +140,7 @@ class MissionTaskNode(StrictModel):
     status: TaskNodeStatus = "pending"
     depends_on: list[str] = Field(default_factory=list, max_length=16)
     executor: TaskExecutor
-    risk: Literal["low", "medium", "high", "critical"]
+    risk: TaskRisk
     max_retries: int = Field(default=1, ge=0, le=20)
     timeout_s: float = Field(default=30.0, gt=0.0, le=3600.0)
     fallback: SafetyAction
@@ -352,13 +361,7 @@ class RuntimeObservation(StrictModel):
 class RuntimeDecisionEvent(StrictModel):
     revision: int = Field(ge=1)
     created_at: datetime
-    kind: Literal[
-        "session",
-        "task_transition",
-        "dynamic_entity",
-        "safety",
-        "operator",
-    ]
+    kind: RuntimeDecisionKind
     code: str = Field(min_length=1, max_length=120)
     summary: str = Field(min_length=1, max_length=240)
     task_ids: list[str] = Field(default_factory=list, max_length=16)

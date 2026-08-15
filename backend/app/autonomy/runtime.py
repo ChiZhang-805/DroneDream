@@ -23,6 +23,7 @@ from app.autonomy.models import (
     MissionTaskNode,
     PerceivedEntity,
     RuntimeDecisionEvent,
+    RuntimeDecisionKind,
     RuntimeObservation,
     RuntimeOperatorCommand,
     RuntimePhase,
@@ -424,7 +425,7 @@ class RuntimeSessionRegistry:
             phase = _next_phase(observation, decision)
             task_graph = _advance_task_graph(current.task_graph, observation, decision)
             entity_ids = [entity.track_id for entity in _dynamic_entities(observation)]
-            event_kind = (
+            event_kind: RuntimeDecisionKind = (
                 "dynamic_entity"
                 if entity_ids
                 else ("safety" if decision.action != "continue" else "task_transition")

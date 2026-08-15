@@ -12,6 +12,7 @@ from app.autonomy.models import (
     AutonomyCompileResponse,
     ExecutionAdapter,
     ExecutionPolicy,
+    MissionAction,
     MissionContract,
     MissionMetrics,
     MissionStep,
@@ -25,6 +26,9 @@ from app.autonomy.models import (
     RuntimeComponentId,
     RuntimeComponentStatus,
     RuntimeMode,
+    SafetyAction,
+    TaskExecutor,
+    TaskRisk,
     ValidationIssue,
 )
 
@@ -202,7 +206,7 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         ),
     ]
     previous = "world-localization"
-    executor_by_action = {
+    executor_by_action: dict[MissionAction, TaskExecutor] = {
         "takeoff": "px4_bridge",
         "transit": "local_planner",
         "traverse_stairs": "local_planner",
@@ -211,7 +215,7 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         "return": "global_planner",
         "land": "px4_bridge",
     }
-    risk_by_action = {
+    risk_by_action: dict[MissionAction, TaskRisk] = {
         "takeoff": "high",
         "transit": "medium",
         "traverse_stairs": "high",
@@ -222,7 +226,7 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
     }
     for step in steps:
         task_id = f"mission-{step.order:02d}-{step.action.replace('_', '-')}"
-        fallback = "land" if step.action in {"return", "land"} else "hold"
+        fallback: SafetyAction = "land" if step.action in {"return", "land"} else "hold"
         nodes.append(
             MissionTaskNode(
                 task_id=task_id,

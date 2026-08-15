@@ -26,6 +26,7 @@ from app.autonomy.models import StrictModel, Vector3
 MAX_MAP_ASSET_BYTES = 25 * 1024 * 1024
 MAX_ASSET_RECEIPTS = 512
 SUPPORTED_MAP_FORMATS = {"glb", "gltf", "geojson", "json", "ply", "pcd"}
+MapLayer = Literal["mesh", "point-cloud", "semantic", "georeference"]
 
 
 class SensorCalibration(StrictModel):
@@ -105,7 +106,7 @@ class MapAssetAdmissionReceipt(StrictModel):
     content_sha256: str
     parser: str
     status: Literal["admitted", "rejected"]
-    layers: list[Literal["mesh", "point-cloud", "semantic", "georeference"]]
+    layers: list[MapLayer]
     issues: list[QualificationIssue]
     created_at: datetime
     planning_qualified: Literal[False] = False
@@ -163,8 +164,7 @@ def qualify_vehicle_pack(
                 code="vehicle.command-link-high-latency",
                 severity="warning",
                 message=(
-                    "Command-link latency exceeds 250 ms; cloud control must not "
-                    "enter a fast loop."
+                    "Command-link latency exceeds 250 ms; cloud control must not enter a fast loop."
                 ),
             )
         )
@@ -212,7 +212,9 @@ def qualify_vehicle_pack(
     )
 
 
-def _json_asset(data: bytes, extension: str) -> tuple[str, list[str], list[QualificationIssue]]:
+def _json_asset(
+    data: bytes, extension: str
+) -> tuple[str, list[MapLayer], list[QualificationIssue]]:
     issues: list[QualificationIssue] = []
     try:
         payload = json.loads(data.decode("utf-8"))
@@ -264,7 +266,7 @@ def _json_asset(data: bytes, extension: str) -> tuple[str, list[str], list[Quali
 
 def _inspect_map_asset(
     data: bytes, extension: str
-) -> tuple[str, list[str], list[QualificationIssue]]:
+) -> tuple[str, list[MapLayer], list[QualificationIssue]]:
     if extension == "glb":
         if len(data) < 12 or data[:4] != b"glTF":
             return (
