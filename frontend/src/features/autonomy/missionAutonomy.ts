@@ -7,7 +7,7 @@ import type {
 export type AutonomyMissionId = "coffee" | "gates" | "narrow";
 
 const SCENE_IDS: Record<AutonomyMissionId, string> = {
-  coffee: "stairwell-coffee-return",
+  coffee: "school-campus-v1",
   gates: "forest-gate-inspection",
   narrow: "service-corridor-dock",
 };
@@ -24,15 +24,15 @@ const SCENE_META: Record<AutonomyMissionId, {
   duration: number;
 }> = {
   coffee: {
-    name: "Multi-level coffee pickup",
-    summary: "Third-floor office, narrow stairwell, courtyard obstacles, loaded pickup and return.",
+    name: "School Map takeout mission",
+    summary: "Third-floor office, 12+12 switchback stairs, campus roads, cafeteria pickup and loaded return.",
     floors: 3,
-    clearance: 0.92,
-    tags: ["stairs", "indoor-outdoor", "trees", "signs", "payload", "return"],
-    objectKinds: ["building", "stairwell", "tree", "tree", "sign", "pole", "pickup"],
-    length: 86.4,
-    vertical: 14.8,
-    duration: 112,
+    clearance: 0.82,
+    tags: ["school", "stairs", "indoor-outdoor", "roads", "people", "payload", "return"],
+    objectKinds: ["building", "stairwell", "building", "road", "tree", "pole", "pickup"],
+    length: 154.8,
+    vertical: 14.4,
+    duration: 186,
   },
   gates: {
     name: "Forest gate inspection",
@@ -113,9 +113,9 @@ function runtimeProfile(target: AutonomyExecutionTarget): AutonomyCompileRespons
 function steps(missionId: AutonomyMissionId, pickupPayloadKg: number) {
   if (missionId === "coffee") return [
     { order: 1, action: "takeoff", label: "Launch from the third-floor office", payload_delta_kg: 0 },
-    { order: 2, action: "traverse_stairs", label: "Descend the narrow stairwell through two landings", payload_delta_kg: 0 },
-    { order: 3, action: "transit", label: "Avoid trees, signs, poles and buildings outside", payload_delta_kg: 0 },
-    { order: 4, action: "pickup", label: "Acquire the coffee at the docking target", payload_delta_kg: pickupPayloadKg },
+    { order: 2, action: "traverse_stairs", label: "Descend both 12+12 switchback stair flights", payload_delta_kg: 0 },
+    { order: 3, action: "transit", label: "Follow the campus road while avoiding people, trees, lights and buildings", payload_delta_kg: 0 },
+    { order: 4, action: "pickup", label: "Acquire the takeout order at the cafeteria pickup pad", payload_delta_kg: pickupPayloadKg },
     { order: 5, action: "return", label: "Replan with the loaded vehicle envelope and return upstairs", payload_delta_kg: 0 },
     { order: 6, action: "land", label: "Land at the original launch point", payload_delta_kg: 0 },
   ];
@@ -394,7 +394,7 @@ export function createLocalAutonomyPreview(
       id: sceneId,
       name: meta.name,
       summary: meta.summary,
-      bounds_m: { x: missionId === "coffee" ? 42 : 48, y: 28, z: missionId === "coffee" ? 11 : 8 },
+      bounds_m: { x: missionId === "coffee" ? 120 : 48, y: missionId === "coffee" ? 90 : 28, z: missionId === "coffee" ? 12.6 : 8 },
       floors: meta.floors,
       minimum_clearance_m: meta.clearance,
       objects: objectList,

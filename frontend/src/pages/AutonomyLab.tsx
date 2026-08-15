@@ -418,7 +418,7 @@ const BASE_MISSIONS: Readonly<Record<MissionId, Omit<MissionPreset, "name" | "de
 };
 
 const SCENE_ID_BY_MISSION: Record<MissionId, string> = {
-  coffee: "stairwell-coffee-return",
+  coffee: "school-campus-v1",
   gates: "forest-gate-inspection",
   narrow: "service-corridor-dock",
 };
@@ -426,16 +426,17 @@ const SCENE_ID_BY_MISSION: Record<MissionId, string> = {
 const MISSION_BY_SCENE_ID = Object.fromEntries(
   Object.entries(SCENE_ID_BY_MISSION).map(([missionId, sceneId]) => [sceneId, missionId as MissionId]),
 ) as Record<string, MissionId>;
+MISSION_BY_SCENE_ID["stairwell-coffee-return"] = "coffee";
 
 const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
-  dry_mass_kg: 1.55,
+  dry_mass_kg: 1.86,
   launch_payload_kg: 0.10,
-  pickup_payload_kg: 0.35,
-  max_takeoff_mass_kg: 2.60,
-  max_total_thrust_n: 39.0,
-  radius_m: 0.28,
-  max_speed_mps: 1.30,
-  max_acceleration_mps2: 3.0,
+  pickup_payload_kg: 0.55,
+  max_takeoff_mass_kg: 2.80,
+  max_total_thrust_n: 44.0,
+  radius_m: 0.381,
+  max_speed_mps: 4.0,
+  max_acceleration_mps2: 2.5,
   reserve_battery_percent: 30,
 };
 

@@ -8,7 +8,7 @@ import {
 } from "./missionHarness";
 
 describe("autonomy mission harness", () => {
-  it("fails closed while the default aircraft and map remain drafts", async () => {
+  it("recognizes the public assets but still fails closed without the server registry", async () => {
     const request = autonomyHarnessRequest(
       "universal",
       defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z")),
@@ -19,8 +19,8 @@ describe("autonomy mission harness", () => {
 
     expect(inspection.status).toBe("needs_assets");
     expect(inspection.planning_ready).toBe(false);
-    expect(inspection.blockers).toContain("aircraft.pack.not-validated");
-    expect(inspection.blockers).toContain("map.pack.not-qualified");
+    expect(inspection.blockers).toContain("aircraft.qualification-registry.unavailable");
+    expect(inspection.blockers).toContain("map.qualification-registry.unavailable");
     expect(inspection.eligible_tool_ids).toEqual([
       "vehicle.inspect_binding",
       "map.inspect_binding",

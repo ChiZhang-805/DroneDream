@@ -109,7 +109,7 @@ def _select_scene(request: AutonomyCompileRequest) -> str:
         return "forest-gate-inspection"
     if any(token in text for token in ("dock", "走廊", "corridor", "停靠", "狭窄")):
         return "service-corridor-dock"
-    return "stairwell-coffee-return"
+    return "school-campus-v1"
 
 
 def _select_perception(request: AutonomyCompileRequest) -> PerceptionMode:
@@ -130,7 +130,7 @@ def _select_perception(request: AutonomyCompileRequest) -> PerceptionMode:
 
 
 def _steps(scene_id: str, pickup_payload_kg: float) -> list[MissionStep]:
-    if scene_id == "stairwell-coffee-return":
+    if scene_id in {"school-campus-v1", "stairwell-coffee-return"}:
         return [
             MissionStep(order=1, action="takeoff", label="Launch from the third-floor office"),
             MissionStep(
@@ -631,7 +631,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
                 ),
             )
         )
-    if scene_id == "stairwell-coffee-return" and perception == "vision":
+    if scene_id in {"school-campus-v1", "stairwell-coffee-return"} and perception == "vision":
         issues.append(
             ValidationIssue(
                 code="perception.no-global-return-map",

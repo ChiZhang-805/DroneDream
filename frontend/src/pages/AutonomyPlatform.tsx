@@ -244,7 +244,7 @@ function inferredSceneId(intent: string, mapPack: AutonomyMapPack): string {
   const normalized = intent.toLocaleLowerCase();
   if (/gate|圆门|圆环|穿门|森林|树林/u.test(normalized)) return "forest-gate-inspection";
   if (/dock|走廊|corridor|停靠|狭窄/u.test(normalized)) return "service-corridor-dock";
-  return "stairwell-coffee-return";
+  return "school-campus-v1";
 }
 
 function compileRequestForWorkspace(
@@ -1023,15 +1023,15 @@ export function AutonomyOverview() {
                   <strong className="assistant-task-popover-title">{copy.context}</strong>
                   <section className="autonomy-context-group" aria-label={copy.aircraft}>
                     <header><span><Navigation2 aria-hidden="true" />{copy.aircraft}</span><Link to="/autonomy/aircraft" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {assetLibrary.aircraft.map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
+                    {assetLibrary.aircraft.filter((aircraft) => aircraft.id === "aircraft-my-drone").map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
                       <input type="radio" name="autonomy-aircraft" value={aircraft.id} checked={aircraft.id === workspace.aircraft.id} onChange={() => selectAircraft(aircraft.id)} />
-                      <span><b>{aircraft.name}</b><small>{aircraft.manufacturer} · {aircraft.airframe} · v{aircraft.version}</small></span>
+                      <span><b>{aircraft.name}</b><small>{aircraft.airframe} · RGB-D · VIO</small></span>
                       {aircraft.id === workspace.aircraft.id ? <em>{copy.selected}</em> : null}
                     </label>)}
                   </section>
                   <section className="autonomy-context-group" aria-label={copy.map}>
                     <header><span><Layers3 aria-hidden="true" />{copy.map}</span><Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {assetLibrary.maps.map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
+                    {assetLibrary.maps.filter((mapPack) => mapPack.id === "map-school").map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
                       <input type="radio" name="autonomy-map" value={mapPack.id} checked={mapPack.id === workspace.mapPack.id} onChange={() => selectMap(mapPack.id)} />
                       <span><b>{mapPack.name}</b><small>{mapPack.representation} · {mapPack.coordinateFrame}</small></span>
                       {mapPack.id === workspace.mapPack.id ? <em>{copy.selected}</em> : null}
@@ -1478,6 +1478,12 @@ const SEMANTIC_LABELS: Record<AutonomyMapPack["semanticLayers"][number], string>
   gates: "Gates",
   people: "People",
   "pickup-zones": "Pickup zones",
+  "launch-zones": "Launch zones",
+  rooms: "Rooms",
+  corridors: "Corridors",
+  roads: "Roads",
+  vegetation: "Vegetation",
+  "street-furniture": "Street furniture",
 };
 
 const PLANNING_LAYER_LABELS: Record<AutonomyMapPack["planningLayers"][number], string> = {
@@ -1492,6 +1498,23 @@ const FALLBACK_MAP_SCENE_MANIFESTS: Record<
   NonNullable<AutonomyMapPack["compilerSceneId"]>,
   AutonomyBundledMapManifest
 > = {
+  "school-campus-v1": {
+    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
+    compiler_scene_id: "school-campus-v1",
+    name: "School Map",
+    representation: "hybrid-3d",
+    coordinate_frame: "ENU",
+    resolution_m: 0.05,
+    bounds_m: { x: 120, y: 90, z: 12.6 },
+    floor_count: 3,
+    confidence_percent: 100,
+    semantic_layers: [
+      "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
+      "rooms", "corridors", "roads", "vegetation", "street-furniture",
+    ],
+    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+    manifest_sha256: "337c362d5d9f3c996283bc4f1c19fe8be3a40d18093d961928883b42ce65fe3c",
+  },
   "stairwell-coffee-return": {
     schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
     compiler_scene_id: "stairwell-coffee-return",

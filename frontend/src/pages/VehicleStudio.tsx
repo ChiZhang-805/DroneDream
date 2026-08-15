@@ -62,8 +62,8 @@ import {
   addVehicleConstraint,
   addVehicleComponent,
   calculateVehicleDiagnostics,
+  createMyDroneVehicleModelDraft,
   createVehicleModelFromBrief,
-  createVehicleModelDraft,
   duplicateVehicleComponent,
   evaluateVehicleConstraints,
   mirrorVehicleComponent,
@@ -266,7 +266,7 @@ export function VehicleStudio() {
     [ownerId, tenantContext.organizationId, tenantContext.tenantId],
   );
   const [models, setModels] = useState<StoredVehicleModel[]>(() => loadVehicleModels(localStorageScope));
-  const [draft, setDraft] = useState<VehicleModelDraft>(() => createVehicleModelDraft());
+  const [draft, setDraft] = useState<VehicleModelDraft>(() => createMyDroneVehicleModelDraft());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("assembly");
   const [manipulator, setManipulator] = useState<Manipulator>("select");
@@ -327,7 +327,7 @@ export function VehicleStudio() {
     const loadGeneration = ++loadGenerationRef.current;
     const ownerModels = loadVehicleModels(localStorageScope);
     const requestedModel = requestedDraftId ? ownerModels.find((model) => model.draftId === requestedDraftId) : null;
-    const next = requestedModel?.revisions[0] ?? ownerModels[0]?.revisions[0] ?? createVehicleModelDraft();
+    const next = requestedModel?.revisions[0] ?? ownerModels[0]?.revisions[0] ?? createMyDroneVehicleModelDraft();
     const initialDraft = cloneDraft(next);
     const initialFingerprint = JSON.stringify(initialDraft);
     setModels(ownerModels);
@@ -498,7 +498,7 @@ export function VehicleStudio() {
       <aside className="vehicle-workbench-left">
         <section className="vehicle-library-panel">
           <div className="vehicle-panel-heading"><strong>{copy.library}</strong><button type="button" aria-label={copy.newModel} onClick={() => {
-            const next = createVehicleModelDraft(); replaceDraft(next); setSelectedId(next.components[0]?.id ?? null); undoRef.current = []; redoRef.current = [];
+            const next = createMyDroneVehicleModelDraft(); replaceDraft(next); setSelectedId(next.components[0]?.id ?? null); undoRef.current = []; redoRef.current = [];
           }}><Plus /></button></div>
           <div className="vehicle-saved-list">{models.length ? models.map((model) => <button type="button" className={draft.draftId === model.draftId ? "is-active" : ""} key={model.draftId} onClick={() => {
             const next = cloneDraft(model.revisions[0]); replaceDraft(next); setSelectedId(next.components[0]?.id ?? null); undoRef.current = []; redoRef.current = [];
@@ -552,7 +552,7 @@ export function VehicleStudio() {
             interaction: "Select parts · Drag to orbit · Scroll to zoom",
             motors: "motors", ratio: "thrust / weight",
           }} />
-          <div className="vehicle-viewport-badge"><span>{manipulator.toUpperCase()}</span><strong>{selected?.name ?? "Assembly"}</strong><small>{transformSpace.toUpperCase()} · {snapEnabled ? `${Math.round(draft.designParameters.gridM * 1_000)} mm SNAP` : "FREE"}</small></div>
+          <div className="vehicle-viewport-badge"><span>{draft.name} · {manipulator.toUpperCase()}</span><strong>{selected?.name ?? "Assembly"}</strong><small>{transformSpace.toUpperCase()} · {snapEnabled ? `${Math.round(draft.designParameters.gridM * 1_000)} mm SNAP` : "FREE"}</small></div>
         </div>
         <div className="vehicle-diagnostics-strip">
           <span><small>Parts</small><strong>{diagnostics.componentCount}</strong></span>
@@ -632,7 +632,7 @@ export function VehicleStudio() {
                     }
                   }
                   setModels(removeVehicleModel(localStorageScope, draftId));
-                  const next = createVehicleModelDraft();
+                  const next = createMyDroneVehicleModelDraft();
                   replaceDraft(next);
                   setSelectedId(next.components[0]?.id ?? null);
                   setMessage("Aircraft deleted.");

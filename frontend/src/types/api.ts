@@ -1485,7 +1485,20 @@ export interface AutonomyMapPackQualificationRequest {
   live_updates: "vision-slam" | "depth-fusion" | "lidar-fusion" | "fixed";
   calibrated: boolean;
   confidence_percent: number;
-  semantic_layers: Array<"free-space" | "stairs" | "doors" | "gates" | "people" | "pickup-zones">;
+  semantic_layers: Array<
+    | "free-space"
+    | "stairs"
+    | "doors"
+    | "gates"
+    | "people"
+    | "pickup-zones"
+    | "launch-zones"
+    | "rooms"
+    | "corridors"
+    | "roads"
+    | "vegetation"
+    | "street-furniture"
+  >;
   planning_layers: Array<"collision-geometry" | "occupancy" | "esdf" | "dynamic-overlay" | "confidence">;
   source_asset_receipt_ids: string[];
 }

@@ -49,10 +49,19 @@ export function withCurrentAutonomyAssets(
   library: AutonomyAssetLibrary,
   workspace: AutonomyWorkspaceState,
 ): AutonomyAssetLibrary {
+  const publicAssets = defaultAutonomyWorkspace();
   return {
     schemaVersion: 1,
-    aircraft: replaceById(library.aircraft, workspace.aircraft, MAX_AIRCRAFT),
-    maps: replaceById(library.maps, workspace.mapPack, MAX_MAPS),
+    aircraft: replaceById(
+      replaceById(library.aircraft, publicAssets.aircraft, MAX_AIRCRAFT),
+      workspace.aircraft,
+      MAX_AIRCRAFT,
+    ),
+    maps: replaceById(
+      replaceById(library.maps, publicAssets.mapPack, MAX_MAPS),
+      workspace.mapPack,
+      MAX_MAPS,
+    ),
   };
 }
 

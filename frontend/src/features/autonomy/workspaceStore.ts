@@ -21,6 +21,7 @@ export type MapRepresentation =
   | "terrain";
 
 export type AutonomyCompiledSceneId =
+  | "school-campus-v1"
   | "stairwell-coffee-return"
   | "forest-gate-inspection"
   | "service-corridor-dock";
@@ -182,7 +183,20 @@ export interface AutonomyMapPack {
   liveUpdates: "vision-slam" | "depth-fusion" | "lidar-fusion" | "fixed";
   calibrated: boolean;
   compilerSceneId: AutonomyCompiledSceneId | null;
-  semanticLayers: Array<"free-space" | "stairs" | "doors" | "gates" | "people" | "pickup-zones">;
+  semanticLayers: Array<
+    | "free-space"
+    | "stairs"
+    | "doors"
+    | "gates"
+    | "people"
+    | "pickup-zones"
+    | "launch-zones"
+    | "rooms"
+    | "corridors"
+    | "roads"
+    | "vegetation"
+    | "street-furniture"
+  >;
   planningLayers: Array<"collision-geometry" | "occupancy" | "esdf" | "dynamic-overlay" | "confidence">;
   origin: { latitude: number | null; longitude: number | null; altitudeM: number | null };
   boundsM: AutonomyVector3;
@@ -288,12 +302,16 @@ const LEGACY_STORAGE_PREFIX = "dronedream:autonomy-workspace:v1";
 const MAX_SOURCE_FILES = 24;
 const MAX_EVIDENCE_RECORDS = 50;
 const COMPILED_SCENE_SET = new Set<AutonomyCompiledSceneId>([
+  "school-campus-v1",
   "stairwell-coffee-return",
   "forest-gate-inspection",
   "service-corridor-dock",
 ]);
 const SENSOR_SET = new Set<AutonomySensorKind>(["rgb", "depth", "stereo", "thermal", "lidar", "gps", "vio"]);
-const SEMANTIC_SET = new Set<AutonomyMapPack["semanticLayers"][number]>(["free-space", "stairs", "doors", "gates", "people", "pickup-zones"]);
+const SEMANTIC_SET = new Set<AutonomyMapPack["semanticLayers"][number]>([
+  "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
+  "rooms", "corridors", "roads", "vegetation", "street-furniture",
+]);
 const PLANNING_LAYER_SET = new Set<AutonomyMapPack["planningLayers"][number]>(["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"]);
 
 function boundedNumber(value: unknown, fallback: number, minimum: number, maximum: number): number {
@@ -446,36 +464,36 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
     schemaVersion: 2,
     aircraft: {
       schemaVersion: 2,
-      id: "aircraft-primary",
+      id: "aircraft-my-drone",
       version: 1,
-      status: "draft",
-      qualificationReceiptId: null,
-      qualificationContentHash: null,
-      name: "Primary research quadrotor",
-      manufacturer: "Self-built",
-      airframe: "Quad X",
+      status: "validated-unsigned",
+      qualificationReceiptId: "bundled-public-vehicle-my-drone-v1",
+      qualificationContentHash: "4a3d2b0677795f3582c6bce68986d508d72d690f184eca8f3642313a20fa9678",
+      name: "My Drone",
+      manufacturer: "DroneDream reference · Holybro X500 V2-derived",
+      airframe: "X500 V2 Quad X",
       flightController: "Pixhawk 6C",
       autopilot: "px4",
       firmware: "PX4 v1.16",
       controlInterface: "px4-ros2",
       computePlatform: "Jetson Orin NX",
-      dryMassKg: 1.55,
+      dryMassKg: 1.86,
       maximumTakeoffMassKg: 2.8,
-      bodyLengthM: 0.38,
-      bodyWidthM: 0.38,
-      bodyHeightM: 0.18,
-      rotorRadiusM: 0.17,
-      maximumThrustN: 39,
-      batteryEnergyWh: 88.8,
-      reserveBatteryPercent: 25,
-      centerOfGravityM: { x: 0, y: 0, z: -0.02 },
-      inertiaKgM2: { x: 0.029, y: 0.029, z: 0.052 },
-      maximumPickupPayloadKg: 0.35,
+      bodyLengthM: 0.36,
+      bodyWidthM: 0.36,
+      bodyHeightM: 0.33,
+      rotorRadiusM: 0.127,
+      maximumThrustN: 44,
+      batteryEnergyWh: 74,
+      reserveBatteryPercent: 30,
+      centerOfGravityM: { x: 0, y: 0, z: -0.018 },
+      inertiaKgM2: { x: 0.035, y: 0.035, z: 0.061 },
+      maximumPickupPayloadKg: 0.55,
       maximumSpeedMps: 4,
-      maximumAccelerationMps2: 3,
-      maximumClimbMps: 2,
-      maximumDescentMps: 1.5,
-      maximumTiltDeg: 35,
+      maximumAccelerationMps2: 2.5,
+      maximumClimbMps: 1.5,
+      maximumDescentMps: 1,
+      maximumTiltDeg: 30,
       commandLink: {
         kind: "wifi",
         latencyMs: 35,
@@ -484,33 +502,36 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       },
       sensors: ["rgb", "depth", "gps", "vio"],
       sensorMounts: [
-        { id: "front-rgb", kind: "rgb", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.18, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
-        { id: "front-depth", kind: "depth", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.17, y: 0, z: -0.04 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
-        { id: "gps-primary", kind: "gps", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: 0, z: 0.12 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 3 },
-        { id: "vio-primary", kind: "vio", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.16, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
+        { id: "front-rgb", kind: "rgb", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: -0.055, z: -0.155 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
+        { id: "front-depth", kind: "depth", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: -0.055, z: -0.155 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
+        { id: "gps-primary", kind: "gps", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: 0.2, z: 0.07 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 0 },
+        { id: "vio-primary", kind: "vio", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: -0.055, z: -0.155 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
       ],
       updatedAt,
     },
     mapPack: {
       schemaVersion: 2,
-      id: "map-primary",
+      id: "map-school",
       version: 1,
-      status: "draft",
-      contentHash: null,
-      qualificationReceiptId: null,
-      name: "Unconfigured environment",
+      status: "qualified",
+      contentHash: "337c362d5d9f3c996283bc4f1c19fe8be3a40d18093d961928883b42ce65fe3c",
+      qualificationReceiptId: "bundled-public-map-school-campus-v1",
+      name: "School Map",
       representation: "hybrid-3d",
       coordinateFrame: "ENU",
-      resolutionM: 0.1,
-      floorCount: 1,
+      resolutionM: 0.05,
+      floorCount: 3,
       liveUpdates: "depth-fusion",
-      calibrated: false,
-      compilerSceneId: null,
-      semanticLayers: ["free-space", "people"],
+      calibrated: true,
+      compilerSceneId: "school-campus-v1",
+      semanticLayers: [
+        "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
+        "rooms", "corridors", "roads", "vegetation", "street-furniture",
+      ],
       planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
       origin: { latitude: null, longitude: null, altitudeM: null },
-      boundsM: { x: 40, y: 30, z: 12 },
-      confidencePercent: 0,
+      boundsM: { x: 120, y: 90, z: 12.6 },
+      confidencePercent: 100,
       sourceFiles: [],
       updatedAt,
     },
@@ -523,8 +544,8 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       planningRunId: null,
       conversationId: null,
       messages: [],
-      aircraftProfileId: "aircraft-primary",
-      mapPackId: "map-primary",
+      aircraftProfileId: "aircraft-my-drone",
+      mapPackId: "map-school",
       compiledPlan: null,
       currentStep: 0,
       updatedAt,
@@ -537,12 +558,20 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
   const fallback = defaultAutonomyWorkspace();
   if (!value || typeof value !== "object") return fallback;
   const candidate = value as Partial<AutonomyWorkspaceState>;
-  const aircraft = candidate.aircraft && typeof candidate.aircraft === "object"
+  const storedAircraft = candidate.aircraft && typeof candidate.aircraft === "object"
     ? candidate.aircraft as Partial<AutonomyAircraftProfile>
     : {};
-  const mapPack = candidate.mapPack && typeof candidate.mapPack === "object"
+  const storedMapPack = candidate.mapPack && typeof candidate.mapPack === "object"
     ? candidate.mapPack as Partial<AutonomyMapPack>
     : {};
+  const aircraft = storedAircraft.id === "aircraft-primary"
+    && storedAircraft.name === "Primary research quadrotor"
+    ? fallback.aircraft
+    : storedAircraft;
+  const mapPack = storedMapPack.id === "map-primary"
+    && storedMapPack.name === "Unconfigured environment"
+    ? fallback.mapPack
+    : storedMapPack;
   const mission = candidate.mission && typeof candidate.mission === "object"
     ? candidate.mission as Partial<AutonomyMissionDraft>
     : {};

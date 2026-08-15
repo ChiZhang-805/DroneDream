@@ -3317,6 +3317,7 @@ body:has(.app-shell-public-demo),
 .vehicle-workbench-center {
   display: grid;
   grid-template-rows: 42px minmax(0, 1fr) 58px;
+  overflow: hidden;
   background:
     radial-gradient(circle at 52% 42%, color-mix(in srgb, var(--dd-brand-start) 10%, transparent), transparent 42%),
     #f8f6fa;
@@ -3515,8 +3516,11 @@ body:has(.app-shell-public-demo),
 .vehicle-diagnostics-strip .is-bad strong { color: #c2375a; }
 
 .vehicle-workbench-right {
+  position: relative;
+  z-index: 3;
   display: grid;
   grid-template-rows: 46px minmax(0, 1fr) auto;
+  overflow: hidden;
   border-left: 1px solid #e6dce8;
   background: color-mix(in srgb, var(--dd-brand-light-surface) 90%, #fff);
 }
@@ -7968,6 +7972,68 @@ a {
 .autonomy-world-3d-toolbar small {
   color: rgba(255, 255, 255, 0.68);
   font-size: 0.47rem;
+}
+
+.autonomy-world-3d-inspector {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.24rem;
+  padding: 0.28rem;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 11px;
+  background: rgba(28, 22, 34, 0.78);
+  box-shadow: 0 8px 24px rgba(29, 20, 37, 0.18);
+  backdrop-filter: blur(14px);
+}
+
+.autonomy-world-3d-inspector > span {
+  display: inline-flex;
+  padding: 0 0.14rem;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.autonomy-world-3d-inspector button {
+  display: inline-flex;
+  min-width: 1.7rem;
+  height: 1.6rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.24rem;
+  padding: 0 0.42rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.76);
+  background: transparent;
+  font: inherit;
+  font-size: 0.5rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.autonomy-world-3d-inspector button:hover,
+.autonomy-world-3d-inspector button.is-active {
+  border-color: rgba(125, 214, 233, 0.48);
+  color: #fff;
+  background: linear-gradient(135deg, rgba(93, 91, 244, 0.88), rgba(222, 74, 188, 0.88));
+}
+
+.autonomy-world-3d-inspector svg {
+  width: 0.78rem;
+  height: 0.78rem;
+}
+
+@media (max-width: 900px) {
+  .autonomy-world-3d-toolbar small,
+  .autonomy-world-3d-inspector > span {
+    display: none;
+  }
+  .autonomy-world-3d-inspector button {
+    min-width: 1.5rem;
+    padding: 0 0.3rem;
+  }
 }
 
 .autonomy-world-3d-error {
@@ -15052,7 +15118,7 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
 
 .assistant-add-popover.assistant-task-popover {
   width: min(25rem, calc(100vw - 2rem));
-  max-height: min(34rem, calc(100vh - 5rem));
+  max-height: min(38rem, calc(100vh - 3rem));
   overflow-y: auto;
 }
 
@@ -15188,6 +15254,7 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
   font-size: 0.7rem;
   font-weight: 480;
   line-height: 1.3;
+  white-space: nowrap;
 }
 
 .assistant-task-chip {

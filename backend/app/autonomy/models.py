@@ -116,6 +116,17 @@ class TerrainObject(StrictModel):
         "gate",
         "pickup",
         "landing",
+        "classroom",
+        "office",
+        "cafeteria",
+        "road",
+        "fence",
+        "street-light",
+        "bicycle-shelter",
+        "guard-booth",
+        "launch",
+        "door",
+        "window",
     ]
     center: Vector3
     size: Vector3
