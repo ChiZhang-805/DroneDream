@@ -582,6 +582,7 @@ export function AutonomyLab({
   const [planned, setPlanned] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [running, setRunning] = useState(false);
+  const [launching, setLaunching] = useState(false);
   const [paused, setPaused] = useState(false);
   const [complete, setComplete] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -806,6 +807,7 @@ export function AutonomyLab({
     setPlanned(false);
     setPlanning(false);
     setRunning(false);
+    setLaunching(false);
     setComplete(false);
     setProgress(0);
     setRuntimeSession(null);
@@ -890,12 +892,13 @@ export function AutonomyLab({
   };
 
   const toggleFlight = async () => {
-    if (!planned || complete) return;
+    if (!planned || complete || launching) return;
     if (!running) {
       if (publicDemoConsole) {
         previewRunId.current ??= `preview-run-${crypto.randomUUID()}`;
       }
       if (!publicDemoConsole && !runtimeSession) {
+        setLaunching(true);
         try {
           runtimeRequestId.current ??= crypto.randomUUID();
           const created = await apiClient.createAutonomyRuntimeSession(
@@ -926,6 +929,8 @@ export function AutonomyLab({
         } catch {
           setCompileError(copy.compileFailed);
           return;
+        } finally {
+          setLaunching(false);
         }
       }
       setRunning(true);
@@ -948,6 +953,7 @@ export function AutonomyLab({
       );
     }
     setRunning(false);
+    setLaunching(false);
     setPaused(false);
     setComplete(false);
     setProgress(0);
@@ -998,6 +1004,7 @@ export function AutonomyLab({
                   type="button"
                   className={target === candidate ? "is-active" : ""}
                   aria-pressed={target === candidate}
+                  disabled={planning || launching || running || Boolean(runtimeSession && !runtimeSession.terminal)}
                   onClick={() => setTarget(candidate)}
                 >
                   {candidate === "simulation" ? <Cpu aria-hidden="true" /> : candidate === "hitl" ? <FileCheck2 aria-hidden="true" /> : <Navigation2 aria-hidden="true" />}
@@ -1012,7 +1019,7 @@ export function AutonomyLab({
             <button
               className="btn btn-primary autonomy-compile-button"
               type="button"
-              disabled={planning || command.trim().length < 3}
+              disabled={planning || launching || running || command.trim().length < 3}
               onClick={() => void planTrajectory()}
             >
               {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
@@ -1207,13 +1214,13 @@ export function AutonomyLab({
           </div>
           <div className="autonomy-map-controls">
             {embedded ? <div className="autonomy-target-switch autonomy-live-target-switch" role="group" aria-label={copy.executionTarget}>
-              {(Object.keys(copy.targets) as AutonomyExecutionTarget[]).map((candidate) => <button key={candidate} type="button" className={target === candidate ? "is-active" : ""} aria-pressed={target === candidate} onClick={() => setTarget(candidate)}>{copy.targets[candidate]}</button>)}
+              {(Object.keys(copy.targets) as AutonomyExecutionTarget[]).map((candidate) => <button key={candidate} type="button" className={target === candidate ? "is-active" : ""} aria-pressed={target === candidate} disabled={planning || launching || running || Boolean(runtimeSession && !runtimeSession.terminal)} onClick={() => setTarget(candidate)}>{copy.targets[candidate]}</button>)}
             </div> : null}
-            {embedded ? <button className="btn" type="button" onClick={() => void planTrajectory()} disabled={planning || command.trim().length < 3}>
+            {embedded ? <button className="btn" type="button" onClick={() => void planTrajectory()} disabled={planning || launching || running || command.trim().length < 3}>
               {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Route aria-hidden="true" />}
               {planning ? copy.planning : planned ? copy.replan : copy.plan}
             </button> : null}
-            <button className="btn btn-primary" type="button" disabled={!planned || complete || !qualification.execution_policy.can_execute} onClick={() => void toggleFlight()}>
+            <button className="btn btn-primary" type="button" disabled={launching || !planned || complete || !qualification.execution_policy.can_execute} onClick={() => void toggleFlight()}>
               {!qualification.execution_policy.can_execute ? <LockKeyhole aria-hidden="true" /> : running && !paused ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
               {running ? paused ? copy.resume : copy.pause : copy.run}
             </button>

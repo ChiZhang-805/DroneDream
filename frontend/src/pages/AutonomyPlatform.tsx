@@ -416,6 +416,10 @@ export function AutonomyMaps() {
     }));
     setSaved(false);
   };
+  const updateMap = (patch: Partial<AutonomyMapPack>) => {
+    setForm((current) => ({ ...current, ...patch }));
+    setSaved(false);
+  };
   const updateGeometry = (
     patch: Partial<Pick<AutonomyMapPack, "representation" | "coordinateFrame" | "resolutionM" | "floorCount">>,
   ) => {
@@ -433,14 +437,14 @@ export function AutonomyMaps() {
         <section className="autonomy-config-card">
           <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
           <div className="autonomy-form-grid is-four">
-            <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input value={form.name} maxLength={120} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
+            <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateMap({ name: event.target.value })} /></label>
             <label><span>{chinese ? "三维表示" : "3D representation"}</span><select value={form.representation} onChange={(event) => updateGeometry({ representation: event.target.value as AutonomyMapPack["representation"] })}><option value="hybrid-3d">Hybrid 3D</option><option value="mesh">Mesh</option><option value="point-cloud">Point cloud</option><option value="occupancy">Occupancy / ESDF</option><option value="terrain">Terrain / DEM</option></select></label>
             <label><span>{chinese ? "坐标系" : "Coordinate frame"}</span><select value={form.coordinateFrame} onChange={(event) => updateGeometry({ coordinateFrame: event.target.value as AutonomyMapPack["coordinateFrame"] })}><option>ENU</option><option>NED</option><option>WGS84</option><option value="building-local">Building local</option></select></label>
             <label><span>{chinese ? "分辨率 (m)" : "Resolution (m)"}</span><input type="number" min="0.005" step="0.005" value={form.resolutionM} onChange={(event) => updateGeometry({ resolutionM: Number(event.target.value) })} /></label>
             <label><span>{chinese ? "楼层数" : "Floors"}</span><input type="number" min="1" max="500" step="1" value={form.floorCount} onChange={(event) => updateGeometry({ floorCount: Number(event.target.value) })} /></label>
-            <label><span>{chinese ? "实时更新" : "Live updates"}</span><select value={form.liveUpdates} onChange={(event) => setForm({ ...form, liveUpdates: event.target.value as AutonomyMapPack["liveUpdates"] })}><option value="vision-slam">Vision SLAM</option><option value="depth-fusion">Depth fusion</option><option value="lidar-fusion">LiDAR fusion</option><option value="fixed">Fixed map</option></select></label>
-            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select disabled={form.sourceFiles.length > 0} value={form.compilerSceneId ?? ""} onChange={(event) => setForm({ ...form, compilerSceneId: event.target.value ? event.target.value as AutonomyMapPack["compilerSceneId"] : null })}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
-            <label className="autonomy-check-control"><input type="checkbox" checked={form.calibrated} onChange={(event) => setForm({ ...form, calibrated: event.target.checked })} /><span>{chinese ? "比例和坐标已校准" : "Scale and frame calibrated"}</span></label>
+            <label><span>{chinese ? "实时更新" : "Live updates"}</span><select value={form.liveUpdates} onChange={(event) => updateMap({ liveUpdates: event.target.value as AutonomyMapPack["liveUpdates"] })}><option value="vision-slam">Vision SLAM</option><option value="depth-fusion">Depth fusion</option><option value="lidar-fusion">LiDAR fusion</option><option value="fixed">Fixed map</option></select></label>
+            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select disabled={form.sourceFiles.length > 0} value={form.compilerSceneId ?? ""} onChange={(event) => updateMap({ calibrated: false, compilerSceneId: event.target.value ? event.target.value as AutonomyMapPack["compilerSceneId"] : null })}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
+            <label className="autonomy-check-control"><input type="checkbox" checked={form.calibrated} onChange={(event) => updateMap({ calibrated: event.target.checked })} /><span>{chinese ? "比例和坐标已校准" : "Scale and frame calibrated"}</span></label>
           </div>
         </section>
 
