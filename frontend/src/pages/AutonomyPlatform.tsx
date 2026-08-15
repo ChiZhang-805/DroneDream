@@ -323,6 +323,7 @@ export function AutonomyOverview() {
     cancelVoice: "取消",
     voiceUnavailable: "当前环境无法使用语音输入，你仍可继续输入文字。",
     tooLong: "任务描述不能超过 2,000 个字符。",
+    modelUnavailable: "请先选择可用于任务规划的模型。",
     examples: [
       { title: "办公室取物", body: "从办公室起飞，避开走廊和楼梯中的人员，前往取物点，确认载荷后安全返航。" },
       { title: "视觉巡检", body: "沿指定区域自主巡检，使用实时视觉识别目标与动态障碍，并报告每个检查点的进度。" },
@@ -347,6 +348,7 @@ export function AutonomyOverview() {
     cancelVoice: "Cancel",
     voiceUnavailable: "Voice input is unavailable here. You can keep typing.",
     tooLong: "The mission description must stay within 2,000 characters.",
+    modelUnavailable: "Choose an available planning model before continuing.",
     examples: [
       { title: "Office pickup", body: "Take off from the office, avoid people in the corridor and stairwell, collect the payload, and return safely." },
       { title: "Visual inspection", body: "Inspect the assigned area with live vision, track dynamic obstacles, and report progress at every checkpoint." },
@@ -425,6 +427,17 @@ export function AutonomyOverview() {
       setError(copy.tooLong);
       return;
     }
+    const planningModel = modelAccess.accessMode === "platform"
+      ? selectedManagedModel
+        ? { accessMode: "platform" as const, provider: selectedManagedModel.provider, model: selectedManagedModel.model }
+        : null
+      : selectedCustomProfileId && modelAccess.model.trim()
+        ? { accessMode: "byok" as const, provider: modelAccess.provider, model: modelAccess.model.trim() }
+        : null;
+    if (!planningModel) {
+      setError(copy.modelUnavailable);
+      return;
+    }
     voice.cancel();
     consumeAutonomyHandoff();
     const updatedAt = new Date().toISOString();
@@ -432,6 +445,7 @@ export function AutonomyOverview() {
       mission: {
         ...workspace.mission,
         intent,
+        planningModel,
         aircraftProfileId: workspace.aircraft.id,
         mapPackId: workspace.mapPack.id,
         currentStep: 0,
@@ -562,7 +576,7 @@ export function AutonomyOverview() {
             <button
               type="submit"
               className="assistant-send-button"
-              disabled={!composer.trim()}
+              disabled={!composer.trim() || !managedModelsReady}
               aria-label={copy.send}
               title={copy.send}
             >
@@ -1082,7 +1096,7 @@ export function AutonomyMission() {
       </ol>
 
       <div className="autonomy-mission-stage">
-        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />Tuning Chat</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
+        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />Tuning Chat</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-mission-model"><Cpu aria-hidden="true" /><span>{chinese ? "规划模型" : "Planning model"}</span><strong>{workspace.mission.planningModel.provider} · {workspace.mission.planningModel.model}</strong></div><div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
         {step === 1 ? <section><header><Navigation2 aria-hidden="true" /><h2>{workspace.aircraft.name}</h2><Link className="btn" to="/autonomy/aircraft">{chinese ? "编辑机型" : "Edit aircraft"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Weight />} label={chinese ? "空机重量" : "Dry mass"} value={`${workspace.aircraft.dryMassKg.toFixed(2)} kg`} /><Metric icon={<Gauge />} label="MTOM" value={`${workspace.aircraft.maximumTakeoffMassKg.toFixed(2)} kg`} /><Metric icon={<Camera />} label={chinese ? "感知设备" : "Sensors"} value={String(workspace.aircraft.sensors.length)} /><Metric icon={<Cpu />} label={chinese ? "飞控" : "Firmware"} value={workspace.aircraft.firmware} /></div></section> : null}
         {step === 2 ? <section><header><Layers3 aria-hidden="true" /><h2>{workspace.mapPack.name}</h2><Link className="btn" to="/autonomy/maps">{chinese ? "编辑地图" : "Edit map"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Database />} label={chinese ? "表示" : "Representation"} value={workspace.mapPack.representation} /><Metric icon={<ScanLine />} label={chinese ? "分辨率" : "Resolution"} value={`${workspace.mapPack.resolutionM.toFixed(3)} m`} /><Metric icon={<HardDrive />} label={chinese ? "资产" : "Assets"} value={String(workspace.mapPack.sourceFiles.length)} /><Metric icon={<ShieldCheck />} label={chinese ? "资格" : "Qualification"} value={mapReady ? "READY" : "BLOCKED"} /></div></section> : null}
         {step === 3 ? <section><header><Route aria-hidden="true" /><h2>{chinese ? "航迹目标" : "Trajectory objectives"}</h2></header><div className="autonomy-planner-choices"><button className="is-selected"><ShieldCheck />{chinese ? "安全优先" : "Safety first"}</button><button><Activity />{chinese ? "平滑飞行" : "Smooth flight"}</button><button><Gauge />{chinese ? "时间效率" : "Time efficient"}</button><button><Cpu />{chinese ? "能量效率" : "Energy efficient"}</button></div></section> : null}

@@ -756,6 +756,24 @@
   gap: 0.85rem;
 }
 
+.autonomy-mission-model {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  padding: 0.48rem 0.72rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, #ddd7e4);
+  border-radius: 999px;
+  color: #706779;
+  background: color-mix(in srgb, var(--dd-brand-start) 6%, #fff);
+  font-size: 0.78rem;
+}
+
+.autonomy-mission-model svg { width: 1rem; height: 1rem; color: var(--dd-brand-middle); }
+.autonomy-mission-model strong { overflow: hidden; color: #2c2431; text-overflow: ellipsis; white-space: nowrap; }
+
 .autonomy-contract-points span {
   display: flex;
   align-items: center;
