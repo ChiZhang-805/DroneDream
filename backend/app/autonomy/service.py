@@ -240,7 +240,9 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         max_retries=1,
         timeout_s=30.0,
         fallback="abort",
-        expected_output="Every required localization and obstacle stream is healthy and synchronized",
+        expected_output=(
+            "Every required localization and obstacle stream is healthy and synchronized"
+        ),
         completion_evidence=["sensor.calibration", "clock.offset", "stream.health"],
     )
     previous = append_node(
@@ -264,8 +266,15 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         max_retries=1,
         timeout_s=30.0,
         fallback="hold",
-        expected_output="A versioned world frame with grounded mission entities and hard boundaries",
-        completion_evidence=["map-pack.digest", "frame.transform", "semantic.bindings", "geofence.version"],
+        expected_output=(
+            "A versioned world frame with grounded mission entities and hard boundaries"
+        ),
+        completion_evidence=[
+            "map-pack.digest",
+            "frame.transform",
+            "semantic.bindings",
+            "geofence.version",
+        ],
     )
     previous = append_node(
         "world-localization",
@@ -277,7 +286,11 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         timeout_s=45.0,
         fallback="hold",
         expected_output="Localization covariance and observable free-space satisfy launch limits",
-        completion_evidence=["localization.covariance", "free-space.snapshot", "dynamic-overlay.age"],
+        completion_evidence=[
+            "localization.covariance",
+            "free-space.snapshot",
+            "dynamic-overlay.age",
+        ],
     )
     previous = append_node(
         "plan-global-corridor",
@@ -288,7 +301,9 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         max_retries=3,
         timeout_s=60.0,
         fallback="hold",
-        expected_output="Primary and contingency corridors satisfy map, clearance and energy constraints",
+        expected_output=(
+            "Primary and contingency corridors satisfy map, clearance and energy constraints"
+        ),
         completion_evidence=["corridor.primary", "corridor.contingency", "energy.projection"],
     )
 
@@ -323,7 +338,11 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
             timeout_s=20.0,
             fallback="hold",
             expected_output="A time-bounded local obstacle and semantic-target snapshot",
-            completion_evidence=["perception.sequence", "local-map.age", "tracked-entities.snapshot"],
+            completion_evidence=[
+                "perception.sequence",
+                "local-map.age",
+                "tracked-entities.snapshot",
+            ],
         )
         previous = append_node(
             f"{prefix}-plan",
@@ -334,8 +353,14 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
             max_retries=3,
             timeout_s=45.0,
             fallback="hold",
-            expected_output="A collision-free, time-parameterized segment inside the approved corridor",
-            completion_evidence=["trajectory.revision", "corridor.containment", "clearance.prediction"],
+            expected_output=(
+                "A collision-free, time-parameterized segment inside the approved corridor"
+            ),
+            completion_evidence=[
+                "trajectory.revision",
+                "corridor.containment",
+                "clearance.prediction",
+            ],
         )
         previous = append_node(
             f"{prefix}-qualify",
@@ -370,13 +395,18 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
             max_retries=2,
             timeout_s=20.0,
             fallback=fallback,
-            expected_output="Completion evidence is consistent, current and attributable to this task",
+            expected_output=(
+                "Completion evidence is consistent, current and attributable to this task"
+            ),
             completion_evidence=["task.result", "task.evidence", "world-state.revision"],
         )
         if step.action == "pickup":
             previous = append_node(
                 f"{prefix}-recompute-envelope",
-                "Confirm payload attachment and recompute mass, center of gravity, thrust and return energy",
+                (
+                    "Confirm payload attachment and recompute mass, center of gravity, thrust "
+                    "and return energy"
+                ),
                 depends_on=[previous],
                 executor="mission_executive",
                 risk="critical",
@@ -384,7 +414,12 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
                 timeout_s=25.0,
                 fallback="land",
                 expected_output="The loaded aircraft remains inside its qualified return envelope",
-                completion_evidence=["payload.confirmed", "mass.loaded", "cg.loaded", "return-energy.margin"],
+                completion_evidence=[
+                    "payload.confirmed",
+                    "mass.loaded",
+                    "cg.loaded",
+                    "return-energy.margin",
+                ],
             )
     previous = append_node(
         "postflight-state",
@@ -408,7 +443,12 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         timeout_s=20.0,
         fallback="hold",
         expected_output="A hash-chained mission evidence head",
-        completion_evidence=["mission.result", "task-graph.revisions", "decision.log", "evidence.chain-head"],
+        completion_evidence=[
+            "mission.result",
+            "task-graph.revisions",
+            "decision.log",
+            "evidence.chain-head",
+        ],
     )
     return MissionTaskGraph(nodes=nodes, active_node_ids=["preflight-pack-identity"])
 
