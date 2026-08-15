@@ -132,8 +132,9 @@
 }
 
 .autonomy-command-page {
+  place-content: center;
   place-items: center;
-  padding: clamp(1rem, 4vh, 3.5rem) clamp(0.25rem, 2vw, 1.5rem);
+  padding: clamp(0.75rem, 2vh, 1.5rem) clamp(0.25rem, 2vw, 1.5rem);
 }
 
 .autonomy-command-stage {
@@ -141,28 +142,15 @@
   width: min(100%, 72rem);
   align-items: center;
   flex-direction: column;
-  transform: translateY(-3vh);
 }
 
-.autonomy-command-mark {
-  display: grid;
-  width: 4.8rem;
-  height: 4.8rem;
-  margin-bottom: 0.8rem;
-  place-items: center;
-  border-radius: 1.45rem;
-  color: #fff;
-  background: linear-gradient(135deg, var(--dd-brand-start), var(--dd-brand-middle) 52%, var(--dd-brand-end));
-  box-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--dd-brand-middle) 24%, transparent);
-}
-
-.autonomy-command-mark svg {
-  width: 2.35rem;
-  height: 2.35rem;
+.autonomy-command-page .autonomy-command-hero-icon {
+  margin-bottom: 0.7rem;
+  color: color-mix(in srgb, var(--dd-brand-end) 70%, #aaa4ad);
 }
 
 .autonomy-command-stage > h2 {
-  margin: 0 0 clamp(1.4rem, 3vh, 2.2rem);
+  margin: 0;
   color: #211827;
   font-size: clamp(1.85rem, 3vw, 3.25rem);
   font-weight: 680;
@@ -170,6 +158,11 @@
   line-height: 1.08;
   text-align: center;
   white-space: nowrap;
+}
+
+.autonomy-command-page .autonomy-command-examples {
+  width: min(100%, 62rem);
+  margin: clamp(0.8rem, 1.6vh, 1.15rem) 0 clamp(0.9rem, 2vh, 1.35rem);
 }
 
 .autonomy-command-page .autonomy-command-composer {
@@ -947,7 +940,6 @@
   .autonomy-section-switch a { min-height: 2.15rem; }
   .autonomy-platform-content { overflow: visible; }
   .autonomy-command-page { min-height: 68vh; }
-  .autonomy-command-stage { transform: none; }
   .autonomy-config-page { grid-template-columns: 1fr; }
   .autonomy-config-summary { position: static; }
   .autonomy-mission-stepper { overflow-x: auto; grid-template-columns: repeat(6, minmax(120px, 1fr)); }
@@ -963,8 +955,6 @@
 @media (max-width: 560px) {
   .autonomy-platform-header h1 { font-size: 1.65rem; }
   .autonomy-command-stage > h2 { font-size: 1.8rem; white-space: normal; }
-  .autonomy-command-mark { width: 4rem; height: 4rem; border-radius: 1.2rem; }
-  .autonomy-command-mark svg { width: 2rem; height: 2rem; }
   .autonomy-command-page .assistant-task-chip { max-width: 9.5rem; }
   .autonomy-overview-grid,
   .autonomy-form-grid.is-three,

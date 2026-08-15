@@ -158,6 +158,48 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
   return <div className="autonomy-asset-metric"><span>{icon}{label}</span><strong>{value}</strong></div>;
 }
 
+function AutonomyTemplateIcon({ index }: { index: number }) {
+  const Icon = [Route, Camera, Layers3][index] ?? Route;
+  return <Icon className="assistant-example-icon" aria-hidden="true" strokeWidth={1.8} />;
+}
+
+function AutonomyCloudTerminalIcon() {
+  return (
+    <svg
+      className="assistant-cloud-terminal-icon"
+      viewBox="0 0 112 80"
+      role="presentation"
+      focusable="false"
+    >
+      <path
+        d="M34 65h48c14.4 0 26-10.8 26-24.2 0-12.5-10.2-22.9-23.3-24.1C79.2 7.3 68.5 2 57.2 4.2 43.8 6.8 34.4 17 32.9 29.4 17.7 29.9 5.5 40.2 5.5 47.8 5.5 57.4 18.3 65 34 65Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        className="assistant-terminal-chevron"
+        d="m38 39 10 8-10 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="5.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        className="assistant-terminal-underscore"
+        d="M55 55h17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="5.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function AutonomyPlatform() {
   const auth = useOptionalAuth();
   const theme = useEditionTheme();
@@ -280,6 +322,11 @@ export function AutonomyOverview() {
     cancelVoice: "取消",
     voiceUnavailable: "当前环境无法使用语音输入，你仍可继续输入文字。",
     tooLong: "任务描述不能超过 2,000 个字符。",
+    examples: [
+      { title: "办公室取物", body: "从办公室起飞，避开走廊和楼梯中的人员，前往取物点，确认载荷后安全返航。" },
+      { title: "视觉巡检", body: "沿指定区域自主巡检，使用实时视觉识别目标与动态障碍，并报告每个检查点的进度。" },
+      { title: "未知环境探索", body: "只给定起点和终点，边飞行边建立局部地图，规划安全航迹并在环境变化时实时重规划。" },
+    ],
   } : {
     question: "What should your drone do?",
     placeholder: "Describe the goal, waypoints, environment, and work to complete…",
@@ -299,6 +346,11 @@ export function AutonomyOverview() {
     cancelVoice: "Cancel",
     voiceUnavailable: "Voice input is unavailable here. You can keep typing.",
     tooLong: "The mission description must stay within 2,000 characters.",
+    examples: [
+      { title: "Office pickup", body: "Take off from the office, avoid people in the corridor and stairwell, collect the payload, and return safely." },
+      { title: "Visual inspection", body: "Inspect the assigned area with live vision, track dynamic obstacles, and report progress at every checkpoint." },
+      { title: "Unknown environment", body: "Use only the start and goal, build a local map in flight, plan a safe route, and replan as the world changes." },
+    ],
   };
   const appendTranscript = useCallback((transcript: string) => {
     setComposer((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript);
@@ -396,8 +448,21 @@ export function AutonomyOverview() {
   return (
     <section className="autonomy-command-page" data-grants-hardware-authority="false">
       <div className="autonomy-command-stage">
-        <div className="autonomy-command-mark" aria-hidden="true"><Sparkles /></div>
+        <div className="assistant-hero-icon autonomy-command-hero-icon" aria-hidden="true">
+          <AutonomyCloudTerminalIcon />
+        </div>
         <h2>{copy.question}</h2>
+        <div className="assistant-examples autonomy-command-examples">
+          {copy.examples.map((example, index) => (
+            <button type="button" key={example.title} onClick={() => setComposer(example.body)}>
+              <span className="assistant-example-heading">
+                <AutonomyTemplateIcon index={index} />
+                <strong>{example.title}</strong>
+              </span>
+              <span className="assistant-example-body">{example.body}</span>
+            </button>
+          ))}
+        </div>
         <form className="assistant-composer autonomy-command-composer" onSubmit={submitMission}>
           <textarea
             value={composer}
