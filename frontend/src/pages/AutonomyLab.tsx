@@ -28,6 +28,13 @@ import { Link } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
+import {
+  autonomyAircraftRadiusM,
+  isAutonomyAircraftProfileValid,
+  type AutonomyAircraftProfile,
+  type AutonomyEvidenceRecord,
+  type AutonomyWorkspaceState,
+} from "../features/autonomy/workspaceStore";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import {
   consumeAutonomyHandoff,
@@ -75,6 +82,8 @@ interface AutonomyCopy {
   compileCommand: string;
   compilingCommand: string;
   compileFailed: string;
+  mapUnavailable: string;
+  aircraftUnavailable: string;
   intentSource: string;
   editInChat: string;
   executionTarget: string;
@@ -154,6 +163,8 @@ const EN_COPY: AutonomyCopy = {
   compileCommand: "Compile & qualify",
   compilingCommand: "Checking mission…",
   compileFailed: "The authoritative compiler did not approve this request. Check the runtime connection and mission inputs, then try again.",
+  mapUnavailable: "Map Pack is not qualified. Calibrate it and bind a validated compiler scene before planning.",
+  aircraftUnavailable: "Aircraft envelope is outside the compiler contract. Review mass, thrust, reserve, and planning radius.",
   intentSource: "Mission intent from Tuning Chat",
   editInChat: "Edit in Tuning Chat",
   executionTarget: "Execution target",
@@ -261,6 +272,8 @@ const ZH_COPY: AutonomyCopy = {
   compileCommand: "编译并验证",
   compilingCommand: "正在检查任务…",
   compileFailed: "权威后端未批准本次请求。请检查运行时连接和任务输入后重试。",
+  mapUnavailable: "地图包尚未验证。请先完成校准并绑定已验证的编译场景。",
+  aircraftUnavailable: "机型包络超出编译器合同。请检查质量、推力、电量预留和规划半径。",
   intentSource: "来自 Tuning Chat 的任务意图",
   editInChat: "返回 Tuning Chat 修改",
   executionTarget: "执行目标",
@@ -404,6 +417,10 @@ const SCENE_ID_BY_MISSION: Record<MissionId, string> = {
   narrow: "service-corridor-dock",
 };
 
+const MISSION_BY_SCENE_ID = Object.fromEntries(
+  Object.entries(SCENE_ID_BY_MISSION).map(([missionId, sceneId]) => [sceneId, missionId as MissionId]),
+) as Record<string, MissionId>;
+
 const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
   dry_mass_kg: 1.55,
   launch_payload_kg: 0.10,
@@ -415,6 +432,43 @@ const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
   max_acceleration_mps2: 3.0,
   reserve_battery_percent: 30,
 };
+
+function missionForWorkspace(workspace?: AutonomyWorkspaceState): MissionId {
+  if (!workspace) return "coffee";
+  const boundMission = workspace.mapPack.compilerSceneId
+    ? MISSION_BY_SCENE_ID[workspace.mapPack.compilerSceneId]
+    : undefined;
+  if (boundMission) return boundMission;
+  const intent = workspace.mission.intent.toLowerCase();
+  if (workspace.mapPack.semanticLayers.includes("gates") || /\bgates?\b|圆环|穿门/u.test(intent)) return "gates";
+  if (/narrow|corridor|passage|狭窄|走廊/u.test(intent)) return "narrow";
+  return "coffee";
+}
+
+function perceptionForWorkspace(workspace?: AutonomyWorkspaceState): PerceptionMode {
+  if (!workspace) return "fusion";
+  const hasMap = workspace.mapPack.calibrated && Boolean(workspace.mapPack.compilerSceneId);
+  const hasVision = workspace.aircraft.sensors.some((sensor) => ["rgb", "depth", "stereo", "thermal", "vio"].includes(sensor));
+  if (hasMap && hasVision) return "fusion";
+  return hasVision ? "vision" : "map";
+}
+
+function vehicleForAircraft(aircraft?: AutonomyAircraftProfile): AutonomyCompileRequest["vehicle"] {
+  if (!aircraft) return DEFAULT_VEHICLE;
+  const payloadMarginKg = Math.max(0, aircraft.maximumTakeoffMassKg - aircraft.dryMassKg);
+  const launchPayloadKg = Math.min(DEFAULT_VEHICLE.launch_payload_kg, payloadMarginKg);
+  const pickupCapacityKg = Math.max(0, payloadMarginKg - launchPayloadKg);
+  return {
+    ...DEFAULT_VEHICLE,
+    dry_mass_kg: aircraft.dryMassKg,
+    launch_payload_kg: launchPayloadKg,
+    pickup_payload_kg: Math.min(DEFAULT_VEHICLE.pickup_payload_kg, pickupCapacityKg),
+    max_takeoff_mass_kg: aircraft.maximumTakeoffMassKg,
+    max_total_thrust_n: aircraft.maximumThrustN,
+    radius_m: autonomyAircraftRadiusM(aircraft),
+    reserve_battery_percent: aircraft.reserveBatteryPercent,
+  };
+}
 
 function defaultTarget(edition: AutonomyEdition): AutonomyExecutionTarget {
   if (edition === "field") return "hardware";
@@ -484,18 +538,43 @@ function runtimeComponentLabel(
   return labels[id];
 }
 
-export function AutonomyLab() {
+export function AutonomyLab({
+  embedded = false,
+  onRunCompleted,
+  workspace,
+}: {
+  embedded?: boolean;
+  onRunCompleted?: (record: AutonomyEvidenceRecord) => void;
+  workspace?: AutonomyWorkspaceState;
+} = {}) {
   const { interfaceLocale } = useI18n();
   const copy = COPY_BY_LOCALE[interfaceLocale] ?? EN_COPY;
   const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
+  const workspaceMissionId = missionForWorkspace(workspace);
+  const workspaceVehicleKey = workspace
+    ? [
+        workspace.aircraft.dryMassKg,
+        workspace.aircraft.maximumTakeoffMassKg,
+        workspace.aircraft.maximumThrustN,
+        workspace.aircraft.bodyLengthM,
+        workspace.aircraft.bodyWidthM,
+        workspace.aircraft.rotorRadiusM,
+        workspace.aircraft.reserveBatteryPercent,
+      ].join(":")
+    : "default";
+  const workspaceVehicleCache = useRef<{ key: string; value: AutonomyCompileRequest["vehicle"] } | null>(null);
+  if (workspaceVehicleCache.current?.key !== workspaceVehicleKey) {
+    workspaceVehicleCache.current = { key: workspaceVehicleKey, value: vehicleForAircraft(workspace?.aircraft) };
+  }
+  const workspaceVehicle = workspaceVehicleCache.current.value;
   const [edition, setEdition] = useState<AutonomyEdition>(loadAutonomyEdition);
-  const [missionId, setMissionId] = useState<MissionId>("coffee");
-  const [perception, setPerception] = useState<PerceptionMode>("fusion");
+  const [missionId, setMissionId] = useState<MissionId>(workspaceMissionId);
+  const [perception, setPerception] = useState<PerceptionMode>(() => perceptionForWorkspace(workspace));
   const [target, setTarget] = useState<AutonomyExecutionTarget>(() => defaultTarget(loadAutonomyEdition()));
   const [command, setCommand] = useState(
-    () => loadAutonomyHandoff() ?? promptForMission("coffee", chinese),
+    () => workspace?.mission.intent ?? loadAutonomyHandoff() ?? promptForMission(workspaceMissionId, chinese),
   );
-  const [pickupPayloadKg, setPickupPayloadKg] = useState(DEFAULT_VEHICLE.pickup_payload_kg);
+  const [pickupPayloadKg, setPickupPayloadKg] = useState(workspaceVehicle.pickup_payload_kg);
   const [compileResult, setCompileResult] = useState<AutonomyCompileResponse | null>(null);
   const [compileSource, setCompileSource] = useState<"backend" | "preview">("preview");
   const [compileError, setCompileError] = useState<string | null>(null);
@@ -503,6 +582,7 @@ export function AutonomyLab() {
   const [planned, setPlanned] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [running, setRunning] = useState(false);
+  const [launching, setLaunching] = useState(false);
   const [paused, setPaused] = useState(false);
   const [complete, setComplete] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -512,13 +592,28 @@ export function AutonomyLab() {
   const runtimeSequence = useRef(0);
   const runtimeObservationPending = useRef(false);
   const runtimeTerminalSent = useRef(false);
+  const evidenceReported = useRef(false);
+  const previewRunId = useRef<string | null>(null);
+  const workspaceBindingApplied = useRef<string | null>(null);
   const progressRef = useRef(0);
   const dronePositionRef = useRef<Point>([0, 0]);
   const [events, setEvents] = useState(() => [{ time: eventTime(), text: copy.events.ready }]);
+  const workspaceBindingKey = workspace
+    ? `${workspace.aircraft.updatedAt}:${workspace.mapPack.updatedAt}:${workspace.mission.updatedAt}:${workspace.mission.intent}`
+    : "standalone";
 
   useEffect(() => {
-    consumeAutonomyHandoff();
-  }, []);
+    if (workspaceBindingApplied.current === workspaceBindingKey) return;
+    workspaceBindingApplied.current = workspaceBindingKey;
+    if (!workspace) {
+      consumeAutonomyHandoff();
+      return;
+    }
+    setCommand(workspace.mission.intent);
+    setMissionId(missionForWorkspace(workspace));
+    setPerception(perceptionForWorkspace(workspace));
+    setPickupPayloadKg(vehicleForAircraft(workspace.aircraft).pickup_payload_kg);
+  }, [workspace, workspaceBindingKey]);
 
   useEffect(() => {
     if (EDITION_IS_FIXED) return undefined;
@@ -538,13 +633,19 @@ export function AutonomyLab() {
     ...copy.missions[base.id],
   })), [copy]);
   const mission = missions.find(({ id }) => id === missionId) ?? missions[0];
+  const hasWorkspace = workspace !== undefined;
+  const workspaceCompilerSceneId = workspace?.mapPack.compilerSceneId;
+  const workspaceMapQualified = !hasWorkspace
+    || (workspace?.mapPack.calibrated === true && Boolean(workspaceCompilerSceneId));
+  const workspaceAircraftQualified = !workspace
+    || isAutonomyAircraftProfileValid(workspace.aircraft);
   const compileRequest = useMemo<AutonomyCompileRequest>(() => ({
     edition,
     execution_target: target,
     natural_language: command.trim() || promptForMission(missionId, chinese),
-    scene_id: SCENE_ID_BY_MISSION[missionId],
+    scene_id: workspaceCompilerSceneId ?? (hasWorkspace ? "" : SCENE_ID_BY_MISSION[missionId]),
     perception_mode: perception,
-    vehicle: { ...DEFAULT_VEHICLE, pickup_payload_kg: pickupPayloadKg },
+    vehicle: { ...workspaceVehicle, pickup_payload_kg: pickupPayloadKg },
     evidence: {
       simulation_qualified: false,
       signed_vehicle_pack_id: null,
@@ -554,7 +655,7 @@ export function AutonomyLab() {
       geofence_ready: false,
       battery_ready: false,
     },
-  }), [chinese, command, edition, missionId, perception, pickupPayloadKg, target]);
+  }), [chinese, command, edition, hasWorkspace, missionId, perception, pickupPayloadKg, target, workspaceCompilerSceneId, workspaceVehicle]);
   const latestCompileRequest = useRef(compileRequest);
   latestCompileRequest.current = compileRequest;
   const provisionalResult = useMemo(
@@ -676,6 +777,29 @@ export function AutonomyLab() {
   }, [complete, copy.compileFailed, mission.clearance, missionId, pickupPayloadKg, runtimeSession]);
 
   useEffect(() => {
+    if (!complete || evidenceReported.current || !onRunCompleted) return;
+    if (!publicDemoConsole && !runtimeSession?.terminal) return;
+    evidenceReported.current = true;
+    const completedAt = new Date().toISOString();
+    const sessionId = runtimeSession?.session_id
+      ?? (previewRunId.current ??= `preview-run-${crypto.randomUUID()}`);
+    onRunCompleted({
+      schemaVersion: 1,
+      id: sessionId,
+      sessionId,
+      contractId: qualification.contract.contract_id,
+      completedAt,
+      executionTarget: target,
+      source: runtimeSession ? "backend" : "preview",
+      evidenceChainHead: runtimeSession?.evidence_chain_head ?? "preview-only-no-signed-evidence-chain",
+      observationCount: runtimeSession?.observation_count ?? 0,
+      missionIntent: command,
+      aircraftName: workspace?.aircraft.name ?? "Default preview aircraft",
+      mapName: workspace?.mapPack.name ?? qualification.scene.name,
+    });
+  }, [command, complete, onRunCompleted, qualification.contract.contract_id, qualification.scene.name, runtimeSession, target, workspace?.aircraft.name, workspace?.mapPack.name]);
+
+  useEffect(() => {
     compileGeneration.current += 1;
     setCompileResult(null);
     setCompileSource("preview");
@@ -683,12 +807,15 @@ export function AutonomyLab() {
     setPlanned(false);
     setPlanning(false);
     setRunning(false);
+    setLaunching(false);
     setComplete(false);
     setProgress(0);
     setRuntimeSession(null);
     runtimeRequestId.current = null;
     runtimeSequence.current = 0;
     runtimeTerminalSent.current = false;
+    evidenceReported.current = false;
+    previewRunId.current = null;
   }, [compileRequest]);
 
   const appendEvent = (text: string) => {
@@ -710,8 +837,22 @@ export function AutonomyLab() {
   };
 
   const planTrajectory = async () => {
+    if (!workspaceAircraftQualified) {
+      setCompileResult(null);
+      setCompileError(copy.aircraftUnavailable);
+      setPlanned(false);
+      return;
+    }
+    if (!workspaceMapQualified) {
+      setCompileResult(null);
+      setCompileError(copy.mapUnavailable);
+      setPlanned(false);
+      return;
+    }
     const generation = ++compileGeneration.current;
     const submittedRequest = compileRequest;
+    previewRunId.current = null;
+    evidenceReported.current = false;
     setPlanning(true);
     setCompileError(null);
     setRunning(false);
@@ -751,9 +892,13 @@ export function AutonomyLab() {
   };
 
   const toggleFlight = async () => {
-    if (!planned || complete) return;
+    if (!planned || complete || launching) return;
     if (!running) {
+      if (publicDemoConsole) {
+        previewRunId.current ??= `preview-run-${crypto.randomUUID()}`;
+      }
       if (!publicDemoConsole && !runtimeSession) {
+        setLaunching(true);
         try {
           runtimeRequestId.current ??= crypto.randomUUID();
           const created = await apiClient.createAutonomyRuntimeSession(
@@ -784,6 +929,8 @@ export function AutonomyLab() {
         } catch {
           setCompileError(copy.compileFailed);
           return;
+        } finally {
+          setLaunching(false);
         }
       }
       setRunning(true);
@@ -806,6 +953,7 @@ export function AutonomyLab() {
       );
     }
     setRunning(false);
+    setLaunching(false);
     setPaused(false);
     setComplete(false);
     setProgress(0);
@@ -814,6 +962,8 @@ export function AutonomyLab() {
     runtimeRequestId.current = null;
     runtimeSequence.current = 0;
     runtimeTerminalSent.current = false;
+    evidenceReported.current = false;
+    previewRunId.current = null;
     setEvents([{ time: eventTime(), text: planned ? copy.events.planned : copy.events.ready }]);
   };
 
@@ -824,8 +974,8 @@ export function AutonomyLab() {
   };
 
   return (
-    <div className="autonomy-lab-page">
-      <header className="autonomy-hero">
+    <div className={`autonomy-lab-page${embedded ? " is-embedded" : ""}`}>
+      {!embedded ? <header className="autonomy-hero">
         <div>
           <span className="autonomy-kicker">{editionLabel} · {copy.kicker}</span>
           <div className="autonomy-title-line">
@@ -833,19 +983,17 @@ export function AutonomyLab() {
             <span><Sparkles aria-hidden="true" />{copy.simulationOnly}</span>
             <span className="autonomy-independent">{copy.independent}</span>
           </div>
-          <p>{copy.subtitle}</p>
         </div>
         <div className={`autonomy-flight-status ${complete ? "is-complete" : running ? "is-running" : ""}`}>
           <span />
           {complete ? copy.completed : running ? copy.running : planned ? copy.planned : copy.ready}
         </div>
-      </header>
+      </header> : null}
 
-      <section className="autonomy-command-center" data-execution-target={target}>
+      {!embedded ? <section className="autonomy-command-center" data-execution-target={target}>
         <div className="autonomy-command-input autonomy-intent-contract">
           <div className="autonomy-command-heading">
             <span><MessageSquareText aria-hidden="true" /><strong>{copy.intentSource}</strong></span>
-            <small>{copy.commandHelp}</small>
           </div>
           <p className="autonomy-intent-readout">{command}</p>
           <div className="autonomy-command-actions">
@@ -856,6 +1004,7 @@ export function AutonomyLab() {
                   type="button"
                   className={target === candidate ? "is-active" : ""}
                   aria-pressed={target === candidate}
+                  disabled={planning || launching || running || Boolean(runtimeSession && !runtimeSession.terminal)}
                   onClick={() => setTarget(candidate)}
                 >
                   {candidate === "simulation" ? <Cpu aria-hidden="true" /> : candidate === "hitl" ? <FileCheck2 aria-hidden="true" /> : <Navigation2 aria-hidden="true" />}
@@ -870,7 +1019,7 @@ export function AutonomyLab() {
             <button
               className="btn btn-primary autonomy-compile-button"
               type="button"
-              disabled={planning || command.trim().length < 3}
+              disabled={planning || launching || running || command.trim().length < 3}
               onClick={() => void planTrajectory()}
             >
               {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
@@ -906,10 +1055,10 @@ export function AutonomyLab() {
             </div>
           </dl>
         </div>
-      </section>
+      </section> : null}
 
       <section className="autonomy-workspace">
-        <aside className="autonomy-panel autonomy-config-panel">
+        {!embedded ? <aside className="autonomy-panel autonomy-config-panel">
           <div className="autonomy-panel-heading">
             <div><Route aria-hidden="true" /><span>{copy.mission}</span></div>
             <code>MISSION-01</code>
@@ -934,7 +1083,6 @@ export function AutonomyLab() {
 
           <div className="autonomy-config-section">
             <h2><Radar aria-hidden="true" />{copy.perception}</h2>
-            <p>{copy.perceptionHelp}</p>
             <div className="autonomy-mode-switch" role="group" aria-label={copy.perception}>
               {(Object.keys(copy.modes) as PerceptionMode[]).map((mode) => (
                 <button
@@ -948,7 +1096,6 @@ export function AutonomyLab() {
                 </button>
               ))}
             </div>
-            <small className="autonomy-mode-description">{copy.modeDescriptions[perception]}</small>
           </div>
 
           <div className="autonomy-config-section autonomy-payload-control">
@@ -979,11 +1126,11 @@ export function AutonomyLab() {
             {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Route aria-hidden="true" />}
             {planning ? copy.planning : planned ? copy.replan : copy.plan}
           </button>
-        </aside>
+        </aside> : null}
 
         <section className="autonomy-panel autonomy-map-panel">
           <div className="autonomy-panel-heading autonomy-map-heading">
-            <div><Map aria-hidden="true" /><span>{copy.environment}</span></div>
+            <div><Map aria-hidden="true" /><span>{workspace?.mapPack.name ?? copy.environment}</span></div>
             <span className="autonomy-world-state">{perception === "vision" ? copy.unknown : copy.mapped}</span>
           </div>
           <div className="autonomy-map-stage">
@@ -1066,7 +1213,14 @@ export function AutonomyLab() {
             </div>
           </div>
           <div className="autonomy-map-controls">
-            <button className="btn btn-primary" type="button" disabled={!planned || complete || !qualification.execution_policy.can_execute} onClick={() => void toggleFlight()}>
+            {embedded ? <div className="autonomy-target-switch autonomy-live-target-switch" role="group" aria-label={copy.executionTarget}>
+              {(Object.keys(copy.targets) as AutonomyExecutionTarget[]).map((candidate) => <button key={candidate} type="button" className={target === candidate ? "is-active" : ""} aria-pressed={target === candidate} disabled={planning || launching || running || Boolean(runtimeSession && !runtimeSession.terminal)} onClick={() => setTarget(candidate)}>{copy.targets[candidate]}</button>)}
+            </div> : null}
+            {embedded ? <button className="btn" type="button" onClick={() => void planTrajectory()} disabled={planning || launching || running || command.trim().length < 3}>
+              {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Route aria-hidden="true" />}
+              {planning ? copy.planning : planned ? copy.replan : copy.plan}
+            </button> : null}
+            <button className="btn btn-primary" type="button" disabled={launching || !planned || complete || !qualification.execution_policy.can_execute} onClick={() => void toggleFlight()}>
               {!qualification.execution_policy.can_execute ? <LockKeyhole aria-hidden="true" /> : running && !paused ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
               {running ? paused ? copy.resume : copy.pause : copy.run}
             </button>
@@ -1083,7 +1237,6 @@ export function AutonomyLab() {
             <div><BrainCircuit aria-hidden="true" /><span>{copy.brain}</span></div>
             <span className="autonomy-brain-rate">20 Hz safety loop</span>
           </div>
-          <p className="autonomy-brain-copy">{copy.brainSubtitle}</p>
           <ol className="autonomy-brain-stages">
             {copy.brainStages.map((stage, index) => (
               <li key={stage} className={index === activeStage ? "is-active" : index < activeStage || complete ? "is-complete" : ""}>

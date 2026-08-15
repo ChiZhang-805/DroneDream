@@ -97,9 +97,53 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         {
           path: "autonomy",
           lazy: async () => {
-            const { AutonomyLab } = await import("./pages/AutonomyLab");
-            return { Component: AutonomyLab };
+            const { AutonomyPlatform } = await import("./pages/AutonomyPlatform");
+            return { Component: AutonomyPlatform };
           },
+          children: [
+            {
+              index: true,
+              lazy: async () => {
+                const { AutonomyOverview } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyOverview };
+              },
+            },
+            {
+              path: "aircraft",
+              lazy: async () => {
+                const { AutonomyAircraft } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyAircraft };
+              },
+            },
+            {
+              path: "maps",
+              lazy: async () => {
+                const { AutonomyMaps } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyMaps };
+              },
+            },
+            {
+              path: "mission",
+              lazy: async () => {
+                const { AutonomyMission } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyMission };
+              },
+            },
+            {
+              path: "live",
+              lazy: async () => {
+                const { AutonomyLive } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyLive };
+              },
+            },
+            {
+              path: "evidence",
+              lazy: async () => {
+                const { AutonomyEvidence } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyEvidence };
+              },
+            },
+          ],
         },
         ...(BUILD_HAS_VEHICLE_STUDIO ? [{
           path: "vehicle-studio",

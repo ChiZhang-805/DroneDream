@@ -21,7 +21,7 @@ const enTranslations = {
     "app.newExperiment": "Experiment",
     "app.history": "Run History",
     "app.fixedScenarios": "Scenarios",
-    "app.autonomyLab": "Autonomy Lab",
+    "app.autonomyLab": "Autonomy",
     "app.vehicleStudio": "Vehicle Studio",
     "app.experimentBuilder": "Experiment",
     "app.labValidation": "Evidence Review",
