@@ -801,6 +801,118 @@ function createEngineeringConstraints(components: VehicleComponentDraft[]): Vehi
   return constraints;
 }
 
+export function createMyDroneVehicleModelDraft(now = new Date()): VehicleModelDraft {
+  const timestamp = now.toISOString();
+  const components = defaultComponents(4, .25, .254);
+  const frame = components.find((component) => component.kind === "frame");
+  if (!frame) throw new Error("The My Drone reference assembly requires a center frame.");
+
+  frame.name = "X500 V2 carbon center frame";
+  frame.geometry.sizeM = { x: .21, y: .038, z: .21 };
+  frame.material = { baseColor: "#20252c", metalness: .5, roughness: .34, opacity: 1 };
+  frame.tags = ["public-reference", "x500-v2", "primary-structure"];
+
+  const fuselage = components.find((component) => component.kind === "fuselage");
+  if (fuselage) {
+    fuselage.name = "Avionics deck and protective canopy";
+    fuselage.geometry.sizeM = { x: .144, y: .082, z: .144 };
+    fuselage.material = { baseColor: "#e7e9ee", metalness: .08, roughness: .46, opacity: .94 };
+    fuselage.tags = ["avionics-bay", "serviceable"];
+  }
+
+  const battery = components.find((component) => component.kind === "battery");
+  if (battery) {
+    battery.name = "4S 5000 mAh LiPo";
+    battery.geometry.sizeM = { x: .155, y: .048, z: .052 };
+    battery.transform.positionM = { x: -.025, y: -.052, z: 0 };
+    battery.tags = ["energy-storage", "74-wh", "quick-release"];
+  }
+
+  const controller = components.find((component) => component.kind === "flight-controller");
+  if (controller) {
+    controller.name = "Pixhawk 6C flight controller";
+    controller.geometry.sizeM = { x: .084, y: .024, z: .054 };
+    controller.transform.positionM = { x: .018, y: .058, z: 0 };
+    controller.tags = ["px4", "redundant-imu", "control-critical"];
+  }
+
+  const legacyCamera = components.find((component) => component.kind === "camera-gimbal");
+  if (legacyCamera) {
+    legacyCamera.name = "Front RGB-D perception module";
+    legacyCamera.kind = "sensor";
+    legacyCamera.geometry = { primitive: "rounded-box", sizeM: { x: .124, y: .029, z: .026 }, radiusM: .013, lengthM: .124, meshUri: "" };
+    legacyCamera.transform.positionM = { x: .155, y: -.035, z: 0 };
+    legacyCamera.material = { baseColor: "#343840", metalness: .22, roughness: .38, opacity: 1 };
+    legacyCamera.mass.massKg = .09;
+    legacyCamera.tags = ["rgb", "depth", "stereo", "vio", "forward-facing"];
+  }
+
+  const compute = createVehicleComponent("custom", "Jetson Orin NX compute enclosure");
+  compute.parentId = frame.id;
+  compute.geometry = { primitive: "rounded-box", sizeM: { x: .103, y: .047, z: .083 }, radiusM: .018, lengthM: .103, meshUri: "" };
+  compute.transform.positionM = { x: -.055, y: .092, z: 0 };
+  compute.material = { baseColor: "#4c5554", metalness: .58, roughness: .31, opacity: 1 };
+  compute.mass.massKg = .19;
+  compute.tags = ["onboard-compute", "jetson-orin-nx", "10-25-w"];
+  components.push(compute);
+
+  const gnss = createVehicleComponent("sensor", "M10 GNSS and compass mast");
+  gnss.parentId = frame.id;
+  gnss.geometry = { primitive: "cylinder", sizeM: { x: .066, y: .022, z: .066 }, radiusM: .033, lengthM: .022, meshUri: "" };
+  gnss.transform.positionM = { x: -.105, y: .19, z: 0 };
+  gnss.material = { baseColor: "#eef0f4", metalness: .12, roughness: .42, opacity: 1 };
+  gnss.mass.massKg = .041;
+  gnss.tags = ["gnss", "compass", "outdoor-localization"];
+  components.push(gnss);
+
+  const gripper = createVehicleComponent("payload", "Takeout payload gripper");
+  gripper.parentId = frame.id;
+  gripper.geometry = { primitive: "rounded-box", sizeM: { x: .118, y: .064, z: .104 }, radiusM: .018, lengthM: .118, meshUri: "" };
+  gripper.transform.positionM = { x: .01, y: -.145, z: 0 };
+  gripper.material = { baseColor: "#e650ad", metalness: .2, roughness: .38, opacity: 1 };
+  gripper.mass.massKg = .16;
+  gripper.tags = ["payload", "takeout", "quick-release", "0.55-kg-capacity"];
+  components.push(gripper);
+
+  let draft: VehicleModelDraft = {
+    schemaVersion: 2,
+    draftId: uuid(),
+    revision: 1,
+    name: "My Drone",
+    manufacturer: "DroneDream reference · Holybro X500 V2-derived",
+    vehicleClass: "multicopter-research",
+    body: { shape: "box", massKg: 0, lengthM: .36, widthM: .36, heightM: .33 },
+    propulsion: {
+      motorCount: 4,
+      armLengthM: .25,
+      propellerDiameterM: .254,
+      maximumThrustPerMotorN: 11,
+      batteryCells: 4,
+      batteryCapacityMah: 5000,
+    },
+    sensors: [
+      { id: uuid(), type: "imu", model: "Pixhawk 6C redundant IMU", enabled: true, componentId: controller?.id },
+      { id: uuid(), type: "gps", model: "M10 GNSS and compass", enabled: true, componentId: gnss.id },
+      { id: uuid(), type: "barometer", model: "Temperature-compensated barometer", enabled: true, componentId: controller?.id },
+      { id: uuid(), type: "camera", model: "Front RGB-D stereo camera", enabled: true, componentId: legacyCamera?.id },
+    ],
+    autopilot: { family: "px4", controllerModel: "Pixhawk 6C", firmwareVersion: "v1.16.0" },
+    controlTarget: { primary: "position", parameterFamilies: ["MPC_XY", "MPC_Z", "MC_ROLL", "MC_PITCH", "MC_YAW"] },
+    targetEditions: ["sim", "lab", "field"],
+    components,
+    constraints: createEngineeringConstraints(components),
+    designParameters: { units: "metric", gridM: .005, symmetry: "x" },
+    notes: "Public reference aircraft for School Map missions. The editable assembly includes the X500-class frame, PX4 avionics, RGB-D perception, onboard compute, GNSS, and a 0.55 kg takeout gripper.",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  draft.body.massKg = components.reduce((sum, component) => sum + getVehicleComponentMassProperties(component).massKg, 0);
+  draft = scaleVehicleModelMass(draft, 1.86);
+  draft.createdAt = timestamp;
+  draft.updatedAt = timestamp;
+  return draft;
+}
+
 export function rebuildVehicleRotorArchitecture(
   draft: VehicleModelDraft,
   propulsion: Pick<VehicleModelDraft["propulsion"], "motorCount" | "armLengthM" | "propellerDiameterM">,

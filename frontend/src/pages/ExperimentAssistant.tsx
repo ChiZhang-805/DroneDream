@@ -18,11 +18,13 @@ import {
   FileUp,
   GitFork,
   LoaderCircle,
+  Layers3,
   MapPinned,
   Mic,
   MicOff,
   Microchip,
   MonitorPlay,
+  Navigation2,
   Orbit,
   PencilRuler,
   Plus,
@@ -64,6 +66,11 @@ import {
   storeAutonomyHandoff,
   type AssistantTaskType,
 } from "../features/experiment/assistantTaskRouter";
+import {
+  defaultAutonomyWorkspace,
+  loadAutonomyWorkspace,
+  saveAutonomyWorkspace,
+} from "../features/autonomy/workspaceStore";
 import { clearExperimentDraft } from "../features/experiment/draftStorage";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import { useOptionalAuth } from "../features/auth/AuthContext";
@@ -716,6 +723,7 @@ export function ExperimentAssistant() {
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
   const copy = COPY[locale];
+  const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
   const editionCopy = {
     ...(locale === "en"
       ? EDITION_ASSISTANT_COPY[editionTheme.id]
@@ -905,6 +913,25 @@ export function ExperimentAssistant() {
   const messages = draft.conversation.messages;
   const taskOptions = assistantTaskOptions(editionTheme.id, interfaceLocale);
   const selectedTask = taskOptions.find(({ id }) => id === selectedTaskType) ?? null;
+  const bindPublicAutonomyAsset = (kind: "aircraft" | "map") => {
+    const current = loadAutonomyWorkspace(ownerId, editionTheme.id);
+    const publicAssets = defaultAutonomyWorkspace();
+    const now = new Date().toISOString();
+    saveAutonomyWorkspace(ownerId, editionTheme.id, {
+      ...current,
+      aircraft: kind === "aircraft" ? publicAssets.aircraft : current.aircraft,
+      mapPack: kind === "map" ? publicAssets.mapPack : current.mapPack,
+      mission: {
+        ...current.mission,
+        aircraftProfileId: kind === "aircraft" ? publicAssets.aircraft.id : current.aircraft.id,
+        mapPackId: kind === "map" ? publicAssets.mapPack.id : current.mapPack.id,
+        compiledPlan: null,
+        updatedAt: now,
+      },
+    });
+    setSelectedTaskType("mission_autonomy");
+    setActionMenuOpen(false);
+  };
 
   useEffect(() => {
     if (!publicDemoConsole || !auth?.account || !workspaceId) return;
@@ -1555,6 +1582,28 @@ export function ExperimentAssistant() {
                     </button>
                   );
                 })}
+                <hr />
+                <strong className="assistant-task-popover-title">{chinese ? "自主任务资产" : "Autonomy assets"}</strong>
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked="true"
+                  data-task-icon="my-drone"
+                  onClick={() => bindPublicAutonomyAsset("aircraft")}
+                >
+                  <span className="assistant-task-icon" aria-hidden="true"><Navigation2 strokeWidth={1.8} /></span>
+                  <span className="assistant-task-popover-copy"><b>My Drone</b><small>{chinese ? "公共 X500 V2 级机型" : "Public X500 V2-class aircraft"}</small></span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked="true"
+                  data-task-icon="school-map"
+                  onClick={() => bindPublicAutonomyAsset("map")}
+                >
+                  <span className="assistant-task-icon" aria-hidden="true"><Layers3 strokeWidth={1.8} /></span>
+                  <span className="assistant-task-popover-copy"><b>School Map</b><small>{chinese ? "公共三层校园地图" : "Public three-floor campus map"}</small></span>
+                </button>
                 <hr />
                 <Link data-task-icon="manual" to="/jobs/new" role="menuitem" onClick={() => setActionMenuOpen(false)}>
                   <span className="assistant-task-icon" aria-hidden="true">

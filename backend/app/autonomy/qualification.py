@@ -37,6 +37,12 @@ MapSemanticLayer = Literal[
     "gates",
     "people",
     "pickup-zones",
+    "launch-zones",
+    "rooms",
+    "corridors",
+    "roads",
+    "vegetation",
+    "street-furniture",
 ]
 MapPlanningLayer = Literal[
     "collision-geometry",

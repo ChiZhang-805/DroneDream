@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { Building2, Eye, EyeOff, Layers3 } from "lucide-react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-type MissionId = "coffee" | "gates" | "narrow";
+import { createMyDroneModel } from "./myDroneModel";
+import {
+  buildSchoolMapScene,
+  type SchoolMapFloor,
+  type SchoolMapMissionId,
+} from "./schoolMapScene";
+
+type MissionId = SchoolMapMissionId;
 
 interface AutonomyWorld3DProps {
   missionId: MissionId;
@@ -14,22 +22,6 @@ interface AutonomyWorld3DProps {
   mapName: string;
 }
 
-const ROUTES: Record<MissionId, Array<[number, number, number]>> = {
-  coffee: [
-    [-14, 8.4, 8], [-10, 8.4, 4], [-7, 6.6, 1], [-7, 4.4, -2],
-    [-5, 2.4, -5], [1, 1.8, -7], [8, 1.8, -4], [14, 1.6, 3],
-    [8, 2.0, -3], [0, 2.6, -7], [-7, 4.6, -2], [-10, 7.0, 4], [-14, 8.4, 8],
-  ],
-  gates: [
-    [-15, 1.8, -6], [-10, 2.0, -3], [-5, 2.4, 0], [0, 2.2, 2],
-    [5, 2.7, 1], [10, 2.3, 4], [15, 1.6, 6],
-  ],
-  narrow: [
-    [-14, 1.5, -7], [-10, 1.8, -3], [-5, 2.0, -1], [-1, 1.7, 4],
-    [4, 1.9, 1], [8, 1.6, 5], [14, 1.2, 7],
-  ],
-};
-
 function material(color: number, roughness = 0.72, opacity = 1) {
   return new THREE.MeshStandardMaterial({
     color,
@@ -37,141 +29,34 @@ function material(color: number, roughness = 0.72, opacity = 1) {
     metalness: 0.08,
     transparent: opacity < 1,
     opacity,
+    depthWrite: opacity > 0.45,
   });
-}
-
-function addBox(
-  group: THREE.Group,
-  size: [number, number, number],
-  position: [number, number, number],
-  color = 0xc9c4d4,
-) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material(color));
-  mesh.position.set(...position);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  group.add(mesh);
-  return mesh;
-}
-
-function addTree(group: THREE.Group, x: number, z: number, height = 4.8) {
-  const trunk = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.25, 0.38, height * 0.56, 12),
-    material(0x765846),
-  );
-  trunk.position.set(x, height * 0.28, z);
-  trunk.castShadow = true;
-  group.add(trunk);
-  const crownMaterial = material(0x5aa880);
-  [[0, 0], [-0.8, 0.2], [0.75, 0.15]].forEach(([offsetX, offsetZ], index) => {
-    const crown = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(index === 0 ? 1.4 : 1.05, 1),
-      crownMaterial,
-    );
-    crown.position.set(x + offsetX, height * 0.72 + index * 0.18, z + offsetZ);
-    crown.castShadow = true;
-    group.add(crown);
-  });
-}
-
-function addGate(group: THREE.Group, x: number, y: number, z: number, color = 0x8b68f5) {
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(1.65, 0.14, 16, 64),
-    material(color, 0.35),
-  );
-  ring.position.set(x, y, z);
-  ring.castShadow = true;
-  group.add(ring);
-  const left = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, y * 2, 10), material(0x6d6479));
-  left.position.set(x - 1.65, y / 2, z);
-  const right = left.clone();
-  right.position.x = x + 1.65;
-  group.add(left, right);
-}
-
-function buildCoffeeWorld(group: THREE.Group) {
-  addBox(group, [9, 0.45, 7], [-12, 1, 5], 0xe5e0e8);
-  addBox(group, [9, 0.45, 7], [-12, 4.1, 5], 0xded7e5);
-  addBox(group, [9, 0.45, 7], [-12, 7.2, 5], 0xd6cde0);
-  addBox(group, [7, 3.2, 0.35], [-12, 8.8, 1.55], 0xc7bfd0);
-  addBox(group, [0.35, 3.2, 7], [-16.4, 8.8, 5], 0xc7bfd0);
-  for (let index = 0; index < 12; index += 1) {
-    addBox(group, [1.25, 0.22, 2.2], [-7.8 + index * 0.47, 6.9 - index * 0.43, 0.4 - index * 0.52], 0xa99fb7);
-  }
-  addBox(group, [7.2, 5.5, 6], [7.5, 2.75, 6.2], 0xbfc7d7);
-  addBox(group, [4.5, 3.8, 5], [13, 1.9, -6], 0xd4c6cf);
-  addTree(group, 2.5, -3.2, 5.4);
-  addTree(group, 8.5, -7.5, 4.7);
-  addTree(group, 13, 0.8, 5.8);
-  const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.4, 10), material(0x675f6d));
-  signPost.position.set(3.5, 1.2, 4.3);
-  group.add(signPost);
-  addBox(group, [1.7, 0.85, 0.14], [3.5, 2.1, 4.3], 0xf1c85b);
-  const dock = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.16, 48), material(0xe4a83d));
-  dock.position.set(14, 0.08, 3);
-  group.add(dock);
-}
-
-function buildGateWorld(group: THREE.Group) {
-  for (let index = 0; index < 16; index += 1) {
-    const x = -14 + index * 1.9;
-    const z = (index % 2 === 0 ? 6.5 : -7) + Math.sin(index * 1.6) * 1.4;
-    addTree(group, x, z, 4 + (index % 4) * 0.55);
-  }
-  addGate(group, -5, 2.4, 0);
-  addGate(group, 0, 2.2, 2);
-  addGate(group, 5, 2.7, 1);
-  addBox(group, [3.5, 4.2, 2.2], [-1, 2.1, -5.2], 0x9b94a4);
-}
-
-function buildNarrowWorld(group: THREE.Group) {
-  addBox(group, [30, 4.8, 0.4], [0, 2.4, -9], 0xc6c1cf);
-  addBox(group, [30, 4.8, 0.4], [0, 2.4, 9], 0xc6c1cf);
-  addBox(group, [4.8, 4, 5.2], [-7, 2, -3], 0xbab3c6);
-  addBox(group, [5.5, 4.6, 4.2], [1, 2.3, 5.8], 0xd0cad8);
-  addBox(group, [4.4, 3.8, 5], [8.5, 1.9, -2.8], 0xbab3c6);
-  const dock = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.14, 48), material(0x62c9df));
-  dock.position.set(14, 0.07, 7);
-  group.add(dock);
-}
-
-function createDrone() {
-  const group = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.65), material(0x393347, 0.3));
-  group.add(body);
-  const armMaterial = material(0x665f74, 0.3);
-  const armA = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.1, 0.12), armMaterial);
-  armA.rotation.y = Math.PI / 4;
-  const armB = armA.clone();
-  armB.rotation.y = -Math.PI / 4;
-  group.add(armA, armB);
-  const rotorMaterial = new THREE.MeshBasicMaterial({ color: 0x65d5e8, transparent: true, opacity: 0.65 });
-  [[-0.75, -0.75], [-0.75, 0.75], [0.75, -0.75], [0.75, 0.75]].forEach(([x, z]) => {
-    const rotor = new THREE.Mesh(new THREE.TorusGeometry(0.43, 0.035, 8, 32), rotorMaterial);
-    rotor.rotation.x = Math.PI / 2;
-    rotor.position.set(x, 0.18, z);
-    group.add(rotor);
-  });
-  const sensor = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.2), material(0xe24ac1, 0.25));
-  sensor.position.set(0, -0.05, -0.42);
-  group.add(sensor);
-  group.scale.setScalar(0.78);
-  return group;
 }
 
 function createPerson() {
   const group = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 1.05, 6, 12), material(0xe24a7e));
-  body.position.y = 1.05;
+  group.name = "dynamic-person";
+  group.userData = { semanticKind: "person", trackId: "person-live-01" };
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.96, 6, 12), material(0xe24a7e));
+  body.position.y = 0.98;
+  body.castShadow = true;
   group.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 12), material(0xd89a78));
+  head.position.y = 1.73;
+  head.castShadow = true;
+  group.add(head);
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(1.15, 1.24, 64),
-    new THREE.MeshBasicMaterial({ color: 0xe24a7e, transparent: true, opacity: 0.5, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ color: 0xe24a7e, transparent: true, opacity: 0.45, side: THREE.DoubleSide }),
   );
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.025;
   group.add(ring);
   return group;
+}
+
+function floorLabel(floor: SchoolMapFloor) {
+  return floor === "all" ? "ALL" : `L${floor}`;
 }
 
 export function AutonomyWorld3D({
@@ -186,6 +71,8 @@ export function AutonomyWorld3D({
   const mountRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef(progress);
   const [webglError, setWebglError] = useState(false);
+  const [xRay, setXRay] = useState(false);
+  const [floor, setFloor] = useState<SchoolMapFloor>("all");
   progressRef.current = progress;
 
   useEffect(() => {
@@ -199,77 +86,94 @@ export function AutonomyWorld3D({
       setWebglError(true);
       return undefined;
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.92;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(perception === "vision" ? 0x15131b : 0xf4f2f7);
-    scene.fog = new THREE.Fog(scene.background, perception === "vision" ? 22 : 38, 58);
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 160);
-    camera.position.set(25, 22, 28);
+    scene.background = new THREE.Color(perception === "vision" ? 0x121017 : 0xdfe8ef);
+    scene.fog = new THREE.Fog(scene.background, perception === "vision" ? 80 : 128, 230);
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 360);
+    if (floor === "all") camera.position.set(74, 58, 86);
+    else camera.position.set(35, 24, 43);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.minDistance = 10;
-    controls.maxDistance = 70;
-    controls.maxPolarAngle = Math.PI * 0.48;
-    controls.target.set(0, 2.5, 0);
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 5;
+    controls.maxDistance = 190;
+    controls.maxPolarAngle = Math.PI * 0.495;
+    if (floor === "all") controls.target.set(-4, 3.2, 1);
+    else controls.target.set(-27, (floor - 1) * 3.6 + 1.8, 5);
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x696270, perception === "vision" ? 1.15 : 2.0));
-    const key = new THREE.DirectionalLight(0xffffff, perception === "vision" ? 1.8 : 2.6);
-    key.position.set(-12, 24, 14);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
-    scene.add(key);
-    const accent = new THREE.PointLight(0x9b64ff, 10, 35);
-    accent.position.set(10, 10, -8);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x6c6974, perception === "vision" ? 1.2 : 1.25));
+    const sun = new THREE.DirectionalLight(0xfff9ef, perception === "vision" ? 1.7 : 1.9);
+    sun.position.set(-42, 72, 28);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -70;
+    sun.shadow.camera.right = 70;
+    sun.shadow.camera.top = 62;
+    sun.shadow.camera.bottom = -62;
+    scene.add(sun);
+    const fill = new THREE.DirectionalLight(0xcdbfff, 0.62);
+    fill.position.set(60, 28, -45);
+    scene.add(fill);
+    const accent = new THREE.PointLight(0xd85bcf, 8, 45);
+    accent.position.set(48, 10, 2);
     scene.add(accent);
 
     const world = new THREE.Group();
     scene.add(world);
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(42, 32),
-      material(perception === "vision" ? 0x28232e : 0xebe8ef, 0.95),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    world.add(ground);
-    const grid = new THREE.GridHelper(42, 42, 0x8e7fad, perception === "vision" ? 0x35303b : 0xd7d0df);
-    grid.position.y = 0.02;
-    world.add(grid);
-    if (missionId === "coffee") buildCoffeeWorld(world);
-    else if (missionId === "gates") buildGateWorld(world);
-    else buildNarrowWorld(world);
-
-    const routePoints = ROUTES[missionId].map(([x, y, z]) => new THREE.Vector3(x, y, z));
-    const curve = new THREE.CatmullRomCurve3(routePoints, false, "centripetal", 0.25);
-    const routeGeometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(240));
+    const school = buildSchoolMapScene(world, { xRay, floor });
+    const routePoints = school.routes[missionId];
+    const curve = new THREE.CatmullRomCurve3(routePoints, false, "centripetal", 0.18);
+    const routeGeometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(640));
     const route = new THREE.Line(
       routeGeometry,
-      new THREE.LineBasicMaterial({ color: obstacleInjected ? 0xe44cc6 : 0x7565f3, transparent: true, opacity: planned ? 0.95 : 0.14 }),
+      new THREE.LineBasicMaterial({
+        color: obstacleInjected ? 0xe44cc6 : 0x6659f5,
+        transparent: true,
+        opacity: planned ? 0.96 : 0.12,
+      }),
     );
+    route.name = "qualified-school-route";
+    route.userData = { semanticKind: "trajectory", missionId, mapId: "school-campus-v1" };
     world.add(route);
 
-    const start = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.12, 48), material(0x6d56dc));
+    const start = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.86, 0.86, 0.07, 48),
+      material(0x6d56dc, 0.38, 0.92),
+    );
     start.position.copy(routePoints[0]);
-    start.position.y = 0.06;
+    start.position.y -= 0.08;
+    start.name = "mission-start-marker";
     world.add(start);
-    const drone = createDrone();
+    const drone = createMyDroneModel();
     drone.visible = planned;
     world.add(drone);
+    const droneHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.48, 0.025, 10, 48),
+      new THREE.MeshBasicMaterial({ color: 0x54d8e3, transparent: true, opacity: 0.75, depthTest: false }),
+    );
+    droneHalo.rotation.x = Math.PI / 2;
+    droneHalo.position.y = 0.2;
+    droneHalo.renderOrder = 12;
+    drone.add(droneHalo);
     const person = createPerson();
     person.visible = dynamicEntityActive;
     world.add(person);
 
     if (perception !== "map") {
-      const coneGeometry = new THREE.ConeGeometry(2.4, 7, 32, 1, true);
-      const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x43d1df, transparent: true, opacity: 0.09, side: THREE.DoubleSide, depthWrite: false });
+      const coneGeometry = new THREE.ConeGeometry(0.85, 4.2, 32, 1, true);
+      const coneMaterial = new THREE.MeshBasicMaterial({ color: 0x43d1df, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false });
       const cone = new THREE.Mesh(coneGeometry, coneMaterial);
       cone.rotation.x = Math.PI / 2;
-      cone.position.set(0, -0.4, -3.2);
+      cone.position.set(0, -0.02, -2.05);
+      cone.name = "rgbd-frustum";
       drone.add(cone);
     }
 
@@ -291,11 +195,12 @@ export function AutonomyWorld3D({
       const position = curve.getPointAt(routeProgress);
       const tangent = curve.getTangentAt(Math.min(0.999, routeProgress));
       drone.position.copy(position);
-      drone.position.y += Math.sin(elapsed * 3.2) * 0.06;
+      drone.position.y += Math.sin(elapsed * 3.1) * 0.025;
       drone.rotation.y = Math.atan2(tangent.x, tangent.z);
+      droneHalo.rotation.z = elapsed * 0.65;
       person.visible = dynamicEntityActive;
-      person.position.set(position.x + 1.2, 0, position.z + 0.4);
-      person.rotation.y = elapsed * 0.25;
+      person.position.set(position.x + 1.45 + Math.sin(elapsed * 0.45) * 0.35, Math.max(0, position.y - 1.4), position.z + 0.85);
+      person.rotation.y = elapsed * 0.18;
       controls.update();
       renderer.render(scene, camera);
       animationFrame = window.requestAnimationFrame(render);
@@ -305,27 +210,47 @@ export function AutonomyWorld3D({
       window.cancelAnimationFrame(animationFrame);
       observer.disconnect();
       controls.dispose();
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
       scene.traverse((object) => {
-        if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.Line)) return;
-        object.geometry.dispose();
-        const objectMaterial = object.material;
-        if (Array.isArray(objectMaterial)) objectMaterial.forEach((item) => item.dispose());
-        else objectMaterial.dispose();
+        if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Sprite) {
+          if ("geometry" in object && object.geometry instanceof THREE.BufferGeometry) geometries.add(object.geometry);
+          const objectMaterial = object.material;
+          (Array.isArray(objectMaterial) ? objectMaterial : [objectMaterial]).forEach((item) => materials.add(item));
+        }
+      });
+      geometries.forEach((geometry) => geometry.dispose());
+      materials.forEach((item) => {
+        if (item instanceof THREE.SpriteMaterial && item.map) item.map.dispose();
+        item.dispose();
       });
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [dynamicEntityActive, missionId, obstacleInjected, perception, planned]);
+  }, [dynamicEntityActive, floor, missionId, obstacleInjected, perception, planned, xRay]);
 
   return (
-    <div className="autonomy-world-3d" data-scene={missionId} data-perception={perception}>
-      <div ref={mountRef} className="autonomy-world-3d-canvas" aria-label={`${mapName} interactive 3D mission world`} />
+    <div className="autonomy-world-3d autonomy-school-world" data-scene="school-campus-v1" data-mission={missionId} data-perception={perception} data-xray={xRay ? "true" : "false"}>
+      <div ref={mountRef} className="autonomy-world-3d-canvas" aria-label={`${mapName} interactive semantic 3D campus`} />
       <div className="autonomy-world-3d-toolbar">
-        <span><i />3D WORLD</span>
+        <span><i />SCHOOL MAP</span>
         <span>{perception === "fusion" ? "MAP + LIVE FUSION" : perception === "vision" ? "LIVE LOCAL SLAM" : "PRIOR MAP"}</span>
         <small>Drag to orbit · Wheel to zoom</small>
       </div>
-      {webglError ? <div className="autonomy-world-3d-error">WebGL is unavailable. The mission contract remains visible, but the 3D world cannot be rendered on this device.</div> : null}
+      <div className="autonomy-world-3d-inspector" aria-label="School Map view controls">
+        <button type="button" className={xRay ? "is-active" : ""} onClick={() => setXRay((current) => !current)} aria-pressed={xRay}>
+          {xRay ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          {xRay ? "Solid" : "X-ray"}
+        </button>
+        <span aria-hidden="true"><Layers3 /></span>
+        {(["all", 1, 2, 3] as SchoolMapFloor[]).map((item) => (
+          <button type="button" key={item} className={floor === item ? "is-active" : ""} onClick={() => setFloor(item)} aria-pressed={floor === item}>
+            {item === "all" ? <Building2 aria-hidden="true" /> : null}{floorLabel(item)}
+          </button>
+        ))}
+      </div>
+      {webglError ? <div className="autonomy-world-3d-error">WebGL is unavailable. The mission contract remains visible, but the 3D campus cannot be rendered on this device.</div> : null}
     </div>
   );
 }

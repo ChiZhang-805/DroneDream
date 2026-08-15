@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateVehicleDiagnostics,
+  createMyDroneVehicleModelDraft,
   createVehicleModelDraft,
   createVehicleModelFromBrief,
   evaluateVehicleConstraints,
@@ -21,6 +22,20 @@ import {
 } from "../features/vehicleStudio/catalog";
 
 describe("Vehicle Studio engineering generator", () => {
+  it("opens the public My Drone as a validated editable X500-class assembly", () => {
+    const draft = createMyDroneVehicleModelDraft(new Date("2026-08-16T00:00:00.000Z"));
+    const diagnostics = calculateVehicleDiagnostics(draft);
+
+    expect(draft.name).toBe("My Drone");
+    expect(draft.propulsion).toMatchObject({ motorCount: 4, armLengthM: .25, propellerDiameterM: .254, batteryCells: 4, batteryCapacityMah: 5000 });
+    expect(draft.components.some((component) => component.name.includes("Jetson Orin NX"))).toBe(true);
+    expect(draft.components.some((component) => component.tags.includes("rgb") && component.tags.includes("depth"))).toBe(true);
+    expect(draft.components.some((component) => component.tags.includes("0.55-kg-capacity"))).toBe(true);
+    expect(diagnostics.totalMassKg).toBeCloseTo(1.86, 8);
+    expect(diagnostics.thrustToWeight).toBeGreaterThan(2.3);
+    expect(validateVehicleModel(draft)).toEqual([]);
+  });
+
   it("turns a payload brief into an editable redundant assembly", () => {
     const { draft, decisions } = createVehicleModelFromBrief({
       name: "Octa cargo demonstrator",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from typing import Literal
 
 from app.autonomy.catalog import SCENES, get_scene
 from app.autonomy.models import (
@@ -36,6 +37,7 @@ from app.autonomy.models import (
 GRAVITY = 9.80665
 MIN_THRUST_TO_WEIGHT = 1.35
 VALIDATED_SIGNED_PACK_COUNT = 0
+SchoolMissionProfile = Literal["coffee", "gates", "narrow"]
 
 
 class AutonomyCompileError(ValueError):
@@ -109,7 +111,7 @@ def _select_scene(request: AutonomyCompileRequest) -> str:
         return "forest-gate-inspection"
     if any(token in text for token in ("dock", "走廊", "corridor", "停靠", "狭窄")):
         return "service-corridor-dock"
-    return "stairwell-coffee-return"
+    return "school-campus-v1"
 
 
 def _select_perception(request: AutonomyCompileRequest) -> PerceptionMode:
@@ -129,8 +131,85 @@ def _select_perception(request: AutonomyCompileRequest) -> PerceptionMode:
     return "fusion"
 
 
-def _steps(scene_id: str, pickup_payload_kg: float) -> list[MissionStep]:
+def _school_mission_profile(
+    request: AutonomyCompileRequest,
+    scene_id: str,
+) -> SchoolMissionProfile:
+    """Select a deterministic route contract inside the shared School Map.
+
+    Public mission presets now share one physical scene. Intent classification
+    therefore selects a route and task graph, not a different display-only map.
+    Explicit legacy scene identifiers remain stable for existing API clients.
+    """
+
+    if scene_id == "forest-gate-inspection":
+        return "gates"
+    if scene_id == "service-corridor-dock":
+        return "narrow"
     if scene_id == "stairwell-coffee-return":
+        return "coffee"
+
+    text = request.natural_language.casefold()
+    if any(token in text for token in ("gate", "ring", "圆门", "圆环", "穿门")):
+        return "gates"
+    if any(
+        token in text
+        for token in (
+            "narrow",
+            "corridor",
+            "stair",
+            "狭窄",
+            "走廊",
+            "楼梯",
+            "通道",
+        )
+    ):
+        return "narrow"
+    if any(
+        token in text
+        for token in (
+            "coffee",
+            "pickup",
+            "pick up",
+            "takeout",
+            "return",
+            "咖啡",
+            "取餐",
+            "外卖",
+            "取回",
+            "返航",
+        )
+    ):
+        return "coffee"
+    return "coffee"
+
+
+def _steps(
+    scene_id: str,
+    profile: SchoolMissionProfile,
+    pickup_payload_kg: float,
+) -> list[MissionStep]:
+    if scene_id == "forest-gate-inspection":
+        return [
+            MissionStep(order=1, action="takeoff", label="Launch into the vegetation corridor"),
+            MissionStep(
+                order=2,
+                action="pass_gate",
+                label="Pass three gates through their geometric centers",
+            ),
+            MissionStep(order=3, action="land", label="Complete the inspection hover and land"),
+        ]
+    if scene_id == "service-corridor-dock":
+        return [
+            MissionStep(order=1, action="takeoff", label="Launch in the service corridor"),
+            MissionStep(
+                order=2,
+                action="transit",
+                label="Follow the narrow collision-free corridor around blind corners",
+            ),
+            MissionStep(order=3, action="land", label="Dock on the marked target"),
+        ]
+    if profile == "coffee":
         return [
             MissionStep(order=1, action="takeoff", label="Launch from the third-floor office"),
             MissionStep(
@@ -156,24 +235,64 @@ def _steps(scene_id: str, pickup_payload_kg: float) -> list[MissionStep]:
             ),
             MissionStep(order=6, action="land", label="Land at the original launch point"),
         ]
-    if scene_id == "forest-gate-inspection":
+    if profile == "gates":
         return [
-            MissionStep(order=1, action="takeoff", label="Launch into the vegetation corridor"),
+            MissionStep(order=1, action="takeoff", label="Launch onto the campus gate course"),
             MissionStep(
                 order=2,
                 action="pass_gate",
-                label="Pass three gates through their geometric centers",
+                label="Pass the three training gates through their geometric centers",
             ),
-            MissionStep(order=3, action="land", label="Complete the inspection hover and land"),
+            MissionStep(order=3, action="land", label="Land at the east course goal"),
         ]
     return [
-        MissionStep(order=1, action="takeoff", label="Launch in the service corridor"),
+        MissionStep(order=1, action="takeoff", label="Launch from the third-floor office"),
         MissionStep(
             order=2,
-            action="transit",
-            label="Follow the narrow collision-free corridor around blind corners",
+            action="traverse_stairs",
+            label="Traverse the teaching wing and descend both switchback stair flights",
         ),
-        MissionStep(order=3, action="land", label="Dock on the marked target"),
+        MissionStep(order=3, action="land", label="Land outside the teaching entrance"),
+    ]
+
+
+def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | None:
+    """Return School Map paths in the backend ENU vector convention.
+
+    Three.js renders `(east, altitude, north)` while the API stores
+    `(east, north, altitude)`, so every reviewed visual waypoint is explicitly
+    transposed here instead of being inferred at runtime.
+    """
+
+    if profile == "coffee":
+        return None
+    if profile == "gates":
+        return [
+            RoutePoint(x=-24.8, y=-4.0, z=1.4, phase="launch", speed_limit_mps=0.7),
+            RoutePoint(x=-20.0, y=-10.0, z=1.8, phase="transit", speed_limit_mps=1.0),
+            RoutePoint(x=-13.0, y=-17.0, z=2.2, phase="transit", speed_limit_mps=1.1),
+            RoutePoint(x=-5.0, y=-18.0, z=2.4, phase="gate", speed_limit_mps=0.8),
+            RoutePoint(x=5.0, y=-18.0, z=2.2, phase="transit", speed_limit_mps=1.0),
+            RoutePoint(x=15.0, y=-18.0, z=2.5, phase="gate", speed_limit_mps=0.8),
+            RoutePoint(x=25.0, y=-18.0, z=2.2, phase="transit", speed_limit_mps=1.0),
+            RoutePoint(x=35.0, y=-18.0, z=1.9, phase="gate", speed_limit_mps=0.8),
+            RoutePoint(x=48.0, y=-18.0, z=1.3, phase="land", speed_limit_mps=0.4),
+        ]
+    return [
+        RoutePoint(x=-49.0, y=15.3, z=8.15, phase="launch", speed_limit_mps=0.55),
+        RoutePoint(x=-46.0, y=9.4, z=8.3, phase="transit", speed_limit_mps=0.8),
+        RoutePoint(x=-35.0, y=5.0, z=8.1, phase="transit", speed_limit_mps=0.9),
+        RoutePoint(x=-23.0, y=5.0, z=8.0, phase="transit", speed_limit_mps=0.9),
+        RoutePoint(x=-12.0, y=5.0, z=8.0, phase="transit", speed_limit_mps=0.8),
+        RoutePoint(x=-2.4, y=6.7, z=7.9, phase="stairs", speed_limit_mps=0.5),
+        RoutePoint(x=-1.9, y=9.0, z=7.2, phase="stairs", speed_limit_mps=0.42),
+        RoutePoint(x=1.7, y=12.2, z=6.0, phase="stairs", speed_limit_mps=0.42),
+        RoutePoint(x=1.7, y=9.4, z=4.6, phase="stairs", speed_limit_mps=0.42),
+        RoutePoint(x=-1.9, y=8.7, z=3.2, phase="stairs", speed_limit_mps=0.42),
+        RoutePoint(x=1.7, y=12.3, z=1.35, phase="stairs", speed_limit_mps=0.42),
+        RoutePoint(x=1.7, y=8.8, z=1.15, phase="stairs", speed_limit_mps=0.45),
+        RoutePoint(x=-8.0, y=5.0, z=1.2, phase="transit", speed_limit_mps=0.65),
+        RoutePoint(x=-24.8, y=3.0, z=1.3, phase="land", speed_limit_mps=0.35),
     ]
 
 
@@ -562,8 +681,12 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             503,
         )
     perception = _select_perception(request)
-    steps = _steps(scene_id, request.vehicle.pickup_payload_kg)
+    mission_profile = _school_mission_profile(request, scene_id)
+    steps = _steps(scene_id, mission_profile, request.vehicle.pickup_payload_kg)
     task_graph = _task_graph(steps)
+    profile_path = (
+        _school_reference_path(mission_profile) if scene_id == "school-campus-v1" else None
+    )
     points = [
         point.model_copy(
             deep=True,
@@ -574,7 +697,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
                 )
             },
         )
-        for point in scene.reference_path
+        for point in profile_path or scene.reference_path
     ]
     route_length, vertical_travel = _route_metrics(points)
     launch_mass = request.vehicle.dry_mass_kg + request.vehicle.launch_payload_kg
@@ -631,7 +754,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
                 ),
             )
         )
-    if scene_id == "stairwell-coffee-return" and perception == "vision":
+    if scene_id in {"school-campus-v1", "stairwell-coffee-return"} and perception == "vision":
         issues.append(
             ValidationIssue(
                 code="perception.no-global-return-map",
@@ -659,6 +782,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         "execution_target": request.execution_target,
         "intent": request.natural_language,
         "scene_id": scene_id,
+        "mission_profile": mission_profile,
         "perception_mode": perception,
         "steps": [step.model_dump(mode="json") for step in steps],
         "task_graph": task_graph.model_dump(mode="json"),
