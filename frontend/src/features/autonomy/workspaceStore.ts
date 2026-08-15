@@ -466,9 +466,9 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       schemaVersion: 2,
       id: "aircraft-my-drone",
       version: 1,
-      status: "validated-unsigned",
-      qualificationReceiptId: "bundled-public-vehicle-my-drone-v1",
-      qualificationContentHash: "4a3d2b0677795f3582c6bce68986d508d72d690f184eca8f3642313a20fa9678",
+      status: "draft",
+      qualificationReceiptId: null,
+      qualificationContentHash: null,
       name: "My Drone",
       manufacturer: "DroneDream reference · Holybro X500 V2-derived",
       airframe: "X500 V2 Quad X",
@@ -488,7 +488,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       reserveBatteryPercent: 30,
       centerOfGravityM: { x: 0, y: 0, z: -0.018 },
       inertiaKgM2: { x: 0.035, y: 0.035, z: 0.061 },
-      maximumPickupPayloadKg: 0.55,
+      maximumPickupPayloadKg: 0.35,
       maximumSpeedMps: 4,
       maximumAccelerationMps2: 2.5,
       maximumClimbMps: 1.5,
@@ -513,9 +513,9 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       schemaVersion: 2,
       id: "map-school",
       version: 1,
-      status: "qualified",
-      contentHash: "337c362d5d9f3c996283bc4f1c19fe8be3a40d18093d961928883b42ce65fe3c",
-      qualificationReceiptId: "bundled-public-map-school-campus-v1",
+      status: "draft",
+      contentHash: null,
+      qualificationReceiptId: null,
       name: "School Map",
       representation: "hybrid-3d",
       coordinateFrame: "ENU",
@@ -649,6 +649,8 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     && /^[0-9a-f]{64}$/u.test(aircraft.qualificationContentHash)
     ? aircraft.qualificationContentHash
     : null;
+  const hasFabricatedBundledAircraftReceipt = typeof aircraft.qualificationReceiptId === "string"
+    && aircraft.qualificationReceiptId.startsWith("bundled-public-");
   const qualificationContractMigrated = autopilotWasInferred
     || normalizedControlInterface !== requestedControlInterface
     || sensorCalibrationContractMigrated
@@ -656,6 +658,7 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     || String(aircraft.firmware).trim().toLowerCase() === "custom build"
     || String(aircraft.airframe).trim().toLowerCase() === "custom"
     || String(aircraft.computePlatform).trim().toLowerCase() === "custom"
+    || hasFabricatedBundledAircraftReceipt
     || ((aircraft.status === "validated-unsigned" || aircraft.status === "signed")
       && !normalizedQualificationContentHash);
   const normalizedAircraft: AutonomyAircraftProfile = {
@@ -709,6 +712,17 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     sensorMounts: normalizedSensorMounts,
     updatedAt: boundedText(aircraft.updatedAt, updatedAt, 40),
   };
+  const normalizedMapContentHash = typeof mapPack.contentHash === "string"
+    && /^[0-9a-f]{64}$/u.test(mapPack.contentHash)
+    ? mapPack.contentHash
+    : null;
+  const normalizedMapReceiptId = typeof mapPack.qualificationReceiptId === "string"
+    && !mapPack.qualificationReceiptId.startsWith("bundled-public-")
+    ? mapPack.qualificationReceiptId.slice(0, 160)
+    : null;
+  const mapQualificationCredentialValid = mapPack.status === "qualified"
+    && Boolean(normalizedMapContentHash)
+    && Boolean(normalizedMapReceiptId);
   const normalizedMap: AutonomyMapPack = {
     ...fallback.mapPack,
     schemaVersion: 2,
@@ -716,9 +730,13 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     version: Math.round(boundedNumber(mapPack.version, fallback.mapPack.version, 1, 1_000_000)),
     status: normalizedSourceFiles.length
       ? (normalizedSourceFiles.every((file) => file.admission === "admitted") ? "assets-admitted" : "draft")
-      : (mapPack.calibrated === true && COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId) ? "qualified" : "draft"),
-    contentHash: typeof mapPack.contentHash === "string" ? mapPack.contentHash.slice(0, 64) : null,
-    qualificationReceiptId: typeof mapPack.qualificationReceiptId === "string" ? mapPack.qualificationReceiptId.slice(0, 160) : null,
+      : (mapQualificationCredentialValid
+          && mapPack.calibrated === true
+          && COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
+        ? "qualified"
+        : "draft"),
+    contentHash: mapQualificationCredentialValid ? normalizedMapContentHash : null,
+    qualificationReceiptId: mapQualificationCredentialValid ? normalizedMapReceiptId : null,
     name: boundedText(mapPack.name, fallback.mapPack.name),
     representation,
     coordinateFrame,

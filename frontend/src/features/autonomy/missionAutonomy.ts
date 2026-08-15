@@ -126,7 +126,7 @@ function steps(missionId: AutonomyMissionId, pickupPayloadKg: number) {
   ];
   return [
     { order: 1, action: "takeoff", label: "Launch from the third-floor autonomy office", payload_delta_kg: 0 },
-    { order: 2, action: "transit", label: "Traverse the classroom corridor and both 12+12 switchback stair flights", payload_delta_kg: 0 },
+    { order: 2, action: "traverse_stairs", label: "Traverse the classroom corridor and both 12+12 switchback stair flights", payload_delta_kg: 0 },
     { order: 3, action: "land", label: "Clear the lobby doorway and land on the marked indoor target", payload_delta_kg: 0 },
   ];
 }

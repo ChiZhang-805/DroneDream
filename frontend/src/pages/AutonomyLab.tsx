@@ -432,7 +432,7 @@ const MISSION_BY_LEGACY_SCENE_ID: Record<string, MissionId> = {
 const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
   dry_mass_kg: 1.86,
   launch_payload_kg: 0.10,
-  pickup_payload_kg: 0.55,
+  pickup_payload_kg: 0.35,
   max_takeoff_mass_kg: 2.80,
   max_total_thrust_n: 44.0,
   radius_m: 0.381,
