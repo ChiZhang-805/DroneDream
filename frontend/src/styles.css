@@ -454,7 +454,7 @@
 .autonomy-choice-grid button.is-selected,
 .autonomy-planner-choices button.is-selected {
   border-color: color-mix(in srgb, var(--dd-brand-middle) 62%, white);
-  color: var(--dd-brand-dark);
+  color: var(--dd-brand-middle);
   background: color-mix(in srgb, var(--dd-brand-light-surface) 62%, white);
 }
 
@@ -618,7 +618,7 @@
 .autonomy-mission-stepper button > span svg,
 .autonomy-mission-stepper button > svg { width: 0.84rem; height: 0.84rem; }
 .autonomy-mission-stepper button strong { overflow: hidden; font-size: 0.64rem; text-overflow: ellipsis; white-space: nowrap; }
-.autonomy-mission-stepper li.is-active button { border-color: color-mix(in srgb, var(--dd-brand-middle) 52%, white); color: var(--dd-brand-dark); background: color-mix(in srgb, var(--dd-brand-light-surface) 60%, white); }
+.autonomy-mission-stepper li.is-active button { border-color: color-mix(in srgb, var(--dd-brand-middle) 52%, white); color: var(--dd-brand-middle); background: color-mix(in srgb, var(--dd-brand-light-surface) 60%, white); }
 .autonomy-mission-stepper li.is-complete button > span { color: #fff; background: #20a77f; }
 
 .autonomy-mission-stage {
