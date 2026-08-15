@@ -401,6 +401,11 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const normalizedSensors = Array.isArray(aircraft.sensors)
     ? [...new Set(aircraft.sensors.filter((sensor): sensor is AutonomySensorKind => SENSOR_SET.has(sensor as AutonomySensorKind)))].slice(0, SENSOR_SET.size)
     : fallback.aircraft.sensors;
+  const sensorCalibrationContractMigrated = Array.isArray(aircraft.sensorMounts) && aircraft.sensorMounts.some((sensor) => (
+    !sensor
+    || typeof sensor !== "object"
+    || !["unverified", "verified", "expired", "failed"].includes(String(sensor.calibrationStatus))
+  ));
   const normalizedSensorMounts = Array.isArray(aircraft.sensorMounts)
     ? aircraft.sensorMounts.filter((sensor): sensor is AutonomySensorMount => Boolean(
       sensor && typeof sensor === "object" && SENSOR_SET.has(sensor.kind as AutonomySensorKind),
@@ -422,7 +427,8 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const commandLink = aircraft.commandLink && typeof aircraft.commandLink === "object"
     ? aircraft.commandLink
     : fallback.aircraft.commandLink;
-  const normalizedAutopilot = ["px4", "ardupilot", "custom"].includes(String(aircraft.autopilot))
+  const autopilotWasInferred = !["px4", "ardupilot", "custom"].includes(String(aircraft.autopilot));
+  const normalizedAutopilot = !autopilotWasInferred
     ? aircraft.autopilot as AutonomyAircraftProfile["autopilot"]
     : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4";
   const requestedControlInterface = ["px4-ros2", "mavsdk", "mavlink", "simulation-only"].includes(String(aircraft.controlInterface))
@@ -431,13 +437,20 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const normalizedControlInterface = normalizedAutopilot !== "px4" && requestedControlInterface === "px4-ros2"
     ? "mavlink"
     : requestedControlInterface;
+  const qualificationContractMigrated = autopilotWasInferred
+    || normalizedControlInterface !== requestedControlInterface
+    || sensorCalibrationContractMigrated;
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     schemaVersion: 2,
     id: boundedText(aircraft.id, fallback.aircraft.id, 80),
     version: Math.round(boundedNumber(aircraft.version, fallback.aircraft.version, 1, 1_000_000)),
-    status: aircraft.status === "validated-unsigned" || aircraft.status === "signed" ? aircraft.status : "draft",
-    qualificationReceiptId: typeof aircraft.qualificationReceiptId === "string" ? aircraft.qualificationReceiptId.slice(0, 160) : null,
+    status: qualificationContractMigrated
+      ? "draft"
+      : aircraft.status === "validated-unsigned" || aircraft.status === "signed" ? aircraft.status : "draft",
+    qualificationReceiptId: !qualificationContractMigrated && typeof aircraft.qualificationReceiptId === "string"
+      ? aircraft.qualificationReceiptId.slice(0, 160)
+      : null,
     name: boundedText(aircraft.name, fallback.aircraft.name),
     manufacturer: boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
     airframe: boundedText(aircraft.airframe, fallback.aircraft.airframe),

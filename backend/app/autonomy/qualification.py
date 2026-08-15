@@ -33,10 +33,17 @@ class SensorCalibration(StrictModel):
     sensor_id: str = Field(min_length=1, max_length=80)
     kind: Literal["rgb", "depth", "stereo", "thermal", "lidar", "gps", "vio"]
     calibrated: bool
+    calibration_status: Literal["unverified", "verified", "expired", "failed"]
     position_m: Vector3
     roll_pitch_yaw_deg: Vector3
     rate_hz: float = Field(gt=0.0, le=1000.0)
     calibration_age_days: float = Field(ge=0.0, le=3650.0)
+
+    @model_validator(mode="after")
+    def validate_calibration_state(self) -> SensorCalibration:
+        if self.calibrated != (self.calibration_status == "verified"):
+            raise ValueError("calibrated must be true exactly when calibration_status is verified")
+        return self
 
 
 class VehiclePackQualificationRequest(StrictModel):

@@ -1369,6 +1369,7 @@ export interface AutonomyVehiclePackQualificationRequest {
     sensor_id: string;
     kind: "rgb" | "depth" | "stereo" | "thermal" | "lidar" | "gps" | "vio";
     calibrated: boolean;
+    calibration_status: "unverified" | "verified" | "expired" | "failed";
     position_m: { x: number; y: number; z: number };
     roll_pitch_yaw_deg: { x: number; y: number; z: number };
     rate_hz: number;

@@ -790,6 +790,7 @@ export function AutonomyAircraft() {
           sensor_id: sensor.id,
           kind: sensor.kind,
           calibrated: sensor.calibrated,
+          calibration_status: sensor.calibrationStatus,
           position_m: sensor.positionM,
           roll_pitch_yaw_deg: sensor.rollPitchYawDeg,
           rate_hz: sensor.rateHz,
