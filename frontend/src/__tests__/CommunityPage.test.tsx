@@ -144,7 +144,7 @@ describe("CommunityPage public data loading", () => {
       <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
     );
 
-    await screen.findByRole("button", { name: "Open discussion: Featured topic 1" });
+    await screen.findByRole("button", { name: "Open card: Featured topic 1" });
     expect(container.querySelectorAll(".community-topic-grid article")).toHaveLength(5);
   });
 
@@ -153,7 +153,7 @@ describe("CommunityPage public data loading", () => {
       <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
     );
     const open = await screen.findByRole("button", {
-      name: "Open discussion: Stable hover evidence",
+      name: "Open card: Stable hover evidence",
     });
     fireEvent.click(open);
 
@@ -247,7 +247,7 @@ describe("CommunityPage public data loading", () => {
     expect(screen.queryByText("Your topic")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", {
-      name: "Open discussion: Stable hover evidence",
+      name: "Open card: Stable hover evidence",
     }));
     const dialog = await screen.findByRole("dialog");
     expect(dialog.querySelector(".community-topic-author img")).toHaveAttribute("src", avatarUrl);
