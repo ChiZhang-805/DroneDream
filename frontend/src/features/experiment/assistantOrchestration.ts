@@ -1,7 +1,6 @@
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
 import type {
   ExperimentAssistantDocumentContext,
-  ExperimentAssistantFieldValue,
   ExperimentAssistantTurnResponse,
 } from "../../types/api";
 import { getAuthAccessToken } from "../auth/authTokenStore";
@@ -63,6 +62,7 @@ export interface AssistantOrchestratedRun {
     assistant_message: string;
     questions: string[];
     artifact_kind:
+      | "autonomy_mission_plan"
       | "universal_vehicle_model"
       | "universal_simulation_experiment"
       | "universal_cross_edition_workflow"
@@ -73,6 +73,7 @@ export interface AssistantOrchestratedRun {
       | "lab_sim_to_real_workflow"
       | "lab_real_to_sim_workflow"
       | "field_task_plan";
+    artifact_payload?: Record<string, unknown>;
     artifact_id: string;
     artifact_version: number;
     product_link: string;
@@ -103,7 +104,7 @@ export interface OrchestratedAssistantTurnInput {
   requestedTaskType?: AssistantTaskType | null;
   locale: "en" | "zh-CN";
   selectedModel: Pick<ManagedModelCatalogEntry, "provider" | "model">;
-  currentValues: Record<string, ExperimentAssistantFieldValue>;
+  currentValues: Record<string, unknown>;
   documentContext: ExperimentAssistantDocumentContext | null;
   onStage?: (stage: AssistantRunStage) => void;
 }
@@ -243,6 +244,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const ARTIFACT_KINDS = [
+  "autonomy_mission_plan",
   "universal_vehicle_model",
   "universal_simulation_experiment",
   "universal_cross_edition_workflow",
@@ -299,13 +301,21 @@ function artifactMatchesEdition(
 ): boolean {
   if (!isRecord(result) || typeof result.artifact_kind !== "string") return false;
   if (edition === "universal") {
-    return result.artifact_kind === "universal_vehicle_model"
+    return result.artifact_kind === "autonomy_mission_plan"
+      || result.artifact_kind === "universal_vehicle_model"
       || result.artifact_kind === "universal_simulation_experiment"
       || result.artifact_kind === "universal_cross_edition_workflow";
   }
-  if (edition === "sim") return result.artifact_kind === "simulation_experiment";
-  if (edition === "field") return result.artifact_kind === "field_task_plan";
+  if (edition === "sim") {
+    return result.artifact_kind === "autonomy_mission_plan"
+      || result.artifact_kind === "simulation_experiment";
+  }
+  if (edition === "field") {
+    return result.artifact_kind === "autonomy_mission_plan"
+      || result.artifact_kind === "field_task_plan";
+  }
   return [
+    "autonomy_mission_plan",
     "lab_simulation_experiment",
     "lab_hardware_validation",
     "lab_calibration_workflow",
@@ -453,6 +463,7 @@ function completedRunResponse(
       artifact_version: run.result_json.artifact_version,
       product_link: run.result_json.product_link,
       artifact_kind: run.result_json.artifact_kind,
+      artifact_payload: run.result_json.artifact_payload,
       sequence: run.sequence,
       intent: run.intent,
       workflow: run.workflow_json,

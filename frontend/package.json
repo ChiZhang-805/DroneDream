@@ -28,6 +28,7 @@
     "test:sim-startup-layout": "node scripts/verify-sim-startup-layout.mjs",
     "test:field-ui-layout": "node scripts/verify-field-ui-layout.mjs",
     "test:assistant-orchestration": "node scripts/verify-assistant-orchestration.mjs",
+    "test:autonomy-mission-entry": "node scripts/verify-autonomy-mission-entry.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

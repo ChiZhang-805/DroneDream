@@ -6,7 +6,9 @@ import struct
 
 from app.autonomy.qualification import (
     MapAssetAdmissionRegistry,
+    MapPackQualificationRequest,
     VehiclePackQualificationRequest,
+    qualify_map_pack,
     qualify_vehicle_pack,
 )
 
@@ -148,6 +150,92 @@ def test_vehicle_pack_blocks_an_unqualified_localization_stack() -> None:
         "vehicle.no-sensors",
         "vehicle.localization-sensor-unqualified",
     }
+
+
+def map_pack_payload() -> dict[str, object]:
+    return {
+        "name": "Engineering building",
+        "pack_id": "engineering-building",
+        "version": 2,
+        "compiler_scene_id": "stairwell-coffee-return",
+        "representation": "hybrid-3d",
+        "coordinate_frame": "ENU",
+        "resolution_m": 0.10,
+        "floor_count": 3,
+        "bounds_m": {"x": 42.0, "y": 28.0, "z": 11.0},
+        "origin": {"latitude": None, "longitude": None, "altitude_m": None},
+        "live_updates": "depth-fusion",
+        "calibrated": True,
+        "confidence_percent": 100.0,
+        "semantic_layers": ["free-space", "stairs", "doors", "people", "pickup-zones"],
+        "planning_layers": [
+            "collision-geometry",
+            "occupancy",
+            "esdf",
+            "dynamic-overlay",
+            "confidence",
+        ],
+        "source_asset_receipt_ids": [],
+    }
+
+
+def test_bundled_map_pack_qualification_binds_exact_scene_manifest() -> None:
+    request = MapPackQualificationRequest.model_validate(map_pack_payload())
+    receipt = qualify_map_pack(request)
+
+    assert receipt.status == "qualified"
+    assert receipt.compiler_scene_id == "stairwell-coffee-return"
+    assert receipt.hardware_authority is False
+    assert len(receipt.content_sha256) == 64
+
+
+def test_map_pack_qualification_blocks_scene_manifest_mismatch() -> None:
+    payload = map_pack_payload()
+    payload["bounds_m"] = {"x": 40.0, "y": 28.0, "z": 11.0}
+    receipt = qualify_map_pack(MapPackQualificationRequest.model_validate(payload))
+
+    assert receipt.status == "blocked"
+    assert "map.bounds.scene-mismatch" in {issue.code for issue in receipt.issues}
+
+
+def test_map_pack_qualification_rejects_declared_layers_that_do_not_match_manifest() -> None:
+    payload = map_pack_payload()
+    payload["semantic_layers"] = ["free-space"]
+    payload["planning_layers"] = ["collision-geometry", "occupancy"]
+    receipt = qualify_map_pack(MapPackQualificationRequest.model_validate(payload))
+
+    assert receipt.status == "blocked"
+    assert {issue.code for issue in receipt.issues} >= {
+        "map.semantic-layers.scene-mismatch",
+        "map.planning-layers.scene-mismatch",
+    }
+
+
+def test_map_pack_content_hash_binds_origin_and_live_update_contract() -> None:
+    first_payload = map_pack_payload()
+    second_payload = map_pack_payload()
+    second_payload["origin"] = {
+        "latitude": 22.304,
+        "longitude": 114.179,
+        "altitude_m": 18.5,
+    }
+    second_payload["live_updates"] = "lidar-fusion"
+
+    first = qualify_map_pack(MapPackQualificationRequest.model_validate(first_payload))
+    second = qualify_map_pack(MapPackQualificationRequest.model_validate(second_payload))
+
+    assert first.status == second.status == "qualified"
+    assert first.content_sha256 != second.content_sha256
+    assert first.manifest_sha256 == second.manifest_sha256
+
+
+def test_imported_map_assets_remain_unqualified_until_reconstruction() -> None:
+    payload = map_pack_payload()
+    payload["source_asset_receipt_ids"] = ["map-asset-aabbcc"]
+    receipt = qualify_map_pack(MapPackQualificationRequest.model_validate(payload))
+
+    assert receipt.status == "blocked"
+    assert "map.imported-assets.require-reconstruction" in {issue.code for issue in receipt.issues}
 
 
 def test_map_asset_admission_checks_structure_without_retaining_bytes() -> None:
