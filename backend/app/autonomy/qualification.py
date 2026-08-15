@@ -42,6 +42,7 @@ class SensorCalibration(StrictModel):
 class VehiclePackQualificationRequest(StrictModel):
     pack_id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     version: int = Field(ge=1, le=1_000_000)
+    autopilot: Literal["px4", "ardupilot", "custom"]
     firmware: str = Field(min_length=1, max_length=120)
     flight_controller: str = Field(min_length=1, max_length=120)
     control_interface: Literal["px4-ros2", "mavsdk", "mavlink", "simulation-only"]
@@ -69,6 +70,8 @@ class VehiclePackQualificationRequest(StrictModel):
             raise ValueError("body_size_m must be positive")
         if min(self.inertia_kg_m2.x, self.inertia_kg_m2.y, self.inertia_kg_m2.z) <= 0:
             raise ValueError("inertia_kg_m2 must be positive")
+        if self.autopilot != "px4" and self.control_interface == "px4-ros2":
+            raise ValueError("px4-ros2 control_interface requires the PX4 autopilot")
         return self
 
 

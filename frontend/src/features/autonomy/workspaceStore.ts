@@ -130,6 +130,7 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     && within(aircraft.maximumClimbMps, "maximumClimbMps")
     && within(aircraft.maximumDescentMps, "maximumDescentMps")
     && within(aircraft.maximumTiltDeg, "maximumTiltDeg")
+    && (aircraft.autopilot === "px4" || aircraft.controlInterface !== "px4-ros2")
     && aircraft.commandLink.latencyMs >= 0
     && aircraft.commandLink.bandwidthMbps > 0
     && aircraft.sensorMounts.some((sensor) => (
@@ -421,6 +422,15 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const commandLink = aircraft.commandLink && typeof aircraft.commandLink === "object"
     ? aircraft.commandLink
     : fallback.aircraft.commandLink;
+  const normalizedAutopilot = ["px4", "ardupilot", "custom"].includes(String(aircraft.autopilot))
+    ? aircraft.autopilot as AutonomyAircraftProfile["autopilot"]
+    : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4";
+  const requestedControlInterface = ["px4-ros2", "mavsdk", "mavlink", "simulation-only"].includes(String(aircraft.controlInterface))
+    ? aircraft.controlInterface as AutonomyAircraftProfile["controlInterface"]
+    : fallback.aircraft.controlInterface;
+  const normalizedControlInterface = normalizedAutopilot !== "px4" && requestedControlInterface === "px4-ros2"
+    ? "mavlink"
+    : requestedControlInterface;
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     schemaVersion: 2,
@@ -432,13 +442,9 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     manufacturer: boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
     airframe: boundedText(aircraft.airframe, fallback.aircraft.airframe),
     flightController: boundedText(aircraft.flightController, fallback.aircraft.flightController),
-    autopilot: ["px4", "ardupilot", "custom"].includes(String(aircraft.autopilot))
-      ? aircraft.autopilot as AutonomyAircraftProfile["autopilot"]
-      : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4",
+    autopilot: normalizedAutopilot,
     firmware: boundedText(aircraft.firmware, fallback.aircraft.firmware),
-    controlInterface: ["px4-ros2", "mavsdk", "mavlink", "simulation-only"].includes(String(aircraft.controlInterface))
-      ? aircraft.controlInterface as AutonomyAircraftProfile["controlInterface"]
-      : fallback.aircraft.controlInterface,
+    controlInterface: normalizedControlInterface,
     computePlatform: boundedText(aircraft.computePlatform, fallback.aircraft.computePlatform),
     dryMassKg: boundedNumber(aircraft.dryMassKg, fallback.aircraft.dryMassKg, AUTONOMY_AIRCRAFT_LIMITS.dryMassKg.min, AUTONOMY_AIRCRAFT_LIMITS.dryMassKg.max),
     maximumTakeoffMassKg: boundedNumber(aircraft.maximumTakeoffMassKg, fallback.aircraft.maximumTakeoffMassKg, AUTONOMY_AIRCRAFT_LIMITS.maximumTakeoffMassKg.min, AUTONOMY_AIRCRAFT_LIMITS.maximumTakeoffMassKg.max),

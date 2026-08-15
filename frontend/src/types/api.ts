@@ -1345,6 +1345,7 @@ export interface AutonomyRuntimeSession {
 export interface AutonomyVehiclePackQualificationRequest {
   pack_id: string;
   version: number;
+  autopilot: "px4" | "ardupilot" | "custom";
   firmware: string;
   flight_controller: string;
   control_interface: "px4-ros2" | "mavsdk" | "mavlink" | "simulation-only";

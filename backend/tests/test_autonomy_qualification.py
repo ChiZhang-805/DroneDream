@@ -15,6 +15,7 @@ def vehicle_payload() -> dict[str, object]:
     return {
         "pack_id": "lab-quad-01",
         "version": 3,
+        "autopilot": "px4",
         "firmware": "PX4 v1.16",
         "flight_controller": "Pixhawk 6X",
         "control_interface": "px4-ros2",
@@ -57,6 +58,20 @@ def test_vehicle_pack_qualification_is_versioned_and_unsigned() -> None:
     assert receipt.hardware_authority is False
     assert receipt.loaded_thrust_to_weight > 1.35
     assert len(receipt.content_sha256) == 64
+
+
+def test_vehicle_pack_receipt_binds_the_autopilot_family() -> None:
+    px4_payload = vehicle_payload()
+    px4_payload["control_interface"] = "mavlink"
+    px4_receipt = qualify_vehicle_pack(VehiclePackQualificationRequest.model_validate(px4_payload))
+
+    ardupilot_payload = {**px4_payload, "autopilot": "ardupilot"}
+    ardupilot_receipt = qualify_vehicle_pack(
+        VehiclePackQualificationRequest.model_validate(ardupilot_payload)
+    )
+
+    assert px4_receipt.content_sha256 != ardupilot_receipt.content_sha256
+    assert px4_receipt.receipt_id != ardupilot_receipt.receipt_id
 
 
 def test_vehicle_pack_blocks_an_unqualified_localization_stack() -> None:
