@@ -214,6 +214,7 @@ export function AutonomyPlatform() {
 
   useEffect(() => {
     setWorkspace(loadAutonomyWorkspace(ownerId, edition));
+    setMissionComposerDraft("");
   }, [edition, ownerId]);
 
   const persist = useCallback((next: AutonomyWorkspaceState) => {
@@ -466,7 +467,7 @@ export function AutonomyOverview() {
         <form className="assistant-composer autonomy-command-composer" onSubmit={submitMission}>
           <textarea
             value={composer}
-            maxLength={12_000}
+            maxLength={2_000}
             rows={3}
             placeholder={copy.placeholder}
             aria-label={copy.placeholder}
