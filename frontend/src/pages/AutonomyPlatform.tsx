@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   CircleCheck,
+  CircleUserRound,
   Cpu,
   Database,
   FileClock,
@@ -874,28 +875,41 @@ export function AutonomyOverview() {
     <section className={`autonomy-command-page ${conversationActive ? "is-conversation" : ""}`} data-grants-hardware-authority="false">
       <div className={`autonomy-command-stage ${conversationActive ? "is-conversation" : ""}`}>
         {conversationActive ? (
-          <div className="autonomy-conversation-thread" aria-live="polite">
-            {conversationMessages.map((message) => (
-              <article className={`autonomy-conversation-message is-${message.role}`} key={message.id}>
-                {message.role === "assistant" ? (
+          <div className="autonomy-conversation-scroll">
+            <div className="autonomy-conversation-thread" aria-live="polite">
+              {conversationMessages.map((message) => (
+                <article className={`autonomy-conversation-message is-${message.role}`} key={message.id}>
+                  {message.role === "assistant" ? (
+                    <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
+                  ) : null}
+                  <div className="autonomy-conversation-body">
+                    <p>{message.content}</p>
+                    {message.role === "assistant"
+                      && workspace.mission.compiledPlan
+                      && message.planContractId === workspace.mission.compiledPlan.contractId
+                      ? <AutonomyMissionPlanCard chinese={chinese} workspace={workspace} />
+                      : null}
+                  </div>
+                  {message.role === "user" ? (
+                    <span className="autonomy-conversation-avatar is-user-account" aria-label={auth?.account?.displayName ?? (chinese ? "本地用户" : "Local user")}>
+                      {auth?.account?.avatarUrl ? (
+                        <img src={auth.account.avatarUrl} alt="" />
+                      ) : auth?.account?.displayName ? (
+                        auth.account.displayName.slice(0, 1).toLocaleUpperCase()
+                      ) : (
+                        <CircleUserRound aria-hidden="true" />
+                      )}
+                    </span>
+                  ) : null}
+                </article>
+              ))}
+              {generating ? (
+                <article className="autonomy-conversation-message is-assistant is-generating" aria-label={chinese ? "正在生成任务计划" : "Generating mission plan"}>
                   <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
-                ) : null}
-                <div className="autonomy-conversation-body">
-                  <p>{message.content}</p>
-                  {message.role === "assistant"
-                    && workspace.mission.compiledPlan
-                    && message.planContractId === workspace.mission.compiledPlan.contractId
-                    ? <AutonomyMissionPlanCard chinese={chinese} workspace={workspace} />
-                    : null}
-                </div>
-              </article>
-            ))}
-            {generating ? (
-              <article className="autonomy-conversation-message is-assistant is-generating" aria-label={chinese ? "正在生成任务计划" : "Generating mission plan"}>
-                <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
-                <div className="autonomy-conversation-thinking"><i /><i /><i /></div>
-              </article>
-            ) : null}
+                  <div className="autonomy-conversation-thinking"><i /><i /><i /></div>
+                </article>
+              ) : null}
+            </div>
           </div>
         ) : (
           <>

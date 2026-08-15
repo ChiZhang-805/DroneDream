@@ -176,8 +176,27 @@ try {
     || await page.locator(".autonomy-conversation-message.is-assistant").count() !== 1) {
     throw new Error("Conversation must render one user message and one model reply.");
   }
+  if (await page.locator(".autonomy-conversation-message.is-user .autonomy-conversation-avatar.is-user-account").count() !== 1) {
+    throw new Error("The user message must render the account avatar boundary.");
+  }
   if (await page.locator(".autonomy-conversation-message.is-assistant .autonomy-inline-plan").count() !== 1) {
     throw new Error("The generated plan must be nested inside the model reply.");
+  }
+  const conversationGeometry = await page.evaluate(() => {
+    const composer = document.querySelector(".autonomy-command-composer")?.getBoundingClientRect();
+    const modelAvatar = document.querySelector(".autonomy-conversation-message.is-assistant .autonomy-conversation-avatar")?.getBoundingClientRect();
+    const userAvatar = document.querySelector(".autonomy-conversation-message.is-user .autonomy-conversation-avatar")?.getBoundingClientRect();
+    return composer && modelAvatar && userAvatar ? {
+      composerLeft: composer.left,
+      composerRight: composer.right,
+      modelLeft: modelAvatar.left,
+      userRight: userAvatar.right,
+    } : null;
+  });
+  if (!conversationGeometry
+    || Math.abs(conversationGeometry.composerLeft - conversationGeometry.modelLeft) > 1
+    || Math.abs(conversationGeometry.composerRight - conversationGeometry.userRight) > 1) {
+    throw new Error(`Conversation avatar rails do not align with the composer: ${JSON.stringify(conversationGeometry)}`);
   }
   if (await page.locator(".autonomy-task-graph li").count() !== 21) {
     throw new Error("The persisted task graph did not render every task node.");

@@ -318,16 +318,23 @@
   gap: 0.8rem;
 }
 
-.autonomy-conversation-thread {
-  display: flex;
+.autonomy-conversation-scroll {
   min-height: 0;
   flex: 1 1 auto;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 0.45rem clamp(0.15rem, 1.4vw, 1rem) 1.1rem;
+  padding: 0.45rem 0 1.1rem;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+}
+
+.autonomy-conversation-scroll::-webkit-scrollbar { width: 0; height: 0; }
+
+.autonomy-conversation-thread {
+  display: flex;
+  width: min(100%, 64rem);
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0 auto;
 }
 
 .autonomy-conversation-message {
@@ -336,7 +343,9 @@
 }
 
 .autonomy-conversation-message.is-user {
-  justify-items: end;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 2.25rem;
+  gap: 0.7rem;
 }
 
 .autonomy-conversation-message.is-assistant {
@@ -359,6 +368,23 @@
 .autonomy-conversation-avatar svg {
   width: 1.15rem;
   height: 1.15rem;
+}
+
+.autonomy-conversation-avatar.is-user-account {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, #ddd6e1);
+  border-radius: 999px;
+  color: var(--dd-brand-end);
+  background: #fff;
+  box-shadow: 0 7px 18px rgba(65, 43, 75, 0.1);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.autonomy-conversation-avatar.is-user-account img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .autonomy-conversation-body {
@@ -1546,7 +1572,7 @@
   .autonomy-command-page { min-height: 68vh; }
   .autonomy-command-page.is-conversation { height: auto; min-height: 68vh; overflow: visible; }
   .autonomy-command-stage.is-conversation { height: auto; }
-  .autonomy-conversation-thread { max-height: 70vh; overflow-y: auto; }
+  .autonomy-conversation-scroll { max-height: 70vh; overflow-y: auto; }
   .autonomy-config-page { grid-template-columns: 1fr; }
   .autonomy-config-summary { position: static; height: auto; }
   .autonomy-config-summary-metrics { grid-template-rows: none; }
@@ -1566,6 +1592,7 @@
   .autonomy-command-stage > h2 { font-size: 1.8rem; white-space: normal; }
   .autonomy-command-page .assistant-task-chip { max-width: 9.5rem; }
   .autonomy-conversation-message.is-assistant { grid-template-columns: 1.85rem minmax(0, 1fr); gap: 0.5rem; }
+  .autonomy-conversation-message.is-user { grid-template-columns: minmax(0, 1fr) 1.85rem; gap: 0.5rem; }
   .autonomy-conversation-avatar { width: 1.85rem; height: 1.85rem; border-radius: 9px; }
   .autonomy-conversation-body > p { max-width: 90%; }
   .autonomy-config-card > header { align-items: flex-start; flex-wrap: wrap; }
