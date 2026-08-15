@@ -111,7 +111,13 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     return Number.isFinite(value) && value >= limit.min && value <= limit.max;
   };
   const radiusM = autonomyAircraftRadiusM(aircraft);
-  return within(aircraft.dryMassKg, "dryMassKg")
+  return aircraft.name.trim().length > 0
+    && aircraft.manufacturer.trim().length > 0
+    && aircraft.airframe.trim().length > 0
+    && aircraft.airframe.trim().toLowerCase() !== "custom"
+    && aircraft.computePlatform.trim().length > 0
+    && aircraft.computePlatform.trim().toLowerCase() !== "custom"
+    && within(aircraft.dryMassKg, "dryMassKg")
     && within(aircraft.maximumTakeoffMassKg, "maximumTakeoffMassKg")
     && aircraft.maximumTakeoffMassKg > aircraft.dryMassKg
     && within(aircraft.bodyLengthM, "bodyLengthM")
@@ -283,7 +289,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       status: "draft",
       qualificationReceiptId: null,
       name: "Primary research quadrotor",
-      manufacturer: "Custom",
+      manufacturer: "Self-built",
       airframe: "Quad X",
       flightController: "Pixhawk 6C",
       autopilot: "px4",
@@ -445,7 +451,9 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     || normalizedControlInterface !== requestedControlInterface
     || sensorCalibrationContractMigrated
     || String(aircraft.flightController).trim().toLowerCase() === "custom"
-    || String(aircraft.firmware).trim().toLowerCase() === "custom build";
+    || String(aircraft.firmware).trim().toLowerCase() === "custom build"
+    || String(aircraft.airframe).trim().toLowerCase() === "custom"
+    || String(aircraft.computePlatform).trim().toLowerCase() === "custom";
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     schemaVersion: 2,
@@ -458,7 +466,9 @@ function normalize(value: unknown): AutonomyWorkspaceState {
       ? aircraft.qualificationReceiptId.slice(0, 160)
       : null,
     name: boundedText(aircraft.name, fallback.aircraft.name),
-    manufacturer: boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
+    manufacturer: String(aircraft.manufacturer).trim().toLowerCase() === "custom"
+      ? "Self-built"
+      : boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
     airframe: boundedText(aircraft.airframe, fallback.aircraft.airframe),
     flightController: boundedText(aircraft.flightController, fallback.aircraft.flightController),
     autopilot: normalizedAutopilot,
