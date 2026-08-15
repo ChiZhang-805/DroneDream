@@ -367,7 +367,13 @@ export function VehicleModelPreview3D({
     const framedBounds = new THREE.Box3().setFromObject(framedObject);
     const target = framedBounds.isEmpty() ? new THREE.Vector3() : framedBounds.getCenter(new THREE.Vector3());
     const framedSize = framedBounds.isEmpty() ? new THREE.Vector3(2.8, 1, 2.8) : framedBounds.getSize(new THREE.Vector3());
-    const homeDistance = Math.max(frameMode === "selection" ? 2.35 : 3.7, Math.max(framedSize.x, framedSize.y, framedSize.z) * (frameMode === "selection" ? 3.15 : 1.72));
+    // Leave enough assembly margin for diagonal arms and translucent rotor discs.
+    // Bounding-box-only framing at 1.72 clipped My Drone in the narrow studio canvas.
+    const homeDistance = Math.max(
+      frameMode === "selection" ? 2.35 : 3.7,
+      Math.max(framedSize.x, framedSize.y, framedSize.z)
+        * (frameMode === "selection" ? 3.15 : 2.05),
+    );
     let yaw: number = presetAngles[viewPreset].yaw;
     let pitch: number = presetAngles[viewPreset].pitch;
     let distance = homeDistance;
