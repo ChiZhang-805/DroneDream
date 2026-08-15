@@ -209,7 +209,7 @@ const communityContent = {
     cancel: "Cancel",
     posted: "Published",
     owner: "Your topic",
-    open: "Open discussion",
+    open: "Open card",
     comments: "Comments",
     commentPlaceholder: "Add a useful observation or a reproducible next step…",
     reply: "Reply",
@@ -267,7 +267,7 @@ const communityContent = {
     cancel: "取消",
     posted: "发布于",
     owner: "你的话题",
-    open: "打开讨论",
+    open: "打开卡片",
     comments: "评论",
     commentPlaceholder: "补充一条有用的观察，或给出可复现的下一步……",
     reply: "回复",
@@ -1067,15 +1067,16 @@ export function CommunityPage({
             const liked = Boolean(account && topic.liked_by_viewer);
             const authorAvatarUrl = topic.author_avatar_url
               || (account?.id === topic.author_id ? account.avatarUrl : null);
+            const renderedAsLongCard = allTopicsView ? isLong : true;
             return (
               <article
                 key={topic.id}
-                className={allTopicsView && isLong ? "is-long" : "is-short"}
+                className={renderedAsLongCard ? "is-long" : "is-short"}
               >
                 <button
                   type="button"
                   className="community-topic-cover"
-                  onClick={() => openTopic(topic, allTopicsView && isLong)}
+                  onClick={() => openTopic(topic, renderedAsLongCard)}
                   aria-label={`${copy.open}: ${topic.title}`}
                 >
                   {topic.image_urls[0] ? (
@@ -1089,7 +1090,7 @@ export function CommunityPage({
                     <TopicCoverArtwork
                       topic={topic}
                       locale={locale}
-                      isLong={allTopicsView && isLong}
+                      isLong={renderedAsLongCard}
                       heading={allTopicsView}
                     />
                   )}
@@ -1130,7 +1131,7 @@ export function CommunityPage({
                     <button
                       type="button"
                       aria-label={`${topic.comment_count} ${copy.comments}`}
-                      onClick={() => openTopic(topic, allTopicsView && isLong)}
+                      onClick={() => openTopic(topic, renderedAsLongCard)}
                     >
                       <MessageCircle aria-hidden="true" />
                       {topic.comment_count}
@@ -1152,7 +1153,7 @@ export function CommunityPage({
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => openTopic(topic, allTopicsView && isLong)}
+                      onClick={() => openTopic(topic, renderedAsLongCard)}
                     >
                       {copy.open}
                       <ArrowUpRight aria-hidden="true" />
