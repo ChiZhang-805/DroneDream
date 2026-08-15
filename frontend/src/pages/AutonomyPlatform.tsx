@@ -668,10 +668,11 @@ const AIRFRAMES = ["Quad X", "Quad +", "Hex X", "Hex +", "Octo X", "Coaxial Octo
 const FLIGHT_CONTROLLERS = ["Pixhawk 6C", "Pixhawk 6X", "Cube Orange+", "CUAV X7+", "Auterion Skynode", "ModalAI VOXL 2", "Custom"] as const;
 const COMPUTE_PLATFORMS = ["Jetson Orin NX", "Jetson Orin Nano", "Jetson AGX Orin", "Raspberry Pi 5", "ModalAI VOXL 2", "Custom"] as const;
 const FIRMWARE_BY_AUTOPILOT: Record<AutonomyAircraftProfile["autopilot"], readonly string[]> = {
-  px4: ["PX4 v1.16", "PX4 v1.15", "PX4 main", "Custom build"],
-  ardupilot: ["ArduPilot Copter 4.6", "ArduPilot Copter 4.5", "ArduPilot master", "Custom build"],
-  custom: ["Custom build"],
+  px4: ["PX4 v1.16", "PX4 v1.15", "PX4 main"],
+  ardupilot: ["ArduPilot Copter 4.6", "ArduPilot Copter 4.5", "ArduPilot master"],
+  custom: [],
 };
+const CUSTOM_FIRMWARE_OPTION = "__custom_firmware__";
 const CONTROL_INTERFACES_BY_AUTOPILOT: Record<AutonomyAircraftProfile["autopilot"], readonly AutonomyAircraftProfile["controlInterface"][]> = {
   px4: ["px4-ros2", "mavsdk", "mavlink", "simulation-only"],
   ardupilot: ["mavsdk", "mavlink", "simulation-only"],
@@ -693,6 +694,8 @@ export function AutonomyAircraft() {
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
   const valid = isAutonomyAircraftProfileValid(form);
+  const firmwareOptions = FIRMWARE_BY_AUTOPILOT[form.autopilot];
+  const firmwareIsCustom = !firmwareOptions.includes(form.firmware);
   const updateAircraft = (patch: Partial<AutonomyAircraftProfile>) => {
     setForm((current) => ({ ...current, ...patch, status: "draft", qualificationReceiptId: null }));
     setSaved(false);
@@ -827,9 +830,9 @@ export function AutonomyAircraft() {
               const controlInterface = compatibleInterfaces.includes(form.controlInterface)
                 ? form.controlInterface
                 : compatibleInterfaces[0];
-              updateAircraft({ autopilot, firmware: FIRMWARE_BY_AUTOPILOT[autopilot][0], controlInterface });
+              updateAircraft({ autopilot, firmware: FIRMWARE_BY_AUTOPILOT[autopilot][0] ?? "", controlInterface });
             }}><option value="px4">PX4</option><option value="ardupilot">ArduPilot</option><option value="custom">{chinese ? "自定义" : "Custom"}</option></select></label>
-            <label><span>{chinese ? "固件版本" : "Firmware version"}</span><select value={form.firmware} onChange={(event) => updateAircraft({ firmware: event.target.value })}>{!FIRMWARE_BY_AUTOPILOT[form.autopilot].includes(form.firmware) ? <option value={form.firmware}>{form.firmware}</option> : null}{FIRMWARE_BY_AUTOPILOT[form.autopilot].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label><span>{chinese ? "固件版本" : "Firmware version"}</span><div className="autonomy-firmware-control"><select value={firmwareIsCustom ? CUSTOM_FIRMWARE_OPTION : form.firmware} onChange={(event) => updateAircraft({ firmware: event.target.value === CUSTOM_FIRMWARE_OPTION ? "" : event.target.value })}>{firmwareOptions.map((value) => <option key={value} value={value}>{value}</option>)}<option value={CUSTOM_FIRMWARE_OPTION}>{chinese ? "自定义构建…" : "Custom build…"}</option></select>{firmwareIsCustom ? <input value={form.firmware.trim().toLowerCase() === "custom build" ? "" : form.firmware} maxLength={120} placeholder={chinese ? "版本、commit 或 build ID" : "Version, commit, or build ID"} aria-label={chinese ? "自定义固件标识" : "Custom firmware identity"} onChange={(event) => updateAircraft({ firmware: event.target.value })} /> : null}</div></label>
             <label><span>{chinese ? "控制接口" : "Control interface"}</span><select value={form.controlInterface} onChange={(event) => updateAircraft({ controlInterface: event.target.value as AutonomyAircraftProfile["controlInterface"] })}>{CONTROL_INTERFACES_BY_AUTOPILOT[form.autopilot].map((value) => <option key={value} value={value}>{value === "simulation-only" && chinese ? "仅仿真" : CONTROL_INTERFACE_LABELS[value]}</option>)}</select></label>
             <label><span>{chinese ? "机载计算" : "Onboard compute"}</span><select value={form.computePlatform} onChange={(event) => updateAircraft({ computePlatform: event.target.value })}>{!COMPUTE_PLATFORMS.includes(form.computePlatform as typeof COMPUTE_PLATFORMS[number]) ? <option value={form.computePlatform}>{form.computePlatform}</option> : null}{COMPUTE_PLATFORMS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
           </div>

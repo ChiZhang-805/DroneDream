@@ -130,6 +130,8 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     && within(aircraft.maximumClimbMps, "maximumClimbMps")
     && within(aircraft.maximumDescentMps, "maximumDescentMps")
     && within(aircraft.maximumTiltDeg, "maximumTiltDeg")
+    && aircraft.firmware.trim().length > 0
+    && aircraft.firmware.trim().toLowerCase() !== "custom build"
     && (aircraft.autopilot === "px4" || aircraft.controlInterface !== "px4-ros2")
     && aircraft.commandLink.latencyMs >= 0
     && aircraft.commandLink.bandwidthMbps > 0
@@ -439,7 +441,8 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     : requestedControlInterface;
   const qualificationContractMigrated = autopilotWasInferred
     || normalizedControlInterface !== requestedControlInterface
-    || sensorCalibrationContractMigrated;
+    || sensorCalibrationContractMigrated
+    || String(aircraft.firmware).trim().toLowerCase() === "custom build";
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     schemaVersion: 2,

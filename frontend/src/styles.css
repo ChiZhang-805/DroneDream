@@ -456,6 +456,12 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dd-brand-light-surface) 72%, transparent);
 }
 
+.autonomy-firmware-control {
+  display: grid;
+  min-width: 0;
+  gap: 0.28rem;
+}
+
 .autonomy-choice-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
