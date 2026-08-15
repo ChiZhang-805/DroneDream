@@ -46,6 +46,9 @@ import {
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import {
+  AUTONOMY_AIRCRAFT_LIMITS,
+  autonomyAircraftRadiusM,
+  isAutonomyAircraftProfileValid,
   loadAutonomyWorkspace,
   saveAutonomyWorkspace,
   type AutonomyAircraftProfile,
@@ -276,7 +279,7 @@ export function AutonomyAircraft() {
   useEffect(() => setForm(workspace.aircraft), [workspace.aircraft]);
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
-  const valid = payloadMargin > 0 && thrustToWeight > 0;
+  const valid = isAutonomyAircraftProfileValid(form);
   const numberField = (key: keyof AutonomyAircraftProfile, value: string) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return;
@@ -327,8 +330,8 @@ export function AutonomyAircraft() {
               ["rotorRadiusM", chinese ? "旋翼半径 (m)" : "Rotor radius (m)"],
               ["maximumThrustN", chinese ? "最大总推力 (N)" : "Maximum thrust (N)"],
               ["batteryEnergyWh", chinese ? "电池能量 (Wh)" : "Battery energy (Wh)"],
-            ] as Array<[keyof AutonomyAircraftProfile, string]>).map(([key, label]) => (
-              <label key={key}><span>{label}</span><input type="number" min="0" step="0.01" value={String(form[key])} onChange={(event) => numberField(key, event.target.value)} /></label>
+            ] as Array<[keyof typeof AUTONOMY_AIRCRAFT_LIMITS, string]>).map(([key, label]) => (
+              <label key={key}><span>{label}</span><input type="number" min={AUTONOMY_AIRCRAFT_LIMITS[key].min} max={AUTONOMY_AIRCRAFT_LIMITS[key].max} step="0.01" value={String(form[key])} onChange={(event) => numberField(key, event.target.value)} /></label>
             ))}
             <label><span>{chinese ? "返航保留电量 (%)" : "Reserve battery (%)"}</span><input type="number" min="10" max="90" step="1" value={form.reserveBatteryPercent} onChange={(event) => numberField("reserveBatteryPercent", event.target.value)} /></label>
           </div>
@@ -352,9 +355,9 @@ export function AutonomyAircraft() {
         <header><Gauge aria-hidden="true" /><h2>{chinese ? "飞行包络" : "Flight envelope"}</h2></header>
         <Metric icon={<Weight aria-hidden="true" />} label={chinese ? "可用载荷" : "Payload margin"} value={`${payloadMargin.toFixed(2)} kg`} />
         <Metric icon={<Activity aria-hidden="true" />} label={chinese ? "满载推重比" : "Loaded thrust / weight"} value={thrustToWeight.toFixed(2)} />
-        <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "对角包络" : "Diagonal envelope"} value={`${Math.hypot(form.bodyLengthM, form.bodyWidthM).toFixed(2)} m`} />
+        <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "规划半径" : "Planning radius"} value={`${autonomyAircraftRadiusM(form).toFixed(2)} m`} />
         <Metric icon={<Camera aria-hidden="true" />} label={chinese ? "感知设备" : "Perception devices"} value={String(form.sensors.length)} />
-        {!valid ? <p className="autonomy-config-error">{chinese ? "最大起飞重量必须大于空机重量。" : "MTOM must exceed dry mass."}</p> : null}
+        {!valid ? <p className="autonomy-config-error">{chinese ? "请检查质量、推力、电量预留和 3 m 规划半径限制。" : "Check mass, thrust, reserve, and the 3 m planning-radius limit."}</p> : null}
         <button className="btn btn-primary" type="submit" disabled={!valid}><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
         {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
         <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.aircraft.updatedAt)}</small>
@@ -436,7 +439,7 @@ export function AutonomyMaps() {
             <label><span>{chinese ? "分辨率 (m)" : "Resolution (m)"}</span><input type="number" min="0.005" step="0.005" value={form.resolutionM} onChange={(event) => updateGeometry({ resolutionM: Number(event.target.value) })} /></label>
             <label><span>{chinese ? "楼层数" : "Floors"}</span><input type="number" min="1" max="500" step="1" value={form.floorCount} onChange={(event) => updateGeometry({ floorCount: Number(event.target.value) })} /></label>
             <label><span>{chinese ? "实时更新" : "Live updates"}</span><select value={form.liveUpdates} onChange={(event) => setForm({ ...form, liveUpdates: event.target.value as AutonomyMapPack["liveUpdates"] })}><option value="vision-slam">Vision SLAM</option><option value="depth-fusion">Depth fusion</option><option value="lidar-fusion">LiDAR fusion</option><option value="fixed">Fixed map</option></select></label>
-            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select value={form.compilerSceneId ?? ""} onChange={(event) => setForm({ ...form, compilerSceneId: event.target.value ? event.target.value as AutonomyMapPack["compilerSceneId"] : null })}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
+            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select disabled={form.sourceFiles.length > 0} value={form.compilerSceneId ?? ""} onChange={(event) => setForm({ ...form, compilerSceneId: event.target.value ? event.target.value as AutonomyMapPack["compilerSceneId"] : null })}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
             <label className="autonomy-check-control"><input type="checkbox" checked={form.calibrated} onChange={(event) => setForm({ ...form, calibrated: event.target.checked })} /><span>{chinese ? "比例和坐标已校准" : "Scale and frame calibrated"}</span></label>
           </div>
         </section>
@@ -504,7 +507,7 @@ export function AutonomyMission() {
     persist(updatedWorkspace(workspace, { mission: { ...workspace.mission, currentStep, updatedAt } }));
   };
   const mapReady = Boolean(workspace.mapPack.compilerSceneId) && workspace.mapPack.calibrated;
-  const aircraftReady = workspace.aircraft.maximumTakeoffMassKg > workspace.aircraft.dryMassKg;
+  const aircraftReady = isAutonomyAircraftProfileValid(workspace.aircraft);
   const blockers = [
     ...(!aircraftReady ? [chinese ? "机型质量包络无效" : "Aircraft mass envelope is invalid"] : []),
     ...(!mapReady ? [chinese ? "Map Pack 尚未绑定经过验证的编译场景并完成校准" : "Map Pack requires a validated compiled-scene binding and calibration"] : []),

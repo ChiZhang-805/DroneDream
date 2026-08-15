@@ -41,6 +41,45 @@ export interface AutonomyAircraftProfile {
   updatedAt: string;
 }
 
+export const AUTONOMY_AIRCRAFT_LIMITS = {
+  dryMassKg: { min: 0.101, max: 50 },
+  maximumTakeoffMassKg: { min: 0.101, max: 70 },
+  bodyLengthM: { min: 0.02, max: 5.95 },
+  bodyWidthM: { min: 0.02, max: 5.95 },
+  bodyHeightM: { min: 0.01, max: 20 },
+  rotorRadiusM: { min: 0.01, max: 2.98 },
+  maximumThrustN: { min: 1.001, max: 5_000 },
+  batteryEnergyWh: { min: 1, max: 1_000_000 },
+  reserveBatteryPercent: { min: 10, max: 90 },
+} as const;
+
+export function autonomyAircraftRadiusM(aircraft: AutonomyAircraftProfile): number {
+  return Math.max(
+    aircraft.rotorRadiusM,
+    Math.hypot(aircraft.bodyLengthM, aircraft.bodyWidthM) / 2 + aircraft.rotorRadiusM,
+  );
+}
+
+export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile): boolean {
+  const within = (value: number, key: keyof typeof AUTONOMY_AIRCRAFT_LIMITS) => {
+    const limit = AUTONOMY_AIRCRAFT_LIMITS[key];
+    return Number.isFinite(value) && value >= limit.min && value <= limit.max;
+  };
+  const radiusM = autonomyAircraftRadiusM(aircraft);
+  return within(aircraft.dryMassKg, "dryMassKg")
+    && within(aircraft.maximumTakeoffMassKg, "maximumTakeoffMassKg")
+    && aircraft.maximumTakeoffMassKg > aircraft.dryMassKg
+    && within(aircraft.bodyLengthM, "bodyLengthM")
+    && within(aircraft.bodyWidthM, "bodyWidthM")
+    && within(aircraft.bodyHeightM, "bodyHeightM")
+    && within(aircraft.rotorRadiusM, "rotorRadiusM")
+    && radiusM >= 0.05
+    && radiusM <= 3
+    && within(aircraft.maximumThrustN, "maximumThrustN")
+    && within(aircraft.batteryEnergyWh, "batteryEnergyWh")
+    && within(aircraft.reserveBatteryPercent, "reserveBatteryPercent");
+}
+
 export interface AutonomyMapSourceFile {
   name: string;
   bytes: number;
@@ -198,6 +237,17 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     ? mapPack.liveUpdates as AutonomyMapPack["liveUpdates"]
     : fallback.mapPack.liveUpdates;
   const updatedAt = new Date().toISOString();
+  const normalizedSourceFiles = Array.isArray(mapPack.sourceFiles)
+    ? mapPack.sourceFiles.filter((file): file is AutonomyMapSourceFile => Boolean(
+      file && typeof file === "object" && typeof file.name === "string" && typeof file.bytes === "number",
+    )).slice(0, MAX_SOURCE_FILES).map((file) => ({
+      name: boundedText(file.name, "map-asset", 255),
+      bytes: Math.round(boundedNumber(file.bytes, 0, 0, 2_000_000_000)),
+      format: boundedText(file.format, "unknown", 32),
+      importedAt: boundedText(file.importedAt, updatedAt, 40),
+    }))
+    : [];
+  const importedMapAwaitingIngestion = normalizedSourceFiles.length > 0;
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     id: boundedText(aircraft.id, fallback.aircraft.id, 80),
@@ -205,15 +255,15 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     manufacturer: boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
     airframe: boundedText(aircraft.airframe, fallback.aircraft.airframe),
     firmware: boundedText(aircraft.firmware, fallback.aircraft.firmware),
-    dryMassKg: boundedNumber(aircraft.dryMassKg, fallback.aircraft.dryMassKg, 0.05, 1_000),
-    maximumTakeoffMassKg: boundedNumber(aircraft.maximumTakeoffMassKg, fallback.aircraft.maximumTakeoffMassKg, 0.05, 2_000),
-    bodyLengthM: boundedNumber(aircraft.bodyLengthM, fallback.aircraft.bodyLengthM, 0.02, 50),
-    bodyWidthM: boundedNumber(aircraft.bodyWidthM, fallback.aircraft.bodyWidthM, 0.02, 50),
-    bodyHeightM: boundedNumber(aircraft.bodyHeightM, fallback.aircraft.bodyHeightM, 0.01, 20),
-    rotorRadiusM: boundedNumber(aircraft.rotorRadiusM, fallback.aircraft.rotorRadiusM, 0.01, 10),
-    maximumThrustN: boundedNumber(aircraft.maximumThrustN, fallback.aircraft.maximumThrustN, 0.1, 100_000),
-    batteryEnergyWh: boundedNumber(aircraft.batteryEnergyWh, fallback.aircraft.batteryEnergyWh, 1, 1_000_000),
-    reserveBatteryPercent: boundedNumber(aircraft.reserveBatteryPercent, fallback.aircraft.reserveBatteryPercent, 10, 90),
+    dryMassKg: boundedNumber(aircraft.dryMassKg, fallback.aircraft.dryMassKg, AUTONOMY_AIRCRAFT_LIMITS.dryMassKg.min, AUTONOMY_AIRCRAFT_LIMITS.dryMassKg.max),
+    maximumTakeoffMassKg: boundedNumber(aircraft.maximumTakeoffMassKg, fallback.aircraft.maximumTakeoffMassKg, AUTONOMY_AIRCRAFT_LIMITS.maximumTakeoffMassKg.min, AUTONOMY_AIRCRAFT_LIMITS.maximumTakeoffMassKg.max),
+    bodyLengthM: boundedNumber(aircraft.bodyLengthM, fallback.aircraft.bodyLengthM, AUTONOMY_AIRCRAFT_LIMITS.bodyLengthM.min, AUTONOMY_AIRCRAFT_LIMITS.bodyLengthM.max),
+    bodyWidthM: boundedNumber(aircraft.bodyWidthM, fallback.aircraft.bodyWidthM, AUTONOMY_AIRCRAFT_LIMITS.bodyWidthM.min, AUTONOMY_AIRCRAFT_LIMITS.bodyWidthM.max),
+    bodyHeightM: boundedNumber(aircraft.bodyHeightM, fallback.aircraft.bodyHeightM, AUTONOMY_AIRCRAFT_LIMITS.bodyHeightM.min, AUTONOMY_AIRCRAFT_LIMITS.bodyHeightM.max),
+    rotorRadiusM: boundedNumber(aircraft.rotorRadiusM, fallback.aircraft.rotorRadiusM, AUTONOMY_AIRCRAFT_LIMITS.rotorRadiusM.min, AUTONOMY_AIRCRAFT_LIMITS.rotorRadiusM.max),
+    maximumThrustN: boundedNumber(aircraft.maximumThrustN, fallback.aircraft.maximumThrustN, AUTONOMY_AIRCRAFT_LIMITS.maximumThrustN.min, AUTONOMY_AIRCRAFT_LIMITS.maximumThrustN.max),
+    batteryEnergyWh: boundedNumber(aircraft.batteryEnergyWh, fallback.aircraft.batteryEnergyWh, AUTONOMY_AIRCRAFT_LIMITS.batteryEnergyWh.min, AUTONOMY_AIRCRAFT_LIMITS.batteryEnergyWh.max),
+    reserveBatteryPercent: boundedNumber(aircraft.reserveBatteryPercent, fallback.aircraft.reserveBatteryPercent, AUTONOMY_AIRCRAFT_LIMITS.reserveBatteryPercent.min, AUTONOMY_AIRCRAFT_LIMITS.reserveBatteryPercent.max),
     sensors: Array.isArray(aircraft.sensors)
       ? [...new Set(aircraft.sensors.filter((sensor): sensor is AutonomySensorKind => SENSOR_SET.has(sensor as AutonomySensorKind)))].slice(0, SENSOR_SET.size)
       : fallback.aircraft.sensors,
@@ -228,23 +278,14 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     resolutionM: boundedNumber(mapPack.resolutionM, fallback.mapPack.resolutionM, 0.005, 100),
     floorCount: Math.round(boundedNumber(mapPack.floorCount, fallback.mapPack.floorCount, 1, 500)),
     liveUpdates,
-    calibrated: mapPack.calibrated === true,
-    compilerSceneId: COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
+    calibrated: !importedMapAwaitingIngestion && mapPack.calibrated === true,
+    compilerSceneId: !importedMapAwaitingIngestion && COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
       ? mapPack.compilerSceneId as AutonomyCompiledSceneId
       : null,
     semanticLayers: Array.isArray(mapPack.semanticLayers)
       ? [...new Set(mapPack.semanticLayers.filter((layer): layer is AutonomyMapPack["semanticLayers"][number] => SEMANTIC_SET.has(layer as AutonomyMapPack["semanticLayers"][number])))].slice(0, SEMANTIC_SET.size)
       : fallback.mapPack.semanticLayers,
-    sourceFiles: Array.isArray(mapPack.sourceFiles)
-      ? mapPack.sourceFiles.filter((file): file is AutonomyMapSourceFile => Boolean(
-        file && typeof file === "object" && typeof file.name === "string" && typeof file.bytes === "number",
-      )).slice(0, MAX_SOURCE_FILES).map((file) => ({
-        name: boundedText(file.name, "map-asset", 255),
-        bytes: Math.round(boundedNumber(file.bytes, 0, 0, 2_000_000_000)),
-        format: boundedText(file.format, "unknown", 32),
-        importedAt: boundedText(file.importedAt, updatedAt, 40),
-      }))
-      : [],
+    sourceFiles: normalizedSourceFiles,
     updatedAt: boundedText(mapPack.updatedAt, updatedAt, 40),
   };
   return {

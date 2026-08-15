@@ -28,10 +28,12 @@ import { Link } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
-import type {
-  AutonomyAircraftProfile,
-  AutonomyEvidenceRecord,
-  AutonomyWorkspaceState,
+import {
+  autonomyAircraftRadiusM,
+  isAutonomyAircraftProfileValid,
+  type AutonomyAircraftProfile,
+  type AutonomyEvidenceRecord,
+  type AutonomyWorkspaceState,
 } from "../features/autonomy/workspaceStore";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import {
@@ -81,6 +83,7 @@ interface AutonomyCopy {
   compilingCommand: string;
   compileFailed: string;
   mapUnavailable: string;
+  aircraftUnavailable: string;
   intentSource: string;
   editInChat: string;
   executionTarget: string;
@@ -161,6 +164,7 @@ const EN_COPY: AutonomyCopy = {
   compilingCommand: "Checking mission…",
   compileFailed: "The authoritative compiler did not approve this request. Check the runtime connection and mission inputs, then try again.",
   mapUnavailable: "Map Pack is not qualified. Calibrate it and bind a validated compiler scene before planning.",
+  aircraftUnavailable: "Aircraft envelope is outside the compiler contract. Review mass, thrust, reserve, and planning radius.",
   intentSource: "Mission intent from Tuning Chat",
   editInChat: "Edit in Tuning Chat",
   executionTarget: "Execution target",
@@ -269,6 +273,7 @@ const ZH_COPY: AutonomyCopy = {
   compilingCommand: "正在检查任务…",
   compileFailed: "权威后端未批准本次请求。请检查运行时连接和任务输入后重试。",
   mapUnavailable: "地图包尚未验证。请先完成校准并绑定已验证的编译场景。",
+  aircraftUnavailable: "机型包络超出编译器合同。请检查质量、推力、电量预留和规划半径。",
   intentSource: "来自 Tuning Chat 的任务意图",
   editInChat: "返回 Tuning Chat 修改",
   executionTarget: "执行目标",
@@ -451,14 +456,16 @@ function perceptionForWorkspace(workspace?: AutonomyWorkspaceState): PerceptionM
 function vehicleForAircraft(aircraft?: AutonomyAircraftProfile): AutonomyCompileRequest["vehicle"] {
   if (!aircraft) return DEFAULT_VEHICLE;
   const payloadMarginKg = Math.max(0, aircraft.maximumTakeoffMassKg - aircraft.dryMassKg);
+  const launchPayloadKg = Math.min(DEFAULT_VEHICLE.launch_payload_kg, payloadMarginKg);
+  const pickupCapacityKg = Math.max(0, payloadMarginKg - launchPayloadKg);
   return {
     ...DEFAULT_VEHICLE,
     dry_mass_kg: aircraft.dryMassKg,
-    launch_payload_kg: Math.min(DEFAULT_VEHICLE.launch_payload_kg, payloadMarginKg),
-    pickup_payload_kg: Math.min(DEFAULT_VEHICLE.pickup_payload_kg, payloadMarginKg),
+    launch_payload_kg: launchPayloadKg,
+    pickup_payload_kg: Math.min(DEFAULT_VEHICLE.pickup_payload_kg, pickupCapacityKg),
     max_takeoff_mass_kg: aircraft.maximumTakeoffMassKg,
     max_total_thrust_n: aircraft.maximumThrustN,
-    radius_m: Math.max(aircraft.rotorRadiusM, Math.hypot(aircraft.bodyLengthM, aircraft.bodyWidthM) / 2 + aircraft.rotorRadiusM),
+    radius_m: autonomyAircraftRadiusM(aircraft),
     reserve_battery_percent: aircraft.reserveBatteryPercent,
   };
 }
@@ -628,6 +635,8 @@ export function AutonomyLab({
   const workspaceCompilerSceneId = workspace?.mapPack.compilerSceneId;
   const workspaceMapQualified = !hasWorkspace
     || (workspace?.mapPack.calibrated === true && Boolean(workspaceCompilerSceneId));
+  const workspaceAircraftQualified = !workspace
+    || isAutonomyAircraftProfileValid(workspace.aircraft);
   const compileRequest = useMemo<AutonomyCompileRequest>(() => ({
     edition,
     execution_target: target,
@@ -823,6 +832,12 @@ export function AutonomyLab({
   };
 
   const planTrajectory = async () => {
+    if (!workspaceAircraftQualified) {
+      setCompileResult(null);
+      setCompileError(copy.aircraftUnavailable);
+      setPlanned(false);
+      return;
+    }
     if (!workspaceMapQualified) {
       setCompileResult(null);
       setCompileError(copy.mapUnavailable);
