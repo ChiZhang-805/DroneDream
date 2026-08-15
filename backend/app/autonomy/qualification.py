@@ -21,12 +21,30 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from app.autonomy.catalog import get_bundled_map_manifest, get_scene
 from app.autonomy.models import StrictModel, Vector3
 
 MAX_MAP_ASSET_BYTES = 25 * 1024 * 1024
 MAX_ASSET_RECEIPTS = 512
 SUPPORTED_MAP_FORMATS = {"glb", "gltf", "geojson", "json", "ply", "pcd"}
 MapLayer = Literal["mesh", "point-cloud", "semantic", "georeference"]
+MapRepresentation = Literal["hybrid-3d", "mesh", "point-cloud", "occupancy", "terrain"]
+MapCoordinateFrame = Literal["ENU", "NED", "WGS84", "building-local"]
+MapSemanticLayer = Literal[
+    "free-space",
+    "stairs",
+    "doors",
+    "gates",
+    "people",
+    "pickup-zones",
+]
+MapPlanningLayer = Literal[
+    "collision-geometry",
+    "occupancy",
+    "esdf",
+    "dynamic-overlay",
+    "confidence",
+]
 
 
 class SensorCalibration(StrictModel):
@@ -135,6 +153,78 @@ class MapAssetAdmissionReceipt(StrictModel):
     issues: list[QualificationIssue]
     created_at: datetime
     planning_qualified: Literal[False] = False
+
+
+class MapOrigin(StrictModel):
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+    altitude_m: float | None = Field(default=None, ge=-20_000.0, le=100_000.0)
+
+    @model_validator(mode="after")
+    def validate_geographic_pair(self) -> MapOrigin:
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("origin latitude and longitude must be supplied together")
+        return self
+
+
+class MapPackQualificationRequest(StrictModel):
+    schema_version: Literal["dronedream.autonomy.map-pack-qualification.v1"] = (
+        "dronedream.autonomy.map-pack-qualification.v1"
+    )
+    name: str = Field(min_length=1, max_length=160)
+    pack_id: str = Field(
+        min_length=1,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+    version: int = Field(ge=1, le=1_000_000)
+    compiler_scene_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+    )
+    representation: MapRepresentation
+    coordinate_frame: MapCoordinateFrame
+    resolution_m: float = Field(ge=0.005, le=5.0)
+    floor_count: int = Field(ge=1, le=500)
+    bounds_m: Vector3
+    origin: MapOrigin = Field(default_factory=MapOrigin)
+    live_updates: Literal["vision-slam", "depth-fusion", "lidar-fusion", "fixed"]
+    calibrated: bool
+    confidence_percent: float = Field(ge=0.0, le=100.0)
+    semantic_layers: list[MapSemanticLayer] = Field(max_length=16)
+    planning_layers: list[MapPlanningLayer] = Field(max_length=16)
+    source_asset_receipt_ids: list[str] = Field(default_factory=list, max_length=24)
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> MapPackQualificationRequest:
+        if min(self.bounds_m.x, self.bounds_m.y, self.bounds_m.z) <= 0:
+            raise ValueError("bounds_m must be positive")
+        if len(self.semantic_layers) != len(set(self.semantic_layers)):
+            raise ValueError("semantic_layers contains duplicates")
+        if len(self.planning_layers) != len(set(self.planning_layers)):
+            raise ValueError("planning_layers contains duplicates")
+        return self
+
+
+class MapPackQualificationReceipt(StrictModel):
+    schema_version: Literal["dronedream.autonomy.map-pack-receipt.v1"] = (
+        "dronedream.autonomy.map-pack-receipt.v1"
+    )
+    receipt_id: str
+    pack_id: str
+    version: int
+    status: Literal["blocked", "qualified"]
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    compiler_scene_id: str
+    coordinate_frame: MapCoordinateFrame
+    resolution_m: float
+    semantic_layers: list[MapSemanticLayer]
+    planning_layers: list[MapPlanningLayer]
+    issues: list[QualificationIssue]
+    created_at: datetime
+    hardware_authority: Literal[False] = False
 
 
 def _now() -> datetime:
@@ -270,6 +360,186 @@ def qualify_vehicle_pack(
         planning_radius_m=round(planning_radius, 4),
         maximum_loaded_mass_kg=round(loaded_mass, 4),
         loaded_thrust_to_weight=round(thrust_to_weight, 4),
+        issues=issues,
+        created_at=_now(),
+    )
+
+
+def qualify_map_pack(
+    request: MapPackQualificationRequest,
+) -> MapPackQualificationReceipt:
+    """Qualify only an exact bundled planning scene.
+
+    Imported assets remain admission-only until a future reconstruction service
+    produces collision, occupancy and coordinate-frame evidence. This function
+    therefore cannot turn a user-supplied mesh or point cloud into a qualified map.
+    """
+
+    issues: list[QualificationIssue] = []
+    scene = get_scene(request.compiler_scene_id)
+    manifest = get_bundled_map_manifest(request.compiler_scene_id)
+    if scene is None or manifest is None:
+        issues.append(
+            QualificationIssue(
+                code="map.compiler-scene.unknown",
+                severity="error",
+                message="The requested compiled scene is not registered.",
+            )
+        )
+    if request.source_asset_receipt_ids:
+        issues.append(
+            QualificationIssue(
+                code="map.imported-assets.require-reconstruction",
+                severity="error",
+                message=(
+                    "Imported assets are admitted but require an audited geometry "
+                    "reconstruction job before planning qualification."
+                ),
+            )
+        )
+    if not request.calibrated:
+        issues.append(
+            QualificationIssue(
+                code="map.scale-frame.not-confirmed",
+                severity="error",
+                message="The bundled map scale and coordinate frame were not confirmed.",
+            )
+        )
+    if request.coordinate_frame != "ENU":
+        issues.append(
+            QualificationIssue(
+                code="map.coordinate-frame.unsupported-for-bundled-scene",
+                severity="error",
+                message="Bundled planning scenes currently use the ENU coordinate frame.",
+            )
+        )
+    if request.resolution_m > 0.20:
+        issues.append(
+            QualificationIssue(
+                code="map.resolution.insufficient",
+                severity="error",
+                message="Planning resolution must be 0.20 m or finer.",
+            )
+        )
+    if request.confidence_percent < 95.0:
+        issues.append(
+            QualificationIssue(
+                code="map.confidence.insufficient",
+                severity="error",
+                message="Bundled-scene confidence must be at least 95 percent.",
+            )
+        )
+    required_planning_layers = {"collision-geometry", "occupancy"}
+    if not required_planning_layers.issubset(set(request.planning_layers)):
+        issues.append(
+            QualificationIssue(
+                code="map.collision-layers.missing",
+                severity="error",
+                message="Collision geometry and occupancy layers are required.",
+            )
+        )
+    if "free-space" not in request.semantic_layers:
+        issues.append(
+            QualificationIssue(
+                code="map.free-space-layer.missing",
+                severity="error",
+                message="A semantic free-space layer is required.",
+            )
+        )
+    if scene is not None and manifest is not None:
+        expected_bounds = scene.bounds_m
+        if any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(
+                (request.bounds_m.x, request.bounds_m.y, request.bounds_m.z),
+                (expected_bounds.x, expected_bounds.y, expected_bounds.z),
+                strict=True,
+            )
+        ):
+            issues.append(
+                QualificationIssue(
+                    code="map.bounds.scene-mismatch",
+                    severity="error",
+                    message="The configured bounds do not match the bundled scene manifest.",
+                )
+            )
+        if request.floor_count != scene.floors:
+            issues.append(
+                QualificationIssue(
+                    code="map.floor-count.scene-mismatch",
+                    severity="error",
+                    message="The floor count does not match the bundled scene manifest.",
+                )
+            )
+        exact_checks: tuple[tuple[bool, str, str], ...] = (
+            (
+                request.representation == manifest["representation"],
+                "map.representation.scene-mismatch",
+                "The 3D representation does not match the bundled scene manifest.",
+            ),
+            (
+                request.coordinate_frame == manifest["coordinate_frame"],
+                "map.coordinate-frame.scene-mismatch",
+                "The coordinate frame does not match the bundled scene manifest.",
+            ),
+            (
+                math.isclose(
+                    request.resolution_m,
+                    float(manifest["resolution_m"]),
+                    rel_tol=0.0,
+                    abs_tol=1e-9,
+                ),
+                "map.resolution.scene-mismatch",
+                "The resolution does not match the bundled scene manifest.",
+            ),
+            (
+                math.isclose(
+                    request.confidence_percent,
+                    float(manifest["confidence_percent"]),
+                    rel_tol=0.0,
+                    abs_tol=1e-9,
+                ),
+                "map.confidence.scene-mismatch",
+                "The confidence value does not match the bundled scene manifest.",
+            ),
+            (
+                set(request.semantic_layers) == set(manifest["semantic_layers"]),
+                "map.semantic-layers.scene-mismatch",
+                "The semantic layers do not match the bundled scene manifest.",
+            ),
+            (
+                set(request.planning_layers) == set(manifest["planning_layers"]),
+                "map.planning-layers.scene-mismatch",
+                "The planning layers do not match the bundled scene manifest.",
+            ),
+        )
+        for matches, code, message in exact_checks:
+            if not matches:
+                issues.append(QualificationIssue(code=code, severity="error", message=message))
+    canonical_request = request.model_dump(mode="json")
+    canonical_request["semantic_layers"] = sorted(request.semantic_layers)
+    canonical_request["planning_layers"] = sorted(request.planning_layers)
+    canonical = {
+        "request": canonical_request,
+        "bundled_manifest": manifest,
+        "qualifier": "dronedream.autonomy.map-pack-qualifier.v1",
+    }
+    digest = hashlib.sha256(
+        json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    blocked = any(issue.severity == "error" for issue in issues)
+    return MapPackQualificationReceipt(
+        receipt_id=f"map-receipt-{digest[:24]}",
+        pack_id=request.pack_id,
+        version=request.version,
+        status="blocked" if blocked else "qualified",
+        content_sha256=digest,
+        manifest_sha256=(str(manifest["manifest_sha256"]) if manifest is not None else "0" * 64),
+        compiler_scene_id=request.compiler_scene_id,
+        coordinate_frame=request.coordinate_frame,
+        resolution_m=request.resolution_m,
+        semantic_layers=request.semantic_layers,
+        planning_layers=request.planning_layers,
         issues=issues,
         created_at=_now(),
     )
@@ -533,8 +803,11 @@ map_asset_admissions = MapAssetAdmissionRegistry()
 __all__ = [
     "MapAssetAdmissionReceipt",
     "MapAssetAdmissionRegistry",
+    "MapPackQualificationReceipt",
+    "MapPackQualificationRequest",
     "VehiclePackQualificationReceipt",
     "VehiclePackQualificationRequest",
     "map_asset_admissions",
+    "qualify_map_pack",
     "qualify_vehicle_pack",
 ]

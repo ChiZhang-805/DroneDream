@@ -1,4 +1,8 @@
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
+import type {
+  AutonomyTaskGraph,
+  AutonomyTaskNode,
+} from "../../types/api";
 
 export type AutonomySensorKind =
   | "rgb"
@@ -44,6 +48,7 @@ export interface AutonomyAircraftProfile {
   version: number;
   status: "draft" | "validated-unsigned" | "signed";
   qualificationReceiptId: string | null;
+  qualificationContentHash: string | null;
   name: string;
   manufacturer: string;
   airframe: string;
@@ -217,10 +222,57 @@ export interface AutonomyMissionDraft {
   };
   planningBrief: string;
   planningRunId: string | null;
+  conversationId: string | null;
+  messages: AutonomyConversationMessage[];
   aircraftProfileId: string;
   mapPackId: string;
+  compiledPlan: AutonomyMissionPlanSnapshot | null;
   currentStep: number;
   updatedAt: string;
+}
+
+export interface AutonomyConversationMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+  planContractId: string | null;
+}
+
+export interface AutonomyMissionPlanSnapshot {
+  schemaVersion: 1;
+  source: "backend" | "local-preview";
+  contractId: string;
+  sceneId: string;
+  sceneName: string;
+  feasible: boolean;
+  readiness: "simulation_ready" | "preview_only" | "denied";
+  canExecute: boolean;
+  perceptionMode: "map" | "vision" | "fusion";
+  steps: Array<{
+    order: number;
+    action: string;
+    label: string;
+    payloadDeltaKg: number;
+  }>;
+  taskGraph: AutonomyTaskGraph;
+  issues: Array<{
+    code: string;
+    severity: "info" | "warning" | "error";
+    message: string;
+  }>;
+  metrics: {
+    routeLengthM: number;
+    verticalTravelM: number;
+    estimatedDurationS: number;
+    minimumClearanceM: number;
+    launchMassKg: number;
+    postPickupMassKg: number;
+    postPickupThrustToWeight: number;
+    brakingDistanceM: number;
+  };
+  immutableSafetyRules: string[];
+  compiledAt: string;
 }
 
 export interface AutonomyWorkspaceState {
@@ -270,6 +322,116 @@ function boundedVector(
   };
 }
 
+function boundedTextList(value: unknown, maximumItems: number, maximumLength: number): string[] {
+  return Array.isArray(value)
+    ? [...new Set(value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+      .map((item) => item.trim().slice(0, maximumLength)))].slice(0, maximumItems)
+    : [];
+}
+
+function normalizeMissionPlan(value: unknown): AutonomyMissionPlanSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const plan = value as Partial<AutonomyMissionPlanSnapshot>;
+  const graph = plan.taskGraph && typeof plan.taskGraph === "object"
+    ? plan.taskGraph as Partial<AutonomyTaskGraph>
+    : {};
+  const rawNodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  const statuses = ["pending", "ready", "active", "blocked", "completed", "failed", "skipped"] as const;
+  const executors = ["language_model", "mission_executive", "perception", "global_planner", "local_planner", "payload_controller", "px4_bridge", "operator"] as const;
+  const risks = ["low", "medium", "high", "critical"] as const;
+  const fallbacks = ["continue", "hold", "land", "abort"] as const;
+  const insertedBy = ["compiler", "runtime", "operator"] as const;
+  const nodes = rawNodes.filter((node): node is AutonomyTaskNode => Boolean(
+    node
+    && typeof node === "object"
+    && typeof node.task_id === "string"
+    && typeof node.label === "string"
+    && statuses.includes(node.status)
+    && executors.includes(node.executor)
+    && risks.includes(node.risk)
+    && fallbacks.includes(node.fallback)
+    && insertedBy.includes(node.inserted_by),
+  )).slice(0, 128).map((node): AutonomyTaskNode => ({
+    task_id: boundedText(node.task_id, "invalid-task", 96),
+    label: boundedText(node.label, "Unnamed task", 200),
+    status: node.status,
+    depends_on: boundedTextList(node.depends_on, 16, 96),
+    executor: node.executor,
+    risk: node.risk,
+    max_retries: Math.round(boundedNumber(node.max_retries, 0, 0, 20)),
+    timeout_s: boundedNumber(node.timeout_s, 30, 0.1, 3_600),
+    fallback: node.fallback,
+    expected_output: boundedText(node.expected_output, "Task completion evidence", 240),
+    completion_evidence: boundedTextList(node.completion_evidence, 12, 120),
+    inserted_by: node.inserted_by,
+  }));
+  if (!nodes.length || new Set(nodes.map((node) => node.task_id)).size !== nodes.length) return null;
+  const knownTaskIds = new Set(nodes.map((node) => node.task_id));
+  if (nodes.some((node) => node.depends_on.some((dependency) => !knownTaskIds.has(dependency)))) return null;
+
+  const steps = Array.isArray(plan.steps) ? plan.steps.filter((step) => Boolean(
+    step
+    && typeof step === "object"
+    && typeof step.action === "string"
+    && typeof step.label === "string",
+  )).slice(0, 64).map((step, index) => ({
+    order: Math.round(boundedNumber(step.order, index + 1, 1, 64)),
+    action: boundedText(step.action, "task", 64),
+    label: boundedText(step.label, "Unnamed mission step", 200),
+    payloadDeltaKg: boundedNumber(step.payloadDeltaKg, 0, 0, 20),
+  })) : [];
+  const issues = Array.isArray(plan.issues) ? plan.issues.filter((issue) => Boolean(
+    issue
+    && typeof issue === "object"
+    && typeof issue.code === "string"
+    && typeof issue.message === "string"
+    && ["info", "warning", "error"].includes(String(issue.severity)),
+  )).slice(0, 64).map((issue) => ({
+    code: boundedText(issue.code, "mission.issue", 120),
+    severity: issue.severity,
+    message: boundedText(issue.message, "Mission qualification issue", 300),
+  })) : [];
+  const metrics = plan.metrics && typeof plan.metrics === "object" ? plan.metrics : {} as AutonomyMissionPlanSnapshot["metrics"];
+  const readiness = ["simulation_ready", "preview_only", "denied"].includes(String(plan.readiness))
+    ? plan.readiness as AutonomyMissionPlanSnapshot["readiness"]
+    : "denied";
+  const perceptionMode = ["map", "vision", "fusion"].includes(String(plan.perceptionMode))
+    ? plan.perceptionMode as AutonomyMissionPlanSnapshot["perceptionMode"]
+    : "fusion";
+  return {
+    schemaVersion: 1,
+    source: plan.source === "backend" ? "backend" : "local-preview",
+    contractId: boundedText(plan.contractId, "mission-contract", 160),
+    sceneId: boundedText(plan.sceneId, "unbound-scene", 96),
+    sceneName: boundedText(plan.sceneName, "Unbound environment", 160),
+    feasible: plan.feasible === true,
+    readiness,
+    canExecute: plan.canExecute === true && readiness === "simulation_ready",
+    perceptionMode,
+    steps,
+    taskGraph: {
+      schema_version: "dronedream.autonomy.task-graph.v1",
+      revision: Math.round(boundedNumber(graph.revision, 1, 1, 1_000_000)),
+      nodes,
+      active_node_ids: boundedTextList(graph.active_node_ids, 16, 96).filter((taskId) => knownTaskIds.has(taskId)),
+      change_reason: boundedText(graph.change_reason, "compiled", 240),
+    },
+    issues,
+    metrics: {
+      routeLengthM: boundedNumber(metrics.routeLengthM, 0, 0, 1_000_000),
+      verticalTravelM: boundedNumber(metrics.verticalTravelM, 0, 0, 1_000_000),
+      estimatedDurationS: boundedNumber(metrics.estimatedDurationS, 0, 0, 10_000_000),
+      minimumClearanceM: boundedNumber(metrics.minimumClearanceM, 0, 0, 10_000),
+      launchMassKg: boundedNumber(metrics.launchMassKg, 0, 0, 100_000),
+      postPickupMassKg: boundedNumber(metrics.postPickupMassKg, 0, 0, 100_000),
+      postPickupThrustToWeight: boundedNumber(metrics.postPickupThrustToWeight, 0, 0, 1_000),
+      brakingDistanceM: boundedNumber(metrics.brakingDistanceM, 0, 0, 100_000),
+    },
+    immutableSafetyRules: boundedTextList(plan.immutableSafetyRules, 24, 320),
+    compiledAt: boundedText(plan.compiledAt, new Date().toISOString(), 40),
+  };
+}
+
 function key(ownerId: string, edition: BrandEditionId): string {
   return `${STORAGE_PREFIX}:${encodeURIComponent(ownerId || "local")}:${edition}`;
 }
@@ -288,6 +450,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       version: 1,
       status: "draft",
       qualificationReceiptId: null,
+      qualificationContentHash: null,
       name: "Primary research quadrotor",
       manufacturer: "Self-built",
       airframe: "Quad X",
@@ -358,8 +521,11 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       planningModel: { accessMode: "platform", provider: "openai", model: "gpt-4.1" },
       planningBrief: "",
       planningRunId: null,
+      conversationId: null,
+      messages: [],
       aircraftProfileId: "aircraft-primary",
       mapPackId: "map-primary",
+      compiledPlan: null,
       currentStep: 0,
       updatedAt,
     },
@@ -367,7 +533,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
   };
 }
 
-function normalize(value: unknown): AutonomyWorkspaceState {
+export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceState {
   const fallback = defaultAutonomyWorkspace();
   if (!value || typeof value !== "object") return fallback;
   const candidate = value as Partial<AutonomyWorkspaceState>;
@@ -380,6 +546,7 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const mission = candidate.mission && typeof candidate.mission === "object"
     ? candidate.mission as Partial<AutonomyMissionDraft>
     : {};
+  const normalizedMissionPlan = normalizeMissionPlan(mission.compiledPlan);
   const representation = ["hybrid-3d", "mesh", "point-cloud", "occupancy", "terrain"].includes(String(mapPack.representation))
     ? mapPack.representation as MapRepresentation
     : fallback.mapPack.representation;
@@ -449,13 +616,19 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const normalizedControlInterface = normalizedAutopilot !== "px4" && requestedControlInterface === "px4-ros2"
     ? "mavlink"
     : requestedControlInterface;
+  const normalizedQualificationContentHash = typeof aircraft.qualificationContentHash === "string"
+    && /^[0-9a-f]{64}$/u.test(aircraft.qualificationContentHash)
+    ? aircraft.qualificationContentHash
+    : null;
   const qualificationContractMigrated = autopilotWasInferred
     || normalizedControlInterface !== requestedControlInterface
     || sensorCalibrationContractMigrated
     || String(aircraft.flightController).trim().toLowerCase() === "custom"
     || String(aircraft.firmware).trim().toLowerCase() === "custom build"
     || String(aircraft.airframe).trim().toLowerCase() === "custom"
-    || String(aircraft.computePlatform).trim().toLowerCase() === "custom";
+    || String(aircraft.computePlatform).trim().toLowerCase() === "custom"
+    || ((aircraft.status === "validated-unsigned" || aircraft.status === "signed")
+      && !normalizedQualificationContentHash);
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     schemaVersion: 2,
@@ -467,6 +640,9 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     qualificationReceiptId: !qualificationContractMigrated && typeof aircraft.qualificationReceiptId === "string"
       ? aircraft.qualificationReceiptId.slice(0, 160)
       : null,
+    qualificationContentHash: qualificationContractMigrated
+      ? null
+      : normalizedQualificationContentHash,
     name: boundedText(aircraft.name, fallback.aircraft.name),
     manufacturer: String(aircraft.manufacturer).trim().toLowerCase() === "custom"
       ? "Self-built"
@@ -559,8 +735,28 @@ function normalize(value: unknown): AutonomyWorkspaceState {
       planningRunId: typeof mission.planningRunId === "string"
         ? boundedText(mission.planningRunId, "", 160) || null
         : null,
+      conversationId: typeof mission.conversationId === "string"
+        ? boundedText(mission.conversationId, "", 160) || null
+        : null,
+      messages: Array.isArray(mission.messages)
+        ? mission.messages.filter((message): message is AutonomyConversationMessage => Boolean(
+          message
+          && typeof message === "object"
+          && (message.role === "user" || message.role === "assistant")
+          && typeof message.content === "string",
+        )).slice(-100).map((message) => ({
+          id: boundedText(message.id, crypto.randomUUID(), 160),
+          role: message.role,
+          content: boundedText(message.content, "Empty message", 6_000),
+          createdAt: boundedText(message.createdAt, updatedAt, 40),
+          planContractId: typeof message.planContractId === "string"
+            ? boundedText(message.planContractId, "", 160) || null
+            : null,
+        }))
+        : [],
       aircraftProfileId: normalizedAircraft.id,
       mapPackId: normalizedMap.id,
+      compiledPlan: normalizedMissionPlan,
       currentStep: Math.round(boundedNumber(mission.currentStep, 0, 0, 5)),
       updatedAt: boundedText(mission.updatedAt, updatedAt, 40),
     },
@@ -604,7 +800,7 @@ export function loadAutonomyWorkspace(
   try {
     const current = storage.getItem(key(ownerId, edition));
     const legacy = current === null ? storage.getItem(legacyKey(ownerId, edition)) : null;
-    return normalize(JSON.parse(current ?? legacy ?? "null"));
+    return normalizeAutonomyWorkspace(JSON.parse(current ?? legacy ?? "null"));
   } catch {
     return defaultAutonomyWorkspace();
   }
@@ -616,7 +812,7 @@ export function saveAutonomyWorkspace(
   workspace: AutonomyWorkspaceState,
   storage: Pick<Storage, "setItem"> = window.localStorage,
 ): AutonomyWorkspaceState {
-  const normalized = normalize(workspace);
+  const normalized = normalizeAutonomyWorkspace(workspace);
   storage.setItem(key(ownerId, edition), JSON.stringify(normalized));
   return normalized;
 }

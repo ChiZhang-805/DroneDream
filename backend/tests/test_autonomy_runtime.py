@@ -61,6 +61,40 @@ def test_runtime_profile_never_grants_hitl_or_hardware_authority() -> None:
     )
 
 
+def test_compiler_expands_each_motion_into_perception_plan_qualification_and_evidence() -> None:
+    compiled = compile_autonomy_mission(mission())
+    graph = compiled.contract.task_graph
+    identifiers = {node.task_id for node in graph.nodes}
+
+    assert graph.active_node_ids == ["preflight-pack-identity"]
+    assert len(graph.nodes) == 23
+    assert len(identifiers) == len(graph.nodes)
+    for order, action in ((1, "takeoff"), (2, "pass-gate"), (3, "land")):
+        prefix = f"mission-{order:02d}-{action}"
+        for stage in ("observe", "plan", "qualify", "execute", "verify"):
+            assert f"{prefix}-{stage}" in identifiers
+    assert graph.nodes[-2].task_id == "postflight-state"
+    assert graph.nodes[-1].depends_on == ["postflight-state"]
+
+
+def test_pickup_requalifies_the_loaded_vehicle_before_return_planning() -> None:
+    coffee = mission().model_copy(
+        update={
+            "natural_language": "Fly from the office, pick up coffee, and return.",
+            "scene_id": "stairwell-coffee-return",
+        }
+    )
+    graph = compile_autonomy_mission(coffee).contract.task_graph
+    nodes = {node.task_id: node for node in graph.nodes}
+    payload_check = nodes["mission-04-pickup-recompute-envelope"]
+    return_observation = nodes["mission-05-return-observe"]
+
+    assert payload_check.risk == "critical"
+    assert payload_check.fallback == "land"
+    assert "return-energy.margin" in payload_check.completion_evidence
+    assert return_observation.depends_on == [payload_check.task_id]
+
+
 def test_runtime_session_is_idempotent_owner_scoped_and_replay_safe() -> None:
     registry = RuntimeSessionRegistry(max_sessions=4)
     request = RuntimeSessionCreateRequest(

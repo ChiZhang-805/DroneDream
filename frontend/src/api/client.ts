@@ -22,9 +22,14 @@ import type {
   Artifact,
   AutonomyCompileRequest,
   AutonomyCompileResponse,
+  AutonomyHarnessInspectRequest,
+  AutonomyHarnessInspectResponse,
   AutonomyRuntimeObservation,
   AutonomyRuntimeSession,
   AutonomyMapAssetAdmissionReceipt,
+  AutonomyMapPackQualificationReceipt,
+  AutonomyMapPackQualificationRequest,
+  AutonomySceneCatalogResponse,
   AutonomyVehiclePackQualificationReceipt,
   AutonomyVehiclePackQualificationRequest,
   BackendCapabilitiesResponse,
@@ -390,10 +395,23 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async listAutonomyScenes(): Promise<AutonomySceneCatalogResponse> {
+    return request<AutonomySceneCatalogResponse>("/autonomy/scenes");
+  },
+
   async compileAutonomyMission(
     req: AutonomyCompileRequest,
   ): Promise<AutonomyCompileResponse> {
     return request<AutonomyCompileResponse>("/autonomy/compile", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  },
+
+  async inspectAutonomyHarness(
+    req: AutonomyHarnessInspectRequest,
+  ): Promise<AutonomyHarnessInspectResponse> {
+    return request<AutonomyHarnessInspectResponse>("/autonomy/harness/inspect", {
       method: "POST",
       body: JSON.stringify(req),
     });
@@ -413,6 +431,15 @@ export const apiClient = {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
       body: file,
+    });
+  },
+
+  async qualifyAutonomyMapPack(
+    req: AutonomyMapPackQualificationRequest,
+  ): Promise<AutonomyMapPackQualificationReceipt> {
+    return request<AutonomyMapPackQualificationReceipt>("/autonomy/map-packs/qualify", {
+      method: "POST",
+      body: JSON.stringify(req),
     });
   },
 

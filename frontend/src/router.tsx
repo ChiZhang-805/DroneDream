@@ -125,8 +125,8 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             {
               path: "mission",
               lazy: async () => {
-                const { AutonomyMission } = await import("./pages/AutonomyPlatform");
-                return { Component: AutonomyMission };
+                const { AutonomyMissionRedirect } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyMissionRedirect };
               },
             },
             {

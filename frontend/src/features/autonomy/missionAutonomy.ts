@@ -4,15 +4,15 @@ import type {
   AutonomyExecutionTarget,
 } from "../../types/api";
 
-type MissionId = "coffee" | "gates" | "narrow";
+export type AutonomyMissionId = "coffee" | "gates" | "narrow";
 
-const SCENE_IDS: Record<MissionId, string> = {
+const SCENE_IDS: Record<AutonomyMissionId, string> = {
   coffee: "stairwell-coffee-return",
   gates: "forest-gate-inspection",
   narrow: "service-corridor-dock",
 };
 
-const SCENE_META: Record<MissionId, {
+const SCENE_META: Record<AutonomyMissionId, {
   name: string;
   summary: string;
   floors: number;
@@ -110,7 +110,7 @@ function runtimeProfile(target: AutonomyExecutionTarget): AutonomyCompileRespons
   };
 }
 
-function steps(missionId: MissionId, pickupPayloadKg: number) {
+function steps(missionId: AutonomyMissionId, pickupPayloadKg: number) {
   if (missionId === "coffee") return [
     { order: 1, action: "takeoff", label: "Launch from the third-floor office", payload_delta_kg: 0 },
     { order: 2, action: "traverse_stairs", label: "Descend the narrow stairwell through two landings", payload_delta_kg: 0 },
@@ -134,39 +134,89 @@ function steps(missionId: MissionId, pickupPayloadKg: number) {
 function taskGraph(
   missionSteps: ReturnType<typeof steps>,
 ): AutonomyCompileResponse["contract"]["task_graph"] {
-  const nodes: AutonomyCompileResponse["contract"]["task_graph"]["nodes"] = [
-    {
-      task_id: "preflight-health",
-      label: "Verify aircraft health, calibration, energy and command-link contract",
-      status: "ready",
-      depends_on: [],
-      executor: "mission_executive",
-      risk: "high",
-      max_retries: 0,
-      timeout_s: 20,
-      fallback: "abort",
-      expected_output: "A timestamped preflight qualification receipt",
-      completion_evidence: ["health.receipt", "battery.margin", "link.identity"],
-      inserted_by: "compiler",
-    },
-    {
-      task_id: "world-localization",
-      label: "Bind the Map Pack and establish a bounded localization estimate",
-      status: "pending",
-      depends_on: ["preflight-health"],
-      executor: "perception",
-      risk: "high",
-      max_retries: 2,
-      timeout_s: 45,
-      fallback: "hold",
-      expected_output: "Map-frame transform, covariance and observable free-space layers",
-      completion_evidence: ["map.version", "frame.transform", "localization.covariance"],
-      inserted_by: "compiler",
-    },
-  ];
-  let previous = "world-localization";
+  type TaskNode = AutonomyCompileResponse["contract"]["task_graph"]["nodes"][number];
+  const nodes: TaskNode[] = [];
+  const appendNode = (node: Omit<TaskNode, "inserted_by" | "status"> & { status?: TaskNode["status"] }) => {
+    nodes.push({ ...node, status: node.status ?? "pending", inserted_by: "compiler" });
+    return node.task_id;
+  };
+
+  let previous = appendNode({
+    task_id: "preflight-pack-identity",
+    label: "Bind the immutable Vehicle Pack, firmware identity and control adapter",
+    status: "ready",
+    depends_on: [],
+    executor: "mission_executive",
+    risk: "critical",
+    max_retries: 0,
+    timeout_s: 15,
+    fallback: "abort",
+    expected_output: "Vehicle, firmware and adapter identities match the mission contract",
+    completion_evidence: ["vehicle-pack.digest", "firmware.identity", "adapter.identity"],
+  });
+  previous = appendNode({
+    task_id: "preflight-sensors",
+    label: "Verify required sensor calibration, time synchronization and stream health",
+    depends_on: [previous],
+    executor: "perception",
+    risk: "critical",
+    max_retries: 1,
+    timeout_s: 30,
+    fallback: "abort",
+    expected_output: "Every required localization and obstacle stream is healthy and synchronized",
+    completion_evidence: ["sensor.calibration", "clock.offset", "stream.health"],
+  });
+  previous = appendNode({
+    task_id: "preflight-flight-envelope",
+    label: "Validate mass, center of gravity, thrust, energy reserve and braking envelope",
+    depends_on: [previous],
+    executor: "mission_executive",
+    risk: "critical",
+    max_retries: 0,
+    timeout_s: 20,
+    fallback: "abort",
+    expected_output: "A task-specific flight-envelope qualification receipt",
+    completion_evidence: ["mass.total", "cg.bound", "thrust.margin", "battery.reserve"],
+  });
+  previous = appendNode({
+    task_id: "world-map-binding",
+    label: "Bind the selected Map Pack, coordinate frame, semantic entities and geofence",
+    depends_on: [previous],
+    executor: "global_planner",
+    risk: "high",
+    max_retries: 1,
+    timeout_s: 30,
+    fallback: "hold",
+    expected_output: "A versioned world frame with grounded mission entities and hard boundaries",
+    completion_evidence: ["map-pack.digest", "frame.transform", "semantic.bindings", "geofence.version"],
+  });
+  previous = appendNode({
+    task_id: "world-localization",
+    label: "Establish bounded localization and initialize the live obstacle world model",
+    depends_on: [previous],
+    executor: "perception",
+    risk: "critical",
+    max_retries: 2,
+    timeout_s: 45,
+    fallback: "hold",
+    expected_output: "Localization covariance and observable free-space satisfy launch limits",
+    completion_evidence: ["localization.covariance", "free-space.snapshot", "dynamic-overlay.age"],
+  });
+  previous = appendNode({
+    task_id: "plan-global-corridor",
+    label: "Generate the global route corridor and a payload-aware return alternative",
+    depends_on: [previous],
+    executor: "global_planner",
+    risk: "high",
+    max_retries: 3,
+    timeout_s: 60,
+    fallback: "hold",
+    expected_output: "Primary and contingency corridors satisfy map, clearance and energy constraints",
+    completion_evidence: ["corridor.primary", "corridor.contingency", "energy.projection"],
+  });
+
   for (const step of missionSteps) {
-    const taskId = `mission-${String(step.order).padStart(2, "0")}-${step.action.replaceAll("_", "-")}`;
+    const prefix = `mission-${String(step.order).padStart(2, "0")}-${step.action.replaceAll("_", "-")}`;
     const executor = step.action === "takeoff" || step.action === "land"
       ? "px4_bridge" as const
       : step.action === "pickup"
@@ -174,26 +224,98 @@ function taskGraph(
         : step.action === "return"
           ? "global_planner" as const
           : "local_planner" as const;
-    nodes.push({
-      task_id: taskId,
+    const risk = step.action === "transit" || step.action === "return" ? "medium" as const : "high" as const;
+    const fallback = step.action === "return" || step.action === "land" ? "land" as const : "hold" as const;
+    previous = appendNode({
+      task_id: `${prefix}-observe`,
+      label: `Refresh perception and confirm the local world before: ${step.label}`,
+      depends_on: [previous],
+      executor: "perception",
+      risk,
+      max_retries: 3,
+      timeout_s: 20,
+      fallback: "hold",
+      expected_output: "A time-bounded local obstacle and semantic-target snapshot",
+      completion_evidence: ["perception.sequence", "local-map.age", "tracked-entities.snapshot"],
+    });
+    previous = appendNode({
+      task_id: `${prefix}-plan`,
+      label: `Plan or repair the local trajectory segment for: ${step.label}`,
+      depends_on: [previous],
+      executor: step.action === "return" ? "global_planner" : "local_planner",
+      risk,
+      max_retries: 3,
+      timeout_s: 45,
+      fallback: "hold",
+      expected_output: "A collision-free, time-parameterized segment inside the approved corridor",
+      completion_evidence: ["trajectory.revision", "corridor.containment", "clearance.prediction"],
+    });
+    previous = appendNode({
+      task_id: `${prefix}-qualify`,
+      label: `Check geometry, dynamics, energy and safety policy for: ${step.label}`,
+      depends_on: [previous],
+      executor: "mission_executive",
+      risk: ["takeoff", "land", "pickup"].includes(step.action) ? "critical" : "high",
+      max_retries: 1,
+      timeout_s: 15,
+      fallback,
+      expected_output: "The proposed segment passes every deterministic execution gate",
+      completion_evidence: ["dynamics.acceptance", "energy.margin", "safety.acceptance"],
+    });
+    previous = appendNode({
+      task_id: `${prefix}-execute`,
       label: step.label,
-      status: "pending",
       depends_on: [previous],
       executor,
-      risk: step.action === "transit" || step.action === "return" ? "medium" : "high",
+      risk,
       max_retries: step.action === "takeoff" || step.action === "land" ? 1 : 2,
       timeout_s: ["transit", "traverse_stairs", "return"].includes(step.action) ? 120 : 45,
-      fallback: step.action === "return" || step.action === "land" ? "land" : "hold",
-      expected_output: `Qualified completion of ${step.action}`,
+      fallback,
+      expected_output: `Controller-accepted completion of ${step.action}`,
       completion_evidence: ["pose.trace", "clearance.minimum", "controller.acceptance"],
-      inserted_by: "compiler",
     });
-    previous = taskId;
+    previous = appendNode({
+      task_id: `${prefix}-verify`,
+      label: `Verify completion evidence and settle the task state for: ${step.label}`,
+      depends_on: [previous],
+      executor: "mission_executive",
+      risk: step.action === "pickup" || step.action === "land" ? "high" : "medium",
+      max_retries: 2,
+      timeout_s: 20,
+      fallback,
+      expected_output: "Completion evidence is consistent, current and attributable to this task",
+      completion_evidence: ["task.result", "task.evidence", "world-state.revision"],
+    });
+    if (step.action === "pickup") {
+      previous = appendNode({
+        task_id: `${prefix}-recompute-envelope`,
+        label: "Confirm payload attachment and recompute mass, center of gravity, thrust and return energy",
+        depends_on: [previous],
+        executor: "mission_executive",
+        risk: "critical",
+        max_retries: 1,
+        timeout_s: 25,
+        fallback: "land",
+        expected_output: "The loaded aircraft remains inside its qualified return envelope",
+        completion_evidence: ["payload.confirmed", "mass.loaded", "cg.loaded", "return-energy.margin"],
+      });
+    }
   }
-  nodes.push({
+  previous = appendNode({
+    task_id: "postflight-state",
+    label: "Confirm landing, disarm the vehicle and close command authority",
+    depends_on: [previous],
+    executor: "px4_bridge",
+    risk: "critical",
+    max_retries: 1,
+    timeout_s: 20,
+    fallback: "abort",
+    expected_output: "Landed and disarmed state with actuator authority revoked",
+    completion_evidence: ["vehicle.landed", "vehicle.disarmed", "authority.revoked"],
+  });
+  appendNode({
     task_id: "postflight-evidence",
-    label: "Seal mission results, anomalies and replay evidence",
-    status: "pending",
+    label: "Seal mission results, anomalies, task revisions and replay evidence",
     depends_on: [previous],
     executor: "mission_executive",
     risk: "low",
@@ -201,20 +323,19 @@ function taskGraph(
     timeout_s: 20,
     fallback: "hold",
     expected_output: "A hash-chained mission evidence head",
-    completion_evidence: ["mission.result", "decision.log", "evidence.chain-head"],
-    inserted_by: "compiler",
+    completion_evidence: ["mission.result", "task-graph.revisions", "decision.log", "evidence.chain-head"],
   });
   return {
     schema_version: "dronedream.autonomy.task-graph.v1",
     revision: 1,
     nodes,
-    active_node_ids: ["preflight-health"],
+    active_node_ids: ["preflight-pack-identity"],
     change_reason: "compiled",
   };
 }
 
 export function createLocalAutonomyPreview(
-  missionId: MissionId,
+  missionId: AutonomyMissionId,
   request: AutonomyCompileRequest,
 ): AutonomyCompileResponse {
   const meta = SCENE_META[missionId];

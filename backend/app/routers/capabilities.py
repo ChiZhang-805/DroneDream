@@ -8,6 +8,11 @@ from pathlib import Path
 from fastapi import APIRouter
 
 from app import __version__
+from app.autonomy.harness import (
+    AUTONOMY_SYSTEM_PROMPT_VERSION,
+    AUTONOMY_TOOL_REGISTRY_VERSION,
+    autonomy_tool_registry,
+)
 from app.config import get_settings
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
 from app.parameters import CATALOG_VERSION, SUPPORTED_PX4_VERSIONS
@@ -184,6 +189,17 @@ def read_capabilities() -> dict[str, object]:
                     "runtime_persistence": "process_local_bounded",
                     "hitl_mode": "shadow_only",
                     "physical_transport_bound": False,
+                    "planner_prompt_version": AUTONOMY_SYSTEM_PROMPT_VERSION,
+                    "tool_registry_version": AUTONOMY_TOOL_REGISTRY_VERSION,
+                    "tool_registry": autonomy_tool_registry(),
+                    "asset_gate": "one_qualified_vehicle_and_one_qualified_map",
+                    "model_actuator_authority": False,
+                    "repair_policy": {
+                        "semantic_attempt_limit": 3,
+                        "trajectory_attempt_limit": 5,
+                        "repeated_plan_hash_limit": 2,
+                        "may_relax_safety_constraints": False,
+                    },
                 },
                 "llm_tool_harness": {
                     "available": True,
