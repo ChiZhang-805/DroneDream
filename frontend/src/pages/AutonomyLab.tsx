@@ -28,6 +28,7 @@ import { Link } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
+import type { AutonomyWorkspaceState } from "../features/autonomy/workspaceStore";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import {
   consumeAutonomyHandoff,
@@ -416,6 +417,38 @@ const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
   reserve_battery_percent: 30,
 };
 
+function missionForWorkspace(workspace?: AutonomyWorkspaceState): MissionId {
+  if (!workspace) return "coffee";
+  const intent = workspace.mission.intent.toLowerCase();
+  if (workspace.mapPack.semanticLayers.includes("gates") || /\bgates?\b|圆环|穿门/u.test(intent)) return "gates";
+  if (/narrow|corridor|passage|狭窄|走廊/u.test(intent)) return "narrow";
+  return "coffee";
+}
+
+function perceptionForWorkspace(workspace?: AutonomyWorkspaceState): PerceptionMode {
+  if (!workspace) return "fusion";
+  const hasMap = workspace.mapPack.sourceFiles.length > 0 && workspace.mapPack.calibrated;
+  const hasVision = workspace.aircraft.sensors.some((sensor) => ["rgb", "depth", "stereo", "thermal", "vio"].includes(sensor));
+  if (hasMap && hasVision) return "fusion";
+  return hasVision ? "vision" : "map";
+}
+
+function vehicleForWorkspace(workspace?: AutonomyWorkspaceState): AutonomyCompileRequest["vehicle"] {
+  if (!workspace) return DEFAULT_VEHICLE;
+  const aircraft = workspace.aircraft;
+  const payloadMarginKg = Math.max(0, aircraft.maximumTakeoffMassKg - aircraft.dryMassKg);
+  return {
+    ...DEFAULT_VEHICLE,
+    dry_mass_kg: aircraft.dryMassKg,
+    launch_payload_kg: Math.min(DEFAULT_VEHICLE.launch_payload_kg, payloadMarginKg),
+    pickup_payload_kg: Math.min(DEFAULT_VEHICLE.pickup_payload_kg, payloadMarginKg),
+    max_takeoff_mass_kg: aircraft.maximumTakeoffMassKg,
+    max_total_thrust_n: aircraft.maximumThrustN,
+    radius_m: Math.max(aircraft.rotorRadiusM, Math.hypot(aircraft.bodyLengthM, aircraft.bodyWidthM) / 2 + aircraft.rotorRadiusM),
+    reserve_battery_percent: aircraft.reserveBatteryPercent,
+  };
+}
+
 function defaultTarget(edition: AutonomyEdition): AutonomyExecutionTarget {
   if (edition === "field") return "hardware";
   if (edition === "lab") return "hitl";
@@ -484,18 +517,26 @@ function runtimeComponentLabel(
   return labels[id];
 }
 
-export function AutonomyLab({ embedded = false }: { embedded?: boolean } = {}) {
+export function AutonomyLab({
+  embedded = false,
+  workspace,
+}: {
+  embedded?: boolean;
+  workspace?: AutonomyWorkspaceState;
+} = {}) {
   const { interfaceLocale } = useI18n();
   const copy = COPY_BY_LOCALE[interfaceLocale] ?? EN_COPY;
   const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
+  const workspaceMissionId = missionForWorkspace(workspace);
+  const workspaceVehicle = useMemo(() => vehicleForWorkspace(workspace), [workspace]);
   const [edition, setEdition] = useState<AutonomyEdition>(loadAutonomyEdition);
-  const [missionId, setMissionId] = useState<MissionId>("coffee");
-  const [perception, setPerception] = useState<PerceptionMode>("fusion");
+  const [missionId, setMissionId] = useState<MissionId>(workspaceMissionId);
+  const [perception, setPerception] = useState<PerceptionMode>(() => perceptionForWorkspace(workspace));
   const [target, setTarget] = useState<AutonomyExecutionTarget>(() => defaultTarget(loadAutonomyEdition()));
   const [command, setCommand] = useState(
-    () => loadAutonomyHandoff() ?? promptForMission("coffee", chinese),
+    () => workspace?.mission.intent ?? loadAutonomyHandoff() ?? promptForMission(workspaceMissionId, chinese),
   );
-  const [pickupPayloadKg, setPickupPayloadKg] = useState(DEFAULT_VEHICLE.pickup_payload_kg);
+  const [pickupPayloadKg, setPickupPayloadKg] = useState(workspaceVehicle.pickup_payload_kg);
   const [compileResult, setCompileResult] = useState<AutonomyCompileResponse | null>(null);
   const [compileSource, setCompileSource] = useState<"backend" | "preview">("preview");
   const [compileError, setCompileError] = useState<string | null>(null);
@@ -517,8 +558,15 @@ export function AutonomyLab({ embedded = false }: { embedded?: boolean } = {}) {
   const [events, setEvents] = useState(() => [{ time: eventTime(), text: copy.events.ready }]);
 
   useEffect(() => {
-    consumeAutonomyHandoff();
-  }, []);
+    if (!workspace) {
+      consumeAutonomyHandoff();
+      return;
+    }
+    setCommand(workspace.mission.intent);
+    setMissionId(missionForWorkspace(workspace));
+    setPerception(perceptionForWorkspace(workspace));
+    setPickupPayloadKg(vehicleForWorkspace(workspace).pickup_payload_kg);
+  }, [workspace]);
 
   useEffect(() => {
     if (EDITION_IS_FIXED) return undefined;
@@ -544,7 +592,7 @@ export function AutonomyLab({ embedded = false }: { embedded?: boolean } = {}) {
     natural_language: command.trim() || promptForMission(missionId, chinese),
     scene_id: SCENE_ID_BY_MISSION[missionId],
     perception_mode: perception,
-    vehicle: { ...DEFAULT_VEHICLE, pickup_payload_kg: pickupPayloadKg },
+    vehicle: { ...workspaceVehicle, pickup_payload_kg: pickupPayloadKg },
     evidence: {
       simulation_qualified: false,
       signed_vehicle_pack_id: null,
@@ -554,7 +602,7 @@ export function AutonomyLab({ embedded = false }: { embedded?: boolean } = {}) {
       geofence_ready: false,
       battery_ready: false,
     },
-  }), [chinese, command, edition, missionId, perception, pickupPayloadKg, target]);
+  }), [chinese, command, edition, missionId, perception, pickupPayloadKg, target, workspaceVehicle]);
   const latestCompileRequest = useRef(compileRequest);
   latestCompileRequest.current = compileRequest;
   const provisionalResult = useMemo(
@@ -1062,6 +1110,10 @@ export function AutonomyLab({ embedded = false }: { embedded?: boolean } = {}) {
             </div>
           </div>
           <div className="autonomy-map-controls">
+            {embedded ? <button className="btn" type="button" onClick={() => void planTrajectory()} disabled={planning || command.trim().length < 3}>
+              {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Route aria-hidden="true" />}
+              {planning ? copy.planning : planned ? copy.replan : copy.plan}
+            </button> : null}
             <button className="btn btn-primary" type="button" disabled={!planned || complete || !qualification.execution_policy.can_execute} onClick={() => void toggleFlight()}>
               {!qualification.execution_policy.can_execute ? <LockKeyhole aria-hidden="true" /> : running && !paused ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
               {running ? paused ? copy.resume : copy.pause : copy.run}

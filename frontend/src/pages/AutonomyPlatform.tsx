@@ -519,7 +519,8 @@ export function AutonomyMission() {
 }
 
 export function AutonomyLive() {
-  return <AutonomyLab embedded />;
+  const { workspace } = useAutonomyWorkspace();
+  return <AutonomyLab embedded workspace={workspace} />;
 }
 
 export function AutonomyEvidence() {
