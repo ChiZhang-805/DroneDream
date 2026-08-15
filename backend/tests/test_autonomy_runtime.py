@@ -200,3 +200,45 @@ def test_dynamic_person_inserts_a_bounded_recovery_branch() -> None:
         for node in repaired.task_graph.nodes
         if node.inserted_by == "runtime"
     )
+
+
+def test_runtime_graph_and_decision_log_remain_bounded_and_monotonic() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-bounds",
+        ),
+    )
+    entities = [
+        {
+            "track_id": f"person-{index:03d}",
+            "kind": "person",
+            "position_m": {"x": 20.0 + index, "y": 2.0, "z": 1.5},
+            "velocity_mps": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "confidence": 0.9,
+            "age_ms": 20,
+            "safety_radius_m": 0.8,
+            "source_stream": "front-depth",
+        }
+        for index in range(80)
+    ]
+    bounded = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(1, 100, perceived_entities=entities),
+    )
+    assert len(bounded.task_graph.nodes) <= 128
+
+    current = bounded
+    for sequence in range(2, 108):
+        current = registry.observe(
+            "user-a",
+            created.session_id,
+            observation(sequence, sequence * 100, perceived_entities=[]),
+        )
+    revisions = [event.revision for event in current.decision_events]
+    assert len(revisions) == 100
+    assert revisions == sorted(set(revisions))
+    assert revisions[-1] == 108

@@ -813,7 +813,7 @@ export function AutonomyLab({
         velocity_mps: { x: paused ? 0 : 0.8, y: 0, z: 0 },
         localization_covariance_m2: 0.04,
         perception_age_ms: 45,
-        minimum_clearance_m: obstacleInjected ? 0.52 : Number.parseFloat(mission.clearance),
+        minimum_clearance_m: dynamicEntityActive ? 0.52 : Number.parseFloat(mission.clearance),
         battery_percent: Math.max(35, 92 - currentProgress * 38),
         link_ok: true,
         geofence_ok: true,
@@ -903,7 +903,9 @@ export function AutonomyLab({
       mapVersion: workspace?.mapPack.version ?? 1,
       taskGraphRevision: activeTaskGraph.revision,
       decisionCount: runtimeSession?.decision_events.length ?? events.length,
-      trackedEntityCount: runtimeSession?.perceived_entities.length ?? (obstacleInjected ? 1 : 0),
+      trackedEntityCount: runtimeSession
+        ? new Set(runtimeSession.decision_events.flatMap((event) => event.entity_ids)).size
+        : (obstacleInjected ? 1 : 0),
     });
   }, [activeTaskGraph.revision, command, complete, events.length, obstacleInjected, onRunCompleted, qualification.contract.contract_id, qualification.scene.name, runtimeSession, target, workspace?.aircraft.name, workspace?.aircraft.version, workspace?.mapPack.name, workspace?.mapPack.version]);
 

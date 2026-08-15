@@ -40,6 +40,8 @@ MAX_OBSERVATION_GAP_MS = 2_000
 MAX_PERCEPTION_AGE_MS = 750
 MAX_LOCALIZATION_COVARIANCE_M2 = 0.25
 MIN_CLEARANCE_MARGIN_M = 0.12
+MAX_TASK_GRAPH_NODES = 128
+MAX_ACTIVE_TASK_NODES = 16
 
 
 class AutonomyRuntimeError(ValueError):
@@ -175,6 +177,10 @@ def _dynamic_entities(observation: RuntimeObservation) -> list[PerceivedEntity]:
     ]
 
 
+def _next_decision_revision(events: list[RuntimeDecisionEvent]) -> int:
+    return events[-1].revision + 1 if events else 1
+
+
 def _advance_task_graph(
     graph: MissionTaskGraph,
     observation: RuntimeObservation,
@@ -182,7 +188,33 @@ def _advance_task_graph(
 ) -> MissionTaskGraph:
     """Advance compiler nodes and insert deterministic runtime recovery branches."""
 
-    nodes = [node.model_copy(deep=True) for node in graph.nodes]
+    original_nodes = [node.model_copy(deep=True) for node in graph.nodes]
+    base_nodes = [node for node in original_nodes if node.inserted_by != "runtime"]
+    maximum_entity_branches = max(
+        0,
+        min(
+            (MAX_TASK_GRAPH_NODES - len(base_nodes)) // 2,
+            (MAX_ACTIVE_TASK_NODES - 1) // 2,
+        ),
+    )
+    entities = sorted(
+        _dynamic_entities(observation),
+        key=lambda entity: math.dist(
+            (observation.position_m.x, observation.position_m.y, observation.position_m.z),
+            (entity.position_m.x, entity.position_m.y, entity.position_m.z),
+        ),
+    )[:maximum_entity_branches]
+    current_suffixes = {_runtime_track_suffix(entity.track_id) for entity in entities}
+    nodes = [
+        *base_nodes,
+        *[
+            node
+            for node in original_nodes
+            if node.inserted_by == "runtime"
+            and node.task_id.removeprefix("runtime-hold-").removeprefix("runtime-replan-")
+            in current_suffixes
+        ],
+    ]
     compiler_nodes = [node for node in nodes if node.inserted_by == "compiler"]
     if observation.landed and observation.mission_progress >= 0.995:
         completed_count = len(compiler_nodes)
@@ -204,7 +236,7 @@ def _advance_task_graph(
         (node.task_id for node in reversed(compiler_nodes) if node.status == "completed"),
         compiler_nodes[0].task_id,
     )
-    for entity in _dynamic_entities(observation):
+    for entity in entities:
         suffix = _runtime_track_suffix(entity.track_id)
         entity_ids.add(suffix)
         hold_id = f"runtime-hold-{suffix}"
@@ -236,7 +268,11 @@ def _advance_task_graph(
                     f"Repair the local corridor around {entity.track_id} and rejoin "
                     "the mission graph"
                 ),
-                status="blocked" if decision.action == "hold" else "active",
+                status=(
+                    "blocked"
+                    if decision.action == "hold"
+                    else ("active" if observation.local_replan_active else "completed")
+                ),
                 depends_on=[hold_id],
                 executor="local_planner",
                 risk="high",
@@ -265,7 +301,7 @@ def _advance_task_graph(
             continue
         node.status = "completed"
 
-    active = [node.task_id for node in nodes if node.status == "active"]
+    active = [node.task_id for node in nodes if node.status == "active"][:MAX_ACTIVE_TASK_NODES]
     signature_before = [(node.task_id, node.status) for node in graph.nodes]
     signature_after = [(node.task_id, node.status) for node in nodes]
     changed = signature_after != signature_before
@@ -424,7 +460,8 @@ class RuntimeSessionRegistry:
             )
             phase = _next_phase(observation, decision)
             task_graph = _advance_task_graph(current.task_graph, observation, decision)
-            entity_ids = [entity.track_id for entity in _dynamic_entities(observation)]
+            all_entity_ids = [entity.track_id for entity in _dynamic_entities(observation)]
+            entity_ids = all_entity_ids[:32]
             event_kind: RuntimeDecisionKind = (
                 "dynamic_entity"
                 if entity_ids
@@ -432,14 +469,14 @@ class RuntimeSessionRegistry:
             )
             event_code = decision.codes[0]
             event_summary = (
-                f"Tracked {len(entity_ids)} dynamic entities and selected {decision.action}."
-                if entity_ids
+                f"Tracked {len(all_entity_ids)} dynamic entities and selected {decision.action}."
+                if all_entity_ids
                 else f"Task graph revision {task_graph.revision}; safety action {decision.action}."
             )
             decision_events = [
                 *current.decision_events,
                 RuntimeDecisionEvent(
-                    revision=len(current.decision_events) + 1,
+                    revision=_next_decision_revision(current.decision_events),
                     created_at=_now(),
                     kind=event_kind,
                     code=event_code,
@@ -537,7 +574,7 @@ class RuntimeSessionRegistry:
                 task_graph.revision += 1
                 task_graph.change_reason = f"operator selected {command.action}"
             event = RuntimeDecisionEvent(
-                revision=len(current.decision_events) + 1,
+                revision=_next_decision_revision(current.decision_events),
                 created_at=_now(),
                 kind="operator",
                 code=f"operator.{command.action}",

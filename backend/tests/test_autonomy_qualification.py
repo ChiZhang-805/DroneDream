@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import struct
 
 from app.autonomy.qualification import (
@@ -72,7 +73,17 @@ def test_vehicle_pack_blocks_an_unqualified_localization_stack() -> None:
 
 def test_map_asset_admission_checks_structure_without_retaining_bytes() -> None:
     registry = MapAssetAdmissionRegistry(maximum_receipts=2)
-    glb = b"glTF" + struct.pack("<II", 2, 12)
+    manifest = json.dumps(
+        {"asset": {"version": "2.0"}, "meshes": [{"primitives": []}]},
+        separators=(",", ":"),
+    ).encode()
+    manifest += b" " * (-len(manifest) % 4)
+    glb = (
+        b"glTF"
+        + struct.pack("<II", 2, 20 + len(manifest))
+        + struct.pack("<I4s", len(manifest), b"JSON")
+        + manifest
+    )
 
     async def chunks():
         yield glb[:5]
@@ -96,3 +107,21 @@ def test_map_asset_admission_rejects_a_malformed_glb() -> None:
 
     assert receipt.status == "rejected"
     assert receipt.issues[0].code == "map.glb-header-invalid"
+
+
+def test_map_asset_admission_rejects_header_only_glb_and_empty_geojson() -> None:
+    registry = MapAssetAdmissionRegistry(maximum_receipts=4)
+
+    async def header_only():
+        yield b"glTF" + struct.pack("<II", 2, 12)
+
+    async def empty_geojson():
+        yield b"{}"
+
+    glb = asyncio.run(registry.admit("user-a", "header-only.glb", header_only()))
+    geojson = asyncio.run(registry.admit("user-a", "empty.geojson", empty_geojson()))
+
+    assert glb.status == "rejected"
+    assert "map.glb-json-chunk-missing" in {issue.code for issue in glb.issues}
+    assert geojson.status == "rejected"
+    assert geojson.issues[0].code == "map.geojson-structure-invalid"

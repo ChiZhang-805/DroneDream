@@ -116,6 +116,44 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+GEOJSON_GEOMETRY_TYPES = {
+    "Point",
+    "LineString",
+    "Polygon",
+    "MultiPoint",
+    "MultiLineString",
+    "MultiPolygon",
+}
+
+
+def _valid_geojson(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    geo_type = value.get("type")
+    if geo_type == "FeatureCollection":
+        features = value.get("features")
+        return isinstance(features, list) and all(
+            isinstance(feature, dict)
+            and feature.get("type") == "Feature"
+            and _valid_geojson(feature)
+            for feature in features
+        )
+    if geo_type == "Feature":
+        geometry = value.get("geometry")
+        properties = value.get("properties")
+        return (geometry is None or _valid_geojson(geometry)) and (
+            properties is None or isinstance(properties, dict)
+        )
+    if geo_type == "GeometryCollection":
+        geometries = value.get("geometries")
+        return isinstance(geometries, list) and all(
+            _valid_geojson(geometry) for geometry in geometries
+        )
+    if geo_type in GEOJSON_GEOMETRY_TYPES:
+        return isinstance(value.get("coordinates"), list)
+    return False
+
+
 def qualify_vehicle_pack(
     request: VehiclePackQualificationRequest,
 ) -> VehiclePackQualificationReceipt:
@@ -243,16 +281,23 @@ def _json_asset(
         return "gltf-2-json", ["mesh"], issues
     geo_type = payload.get("type") if isinstance(payload, dict) else None
     if extension == "geojson" or geo_type in {
+        *GEOJSON_GEOMETRY_TYPES,
         "FeatureCollection",
         "Feature",
-        "Point",
-        "LineString",
-        "Polygon",
-        "MultiPoint",
-        "MultiLineString",
-        "MultiPolygon",
         "GeometryCollection",
     }:
+        if not _valid_geojson(payload):
+            return (
+                "geojson-rfc7946",
+                [],
+                [
+                    QualificationIssue(
+                        code="map.geojson-structure-invalid",
+                        severity="error",
+                        message="GeoJSON type and required members are invalid.",
+                    )
+                ],
+            )
         return "geojson-rfc7946", ["semantic", "georeference"], issues
     issues.append(
         QualificationIssue(
@@ -298,7 +343,57 @@ def _inspect_map_asset(
                     message="GLB declared length does not match upload size.",
                 )
             )
-        return "glb-2-binary", ["mesh"], issues
+        if len(data) < 20:
+            issues.append(
+                QualificationIssue(
+                    code="map.glb-json-chunk-missing",
+                    severity="error",
+                    message="GLB must contain a first JSON chunk.",
+                )
+            )
+            return "glb-2-binary", [], issues
+        json_length, json_type = struct.unpack("<I4s", data[12:20])
+        json_end = 20 + json_length
+        if json_type != b"JSON" or json_end > len(data):
+            issues.append(
+                QualificationIssue(
+                    code="map.glb-json-chunk-invalid",
+                    severity="error",
+                    message="GLB first chunk must be a bounded JSON chunk.",
+                )
+            )
+            return "glb-2-binary", [], issues
+        try:
+            manifest = json.loads(data[20:json_end].rstrip(b" \x00").decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            issues.append(
+                QualificationIssue(
+                    code="map.glb-json-invalid",
+                    severity="error",
+                    message=str(exc)[:200],
+                )
+            )
+            return "glb-2-binary", [], issues
+        if not isinstance(manifest, dict) or not str(
+            manifest.get("asset", {}).get("version", "")
+        ).startswith("2"):
+            issues.append(
+                QualificationIssue(
+                    code="map.glb-manifest-invalid",
+                    severity="error",
+                    message="GLB JSON must declare a glTF 2.x asset.",
+                )
+            )
+        meshes = manifest.get("meshes") if isinstance(manifest, dict) else None
+        if not isinstance(meshes, list) or not meshes:
+            issues.append(
+                QualificationIssue(
+                    code="map.glb-meshes-missing",
+                    severity="error",
+                    message="GLB JSON must declare a mesh collection.",
+                )
+            )
+        return "glb-2-binary", [] if issues else ["mesh"], issues
     if extension in {"gltf", "geojson", "json"}:
         return _json_asset(data, extension)
     header = data[:65_536]

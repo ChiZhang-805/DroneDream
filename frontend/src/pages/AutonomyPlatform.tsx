@@ -295,6 +295,7 @@ export function AutonomyAircraft() {
   const save = (event: FormEvent) => {
     event.preventDefault();
     if (!valid) return;
+    if (form.status !== "draft" && form.qualificationReceiptId) return;
     const next = {
       ...form,
       version: Math.max(workspace.aircraft.version + 1, form.version),
@@ -391,6 +392,7 @@ export function AutonomyAircraft() {
       };
       setForm(next);
       persist(updatedWorkspace(workspace, { aircraft: next }));
+      setSaved(true);
       setQualificationState(receipt.status === "validated_unsigned" ? "qualified" : "blocked");
     } catch {
       setQualificationState("unavailable");
@@ -484,8 +486,8 @@ export function AutonomyAircraft() {
         <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "Vehicle Pack 版本" : "Vehicle Pack version"} value={`v${form.version}`} />
         <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "资格状态" : "Qualification"} value={form.status.toUpperCase()} />
         {!valid ? <p className="autonomy-config-error">{chinese ? "请检查质量、推力、电量预留和 3 m 规划半径限制。" : "Check mass, thrust, reserve, and the 3 m planning-radius limit."}</p> : null}
-        <button className="btn btn-primary" type="submit" disabled={!valid}><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
-        <button className="btn" type="button" disabled={!valid || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
+        <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"}><Save aria-hidden="true" />{form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
+        <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
         {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "公开网页不签发资格凭据。请在连接 DroneDream 后端的桌面或私有控制台完成验证。" : "The public site cannot issue qualification receipts. Use a desktop or private console connected to the DroneDream backend."}</p> : null}
         {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
         <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.aircraft.updatedAt)}</small>
