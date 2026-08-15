@@ -92,7 +92,7 @@ const CHINESE_TOPIC_TITLE_LIMIT = 18;
 const ENGLISH_TOPIC_TITLE_LIMIT = 28;
 const HAN_CHARACTER_PATTERN = /\p{Script=Han}/u;
 const COMMUNITY_OWNER_DISPLAY_NAME = "Chi Zhang";
-const COMMUNITY_OWNER_ALIASES = new Set(["chi zhang", "chizhang", "cz91"]);
+const COMMUNITY_OWNER_AUTHOR_ID = "bc77348a-90e9-4c0c-92eb-9db31301cdbd";
 
 export function isLongCommunityTopicTitle(value: string): boolean {
   const normalizedValue = value.trim();
@@ -114,13 +114,14 @@ function resolveCommunityTopicAuthor(
   topic: CommunityTopic,
   account: DroneDreamAccount | null,
 ): { name: string; avatarUrl: string | null } {
-  const normalizedName = topic.author_name.trim().toLocaleLowerCase("en-US");
-  const isCurrentOwner = account?.id === topic.author_id
-    || COMMUNITY_OWNER_ALIASES.has(normalizedName);
+  const isCurrentOwner = topic.author_id === COMMUNITY_OWNER_AUTHOR_ID;
+  const ownerAccount = account?.id === COMMUNITY_OWNER_AUTHOR_ID ? account : null;
   return {
-    name: isCurrentOwner ? account?.displayName || COMMUNITY_OWNER_DISPLAY_NAME : topic.author_name,
+    name: isCurrentOwner
+      ? ownerAccount?.displayName || COMMUNITY_OWNER_DISPLAY_NAME
+      : topic.author_name,
     avatarUrl: isCurrentOwner
-      ? account?.avatarUrl || topic.author_avatar_url || null
+      ? ownerAccount?.avatarUrl || topic.author_avatar_url || null
       : topic.author_avatar_url || null,
   };
 }

@@ -69,7 +69,7 @@ describe("CommunityPage public data loading", () => {
       return rpcResult([
         {
           id: "00000000-0000-0000-0000-000000000001",
-          author_id: "00000000-0000-0000-0000-000000000002",
+          author_id: "bc77348a-90e9-4c0c-92eb-9db31301cdbd",
           author_name: "cz91",
           author_avatar_url: "/chi-avatar.png",
           title: "Stable hover evidence",
@@ -237,7 +237,7 @@ describe("CommunityPage public data loading", () => {
       <CommunityPage
         locale="en"
         account={{
-          id: "00000000-0000-0000-0000-000000000002",
+          id: "bc77348a-90e9-4c0c-92eb-9db31301cdbd",
           email: "pilot@example.com",
           displayName: "Pilot",
           avatarUrl,
@@ -266,7 +266,7 @@ describe("CommunityPage public data loading", () => {
       <CommunityPage
         locale="en"
         account={{
-          id: "00000000-0000-0000-0000-000000000002",
+          id: "bc77348a-90e9-4c0c-92eb-9db31301cdbd",
           email: "pilot@example.com",
           displayName: "Pilot",
           avatarUrl: null,
@@ -292,7 +292,7 @@ describe("CommunityPage public data loading", () => {
     );
     expect(supabaseMock.deleteAuthorEq).toHaveBeenCalledWith(
       "author_id",
-      "00000000-0000-0000-0000-000000000002",
+      "bc77348a-90e9-4c0c-92eb-9db31301cdbd",
     );
     confirm.mockRestore();
   });
