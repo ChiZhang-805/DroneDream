@@ -886,6 +886,37 @@
   background: #e8f8f3;
 }
 
+.autonomy-asset-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.42rem;
+  margin-left: auto;
+}
+
+.autonomy-asset-toolbar select {
+  width: clamp(11rem, 24vw, 20rem);
+  min-height: 2rem;
+  padding: 0.38rem 2rem 0.38rem 0.62rem;
+  border: 1px solid #ddd4e0;
+  border-radius: 9px;
+  color: #4c404f;
+  background: #fbf9fc;
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.autonomy-asset-toolbar .btn {
+  min-height: 2rem;
+  padding: 0.36rem 0.55rem;
+  font-size: 0.66rem;
+  white-space: nowrap;
+}
+
+.autonomy-config-card header .autonomy-asset-toolbar + em {
+  margin-left: 0;
+}
+
 .autonomy-form-grid {
   display: grid;
   gap: 0.58rem;
@@ -1537,6 +1568,9 @@
   .autonomy-conversation-message.is-assistant { grid-template-columns: 1.85rem minmax(0, 1fr); gap: 0.5rem; }
   .autonomy-conversation-avatar { width: 1.85rem; height: 1.85rem; border-radius: 9px; }
   .autonomy-conversation-body > p { max-width: 90%; }
+  .autonomy-config-card > header { align-items: flex-start; flex-wrap: wrap; }
+  .autonomy-asset-toolbar { width: 100%; margin-left: 0; }
+  .autonomy-asset-toolbar select { width: auto; flex: 1 1 auto; }
   .autonomy-overview-grid,
   .autonomy-form-grid.is-three,
   .autonomy-form-grid.is-four,

@@ -58,6 +58,7 @@ import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   AUTONOMY_AIRCRAFT_LIMITS,
   autonomyAircraftRadiusM,
+  defaultAutonomyWorkspace,
   isAutonomyAircraftProfileValid,
   loadAutonomyWorkspace,
   saveAutonomyWorkspace,
@@ -278,6 +279,43 @@ function compileRequestForWorkspace(
       battery_ready: false,
     },
   };
+}
+
+function normalizedAssetReference(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+}
+
+function resolveMissionAssets(
+  workspace: AutonomyWorkspaceState,
+  assetLibrary: AutonomyAssetLibrary,
+  naturalLanguage: string,
+): AutonomyWorkspaceState {
+  const normalizedIntent = normalizedAssetReference(naturalLanguage);
+  const referencedAsset = <T extends { id: string; name: string }>(assets: T[]): T | null => assets
+    .map((asset) => ({
+      asset,
+      references: [asset.name, asset.id]
+        .map(normalizedAssetReference)
+        .filter((reference) => reference.length >= 4),
+    }))
+    .filter(({ references }) => references.some((reference) => normalizedIntent.includes(reference)))
+    .sort((left, right) => Math.max(...right.references.map((reference) => reference.length))
+      - Math.max(...left.references.map((reference) => reference.length)))[0]?.asset ?? null;
+  const aircraft = referencedAsset(assetLibrary.aircraft) ?? workspace.aircraft;
+  const mapPack = referencedAsset(assetLibrary.maps) ?? workspace.mapPack;
+  if (aircraft.id === workspace.aircraft.id && mapPack.id === workspace.mapPack.id) return workspace;
+  const updatedAt = new Date().toISOString();
+  return updatedWorkspace(workspace, {
+    aircraft,
+    mapPack,
+    mission: {
+      ...workspace.mission,
+      aircraftProfileId: aircraft.id,
+      mapPackId: mapPack.id,
+      compiledPlan: null,
+      updatedAt,
+    },
+  });
 }
 
 function missionPlanSnapshot(
@@ -710,11 +748,12 @@ export function AutonomyOverview() {
     setGenerating(true);
     setError(null);
     try {
-      const assistantWorkspaceId = workspace.mission.conversationId ?? createExperimentWorkspaceId();
+      const missionWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
+      const assistantWorkspaceId = missionWorkspace.mission.conversationId ?? createExperimentWorkspaceId();
       const turnId = crypto.randomUUID();
       const followUpPrefix = chinese ? "\n补充指令：" : "\nFollow-up instruction: ";
-      const revisedIntent = workspace.mission.messages.length || workspace.mission.compiledPlan
-        ? `${workspace.mission.intent.slice(0, Math.max(0, 2_000 - followUpPrefix.length - intent.length))}${followUpPrefix}${intent}`
+      const revisedIntent = missionWorkspace.mission.messages.length || missionWorkspace.mission.compiledPlan
+        ? `${missionWorkspace.mission.intent.slice(0, Math.max(0, 2_000 - followUpPrefix.length - intent.length))}${followUpPrefix}${intent}`
         : intent;
       const submittedAt = new Date().toISOString();
       const userMessage: AutonomyConversationMessage = {
@@ -724,15 +763,15 @@ export function AutonomyOverview() {
         createdAt: submittedAt,
         planContractId: null,
       };
-      const priorMessages = workspace.mission.messages;
-      persist(updatedWorkspace(workspace, {
+      const priorMessages = missionWorkspace.mission.messages;
+      persist(updatedWorkspace(missionWorkspace, {
         mission: {
-          ...workspace.mission,
+          ...missionWorkspace.mission,
           intent: revisedIntent,
           conversationId: assistantWorkspaceId,
           messages: [...priorMessages, userMessage].slice(-100),
-          aircraftProfileId: workspace.aircraft.id,
-          mapPackId: workspace.mapPack.id,
+          aircraftProfileId: missionWorkspace.aircraft.id,
+          mapPackId: missionWorkspace.mapPack.id,
           updatedAt: submittedAt,
         },
       }));
@@ -778,7 +817,7 @@ export function AutonomyOverview() {
       } catch {
         modelReasoningUnavailable = true;
       }
-      const compileRequest = compileRequestForWorkspace(edition, workspace, revisedIntent, planningBrief);
+      const compileRequest = compileRequestForWorkspace(edition, missionWorkspace, revisedIntent, planningBrief);
       const localMissionId = missionIdForScene(compileRequest.scene_id);
       let compileResult: AutonomyCompileResponse;
       let compileSource: AutonomyMissionPlanSnapshot["source"];
@@ -791,7 +830,7 @@ export function AutonomyOverview() {
         compileSource = "local-preview";
       }
       const updatedAt = new Date().toISOString();
-      const compiledPlan = missionPlanSnapshot(compileResult, workspace, compileSource);
+      const compiledPlan = missionPlanSnapshot(compileResult, missionWorkspace, compileSource);
       const assistantMessage: AutonomyConversationMessage = {
         id: `assistant-${turnId}`,
         role: "assistant",
@@ -799,17 +838,17 @@ export function AutonomyOverview() {
         createdAt: updatedAt,
         planContractId: compiledPlan.contractId,
       };
-      persist(updatedWorkspace(workspace, {
+      persist(updatedWorkspace(missionWorkspace, {
         mission: {
-          ...workspace.mission,
+          ...missionWorkspace.mission,
           intent: revisedIntent,
           planningModel: selectedPlanningModel,
           planningBrief,
           planningRunId,
           conversationId: assistantWorkspaceId,
           messages: [...priorMessages, userMessage, assistantMessage].slice(-100),
-          aircraftProfileId: workspace.aircraft.id,
-          mapPackId: workspace.mapPack.id,
+          aircraftProfileId: missionWorkspace.aircraft.id,
+          mapPackId: missionWorkspace.mapPack.id,
           compiledPlan,
           currentStep: 0,
           updatedAt,
@@ -1033,7 +1072,7 @@ const CONTROL_INTERFACE_LABELS: Record<AutonomyAircraftProfile["controlInterface
 };
 
 export function AutonomyAircraft() {
-  const { chinese, workspace, persist, edition } = useAutonomyWorkspace();
+  const { chinese, workspace, assetLibrary, selectAircraft, persist, edition } = useAutonomyWorkspace();
   const [form, setForm] = useState(workspace.aircraft);
   const [saved, setSaved] = useState(false);
   const [qualificationState, setQualificationState] = useState<"idle" | "working" | "qualified" | "blocked" | "unavailable">("idle");
@@ -1041,6 +1080,26 @@ export function AutonomyAircraft() {
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
   const valid = isAutonomyAircraftProfileValid(form);
+  const createAircraft = () => {
+    const updatedAt = new Date().toISOString();
+    const next: AutonomyAircraftProfile = {
+      ...defaultAutonomyWorkspace().aircraft,
+      id: `aircraft-${crypto.randomUUID()}`,
+      name: chinese ? `新无人机 ${assetLibrary.aircraft.length + 1}` : `New aircraft ${assetLibrary.aircraft.length + 1}`,
+      updatedAt,
+    };
+    persist(updatedWorkspace(workspace, {
+      aircraft: next,
+      mission: {
+        ...workspace.mission,
+        aircraftProfileId: next.id,
+        compiledPlan: null,
+        updatedAt,
+      },
+    }));
+    setSaved(false);
+    setQualificationState("idle");
+  };
   const updateAircraft = (patch: Partial<AutonomyAircraftProfile>) => {
     setForm((current) => ({ ...current, ...patch, status: "draft", qualificationReceiptId: null }));
     setSaved(false);
@@ -1163,7 +1222,7 @@ export function AutonomyAircraft() {
     <form className="autonomy-config-page" onSubmit={save}>
       <div className="autonomy-config-main">
         <section className="autonomy-config-card">
-          <header><Navigation2 aria-hidden="true" /><h2>{chinese ? "机型身份" : "Aircraft identity"}</h2></header>
+          <header><Navigation2 aria-hidden="true" /><h2>{chinese ? "机型身份" : "Aircraft identity"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存无人机" : "Saved aircraft"} value={workspace.aircraft.id} onChange={(event) => selectAircraft(event.target.value)}>{assetLibrary.aircraft.map((aircraft) => <option value={aircraft.id} key={aircraft.id}>{aircraft.name} · v{aircraft.version}</option>)}</select><button className="btn" type="button" onClick={createAircraft}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div></header>
           <div className="autonomy-form-grid is-four autonomy-identity-grid">
             <label><span>{chinese ? "名称" : "Name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateAircraft({ name: event.target.value })} /></label>
             <label><span>{chinese ? "制造商" : "Manufacturer"}</span><select value={form.manufacturer} onChange={(event) => updateAircraft({ manufacturer: event.target.value })}>{!AIRCRAFT_MANUFACTURERS.includes(form.manufacturer as typeof AIRCRAFT_MANUFACTURERS[number]) ? <option value={form.manufacturer}>{form.manufacturer}</option> : null}{AIRCRAFT_MANUFACTURERS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -1295,12 +1354,31 @@ async function fileSha256(file: File): Promise<string> {
 }
 
 export function AutonomyMaps() {
-  const { chinese, workspace, persist } = useAutonomyWorkspace();
+  const { chinese, workspace, assetLibrary, selectMap, persist } = useAutonomyWorkspace();
   const [form, setForm] = useState(workspace.mapPack);
   const [saved, setSaved] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   useEffect(() => setForm(workspace.mapPack), [workspace.mapPack]);
   const ready = Boolean(form.compilerSceneId) && form.calibrated;
+  const createMap = () => {
+    const updatedAt = new Date().toISOString();
+    const next: AutonomyMapPack = {
+      ...defaultAutonomyWorkspace().mapPack,
+      id: `map-${crypto.randomUUID()}`,
+      name: chinese ? `新地图 ${assetLibrary.maps.length + 1}` : `New map ${assetLibrary.maps.length + 1}`,
+      updatedAt,
+    };
+    persist(updatedWorkspace(workspace, {
+      mapPack: next,
+      mission: {
+        ...workspace.mission,
+        mapPackId: next.id,
+        compiledPlan: null,
+        updatedAt,
+      },
+    }));
+    setSaved(false);
+  };
   const addFiles = async (files: FileList | null) => {
     if (!files) return;
     setIngesting(true);
@@ -1428,7 +1506,7 @@ export function AutonomyMaps() {
     <form className="autonomy-config-page autonomy-maps-page" onSubmit={save}>
       <div className="autonomy-config-main">
         <section className="autonomy-config-card">
-          <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
+          <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存地图" : "Saved maps"} value={workspace.mapPack.id} onChange={(event) => selectMap(event.target.value)}>{assetLibrary.maps.map((mapPack) => <option value={mapPack.id} key={mapPack.id}>{mapPack.name} · v{mapPack.version}</option>)}</select><button className="btn" type="button" onClick={createMap}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
           <div className="autonomy-form-grid is-four">
             <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateMap({ name: event.target.value })} /></label>
             <label><span>{chinese ? "三维表示" : "3D representation"}</span><select value={form.representation} onChange={(event) => updateGeometry({ representation: event.target.value as AutonomyMapPack["representation"] })}><option value="hybrid-3d">Hybrid 3D</option><option value="mesh">Mesh</option><option value="point-cloud">Point cloud</option><option value="occupancy">Occupancy / ESDF</option><option value="terrain">Terrain / DEM</option></select></label>

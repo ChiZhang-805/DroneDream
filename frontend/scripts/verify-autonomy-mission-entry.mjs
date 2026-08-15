@@ -188,6 +188,34 @@ try {
   }
   await page.locator(".assistant-add-button").click();
   await page.screenshot({ path: screenshotPath, fullPage: false });
+  await page.goto(`${origin}/console/autonomy/aircraft`, { waitUntil: "networkidle" });
+  await page.evaluate(() => {
+    document.querySelector(".account-dialog-backdrop")?.remove();
+    document.querySelectorAll("[inert]").forEach((element) => element.removeAttribute("inert"));
+  });
+  if (await page.locator(".autonomy-asset-toolbar select").count() !== 1
+    || await page.locator(".autonomy-asset-toolbar button").count() !== 1) {
+    throw new Error("Aircraft library must expose saved-profile selection and new-profile creation.");
+  }
+  const aircraftOptions = await page.locator(".autonomy-asset-toolbar option").count();
+  await page.locator(".autonomy-asset-toolbar button").click();
+  if (await page.locator(".autonomy-asset-toolbar option").count() !== aircraftOptions + 1) {
+    throw new Error("Creating a new aircraft did not preserve the prior saved profile.");
+  }
+  await page.goto(`${origin}/console/autonomy/maps`, { waitUntil: "networkidle" });
+  await page.evaluate(() => {
+    document.querySelector(".account-dialog-backdrop")?.remove();
+    document.querySelectorAll("[inert]").forEach((element) => element.removeAttribute("inert"));
+  });
+  if (await page.locator(".autonomy-asset-toolbar select").count() !== 1
+    || await page.locator(".autonomy-asset-toolbar button").count() !== 1) {
+    throw new Error("Map library must expose saved-pack selection and new-pack creation.");
+  }
+  const mapOptions = await page.locator(".autonomy-asset-toolbar option").count();
+  await page.locator(".autonomy-asset-toolbar button").click();
+  if (await page.locator(".autonomy-asset-toolbar option").count() !== mapOptions + 1) {
+    throw new Error("Creating a new map did not preserve the prior saved pack.");
+  }
   await page.goto(`${origin}/console/autonomy/mission`, { waitUntil: "networkidle" });
   if (!page.url().endsWith("/console/autonomy")) {
     throw new Error(`Legacy Mission URL did not redirect to Overview: ${page.url()}`);
