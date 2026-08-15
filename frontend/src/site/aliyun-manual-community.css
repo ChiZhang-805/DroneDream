@@ -2133,7 +2133,7 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   }
 }
 
-/* Canonical Community card geometry: long 7:10, short 7:5. */
+/* Canonical Community card geometry: long 7:10, short 7:4. */
 .community-topic-cover,
 .community-topic-dialog-visual {
   container-type: inline-size;
@@ -2163,11 +2163,12 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
 }
 
 .community-page.is-all-topics .community-topic-grid {
-  height: auto;
-  flex: 0 0 auto;
+  height: fit-content;
+  flex: none;
   align-content: start;
+  align-items: start;
   grid-template-rows: none;
-  grid-auto-rows: auto;
+  grid-auto-rows: max-content;
 }
 
 .community-page.is-all-topics .community-feed {
@@ -2186,7 +2187,7 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
 .community-page.is-all-topics .community-topic-grid article.is-short .community-topic-cover {
   height: auto;
   align-self: start;
-  aspect-ratio: 7 / 5;
+  aspect-ratio: 7 / 4;
 }
 
 .community-page.is-all-topics .community-topic-grid article.is-long .community-topic-cover {
@@ -2309,7 +2310,7 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
 }
 
 .community-composer-preview-stage article.is-short .community-topic-cover {
-  aspect-ratio: 7 / 5;
+  aspect-ratio: 7 / 4;
 }
 
 .community-composer-preview-stage article.is-long .community-topic-cover {
@@ -2323,5 +2324,34 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
 
   .community-composer-preview-stage article.is-short {
     width: min(340px, 86vw);
+  }
+}
+
+/* Recent topics ends with its card row instead of filling the remaining viewport. */
+.community-page:not(.is-all-topics) .community-feed {
+  flex: 0 0 auto;
+}
+
+.community-page .community-feed-title {
+  align-items: flex-start;
+}
+
+.community-page .community-feed-title > svg {
+  margin-top: 0.1rem;
+}
+
+@media (max-width: 900px) {
+  .community-feed-title-copy p {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (min-width: 901px) and (min-height: 900px) {
+  .community-page.is-all-topics .community-feed {
+    max-height: none;
+    flex: 0 0 auto;
+    overflow-y: visible;
+    scrollbar-gutter: auto;
   }
 }

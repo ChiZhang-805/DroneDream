@@ -179,7 +179,9 @@ const communityContent = {
     signIn: "Sign in to publish",
     search: "Search topics, evidence, or tags",
     recent: "Recent topics",
+    recentDescription: "Latest questions, field notes, and flight evidence from the community.",
     allTopics: "All topics",
+    allTopicsDescription: "Browse every discussion and narrow the results by evidence or tag.",
     more: "More topics",
     back: "Back to recent topics",
     empty: "No topic matches this view. Start the first evidence-backed discussion.",
@@ -238,7 +240,9 @@ const communityContent = {
     signIn: "登录后发表",
     search: "搜索话题、证据或标签",
     recent: "近期话题",
+    recentDescription: "查看社区最新的问题、飞行记录与验证证据。",
     allTopics: "全部话题",
+    allTopicsDescription: "浏览全部讨论，并按关键词、证据或标签快速筛选。",
     more: "查看更多",
     back: "返回近期话题",
     empty: "当前视图没有匹配的话题；你可以发起第一场有证据的讨论。",
@@ -1006,11 +1010,14 @@ export function CommunityPage({
 
       <section className="community-feed" aria-labelledby="community-feed-heading">
         <header className="community-feed-heading">
-          <div>
+          <div className="community-feed-title">
             {allTopicsView ? <Search aria-hidden="true" /> : <MessageCircle aria-hidden="true" />}
-            <h2 id="community-feed-heading">
-              {allTopicsView ? copy.allTopics : copy.recent}
-            </h2>
+            <div className="community-feed-title-copy">
+              <h2 id="community-feed-heading">
+                {allTopicsView ? copy.allTopics : copy.recent}
+              </h2>
+              <p>{allTopicsView ? copy.allTopicsDescription : copy.recentDescription}</p>
+            </div>
           </div>
           <label className="community-search">
             <Search aria-hidden="true" />
