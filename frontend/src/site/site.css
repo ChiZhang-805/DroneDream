@@ -2629,7 +2629,9 @@ html[lang="zh-CN"] .site-hero h1 {
   .dd-site[data-page="community"] .community-feed { overflow: hidden; }
   .dd-site[data-page="community"] .community-page.is-all-topics,
   .dd-site[data-page="community"] .community-page.is-all-topics .community-feed {
-    overflow-y: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
   .dd-site[data-page="community"] .community-page.is-all-topics .community-topic-grid {
     min-height: 0;
