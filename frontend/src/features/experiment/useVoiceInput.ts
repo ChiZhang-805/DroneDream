@@ -130,6 +130,7 @@ export function useVoiceInput({
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
       recognition.onresult = (event) => {
+        if (operationRef.current !== operation) return;
         let transcript = "";
         for (let index = event.resultIndex; index < event.results.length; index += 1) {
           const result = event.results[index];
