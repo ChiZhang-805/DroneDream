@@ -1024,7 +1024,7 @@ export function AutonomyOverview() {
                   <strong className="assistant-task-popover-title">{copy.context}</strong>
                   <section className="autonomy-context-group" aria-label={copy.aircraft}>
                     <header><span><Navigation2 aria-hidden="true" />{copy.aircraft}</span><Link to="/autonomy/aircraft" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {assetLibrary.aircraft.filter((aircraft) => aircraft.id === "aircraft-my-drone").map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
+                    {assetLibrary.aircraft.map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
                       <input type="radio" name="autonomy-aircraft" value={aircraft.id} checked={aircraft.id === workspace.aircraft.id} onChange={() => selectAircraft(aircraft.id)} />
                       <span><b>{aircraft.name}</b><small>{aircraft.airframe} · RGB-D · VIO</small></span>
                       {aircraft.id === workspace.aircraft.id ? <em>{copy.selected}</em> : null}
@@ -1032,7 +1032,7 @@ export function AutonomyOverview() {
                   </section>
                   <section className="autonomy-context-group" aria-label={copy.map}>
                     <header><span><Layers3 aria-hidden="true" />{copy.map}</span><Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {assetLibrary.maps.filter((mapPack) => mapPack.id === "map-school").map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
+                    {assetLibrary.maps.map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
                       <input type="radio" name="autonomy-map" value={mapPack.id} checked={mapPack.id === workspace.mapPack.id} onChange={() => selectMap(mapPack.id)} />
                       <span><b>{mapPack.name}</b><small>{mapPack.representation} · {mapPack.coordinateFrame}</small></span>
                       {mapPack.id === workspace.mapPack.id ? <em>{copy.selected}</em> : null}
