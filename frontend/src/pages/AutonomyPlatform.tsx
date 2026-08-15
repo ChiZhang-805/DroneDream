@@ -37,8 +37,10 @@ import {
   useEffect,
   useRef,
   useState,
+  type Dispatch,
   type FormEvent,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import {
   Link,
@@ -86,6 +88,8 @@ type WorkspaceContext = {
   chinese: boolean;
   workspace: AutonomyWorkspaceState;
   persist: (next: AutonomyWorkspaceState) => void;
+  missionComposerDraft: string;
+  setMissionComposerDraft: Dispatch<SetStateAction<string>>;
 };
 
 type AutonomySectionId = "overview" | "aircraft" | "maps" | "mission" | "live" | "evidence";
@@ -164,6 +168,7 @@ export function AutonomyPlatform() {
   const ownerId = auth?.account?.id ?? "local";
   const edition = theme.id;
   const [workspace, setWorkspace] = useState(() => loadAutonomyWorkspace(ownerId, edition));
+  const [missionComposerDraft, setMissionComposerDraft] = useState("");
 
   useEffect(() => {
     setWorkspace(loadAutonomyWorkspace(ownerId, edition));
@@ -208,14 +213,27 @@ export function AutonomyPlatform() {
       </header>
 
       <main className="autonomy-platform-content">
-        <Outlet context={{ edition, chinese, workspace, persist } satisfies WorkspaceContext} />
+        <Outlet context={{
+          edition,
+          chinese,
+          workspace,
+          persist,
+          missionComposerDraft,
+          setMissionComposerDraft,
+        } satisfies WorkspaceContext} />
       </main>
     </div>
   );
 }
 
 export function AutonomyOverview() {
-  const { chinese, workspace, persist } = useAutonomyWorkspace();
+  const {
+    chinese,
+    workspace,
+    persist,
+    missionComposerDraft: composer,
+    setMissionComposerDraft: setComposer,
+  } = useAutonomyWorkspace();
   const auth = useOptionalAuth();
   const navigate = useNavigate();
   const {
@@ -226,7 +244,6 @@ export function AutonomyOverview() {
     selectManagedModel,
     selectProfile,
   } = useModelAccess();
-  const [composer, setComposer] = useState("");
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [voiceConsentPending, setVoiceConsentPending] = useState(false);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
@@ -285,7 +302,7 @@ export function AutonomyOverview() {
   };
   const appendTranscript = useCallback((transcript: string) => {
     setComposer((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript);
-  }, []);
+  }, [setComposer]);
   const voice = useVoiceInput({ locale: chinese ? "zh-CN" : "en", onTranscript: appendTranscript });
 
   useEffect(() => {
@@ -364,6 +381,7 @@ export function AutonomyOverview() {
         updatedAt,
       },
     }));
+    setComposer("");
     navigate("/autonomy/mission?from=overview");
   };
 
