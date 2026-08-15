@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -15,6 +16,33 @@ ExecutionAdapter = Literal[
     "hitl_contract",
     "hardware_contract",
 ]
+RuntimePhase = Literal[
+    "ready",
+    "takeoff",
+    "navigating",
+    "pickup",
+    "replanning",
+    "returning",
+    "landing",
+    "holding",
+    "completed",
+    "aborted",
+]
+SafetyAction = Literal["continue", "hold", "land", "abort"]
+RuntimeComponentId = Literal[
+    "mission_executive",
+    "perception_vio_slam",
+    "world_model",
+    "global_planner",
+    "local_planner",
+    "trajectory_tracker",
+    "px4_bridge",
+    "safety_supervisor",
+    "evidence_recorder",
+]
+RuntimeComponentStatus = Literal["available", "shadow", "locked"]
+RuntimeMode = Literal["simulation_contract", "hitl_shadow", "hardware_locked"]
+RuntimeBridge = Literal["px4_gazebo", "px4_hitl_shadow", "px4_hardware_locked"]
 
 
 class StrictModel(BaseModel):
@@ -182,6 +210,92 @@ class ExecutionPolicy(StrictModel):
     required_next_steps: list[str]
 
 
+class RuntimeComponent(StrictModel):
+    id: RuntimeComponentId
+    status: RuntimeComponentStatus
+    role: str = Field(min_length=1, max_length=160)
+    rate_hz: float | None = Field(default=None, gt=0.0, le=1000.0)
+    actuator_authority: bool = False
+
+
+class OnboardRuntimeProfile(StrictModel):
+    schema_version: Literal["dronedream.autonomy.runtime-profile.v1"] = (
+        "dronedream.autonomy.runtime-profile.v1"
+    )
+    mode: RuntimeMode
+    bridge: RuntimeBridge
+    command_authority: bool
+    persistence: Literal["process_local_bounded"] = "process_local_bounded"
+    observation_contract: Literal["dronedream.autonomy.observation.v1"] = (
+        "dronedream.autonomy.observation.v1"
+    )
+    components: list[RuntimeComponent]
+    fail_safe_actions: list[SafetyAction]
+
+
+class RuntimeObservation(StrictModel):
+    schema_version: Literal["dronedream.autonomy.observation.v1"] = (
+        "dronedream.autonomy.observation.v1"
+    )
+    sequence: int = Field(ge=1)
+    monotonic_ms: int = Field(ge=0)
+    armed: bool
+    landed: bool
+    position_m: Vector3
+    velocity_mps: Vector3
+    localization_covariance_m2: float = Field(ge=0.0, le=10000.0)
+    perception_age_ms: int = Field(ge=0, le=60000)
+    minimum_clearance_m: float = Field(ge=0.0, le=1000.0)
+    battery_percent: float = Field(ge=0.0, le=100.0)
+    link_ok: bool
+    geofence_ok: bool
+    payload_mass_kg: float = Field(ge=0.0, le=50.0)
+    mission_progress: float = Field(ge=0.0, le=1.0)
+    pickup_confirmed: bool = False
+    local_replan_active: bool = False
+    emergency_stop: bool = False
+
+
+class SafetyDecision(StrictModel):
+    action: SafetyAction
+    accepted: bool
+    codes: list[str]
+
+
+class RuntimeSessionCreateRequest(StrictModel):
+    mission: AutonomyCompileRequest
+    client_request_id: str = Field(
+        min_length=8,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+
+
+class RuntimeOperatorCommand(StrictModel):
+    action: Literal["hold", "abort"]
+    reason: str = Field(min_length=3, max_length=240)
+
+
+class RuntimeSession(StrictModel):
+    schema_version: Literal["dronedream.autonomy.runtime-session.v1"] = (
+        "dronedream.autonomy.runtime-session.v1"
+    )
+    session_id: str
+    contract_id: str
+    execution_target: ExecutionTarget
+    phase: RuntimePhase
+    bridge: str
+    command_authority: bool
+    created_at: datetime
+    updated_at: datetime
+    latest_sequence: int
+    latest_monotonic_ms: int
+    observation_count: int
+    decision: SafetyDecision
+    evidence_chain_head: str
+    terminal: bool
+
+
 class AutonomyCompileResponse(StrictModel):
     scene: TerrainScene
     contract: MissionContract
@@ -191,3 +305,4 @@ class AutonomyCompileResponse(StrictModel):
     metrics: MissionMetrics
     execution_policy: ExecutionPolicy
     planner: dict[str, str]
+    runtime_profile: OnboardRuntimeProfile

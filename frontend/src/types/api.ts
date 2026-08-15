@@ -1186,6 +1186,84 @@ export interface AutonomyCompileResponse {
     required_next_steps: string[];
   };
   planner: Record<string, string>;
+  runtime_profile: {
+    schema_version: "dronedream.autonomy.runtime-profile.v1";
+    mode: "simulation_contract" | "hitl_shadow" | "hardware_locked";
+    bridge: "px4_gazebo" | "px4_hitl_shadow" | "px4_hardware_locked";
+    command_authority: boolean;
+    persistence: "process_local_bounded";
+    observation_contract: "dronedream.autonomy.observation.v1";
+    components: Array<{
+      id:
+        | "mission_executive"
+        | "perception_vio_slam"
+        | "world_model"
+        | "global_planner"
+        | "local_planner"
+        | "trajectory_tracker"
+        | "px4_bridge"
+        | "safety_supervisor"
+        | "evidence_recorder";
+      status: "available" | "shadow" | "locked";
+      role: string;
+      rate_hz: number | null;
+      actuator_authority: boolean;
+    }>;
+    fail_safe_actions: Array<"continue" | "hold" | "land" | "abort">;
+  };
+}
+
+export interface AutonomyRuntimeObservation {
+  schema_version?: "dronedream.autonomy.observation.v1";
+  sequence: number;
+  monotonic_ms: number;
+  armed: boolean;
+  landed: boolean;
+  position_m: { x: number; y: number; z: number };
+  velocity_mps: { x: number; y: number; z: number };
+  localization_covariance_m2: number;
+  perception_age_ms: number;
+  minimum_clearance_m: number;
+  battery_percent: number;
+  link_ok: boolean;
+  geofence_ok: boolean;
+  payload_mass_kg: number;
+  mission_progress: number;
+  pickup_confirmed?: boolean;
+  local_replan_active?: boolean;
+  emergency_stop?: boolean;
+}
+
+export interface AutonomyRuntimeSession {
+  schema_version: "dronedream.autonomy.runtime-session.v1";
+  session_id: string;
+  contract_id: string;
+  execution_target: AutonomyExecutionTarget;
+  phase:
+    | "ready"
+    | "takeoff"
+    | "navigating"
+    | "pickup"
+    | "replanning"
+    | "returning"
+    | "landing"
+    | "holding"
+    | "completed"
+    | "aborted";
+  bridge: string;
+  command_authority: boolean;
+  created_at: string;
+  updated_at: string;
+  latest_sequence: number;
+  latest_monotonic_ms: number;
+  observation_count: number;
+  decision: {
+    action: "continue" | "hold" | "land" | "abort";
+    accepted: boolean;
+    codes: string[];
+  };
+  evidence_chain_head: string;
+  terminal: boolean;
 }
 
 export type JobsCompareRequest = JobCompareRequest;

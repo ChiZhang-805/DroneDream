@@ -181,6 +181,11 @@ def read_capabilities() -> dict[str, object]:
                     "simulation_adapter": "px4_gazebo_contract",
                     "hardware_authority": False,
                     "validated_signed_vehicle_packs": 0,
+                    "runtime_session_schema": "dronedream.autonomy.runtime-session.v1",
+                    "observation_schema": "dronedream.autonomy.observation.v1",
+                    "runtime_persistence": "process_local_bounded",
+                    "hitl_mode": "shadow_only",
+                    "physical_transport_bound": False,
                 },
                 "llm_tool_harness": {
                     "available": True,

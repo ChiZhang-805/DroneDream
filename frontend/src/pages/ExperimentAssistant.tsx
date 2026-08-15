@@ -15,6 +15,7 @@ import {
   Paperclip,
   PencilRuler,
   Plus,
+  Route,
   Wind,
   Workflow,
   X,
@@ -43,6 +44,11 @@ import {
   type AssistantRunStage,
   type AssistantWorkflowStep,
 } from "../features/experiment/assistantOrchestration";
+import {
+  assistantTaskOptions,
+  storeAutonomyHandoff,
+  type AssistantTaskType,
+} from "../features/experiment/assistantTaskRouter";
 import { clearExperimentDraft } from "../features/experiment/draftStorage";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import { useOptionalAuth } from "../features/auth/AuthContext";
@@ -104,6 +110,9 @@ const COPY = {
       "Describe the flight, model, constraints, and trial budget; DroneDream will turn your intent into a reviewable experiment draft.",
     manual: "Create manually",
     moreActions: "More ways to start",
+    taskType: "Task workflow",
+    autoTask: "Auto-detect",
+    autoTaskDescription: "Let the model classify the request before choosing a workflow.",
     importFiles: "Import files",
     removeFile: "Remove file",
     unsupportedFile: "Use JSON, text, Markdown, CSV, YAML, TOML, XML, or log files.",
@@ -175,6 +184,9 @@ const COPY = {
       "直接说出轨迹、机型、调优目标、控制参数、仿真场景和次数预算，先生成可审查草案。",
     manual: "手动创建",
     moreActions: "更多创建方式",
+    taskType: "任务工作流",
+    autoTask: "自动判断",
+    autoTaskDescription: "先由模型判断任务类型，再进入对应工作流。",
     importFiles: "导入参考文件",
     removeFile: "移除文件",
     unsupportedFile: "请选择 JSON、文本、Markdown、CSV、YAML、TOML、XML 或日志文件。",
@@ -705,6 +717,9 @@ export function ExperimentAssistant() {
   );
 
   function openDraftPath(): string {
+    if (latest?.orchestration?.intent === "mission_autonomy") {
+      return "/autonomy?from=tuning-chat";
+    }
     if (editionTheme.id === "universal") {
       return latest?.orchestration?.artifact_kind === "universal_vehicle_model"
         && vehicleDraftId
@@ -769,6 +784,7 @@ export function ExperimentAssistant() {
   const [voiceConsentPending, setVoiceConsentPending] = useState(false);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>(null);
   const [referenceFiles, setReferenceFiles] = useState<AssistantReferenceFile[]>(
     [],
   );
@@ -847,6 +863,8 @@ export function ExperimentAssistant() {
     onTranscript: appendTranscript,
   });
   const messages = draft.conversation.messages;
+  const taskOptions = assistantTaskOptions(editionTheme.id, interfaceLocale);
+  const selectedTask = taskOptions.find(({ id }) => id === selectedTaskType) ?? null;
 
   useEffect(() => {
     if (!publicDemoConsole || !auth?.account || !workspaceId) return;
@@ -1007,6 +1025,11 @@ export function ExperimentAssistant() {
     ) {
       return;
     }
+    if (!publicDemoConsole && selectedTaskType === "mission_autonomy") {
+      storeAutonomyHandoff(visibleMessage);
+      navigate("/autonomy?from=tuning-chat");
+      return;
+    }
     if (visibleMessage.length > MAX_ASSISTANT_MESSAGE_LENGTH) {
       setError(copy.messageTooLong);
       return;
@@ -1049,6 +1072,7 @@ export function ExperimentAssistant() {
               selectedModel: selectedManagedModel,
               locale,
               message: visibleMessage,
+              requestedTaskType: selectedTaskType,
               currentValues: assistantCurrentValues(draft.form),
               documentContext,
               onStage: setRunStage,
@@ -1135,6 +1159,9 @@ export function ExperimentAssistant() {
       }
       setDraft(next);
       setLatest(result);
+      if (result.orchestration?.intent === "mission_autonomy") {
+        storeAutonomyHandoff(visibleMessage);
+      }
       setComposer((current) => current === submittedComposer ? "" : current);
       setReferenceFiles((current) => current.filter(
         (file) => !submittedReferenceFileIds.has(file.id),
@@ -1233,6 +1260,7 @@ export function ExperimentAssistant() {
                   setComposer("");
                   setReferenceFiles([]);
                   setActionMenuOpen(false);
+                  setSelectedTaskType(null);
                   setError(null);
                 }}
               >
@@ -1391,7 +1419,38 @@ export function ExperimentAssistant() {
               <Plus aria-hidden="true" strokeWidth={1.8} />
             </button>
             {actionMenuOpen ? (
-              <div className="assistant-add-popover" role="menu">
+              <div className="assistant-add-popover assistant-task-popover" role="menu">
+                <strong className="assistant-task-popover-title">{copy.taskType}</strong>
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={selectedTaskType === null}
+                  className={selectedTaskType === null ? "is-selected" : ""}
+                  onClick={() => {
+                    setSelectedTaskType(null);
+                    setActionMenuOpen(false);
+                  }}
+                >
+                  <Orbit aria-hidden="true" strokeWidth={1.8} />
+                  <span><b>{copy.autoTask}</b><small>{copy.autoTaskDescription}</small></span>
+                </button>
+                {taskOptions.map((task) => (
+                  <button
+                    key={task.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selectedTaskType === task.id}
+                    className={selectedTaskType === task.id ? "is-selected" : ""}
+                    onClick={() => {
+                      setSelectedTaskType(task.id);
+                      setActionMenuOpen(false);
+                    }}
+                  >
+                    {task.id === "mission_autonomy" ? <Route aria-hidden="true" strokeWidth={1.8} /> : <Workflow aria-hidden="true" strokeWidth={1.8} />}
+                    <span><b>{task.label}</b><small>{task.description}</small></span>
+                  </button>
+                ))}
+                <hr />
                 <Link to="/jobs/new" role="menuitem" onClick={() => setActionMenuOpen(false)}>
                   <PencilRuler aria-hidden="true" strokeWidth={1.8} />
                   <span>{copy.manual}</span>
@@ -1410,6 +1469,13 @@ export function ExperimentAssistant() {
               </div>
             ) : null}
           </div>
+          <button
+            type="button"
+            className={`assistant-task-chip ${selectedTask ? "is-explicit" : ""}`}
+            onClick={() => setActionMenuOpen(true)}
+          >
+            {selectedTask ? selectedTask.label : copy.autoTask}
+          </button>
           <span className="assistant-composer-spacer" />
           <AssistantModelPicker
             ariaLabel={copy.model}

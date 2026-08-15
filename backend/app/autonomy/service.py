@@ -15,8 +15,14 @@ from app.autonomy.models import (
     MissionContract,
     MissionMetrics,
     MissionStep,
+    OnboardRuntimeProfile,
     PerceptionMode,
     RoutePoint,
+    RuntimeBridge,
+    RuntimeComponent,
+    RuntimeComponentId,
+    RuntimeComponentStatus,
+    RuntimeMode,
     ValidationIssue,
 )
 
@@ -31,6 +37,55 @@ class AutonomyCompileError(ValueError):
         self.code = code
         self.message = message
         self.status_code = status_code
+
+
+def runtime_profile_for(request: AutonomyCompileRequest) -> OnboardRuntimeProfile:
+    """Describe the runtime boundary without claiming that hardware is connected."""
+
+    if request.execution_target == "simulation":
+        mode: RuntimeMode = "simulation_contract"
+        bridge: RuntimeBridge = "px4_gazebo"
+        status: RuntimeComponentStatus = "available"
+        authority = True
+    elif request.execution_target == "hitl":
+        mode = "hitl_shadow"
+        bridge = "px4_hitl_shadow"
+        status = "shadow"
+        authority = False
+    else:
+        mode = "hardware_locked"
+        bridge = "px4_hardware_locked"
+        status = "locked"
+        authority = False
+
+    component_specs: tuple[tuple[RuntimeComponentId, str, float], ...] = (
+        ("mission_executive", "Runs the bounded mission state machine.", 20.0),
+        ("perception_vio_slam", "Accepts versioned VIO, SLAM, map and vision observations.", 30.0),
+        ("world_model", "Maintains obstacle, gate, terrain and payload state.", 20.0),
+        ("global_planner", "Builds the route corridor between mission checkpoints.", 2.0),
+        ("local_planner", "Repairs the trajectory inside the approved corridor.", 20.0),
+        ("trajectory_tracker", "Converts a qualified trajectory to PX4 setpoint contracts.", 50.0),
+        ("px4_bridge", "Separates simulator, HITL shadow and locked aircraft transports.", 50.0),
+        ("safety_supervisor", "Overrides progress with hold, land or abort decisions.", 50.0),
+        ("evidence_recorder", "Hash-chains accepted observations and decisions.", 20.0),
+    )
+    components = [
+        RuntimeComponent(
+            id=component_id,
+            status=status,
+            role=role,
+            rate_hz=rate_hz,
+            actuator_authority=authority and component_id == "px4_bridge",
+        )
+        for component_id, role, rate_hz in component_specs
+    ]
+    return OnboardRuntimeProfile(
+        mode=mode,
+        bridge=bridge,
+        command_authority=authority,
+        components=components,
+        fail_safe_actions=["hold", "land", "abort"],
+    )
 
 
 def _select_scene(request: AutonomyCompileRequest) -> str:
@@ -370,6 +425,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             "trajectory_layer": "payload-aware-speed-profile-v1",
             "safety_layer": "deterministic-geometric-policy-kernel-v1",
         },
+        runtime_profile=runtime_profile_for(request),
     )
 
 

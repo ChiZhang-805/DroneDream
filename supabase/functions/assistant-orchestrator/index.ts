@@ -10,6 +10,17 @@ declare const EdgeRuntime:
 
 type JsonRecord = Record<string, unknown>;
 export type AssistantEdition = "universal" | "sim" | "lab" | "field";
+export type AssistantTaskType =
+  | "control_tuning"
+  | "mission_autonomy"
+  | "vehicle_modeling"
+  | "simulation_experiment"
+  | "cross_edition_workflow"
+  | "hardware_validation"
+  | "calibration"
+  | "sim_to_real"
+  | "real_to_sim"
+  | "field_task";
 type ManagedProvider = "openai" | "deepseek" | "kimi";
 type ArtifactKind =
   | "universal_vehicle_model"
@@ -70,6 +81,37 @@ const EDITION_ARTIFACTS: Readonly<Record<AssistantEdition, readonly ArtifactKind
     "lab_real_to_sim_workflow",
   ],
   field: ["field_task_plan"],
+};
+
+const EDITION_TASK_ARTIFACTS: Readonly<
+  Record<AssistantEdition, Readonly<Partial<Record<AssistantTaskType, ArtifactKind>>>>
+> = {
+  universal: {
+    control_tuning: "universal_simulation_experiment",
+    mission_autonomy: "universal_simulation_experiment",
+    vehicle_modeling: "universal_vehicle_model",
+    simulation_experiment: "universal_simulation_experiment",
+    cross_edition_workflow: "universal_cross_edition_workflow",
+  },
+  sim: {
+    control_tuning: "simulation_experiment",
+    mission_autonomy: "simulation_experiment",
+    simulation_experiment: "simulation_experiment",
+  },
+  lab: {
+    control_tuning: "lab_simulation_experiment",
+    mission_autonomy: "lab_simulation_experiment",
+    simulation_experiment: "lab_simulation_experiment",
+    hardware_validation: "lab_hardware_validation",
+    calibration: "lab_calibration_workflow",
+    sim_to_real: "lab_sim_to_real_workflow",
+    real_to_sim: "lab_real_to_sim_workflow",
+  },
+  field: {
+    control_tuning: "field_task_plan",
+    mission_autonomy: "field_task_plan",
+    field_task: "field_task_plan",
+  },
 };
 
 const EDITION_SYSTEM_PROMPTS: Readonly<Record<AssistantEdition, string>> = {
@@ -271,6 +313,24 @@ function edition(value: unknown): AssistantEdition {
   throw new OrchestratorError("INVALID_REQUEST", "edition is invalid.", 400);
 }
 
+function requestedTaskType(
+  value: unknown,
+  selectedEdition: AssistantEdition,
+): AssistantTaskType | null {
+  if (value == null || value === "") return null;
+  if (
+    typeof value === "string"
+    && Object.hasOwn(EDITION_TASK_ARTIFACTS[selectedEdition], value)
+  ) {
+    return value as AssistantTaskType;
+  }
+  throw new OrchestratorError(
+    "INVALID_REQUEST",
+    "requested_task_type is not available in this edition.",
+    400,
+  );
+}
+
 function workspaceId(value: unknown): string {
   if (typeof value === "string" && /^[A-Za-z0-9_-]{8,128}$/u.test(value)) return value;
   throw new OrchestratorError("INVALID_REQUEST", "workspace_id is invalid.", 400);
@@ -330,7 +390,7 @@ function requestMessage(value: unknown): string {
 }
 
 const SENSITIVE_CONTEXT_KEY = /(?:api[_-]?key|authorization|cookie|credential|password|private[_-]?key|client[_-]?secret|secret|token)/iu;
-const SENSITIVE_TEXT_VALUE = /(?:\bsk-[a-z0-9_-]{10,}\b|\b(?:api[_ -]?key|authorization|credential|password|private[_ -]?key|client[_ -]?secret|secret|token)\s*[:=]\s*[^\s,;]+)/giu;
+const SENSITIVE_TEXT_VALUE = /(?:\bsk-[a-z0-9_-]{10,}\b|\b(?:api[_ -]?key|authorization|credential|password|private[_ -]?key|client[_ -]?secret|secret|token)\s*[:=]\s*[^\s,;]+[,;]?)/giu;
 
 function isSensitiveContextKey(key: string): boolean {
   const normalized = key.trim().toLocaleLowerCase().replace(/[^a-z0-9]/gu, "");
@@ -354,7 +414,10 @@ export function sanitizedContextValue(value: unknown, depth = 0): unknown {
   );
 }
 
-function sanitizedRequestContext(body: JsonRecord): JsonRecord {
+function sanitizedRequestContext(
+  body: JsonRecord,
+  selectedEdition: AssistantEdition,
+): JsonRecord {
   const currentValues = isRecord(body.current_values)
     ? sanitizedContextValue(body.current_values)
     : {};
@@ -372,6 +435,7 @@ function sanitizedRequestContext(body: JsonRecord): JsonRecord {
     : [];
   return {
     locale,
+    requested_task_type: requestedTaskType(body.requested_task_type, selectedEdition),
     current_values: currentValues,
     reference_documents: referenceDocuments,
   };
@@ -427,6 +491,8 @@ function commonSystemPrompt(selectedEdition: AssistantEdition): string {
     "Return a concise audited workflow summary, not private chain-of-thought.",
     "Create a proposal-only editable artifact. You have no execution, simulator, vehicle, parameter-write, or deployment authority.",
     EDITION_SYSTEM_PROMPTS[selectedEdition],
+    "The request_context.requested_task_type is authoritative when non-null. When it is null, classify the task before drafting.",
+    "Set intent to exactly one allowed_task_type and choose its required artifact kind. Never silently change an explicit task type.",
     "Return exactly one JSON object and no markdown.",
   ].join("\n");
 }
@@ -442,6 +508,8 @@ function plannerPrompt(
     task: "Produce the next reviewable DroneDream draft artifact.",
     edition: selectedEdition,
     allowed_artifact_kinds: EDITION_ARTIFACTS[selectedEdition],
+    allowed_task_types: Object.keys(EDITION_TASK_ARTIFACTS[selectedEdition]),
+    task_type_to_artifact_kind: EDITION_TASK_ARTIFACTS[selectedEdition],
     required_output: {
       artifact_kind: "one allowed artifact kind",
       artifact_title: "1-255 characters",
@@ -772,7 +840,11 @@ function validateEditionDraft(kind: ArtifactKind, draft: JsonRecord): void {
   }
 }
 
-export function parseAssistantPlan(raw: string, selectedEdition: AssistantEdition): AssistantPlan {
+export function parseAssistantPlan(
+  raw: string,
+  selectedEdition: AssistantEdition,
+  expectedTaskType?: AssistantTaskType | null,
+): AssistantPlan {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -815,10 +887,35 @@ export function parseAssistantPlan(raw: string, selectedEdition: AssistantEditio
     throw new OrchestratorError("MODEL_RESPONSE_INVALID", "The assistant questions are invalid.", 502);
   }
   const questions = parsed.questions.map((item) => boundedText(item, "question", 500));
+  const intent = boundedText(parsed.intent, "intent", 64);
+  if (expectedTaskType !== undefined) {
+    const selectedTaskType = requestedTaskType(intent, selectedEdition);
+    if (selectedTaskType === null) {
+      throw new OrchestratorError(
+        "MODEL_RESPONSE_INVALID",
+        "The assistant did not classify the task type.",
+        502,
+      );
+    }
+    if (expectedTaskType !== null && selectedTaskType !== expectedTaskType) {
+      throw new OrchestratorError(
+        "MODEL_RESPONSE_INVALID",
+        "The assistant changed the explicitly selected task type.",
+        502,
+      );
+    }
+    if (EDITION_TASK_ARTIFACTS[selectedEdition][selectedTaskType] !== kind) {
+      throw new OrchestratorError(
+        "MODEL_RESPONSE_INVALID",
+        "The assistant routed the task to an incompatible workflow artifact.",
+        502,
+      );
+    }
+  }
   return {
     artifact_kind: kind,
     artifact_title: boundedText(parsed.artifact_title, "artifact title", 255),
-    intent: boundedText(parsed.intent, "intent", 64),
+    intent,
     assistant_message: boundedText(parsed.assistant_message, "assistant message", 12000),
     conversation_summary: boundedText(parsed.conversation_summary, "conversation summary", 8000),
     workflow,
@@ -911,7 +1008,15 @@ async function callManagedPlanner(
     throw new OrchestratorError("MODEL_RESPONSE_INVALID", "The model gateway response is invalid.", 502);
   }
   const message = isRecord(body.choices[0].message) ? body.choices[0].message : null;
-  return parseAssistantPlan(typeof message?.content === "string" ? message.content : "", selectedEdition);
+  const expectedTaskType = requestedTaskType(
+    requestContext.requested_task_type,
+    selectedEdition,
+  );
+  return parseAssistantPlan(
+    typeof message?.content === "string" ? message.content : "",
+    selectedEdition,
+    expectedTaskType,
+  );
 }
 
 function legacyAssistantResponse(plan: AssistantPlan, model: string): JsonRecord {
@@ -1320,7 +1425,7 @@ async function handleTurn(request: Request): Promise<Response> {
   const selectedMessage = requestMessage(body.message);
   const selection = modelSelection(body);
   const key = idempotencyKey(request, body);
-  const requestContext = sanitizedRequestContext(body);
+  const requestContext = sanitizedRequestContext(body, selectedEdition);
   const requestSha256 = await sha256Hex(JSON.stringify({
     edition: selectedEdition,
     workspace_id: selectedWorkspace,
