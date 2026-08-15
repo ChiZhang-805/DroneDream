@@ -28,6 +28,7 @@ from app.autonomy.models import (
     RuntimeMode,
     SafetyAction,
     TaskExecutor,
+    TaskNodeStatus,
     TaskRisk,
     ValidationIssue,
 )
@@ -177,35 +178,120 @@ def _steps(scene_id: str, pickup_payload_kg: float) -> list[MissionStep]:
 
 
 def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
-    """Expand linear intent into an auditable graph owned by the mission executive."""
+    """Expand intent into an auditable, fail-closed execution graph.
 
-    nodes: list[MissionTaskNode] = [
-        MissionTaskNode(
-            task_id="preflight-health",
-            label="Verify aircraft health, calibration, energy and command-link contract",
-            status="ready",
-            executor="mission_executive",
-            risk="high",
-            max_retries=0,
-            timeout_s=20.0,
-            fallback="abort",
-            expected_output="A timestamped preflight qualification receipt",
-            completion_evidence=["health.receipt", "battery.margin", "link.identity"],
-        ),
-        MissionTaskNode(
-            task_id="world-localization",
-            label="Bind the Map Pack and establish a bounded localization estimate",
-            depends_on=["preflight-health"],
-            executor="perception",
-            risk="high",
-            max_retries=2,
-            timeout_s=45.0,
-            fallback="hold",
-            expected_output="Map-frame transform, covariance and observable free-space layers",
-            completion_evidence=["map.version", "frame.transform", "localization.covariance"],
-        ),
-    ]
-    previous = "world-localization"
+    The language model can describe goals, but every motion segment is gated by
+    perception, corridor planning, dynamics checks and explicit completion
+    evidence before the mission executive advances the graph.
+    """
+
+    nodes: list[MissionTaskNode] = []
+
+    def append_node(
+        task_id: str,
+        label: str,
+        *,
+        depends_on: list[str],
+        executor: TaskExecutor,
+        risk: TaskRisk,
+        timeout_s: float,
+        fallback: SafetyAction,
+        expected_output: str,
+        completion_evidence: list[str],
+        max_retries: int = 2,
+        status: TaskNodeStatus = "pending",
+    ) -> str:
+        nodes.append(
+            MissionTaskNode(
+                task_id=task_id,
+                label=label,
+                status=status,
+                depends_on=depends_on,
+                executor=executor,
+                risk=risk,
+                max_retries=max_retries,
+                timeout_s=timeout_s,
+                fallback=fallback,
+                expected_output=expected_output,
+                completion_evidence=completion_evidence,
+            )
+        )
+        return task_id
+
+    previous = append_node(
+        "preflight-pack-identity",
+        "Bind the immutable Vehicle Pack, firmware identity and control adapter",
+        depends_on=[],
+        executor="mission_executive",
+        risk="critical",
+        max_retries=0,
+        timeout_s=15.0,
+        fallback="abort",
+        expected_output="Vehicle, firmware and adapter identities match the mission contract",
+        completion_evidence=["vehicle-pack.digest", "firmware.identity", "adapter.identity"],
+        status="ready",
+    )
+    previous = append_node(
+        "preflight-sensors",
+        "Verify required sensor calibration, time synchronization and stream health",
+        depends_on=[previous],
+        executor="perception",
+        risk="critical",
+        max_retries=1,
+        timeout_s=30.0,
+        fallback="abort",
+        expected_output="Every required localization and obstacle stream is healthy and synchronized",
+        completion_evidence=["sensor.calibration", "clock.offset", "stream.health"],
+    )
+    previous = append_node(
+        "preflight-flight-envelope",
+        "Validate mass, center of gravity, thrust, energy reserve and braking envelope",
+        depends_on=[previous],
+        executor="mission_executive",
+        risk="critical",
+        max_retries=0,
+        timeout_s=20.0,
+        fallback="abort",
+        expected_output="A task-specific flight-envelope qualification receipt",
+        completion_evidence=["mass.total", "cg.bound", "thrust.margin", "battery.reserve"],
+    )
+    previous = append_node(
+        "world-map-binding",
+        "Bind the selected Map Pack, coordinate frame, semantic entities and geofence",
+        depends_on=[previous],
+        executor="global_planner",
+        risk="high",
+        max_retries=1,
+        timeout_s=30.0,
+        fallback="hold",
+        expected_output="A versioned world frame with grounded mission entities and hard boundaries",
+        completion_evidence=["map-pack.digest", "frame.transform", "semantic.bindings", "geofence.version"],
+    )
+    previous = append_node(
+        "world-localization",
+        "Establish bounded localization and initialize the live obstacle world model",
+        depends_on=[previous],
+        executor="perception",
+        risk="critical",
+        max_retries=2,
+        timeout_s=45.0,
+        fallback="hold",
+        expected_output="Localization covariance and observable free-space satisfy launch limits",
+        completion_evidence=["localization.covariance", "free-space.snapshot", "dynamic-overlay.age"],
+    )
+    previous = append_node(
+        "plan-global-corridor",
+        "Generate the global route corridor and a payload-aware return alternative",
+        depends_on=[previous],
+        executor="global_planner",
+        risk="high",
+        max_retries=3,
+        timeout_s=60.0,
+        fallback="hold",
+        expected_output="Primary and contingency corridors satisfy map, clearance and energy constraints",
+        completion_evidence=["corridor.primary", "corridor.contingency", "energy.projection"],
+    )
+
     executor_by_action: dict[MissionAction, TaskExecutor] = {
         "takeoff": "px4_bridge",
         "transit": "local_planner",
@@ -225,44 +311,106 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         "land": "high",
     }
     for step in steps:
-        task_id = f"mission-{step.order:02d}-{step.action.replace('_', '-')}"
+        prefix = f"mission-{step.order:02d}-{step.action.replace('_', '-')}"
         fallback: SafetyAction = "land" if step.action in {"return", "land"} else "hold"
-        nodes.append(
-            MissionTaskNode(
-                task_id=task_id,
-                label=step.label,
-                depends_on=[previous],
-                executor=executor_by_action[step.action],
-                risk=risk_by_action[step.action],
-                max_retries=2 if step.action not in {"takeoff", "land"} else 1,
-                timeout_s=120.0
-                if step.action in {"transit", "traverse_stairs", "return"}
-                else 45.0,
-                fallback=fallback,
-                expected_output=f"Qualified completion of {step.action}",
-                completion_evidence=[
-                    "pose.trace",
-                    "clearance.minimum",
-                    "controller.acceptance",
-                ],
-            )
-        )
-        previous = task_id
-    nodes.append(
-        MissionTaskNode(
-            task_id="postflight-evidence",
-            label="Seal mission results, anomalies and replay evidence",
+        previous = append_node(
+            f"{prefix}-observe",
+            f"Refresh perception and confirm the local world before: {step.label}",
             depends_on=[previous],
-            executor="mission_executive",
-            risk="low",
-            max_retries=2,
+            executor="perception",
+            risk=risk_by_action[step.action],
+            max_retries=3,
             timeout_s=20.0,
             fallback="hold",
-            expected_output="A hash-chained mission evidence head",
-            completion_evidence=["mission.result", "decision.log", "evidence.chain-head"],
+            expected_output="A time-bounded local obstacle and semantic-target snapshot",
+            completion_evidence=["perception.sequence", "local-map.age", "tracked-entities.snapshot"],
         )
+        previous = append_node(
+            f"{prefix}-plan",
+            f"Plan or repair the local trajectory segment for: {step.label}",
+            depends_on=[previous],
+            executor="global_planner" if step.action == "return" else "local_planner",
+            risk=risk_by_action[step.action],
+            max_retries=3,
+            timeout_s=45.0,
+            fallback="hold",
+            expected_output="A collision-free, time-parameterized segment inside the approved corridor",
+            completion_evidence=["trajectory.revision", "corridor.containment", "clearance.prediction"],
+        )
+        previous = append_node(
+            f"{prefix}-qualify",
+            f"Check geometry, dynamics, energy and safety policy for: {step.label}",
+            depends_on=[previous],
+            executor="mission_executive",
+            risk="critical" if step.action in {"takeoff", "land", "pickup"} else "high",
+            max_retries=1,
+            timeout_s=15.0,
+            fallback=fallback,
+            expected_output="The proposed segment passes every deterministic execution gate",
+            completion_evidence=["dynamics.acceptance", "energy.margin", "safety.acceptance"],
+        )
+        previous = append_node(
+            f"{prefix}-execute",
+            step.label,
+            depends_on=[previous],
+            executor=executor_by_action[step.action],
+            risk=risk_by_action[step.action],
+            max_retries=1 if step.action in {"takeoff", "land"} else 2,
+            timeout_s=120.0 if step.action in {"transit", "traverse_stairs", "return"} else 45.0,
+            fallback=fallback,
+            expected_output=f"Controller-accepted completion of {step.action}",
+            completion_evidence=["pose.trace", "clearance.minimum", "controller.acceptance"],
+        )
+        previous = append_node(
+            f"{prefix}-verify",
+            f"Verify completion evidence and settle the task state for: {step.label}",
+            depends_on=[previous],
+            executor="mission_executive",
+            risk="high" if step.action in {"pickup", "land"} else "medium",
+            max_retries=2,
+            timeout_s=20.0,
+            fallback=fallback,
+            expected_output="Completion evidence is consistent, current and attributable to this task",
+            completion_evidence=["task.result", "task.evidence", "world-state.revision"],
+        )
+        if step.action == "pickup":
+            previous = append_node(
+                f"{prefix}-recompute-envelope",
+                "Confirm payload attachment and recompute mass, center of gravity, thrust and return energy",
+                depends_on=[previous],
+                executor="mission_executive",
+                risk="critical",
+                max_retries=1,
+                timeout_s=25.0,
+                fallback="land",
+                expected_output="The loaded aircraft remains inside its qualified return envelope",
+                completion_evidence=["payload.confirmed", "mass.loaded", "cg.loaded", "return-energy.margin"],
+            )
+    previous = append_node(
+        "postflight-state",
+        "Confirm landing, disarm the vehicle and close command authority",
+        depends_on=[previous],
+        executor="px4_bridge",
+        risk="critical",
+        max_retries=1,
+        timeout_s=20.0,
+        fallback="abort",
+        expected_output="Landed and disarmed state with actuator authority revoked",
+        completion_evidence=["vehicle.landed", "vehicle.disarmed", "authority.revoked"],
     )
-    return MissionTaskGraph(nodes=nodes, active_node_ids=["preflight-health"])
+    append_node(
+        "postflight-evidence",
+        "Seal mission results, anomalies, task revisions and replay evidence",
+        depends_on=[previous],
+        executor="mission_executive",
+        risk="low",
+        max_retries=2,
+        timeout_s=20.0,
+        fallback="hold",
+        expected_output="A hash-chained mission evidence head",
+        completion_evidence=["mission.result", "task-graph.revisions", "decision.log", "evidence.chain-head"],
+    )
+    return MissionTaskGraph(nodes=nodes, active_node_ids=["preflight-pack-identity"])
 
 
 def _route_metrics(points: list[RoutePoint]) -> tuple[float, float]:
