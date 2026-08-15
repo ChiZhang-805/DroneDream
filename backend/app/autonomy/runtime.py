@@ -108,7 +108,7 @@ def _safety_decision(
     ):
         escalate("hold", "safety.observation-gap")
     for stream in observation.stream_health:
-        if stream.kind in {"rgb", "depth", "stereo", "lidar", "vio", "slam"} and (
+        if stream.kind in {"rgb", "depth", "stereo", "thermal", "lidar", "vio", "slam"} and (
             stream.status in {"stale", "offline"}
         ):
             escalate("hold", f"safety.perception-stream-{stream.status}")

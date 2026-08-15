@@ -125,3 +125,15 @@ def test_map_asset_admission_rejects_header_only_glb_and_empty_geojson() -> None
     assert "map.glb-json-chunk-missing" in {issue.code for issue in glb.issues}
     assert geojson.status == "rejected"
     assert geojson.issues[0].code == "map.geojson-structure-invalid"
+
+
+def test_map_asset_admission_rejects_a_malformed_gltf_asset_member() -> None:
+    registry = MapAssetAdmissionRegistry(maximum_receipts=2)
+
+    async def malformed_gltf():
+        yield b'{"asset":[],"meshes":[{}]}'
+
+    receipt = asyncio.run(registry.admit("user-a", "malformed.gltf", malformed_gltf()))
+
+    assert receipt.status == "rejected"
+    assert receipt.issues[0].code == "map.gltf-version-unsupported"

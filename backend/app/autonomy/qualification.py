@@ -267,9 +267,8 @@ def _json_asset(
             ],
         )
     if extension == "gltf":
-        version = (
-            str(payload.get("asset", {}).get("version", "")) if isinstance(payload, dict) else ""
-        )
+        asset = payload.get("asset") if isinstance(payload, dict) else None
+        version = str(asset.get("version", "")) if isinstance(asset, dict) else ""
         if not version.startswith("2"):
             issues.append(
                 QualificationIssue(

@@ -122,6 +122,41 @@ def test_safety_supervisor_escalates_and_terminal_sessions_stop() -> None:
     assert terminal.value.code == "AUTONOMY_RUNTIME_TERMINAL"
 
 
+def test_thermal_stream_loss_holds_the_mission() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-thermal",
+        ),
+    )
+
+    held = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(
+            1,
+            100,
+            stream_health=[
+                {
+                    "stream_id": "thermal-front",
+                    "kind": "thermal",
+                    "status": "offline",
+                    "rate_hz": 0.0,
+                    "latency_ms": 0.0,
+                    "dropped_percent": 100.0,
+                    "source": "onboard",
+                }
+            ],
+        ),
+    )
+
+    assert held.phase == "holding"
+    assert held.decision.action == "hold"
+    assert "safety.perception-stream-offline" in held.decision.codes
+
+
 def test_non_simulation_session_creation_remains_denied() -> None:
     registry = RuntimeSessionRegistry()
     with pytest.raises(AutonomyRuntimeError) as denied:
