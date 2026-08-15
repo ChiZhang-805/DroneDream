@@ -82,6 +82,13 @@ import {
   createLocalAutonomyPreview,
   type AutonomyMissionId,
 } from "../features/autonomy/missionAutonomy";
+import {
+  autonomyAssetBlockerMessage,
+  autonomyHarnessRequest,
+  autonomyModelContext,
+  localAutonomyHarnessInspection,
+  parseAutonomyPlannerArtifact,
+} from "../features/autonomy/missionHarness";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import { consumeAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
@@ -103,6 +110,7 @@ import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type {
   AutonomyCompileRequest,
   AutonomyCompileResponse,
+  AutonomyHarnessInspectResponse,
 } from "../types/api";
 import { AutonomyLab } from "./AutonomyLab";
 
@@ -777,12 +785,22 @@ export function AutonomyOverview() {
         },
       }));
       setComposer("");
+      const harnessRequest = autonomyHarnessRequest(edition, missionWorkspace, revisedIntent);
+      let harnessInspection: AutonomyHarnessInspectResponse;
+      try {
+        if (publicDemoConsole) throw new Error("Public demo uses the bounded local asset gate.");
+        harnessInspection = await apiClient.inspectAutonomyHarness(harnessRequest);
+      } catch {
+        harnessInspection = await localAutonomyHarnessInspection(harnessRequest);
+      }
       let planningBrief = "";
       let planningRunId: string | null = assistantWorkspaceId;
       let modelReasoningUnavailable = false;
       try {
-        const response = selectedPlanningModel.accessMode === "platform"
-          ? (await orchestrateAssistantTurn({
+        if (selectedPlanningModel.accessMode !== "platform") {
+          throw new Error("The dedicated BYOK autonomy planner adapter is not yet bound.");
+        }
+        const response = (await orchestrateAssistantTurn({
             edition,
             workspaceId: assistantWorkspaceId,
             organizationId: activeAssistantTenantContext(auth?.account?.id ?? "local").organizationId,
@@ -791,32 +809,59 @@ export function AutonomyOverview() {
             requestedTaskType: "mission_autonomy",
             locale: chinese ? "zh-CN" : "en",
             selectedModel: selectedPlanningModel,
-            currentValues: {},
-            documentContext: null,
-          })).response
-          : await apiClient.compileExperimentAssistantTurn({
-            message_id: turnId,
-            message: intent,
-            locale: chinese ? "zh-CN" : "en",
-            conversation_summary: "Autonomy mission planning",
-            current_values: {},
-            explicit_field_ids: [],
-            current_parameters: [],
-            document_context: null,
-            llm: {
-              access_mode: "byok",
-              provider: modelAccess.provider,
-              api_key: modelAccess.apiKey,
-              platform_grant: null,
-              model: modelAccess.model.trim(),
-              base_url: modelAccess.baseUrl.trim() || null,
+            currentValues: {
+              autonomy_context: autonomyModelContext(harnessRequest, harnessInspection),
             },
-          });
-        planningBrief = response.assistant_message?.trim()
-          || response.experiment_summary.trim();
+            documentContext: null,
+          })).response;
+        const autonomyArtifact = parseAutonomyPlannerArtifact(
+          response.orchestration?.artifact_payload,
+        );
+        planningBrief = !harnessInspection.planning_ready
+          ? autonomyAssetBlockerMessage(harnessInspection, chinese)
+          : response.assistant_message?.trim() || response.experiment_summary.trim();
+        if (autonomyArtifact && autonomyArtifact.status !== "draft") {
+          harnessInspection = {
+            ...harnessInspection,
+            status: autonomyArtifact.status,
+            planning_ready: false,
+            blockers: [...new Set([
+              ...harnessInspection.blockers,
+              ...autonomyArtifact.blockers,
+            ])],
+          };
+        }
         planningRunId = response.orchestration?.run_id ?? assistantWorkspaceId;
       } catch {
         modelReasoningUnavailable = true;
+        planningBrief = autonomyAssetBlockerMessage(harnessInspection, chinese);
+      }
+      if (!harnessInspection.planning_ready) {
+        const updatedAt = new Date().toISOString();
+        const assistantMessage: AutonomyConversationMessage = {
+          id: `assistant-${turnId}`,
+          role: "assistant",
+          content: planningBrief,
+          createdAt: updatedAt,
+          planContractId: null,
+        };
+        persist(updatedWorkspace(missionWorkspace, {
+          mission: {
+            ...missionWorkspace.mission,
+            intent: revisedIntent,
+            planningModel: selectedPlanningModel,
+            planningBrief,
+            planningRunId,
+            conversationId: assistantWorkspaceId,
+            messages: [...priorMessages, userMessage, assistantMessage].slice(-100),
+            aircraftProfileId: missionWorkspace.aircraft.id,
+            mapPackId: missionWorkspace.mapPack.id,
+            compiledPlan: null,
+            currentStep: 0,
+            updatedAt,
+          },
+        }));
+        return;
       }
       const compileRequest = compileRequestForWorkspace(edition, missionWorkspace, revisedIntent, planningBrief);
       const localMissionId = missionIdForScene(compileRequest.scene_id);

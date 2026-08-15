@@ -563,6 +563,7 @@ export interface ExperimentAssistantTurnResponse {
     artifact_version: number;
     product_link: string;
     artifact_kind:
+        | "autonomy_mission_plan"
         | "universal_vehicle_model"
         | "universal_simulation_experiment"
         | "universal_cross_edition_workflow"
@@ -573,6 +574,7 @@ export interface ExperimentAssistantTurnResponse {
         | "lab_sim_to_real_workflow"
         | "lab_real_to_sim_workflow"
         | "field_task_plan";
+    artifact_payload?: Record<string, unknown>;
     sequence: number;
     intent: string | null;
     workflow: Array<{
@@ -1109,6 +1111,53 @@ export interface AutonomyRuntimeEvidence {
   link_ready: boolean;
   geofence_ready: boolean;
   battery_ready: boolean;
+}
+
+export interface AutonomyHarnessAsset {
+  kind: "aircraft" | "map";
+  asset_id: string;
+  name: string;
+  version: number;
+  status: string;
+  content_hash: string | null;
+  qualification_receipt_id: string | null;
+  capabilities: Record<string, string | number | boolean | string[] | null>;
+}
+
+export interface AutonomyHarnessInspectRequest {
+  schema_version: "dronedream.autonomy.harness-inspect.v1";
+  edition: AutonomyEdition;
+  natural_language: string;
+  aircraft: AutonomyHarnessAsset;
+  map_pack: AutonomyHarnessAsset;
+}
+
+export interface AutonomyHarnessToolReceipt {
+  tool_id: string;
+  tool_version: string;
+  outcome: "accepted" | "blocked";
+  evidence: Record<string, string | number | boolean | string[] | null>;
+  issue_codes: string[];
+}
+
+export interface AutonomyHarnessInspectResponse {
+  schema_version: "dronedream.autonomy.harness-context.v1";
+  prompt_version: "dronedream.autonomy.system.v1";
+  tool_registry_version: "dronedream.autonomy.tools.v1";
+  context_sha256: string;
+  status: "needs_assets" | "needs_input" | "draft" | "blocked";
+  planning_ready: boolean;
+  blockers: string[];
+  required_next_actions: string[];
+  eligible_tool_ids: string[];
+  tool_receipts: AutonomyHarnessToolReceipt[];
+  repair_policy: {
+    schema_version: "dronedream.autonomy.repair-policy.v1";
+    semantic_attempt_limit: number;
+    trajectory_attempt_limit: number;
+    repeated_plan_hash_limit: number;
+    may_relax_safety_constraints: false;
+  };
 }
 
 export interface AutonomyCompileRequest {

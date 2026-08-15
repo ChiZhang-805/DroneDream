@@ -79,6 +79,14 @@ RuntimeDecisionKind = Literal[
     "safety",
     "operator",
 ]
+AutonomyHarnessStatus = Literal[
+    "needs_assets",
+    "needs_input",
+    "draft",
+    "blocked",
+]
+AutonomyAssetKind = Literal["aircraft", "map"]
+AutonomyToolOutcome = Literal["accepted", "blocked"]
 
 
 class StrictModel(BaseModel):
@@ -200,6 +208,90 @@ class RuntimeEvidence(StrictModel):
     link_ready: bool = False
     geofence_ready: bool = False
     battery_ready: bool = False
+
+
+class AutonomyHarnessAsset(StrictModel):
+    kind: AutonomyAssetKind
+    asset_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+    )
+    name: str = Field(min_length=1, max_length=160)
+    version: int = Field(ge=1, le=1_000_000)
+    status: str = Field(min_length=1, max_length=64)
+    content_hash: str | None = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    qualification_receipt_id: str | None = Field(default=None, max_length=160)
+    capabilities: dict[str, str | int | float | bool | list[str] | None] = Field(
+        default_factory=dict,
+        max_length=48,
+    )
+
+
+class AutonomyHarnessInspectRequest(StrictModel):
+    schema_version: Literal["dronedream.autonomy.harness-inspect.v1"] = (
+        "dronedream.autonomy.harness-inspect.v1"
+    )
+    edition: Edition
+    natural_language: str = Field(min_length=3, max_length=2_000)
+    aircraft: AutonomyHarnessAsset
+    map_pack: AutonomyHarnessAsset
+
+    @model_validator(mode="after")
+    def validate_asset_kinds(self) -> AutonomyHarnessInspectRequest:
+        if self.aircraft.kind != "aircraft" or self.map_pack.kind != "map":
+            raise ValueError("autonomy harness assets are bound to the wrong slots")
+        return self
+
+
+class AutonomyHarnessToolReceipt(StrictModel):
+    tool_id: str = Field(
+        min_length=1,
+        max_length=96,
+        pattern=r"^[a-z][a-z0-9._-]*$",
+    )
+    tool_version: str = Field(min_length=1, max_length=32)
+    outcome: AutonomyToolOutcome
+    evidence: dict[str, str | int | float | bool | list[str] | None] = Field(
+        default_factory=dict,
+        max_length=48,
+    )
+    issue_codes: list[str] = Field(default_factory=list, max_length=24)
+
+
+class AutonomyHarnessRepairPolicy(StrictModel):
+    schema_version: Literal["dronedream.autonomy.repair-policy.v1"] = (
+        "dronedream.autonomy.repair-policy.v1"
+    )
+    semantic_attempt_limit: int = Field(default=3, ge=0, le=8)
+    trajectory_attempt_limit: int = Field(default=5, ge=0, le=12)
+    repeated_plan_hash_limit: int = Field(default=2, ge=1, le=4)
+    may_relax_safety_constraints: Literal[False] = False
+
+
+class AutonomyHarnessInspectResponse(StrictModel):
+    schema_version: Literal["dronedream.autonomy.harness-context.v1"] = (
+        "dronedream.autonomy.harness-context.v1"
+    )
+    prompt_version: Literal["dronedream.autonomy.system.v1"] = (
+        "dronedream.autonomy.system.v1"
+    )
+    tool_registry_version: Literal["dronedream.autonomy.tools.v1"] = (
+        "dronedream.autonomy.tools.v1"
+    )
+    context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    status: AutonomyHarnessStatus
+    planning_ready: bool
+    blockers: list[str] = Field(default_factory=list, max_length=24)
+    required_next_actions: list[str] = Field(default_factory=list, max_length=24)
+    eligible_tool_ids: list[str] = Field(default_factory=list, max_length=24)
+    tool_receipts: list[AutonomyHarnessToolReceipt] = Field(max_length=24)
+    repair_policy: AutonomyHarnessRepairPolicy = Field(
+        default_factory=AutonomyHarnessRepairPolicy
+    )
 
 
 class AutonomyCompileRequest(StrictModel):

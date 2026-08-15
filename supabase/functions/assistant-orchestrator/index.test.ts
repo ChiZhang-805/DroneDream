@@ -55,6 +55,93 @@ function plan(edition: AssistantEdition): string {
   });
 }
 
+function autonomyRequestContext({ ready }: { ready: boolean }): Record<string, unknown> {
+  return {
+    requested_task_type: "mission_autonomy",
+    current_values: {
+      autonomy_context: {
+        context_sha256: "a".repeat(64),
+        selected_aircraft: {
+          kind: "aircraft",
+          asset_id: "aircraft-primary",
+          name: "Primary research quadrotor",
+          version: 2,
+          status: ready ? "validated-unsigned" : "draft",
+          content_hash: null,
+          qualification_receipt_id: ready ? "vehicle-receipt-v2" : null,
+          capabilities: { localization_sources: ["gps", "vio"] },
+        },
+        selected_map: {
+          kind: "map",
+          asset_id: "map-building",
+          name: "Engineering Building",
+          version: 4,
+          status: ready ? "qualified" : "draft",
+          content_hash: ready ? "b".repeat(64) : null,
+          qualification_receipt_id: ready ? "map-receipt-v4" : null,
+          capabilities: {
+            planning_layers: ready ? ["collision-geometry", "occupancy", "esdf"] : [],
+            compiler_scene_id: ready ? "stairwell-coffee-return" : null,
+          },
+        },
+      },
+    },
+  };
+}
+
+function autonomyPlan({ ready }: { ready: boolean }): string {
+  const blockers = ready
+    ? []
+    : [
+      "aircraft.pack.not-validated",
+      "aircraft.qualification-receipt.missing",
+      "map.pack.not-qualified",
+      "map.content-hash.missing",
+      "map.qualification-receipt.missing",
+      "map.collision-layers.missing",
+      "map.compiler-scene.unbound",
+    ];
+  return JSON.stringify({
+    artifact_kind: "autonomy_mission_plan",
+    artifact_title: "Coffee return mission",
+    intent: "mission_autonomy",
+    assistant_message: ready
+      ? "I bound the selected assets and prepared a reviewable mission draft."
+      : "I saved the intent, but the selected assets are not yet qualified.",
+    conversation_summary: "The user requested a bounded autonomous mission.",
+    workflow: [{
+      step: "asset_gate",
+      label: "Bind and validate the selected aircraft and map",
+      status: ready ? "completed" : "needs_input",
+    }],
+    draft: {
+      schema_version: "dronedream.autonomy.planner-response.v1",
+      status: ready ? "draft" : "needs_assets",
+      goal: "Collect coffee and return to the office",
+      asset_bindings: {
+        aircraft_id: "aircraft-primary",
+        aircraft_version: 2,
+        map_id: "map-building",
+        map_version: 4,
+        context_sha256: "a".repeat(64),
+      },
+      grounded_entities: [],
+      task_graph: {},
+      tool_requests: [],
+      tool_receipts: [],
+      assumptions: [],
+      blockers,
+      repair: { attempt: 0, max_attempts: 3, repeated_plan_hashes: 0, stop_reason: null },
+      safety_policy: {
+        actuator_authority: false,
+        may_relax_constraints: false,
+        execution_requires_deterministic_validation: true,
+      },
+    },
+    questions: ready ? [] : ["Please qualify the selected aircraft and map."],
+  });
+}
+
 Deno.test("accepts every edition's own artifact contract", () => {
   for (const edition of Object.keys(contracts) as AssistantEdition[]) {
     const result = parseAssistantPlan(plan(edition), edition);
@@ -67,15 +154,14 @@ Deno.test("rejects an artifact from another edition", () => {
 });
 
 Deno.test("honors an explicitly selected task workflow", () => {
-  const value = JSON.parse(plan("sim"));
-  value.intent = "mission_autonomy";
   const result = parseAssistantPlan(
-    JSON.stringify(value),
+    autonomyPlan({ ready: true }),
     "sim",
     "mission_autonomy",
+    autonomyRequestContext({ ready: true }),
   );
   assertEquals(result.intent, "mission_autonomy");
-  assertEquals(result.artifact_kind, "simulation_experiment");
+  assertEquals(result.artifact_kind, "autonomy_mission_plan");
 });
 
 Deno.test("rejects a model that changes an explicitly selected task", () => {
@@ -86,6 +172,76 @@ Deno.test("rejects a model that changes an explicitly selected task", () => {
     "sim",
     "mission_autonomy",
   ));
+});
+
+Deno.test("rejects a ready autonomy draft when the selected assets are not qualified", () => {
+  assertThrows(() => parseAssistantPlan(
+    autonomyPlan({ ready: true }),
+    "sim",
+    "mission_autonomy",
+    autonomyRequestContext({ ready: false }),
+  ));
+});
+
+Deno.test("accepts a needs-assets response only when it preserves authoritative blockers", () => {
+  const result = parseAssistantPlan(
+    autonomyPlan({ ready: false }),
+    "field",
+    "mission_autonomy",
+    autonomyRequestContext({ ready: false }),
+  );
+  assertEquals(result.artifact_kind, "autonomy_mission_plan");
+  assertEquals(result.draft.status, "needs_assets");
+});
+
+Deno.test("rejects model-authored autonomy tool receipts", () => {
+  const value = JSON.parse(autonomyPlan({ ready: true }));
+  value.draft.tool_receipts = [{ tool_id: "mission.validate_plan", outcome: "accepted" }];
+  assertThrows(() => parseAssistantPlan(
+    JSON.stringify(value),
+    "lab",
+    "mission_autonomy",
+    autonomyRequestContext({ ready: true }),
+  ));
+});
+
+Deno.test("rejects an autonomy request outside the closed eligible tool set", () => {
+  const value = JSON.parse(autonomyPlan({ ready: false }));
+  value.draft.tool_requests = [{
+    tool_id: "trajectory.plan_segment",
+    arguments: {},
+    reason: "Plan before assets are ready",
+    evidence_required: [],
+  }];
+  assertThrows(() => parseAssistantPlan(
+    JSON.stringify(value),
+    "universal",
+    "mission_autonomy",
+    autonomyRequestContext({ ready: false }),
+  ));
+});
+
+Deno.test("requires the model repair counter to match the server-owned attempt", () => {
+  const request = autonomyRequestContext({ ready: true });
+  const plan = JSON.parse(autonomyPlan({ ready: true }));
+  plan.draft.repair = {
+    attempt: 0,
+    max_attempts: 3,
+    repeated_plan_hashes: 0,
+    stop_reason: null,
+  };
+  assertThrows(
+    () => parseAssistantPlan(
+      JSON.stringify(plan),
+      "universal",
+      "mission_autonomy",
+      request,
+      1,
+      0,
+    ),
+    Error,
+    "repair state is invalid",
+  );
 });
 
 Deno.test("requires auto-routing to return an edition-valid task type", () => {

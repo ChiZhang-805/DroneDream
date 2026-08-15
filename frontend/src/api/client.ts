@@ -22,6 +22,8 @@ import type {
   Artifact,
   AutonomyCompileRequest,
   AutonomyCompileResponse,
+  AutonomyHarnessInspectRequest,
+  AutonomyHarnessInspectResponse,
   AutonomyRuntimeObservation,
   AutonomyRuntimeSession,
   AutonomyMapAssetAdmissionReceipt,
@@ -394,6 +396,15 @@ export const apiClient = {
     req: AutonomyCompileRequest,
   ): Promise<AutonomyCompileResponse> {
     return request<AutonomyCompileResponse>("/autonomy/compile", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  },
+
+  async inspectAutonomyHarness(
+    req: AutonomyHarnessInspectRequest,
+  ): Promise<AutonomyHarnessInspectResponse> {
+    return request<AutonomyHarnessInspectResponse>("/autonomy/harness/inspect", {
       method: "POST",
       body: JSON.stringify(req),
     });

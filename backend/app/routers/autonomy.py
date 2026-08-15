@@ -10,8 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app import models
 from app.auth import get_current_user
 from app.autonomy.catalog import list_scenes
+from app.autonomy.harness import inspect_autonomy_harness
 from app.autonomy.models import (
     AutonomyCompileRequest,
+    AutonomyHarnessInspectRequest,
     RuntimeObservation,
     RuntimeOperatorCommand,
     RuntimeSessionCreateRequest,
@@ -61,6 +63,17 @@ async def compile_mission(
             status_code=exc.status_code,
             detail={"code": exc.code, "message": exc.message},
         ) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.post("/harness/inspect")
+async def inspect_mission_harness(
+    request: AutonomyHarnessInspectRequest,
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Execute read-only asset gates before any model can draft a mission."""
+
+    result = await asyncio.to_thread(inspect_autonomy_harness, request)
     return ok(result.model_dump(mode="json"))
 
 

@@ -13,6 +13,7 @@ export const EXPERIMENT_WORKSPACES_CHANGED_EVENT =
 export type ExperimentWorkspaceSource = "manual" | "assistant";
 export type ExperimentWorkspaceStatus = "draft" | "created";
 export type AssistantArtifactKind =
+  | "autonomy_mission_plan"
   | "universal_vehicle_model"
   | "universal_simulation_experiment"
   | "universal_cross_edition_workflow"
@@ -161,7 +162,8 @@ function isBrandEditionId(value: unknown): value is BrandEditionId {
 }
 
 function isAssistantArtifactKind(value: unknown): value is AssistantArtifactKind {
-  return value === "universal_vehicle_model"
+  return value === "autonomy_mission_plan"
+    || value === "universal_vehicle_model"
     || value === "universal_simulation_experiment"
     || value === "universal_cross_edition_workflow"
     || value === "simulation_experiment"
@@ -178,13 +180,14 @@ function artifactMatchesEdition(
   artifactKind: AssistantArtifactKind,
 ): boolean {
   if (edition === "universal") {
-    return artifactKind === "universal_vehicle_model"
+    return artifactKind === "autonomy_mission_plan"
+      || artifactKind === "universal_vehicle_model"
       || artifactKind === "universal_simulation_experiment"
       || artifactKind === "universal_cross_edition_workflow";
   }
-  if (edition === "sim") return artifactKind === "simulation_experiment";
-  if (edition === "field") return artifactKind === "field_task_plan";
-  return artifactKind.startsWith("lab_");
+  if (edition === "sim") return artifactKind === "autonomy_mission_plan" || artifactKind === "simulation_experiment";
+  if (edition === "field") return artifactKind === "autonomy_mission_plan" || artifactKind === "field_task_plan";
+  return artifactKind === "autonomy_mission_plan" || artifactKind.startsWith("lab_");
 }
 
 function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorkspace {
