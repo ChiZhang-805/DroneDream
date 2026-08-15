@@ -19,8 +19,10 @@ from app.autonomy.models import (
     RuntimeSessionCreateRequest,
 )
 from app.autonomy.qualification import (
+    MapPackQualificationRequest,
     VehiclePackQualificationRequest,
     map_asset_admissions,
+    qualify_map_pack,
     qualify_vehicle_pack,
 )
 from app.autonomy.runtime import AutonomyRuntimeError, runtime_sessions
@@ -103,6 +105,17 @@ async def admit_autonomy_map_asset(
             status_code=413,
             detail={"code": "AUTONOMY_MAP_ASSET_REJECTED", "message": str(exc)},
         ) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.post("/map-packs/qualify")
+async def qualify_autonomy_map_pack(
+    request: MapPackQualificationRequest,
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Qualify an exact bundled Map Pack; imported assets stay admission-only."""
+
+    result = await asyncio.to_thread(qualify_map_pack, request)
     return ok(result.model_dump(mode="json"))
 
 

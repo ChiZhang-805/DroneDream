@@ -1462,6 +1462,40 @@ export interface AutonomyMapAssetAdmissionReceipt {
   planning_qualified: false;
 }
 
+export interface AutonomyMapPackQualificationRequest {
+  schema_version: "dronedream.autonomy.map-pack-qualification.v1";
+  pack_id: string;
+  version: number;
+  compiler_scene_id: string;
+  representation: "hybrid-3d" | "mesh" | "point-cloud" | "occupancy" | "terrain";
+  coordinate_frame: "ENU" | "NED" | "WGS84" | "building-local";
+  resolution_m: number;
+  floor_count: number;
+  bounds_m: { x: number; y: number; z: number };
+  calibrated: boolean;
+  confidence_percent: number;
+  semantic_layers: Array<"free-space" | "stairs" | "doors" | "gates" | "people" | "pickup-zones">;
+  planning_layers: Array<"collision-geometry" | "occupancy" | "esdf" | "dynamic-overlay" | "confidence">;
+  source_asset_receipt_ids: string[];
+}
+
+export interface AutonomyMapPackQualificationReceipt {
+  schema_version: "dronedream.autonomy.map-pack-receipt.v1";
+  receipt_id: string;
+  pack_id: string;
+  version: number;
+  status: "blocked" | "qualified";
+  content_sha256: string;
+  compiler_scene_id: string;
+  coordinate_frame: "ENU" | "NED" | "WGS84" | "building-local";
+  resolution_m: number;
+  semantic_layers: AutonomyMapPackQualificationRequest["semantic_layers"];
+  planning_layers: AutonomyMapPackQualificationRequest["planning_layers"];
+  issues: AutonomyQualificationIssue[];
+  created_at: string;
+  hardware_authority: false;
+}
+
 export type JobsCompareRequest = JobCompareRequest;
 export type JobsCompareResponse = JobCompareResponse;
 

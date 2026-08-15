@@ -1407,6 +1407,41 @@ const PLANNING_LAYER_LABELS: Record<AutonomyMapPack["planningLayers"][number], s
   confidence: "Confidence",
 };
 
+const BUILTIN_MAP_SCENE_MANIFESTS: Record<
+  NonNullable<AutonomyMapPack["compilerSceneId"]>,
+  Pick<AutonomyMapPack, "name" | "boundsM" | "floorCount" | "semanticLayers" | "planningLayers">
+> = {
+  "stairwell-coffee-return": {
+    name: "Building stairwell · pickup · return",
+    boundsM: { x: 42, y: 28, z: 11 },
+    floorCount: 3,
+    semanticLayers: ["free-space", "stairs", "doors", "people", "pickup-zones"],
+    planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+  },
+  "forest-gate-inspection": {
+    name: "Forest circular-gate inspection",
+    boundsM: { x: 48, y: 24, z: 8 },
+    floorCount: 1,
+    semanticLayers: ["free-space", "gates", "people"],
+    planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+  },
+  "service-corridor-dock": {
+    name: "Service corridor · autonomous dock",
+    boundsM: { x: 34, y: 18, z: 5 },
+    floorCount: 1,
+    semanticLayers: ["free-space", "doors", "people"],
+    planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
+  },
+};
+
+function autonomyMapPackQualified(mapPack: AutonomyMapPack): boolean {
+  return mapPack.status === "qualified"
+    && Boolean(mapPack.compilerSceneId)
+    && Boolean(mapPack.contentHash)
+    && Boolean(mapPack.qualificationReceiptId)
+    && mapPack.calibrated;
+}
+
 async function fileSha256(file: File): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -1417,8 +1452,13 @@ export function AutonomyMaps() {
   const [form, setForm] = useState(workspace.mapPack);
   const [saved, setSaved] = useState(false);
   const [ingesting, setIngesting] = useState(false);
-  useEffect(() => setForm(workspace.mapPack), [workspace.mapPack]);
-  const ready = Boolean(form.compilerSceneId) && form.calibrated;
+  const [qualificationState, setQualificationState] = useState<"idle" | "working" | "qualified" | "blocked" | "unavailable">("idle");
+  useEffect(() => {
+    setForm(workspace.mapPack);
+    setSaved(true);
+    setQualificationState(autonomyMapPackQualified(workspace.mapPack) ? "qualified" : "idle");
+  }, [workspace.mapPack]);
+  const ready = autonomyMapPackQualified(form);
   const createMap = () => {
     const updatedAt = new Date().toISOString();
     const next: AutonomyMapPack = {
@@ -1479,6 +1519,7 @@ export function AutonomyMaps() {
         sourceFiles: [...current.sourceFiles, ...incoming].slice(0, 24),
       }));
       setSaved(false);
+      setQualificationState("idle");
     } finally {
       setIngesting(false);
     }
@@ -1488,13 +1529,18 @@ export function AutonomyMaps() {
     const next = {
       ...form,
       version: Math.max(workspace.mapPack.version + 1, form.version),
-      status: ready ? "qualified" as const : form.sourceFiles.length && form.sourceFiles.every((file) => file.admission === "admitted") ? "assets-admitted" as const : "draft" as const,
+      status: ready
+        ? "qualified" as const
+        : form.sourceFiles.length && form.sourceFiles.every((file) => file.admission === "admitted")
+          ? "assets-admitted" as const
+          : "draft" as const,
       updatedAt: new Date().toISOString(),
     };
     persist(updatedWorkspace(workspace, {
       mapPack: next,
       mission: { ...workspace.mission, mapPackId: next.id, updatedAt: next.updatedAt },
     }));
+    setForm(next);
     setSaved(true);
   };
   const toggleSemantic = (layer: AutonomyMapPack["semanticLayers"][number]) => {
@@ -1510,6 +1556,7 @@ export function AutonomyMaps() {
         : [...current.semanticLayers, layer],
     }));
     setSaved(false);
+    setQualificationState("idle");
   };
   const togglePlanningLayer = (layer: AutonomyMapPack["planningLayers"][number]) => {
     setForm((current) => ({
@@ -1517,35 +1564,50 @@ export function AutonomyMaps() {
       calibrated: false,
       compilerSceneId: null,
       status: "draft",
+      contentHash: null,
+      qualificationReceiptId: null,
       planningLayers: current.planningLayers.includes(layer)
         ? current.planningLayers.filter((item) => item !== layer)
         : [...current.planningLayers, layer],
     }));
     setSaved(false);
+    setQualificationState("idle");
   };
   const updateMap = (patch: Partial<AutonomyMapPack>) => {
-    setForm((current) => ({ ...current, ...patch }));
+    setForm((current) => ({
+      ...current,
+      ...patch,
+      status: "draft",
+      contentHash: null,
+      qualificationReceiptId: null,
+    }));
     setSaved(false);
+    setQualificationState("idle");
   };
   const selectCompilerScene = (value: string) => {
     const compilerSceneId = value ? value as NonNullable<AutonomyMapPack["compilerSceneId"]> : null;
-    const sceneNames: Record<NonNullable<AutonomyMapPack["compilerSceneId"]>, string> = {
-      "stairwell-coffee-return": "Building stairwell · pickup · return",
-      "forest-gate-inspection": "Forest circular-gate inspection",
-      "service-corridor-dock": "Service corridor · autonomous dock",
-    };
+    const manifest = compilerSceneId ? BUILTIN_MAP_SCENE_MANIFESTS[compilerSceneId] : null;
     setForm((current) => ({
       ...current,
-      name: compilerSceneId && current.name === "Unconfigured environment"
-        ? sceneNames[compilerSceneId]
+      name: manifest && current.name === "Unconfigured environment"
+        ? manifest.name
         : current.name,
       status: "draft",
       contentHash: null,
       qualificationReceiptId: null,
       calibrated: false,
       compilerSceneId,
+      representation: manifest ? "hybrid-3d" : current.representation,
+      coordinateFrame: manifest ? "ENU" : current.coordinateFrame,
+      resolutionM: manifest ? 0.1 : current.resolutionM,
+      floorCount: manifest?.floorCount ?? current.floorCount,
+      boundsM: manifest?.boundsM ?? current.boundsM,
+      confidencePercent: manifest ? 100 : current.confidencePercent,
+      semanticLayers: manifest?.semanticLayers ?? current.semanticLayers,
+      planningLayers: manifest?.planningLayers ?? current.planningLayers,
     }));
     setSaved(false);
+    setQualificationState("idle");
   };
   const updateGeometry = (
     patch: Partial<Pick<AutonomyMapPack, "representation" | "coordinateFrame" | "resolutionM" | "floorCount" | "origin" | "boundsM" | "confidencePercent">>,
@@ -1560,6 +1622,53 @@ export function AutonomyMaps() {
       compilerSceneId: null,
     }));
     setSaved(false);
+    setQualificationState("idle");
+  };
+  const qualify = async () => {
+    if (!form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || !saved) {
+      setQualificationState("blocked");
+      return;
+    }
+    if (publicDemoConsole) {
+      setQualificationState("unavailable");
+      return;
+    }
+    setQualificationState("working");
+    try {
+      const receipt = await apiClient.qualifyAutonomyMapPack({
+        schema_version: "dronedream.autonomy.map-pack-qualification.v1",
+        pack_id: form.id,
+        version: form.version,
+        compiler_scene_id: form.compilerSceneId,
+        representation: form.representation,
+        coordinate_frame: form.coordinateFrame,
+        resolution_m: form.resolutionM,
+        floor_count: form.floorCount,
+        bounds_m: form.boundsM,
+        calibrated: form.calibrated,
+        confidence_percent: form.confidencePercent,
+        semantic_layers: form.semanticLayers,
+        planning_layers: form.planningLayers,
+        source_asset_receipt_ids: form.sourceFiles
+          .map((file) => file.receiptId)
+          .filter((receiptId): receiptId is string => Boolean(receiptId)),
+      });
+      const next: AutonomyMapPack = {
+        ...form,
+        status: receipt.status === "qualified" ? "qualified" : "draft",
+        contentHash: receipt.status === "qualified" ? receipt.content_sha256 : null,
+        qualificationReceiptId: receipt.receipt_id,
+        updatedAt: receipt.created_at,
+      };
+      setForm(next);
+      persist(updatedWorkspace(workspace, {
+        mapPack: next,
+        mission: { ...workspace.mission, mapPackId: next.id, compiledPlan: null, updatedAt: next.updatedAt },
+      }));
+      setQualificationState(receipt.status === "qualified" ? "qualified" : "blocked");
+    } catch {
+      setQualificationState("unavailable");
+    }
   };
   return (
     <form className="autonomy-config-page autonomy-maps-page" onSubmit={save}>
@@ -1581,7 +1690,7 @@ export function AutonomyMaps() {
             <label><span>{chinese ? "原点经度" : "Origin longitude"}</span><input type="number" min="-180" max="180" step="0.000001" placeholder={chinese ? "本地坐标可留空" : "Optional for local frames"} value={form.origin.longitude ?? ""} onChange={(event) => updateGeometry({ origin: { ...form.origin, longitude: event.target.value === "" ? null : Number(event.target.value) } })} /></label>
             <label><span>{chinese ? "原点海拔 (m)" : "Origin altitude (m)"}</span><input type="number" step="0.1" value={form.origin.altitudeM ?? ""} onChange={(event) => updateGeometry({ origin: { ...form.origin, altitudeM: event.target.value === "" ? null : Number(event.target.value) } })} /></label>
             <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select disabled={form.sourceFiles.length > 0} value={form.compilerSceneId ?? ""} onChange={(event) => selectCompilerScene(event.target.value)}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
-             <label className="autonomy-check-control"><input type="checkbox" disabled={form.sourceFiles.length > 0 || !form.compilerSceneId} checked={form.calibrated} onChange={(event) => updateMap({ calibrated: event.target.checked, status: event.target.checked && form.compilerSceneId ? "qualified" : "draft" })} /><span>{chinese ? "内置场景比例与坐标资格已确认" : "Built-in scene scale and frame verified"}</span></label>
+             <label className="autonomy-check-control"><input type="checkbox" disabled={form.sourceFiles.length > 0 || !form.compilerSceneId} checked={form.calibrated} onChange={(event) => updateMap({ calibrated: event.target.checked })} /><span>{chinese ? "确认使用内置场景的固定比例与 ENU 坐标" : "Confirm the bundled scene's fixed scale and ENU frame"}</span></label>
           </div>
         </section>
 
@@ -1595,7 +1704,7 @@ export function AutonomyMaps() {
           </label>
           <div className="autonomy-map-assets">
             {form.sourceFiles.length ? form.sourceFiles.map((file, index) => (
-               <div key={`${file.name}-${index}`} data-admission={file.admission}><HardDrive aria-hidden="true" /><span><strong>{file.name}</strong><small>{file.format.toUpperCase()} · {(file.bytes / 1_000_000).toFixed(2)} MB · {file.admission.toUpperCase()}{file.parser ? ` · ${file.parser}` : ""}</small>{file.sha256 ? <code>{file.sha256.slice(0, 20)}</code> : null}</span><button type="button" onClick={() => setForm({ ...form, status: "draft", calibrated: false, compilerSceneId: null, sourceFiles: form.sourceFiles.filter((_, itemIndex) => itemIndex !== index) })}>×</button></div>
+               <div key={`${file.name}-${index}`} data-admission={file.admission}><HardDrive aria-hidden="true" /><span><strong>{file.name}</strong><small>{file.format.toUpperCase()} · {(file.bytes / 1_000_000).toFixed(2)} MB · {file.admission.toUpperCase()}{file.parser ? ` · ${file.parser}` : ""}</small>{file.sha256 ? <code>{file.sha256.slice(0, 20)}</code> : null}</span><button type="button" onClick={() => { setForm({ ...form, status: "draft", contentHash: null, qualificationReceiptId: null, calibrated: false, compilerSceneId: null, sourceFiles: form.sourceFiles.filter((_, itemIndex) => itemIndex !== index) }); setSaved(false); setQualificationState("idle"); }}>×</button></div>
             )) : <p className="autonomy-honest-empty">{chinese ? "尚未登记地图资产。可选择经过验证的内置三维场景；导入文件必须由后端完成几何摄取后才会获得编译场景资格。" : "No map assets registered. Select a validated built-in 3D scene, or wait for backend geometry ingestion before an imported pack receives a compiled scene binding."}</p>}
           </div>
         </section>
@@ -1624,6 +1733,9 @@ export function AutonomyMaps() {
         <Metric icon={<Database aria-hidden="true" />} label={chinese ? "资产准入" : "Asset admission"} value={form.status.toUpperCase()} />
         <Metric icon={<Gauge aria-hidden="true" />} label={chinese ? "地图可信度" : "Map confidence"} value={`${form.confidencePercent.toFixed(0)}%`} />
         <button className="btn btn-primary" type="submit"><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存 Map Pack" : "Save Map Pack")}</button>
+        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
+        {qualificationState === "blocked" ? <p className="autonomy-config-error">{chinese ? "地图配置与内置场景清单不一致，或导入资产仍缺少几何重建凭据。" : "The map configuration differs from the bundled manifest, or imported assets still lack a reconstruction receipt."}</p> : null}
+        {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "当前控制台无法签发地图资格凭据。请连接 DroneDream 后端后重试。" : "This console cannot issue a map qualification receipt. Connect the DroneDream backend and retry."}</p> : null}
         <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.mapPack.updatedAt)}</small>
       </aside>
     </form>
@@ -1659,7 +1771,7 @@ export function AutonomyMission() {
     const updatedAt = new Date().toISOString();
     persist(updatedWorkspace(workspace, { mission: { ...workspace.mission, currentStep, updatedAt } }));
   };
-  const mapReady = Boolean(workspace.mapPack.compilerSceneId) && workspace.mapPack.calibrated;
+  const mapReady = autonomyMapPackQualified(workspace.mapPack);
   const aircraftReady = isAutonomyAircraftProfileValid(workspace.aircraft);
   const blockers = [
     ...(!aircraftReady ? [chinese ? "机型质量包络无效" : "Aircraft mass envelope is invalid"] : []),

@@ -6,7 +6,9 @@ import struct
 
 from app.autonomy.qualification import (
     MapAssetAdmissionRegistry,
+    MapPackQualificationRequest,
     VehiclePackQualificationRequest,
+    qualify_map_pack,
     qualify_vehicle_pack,
 )
 
@@ -118,6 +120,60 @@ def test_vehicle_pack_blocks_an_unqualified_localization_stack() -> None:
     assert {issue.code for issue in receipt.issues} >= {
         "vehicle.no-sensors",
         "vehicle.localization-sensor-unqualified",
+    }
+
+
+def map_pack_payload() -> dict[str, object]:
+    return {
+        "pack_id": "engineering-building",
+        "version": 2,
+        "compiler_scene_id": "stairwell-coffee-return",
+        "representation": "hybrid-3d",
+        "coordinate_frame": "ENU",
+        "resolution_m": 0.10,
+        "floor_count": 3,
+        "bounds_m": {"x": 42.0, "y": 28.0, "z": 11.0},
+        "calibrated": True,
+        "confidence_percent": 100.0,
+        "semantic_layers": ["free-space", "stairs", "people", "pickup-zones"],
+        "planning_layers": [
+            "collision-geometry",
+            "occupancy",
+            "esdf",
+            "dynamic-overlay",
+            "confidence",
+        ],
+        "source_asset_receipt_ids": [],
+    }
+
+
+def test_bundled_map_pack_qualification_binds_exact_scene_manifest() -> None:
+    request = MapPackQualificationRequest.model_validate(map_pack_payload())
+    receipt = qualify_map_pack(request)
+
+    assert receipt.status == "qualified"
+    assert receipt.compiler_scene_id == "stairwell-coffee-return"
+    assert receipt.hardware_authority is False
+    assert len(receipt.content_sha256) == 64
+
+
+def test_map_pack_qualification_blocks_scene_manifest_mismatch() -> None:
+    payload = map_pack_payload()
+    payload["bounds_m"] = {"x": 40.0, "y": 28.0, "z": 11.0}
+    receipt = qualify_map_pack(MapPackQualificationRequest.model_validate(payload))
+
+    assert receipt.status == "blocked"
+    assert "map.bounds.scene-mismatch" in {issue.code for issue in receipt.issues}
+
+
+def test_imported_map_assets_remain_unqualified_until_reconstruction() -> None:
+    payload = map_pack_payload()
+    payload["source_asset_receipt_ids"] = ["map-asset-aabbcc"]
+    receipt = qualify_map_pack(MapPackQualificationRequest.model_validate(payload))
+
+    assert receipt.status == "blocked"
+    assert "map.imported-assets.require-reconstruction" in {
+        issue.code for issue in receipt.issues
     }
 
 

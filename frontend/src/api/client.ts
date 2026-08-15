@@ -27,6 +27,8 @@ import type {
   AutonomyRuntimeObservation,
   AutonomyRuntimeSession,
   AutonomyMapAssetAdmissionReceipt,
+  AutonomyMapPackQualificationReceipt,
+  AutonomyMapPackQualificationRequest,
   AutonomyVehiclePackQualificationReceipt,
   AutonomyVehiclePackQualificationRequest,
   BackendCapabilitiesResponse,
@@ -424,6 +426,15 @@ export const apiClient = {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
       body: file,
+    });
+  },
+
+  async qualifyAutonomyMapPack(
+    req: AutonomyMapPackQualificationRequest,
+  ): Promise<AutonomyMapPackQualificationReceipt> {
+    return request<AutonomyMapPackQualificationReceipt>("/autonomy/map-packs/qualify", {
+      method: "POST",
+      body: JSON.stringify(req),
     });
   },
 
