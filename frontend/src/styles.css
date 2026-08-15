@@ -8317,7 +8317,20 @@ a {
   flex: 0 0 4.75rem;
   min-height: 4.75rem;
   max-height: 4.75rem;
+  gap: 0.18rem;
+  padding: 0.35rem 0.5rem;
   overflow: hidden;
+}
+
+.autonomy-safety-gate.is-embedded h2,
+.autonomy-safety-gate.is-embedded .autonomy-safety-readout,
+.autonomy-safety-gate.is-embedded li,
+.autonomy-safety-gate.is-embedded p {
+  line-height: 1.1;
+}
+
+.autonomy-safety-gate.is-embedded ul {
+  gap: 0.08rem;
 }
 
 .autonomy-event-log {
