@@ -1412,7 +1412,7 @@ export function AutonomyAircraft() {
         </div>
         <div className="autonomy-config-summary-actions">
           <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"}><Save aria-hidden="true" />{form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
-          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working" || qualificationState === "unavailable"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "unavailable" ? (chinese ? "需要连接后端" : "Backend required") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
+          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
           {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
         </div>
       </aside>
@@ -1808,7 +1808,7 @@ export function AutonomyMaps() {
         <Metric icon={<Database aria-hidden="true" />} label={chinese ? "资产准入" : "Asset admission"} value={form.status.toUpperCase()} />
         <Metric icon={<Gauge aria-hidden="true" />} label={chinese ? "地图可信度" : "Map confidence"} value={`${form.confidencePercent.toFixed(0)}%`} />
         <button className="btn btn-primary" type="submit" disabled={saved}><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存 Map Pack" : "Save Map Pack")}</button>
-        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified" || qualificationState === "unavailable"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : qualificationState === "blocked" ? (chinese ? "资格验证未通过" : "Qualification blocked") : qualificationState === "unavailable" ? (chinese ? "需要连接后端" : "Backend required") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
+        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : qualificationState === "blocked" ? (chinese ? "资格验证未通过" : "Qualification blocked") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
       </aside>
     </form>
   );

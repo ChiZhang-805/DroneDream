@@ -1576,7 +1576,11 @@
   .autonomy-config-page { grid-template-columns: minmax(0, 1fr) 240px; }
   .autonomy-mission-stepper button { grid-template-columns: auto minmax(0, 1fr); }
   .autonomy-mission-stepper button > svg { display: none; }
-  .autonomy-lab-page.is-embedded .autonomy-workspace { grid-template-columns: minmax(0, 1fr); }
+  .autonomy-platform-content:has(.autonomy-lab-page.is-embedded) { overflow: auto; scrollbar-gutter: stable; }
+  .autonomy-lab-page.is-embedded { height: auto; }
+  .autonomy-lab-page.is-embedded .autonomy-workspace { height: auto; grid-template-columns: minmax(0, 1fr); }
+  .autonomy-lab-page.is-embedded .autonomy-map-panel { min-height: 680px; }
+  .autonomy-lab-page.is-embedded .autonomy-brain-panel { min-height: 36rem; overflow: visible; }
 }
 
 @media (max-width: 820px) {
@@ -8277,6 +8281,13 @@ a {
   margin: 0;
   color: #327865;
   font-size: 0.52rem;
+}
+
+.autonomy-safety-gate.is-embedded {
+  flex: 0 0 4.75rem;
+  min-height: 4.75rem;
+  max-height: 4.75rem;
+  overflow: hidden;
 }
 
 .autonomy-event-log {

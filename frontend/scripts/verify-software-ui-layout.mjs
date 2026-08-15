@@ -673,6 +673,7 @@ async function verifyEce498ExternalEntry(page, testCase) {
 
 async function verifyFixedScenarios(page, testCase) {
   await page.goto(`${origin}/scenarios?docsPreview=1`, { waitUntil: "networkidle" });
+  const expectedNavigationCount = 6;
   const nav = page.locator(".app-nav");
   const navEntries = nav.locator(":scope > a");
   const activeEntry = nav.locator('a[href="/scenarios"]');
@@ -721,7 +722,7 @@ async function verifyFixedScenarios(page, testCase) {
         documentScrollWidth: document.documentElement.scrollWidth,
       };
     });
-    assert.equal(mobileMenu.links.length, 5);
+    assert.equal(mobileMenu.links.length, expectedNavigationCount);
     assert(mobileMenu.account.bottom <= mobileMenu.links[0].top + 1);
     assert(mobileMenu.links.at(-1).bottom <= mobileMenu.settings.top + 1);
     assert(mobileMenu.links.every((entry) => closeEnough(
@@ -749,8 +750,8 @@ async function verifyFixedScenarios(page, testCase) {
     mobileMenuImage = await screenshot(page, testCase.id, "mobile-navigation");
   }
   await activeEntry.waitFor();
-  assert.equal(await navEntries.count(), 5);
-  assert.equal(await cards.count(), 4);
+  assert.equal(await navEntries.count(), expectedNavigationCount);
+  assert.equal(await cards.count(), 2);
   assert(await activeEntry.evaluate((element) => element.classList.contains("active")));
 
   const metrics = await page.evaluate(() => {
@@ -789,6 +790,22 @@ async function verifyFixedScenarios(page, testCase) {
         };
       }),
       cards: scenarioCards.map(bounds),
+      factRowsAligned: scenarioCards.every((card) => Array.from(
+        card.querySelectorAll(".fixed-scenario-facts > div"),
+      ).every((row) => {
+        const term = row.querySelector("dt");
+        const value = row.querySelector("dd");
+        if (!(term instanceof HTMLElement) || !(value instanceof HTMLElement)) return false;
+        const termRect = term.getBoundingClientRect();
+        const valueRect = value.getBoundingClientRect();
+        return termRect.left < valueRect.left && valueRect.right <= row.getBoundingClientRect().right + 1;
+      })),
+      previews: scenarioCards.map((card) => {
+        const preview = card.querySelector(".experience-preview-canvas");
+        return preview instanceof HTMLElement || preview instanceof SVGElement
+          ? bounds(preview)
+          : null;
+      }),
       documentWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
     };
@@ -817,9 +834,16 @@ async function verifyFixedScenarios(page, testCase) {
   );
   if (testCase.viewport.width >= 1000) {
     assert(closeEnough(metrics.cards[0].top, metrics.cards[1].top, 1));
-    assert(closeEnough(metrics.cards[2].top, metrics.cards[3].top, 1));
     assert(closeEnough(metrics.cards[0].width, metrics.cards[1].width, 1));
-    assert(closeEnough(metrics.cards[2].width, metrics.cards[3].width, 1));
+    assert(metrics.factRowsAligned, `${testCase.id}: scenario fact labels and values are not row-aligned`);
+    assert(
+      metrics.previews.every((preview, index) => (
+        preview
+        && preview.height >= metrics.cards[index].height * 0.35
+        && preview.bottom <= metrics.cards[index].bottom + 1
+      )),
+      `${testCase.id}: scenario preview does not occupy the lower card area`,
+    );
     assert(
       metrics.navEntries.every((entry, index, entries) => (
         index === 0 || entry.top > entries[index - 1].top
@@ -870,10 +894,10 @@ async function verifyFixedScenarios(page, testCase) {
     await page.locator(".app-mobile-menu-button").click();
   }
   const previews = page.locator(".experience-preview");
-  assert.equal(await previews.count(), 4);
+  assert.equal(await previews.count(), 2);
   assert.equal(await page.locator(".experience-preview-meta").count(), 0);
-  assert.equal(await page.locator('.experience-preview-canvas[data-view="3d"]').count(), 4);
-  assert.equal(await page.locator(".experience-preview-view-switcher").count(), 4);
+  assert.equal(await page.locator('.experience-preview-canvas[data-view="3d"]').count(), 2);
+  assert.equal(await page.locator(".experience-preview-view-switcher").count(), 2);
   assert(await previews.evaluateAll((elements) => elements.every((element) => (
     element.scrollWidth <= element.clientWidth + 1
   ))), `${testCase.id}: a 3D scenario preview overflows its card`);
@@ -898,6 +922,9 @@ async function verifyFixedScenarios(page, testCase) {
     }
   };
   page.on("request", countCreateRequest);
+  await page.getByRole("button", {
+    name: testCase.locale === "en" ? "Next scenario page" : "下一页场景",
+  }).click();
   const combinedScenario = page.locator(
     '.fixed-scenario-card[data-template-key="wind-sensor-circle@1"] .fixed-scenario-use',
   );

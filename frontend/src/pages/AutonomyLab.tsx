@@ -1408,15 +1408,15 @@ export function AutonomyLab({
             </dl>
           </div>
 
-          {!embedded ? <div className={`autonomy-safety-gate ${qualification.execution_policy.can_execute ? "is-ready" : "is-denied"}`}>
+          <div className={`autonomy-safety-gate ${qualification.execution_policy.can_execute ? "is-ready" : "is-denied"}${embedded ? " is-embedded" : ""}`}>
             <h2>{qualification.execution_policy.can_execute ? <BadgeCheck aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}{copy.safetyGate}</h2>
             <div className="autonomy-safety-readout">
               <span>{copy.signedPacks}</span><strong>{qualification.execution_policy.validated_signed_pack_count}</strong>
             </div>
             {qualification.execution_policy.blockers.length ? (
-              <ul>{qualification.execution_policy.blockers.slice(0, 4).map((blocker) => <li key={blocker}>{blocker.replaceAll(".", " · ")}</li>)}</ul>
+              <ul>{qualification.execution_policy.blockers.slice(0, embedded ? 2 : 4).map((blocker) => <li key={blocker}>{blocker.replaceAll(".", " · ")}</li>)}</ul>
             ) : <p>{copy.noBlockers}</p>}
-          </div> : null}
+          </div>
 
           {!embedded ? <div className="autonomy-event-log">
             <h2>{copy.eventLog}</h2>
