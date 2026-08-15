@@ -1591,6 +1591,28 @@
   .autonomy-lab-page.is-embedded .autonomy-brain-panel { min-height: 36rem; overflow: visible; }
 }
 
+@media (min-width: 1201px) and (max-height: 820px) {
+  .autonomy-platform-content:has(.autonomy-lab-page.is-embedded) {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .autonomy-lab-page.is-embedded,
+  .autonomy-lab-page.is-embedded .autonomy-workspace {
+    height: auto;
+    min-height: 46rem;
+  }
+
+  .autonomy-lab-page.is-embedded .autonomy-map-panel,
+  .autonomy-lab-page.is-embedded .autonomy-brain-panel {
+    min-height: 46rem;
+  }
+
+  .autonomy-lab-page.is-embedded .autonomy-brain-panel {
+    overflow: visible;
+  }
+}
+
 @media (max-width: 820px) {
   .app-main:has(.autonomy-platform-page) { overflow: auto; }
   .autonomy-platform-page { min-height: 100%; grid-template-rows: auto auto; }
