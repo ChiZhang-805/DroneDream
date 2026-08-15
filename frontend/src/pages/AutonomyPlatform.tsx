@@ -1147,6 +1147,33 @@ const CONTROL_INTERFACE_LABELS: Record<AutonomyAircraftProfile["controlInterface
   "simulation-only": "Simulation only",
 };
 
+function aircraftValidationIssue(aircraft: AutonomyAircraftProfile, chinese: boolean): string | null {
+  if (!aircraft.name.trim()) return chinese ? "请填写机型名称" : "Add aircraft name";
+  if (!aircraft.manufacturer.trim()) return chinese ? "请选择或填写制造商" : "Select a manufacturer";
+  if (!aircraft.airframe.trim() || aircraft.airframe.trim().toLowerCase() === "custom") return chinese ? "请选择或填写机架" : "Select an airframe";
+  if (!aircraft.flightController.trim() || aircraft.flightController.trim().toLowerCase() === "custom") return chinese ? "请选择或填写飞控" : "Select a flight controller";
+  if (!aircraft.firmware.trim() || aircraft.firmware.trim().toLowerCase() === "custom build") return chinese ? "请选择或填写固件版本" : "Select a firmware build";
+  if (!aircraft.computePlatform.trim() || aircraft.computePlatform.trim().toLowerCase() === "custom") return chinese ? "请选择或填写机载计算平台" : "Select onboard compute";
+
+  const outsideLimit = (key: keyof typeof AUTONOMY_AIRCRAFT_LIMITS) => {
+    const value = aircraft[key];
+    const limit = AUTONOMY_AIRCRAFT_LIMITS[key];
+    return typeof value !== "number" || !Number.isFinite(value) || value < limit.min || value > limit.max;
+  };
+  if ((Object.keys(AUTONOMY_AIRCRAFT_LIMITS) as Array<keyof typeof AUTONOMY_AIRCRAFT_LIMITS>).some(outsideLimit)) {
+    return chinese ? "修正红框中的参数" : "Fix highlighted limits";
+  }
+  if (aircraft.maximumTakeoffMassKg <= aircraft.dryMassKg) return chinese ? "最大起飞重量须大于空机重量" : "Increase MTOM above dry mass";
+  if (aircraft.dryMassKg + aircraft.maximumPickupPayloadKg > aircraft.maximumTakeoffMassKg) return chinese ? "降低载荷或提高最大起飞重量" : "Reduce payload or increase MTOM";
+  if (autonomyAircraftRadiusM(aircraft) > 3) return chinese ? "减小机体或旋翼尺寸" : "Reduce body or rotor size";
+  if (aircraft.autopilot !== "px4" && aircraft.controlInterface === "px4-ros2") return chinese ? "控制接口与自动驾驶栈不兼容" : "Choose a compatible control link";
+  if (aircraft.commandLink.latencyMs < 0 || aircraft.commandLink.bandwidthMbps <= 0) return chinese ? "修正通信链路参数" : "Fix command-link values";
+  if (!aircraft.sensorMounts.some((sensor) => sensor.calibrated && sensor.calibrationStatus === "verified" && (sensor.kind === "gps" || sensor.kind === "vio"))) {
+    return chinese ? "验证至少一个 GNSS 或 VIO" : "Verify one GNSS or VIO";
+  }
+  return null;
+}
+
 export function AutonomyAircraft() {
   const { chinese, workspace, assetLibrary, selectAircraft, persist, edition } = useAutonomyWorkspace();
   const [form, setForm] = useState(workspace.aircraft);
@@ -1156,6 +1183,7 @@ export function AutonomyAircraft() {
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
   const valid = isAutonomyAircraftProfileValid(form);
+  const validationIssue = aircraftValidationIssue(form, chinese);
   const createAircraft = () => {
     const updatedAt = new Date().toISOString();
     const next: AutonomyAircraftProfile = {
@@ -1353,7 +1381,7 @@ export function AutonomyAircraft() {
               ["maximumDescentMps", chinese ? "最大下降 (m/s)" : "Maximum descent (m/s)"],
               ["maximumTiltDeg", chinese ? "最大倾角 (°)" : "Maximum tilt (°)"],
             ] as Array<[keyof typeof AUTONOMY_AIRCRAFT_LIMITS, string]>).map(([key, label]) => (
-              <label key={key}><span>{label}</span><input type="number" min={AUTONOMY_AIRCRAFT_LIMITS[key].min} max={AUTONOMY_AIRCRAFT_LIMITS[key].max} step="0.01" value={String(form[key])} onChange={(event) => numberField(key, event.target.value)} /></label>
+              <label key={key}><span>{label}</span><input type="number" min={AUTONOMY_AIRCRAFT_LIMITS[key].min} max={AUTONOMY_AIRCRAFT_LIMITS[key].max} step="0.01" value={String(form[key])} aria-invalid={typeof form[key] !== "number" || form[key] < AUTONOMY_AIRCRAFT_LIMITS[key].min || form[key] > AUTONOMY_AIRCRAFT_LIMITS[key].max} onChange={(event) => numberField(key, event.target.value)} /></label>
             ))}
             <label><span>{chinese ? "返航保留电量 (%)" : "Reserve battery (%)"}</span><input type="number" min="10" max="90" step="1" value={form.reserveBatteryPercent} onChange={(event) => numberField("reserveBatteryPercent", event.target.value)} /></label>
           </div>
@@ -1411,8 +1439,8 @@ export function AutonomyAircraft() {
           <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "资格状态" : "Qualification"} value={form.status.toUpperCase()} />
         </div>
         <div className="autonomy-config-summary-actions">
-          <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"}><Save aria-hidden="true" />{form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
-          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
+          <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"} title={validationIssue ?? undefined}><Save aria-hidden="true" />{validationIssue ?? (form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft"))}</button>
+          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working" || (publicDemoConsole && qualificationState === "unavailable")} title={publicDemoConsole && qualificationState === "unavailable" ? (chinese ? "请在桌面端或私有控制台签发资格凭据" : "Qualify in the desktop or private console") : undefined} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "unavailable" && publicDemoConsole ? (chinese ? "请使用桌面端验证" : "Use desktop to qualify") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
           {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
         </div>
       </aside>
@@ -1808,7 +1836,7 @@ export function AutonomyMaps() {
         <Metric icon={<Database aria-hidden="true" />} label={chinese ? "资产准入" : "Asset admission"} value={form.status.toUpperCase()} />
         <Metric icon={<Gauge aria-hidden="true" />} label={chinese ? "地图可信度" : "Map confidence"} value={`${form.confidencePercent.toFixed(0)}%`} />
         <button className="btn btn-primary" type="submit" disabled={saved}><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存 Map Pack" : "Save Map Pack")}</button>
-        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : qualificationState === "blocked" ? (chinese ? "资格验证未通过" : "Qualification blocked") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
+        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified" || (publicDemoConsole && qualificationState === "unavailable")} title={publicDemoConsole && qualificationState === "unavailable" ? (chinese ? "请在桌面端或私有控制台签发资格凭据" : "Qualify in the desktop or private console") : undefined} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : qualificationState === "blocked" ? (chinese ? "资格验证未通过" : "Qualification blocked") : qualificationState === "unavailable" && publicDemoConsole ? (chinese ? "请使用桌面端验证" : "Use desktop to qualify") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
       </aside>
     </form>
   );

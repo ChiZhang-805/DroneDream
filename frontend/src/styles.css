@@ -996,6 +996,11 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dd-brand-light-surface) 72%, transparent);
 }
 
+.autonomy-form-grid input[aria-invalid="true"] {
+  border-color: color-mix(in srgb, var(--danger) 72%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
 .autonomy-custom-select-control {
   display: grid;
   min-width: 0;
@@ -1063,6 +1068,9 @@
 
 .autonomy-config-summary .btn {
   justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .autonomy-config-summary-metrics {
