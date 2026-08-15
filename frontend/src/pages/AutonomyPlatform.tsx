@@ -425,7 +425,8 @@ export function AutonomyOverview() {
       setError(copy.tooLong);
       return;
     }
-    voice.stop();
+    voice.cancel();
+    consumeAutonomyHandoff();
     const updatedAt = new Date().toISOString();
     persist(updatedWorkspace(workspace, {
       mission: {
