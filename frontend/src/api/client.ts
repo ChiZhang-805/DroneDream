@@ -22,6 +22,8 @@ import type {
   Artifact,
   AutonomyCompileRequest,
   AutonomyCompileResponse,
+  AutonomyRuntimeObservation,
+  AutonomyRuntimeSession,
   BackendCapabilitiesResponse,
   BatchCreateRequest,
   BatchJob,
@@ -391,6 +393,45 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(req),
     });
+  },
+
+  async createAutonomyRuntimeSession(
+    mission: AutonomyCompileRequest,
+    clientRequestId: string,
+  ): Promise<AutonomyRuntimeSession> {
+    return request<AutonomyRuntimeSession>("/autonomy/runtime/sessions", {
+      method: "POST",
+      body: JSON.stringify({ mission, client_request_id: clientRequestId }),
+    });
+  },
+
+  async getAutonomyRuntimeSession(
+    sessionId: string,
+  ): Promise<AutonomyRuntimeSession> {
+    return request<AutonomyRuntimeSession>(
+      `/autonomy/runtime/sessions/${encodeURIComponent(sessionId)}`,
+    );
+  },
+
+  async ingestAutonomyRuntimeObservation(
+    sessionId: string,
+    observation: AutonomyRuntimeObservation,
+  ): Promise<AutonomyRuntimeSession> {
+    return request<AutonomyRuntimeSession>(
+      `/autonomy/runtime/sessions/${encodeURIComponent(sessionId)}/observations`,
+      { method: "POST", body: JSON.stringify(observation) },
+    );
+  },
+
+  async stopAutonomyRuntimeSession(
+    sessionId: string,
+    action: "hold" | "abort",
+    reason: string,
+  ): Promise<AutonomyRuntimeSession> {
+    return request<AutonomyRuntimeSession>(
+      `/autonomy/runtime/sessions/${encodeURIComponent(sessionId)}/operator-commands`,
+      { method: "POST", body: JSON.stringify({ action, reason }) },
+    );
   },
 
   async compileExperimentAssistantTurn(

@@ -5085,6 +5085,33 @@ a {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dd-brand-light-surface) 80%, transparent);
 }
 
+.autonomy-intent-contract {
+  align-content: start;
+}
+
+.autonomy-intent-readout {
+  min-height: 3.45rem;
+  margin: 0;
+  padding: 0.7rem 0.82rem;
+  border: 1px solid #e5dce8;
+  border-radius: 10px;
+  color: #4b3e50;
+  background: #fbf9fc;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.autonomy-edit-in-chat {
+  min-height: 2rem;
+  padding: 0.42rem 0.68rem;
+  white-space: nowrap;
+}
+
+.autonomy-edit-in-chat svg {
+  width: 0.82rem;
+  height: 0.82rem;
+}
+
 .autonomy-command-actions {
   display: grid;
   width: min(360px, 31vw);
@@ -6099,6 +6126,127 @@ a {
   gap: 0.45rem;
   padding-top: 0.62rem;
   border-top: 1px solid #eee6f0;
+}
+
+.autonomy-runtime-stack {
+  display: grid;
+  gap: 0.38rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid #eee6f0;
+}
+
+.autonomy-runtime-stack header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.autonomy-runtime-stack h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  margin: 0;
+  color: #544659;
+  font-size: 0.7rem;
+}
+
+.autonomy-runtime-stack h2 svg {
+  width: 0.82rem;
+  height: 0.82rem;
+  color: #8558ca;
+}
+
+.autonomy-runtime-stack header > span {
+  padding: 0.18rem 0.36rem;
+  border: 1px solid #c7e6dd;
+  border-radius: 999px;
+  color: #217861;
+  background: #effaf7;
+  font-size: 0.45rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.autonomy-runtime-stack header > span[data-mode="hitl_shadow"] {
+  border-color: #ead7ae;
+  color: #8b651b;
+  background: #fff8e8;
+}
+
+.autonomy-runtime-stack header > span[data-mode="hardware_locked"] {
+  border-color: #ebcbd4;
+  color: #a33c5a;
+  background: #fff2f5;
+}
+
+.autonomy-runtime-stack ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.24rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.autonomy-runtime-stack li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.26rem;
+  min-width: 0;
+  padding: 0.3rem 0.34rem;
+  border: 1px solid #ede7ef;
+  border-radius: 7px;
+  background: #fcfafc;
+}
+
+.autonomy-runtime-stack li > i {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 50%;
+  background: #23a681;
+  box-shadow: 0 0 0 3px rgba(35, 166, 129, 0.1);
+}
+
+.autonomy-runtime-stack li[data-status="shadow"] > i {
+  background: #dda72d;
+  box-shadow: 0 0 0 3px rgba(221, 167, 45, 0.1);
+}
+
+.autonomy-runtime-stack li[data-status="locked"] > i {
+  background: #c94b70;
+  box-shadow: 0 0 0 3px rgba(201, 75, 112, 0.1);
+}
+
+.autonomy-runtime-stack li strong,
+.autonomy-runtime-stack li small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-runtime-receipt {
+  display: block;
+  padding: 0.28rem 0.34rem;
+  overflow: hidden;
+  border-radius: 6px;
+  color: #817487;
+  background: #f5f1f6;
+  font-size: 0.43rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-runtime-stack li strong {
+  color: #65596a;
+  font-size: 0.51rem;
+}
+
+.autonomy-runtime-stack li small {
+  color: #a093a5;
+  font-size: 0.43rem;
 }
 
 .autonomy-telemetry dl {
@@ -12894,6 +13042,27 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
   box-shadow: 0 16px 38px rgba(48, 27, 53, 0.16);
 }
 
+.assistant-add-popover.assistant-task-popover {
+  width: min(25rem, calc(100vw - 2rem));
+  max-height: min(34rem, calc(100vh - 5rem));
+  overflow-y: auto;
+}
+
+.assistant-task-popover-title {
+  padding: 0.42rem 0.7rem 0.28rem;
+  color: #8e7e94;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assistant-task-popover hr {
+  width: calc(100% - 0.7rem);
+  margin: 0.22rem auto;
+  border: 0;
+  border-top: 1px solid #ebe4ed;
+}
+
 .assistant-add-popover a,
 .assistant-add-popover button {
   display: flex;
@@ -12917,6 +13086,59 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
   background: #f4eef6;
   color: #8c2f97;
   text-decoration: none;
+}
+
+.assistant-add-popover button.is-selected {
+  color: #742f91;
+  background: #f4eafa;
+}
+
+.assistant-task-popover button > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.assistant-task-popover button b,
+.assistant-task-popover button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assistant-task-popover button b {
+  font-size: 0.86rem;
+}
+
+.assistant-task-popover button small {
+  color: #8c808f;
+  font-size: 0.7rem;
+  font-weight: 480;
+  line-height: 1.3;
+}
+
+.assistant-task-chip {
+  display: inline-flex;
+  max-width: 13rem;
+  min-height: 2.2rem;
+  align-items: center;
+  padding: 0.42rem 0.72rem;
+  overflow: hidden;
+  border: 1px solid #e2d8e5;
+  border-radius: 999px;
+  color: #766b79;
+  background: #faf7fb;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.assistant-task-chip.is-explicit {
+  border-color: #d3b8e4;
+  color: #743590;
+  background: #f7eefb;
 }
 
 .assistant-add-popover svg {

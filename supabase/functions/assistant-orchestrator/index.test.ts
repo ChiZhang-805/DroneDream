@@ -66,6 +66,34 @@ Deno.test("rejects an artifact from another edition", () => {
   assertThrows(() => parseAssistantPlan(plan("field"), "sim"));
 });
 
+Deno.test("honors an explicitly selected task workflow", () => {
+  const value = JSON.parse(plan("sim"));
+  value.intent = "mission_autonomy";
+  const result = parseAssistantPlan(
+    JSON.stringify(value),
+    "sim",
+    "mission_autonomy",
+  );
+  assertEquals(result.intent, "mission_autonomy");
+  assertEquals(result.artifact_kind, "simulation_experiment");
+});
+
+Deno.test("rejects a model that changes an explicitly selected task", () => {
+  const value = JSON.parse(plan("sim"));
+  value.intent = "control_tuning";
+  assertThrows(() => parseAssistantPlan(
+    JSON.stringify(value),
+    "sim",
+    "mission_autonomy",
+  ));
+});
+
+Deno.test("requires auto-routing to return an edition-valid task type", () => {
+  const value = JSON.parse(plan("field"));
+  value.intent = "vehicle_modeling";
+  assertThrows(() => parseAssistantPlan(JSON.stringify(value), "field", null));
+});
+
 Deno.test("rejects unexpected top-level fields", () => {
   const value = JSON.parse(plan("sim"));
   value.private_reasoning = "must never be accepted";

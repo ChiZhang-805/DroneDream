@@ -14,6 +14,7 @@ import {
   CloudModelAccessError,
   type ManagedModelCatalogEntry,
 } from "../settings/cloudModelAccess";
+import type { AssistantTaskType } from "./assistantTaskRouter";
 
 export type AssistantRunState = "queued" | "processing" | "retry_wait" | "completed" | "failed";
 export type AssistantRunStage =
@@ -99,6 +100,7 @@ export interface OrchestratedAssistantTurnInput {
   organizationId?: string | null;
   idempotencyKey: string;
   message: string;
+  requestedTaskType?: AssistantTaskType | null;
   locale: "en" | "zh-CN";
   selectedModel: Pick<ManagedModelCatalogEntry, "provider" | "model">;
   currentValues: Record<string, ExperimentAssistantFieldValue>;
@@ -800,6 +802,7 @@ export async function orchestrateAssistantTurn(
         provider: input.selectedModel.provider,
         model: input.selectedModel.model,
         message: input.message,
+        requested_task_type: input.requestedTaskType ?? null,
         locale: input.locale,
         current_values: input.currentValues,
         reference_documents: input.documentContext?.chunks ?? [],

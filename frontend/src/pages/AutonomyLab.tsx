@@ -23,11 +23,16 @@ import {
   Waypoints,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
 import { publicDemoConsole } from "../features/demo/publicDemo";
+import {
+  consumeAutonomyHandoff,
+  loadAutonomyHandoff,
+} from "../features/experiment/assistantTaskRouter";
 import {
   loadUniversalMode,
   UNIVERSAL_WORKSPACE_CHANGED_EVENT,
@@ -39,6 +44,7 @@ import type {
   AutonomyCompileResponse,
   AutonomyEdition,
   AutonomyExecutionTarget,
+  AutonomyRuntimeSession,
 } from "../types/api";
 
 type MissionId = "coffee" | "gates" | "narrow";
@@ -69,6 +75,8 @@ interface AutonomyCopy {
   compileCommand: string;
   compilingCommand: string;
   compileFailed: string;
+  intentSource: string;
+  editInChat: string;
   executionTarget: string;
   targets: Record<AutonomyExecutionTarget, string>;
   targetHelp: Record<AutonomyExecutionTarget, string>;
@@ -115,6 +123,9 @@ interface AutonomyCopy {
   brainSubtitle: string;
   brainStages: readonly string[];
   telemetry: string;
+  onboardRuntime: string;
+  runtimeModes: Record<AutonomyCompileResponse["runtime_profile"]["mode"], string>;
+  runtimeAwaiting: string;
   distance: string;
   clearance: string;
   eta: string;
@@ -143,6 +154,8 @@ const EN_COPY: AutonomyCopy = {
   compileCommand: "Compile & qualify",
   compilingCommand: "Checking mission…",
   compileFailed: "The authoritative compiler did not approve this request. Check the runtime connection and mission inputs, then try again.",
+  intentSource: "Mission intent from Tuning Chat",
+  editInChat: "Edit in Tuning Chat",
   executionTarget: "Execution target",
   targets: { simulation: "Simulation", hitl: "HITL", hardware: "Aircraft" },
   targetHelp: {
@@ -213,6 +226,13 @@ const EN_COPY: AutonomyCopy = {
   brainSubtitle: "A slow semantic planner sets intent; a fast geometric loop keeps every command safe and flyable.",
   brainStages: ["Perceive", "Understand", "Plan", "Track", "Replan"],
   telemetry: "Live flight state",
+  onboardRuntime: "Onboard runtime",
+  runtimeModes: {
+    simulation_contract: "SIMULATION BOUND",
+    hitl_shadow: "HITL SHADOW",
+    hardware_locked: "AIRCRAFT LOCKED",
+  },
+  runtimeAwaiting: "CONTRACT ONLY · NO LIVE SESSION",
   distance: "Route",
   clearance: "Min clearance",
   eta: "Mission ETA",
@@ -241,6 +261,8 @@ const ZH_COPY: AutonomyCopy = {
   compileCommand: "编译并验证",
   compilingCommand: "正在检查任务…",
   compileFailed: "权威后端未批准本次请求。请检查运行时连接和任务输入后重试。",
+  intentSource: "来自 Tuning Chat 的任务意图",
+  editInChat: "返回 Tuning Chat 修改",
   executionTarget: "执行目标",
   targets: { simulation: "仿真", hitl: "半实物 HITL", hardware: "真机" },
   targetHelp: {
@@ -311,6 +333,13 @@ const ZH_COPY: AutonomyCopy = {
   brainSubtitle: "低频语义规划负责理解任务，高频几何安全环保证每条指令都安全、可飞。",
   brainStages: ["感知", "理解", "规划", "跟踪", "重规划"],
   telemetry: "实时飞行状态",
+  onboardRuntime: "机载运行底座",
+  runtimeModes: {
+    simulation_contract: "仿真合同已绑定",
+    hitl_shadow: "HITL 影子模式",
+    hardware_locked: "真机保持锁定",
+  },
+  runtimeAwaiting: "仅运行合同 · 尚未创建实时会话",
   distance: "航程",
   clearance: "最小净空",
   eta: "预计耗时",
@@ -427,6 +456,34 @@ function eventTime() {
   return new Intl.DateTimeFormat(undefined, { minute: "2-digit", second: "2-digit" }).format(new Date());
 }
 
+function runtimeComponentLabel(
+  id: AutonomyCompileResponse["runtime_profile"]["components"][number]["id"],
+  chinese: boolean,
+): string {
+  const labels = chinese ? {
+    mission_executive: "任务状态机",
+    perception_vio_slam: "感知 / VIO / SLAM",
+    world_model: "实时世界模型",
+    global_planner: "全局规划器",
+    local_planner: "局部重规划",
+    trajectory_tracker: "航迹跟踪器",
+    px4_bridge: "PX4 控制桥",
+    safety_supervisor: "独立安全监督",
+    evidence_recorder: "证据记录器",
+  } : {
+    mission_executive: "Mission executive",
+    perception_vio_slam: "Perception / VIO / SLAM",
+    world_model: "Live world model",
+    global_planner: "Global planner",
+    local_planner: "Local replanner",
+    trajectory_tracker: "Trajectory tracker",
+    px4_bridge: "PX4 bridge",
+    safety_supervisor: "Safety supervisor",
+    evidence_recorder: "Evidence recorder",
+  };
+  return labels[id];
+}
+
 export function AutonomyLab() {
   const { interfaceLocale } = useI18n();
   const copy = COPY_BY_LOCALE[interfaceLocale] ?? EN_COPY;
@@ -435,7 +492,9 @@ export function AutonomyLab() {
   const [missionId, setMissionId] = useState<MissionId>("coffee");
   const [perception, setPerception] = useState<PerceptionMode>("fusion");
   const [target, setTarget] = useState<AutonomyExecutionTarget>(() => defaultTarget(loadAutonomyEdition()));
-  const [command, setCommand] = useState(() => promptForMission("coffee", chinese));
+  const [command, setCommand] = useState(
+    () => loadAutonomyHandoff() ?? promptForMission("coffee", chinese),
+  );
   const [pickupPayloadKg, setPickupPayloadKg] = useState(DEFAULT_VEHICLE.pickup_payload_kg);
   const [compileResult, setCompileResult] = useState<AutonomyCompileResponse | null>(null);
   const [compileSource, setCompileSource] = useState<"backend" | "preview">("preview");
@@ -448,7 +507,18 @@ export function AutonomyLab() {
   const [complete, setComplete] = useState(false);
   const [progress, setProgress] = useState(0);
   const [obstacleInjected, setObstacleInjected] = useState(false);
+  const [runtimeSession, setRuntimeSession] = useState<AutonomyRuntimeSession | null>(null);
+  const runtimeRequestId = useRef<string | null>(null);
+  const runtimeSequence = useRef(0);
+  const runtimeObservationPending = useRef(false);
+  const runtimeTerminalSent = useRef(false);
+  const progressRef = useRef(0);
+  const dronePositionRef = useRef<Point>([0, 0]);
   const [events, setEvents] = useState(() => [{ time: eventTime(), text: copy.events.ready }]);
+
+  useEffect(() => {
+    consumeAutonomyHandoff();
+  }, []);
 
   useEffect(() => {
     if (EDITION_IS_FIXED) return undefined;
@@ -500,6 +570,9 @@ export function AutonomyLab() {
   } as const)[edition];
   const activePoints = obstacleInjected ? mission.replanPoints : mission.points;
   const [droneX, droneY] = interpolatePath(activePoints, progress);
+  progressRef.current = progress;
+  dronePositionRef.current = [droneX, droneY];
+  const runtimeSessionId = runtimeSession?.session_id ?? null;
   const activeStage = complete ? 4 : !planned ? 0 : !running ? 2 : obstacleInjected ? 4 : progress < 0.18 ? 0 : progress < 0.36 ? 1 : progress < 0.56 ? 2 : 3;
   const nextCheckpoint = missionId === "coffee"
     ? progress < 0.42 ? copy.destination : progress < 0.94 ? copy.returnHome : copy.start
@@ -527,6 +600,82 @@ export function AutonomyLab() {
   }, [copy.events.completed, paused, running]);
 
   useEffect(() => {
+    if (!running || !runtimeSessionId || publicDemoConsole) return undefined;
+    const sessionId = runtimeSessionId;
+    const interval = window.setInterval(() => {
+      if (runtimeObservationPending.current) return;
+      runtimeObservationPending.current = true;
+      const sequence = ++runtimeSequence.current;
+      const currentProgress = progressRef.current;
+      const [currentX, currentY] = dronePositionRef.current;
+      void apiClient.ingestAutonomyRuntimeObservation(sessionId, {
+        sequence,
+        monotonic_ms: Math.max(1, Math.round(performance.now())),
+        armed: true,
+        landed: false,
+        position_m: { x: currentX / 20, y: currentY / 20, z: 1.5 },
+        velocity_mps: { x: paused ? 0 : 0.8, y: 0, z: 0 },
+        localization_covariance_m2: 0.04,
+        perception_age_ms: 45,
+        minimum_clearance_m: obstacleInjected ? 0.52 : Number.parseFloat(mission.clearance),
+        battery_percent: Math.max(35, 92 - currentProgress * 38),
+        link_ok: true,
+        geofence_ok: true,
+        payload_mass_kg: currentProgress >= 0.42 && missionId === "coffee" ? pickupPayloadKg : 0,
+        mission_progress: currentProgress,
+        pickup_confirmed: currentProgress >= 0.42 && missionId === "coffee",
+        local_replan_active: obstacleInjected && currentProgress < 0.7,
+      }).then(setRuntimeSession).catch(() => {
+        setRunning(false);
+        setCompileError(copy.compileFailed);
+      }).finally(() => {
+        runtimeObservationPending.current = false;
+      });
+    }, 500);
+    return () => window.clearInterval(interval);
+  }, [copy.compileFailed, mission.clearance, missionId, obstacleInjected, paused, pickupPayloadKg, running, runtimeSessionId]);
+
+  useEffect(() => {
+    if (!complete || !runtimeSession || publicDemoConsole || runtimeTerminalSent.current) return;
+    let cancelled = false;
+    let retryTimer: number | undefined;
+    const sendTerminalObservation = () => {
+      if (cancelled || runtimeTerminalSent.current) return;
+      if (runtimeObservationPending.current) {
+        retryTimer = window.setTimeout(sendTerminalObservation, 50);
+        return;
+      }
+      runtimeTerminalSent.current = true;
+      runtimeObservationPending.current = true;
+      const sequence = ++runtimeSequence.current;
+      void apiClient.ingestAutonomyRuntimeObservation(runtimeSession.session_id, {
+        sequence,
+        monotonic_ms: Math.max(1, Math.round(performance.now())),
+        armed: false,
+        landed: true,
+        position_m: { x: 0, y: 0, z: 0 },
+        velocity_mps: { x: 0, y: 0, z: 0 },
+        localization_covariance_m2: 0.04,
+        perception_age_ms: 40,
+        minimum_clearance_m: Number.parseFloat(mission.clearance),
+        battery_percent: 54,
+        link_ok: true,
+        geofence_ok: true,
+        payload_mass_kg: missionId === "coffee" ? pickupPayloadKg : 0,
+        mission_progress: 1,
+        pickup_confirmed: missionId === "coffee",
+      }).then(setRuntimeSession).catch(() => setCompileError(copy.compileFailed)).finally(() => {
+        runtimeObservationPending.current = false;
+      });
+    };
+    sendTerminalObservation();
+    return () => {
+      cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
+  }, [complete, copy.compileFailed, mission.clearance, missionId, pickupPayloadKg, runtimeSession]);
+
+  useEffect(() => {
     compileGeneration.current += 1;
     setCompileResult(null);
     setCompileSource("preview");
@@ -536,6 +685,10 @@ export function AutonomyLab() {
     setRunning(false);
     setComplete(false);
     setProgress(0);
+    setRuntimeSession(null);
+    runtimeRequestId.current = null;
+    runtimeSequence.current = 0;
+    runtimeTerminalSent.current = false;
   }, [compileRequest]);
 
   const appendEvent = (text: string) => {
@@ -597,9 +750,42 @@ export function AutonomyLab() {
     }
   };
 
-  const toggleFlight = () => {
+  const toggleFlight = async () => {
     if (!planned || complete) return;
     if (!running) {
+      if (!publicDemoConsole && !runtimeSession) {
+        try {
+          runtimeRequestId.current ??= crypto.randomUUID();
+          const created = await apiClient.createAutonomyRuntimeSession(
+            compileRequest,
+            runtimeRequestId.current,
+          );
+          const sequence = ++runtimeSequence.current;
+          const started = await apiClient.ingestAutonomyRuntimeObservation(
+            created.session_id,
+            {
+              sequence,
+              monotonic_ms: Math.max(1, Math.round(performance.now())),
+              armed: true,
+              landed: false,
+              position_m: { x: 0, y: 0, z: 1.2 },
+              velocity_mps: { x: 0, y: 0, z: 0.4 },
+              localization_covariance_m2: 0.04,
+              perception_age_ms: 40,
+              minimum_clearance_m: Number.parseFloat(mission.clearance),
+              battery_percent: 92,
+              link_ok: true,
+              geofence_ok: true,
+              payload_mass_kg: 0,
+              mission_progress: 0.02,
+            },
+          );
+          setRuntimeSession(started);
+        } catch {
+          setCompileError(copy.compileFailed);
+          return;
+        }
+      }
       setRunning(true);
       setPaused(false);
       appendEvent(copy.events.launched);
@@ -612,11 +798,22 @@ export function AutonomyLab() {
   };
 
   const resetMission = () => {
+    if (runtimeSession && !runtimeSession.terminal && !publicDemoConsole) {
+      void apiClient.stopAutonomyRuntimeSession(
+        runtimeSession.session_id,
+        "abort",
+        "Operator reset the mission workspace.",
+      );
+    }
     setRunning(false);
     setPaused(false);
     setComplete(false);
     setProgress(0);
     setObstacleInjected(false);
+    setRuntimeSession(null);
+    runtimeRequestId.current = null;
+    runtimeSequence.current = 0;
+    runtimeTerminalSent.current = false;
     setEvents([{ time: eventTime(), text: planned ? copy.events.planned : copy.events.ready }]);
   };
 
@@ -645,17 +842,12 @@ export function AutonomyLab() {
       </header>
 
       <section className="autonomy-command-center" data-execution-target={target}>
-        <div className="autonomy-command-input">
+        <div className="autonomy-command-input autonomy-intent-contract">
           <div className="autonomy-command-heading">
-            <span><MessageSquareText aria-hidden="true" /><strong>{copy.commandTitle}</strong></span>
+            <span><MessageSquareText aria-hidden="true" /><strong>{copy.intentSource}</strong></span>
             <small>{copy.commandHelp}</small>
           </div>
-          <textarea
-            value={command}
-            maxLength={2000}
-            onChange={(event) => setCommand(event.target.value)}
-            aria-label={copy.commandTitle}
-          />
+          <p className="autonomy-intent-readout">{command}</p>
           <div className="autonomy-command-actions">
             <div className="autonomy-target-switch" role="group" aria-label={copy.executionTarget}>
               {(Object.keys(copy.targets) as AutonomyExecutionTarget[]).map((candidate) => (
@@ -672,6 +864,9 @@ export function AutonomyLab() {
               ))}
             </div>
             <span className="autonomy-target-help">{copy.targetHelp[target]}</span>
+            <Link className="btn autonomy-edit-in-chat" to="/assistant">
+              <MessageSquareText aria-hidden="true" />{copy.editInChat}
+            </Link>
             <button
               className="btn btn-primary autonomy-compile-button"
               type="button"
@@ -871,7 +1066,7 @@ export function AutonomyLab() {
             </div>
           </div>
           <div className="autonomy-map-controls">
-            <button className="btn btn-primary" type="button" disabled={!planned || complete || !qualification.execution_policy.can_execute} onClick={toggleFlight}>
+            <button className="btn btn-primary" type="button" disabled={!planned || complete || !qualification.execution_policy.can_execute} onClick={() => void toggleFlight()}>
               {!qualification.execution_policy.can_execute ? <LockKeyhole aria-hidden="true" /> : running && !paused ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
               {running ? paused ? copy.resume : copy.pause : copy.run}
             </button>
@@ -897,6 +1092,29 @@ export function AutonomyLab() {
               </li>
             ))}
           </ol>
+
+          <div className="autonomy-runtime-stack">
+            <header>
+              <h2><Cpu aria-hidden="true" />{copy.onboardRuntime}</h2>
+              <span data-mode={qualification.runtime_profile.mode}>
+                {copy.runtimeModes[qualification.runtime_profile.mode]}
+              </span>
+            </header>
+            <ul>
+              {qualification.runtime_profile.components.map((component) => (
+                <li key={component.id} data-status={component.status}>
+                  <i aria-hidden="true" />
+                  <strong>{runtimeComponentLabel(component.id, chinese)}</strong>
+                  <small>{component.rate_hz ? `${component.rate_hz} Hz` : "—"}</small>
+                </li>
+              ))}
+            </ul>
+            <code className="autonomy-runtime-receipt">
+              {runtimeSession
+                ? `${runtimeSession.phase.toUpperCase()} · ${runtimeSession.session_id.slice(0, 18)} · ${runtimeSession.evidence_chain_head.slice(0, 12)}`
+                : copy.runtimeAwaiting}
+            </code>
+          </div>
 
           <div className="autonomy-telemetry">
             <h2><ShieldCheck aria-hidden="true" />{copy.telemetry}</h2>

@@ -64,6 +64,52 @@ function targetAdapter(target: AutonomyExecutionTarget) {
   return "px4_gazebo_contract" as const;
 }
 
+function runtimeProfile(target: AutonomyExecutionTarget): AutonomyCompileResponse["runtime_profile"] {
+  const mode = target === "simulation"
+    ? "simulation_contract" as const
+    : target === "hitl"
+      ? "hitl_shadow" as const
+      : "hardware_locked" as const;
+  const bridge = target === "simulation"
+    ? "px4_gazebo" as const
+    : target === "hitl"
+      ? "px4_hitl_shadow" as const
+      : "px4_hardware_locked" as const;
+  const status = target === "simulation"
+    ? "available" as const
+    : target === "hitl"
+      ? "shadow" as const
+      : "locked" as const;
+  const authority = target === "simulation";
+  const components: AutonomyCompileResponse["runtime_profile"]["components"] = [
+    ["mission_executive", "Bounded mission state machine", 20],
+    ["perception_vio_slam", "Versioned VIO, SLAM, map and vision observations", 30],
+    ["world_model", "Obstacle, gate, terrain and payload state", 20],
+    ["global_planner", "Route corridor between mission checkpoints", 2],
+    ["local_planner", "Trajectory repair inside the approved corridor", 20],
+    ["trajectory_tracker", "Qualified trajectory to PX4 setpoint contracts", 50],
+    ["px4_bridge", "Simulator, HITL shadow and locked-aircraft transport boundary", 50],
+    ["safety_supervisor", "Hold, land and abort overrides", 50],
+    ["evidence_recorder", "Hash-chained observation and decision receipts", 20],
+  ].map(([id, role, rate]) => ({
+    id: id as AutonomyCompileResponse["runtime_profile"]["components"][number]["id"],
+    status,
+    role: String(role),
+    rate_hz: Number(rate),
+    actuator_authority: authority && id === "px4_bridge",
+  }));
+  return {
+    schema_version: "dronedream.autonomy.runtime-profile.v1",
+    mode,
+    bridge,
+    command_authority: authority,
+    persistence: "process_local_bounded",
+    observation_contract: "dronedream.autonomy.observation.v1",
+    components,
+    fail_safe_actions: ["hold", "land", "abort"],
+  };
+}
+
 function steps(missionId: MissionId, pickupPayloadKg: number) {
   if (missionId === "coffee") return [
     { order: 1, action: "takeoff", label: "Launch from the third-floor office", payload_delta_kg: 0 },
@@ -195,6 +241,6 @@ export function createLocalAutonomyPreview(
       trajectory_layer: "payload-aware-speed-profile-v1",
       safety_layer: "deterministic-geometric-policy-kernel-v1",
     },
+    runtime_profile: runtimeProfile(request.execution_target),
   };
 }
-
