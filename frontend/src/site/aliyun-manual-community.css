@@ -2374,6 +2374,18 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
     justify-content: center;
   }
 
+  .community-page.is-all-topics .community-hero {
+    min-height: 124px;
+  }
+
+  .community-page.is-all-topics .community-pagination {
+    margin-top: 0.25rem;
+  }
+
+  .community-page:not(.is-all-topics) .community-topic-grid {
+    margin-top: 0.85rem;
+  }
+
   .community-page:not(.is-all-topics) .community-feed,
   .community-page.is-all-topics .community-feed {
     max-height: none;
