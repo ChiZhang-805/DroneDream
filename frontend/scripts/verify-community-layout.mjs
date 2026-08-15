@@ -99,6 +99,37 @@ async function measure(page) {
       };
     };
     const headings = Array.from(document.querySelectorAll(".community-hero h1"), (entry) => entry.textContent?.trim());
+    const shortCardRects = Array.from(document.querySelectorAll(".community-topic-grid article.is-short"), (entry) => {
+      const bounds = entry.getBoundingClientRect();
+      return { top: bounds.top, bottom: bounds.bottom };
+    }).sort((left, right) => left.top - right.top);
+    const shortCardRows = [];
+    for (const bounds of shortCardRects) {
+      const row = shortCardRows.find((candidate) => Math.abs(candidate.top - bounds.top) < 2);
+      if (row) row.bottom = Math.max(row.bottom, bounds.bottom);
+      else shortCardRows.push({ ...bounds });
+    }
+    const shortCardRowGap = shortCardRows.length > 1
+      ? Math.min(...shortCardRows.slice(1).map((row, index) => row.top - shortCardRows[index].bottom))
+      : null;
+    const clippedShortCards = Array.from(
+      document.querySelectorAll(".community-topic-grid article.is-short .community-cover-art"),
+      (entry) => {
+        const artBounds = entry.getBoundingClientRect();
+        const copyBounds = entry.querySelector(".community-cover-copy")?.getBoundingClientRect();
+        return Boolean(
+          copyBounds
+          && (copyBounds.top < artBounds.top - 1 || copyBounds.bottom > artBounds.bottom + 1)
+        );
+      },
+    ).filter(Boolean).length;
+    const feedElement = document.querySelector(".community-feed");
+    const feedScroll = feedElement instanceof HTMLElement
+      ? {
+          scrollable: feedElement.scrollHeight > feedElement.clientHeight + 1,
+          overflowY: getComputedStyle(feedElement).overflowY,
+        }
+      : null;
     return {
       language: document.documentElement.lang,
       viewport: { width: window.innerWidth, height: window.innerHeight },
@@ -116,6 +147,9 @@ async function measure(page) {
       headings,
       cards: document.querySelectorAll(".community-topic-grid article").length,
       longCards: document.querySelectorAll(".community-topic-grid article.is-long").length,
+      shortCardRowGap: shortCardRowGap === null ? null : Number(shortCardRowGap.toFixed(2)),
+      clippedShortCards,
+      feedScroll,
       maxTags: Math.max(0, ...Array.from(
         document.querySelectorAll(".community-topic-grid .community-cover-tags"),
         (entry) => entry.children.length,
@@ -145,6 +179,9 @@ try {
     { id: "recent-en", locale: "en", path: "/community/?docsPreview=1", viewport: { width: 1440, height: 900 }, expectedCards: 5 },
     { id: "all-zh", locale: "zh-CN", path: "/community/?view=all&docsPreview=1", viewport: { width: 1920, height: 1080 }, expectedCards: 10 },
     { id: "all-en-short", locale: "en", path: "/community/?view=all&docsPreview=1", viewport: { width: 1920, height: 768 }, expectedCards: 10 },
+    { id: "all-en-wide", locale: "en", path: "/community/?view=all&docsPreview=1", viewport: { width: 2560, height: 1246 }, expectedCards: 10, minShortCardRowGap: 8 },
+    { id: "all-en-breakpoint", locale: "en", path: "/community/?view=all&docsPreview=1", viewport: { width: 1024, height: 900 }, expectedCards: 10, minShortCardRowGap: 8 },
+    { id: "recent-en-short", locale: "en", path: "/community/?docsPreview=1", viewport: { width: 1440, height: 600 }, expectedCards: 5, expectFeedScroll: true },
   ]) {
     const context = await browser.newContext({ viewport: testCase.viewport, colorScheme: "light" });
     await context.addInitScript((locale) => window.localStorage.setItem("drone-dream:locale", locale), testCase.locale);
@@ -263,6 +300,15 @@ try {
       && aligned
       && initial.document.scrollWidth <= initial.document.clientWidth + 1
       && initial.document.scrollHeight <= initial.document.clientHeight + 1
+      && initial.clippedShortCards === 0
+      && (!testCase.expectFeedScroll || (
+        initial.feedScroll?.scrollable
+        && initial.feedScroll.overflowY === "auto"
+      ))
+      && (testCase.minShortCardRowGap === undefined || (
+        initial.shortCardRowGap !== null
+        && initial.shortCardRowGap >= testCase.minShortCardRowGap
+      ))
       && (!shortTitleParity || (
         shortTitleParity.dialogIsShort
         && shortTitleParity.card?.text === shortTitleParity.dialog?.text

@@ -91,6 +91,8 @@ const COMMENT_PAGE_SIZE = 100;
 const CHINESE_TOPIC_TITLE_LIMIT = 18;
 const ENGLISH_TOPIC_TITLE_LIMIT = 28;
 const HAN_CHARACTER_PATTERN = /\p{Script=Han}/u;
+const COMMUNITY_OWNER_DISPLAY_NAME = "Chi Zhang";
+const COMMUNITY_OWNER_AUTHOR_ID = "bc77348a-90e9-4c0c-92eb-9db31301cdbd";
 
 export function isLongCommunityTopicTitle(value: string): boolean {
   const normalizedValue = value.trim();
@@ -106,6 +108,22 @@ function isLongCommunityTopic(topic: CommunityTopic): boolean {
   if (topic.card_variant === "long") return true;
   if (topic.card_variant === "short") return false;
   return isLongCommunityTopicTitle(topic.title);
+}
+
+function resolveCommunityTopicAuthor(
+  topic: CommunityTopic,
+  account: DroneDreamAccount | null,
+): { name: string; avatarUrl: string | null } {
+  const isCurrentOwner = topic.author_id === COMMUNITY_OWNER_AUTHOR_ID;
+  const ownerAccount = account?.id === COMMUNITY_OWNER_AUTHOR_ID ? account : null;
+  return {
+    name: isCurrentOwner
+      ? ownerAccount?.displayName || COMMUNITY_OWNER_DISPLAY_NAME
+      : topic.author_name,
+    avatarUrl: isCurrentOwner
+      ? ownerAccount?.avatarUrl || topic.author_avatar_url || null
+      : topic.author_avatar_url || null,
+  };
 }
 
 export interface CommunityTopicPlacement {
@@ -993,7 +1011,10 @@ export function CommunityPage({
   return (
     <div className={`site-portal community-page${allTopicsView ? " is-all-topics" : ""}`}>
       <header className="community-hero">
-        <h1 className="site-eyebrow">{copy.eyebrow}</h1>
+        <div className="community-hero-copy">
+          <h1 className="site-eyebrow">{copy.eyebrow}</h1>
+          <p>{copy.intro}</p>
+        </div>
         <button
           type="button"
           disabled={!sensitiveCloudActionsEnabled}
@@ -1065,8 +1086,7 @@ export function CommunityPage({
         <div className="community-topic-grid">
           {visibleTopicPlacements.map(({ topic, isLong }) => {
             const liked = Boolean(account && topic.liked_by_viewer);
-            const authorAvatarUrl = topic.author_avatar_url
-              || (account?.id === topic.author_id ? account.avatarUrl : null);
+            const topicAuthor = resolveCommunityTopicAuthor(topic, account);
             const renderedAsLongCard = allTopicsView ? isLong : true;
             return (
               <article
@@ -1098,14 +1118,14 @@ export function CommunityPage({
                 <div className="community-topic-card-body">
                   <div className="community-topic-author">
                     <span>
-                      {authorAvatarUrl ? (
-                        <img src={authorAvatarUrl} alt="" />
+                      {topicAuthor.avatarUrl ? (
+                        <img src={topicAuthor.avatarUrl} alt="" />
                       ) : (
                         <UserRound aria-hidden="true" />
                       )}
                     </span>
                     <div>
-                      <strong>{topic.author_name}</strong>
+                      <strong>{topicAuthor.name}</strong>
                       <time dateTime={topic.created_at}>{dateLabel(locale, topic.created_at)}</time>
                     </div>
                   </div>
@@ -1485,9 +1505,9 @@ export function CommunityPage({
               <header>
                 <div className="community-topic-author">
                   <span>
-                    {selectedTopic.author_avatar_url || (account?.id === selectedTopic.author_id && account.avatarUrl) ? (
+                    {resolveCommunityTopicAuthor(selectedTopic, account).avatarUrl ? (
                       <img
-                        src={selectedTopic.author_avatar_url || account?.avatarUrl || ""}
+                        src={resolveCommunityTopicAuthor(selectedTopic, account).avatarUrl || ""}
                         alt=""
                       />
                     ) : (
@@ -1495,7 +1515,7 @@ export function CommunityPage({
                     )}
                   </span>
                   <div>
-                    <strong>{selectedTopic.author_name}</strong>
+                    <strong>{resolveCommunityTopicAuthor(selectedTopic, account).name}</strong>
                     <time dateTime={selectedTopic.created_at}>
                       {dateLabel(locale, selectedTopic.created_at)}
                     </time>
