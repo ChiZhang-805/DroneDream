@@ -507,7 +507,7 @@
   position: sticky;
   top: 0;
   display: flex;
-  height: calc(100dvh - 9.75rem);
+  height: max(38rem, calc(100dvh - 9.75rem));
   min-height: 0;
   flex-direction: column;
   gap: 0.58rem;
