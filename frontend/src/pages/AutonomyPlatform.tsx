@@ -354,7 +354,10 @@ export function AutonomyOverview() {
     ],
   };
   const appendTranscript = useCallback((transcript: string) => {
-    setComposer((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript);
+    setComposer((current) => {
+      const next = current.trim() ? `${current.trim()} ${transcript}` : transcript;
+      return next.slice(0, 2_000);
+    });
   }, [setComposer]);
   const voice = useVoiceInput({ locale: chinese ? "zh-CN" : "en", onTranscript: appendTranscript });
 
