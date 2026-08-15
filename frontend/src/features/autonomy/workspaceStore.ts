@@ -440,7 +440,9 @@ function normalize(value: unknown): AutonomyWorkspaceState {
   const autopilotWasInferred = !["px4", "ardupilot", "custom"].includes(String(aircraft.autopilot));
   const normalizedAutopilot = !autopilotWasInferred
     ? aircraft.autopilot as AutonomyAircraftProfile["autopilot"]
-    : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4";
+    : aircraft.controlInterface === "px4-ros2"
+      ? "px4"
+      : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4";
   const requestedControlInterface = ["px4-ros2", "mavsdk", "mavlink", "simulation-only"].includes(String(aircraft.controlInterface))
     ? aircraft.controlInterface as AutonomyAircraftProfile["controlInterface"]
     : fallback.aircraft.controlInterface;
