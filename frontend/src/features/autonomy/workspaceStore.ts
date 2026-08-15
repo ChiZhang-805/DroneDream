@@ -213,7 +213,7 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     rotorRadiusM: boundedNumber(aircraft.rotorRadiusM, fallback.aircraft.rotorRadiusM, 0.01, 10),
     maximumThrustN: boundedNumber(aircraft.maximumThrustN, fallback.aircraft.maximumThrustN, 0.1, 100_000),
     batteryEnergyWh: boundedNumber(aircraft.batteryEnergyWh, fallback.aircraft.batteryEnergyWh, 1, 1_000_000),
-    reserveBatteryPercent: boundedNumber(aircraft.reserveBatteryPercent, fallback.aircraft.reserveBatteryPercent, 0, 95),
+    reserveBatteryPercent: boundedNumber(aircraft.reserveBatteryPercent, fallback.aircraft.reserveBatteryPercent, 10, 90),
     sensors: Array.isArray(aircraft.sensors)
       ? [...new Set(aircraft.sensors.filter((sensor): sensor is AutonomySensorKind => SENSOR_SET.has(sensor as AutonomySensorKind)))].slice(0, SENSOR_SET.size)
       : fallback.aircraft.sensors,
