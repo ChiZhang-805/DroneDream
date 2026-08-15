@@ -127,7 +127,7 @@ async function measure(page) {
 }
 
 await mkdir(path.dirname(outputRoot), { recursive: true });
-await mkdir(outputRoot);
+await mkdir(outputRoot, { recursive: true });
 const server = await createServer({
   configFile: path.join(frontendRoot, "vite.site.config.ts"),
   root: frontendRoot,
@@ -144,6 +144,7 @@ try {
   for (const testCase of [
     { id: "recent-en", locale: "en", path: "/community/?docsPreview=1", viewport: { width: 1440, height: 900 }, expectedCards: 5 },
     { id: "all-zh", locale: "zh-CN", path: "/community/?view=all&docsPreview=1", viewport: { width: 1920, height: 1080 }, expectedCards: 10 },
+    { id: "all-en-short", locale: "en", path: "/community/?view=all&docsPreview=1", viewport: { width: 1920, height: 768 }, expectedCards: 10 },
   ]) {
     const context = await browser.newContext({ viewport: testCase.viewport, colorScheme: "light" });
     await context.addInitScript((locale) => window.localStorage.setItem("drone-dream:locale", locale), testCase.locale);
@@ -161,6 +162,22 @@ try {
     let mixedPage = null;
     let shortTitleParity = null;
     let longDialog = null;
+    let shortViewportScroll = null;
+    if (testCase.id === "all-en-short") {
+      shortViewportScroll = await page.evaluate(() => {
+        const feed = document.querySelector(".community-feed");
+        const pagination = document.querySelector(".community-pagination");
+        if (!(feed instanceof HTMLElement) || !(pagination instanceof HTMLElement)) return null;
+        feed.scrollTop = feed.scrollHeight;
+        const feedBounds = feed.getBoundingClientRect();
+        const paginationBounds = pagination.getBoundingClientRect();
+        return {
+          scrollable: feed.scrollHeight > feed.clientHeight,
+          overflowY: getComputedStyle(feed).overflowY,
+          paginationVisibleAtBottom: paginationBounds.bottom <= feedBounds.bottom + 1,
+        };
+      });
+    }
     if (testCase.id === "all-zh") {
       await page.locator(".community-topic-grid article").first().locator(".community-topic-cover").click();
       await page.locator(".community-topic-dialog").waitFor();
@@ -269,9 +286,14 @@ try {
         && longDialog.tagGap <= 24
       ))
       && (!mixedPage || (mixedPage.longCards > 0 && mixedPage.cards <= 10 && mixedPage.maxTags <= 3))
+      && (!shortViewportScroll || (
+        shortViewportScroll.scrollable
+        && shortViewportScroll.overflowY === "auto"
+        && shortViewportScroll.paginationVisibleAtBottom
+      ))
       && consoleErrors.length === 0
       && pageErrors.length === 0;
-    results.push({ ...testCase, passed, initial, mixedPage, shortTitleParity, longDialog, aligned, consoleErrors, pageErrors });
+    results.push({ ...testCase, passed, initial, mixedPage, shortTitleParity, longDialog, shortViewportScroll, aligned, consoleErrors, pageErrors });
     await context.close();
   }
 

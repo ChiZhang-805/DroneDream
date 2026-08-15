@@ -2170,6 +2170,13 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   grid-auto-rows: auto;
 }
 
+.community-page.is-all-topics .community-feed {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
 .community-page.is-all-topics .community-topic-grid article {
   height: auto !important;
   align-self: start;
