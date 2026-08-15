@@ -80,6 +80,7 @@ interface AutonomyCopy {
   compileCommand: string;
   compilingCommand: string;
   compileFailed: string;
+  mapUnavailable: string;
   intentSource: string;
   editInChat: string;
   executionTarget: string;
@@ -159,6 +160,7 @@ const EN_COPY: AutonomyCopy = {
   compileCommand: "Compile & qualify",
   compilingCommand: "Checking mission…",
   compileFailed: "The authoritative compiler did not approve this request. Check the runtime connection and mission inputs, then try again.",
+  mapUnavailable: "Map Pack is not qualified. Calibrate it and bind a validated compiler scene before planning.",
   intentSource: "Mission intent from Tuning Chat",
   editInChat: "Edit in Tuning Chat",
   executionTarget: "Execution target",
@@ -266,6 +268,7 @@ const ZH_COPY: AutonomyCopy = {
   compileCommand: "编译并验证",
   compilingCommand: "正在检查任务…",
   compileFailed: "权威后端未批准本次请求。请检查运行时连接和任务输入后重试。",
+  mapUnavailable: "地图包尚未验证。请先完成校准并绑定已验证的编译场景。",
   intentSource: "来自 Tuning Chat 的任务意图",
   editInChat: "返回 Tuning Chat 修改",
   executionTarget: "执行目标",
@@ -409,6 +412,10 @@ const SCENE_ID_BY_MISSION: Record<MissionId, string> = {
   narrow: "service-corridor-dock",
 };
 
+const MISSION_BY_SCENE_ID = Object.fromEntries(
+  Object.entries(SCENE_ID_BY_MISSION).map(([missionId, sceneId]) => [sceneId, missionId as MissionId]),
+) as Record<string, MissionId>;
+
 const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
   dry_mass_kg: 1.55,
   launch_payload_kg: 0.10,
@@ -423,6 +430,10 @@ const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
 
 function missionForWorkspace(workspace?: AutonomyWorkspaceState): MissionId {
   if (!workspace) return "coffee";
+  const boundMission = workspace.mapPack.compilerSceneId
+    ? MISSION_BY_SCENE_ID[workspace.mapPack.compilerSceneId]
+    : undefined;
+  if (boundMission) return boundMission;
   const intent = workspace.mission.intent.toLowerCase();
   if (workspace.mapPack.semanticLayers.includes("gates") || /\bgates?\b|圆环|穿门/u.test(intent)) return "gates";
   if (/narrow|corridor|passage|狭窄|走廊/u.test(intent)) return "narrow";
@@ -431,7 +442,7 @@ function missionForWorkspace(workspace?: AutonomyWorkspaceState): MissionId {
 
 function perceptionForWorkspace(workspace?: AutonomyWorkspaceState): PerceptionMode {
   if (!workspace) return "fusion";
-  const hasMap = workspace.mapPack.sourceFiles.length > 0 && workspace.mapPack.calibrated;
+  const hasMap = workspace.mapPack.calibrated && Boolean(workspace.mapPack.compilerSceneId);
   const hasVision = workspace.aircraft.sensors.some((sensor) => ["rgb", "depth", "stereo", "thermal", "vio"].includes(sensor));
   if (hasMap && hasVision) return "fusion";
   return hasVision ? "vision" : "map";
@@ -613,11 +624,15 @@ export function AutonomyLab({
     ...copy.missions[base.id],
   })), [copy]);
   const mission = missions.find(({ id }) => id === missionId) ?? missions[0];
+  const hasWorkspace = workspace !== undefined;
+  const workspaceCompilerSceneId = workspace?.mapPack.compilerSceneId;
+  const workspaceMapQualified = !hasWorkspace
+    || (workspace?.mapPack.calibrated === true && Boolean(workspaceCompilerSceneId));
   const compileRequest = useMemo<AutonomyCompileRequest>(() => ({
     edition,
     execution_target: target,
     natural_language: command.trim() || promptForMission(missionId, chinese),
-    scene_id: workspace?.mapPack.compilerSceneId ?? SCENE_ID_BY_MISSION[missionId],
+    scene_id: workspaceCompilerSceneId ?? (hasWorkspace ? "" : SCENE_ID_BY_MISSION[missionId]),
     perception_mode: perception,
     vehicle: { ...workspaceVehicle, pickup_payload_kg: pickupPayloadKg },
     evidence: {
@@ -629,7 +644,7 @@ export function AutonomyLab({
       geofence_ready: false,
       battery_ready: false,
     },
-  }), [chinese, command, edition, missionId, perception, pickupPayloadKg, target, workspace?.mapPack.compilerSceneId, workspaceVehicle]);
+  }), [chinese, command, edition, hasWorkspace, missionId, perception, pickupPayloadKg, target, workspaceCompilerSceneId, workspaceVehicle]);
   const latestCompileRequest = useRef(compileRequest);
   latestCompileRequest.current = compileRequest;
   const provisionalResult = useMemo(
@@ -808,6 +823,12 @@ export function AutonomyLab({
   };
 
   const planTrajectory = async () => {
+    if (!workspaceMapQualified) {
+      setCompileResult(null);
+      setCompileError(copy.mapUnavailable);
+      setPlanned(false);
+      return;
+    }
     const generation = ++compileGeneration.current;
     const submittedRequest = compileRequest;
     setPlanning(true);
