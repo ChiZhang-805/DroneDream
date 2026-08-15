@@ -150,6 +150,21 @@ def _school_mission_profile(
         return "coffee"
 
     text = request.natural_language.casefold()
+    if any(token in text for token in ("gate", "ring", "圆门", "圆环", "穿门")):
+        return "gates"
+    if any(
+        token in text
+        for token in (
+            "narrow",
+            "corridor",
+            "stair",
+            "狭窄",
+            "走廊",
+            "楼梯",
+            "通道",
+        )
+    ):
+        return "narrow"
     if any(
         token in text
         for token in (
@@ -166,25 +181,34 @@ def _school_mission_profile(
         )
     ):
         return "coffee"
-    if any(token in text for token in ("gate", "ring", "圆门", "圆环", "穿门")):
-        return "gates"
-    if any(
-        token in text
-        for token in (
-            "narrow",
-            "corridor",
-            "stair",
-            "狭窄",
-            "走廊",
-            "楼梯",
-            "通道",
-        )
-    ):
-        return "narrow"
     return "coffee"
 
 
-def _steps(profile: SchoolMissionProfile, pickup_payload_kg: float) -> list[MissionStep]:
+def _steps(
+    scene_id: str,
+    profile: SchoolMissionProfile,
+    pickup_payload_kg: float,
+) -> list[MissionStep]:
+    if scene_id == "forest-gate-inspection":
+        return [
+            MissionStep(order=1, action="takeoff", label="Launch into the vegetation corridor"),
+            MissionStep(
+                order=2,
+                action="pass_gate",
+                label="Pass three gates through their geometric centers",
+            ),
+            MissionStep(order=3, action="land", label="Complete the inspection hover and land"),
+        ]
+    if scene_id == "service-corridor-dock":
+        return [
+            MissionStep(order=1, action="takeoff", label="Launch in the service corridor"),
+            MissionStep(
+                order=2,
+                action="transit",
+                label="Follow the narrow collision-free corridor around blind corners",
+            ),
+            MissionStep(order=3, action="land", label="Dock on the marked target"),
+        ]
     if profile == "coffee":
         return [
             MissionStep(order=1, action="takeoff", label="Launch from the third-floor office"),
@@ -658,7 +682,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         )
     perception = _select_perception(request)
     mission_profile = _school_mission_profile(request, scene_id)
-    steps = _steps(mission_profile, request.vehicle.pickup_payload_kg)
+    steps = _steps(scene_id, mission_profile, request.vehicle.pickup_payload_kg)
     task_graph = _task_graph(steps)
     profile_path = (
         _school_reference_path(mission_profile) if scene_id == "school-campus-v1" else None

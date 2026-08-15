@@ -502,10 +502,12 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       },
       sensors: ["rgb", "depth", "gps", "vio"],
       sensorMounts: [
-        { id: "front-rgb", kind: "rgb", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: -0.055, z: -0.155 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
-        { id: "front-depth", kind: "depth", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: -0.055, z: -0.155 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
-        { id: "gps-primary", kind: "gps", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: 0.2, z: 0.07 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 0 },
-        { id: "vio-primary", kind: "vio", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: -0.055, z: -0.155 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
+        // The renderer is X-right/Y-up/Z-aft; Vehicle Pack extrinsics are
+        // X-forward/Y-right/Z-up. Publish (-renderZ, renderX, renderY).
+        { id: "front-rgb", kind: "rgb", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.155, y: 0, z: -0.055 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
+        { id: "front-depth", kind: "depth", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.155, y: 0, z: -0.055 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
+        { id: "gps-primary", kind: "gps", calibrated: true, calibrationStatus: "verified", positionM: { x: -0.07, y: 0, z: 0.2 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 0 },
+        { id: "vio-primary", kind: "vio", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.155, y: 0, z: -0.055 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
       ],
       updatedAt,
     },

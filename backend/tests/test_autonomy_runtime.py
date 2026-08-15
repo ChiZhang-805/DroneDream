@@ -115,6 +115,35 @@ def test_school_map_gate_intent_compiles_gate_steps_and_visual_route() -> None:
     assert not any(step.action == "pickup" for step in compiled.contract.steps)
 
 
+def test_school_map_concrete_route_wins_over_generic_return_language() -> None:
+    gate_mission = mission().model_copy(
+        update={
+            "natural_language": "Pass all three circular gates and return to launch.",
+            "scene_id": "school-campus-v1",
+        }
+    )
+    stair_mission = mission().model_copy(
+        update={
+            "natural_language": "Descend the switchback stairs, then return upstairs.",
+            "scene_id": "school-campus-v1",
+        }
+    )
+
+    gate_compiled = compile_autonomy_mission(gate_mission)
+    stair_compiled = compile_autonomy_mission(stair_mission)
+
+    assert [step.action for step in gate_compiled.contract.steps] == [
+        "takeoff",
+        "pass_gate",
+        "land",
+    ]
+    assert [step.action for step in stair_compiled.contract.steps] == [
+        "takeoff",
+        "traverse_stairs",
+        "land",
+    ]
+
+
 def test_school_map_narrow_intent_compiles_switchback_stair_route() -> None:
     narrow_mission = mission().model_copy(
         update={
@@ -133,6 +162,24 @@ def test_school_map_narrow_intent_compiles_switchback_stair_route() -> None:
     assert compiled.trajectory[0].z == pytest.approx(8.15)
     assert max(point.z for point in compiled.trajectory) == pytest.approx(8.3)
     assert compiled.trajectory[-1].z == pytest.approx(1.3)
+
+
+def test_legacy_service_corridor_keeps_its_transit_contract() -> None:
+    corridor_mission = mission().model_copy(
+        update={
+            "natural_language": "Follow the narrow service corridor and dock.",
+            "scene_id": "service-corridor-dock",
+        }
+    )
+
+    compiled = compile_autonomy_mission(corridor_mission)
+
+    assert [step.action for step in compiled.contract.steps] == [
+        "takeoff",
+        "transit",
+        "land",
+    ]
+    assert all(point.phase != "stairs" for point in compiled.trajectory)
 
 
 def test_runtime_session_is_idempotent_owner_scoped_and_replay_safe() -> None:

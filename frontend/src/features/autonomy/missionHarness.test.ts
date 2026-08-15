@@ -40,6 +40,16 @@ describe("autonomy mission harness", () => {
     expect(migrated.mapPack.contentHash).toBeNull();
   });
 
+  it("publishes My Drone sensor mounts in the Vehicle Pack body frame", () => {
+    const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    const mounts = Object.fromEntries(workspace.aircraft.sensorMounts.map((mount) => [mount.id, mount]));
+
+    expect(mounts["front-rgb"].positionM).toEqual({ x: 0.155, y: 0, z: -0.055 });
+    expect(mounts["front-depth"].positionM).toEqual({ x: 0.155, y: 0, z: -0.055 });
+    expect(mounts["vio-primary"].positionM).toEqual({ x: 0.155, y: 0, z: -0.055 });
+    expect(mounts["gps-primary"].positionM).toEqual({ x: -0.07, y: 0, z: 0.2 });
+  });
+
   it("keeps every public mission preset grounded in School Map", () => {
     const request: AutonomyCompileRequest = {
       edition: "sim",

@@ -11,7 +11,7 @@ export const MY_DRONE_CONTRACT = {
   collisionEnvelopeM: { x: 0.72, y: 0.33, z: 0.72 },
   dryMassKg: 1.86,
   maximumTakeoffMassKg: 2.8,
-  maximumPickupPayloadKg: 0.55,
+  maximumPickupPayloadKg: 0.35,
   battery: { cells: 4, capacityMah: 5000, nominalEnergyWh: 74 },
   compute: { model: "Jetson Orin NX", moduleM: { x: 0.07, y: 0.045 }, powerW: "10–25" },
   depthCamera: { model: "RealSense D455-class", sizeM: { x: 0.124, y: 0.026, z: 0.029 } },
