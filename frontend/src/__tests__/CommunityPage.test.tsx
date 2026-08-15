@@ -70,7 +70,8 @@ describe("CommunityPage public data loading", () => {
         {
           id: "00000000-0000-0000-0000-000000000001",
           author_id: "00000000-0000-0000-0000-000000000002",
-          author_name: "Pilot",
+          author_name: "cz91",
+          author_avatar_url: "/chi-avatar.png",
           title: "Stable hover evidence",
           body: "The full reproducible test description.",
           tags: ["PX4"],
@@ -85,7 +86,7 @@ describe("CommunityPage public data loading", () => {
   });
 
   it("loads a bounded topic page with database-side counts", async () => {
-    render(
+    const { container } = render(
       <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
     );
 
@@ -98,6 +99,9 @@ describe("CommunityPage public data loading", () => {
     );
     expect(screen.getByText("7")).toBeVisible();
     expect(screen.getByText("4")).toBeVisible();
+    expect(screen.getByText("Chi Zhang")).toBeVisible();
+    expect(container.querySelector(".community-topic-author img"))
+      .toHaveAttribute("src", "/chi-avatar.png");
   });
 
   it("paginates the locally packed discovery topics without another server page request", async () => {

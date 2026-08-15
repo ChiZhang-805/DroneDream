@@ -2327,11 +2327,6 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   }
 }
 
-/* Recent topics ends with its card row instead of filling the remaining viewport. */
-.community-page:not(.is-all-topics) .community-feed {
-  flex: 0 0 auto;
-}
-
 .community-page .community-hero {
   min-height: 118px;
   padding-block: 1rem;
@@ -2351,11 +2346,35 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   white-space: nowrap;
 }
 
-@media (min-width: 901px) and (min-height: 900px) {
+@media (min-width: 901px) {
+  .community-page:not(.is-all-topics) .community-feed {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1040px) {
+  .community-page:not(.is-all-topics) .community-topic-grid,
+  .community-page.is-all-topics .community-topic-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1041px) and (max-width: 1199px) {
+  .community-page:not(.is-all-topics) .community-topic-grid,
+  .community-page.is-all-topics .community-topic-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) and (min-height: 900px) {
   .community-page {
     justify-content: center;
   }
 
+  .community-page:not(.is-all-topics) .community-feed,
   .community-page.is-all-topics .community-feed {
     max-height: none;
     flex: 0 0 auto;
