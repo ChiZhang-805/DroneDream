@@ -1181,9 +1181,18 @@ export function AutonomyAircraft() {
   const [saved, setSaved] = useState(false);
   const [qualificationState, setQualificationState] = useState<"idle" | "working" | "qualified" | "blocked" | "unavailable">("idle");
   const [qualificationIssues, setQualificationIssues] = useState<string[]>([]);
+  const qualificationReceiptRef = useRef<string | null>(null);
   useEffect(() => {
     setForm(workspace.aircraft);
-    setQualificationIssues([]);
+    const preservesCurrentReceipt = Boolean(workspace.aircraft.qualificationReceiptId)
+      && workspace.aircraft.qualificationReceiptId === qualificationReceiptRef.current;
+    if (workspace.aircraft.status !== "draft") {
+      setQualificationState("qualified");
+      setQualificationIssues([]);
+    } else if (!preservesCurrentReceipt) {
+      setQualificationState("idle");
+      setQualificationIssues([]);
+    }
   }, [workspace.aircraft]);
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
@@ -1341,6 +1350,7 @@ export function AutonomyAircraft() {
         qualificationContentHash: receipt.status === "validated_unsigned" ? receipt.content_sha256 : null,
         updatedAt: new Date().toISOString(),
       };
+      qualificationReceiptRef.current = receipt.receipt_id;
       setForm(next);
       persist(updatedWorkspace(workspace, { aircraft: next }));
       setSaved(true);
@@ -1396,7 +1406,7 @@ export function AutonomyAircraft() {
             ] as Array<[keyof typeof AUTONOMY_AIRCRAFT_LIMITS, string]>).map(([key, label]) => (
               <label key={key}><span>{label}</span><input type="number" min={AUTONOMY_AIRCRAFT_LIMITS[key].min} max={AUTONOMY_AIRCRAFT_LIMITS[key].max} step="0.01" value={String(form[key])} aria-invalid={typeof form[key] !== "number" || form[key] < AUTONOMY_AIRCRAFT_LIMITS[key].min || form[key] > AUTONOMY_AIRCRAFT_LIMITS[key].max} onChange={(event) => numberField(key, event.target.value)} /></label>
             ))}
-            <label><span>{chinese ? "返航保留电量 (%)" : "Reserve battery (%)"}</span><input type="number" min="10" max="90" step="1" value={form.reserveBatteryPercent} onChange={(event) => numberField("reserveBatteryPercent", event.target.value)} /></label>
+            <label><span>{chinese ? "返航保留电量 (%)" : "Reserve battery (%)"}</span><input type="number" min="10" max="90" step="1" value={form.reserveBatteryPercent} aria-invalid={form.reserveBatteryPercent < AUTONOMY_AIRCRAFT_LIMITS.reserveBatteryPercent.min || form.reserveBatteryPercent > AUTONOMY_AIRCRAFT_LIMITS.reserveBatteryPercent.max} onChange={(event) => numberField("reserveBatteryPercent", event.target.value)} /></label>
           </div>
         </section>
 
@@ -1546,12 +1556,20 @@ export function AutonomyMaps() {
   const [ingesting, setIngesting] = useState(false);
   const [qualificationState, setQualificationState] = useState<"idle" | "working" | "qualified" | "blocked" | "unavailable">("idle");
   const [qualificationIssues, setQualificationIssues] = useState<string[]>([]);
+  const qualificationReceiptRef = useRef<string | null>(null);
   const [sceneManifests, setSceneManifests] = useState(FALLBACK_MAP_SCENE_MANIFESTS);
   useEffect(() => {
     setForm(workspace.mapPack);
     setSaved(true);
-    setQualificationIssues([]);
-    setQualificationState(autonomyMapPackQualified(workspace.mapPack) ? "qualified" : "idle");
+    const preservesCurrentReceipt = Boolean(workspace.mapPack.qualificationReceiptId)
+      && workspace.mapPack.qualificationReceiptId === qualificationReceiptRef.current;
+    if (autonomyMapPackQualified(workspace.mapPack)) {
+      setQualificationState("qualified");
+      setQualificationIssues([]);
+    } else if (!preservesCurrentReceipt) {
+      setQualificationState("idle");
+      setQualificationIssues([]);
+    }
   }, [workspace.mapPack]);
   useEffect(() => {
     if (publicDemoConsole) return;
@@ -1778,6 +1796,7 @@ export function AutonomyMaps() {
         qualificationReceiptId: receipt.receipt_id,
         updatedAt: receipt.created_at,
       };
+      qualificationReceiptRef.current = receipt.receipt_id;
       setForm(next);
       persist(updatedWorkspace(workspace, {
         mapPack: next,
