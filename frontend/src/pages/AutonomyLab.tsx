@@ -734,7 +734,9 @@ export function AutonomyLab({
   const compileRequest = useMemo<AutonomyCompileRequest>(() => ({
     edition,
     execution_target: target,
-    natural_language: command.trim() || promptForMission(missionId, chinese),
+    natural_language: workspace?.mission.planningBrief.trim()
+      ? `${command.trim()}\n\nPlanning brief from ${workspace.mission.planningModel.provider}/${workspace.mission.planningModel.model}: ${workspace.mission.planningBrief.trim()}`.slice(0, 2_000)
+      : command.trim() || promptForMission(missionId, chinese),
     scene_id: workspaceCompilerSceneId ?? (hasWorkspace ? "" : SCENE_ID_BY_MISSION[missionId]),
     perception_mode: perception,
     vehicle: { ...workspaceVehicle, pickup_payload_kg: pickupPayloadKg },
@@ -747,7 +749,7 @@ export function AutonomyLab({
       geofence_ready: false,
       battery_ready: false,
     },
-  }), [chinese, command, edition, hasWorkspace, missionId, perception, pickupPayloadKg, target, workspaceCompilerSceneId, workspaceVehicle]);
+  }), [chinese, command, edition, hasWorkspace, missionId, perception, pickupPayloadKg, target, workspace, workspaceCompilerSceneId, workspaceVehicle]);
   const latestCompileRequest = useRef(compileRequest);
   latestCompileRequest.current = compileRequest;
   const provisionalResult = useMemo(

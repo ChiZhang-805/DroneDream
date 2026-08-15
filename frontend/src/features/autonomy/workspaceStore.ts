@@ -193,6 +193,13 @@ export interface AutonomyMissionDraft {
   schemaVersion: 2;
   id: string;
   intent: string;
+  planningModel: {
+    accessMode: "platform" | "byok";
+    provider: string;
+    model: string;
+  };
+  planningBrief: string;
+  planningRunId: string | null;
   aircraftProfileId: string;
   mapPackId: string;
   currentStep: number;
@@ -330,6 +337,9 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       schemaVersion: 2,
       id: "mission-draft-primary",
       intent: "Launch, reach the assigned work point, complete the task, and return safely.",
+      planningModel: { accessMode: "platform", provider: "openai", model: "gpt-4.1" },
+      planningBrief: "",
+      planningRunId: null,
       aircraftProfileId: "aircraft-primary",
       mapPackId: "map-primary",
       currentStep: 0,
@@ -486,6 +496,17 @@ function normalize(value: unknown): AutonomyWorkspaceState {
       ...fallback.mission,
       id: boundedText(mission.id, fallback.mission.id, 80),
       intent: boundedText(mission.intent, fallback.mission.intent, 2_000),
+      planningModel: mission.planningModel && typeof mission.planningModel === "object"
+        ? {
+            accessMode: mission.planningModel.accessMode === "byok" ? "byok" : "platform",
+            provider: boundedText(mission.planningModel.provider, fallback.mission.planningModel.provider, 80),
+            model: boundedText(mission.planningModel.model, fallback.mission.planningModel.model, 160),
+          }
+        : fallback.mission.planningModel,
+      planningBrief: boundedText(mission.planningBrief, fallback.mission.planningBrief, 4_000),
+      planningRunId: typeof mission.planningRunId === "string"
+        ? boundedText(mission.planningRunId, "", 160) || null
+        : null,
       aircraftProfileId: normalizedAircraft.id,
       mapPackId: normalizedMap.id,
       currentStep: Math.round(boundedNumber(mission.currentStep, 0, 0, 5)),

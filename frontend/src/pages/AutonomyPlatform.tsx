@@ -1,6 +1,7 @@
 import {
   Activity,
   Airplay,
+  ArrowUp,
   Box,
   Camera,
   Check,
@@ -14,8 +15,10 @@ import {
   Layers3,
   Map,
   MapPin,
+  Mic,
   Navigation2,
   Orbit,
+  Plus,
   Radar,
   Radio,
   Route,
@@ -34,19 +37,24 @@ import {
   useEffect,
   useRef,
   useState,
+  type Dispatch,
   type FormEvent,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import {
   Link,
   NavLink,
   Outlet,
   useLocation,
+  useNavigate,
   useOutletContext,
 } from "react-router-dom";
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
+import { openAppSettings } from "../appSettings";
+import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   AUTONOMY_AIRCRAFT_LIMITS,
   autonomyAircraftRadiusM,
@@ -63,6 +71,19 @@ import {
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import { consumeAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
+import { orchestrateAssistantTurn } from "../features/experiment/assistantOrchestration";
+import { useVoiceInput } from "../features/experiment/useVoiceInput";
+import {
+  activeAssistantTenantContext,
+  createExperimentWorkspaceId,
+} from "../features/experiment/workspaceRegistry";
+import {
+  completeManagedModelCatalog,
+  DEFAULT_MANAGED_MODEL_CATALOG,
+  getManagedModelCatalog,
+  managedModelAvailableForAssistant,
+} from "../features/settings/cloudModelAccess";
+import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
 import { AutonomyLab } from "./AutonomyLab";
@@ -72,6 +93,8 @@ type WorkspaceContext = {
   chinese: boolean;
   workspace: AutonomyWorkspaceState;
   persist: (next: AutonomyWorkspaceState) => void;
+  missionComposerDraft: string;
+  setMissionComposerDraft: Dispatch<SetStateAction<string>>;
 };
 
 type AutonomySectionId = "overview" | "aircraft" | "maps" | "mission" | "live" | "evidence";
@@ -93,9 +116,7 @@ const SECTION_COPY = {
     mission: "Mission",
     live: "Live",
     evidence: "Evidence",
-    tuningChat: "Tuning Chat",
     title: "Autonomy",
-    draft: "Workspace draft",
   },
   zh: {
     overview: "总览",
@@ -104,9 +125,7 @@ const SECTION_COPY = {
     mission: "任务",
     live: "实时运行",
     evidence: "证据回放",
-    tuningChat: "Tuning Chat",
-    title: "自主任务",
-    draft: "工作区草稿",
+    title: "Autonomy",
   },
 } as const;
 
@@ -144,6 +163,48 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
   return <div className="autonomy-asset-metric"><span>{icon}{label}</span><strong>{value}</strong></div>;
 }
 
+function AutonomyTemplateIcon({ index }: { index: number }) {
+  const Icon = [Route, Camera, Layers3][index] ?? Route;
+  return <Icon className="assistant-example-icon" aria-hidden="true" strokeWidth={1.8} />;
+}
+
+function AutonomyCloudTerminalIcon() {
+  return (
+    <svg
+      className="assistant-cloud-terminal-icon"
+      viewBox="0 0 112 80"
+      role="presentation"
+      focusable="false"
+    >
+      <path
+        d="M34 65h48c14.4 0 26-10.8 26-24.2 0-12.5-10.2-22.9-23.3-24.1C79.2 7.3 68.5 2 57.2 4.2 43.8 6.8 34.4 17 32.9 29.4 17.7 29.9 5.5 40.2 5.5 47.8 5.5 57.4 18.3 65 34 65Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        className="assistant-terminal-chevron"
+        d="m38 39 10 8-10 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="5.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        className="assistant-terminal-underscore"
+        d="M55 55h17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="5.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function AutonomyPlatform() {
   const auth = useOptionalAuth();
   const theme = useEditionTheme();
@@ -154,9 +215,11 @@ export function AutonomyPlatform() {
   const ownerId = auth?.account?.id ?? "local";
   const edition = theme.id;
   const [workspace, setWorkspace] = useState(() => loadAutonomyWorkspace(ownerId, edition));
+  const [missionComposerDraft, setMissionComposerDraft] = useState("");
 
   useEffect(() => {
     setWorkspace(loadAutonomyWorkspace(ownerId, edition));
+    setMissionComposerDraft("");
   }, [edition, ownerId]);
 
   const persist = useCallback((next: AutonomyWorkspaceState) => {
@@ -176,108 +239,415 @@ export function AutonomyPlatform() {
   return (
     <div className="autonomy-platform-page">
       <header className="autonomy-platform-header">
-        <div>
-          <span>{edition.toUpperCase()} · AUTONOMY</span>
-          <h1>{copy.title}</h1>
-        </div>
-        <div className="autonomy-platform-actions">
-          <small><i />{copy.draft}</small>
-          <Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />{copy.tuningChat}</Link>
-        </div>
+        <h1>{copy.title}</h1>
+        <nav className="autonomy-section-switch" aria-label={copy.title}>
+          {sections.map(({ id, to }) => {
+            const Icon = SECTION_ICONS[id];
+            const selected = currentSectionPath === to;
+            return (
+              <NavLink
+                key={id}
+                to={to}
+                end={id === "overview"}
+                className={({ isActive }) => isActive || selected ? "active" : undefined}
+                aria-current={selected ? "page" : undefined}
+              >
+                <Icon aria-hidden="true" />
+                <span>{copy[id]}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
       </header>
 
-      <nav className="autonomy-section-switch" aria-label={copy.title}>
-        {sections.map(({ id, to }) => {
-          const Icon = SECTION_ICONS[id];
-          const selected = currentSectionPath === to;
-          return (
-            <NavLink
-              key={id}
-              to={to}
-              end={id === "overview"}
-              className={({ isActive }) => isActive || selected ? "active" : undefined}
-              aria-current={selected ? "page" : undefined}
-            >
-              <Icon aria-hidden="true" />
-              <span>{copy[id]}</span>
-            </NavLink>
-          );
-        })}
-      </nav>
-
       <main className="autonomy-platform-content">
-        <Outlet context={{ edition, chinese, workspace, persist } satisfies WorkspaceContext} />
+        <Outlet context={{
+          edition,
+          chinese,
+          workspace,
+          persist,
+          missionComposerDraft,
+          setMissionComposerDraft,
+        } satisfies WorkspaceContext} />
       </main>
     </div>
   );
 }
 
 export function AutonomyOverview() {
-  const { chinese, workspace, edition } = useAutonomyWorkspace();
-  const aircraft = workspace.aircraft;
-  const mapPack = workspace.mapPack;
-  const payloadKg = Math.max(0, aircraft.maximumTakeoffMassKg - aircraft.dryMassKg);
-  const mapReady = Boolean(mapPack.compilerSceneId) && mapPack.calibrated;
-  const liveState = edition === "sim"
-    ? (chinese ? "仿真可用" : "Simulation ready")
-    : edition === "lab"
-      ? (chinese ? "HITL 影子模式" : "HITL shadow")
-      : (chinese ? "真机保持锁定" : "Aircraft locked");
-  const cards = [
-    {
-      id: "aircraft",
-      icon: Navigation2,
-      title: chinese ? "当前无人机" : "Current aircraft",
-      value: aircraft.name,
-      meta: `${aircraft.dryMassKg.toFixed(2)} kg · ${payloadKg.toFixed(2)} kg ${chinese ? "载荷余量" : "payload margin"}`,
-      state: `${aircraft.sensors.length} ${chinese ? "个传感器" : "sensors"}`,
-      to: "/autonomy/aircraft",
-    },
-    {
-      id: "maps",
-      icon: Layers3,
-      title: chinese ? "当前地图" : "Current map",
-      value: mapPack.name,
-      meta: `${mapPack.representation} · ${mapPack.resolutionM.toFixed(3)} m`,
-      state: mapReady ? (chinese ? "已校准" : "Calibrated") : (chinese ? "需要配置" : "Configuration required"),
-      to: "/autonomy/maps",
-    },
-    {
-      id: "mission",
-      icon: Waypoints,
-      title: chinese ? "任务草稿" : "Mission draft",
-      value: workspace.mission.intent,
-      meta: `${chinese ? "阶段" : "Stage"} ${workspace.mission.currentStep + 1}/6`,
-      state: chinese ? "来自 Tuning Chat" : "From Tuning Chat",
-      to: "/autonomy/mission",
-    },
-    {
-      id: "live",
-      icon: Activity,
-      title: chinese ? "执行状态" : "Execution state",
-      value: liveState,
-      meta: chinese ? "无活动运行会话" : "No active runtime session",
-      state: edition.toUpperCase(),
-      to: "/autonomy/live",
-    },
-  ];
+  const {
+    edition,
+    chinese,
+    workspace,
+    persist,
+    missionComposerDraft: composer,
+    setMissionComposerDraft: setComposer,
+  } = useAutonomyWorkspace();
+  const auth = useOptionalAuth();
+  const navigate = useNavigate();
+  const {
+    settings: modelAccess,
+    profiles: modelProfiles,
+    activeProfileId,
+    selectAccessMode,
+    selectManagedModel,
+    selectProfile,
+  } = useModelAccess();
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [voiceConsentPending, setVoiceConsentPending] = useState(false);
+  const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [managedModels, setManagedModels] = useState(DEFAULT_MANAGED_MODEL_CATALOG);
+  const [managedModelsReady, setManagedModelsReady] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const configuredProfiles = modelProfiles.filter((profile) => profile.apiKey.trim());
+  const selectedManagedModel = managedModels.find(
+    (model) => model.provider === modelAccess.managedProvider
+      && model.model === modelAccess.managedModel
+      && managedModelAvailableForAssistant(model),
+  ) ?? null;
+  const selectedCustomProfileId = modelAccess.accessMode === "byok"
+    && configuredProfiles.some((profile) => profile.id === activeProfileId)
+    ? activeProfileId
+    : null;
+  const selectedPlanningModel = modelAccess.accessMode === "platform"
+    ? selectedManagedModel
+      ? { accessMode: "platform" as const, provider: selectedManagedModel.provider, model: selectedManagedModel.model }
+      : null
+    : selectedCustomProfileId && modelAccess.model.trim()
+      ? { accessMode: "byok" as const, provider: modelAccess.provider, model: modelAccess.model.trim() }
+      : null;
+  const copy = chinese ? {
+    question: "你希望无人机完成什么任务？",
+    placeholder: "描述目标、途经点、环境和需要完成的工作…",
+    workflow: "自主飞行任务",
+    context: "任务上下文",
+    aircraft: "当前无人机",
+    map: "当前地图",
+    mission: "现有任务合同",
+    send: "生成任务合同",
+    model: "模型",
+    microphone: "使用语音输入",
+    stopVoice: "停止语音输入",
+    requestingVoice: "正在请求麦克风权限…",
+    listening: "正在聆听…",
+    voiceConsent: "浏览器可能使用语音服务转写麦克风音频；音频不会写入任务合同。",
+    startVoice: "允许并开始",
+    cancelVoice: "取消",
+    voiceUnavailable: "当前环境无法使用语音输入，你仍可继续输入文字。",
+    tooLong: "任务描述不能超过 2,000 个字符。",
+    modelUnavailable: "请先选择可用于任务规划的模型。",
+    examples: [
+      { title: "办公室取物", body: "从办公室起飞，避开走廊和楼梯中的人员，前往取物点，确认载荷后安全返航。" },
+      { title: "视觉巡检", body: "沿指定区域自主巡检，使用实时视觉识别目标与动态障碍，并报告每个检查点的进度。" },
+      { title: "未知环境探索", body: "只给定起点和终点，边飞行边建立局部地图，规划安全航迹并在环境变化时实时重规划。" },
+    ],
+  } : {
+    question: "What should your drone do?",
+    placeholder: "Describe the goal, waypoints, environment, and work to complete…",
+    workflow: "Autonomous mission",
+    context: "Mission context",
+    aircraft: "Current aircraft",
+    map: "Current map",
+    mission: "Existing mission contract",
+    send: "Build mission contract",
+    model: "Model",
+    microphone: "Use voice input",
+    stopVoice: "Stop voice input",
+    requestingVoice: "Requesting microphone access…",
+    listening: "Listening…",
+    voiceConsent: "Your browser may use a speech service to transcribe microphone audio. Audio is not written to the mission contract.",
+    startVoice: "Allow and start",
+    cancelVoice: "Cancel",
+    voiceUnavailable: "Voice input is unavailable here. You can keep typing.",
+    tooLong: "The mission description must stay within 2,000 characters.",
+    modelUnavailable: "Choose an available planning model before continuing.",
+    examples: [
+      { title: "Office pickup", body: "Take off from the office, avoid people in the corridor and stairwell, collect the payload, and return safely." },
+      { title: "Visual inspection", body: "Inspect the assigned area with live vision, track dynamic obstacles, and report progress at every checkpoint." },
+      { title: "Unknown environment", body: "Use only the start and goal, build a local map in flight, plan a safe route, and replan as the world changes." },
+    ],
+  };
+  const appendTranscript = useCallback((transcript: string) => {
+    setComposer((current) => {
+      const next = current.trim() ? `${current.trim()} ${transcript}` : transcript;
+      return next.slice(0, 2_000);
+    });
+  }, [setComposer]);
+  const voice = useVoiceInput({ locale: chinese ? "zh-CN" : "en", onTranscript: appendTranscript });
+
+  useEffect(() => {
+    if (!auth?.account) {
+      setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
+      setManagedModelsReady(true);
+      return;
+    }
+    let active = true;
+    setManagedModelsReady(false);
+    void getManagedModelCatalog()
+      .then((catalog) => {
+        if (!active) return;
+        setManagedModels(completeManagedModelCatalog(catalog.models));
+        setManagedModelsReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
+        setManagedModelsReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth?.account]);
+
+  useEffect(() => {
+    if (
+      modelAccess.accessMode !== "platform"
+      || selectedManagedModel
+      || !managedModelsReady
+    ) return;
+    const fallback = managedModels.find(managedModelAvailableForAssistant);
+    if (fallback) selectManagedModel(fallback.provider, fallback.model);
+  }, [
+    managedModels,
+    managedModelsReady,
+    modelAccess.accessMode,
+    selectManagedModel,
+    selectedManagedModel,
+  ]);
+
+  useEffect(() => {
+    if (!contextMenuOpen) return undefined;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!contextMenuRef.current?.contains(event.target as Node)) setContextMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setContextMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextMenuOpen]);
+
+  const submitMission = async (event: FormEvent) => {
+    event.preventDefault();
+    const intent = composer.trim();
+    if (!intent) return;
+    if (intent.length > 2_000) {
+      setError(copy.tooLong);
+      return;
+    }
+    if (!selectedPlanningModel || generating) {
+      setError(copy.modelUnavailable);
+      return;
+    }
+    voice.cancel();
+    consumeAutonomyHandoff();
+    setGenerating(true);
+    setError(null);
+    try {
+      const assistantWorkspaceId = createExperimentWorkspaceId();
+      const response = selectedPlanningModel.accessMode === "platform"
+        ? (await orchestrateAssistantTurn({
+            edition,
+            workspaceId: assistantWorkspaceId,
+            organizationId: activeAssistantTenantContext(auth?.account?.id ?? "local").organizationId,
+            idempotencyKey: `autonomy:${assistantWorkspaceId}`,
+            message: intent,
+            requestedTaskType: "mission_autonomy",
+            locale: chinese ? "zh-CN" : "en",
+            selectedModel: selectedPlanningModel,
+            currentValues: {},
+            documentContext: null,
+          })).response
+        : await apiClient.compileExperimentAssistantTurn({
+            message_id: assistantWorkspaceId,
+            message: intent,
+            locale: chinese ? "zh-CN" : "en",
+            conversation_summary: "Autonomy mission planning",
+            current_values: {},
+            explicit_field_ids: [],
+            current_parameters: [],
+            document_context: null,
+            llm: {
+              access_mode: "byok",
+              provider: modelAccess.provider,
+              api_key: modelAccess.apiKey,
+              platform_grant: null,
+              model: modelAccess.model.trim(),
+              base_url: modelAccess.baseUrl.trim() || null,
+            },
+          });
+      const planningBrief = response.assistant_message?.trim()
+        || response.experiment_summary.trim();
+      const updatedAt = new Date().toISOString();
+      persist(updatedWorkspace(workspace, {
+        mission: {
+          ...workspace.mission,
+          intent,
+          planningModel: selectedPlanningModel,
+          planningBrief,
+          planningRunId: response.orchestration?.run_id ?? assistantWorkspaceId,
+          aircraftProfileId: workspace.aircraft.id,
+          mapPackId: workspace.mapPack.id,
+          currentStep: 0,
+          updatedAt,
+        },
+      }));
+      setComposer("");
+      navigate("/autonomy/mission?from=overview");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : copy.modelUnavailable);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const voiceStatus = voice.state === "requesting"
+    ? copy.requestingVoice
+    : voice.state === "listening"
+      ? copy.listening
+      : voice.error
+        ? copy.voiceUnavailable
+        : null;
+
   return (
-    <section className="autonomy-overview-page">
-      <div className="autonomy-overview-grid">
-        {cards.map(({ id, icon: Icon, title, value, meta, state, to }) => (
-          <Link className={`autonomy-overview-card is-${id}`} to={to} key={id}>
-            <header><Icon aria-hidden="true" /><span>{title}</span><em>{state}</em></header>
-            <strong>{value}</strong>
-            <small>{meta}</small>
-            <ChevronRight aria-hidden="true" />
-          </Link>
-        ))}
-      </div>
-      <div className="autonomy-readiness-strip">
-        <Metric icon={<Weight aria-hidden="true" />} label={chinese ? "最大起飞重量" : "MTOM"} value={`${aircraft.maximumTakeoffMassKg.toFixed(2)} kg`} />
-        <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "机体包络" : "Body envelope"} value={`${aircraft.bodyLengthM.toFixed(2)} × ${aircraft.bodyWidthM.toFixed(2)} m`} />
-        <Metric icon={<MapPin aria-hidden="true" />} label={chinese ? "地图资产" : "Map assets"} value={String(mapPack.sourceFiles.length)} />
-        <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "地图资格" : "Map qualification"} value={mapReady ? "READY" : "BLOCKED"} />
+    <section className="autonomy-command-page" data-grants-hardware-authority="false">
+      <div className="autonomy-command-stage">
+        <div className="assistant-hero-icon autonomy-command-hero-icon" aria-hidden="true">
+          <AutonomyCloudTerminalIcon />
+        </div>
+        <h2>{copy.question}</h2>
+        <div className="assistant-examples autonomy-command-examples">
+          {copy.examples.map((example, index) => (
+            <button type="button" key={example.title} onClick={() => setComposer(example.body)}>
+              <span className="assistant-example-heading">
+                <AutonomyTemplateIcon index={index} />
+                <strong>{example.title}</strong>
+              </span>
+              <span className="assistant-example-body">{example.body}</span>
+            </button>
+          ))}
+        </div>
+        <form className="assistant-composer autonomy-command-composer" onSubmit={submitMission}>
+          <textarea
+            value={composer}
+            maxLength={2_000}
+            rows={3}
+            placeholder={copy.placeholder}
+            aria-label={copy.placeholder}
+            onChange={(event) => {
+              setComposer(event.target.value);
+              setError(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+          <div className="assistant-composer-bar">
+            <div className="assistant-add-menu" ref={contextMenuRef}>
+              <button
+                type="button"
+                className="assistant-add-button"
+                aria-label={copy.context}
+                title={copy.context}
+                aria-haspopup="menu"
+                aria-expanded={contextMenuOpen}
+                onClick={() => setContextMenuOpen((current) => !current)}
+              >
+                <Plus aria-hidden="true" strokeWidth={1.8} />
+              </button>
+              {contextMenuOpen ? (
+                <div className="assistant-add-popover autonomy-context-popover" role="menu">
+                  <strong className="assistant-task-popover-title">{copy.context}</strong>
+                  <Link to="/autonomy/aircraft" role="menuitem" onClick={() => setContextMenuOpen(false)}>
+                    <Navigation2 aria-hidden="true" />
+                    <span><b>{copy.aircraft}</b><small>{workspace.aircraft.name}</small></span>
+                  </Link>
+                  <Link to="/autonomy/maps" role="menuitem" onClick={() => setContextMenuOpen(false)}>
+                    <Layers3 aria-hidden="true" />
+                    <span><b>{copy.map}</b><small>{workspace.mapPack.name}</small></span>
+                  </Link>
+                  <Link to="/autonomy/mission" role="menuitem" onClick={() => setContextMenuOpen(false)}>
+                    <Waypoints aria-hidden="true" />
+                    <span><b>{copy.mission}</b><small>{workspace.mission.intent}</small></span>
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+            <span className="assistant-task-chip is-explicit"><Route aria-hidden="true" />{copy.workflow}</span>
+            <span className="assistant-composer-spacer" />
+            <AssistantModelPicker
+              ariaLabel={copy.model}
+              defaultModels={managedModels}
+              customProfiles={configuredProfiles}
+              selectedDefault={modelAccess.accessMode === "platform" ? selectedManagedModel : null}
+              selectedCustomId={selectedCustomProfileId}
+              disabled={!managedModelsReady}
+              onSelectDefault={(model) => {
+                selectAccessMode("platform");
+                selectManagedModel(model.provider, model.model);
+              }}
+              onSelectCustom={(profileId) => {
+                selectProfile(profileId);
+                selectAccessMode("byok");
+              }}
+              onOpenSettings={openAppSettings}
+            />
+            <button
+              type="button"
+              className={`assistant-voice-button ${voice.state === "listening" ? "listening" : ""}`}
+              aria-label={voice.state === "listening" ? copy.stopVoice : copy.microphone}
+              title={voice.state === "listening" ? copy.stopVoice : copy.microphone}
+              onClick={() => {
+                if (voice.state === "listening") {
+                  voice.stop();
+                  return;
+                }
+                if (!voice.supported) {
+                  void voice.start();
+                  return;
+                }
+                if (!voiceConsentGranted) {
+                  setVoiceConsentPending(true);
+                  return;
+                }
+                void voice.start();
+              }}
+            >
+              <Mic aria-hidden="true" strokeWidth={1.9} />
+            </button>
+            <button
+              type="submit"
+              className="assistant-send-button"
+              disabled={!composer.trim() || !managedModelsReady || !selectedPlanningModel || generating}
+              aria-label={copy.send}
+              title={copy.send}
+            >
+              <ArrowUp aria-hidden="true" strokeWidth={2} />
+            </button>
+          </div>
+          {voiceConsentPending ? (
+            <div className="assistant-voice-consent" role="note">
+              <p>{copy.voiceConsent}</p>
+              <button type="button" className="btn btn-primary" onClick={() => {
+                setVoiceConsentPending(false);
+                setVoiceConsentGranted(true);
+                void voice.start();
+              }}>{copy.startVoice}</button>
+              <button type="button" className="btn" onClick={() => setVoiceConsentPending(false)}>{copy.cancelVoice}</button>
+            </div>
+          ) : null}
+          {voiceStatus ? <p className="assistant-composer-status">{voiceStatus}</p> : null}
+          {error ? <p className="assistant-composer-error" role="alert">{error}</p> : null}
+        </form>
       </div>
     </section>
   );
@@ -777,7 +1147,7 @@ export function AutonomyMission() {
       </ol>
 
       <div className="autonomy-mission-stage">
-        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />Tuning Chat</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
+        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />Tuning Chat</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-mission-model"><Cpu aria-hidden="true" /><span>{chinese ? "规划模型" : "Planning model"}</span><strong>{workspace.mission.planningModel.provider} · {workspace.mission.planningModel.model}</strong></div>{workspace.mission.planningBrief ? <p className="autonomy-planning-brief">{workspace.mission.planningBrief}</p> : null}<div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
         {step === 1 ? <section><header><Navigation2 aria-hidden="true" /><h2>{workspace.aircraft.name}</h2><Link className="btn" to="/autonomy/aircraft">{chinese ? "编辑机型" : "Edit aircraft"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Weight />} label={chinese ? "空机重量" : "Dry mass"} value={`${workspace.aircraft.dryMassKg.toFixed(2)} kg`} /><Metric icon={<Gauge />} label="MTOM" value={`${workspace.aircraft.maximumTakeoffMassKg.toFixed(2)} kg`} /><Metric icon={<Camera />} label={chinese ? "感知设备" : "Sensors"} value={String(workspace.aircraft.sensors.length)} /><Metric icon={<Cpu />} label={chinese ? "飞控" : "Firmware"} value={workspace.aircraft.firmware} /></div></section> : null}
         {step === 2 ? <section><header><Layers3 aria-hidden="true" /><h2>{workspace.mapPack.name}</h2><Link className="btn" to="/autonomy/maps">{chinese ? "编辑地图" : "Edit map"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Database />} label={chinese ? "表示" : "Representation"} value={workspace.mapPack.representation} /><Metric icon={<ScanLine />} label={chinese ? "分辨率" : "Resolution"} value={`${workspace.mapPack.resolutionM.toFixed(3)} m`} /><Metric icon={<HardDrive />} label={chinese ? "资产" : "Assets"} value={String(workspace.mapPack.sourceFiles.length)} /><Metric icon={<ShieldCheck />} label={chinese ? "资格" : "Qualification"} value={mapReady ? "READY" : "BLOCKED"} /></div></section> : null}
         {step === 3 ? <section><header><Route aria-hidden="true" /><h2>{chinese ? "航迹目标" : "Trajectory objectives"}</h2></header><div className="autonomy-planner-choices"><button className="is-selected"><ShieldCheck />{chinese ? "安全优先" : "Safety first"}</button><button><Activity />{chinese ? "平滑飞行" : "Smooth flight"}</button><button><Gauge />{chinese ? "时间效率" : "Time efficient"}</button><button><Cpu />{chinese ? "能量效率" : "Energy efficient"}</button></div></section> : null}

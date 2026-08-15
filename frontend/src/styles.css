@@ -49,7 +49,7 @@
   width: 100%;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0.72rem;
   color: #211827;
 }
@@ -57,62 +57,24 @@
 .autonomy-platform-header {
   display: flex;
   min-width: 0;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: clamp(1rem, 2vw, 2rem);
   padding: 0 0.22rem;
 }
 
-.autonomy-platform-header > div:first-child {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 0.7rem;
-}
-
-.autonomy-platform-header > div:first-child > span {
-  color: var(--dd-brand-middle);
-  font-size: 0.68rem;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-}
-
 .autonomy-platform-header h1 {
+  flex: 0 0 auto;
   margin: 0;
   font-size: clamp(1.7rem, 2.25vw, 2.6rem);
   line-height: 1;
   letter-spacing: -0.045em;
 }
 
-.autonomy-platform-actions,
-.autonomy-platform-actions small,
-.autonomy-platform-actions .btn {
-  display: flex;
-  align-items: center;
-}
-
-.autonomy-platform-actions {
-  gap: 0.55rem;
-}
-
-.autonomy-platform-actions small {
-  gap: 0.38rem;
-  color: #7c7081;
-  font-weight: 750;
-}
-
-.autonomy-platform-actions small i {
-  width: 0.48rem;
-  height: 0.48rem;
-  border-radius: 50%;
-  background: #21af87;
-  box-shadow: 0 0 0 4px rgba(33, 175, 135, 0.12);
-}
-
 .autonomy-section-switch {
   display: grid;
-  width: min(860px, 100%);
-  margin: 0 auto;
+  width: min(800px, 100%);
+  margin: 0 0 0 auto;
   padding: 0.35rem;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.24rem;
@@ -161,12 +123,89 @@
   scrollbar-gutter: stable;
 }
 
-.autonomy-overview-page,
+.autonomy-command-page,
 .autonomy-evidence-page {
   display: grid;
   min-height: 100%;
   align-content: start;
   gap: 0.8rem;
+}
+
+.autonomy-command-page {
+  place-content: center;
+  place-items: center;
+  padding: clamp(0.75rem, 2vh, 1.5rem) clamp(0.25rem, 2vw, 1.5rem);
+}
+
+.autonomy-command-stage {
+  display: flex;
+  width: min(100%, 72rem);
+  align-items: center;
+  flex-direction: column;
+}
+
+.autonomy-command-page .autonomy-command-hero-icon {
+  margin-bottom: 0.7rem;
+  color: color-mix(in srgb, var(--dd-brand-end) 70%, #aaa4ad);
+}
+
+.autonomy-command-stage > h2 {
+  margin: 0;
+  color: #211827;
+  font-size: clamp(1.85rem, 3vw, 3.25rem);
+  font-weight: 680;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.autonomy-command-page .autonomy-command-examples {
+  width: min(100%, 62rem);
+  margin: clamp(0.8rem, 1.6vh, 1.15rem) 0 clamp(0.9rem, 2vh, 1.35rem);
+}
+
+.autonomy-command-page .autonomy-command-composer {
+  width: min(100%, 64rem);
+  margin: 0 auto;
+}
+
+.autonomy-command-page .assistant-task-chip {
+  gap: 0.38rem;
+  color: var(--dd-brand-end);
+}
+
+.autonomy-command-page .assistant-task-chip svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.autonomy-context-popover {
+  width: min(23rem, calc(100vw - 2rem));
+}
+
+.autonomy-context-popover a > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+}
+
+.autonomy-context-popover a b,
+.autonomy-context-popover a small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-context-popover a b {
+  font-size: 0.86rem;
+}
+
+.autonomy-context-popover a small {
+  max-width: 18rem;
+  color: #8c808f;
+  font-size: 0.7rem;
+  font-weight: 480;
 }
 
 .autonomy-overview-grid {
@@ -717,6 +756,31 @@
   gap: 0.85rem;
 }
 
+.autonomy-mission-model {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  padding: 0.48rem 0.72rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, #ddd7e4);
+  border-radius: 999px;
+  color: #706779;
+  background: color-mix(in srgb, var(--dd-brand-start) 6%, #fff);
+  font-size: 0.78rem;
+}
+
+.autonomy-mission-model svg { width: 1rem; height: 1rem; color: var(--dd-brand-middle); }
+.autonomy-mission-model strong { overflow: hidden; color: #2c2431; text-overflow: ellipsis; white-space: nowrap; }
+
+.autonomy-planning-brief {
+  max-width: 64rem;
+  margin: 0 0 1rem;
+  color: #6f6675;
+  line-height: 1.55;
+}
+
 .autonomy-contract-points span {
   display: flex;
   align-items: center;
@@ -895,12 +959,12 @@
 
 @media (max-width: 820px) {
   .app-main:has(.autonomy-platform-page) { overflow: auto; }
-  .autonomy-platform-page { min-height: 100%; grid-template-rows: auto auto auto; }
-  .autonomy-platform-header { align-items: center; }
-  .autonomy-platform-actions small { display: none; }
+  .autonomy-platform-page { min-height: 100%; grid-template-rows: auto auto; }
+  .autonomy-platform-header { align-items: stretch; flex-direction: column; }
   .autonomy-section-switch { width: 100%; overflow-x: auto; grid-template-columns: repeat(6, minmax(105px, 1fr)); border-radius: 16px; }
   .autonomy-section-switch a { min-height: 2.15rem; }
   .autonomy-platform-content { overflow: visible; }
+  .autonomy-command-page { min-height: 68vh; }
   .autonomy-config-page { grid-template-columns: 1fr; }
   .autonomy-config-summary { position: static; }
   .autonomy-mission-stepper { overflow-x: auto; grid-template-columns: repeat(6, minmax(120px, 1fr)); }
@@ -914,8 +978,9 @@
 }
 
 @media (max-width: 560px) {
-  .autonomy-platform-header > div:first-child > span { display: none; }
   .autonomy-platform-header h1 { font-size: 1.65rem; }
+  .autonomy-command-stage > h2 { font-size: 1.8rem; white-space: normal; }
+  .autonomy-command-page .assistant-task-chip { max-width: 9.5rem; }
   .autonomy-overview-grid,
   .autonomy-form-grid.is-three,
   .autonomy-form-grid.is-four,

@@ -85,11 +85,24 @@ export function useVoiceInput({
   }, []);
 
   const stop = useCallback(() => {
+    const recognition = recognitionRef.current;
+    if (!recognition || phaseRef.current !== "listening") {
+      operationRef.current += 1;
+    }
+    phaseRef.current = "idle";
+    clearRecognitionTimeout();
+    recognition?.stop();
+    recognitionRef.current = null;
+    setState("idle");
+  }, [clearRecognitionTimeout]);
+
+  const cancel = useCallback(() => {
     operationRef.current += 1;
     phaseRef.current = "idle";
     clearRecognitionTimeout();
-    recognitionRef.current?.stop();
+    const recognition = recognitionRef.current;
     recognitionRef.current = null;
+    recognition?.abort();
     setState("idle");
   }, [clearRecognitionTimeout]);
 
@@ -130,6 +143,7 @@ export function useVoiceInput({
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
       recognition.onresult = (event) => {
+        if (operationRef.current !== operation) return;
         let transcript = "";
         for (let index = event.resultIndex; index < event.results.length; index += 1) {
           const result = event.results[index];
@@ -188,6 +202,7 @@ export function useVoiceInput({
     supported,
     start,
     stop,
+    cancel,
     clearError: () => {
       phaseRef.current = "idle";
       setError(null);
