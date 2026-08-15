@@ -280,11 +280,14 @@ export function AutonomyAircraft() {
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
   const valid = isAutonomyAircraftProfileValid(form);
+  const updateAircraft = (patch: Partial<AutonomyAircraftProfile>) => {
+    setForm((current) => ({ ...current, ...patch }));
+    setSaved(false);
+  };
   const numberField = (key: keyof AutonomyAircraftProfile, value: string) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return;
-    setForm((current) => ({ ...current, [key]: numeric }));
-    setSaved(false);
+    updateAircraft({ [key]: numeric });
   };
   const save = (event: FormEvent) => {
     event.preventDefault();
@@ -311,10 +314,10 @@ export function AutonomyAircraft() {
         <section className="autonomy-config-card">
           <header><Navigation2 aria-hidden="true" /><h2>{chinese ? "机型身份" : "Aircraft identity"}</h2></header>
           <div className="autonomy-form-grid is-three">
-            <label><span>{chinese ? "名称" : "Name"}</span><input value={form.name} maxLength={120} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-            <label><span>{chinese ? "制造商" : "Manufacturer"}</span><input value={form.manufacturer} maxLength={120} onChange={(event) => setForm({ ...form, manufacturer: event.target.value })} /></label>
-            <label><span>{chinese ? "机架" : "Airframe"}</span><input value={form.airframe} maxLength={120} onChange={(event) => setForm({ ...form, airframe: event.target.value })} /></label>
-            <label className="is-wide"><span>{chinese ? "飞控固件" : "Flight controller firmware"}</span><input value={form.firmware} maxLength={120} onChange={(event) => setForm({ ...form, firmware: event.target.value })} /></label>
+            <label><span>{chinese ? "名称" : "Name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateAircraft({ name: event.target.value })} /></label>
+            <label><span>{chinese ? "制造商" : "Manufacturer"}</span><input value={form.manufacturer} maxLength={120} onChange={(event) => updateAircraft({ manufacturer: event.target.value })} /></label>
+            <label><span>{chinese ? "机架" : "Airframe"}</span><input value={form.airframe} maxLength={120} onChange={(event) => updateAircraft({ airframe: event.target.value })} /></label>
+            <label className="is-wide"><span>{chinese ? "飞控固件" : "Flight controller firmware"}</span><input value={form.firmware} maxLength={120} onChange={(event) => updateAircraft({ firmware: event.target.value })} /></label>
           </div>
         </section>
 
