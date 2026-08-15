@@ -31,6 +31,7 @@ export interface AutonomySensorMount {
   id: string;
   kind: AutonomySensorKind;
   calibrated: boolean;
+  calibrationStatus: "unverified" | "verified" | "expired" | "failed";
   positionM: AutonomyVector3;
   rollPitchYawDeg: AutonomyVector3;
   rateHz: number;
@@ -47,6 +48,7 @@ export interface AutonomyAircraftProfile {
   manufacturer: string;
   airframe: string;
   flightController: string;
+  autopilot: "px4" | "ardupilot" | "custom";
   firmware: string;
   controlInterface: "px4-ros2" | "mavsdk" | "mavlink" | "simulation-only";
   computePlatform: string;
@@ -130,7 +132,11 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     && within(aircraft.maximumTiltDeg, "maximumTiltDeg")
     && aircraft.commandLink.latencyMs >= 0
     && aircraft.commandLink.bandwidthMbps > 0
-    && aircraft.sensorMounts.some((sensor) => sensor.calibrated && (sensor.kind === "gps" || sensor.kind === "vio"));
+    && aircraft.sensorMounts.some((sensor) => (
+      sensor.calibrated
+      && sensor.calibrationStatus === "verified"
+      && (sensor.kind === "gps" || sensor.kind === "vio")
+    ));
 }
 
 export interface AutonomyMapSourceFile {
@@ -275,6 +281,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       manufacturer: "Custom",
       airframe: "Quad X",
       flightController: "Pixhawk 6C",
+      autopilot: "px4",
       firmware: "PX4 v1.16",
       controlInterface: "px4-ros2",
       computePlatform: "Jetson Orin NX",
@@ -303,10 +310,10 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       },
       sensors: ["rgb", "depth", "gps", "vio"],
       sensorMounts: [
-        { id: "front-rgb", kind: "rgb", calibrated: true, positionM: { x: 0.18, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
-        { id: "front-depth", kind: "depth", calibrated: true, positionM: { x: 0.17, y: 0, z: -0.04 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
-        { id: "gps-primary", kind: "gps", calibrated: true, positionM: { x: 0, y: 0, z: 0.12 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 3 },
-        { id: "vio-primary", kind: "vio", calibrated: true, positionM: { x: 0.16, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
+        { id: "front-rgb", kind: "rgb", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.18, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
+        { id: "front-depth", kind: "depth", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.17, y: 0, z: -0.04 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
+        { id: "gps-primary", kind: "gps", calibrated: true, calibrationStatus: "verified", positionM: { x: 0, y: 0, z: 0.12 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 3 },
+        { id: "vio-primary", kind: "vio", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.16, y: 0, z: -0.03 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 7 },
       ],
       updatedAt,
     },
@@ -399,7 +406,12 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     )).slice(0, 64).map((sensor, index) => ({
       id: boundedText(sensor.id, `sensor-${index + 1}`, 80),
       kind: sensor.kind,
-      calibrated: sensor.calibrated === true,
+      calibrated: sensor.calibrationStatus
+        ? sensor.calibrationStatus === "verified"
+        : sensor.calibrated === true,
+      calibrationStatus: ["unverified", "verified", "expired", "failed"].includes(String(sensor.calibrationStatus))
+        ? sensor.calibrationStatus
+        : sensor.calibrated === true ? "verified" : "unverified",
       positionM: boundedVector(sensor.positionM, { x: 0, y: 0, z: 0 }, -10, 10),
       rollPitchYawDeg: boundedVector(sensor.rollPitchYawDeg, { x: 0, y: 0, z: 0 }, -360, 360),
       rateHz: boundedNumber(sensor.rateHz, 30, 0.1, 1_000),
@@ -420,6 +432,9 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     manufacturer: boundedText(aircraft.manufacturer, fallback.aircraft.manufacturer),
     airframe: boundedText(aircraft.airframe, fallback.aircraft.airframe),
     flightController: boundedText(aircraft.flightController, fallback.aircraft.flightController),
+    autopilot: ["px4", "ardupilot", "custom"].includes(String(aircraft.autopilot))
+      ? aircraft.autopilot as AutonomyAircraftProfile["autopilot"]
+      : typeof aircraft.firmware === "string" && aircraft.firmware.toLowerCase().includes("ardu") ? "ardupilot" : "px4",
     firmware: boundedText(aircraft.firmware, fallback.aircraft.firmware),
     controlInterface: ["px4-ros2", "mavsdk", "mavlink", "simulation-only"].includes(String(aircraft.controlInterface))
       ? aircraft.controlInterface as AutonomyAircraftProfile["controlInterface"]
