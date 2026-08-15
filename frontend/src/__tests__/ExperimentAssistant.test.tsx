@@ -324,7 +324,9 @@ describe("conversational experiment drafting", () => {
       expect(stopTrack).toHaveBeenCalledTimes(1);
       expect(recognitionStart).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByText("Listening…")).toBeVisible();
+    expect(screen.queryByText("Listening…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop voice input" }))
+      .toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps the manual five-step path available beside the conversation path", () => {

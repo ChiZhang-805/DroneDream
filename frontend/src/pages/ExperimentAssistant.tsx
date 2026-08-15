@@ -5,20 +5,35 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowUp,
+  Boxes,
+  BrainCircuit,
+  Crosshair,
+  Download,
   FileText,
+  FileUp,
+  GitFork,
+  LoaderCircle,
+  MapPinned,
   Mic,
+  MicOff,
+  Microchip,
+  MonitorPlay,
   Orbit,
-  Paperclip,
   PencilRuler,
   Plus,
   Route,
+  SlidersHorizontal,
+  Square,
+  Upload,
   Wind,
   Workflow,
   X,
+  type LucideIcon,
 } from "lucide-react";
 
 import { apiClient, ApiClientError } from "../api/client";
@@ -103,6 +118,19 @@ import type {
 } from "../types/api";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 
+const TASK_ICON_BY_TYPE: Record<AssistantTaskType, LucideIcon> = {
+  control_tuning: SlidersHorizontal,
+  mission_autonomy: Route,
+  vehicle_modeling: Boxes,
+  simulation_experiment: MonitorPlay,
+  cross_edition_workflow: GitFork,
+  hardware_validation: Microchip,
+  calibration: Crosshair,
+  sim_to_real: Upload,
+  real_to_sim: Download,
+  field_task: MapPinned,
+};
+
 const COPY = {
   en: {
     title: "What flight experiment should we build?",
@@ -112,7 +140,7 @@ const COPY = {
     moreActions: "More ways to start",
     taskType: "Task workflow",
     autoTask: "Auto-detect",
-    autoTaskDescription: "Let the model classify the request before choosing a workflow.",
+    autoTaskDescription: "Let the model choose the right workflow.",
     importFiles: "Import files",
     removeFile: "Remove file",
     unsupportedFile: "Use JSON, text, Markdown, CSV, YAML, TOML, XML, or log files.",
@@ -137,6 +165,7 @@ const COPY = {
       "Windows WebView2 may send microphone audio to Microsoft for speech transcription. Audio is not added to the experiment draft.",
     voiceConsentWeb:
       "Your browser may send microphone audio to its speech service for transcription. Audio is not added to the experiment draft.",
+    allowVoice: "Allow",
     startVoice: "Allow and start",
     cancelVoice: "Cancel",
     voiceUnsupported: "Voice input is unavailable here. You can keep typing.",
@@ -186,7 +215,7 @@ const COPY = {
     moreActions: "更多创建方式",
     taskType: "任务工作流",
     autoTask: "自动判断",
-    autoTaskDescription: "先由模型判断任务类型，再进入对应工作流。",
+    autoTaskDescription: "让模型选择合适的工作流。",
     importFiles: "导入参考文件",
     removeFile: "移除文件",
     unsupportedFile: "请选择 JSON、文本、Markdown、CSV、YAML、TOML、XML 或日志文件。",
@@ -210,6 +239,7 @@ const COPY = {
       "Windows WebView2 可能将麦克风音频发送给 Microsoft 完成语音转写，原始音频不会写入实验草稿。",
     voiceConsentWeb:
       "浏览器可能将麦克风音频发送给其语音服务完成转写，原始音频不会写入实验草稿。",
+    allowVoice: "允许",
     startVoice: "允许并开始",
     cancelVoice: "取消",
     voiceUnsupported: "当前环境不支持语音输入，你仍可继续打字。",
@@ -781,7 +811,7 @@ export function ExperimentAssistant() {
   const [pending, setPending] = useState(false);
   const [runStage, setRunStage] = useState<AssistantRunStage | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [voiceConsentPending, setVoiceConsentPending] = useState(false);
+  const [voiceConsentIntent, setVoiceConsentIntent] = useState<"toggle" | "hold" | null>(null);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>(null);
@@ -795,6 +825,9 @@ export function ExperimentAssistant() {
   const restoredWorkspaceRef = useRef<string | null>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const voiceHoldTimerRef = useRef<number | null>(null);
+  const voiceHoldActiveRef = useRef(false);
+  const suppressVoiceClickRef = useRef(false);
 
   useEffect(() => {
     if (docsPreview) {
@@ -861,7 +894,14 @@ export function ExperimentAssistant() {
   const voice = useVoiceInput({
     locale,
     onTranscript: appendTranscript,
+    continuous: true,
+    maxDurationMs: 5 * 60_000,
   });
+  useEffect(() => () => {
+    if (voiceHoldTimerRef.current !== null) {
+      window.clearTimeout(voiceHoldTimerRef.current);
+    }
+  }, []);
   const messages = draft.conversation.messages;
   const taskOptions = assistantTaskOptions(editionTheme.id, interfaceLocale);
   const selectedTask = taskOptions.find(({ id }) => id === selectedTaskType) ?? null;
@@ -1198,12 +1238,68 @@ export function ExperimentAssistant() {
     setComposer(example);
   }
 
-  const voiceStatus =
+  function requestVoiceStart(intent: "toggle" | "hold"): void {
+    if (!voice.supported) {
+      void voice.start();
+      return;
+    }
+    if (!voiceConsentGranted) {
+      setVoiceConsentIntent(intent);
+      return;
+    }
+    void voice.start();
+  }
+
+  function toggleVoiceInput(): void {
+    if (voice.state === "listening" || voice.state === "requesting") {
+      voice.stop();
+      return;
+    }
+    requestVoiceStart("toggle");
+  }
+
+  function beginVoiceHold(event: ReactPointerEvent<HTMLButtonElement>): void {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (voice.state === "listening" || voice.state === "requesting") return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (voiceHoldTimerRef.current !== null) {
+      window.clearTimeout(voiceHoldTimerRef.current);
+    }
+    voiceHoldActiveRef.current = false;
+    voiceHoldTimerRef.current = window.setTimeout(() => {
+      voiceHoldTimerRef.current = null;
+      voiceHoldActiveRef.current = true;
+      requestVoiceStart("hold");
+    }, 420);
+  }
+
+  function endVoiceHold(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    cancelled = false,
+  ): void {
+    if (voiceHoldTimerRef.current !== null) {
+      window.clearTimeout(voiceHoldTimerRef.current);
+      voiceHoldTimerRef.current = null;
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!voiceHoldActiveRef.current) return;
+    voiceHoldActiveRef.current = false;
+    suppressVoiceClickRef.current = !cancelled;
+    if (voice.state === "requesting" || voice.state === "listening") {
+      voice.stop();
+    }
+  }
+
+  const voiceButtonLabel =
     voice.state === "requesting"
       ? copy.requestingVoice
       : voice.state === "listening"
-        ? copy.listening
-        : voiceMessage(voice.error, copy);
+        ? copy.stopVoice
+        : voice.state === "error"
+          ? voiceMessage(voice.error, copy) ?? copy.microphone
+          : copy.microphone;
   const voiceConsentCopy = isDesktopRuntime()
     ? copy.voiceConsentDesktop
     : copy.voiceConsentWeb;
@@ -1425,45 +1521,59 @@ export function ExperimentAssistant() {
                   type="button"
                   role="menuitemradio"
                   aria-checked={selectedTaskType === null}
+                  data-task-icon="auto_detect"
                   className={selectedTaskType === null ? "is-selected" : ""}
                   onClick={() => {
                     setSelectedTaskType(null);
                     setActionMenuOpen(false);
                   }}
                 >
-                  <Orbit aria-hidden="true" strokeWidth={1.8} />
-                  <span><b>{copy.autoTask}</b><small>{copy.autoTaskDescription}</small></span>
+                  <span className="assistant-task-icon" aria-hidden="true">
+                    <BrainCircuit strokeWidth={1.8} />
+                  </span>
+                  <span className="assistant-task-popover-copy"><b>{copy.autoTask}</b><small>{copy.autoTaskDescription}</small></span>
                 </button>
-                {taskOptions.map((task) => (
-                  <button
-                    key={task.id}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={selectedTaskType === task.id}
-                    className={selectedTaskType === task.id ? "is-selected" : ""}
-                    onClick={() => {
-                      setSelectedTaskType(task.id);
-                      setActionMenuOpen(false);
-                    }}
-                  >
-                    {task.id === "mission_autonomy" ? <Route aria-hidden="true" strokeWidth={1.8} /> : <Workflow aria-hidden="true" strokeWidth={1.8} />}
-                    <span><b>{task.label}</b><small>{task.description}</small></span>
-                  </button>
-                ))}
+                {taskOptions.map((task) => {
+                  const TaskIcon = TASK_ICON_BY_TYPE[task.id];
+                  return (
+                    <button
+                      key={task.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selectedTaskType === task.id}
+                      data-task-icon={task.id}
+                      className={selectedTaskType === task.id ? "is-selected" : ""}
+                      onClick={() => {
+                        setSelectedTaskType(task.id);
+                        setActionMenuOpen(false);
+                      }}
+                    >
+                      <span className="assistant-task-icon" aria-hidden="true">
+                        <TaskIcon strokeWidth={1.8} />
+                      </span>
+                      <span className="assistant-task-popover-copy"><b>{task.label}</b><small>{task.description}</small></span>
+                    </button>
+                  );
+                })}
                 <hr />
-                <Link to="/jobs/new" role="menuitem" onClick={() => setActionMenuOpen(false)}>
-                  <PencilRuler aria-hidden="true" strokeWidth={1.8} />
+                <Link data-task-icon="manual" to="/jobs/new" role="menuitem" onClick={() => setActionMenuOpen(false)}>
+                  <span className="assistant-task-icon" aria-hidden="true">
+                    <PencilRuler strokeWidth={1.8} />
+                  </span>
                   <span>{copy.manual}</span>
                 </Link>
                 <button
                   type="button"
                   role="menuitem"
+                  data-task-icon="import"
                   onClick={() => {
                     setActionMenuOpen(false);
                     fileInputRef.current?.click();
                   }}
                 >
-                  <Paperclip aria-hidden="true" strokeWidth={1.8} />
+                  <span className="assistant-task-icon" aria-hidden="true">
+                    <FileUp strokeWidth={1.8} />
+                  </span>
                   <span>{copy.importFiles}</span>
                 </button>
               </div>
@@ -1500,31 +1610,36 @@ export function ExperimentAssistant() {
           <button
             type="button"
             className={`assistant-voice-button ${
-              voice.state === "listening" ? "listening" : ""
+              voice.state === "listening"
+                ? "listening"
+                : voice.state === "requesting"
+                  ? "requesting"
+                  : voice.state === "error" ? "error" : ""
             }`}
-            aria-label={
-              voice.state === "listening" ? copy.stopVoice : copy.microphone
-            }
-            title={
-              voice.state === "listening" ? copy.stopVoice : copy.microphone
-            }
+            aria-label={voiceButtonLabel}
+            aria-pressed={voice.state === "listening"}
+            title={voiceButtonLabel}
+            onPointerDown={beginVoiceHold}
+            onPointerUp={(event) => endVoiceHold(event)}
+            onPointerCancel={(event) => endVoiceHold(event, true)}
+            onContextMenu={(event) => event.preventDefault()}
             onClick={() => {
-              if (voice.state === "listening") {
-                voice.stop();
+              if (suppressVoiceClickRef.current) {
+                suppressVoiceClickRef.current = false;
                 return;
               }
-              if (!voice.supported) {
-                void voice.start();
-                return;
-              }
-              if (!voiceConsentGranted) {
-                setVoiceConsentPending(true);
-                return;
-              }
-              void voice.start();
+              toggleVoiceInput();
             }}
           >
-            <Mic aria-hidden="true" strokeWidth={1.9} />
+            {voice.state === "requesting" ? (
+              <LoaderCircle aria-hidden="true" strokeWidth={1.9} />
+            ) : voice.state === "listening" ? (
+              <Square className="assistant-voice-stop-icon" aria-hidden="true" strokeWidth={1.9} />
+            ) : voice.state === "error" ? (
+              <MicOff aria-hidden="true" strokeWidth={1.9} />
+            ) : (
+              <Mic aria-hidden="true" strokeWidth={1.9} />
+            )}
           </button>
           <button
             type="submit"
@@ -1536,31 +1651,29 @@ export function ExperimentAssistant() {
             <ArrowUp aria-hidden="true" strokeWidth={2} />
           </button>
         </div>
-        {voiceConsentPending ? (
+        {voiceConsentIntent ? (
           <div className="assistant-voice-consent" role="note">
             <p>{voiceConsentCopy}</p>
             <button
               type="button"
               className="btn btn-primary"
               onClick={() => {
-                setVoiceConsentPending(false);
+                const shouldStart = voiceConsentIntent === "toggle";
+                setVoiceConsentIntent(null);
                 setVoiceConsentGranted(true);
-                void voice.start();
+                if (shouldStart) void voice.start();
               }}
             >
-              {copy.startVoice}
+              {voiceConsentIntent === "toggle" ? copy.startVoice : copy.allowVoice}
             </button>
             <button
               type="button"
               className="btn"
-              onClick={() => setVoiceConsentPending(false)}
+              onClick={() => setVoiceConsentIntent(null)}
             >
               {copy.cancelVoice}
             </button>
           </div>
-        ) : null}
-        {voiceStatus ? (
-          <p className="assistant-composer-status">{voiceStatus}</p>
         ) : null}
         {error ? (
           <p className="assistant-composer-error" role="alert">

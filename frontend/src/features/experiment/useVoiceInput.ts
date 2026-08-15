@@ -30,7 +30,7 @@ interface SpeechRecognitionLike {
 }
 
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-const MAX_RECOGNITION_DURATION_MS = 60_000;
+const DEFAULT_MAX_RECOGNITION_DURATION_MS = 60_000;
 
 function recognitionConstructor(): SpeechRecognitionConstructor | null {
   const candidate = window as typeof window & {
@@ -61,9 +61,13 @@ function recognitionErrorMessage(error: string | undefined): string {
 export function useVoiceInput({
   locale,
   onTranscript,
+  continuous = false,
+  maxDurationMs = DEFAULT_MAX_RECOGNITION_DURATION_MS,
 }: {
   locale: "en" | "zh-CN";
   onTranscript: (transcript: string) => void;
+  continuous?: boolean;
+  maxDurationMs?: number;
 }) {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const timeoutRef = useRef<number | null>(null);
@@ -139,7 +143,7 @@ export function useVoiceInput({
       const recognition = new Recognition();
       recognitionRef.current = recognition;
       recognition.lang = locale === "zh-CN" ? "zh-CN" : "en-US";
-      recognition.continuous = false;
+      recognition.continuous = continuous;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
       recognition.onresult = (event) => {
@@ -172,7 +176,7 @@ export function useVoiceInput({
       recognition.start();
       timeoutRef.current = window.setTimeout(() => {
         recognitionRef.current?.stop();
-      }, MAX_RECOGNITION_DURATION_MS);
+      }, maxDurationMs);
       phaseRef.current = "listening";
       setState("listening");
     } catch (reason) {
@@ -183,7 +187,7 @@ export function useVoiceInput({
       setState("error");
       recognitionRef.current = null;
     }
-  }, [clearRecognitionTimeout, locale, onTranscript]);
+  }, [clearRecognitionTimeout, continuous, locale, maxDurationMs, onTranscript]);
 
   useEffect(
     () => () => {

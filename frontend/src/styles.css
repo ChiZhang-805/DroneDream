@@ -14375,6 +14375,24 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
   animation: assistant-listening 1.4s ease-in-out infinite;
 }
 
+.assistant-voice-button.requesting {
+  color: #8a43c2;
+}
+
+.assistant-voice-button.requesting svg {
+  animation: assistant-voice-spin 0.9s linear infinite;
+}
+
+.assistant-voice-button.error {
+  color: #bb3153;
+}
+
+.assistant-voice-button .assistant-voice-stop-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  fill: currentColor;
+}
+
 .assistant-add-button svg,
 .assistant-voice-button svg,
 .assistant-send-button svg {
@@ -14458,10 +14476,76 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
   background: #f4eafa;
 }
 
-.assistant-task-popover button > span {
+.assistant-task-popover-copy {
   display: grid;
   min-width: 0;
   gap: 0.1rem;
+}
+
+.assistant-task-icon {
+  display: grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  flex: 0 0 1.45rem;
+  place-items: center;
+  color: var(--task-icon-color, #6f5f73);
+}
+
+.assistant-task-icon svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.assistant-task-popover [data-task-icon="auto_detect"] {
+  --task-icon-color: #7c3aed;
+}
+
+.assistant-task-popover [data-task-icon="control_tuning"] {
+  --task-icon-color: #2563eb;
+}
+
+.assistant-task-popover [data-task-icon="mission_autonomy"] {
+  --task-icon-color: #0786a3;
+}
+
+.assistant-task-popover [data-task-icon="vehicle_modeling"] {
+  --task-icon-color: #7048c8;
+}
+
+.assistant-task-popover [data-task-icon="simulation_experiment"] {
+  --task-icon-color: #c96b08;
+}
+
+.assistant-task-popover [data-task-icon="cross_edition_workflow"] {
+  --task-icon-color: #c72b78;
+}
+
+.assistant-task-popover [data-task-icon="hardware_validation"] {
+  --task-icon-color: #0d7a6f;
+}
+
+.assistant-task-popover [data-task-icon="calibration"] {
+  --task-icon-color: #b2550b;
+}
+
+.assistant-task-popover [data-task-icon="sim_to_real"] {
+  --task-icon-color: #2171d5;
+}
+
+.assistant-task-popover [data-task-icon="real_to_sim"] {
+  --task-icon-color: #8438b8;
+}
+
+.assistant-task-popover [data-task-icon="field_task"] {
+  --task-icon-color: #d12b55;
+}
+
+.assistant-task-popover [data-task-icon="manual"] {
+  --task-icon-color: #ba2dad;
+}
+
+.assistant-task-popover [data-task-icon="import"] {
+  --task-icon-color: #4f6175;
 }
 
 .assistant-task-popover button b,
@@ -14777,6 +14861,22 @@ html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
   50% {
     box-shadow: 0 0 0 0.45rem rgba(199, 46, 103, 0);
   }
+}
+
+@keyframes assistant-voice-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-voice-button.requesting svg {
+    animation: none;
+  }
+}
+
+html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
+  animation: none;
 }
 
 @media (max-width: 900px) {
