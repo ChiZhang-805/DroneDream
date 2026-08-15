@@ -126,6 +126,18 @@ def test_vehicle_pack_qualification_migrates_legacy_v1_requests() -> None:
     assert receipt.status == "validated_unsigned"
 
 
+def test_legacy_px4_interface_remains_compatible_with_ardupilot_firmware_text() -> None:
+    legacy_payload = vehicle_payload()
+    legacy_payload.pop("autopilot")
+    legacy_payload["firmware"] = "ArduPilot-compatible custom build"
+
+    request = VehiclePackQualificationRequest.model_validate(legacy_payload)
+    receipt = qualify_vehicle_pack(request)
+
+    assert request.autopilot == "px4"
+    assert receipt.status == "validated_unsigned"
+
+
 def test_vehicle_pack_blocks_an_unqualified_localization_stack() -> None:
     payload = vehicle_payload()
     payload["sensors"] = []

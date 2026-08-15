@@ -80,7 +80,13 @@ class VehiclePackQualificationRequest(StrictModel):
     @model_validator(mode="after")
     def validate_dimensions(self) -> VehiclePackQualificationRequest:
         if self.autopilot is None:
-            inferred_autopilot = "ardupilot" if "ardu" in self.firmware.lower() else "px4"
+            inferred_autopilot = (
+                "px4"
+                if self.control_interface == "px4-ros2"
+                else "ardupilot"
+                if "ardu" in self.firmware.lower()
+                else "px4"
+            )
             object.__setattr__(self, "autopilot", inferred_autopilot)
         if min(self.body_size_m.x, self.body_size_m.y, self.body_size_m.z) <= 0:
             raise ValueError("body_size_m must be positive")
