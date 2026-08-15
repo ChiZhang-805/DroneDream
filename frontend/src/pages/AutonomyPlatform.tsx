@@ -71,7 +71,12 @@ import {
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import { consumeAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
+import { orchestrateAssistantTurn } from "../features/experiment/assistantOrchestration";
 import { useVoiceInput } from "../features/experiment/useVoiceInput";
+import {
+  activeAssistantTenantContext,
+  createExperimentWorkspaceId,
+} from "../features/experiment/workspaceRegistry";
 import {
   completeManagedModelCatalog,
   DEFAULT_MANAGED_MODEL_CATALOG,
@@ -271,6 +276,7 @@ export function AutonomyPlatform() {
 
 export function AutonomyOverview() {
   const {
+    edition,
     chinese,
     workspace,
     persist,
@@ -293,6 +299,7 @@ export function AutonomyOverview() {
   const [error, setError] = useState<string | null>(null);
   const [managedModels, setManagedModels] = useState(DEFAULT_MANAGED_MODEL_CATALOG);
   const [managedModelsReady, setManagedModelsReady] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const configuredProfiles = modelProfiles.filter((profile) => profile.apiKey.trim());
   const selectedManagedModel = managedModels.find(
@@ -304,6 +311,13 @@ export function AutonomyOverview() {
     && configuredProfiles.some((profile) => profile.id === activeProfileId)
     ? activeProfileId
     : null;
+  const selectedPlanningModel = modelAccess.accessMode === "platform"
+    ? selectedManagedModel
+      ? { accessMode: "platform" as const, provider: selectedManagedModel.provider, model: selectedManagedModel.model }
+      : null
+    : selectedCustomProfileId && modelAccess.model.trim()
+      ? { accessMode: "byok" as const, provider: modelAccess.provider, model: modelAccess.model.trim() }
+      : null;
   const copy = chinese ? {
     question: "你希望无人机完成什么任务？",
     placeholder: "描述目标、途经点、环境和需要完成的工作…",
@@ -419,7 +433,7 @@ export function AutonomyOverview() {
     };
   }, [contextMenuOpen]);
 
-  const submitMission = (event: FormEvent) => {
+  const submitMission = async (event: FormEvent) => {
     event.preventDefault();
     const intent = composer.trim();
     if (!intent) return;
@@ -427,33 +441,70 @@ export function AutonomyOverview() {
       setError(copy.tooLong);
       return;
     }
-    const planningModel = modelAccess.accessMode === "platform"
-      ? selectedManagedModel
-        ? { accessMode: "platform" as const, provider: selectedManagedModel.provider, model: selectedManagedModel.model }
-        : null
-      : selectedCustomProfileId && modelAccess.model.trim()
-        ? { accessMode: "byok" as const, provider: modelAccess.provider, model: modelAccess.model.trim() }
-        : null;
-    if (!planningModel) {
+    if (!selectedPlanningModel || generating) {
       setError(copy.modelUnavailable);
       return;
     }
     voice.cancel();
     consumeAutonomyHandoff();
-    const updatedAt = new Date().toISOString();
-    persist(updatedWorkspace(workspace, {
-      mission: {
-        ...workspace.mission,
-        intent,
-        planningModel,
-        aircraftProfileId: workspace.aircraft.id,
-        mapPackId: workspace.mapPack.id,
-        currentStep: 0,
-        updatedAt,
-      },
-    }));
-    setComposer("");
-    navigate("/autonomy/mission?from=overview");
+    setGenerating(true);
+    setError(null);
+    try {
+      const assistantWorkspaceId = createExperimentWorkspaceId();
+      const response = selectedPlanningModel.accessMode === "platform"
+        ? (await orchestrateAssistantTurn({
+            edition,
+            workspaceId: assistantWorkspaceId,
+            organizationId: activeAssistantTenantContext(auth?.account?.id ?? "local").organizationId,
+            idempotencyKey: `autonomy:${assistantWorkspaceId}`,
+            message: intent,
+            requestedTaskType: "mission_autonomy",
+            locale: chinese ? "zh-CN" : "en",
+            selectedModel: selectedPlanningModel,
+            currentValues: {},
+            documentContext: null,
+          })).response
+        : await apiClient.compileExperimentAssistantTurn({
+            message_id: assistantWorkspaceId,
+            message: intent,
+            locale: chinese ? "zh-CN" : "en",
+            conversation_summary: "Autonomy mission planning",
+            current_values: {},
+            explicit_field_ids: [],
+            current_parameters: [],
+            document_context: null,
+            llm: {
+              access_mode: "byok",
+              provider: modelAccess.provider,
+              api_key: modelAccess.apiKey,
+              platform_grant: null,
+              model: modelAccess.model.trim(),
+              base_url: modelAccess.baseUrl.trim() || null,
+            },
+          });
+      const planningBrief = response.assistant_message?.trim()
+        || response.experiment_summary.trim();
+      const updatedAt = new Date().toISOString();
+      persist(updatedWorkspace(workspace, {
+        mission: {
+          ...workspace.mission,
+          intent,
+          planningModel: selectedPlanningModel,
+          planningBrief,
+          planningRunId: response.orchestration?.run_id ?? assistantWorkspaceId,
+          aircraftProfileId: workspace.aircraft.id,
+          mapPackId: workspace.mapPack.id,
+          currentStep: 0,
+          updatedAt,
+        },
+      }));
+      setComposer("");
+      navigate("/autonomy/mission?from=overview");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : copy.modelUnavailable);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const voiceStatus = voice.state === "requesting"
@@ -576,7 +627,7 @@ export function AutonomyOverview() {
             <button
               type="submit"
               className="assistant-send-button"
-              disabled={!composer.trim() || !managedModelsReady}
+              disabled={!composer.trim() || !managedModelsReady || !selectedPlanningModel || generating}
               aria-label={copy.send}
               title={copy.send}
             >
@@ -1096,7 +1147,7 @@ export function AutonomyMission() {
       </ol>
 
       <div className="autonomy-mission-stage">
-        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />Tuning Chat</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-mission-model"><Cpu aria-hidden="true" /><span>{chinese ? "规划模型" : "Planning model"}</span><strong>{workspace.mission.planningModel.provider} · {workspace.mission.planningModel.model}</strong></div><div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
+        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />Tuning Chat</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-mission-model"><Cpu aria-hidden="true" /><span>{chinese ? "规划模型" : "Planning model"}</span><strong>{workspace.mission.planningModel.provider} · {workspace.mission.planningModel.model}</strong></div>{workspace.mission.planningBrief ? <p className="autonomy-planning-brief">{workspace.mission.planningBrief}</p> : null}<div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
         {step === 1 ? <section><header><Navigation2 aria-hidden="true" /><h2>{workspace.aircraft.name}</h2><Link className="btn" to="/autonomy/aircraft">{chinese ? "编辑机型" : "Edit aircraft"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Weight />} label={chinese ? "空机重量" : "Dry mass"} value={`${workspace.aircraft.dryMassKg.toFixed(2)} kg`} /><Metric icon={<Gauge />} label="MTOM" value={`${workspace.aircraft.maximumTakeoffMassKg.toFixed(2)} kg`} /><Metric icon={<Camera />} label={chinese ? "感知设备" : "Sensors"} value={String(workspace.aircraft.sensors.length)} /><Metric icon={<Cpu />} label={chinese ? "飞控" : "Firmware"} value={workspace.aircraft.firmware} /></div></section> : null}
         {step === 2 ? <section><header><Layers3 aria-hidden="true" /><h2>{workspace.mapPack.name}</h2><Link className="btn" to="/autonomy/maps">{chinese ? "编辑地图" : "Edit map"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Database />} label={chinese ? "表示" : "Representation"} value={workspace.mapPack.representation} /><Metric icon={<ScanLine />} label={chinese ? "分辨率" : "Resolution"} value={`${workspace.mapPack.resolutionM.toFixed(3)} m`} /><Metric icon={<HardDrive />} label={chinese ? "资产" : "Assets"} value={String(workspace.mapPack.sourceFiles.length)} /><Metric icon={<ShieldCheck />} label={chinese ? "资格" : "Qualification"} value={mapReady ? "READY" : "BLOCKED"} /></div></section> : null}
         {step === 3 ? <section><header><Route aria-hidden="true" /><h2>{chinese ? "航迹目标" : "Trajectory objectives"}</h2></header><div className="autonomy-planner-choices"><button className="is-selected"><ShieldCheck />{chinese ? "安全优先" : "Safety first"}</button><button><Activity />{chinese ? "平滑飞行" : "Smooth flight"}</button><button><Gauge />{chinese ? "时间效率" : "Time efficient"}</button><button><Cpu />{chinese ? "能量效率" : "Energy efficient"}</button></div></section> : null}

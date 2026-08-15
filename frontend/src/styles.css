@@ -774,6 +774,13 @@
 .autonomy-mission-model svg { width: 1rem; height: 1rem; color: var(--dd-brand-middle); }
 .autonomy-mission-model strong { overflow: hidden; color: #2c2431; text-overflow: ellipsis; white-space: nowrap; }
 
+.autonomy-planning-brief {
+  max-width: 64rem;
+  margin: 0 0 1rem;
+  color: #6f6675;
+  line-height: 1.55;
+}
+
 .autonomy-contract-points span {
   display: flex;
   align-items: center;

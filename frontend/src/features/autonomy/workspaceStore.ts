@@ -198,6 +198,8 @@ export interface AutonomyMissionDraft {
     provider: string;
     model: string;
   };
+  planningBrief: string;
+  planningRunId: string | null;
   aircraftProfileId: string;
   mapPackId: string;
   currentStep: number;
@@ -336,6 +338,8 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       id: "mission-draft-primary",
       intent: "Launch, reach the assigned work point, complete the task, and return safely.",
       planningModel: { accessMode: "platform", provider: "openai", model: "gpt-4.1" },
+      planningBrief: "",
+      planningRunId: null,
       aircraftProfileId: "aircraft-primary",
       mapPackId: "map-primary",
       currentStep: 0,
@@ -499,6 +503,10 @@ function normalize(value: unknown): AutonomyWorkspaceState {
             model: boundedText(mission.planningModel.model, fallback.mission.planningModel.model, 160),
           }
         : fallback.mission.planningModel,
+      planningBrief: boundedText(mission.planningBrief, fallback.mission.planningBrief, 4_000),
+      planningRunId: typeof mission.planningRunId === "string"
+        ? boundedText(mission.planningRunId, "", 160) || null
+        : null,
       aircraftProfileId: normalizedAircraft.id,
       mapPackId: normalizedMap.id,
       currentStep: Math.round(boundedNumber(mission.currentStep, 0, 0, 5)),
