@@ -41,6 +41,7 @@ import {
   Link,
   NavLink,
   Outlet,
+  useLocation,
   useOutletContext,
 } from "react-router-dom";
 
@@ -130,6 +131,15 @@ function formatTime(value: string): string {
   }).format(date);
 }
 
+function normalizedAutonomyPath(pathname: string): string {
+  const withoutBasename = pathname === "/console"
+    ? "/"
+    : pathname.startsWith("/console/")
+      ? pathname.slice("/console".length)
+      : pathname;
+  return withoutBasename.replace(/\/+$/u, "") || "/";
+}
+
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return <div className="autonomy-asset-metric"><span>{icon}{label}</span><strong>{value}</strong></div>;
 }
@@ -137,6 +147,7 @@ function Metric({ icon, label, value }: { icon: ReactNode; label: string; value:
 export function AutonomyPlatform() {
   const auth = useOptionalAuth();
   const theme = useEditionTheme();
+  const location = useLocation();
   const { interfaceLocale } = useI18n();
   const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
   const copy = chinese ? SECTION_COPY.zh : SECTION_COPY.en;
@@ -153,13 +164,14 @@ export function AutonomyPlatform() {
   }, [edition, ownerId]);
 
   const sections: Array<{ id: AutonomySectionId; to: string }> = [
-    { id: "overview", to: "/autonomy/" },
+    { id: "overview", to: "/autonomy" },
     { id: "aircraft", to: "/autonomy/aircraft" },
     { id: "maps", to: "/autonomy/maps" },
     { id: "mission", to: "/autonomy/mission" },
     { id: "live", to: "/autonomy/live" },
     { id: "evidence", to: "/autonomy/evidence" },
   ];
+  const currentSectionPath = normalizedAutonomyPath(location.pathname);
 
   return (
     <div className="autonomy-platform-page">
@@ -177,8 +189,15 @@ export function AutonomyPlatform() {
       <nav className="autonomy-section-switch" aria-label={copy.title}>
         {sections.map(({ id, to }) => {
           const Icon = SECTION_ICONS[id];
+          const selected = currentSectionPath === to;
           return (
-            <NavLink key={id} to={to} end={id === "overview"}>
+            <NavLink
+              key={id}
+              to={to}
+              end={id === "overview"}
+              className={({ isActive }) => isActive || selected ? "active" : undefined}
+              aria-current={selected ? "page" : undefined}
+            >
               <Icon aria-hidden="true" />
               <span>{copy[id]}</span>
             </NavLink>
