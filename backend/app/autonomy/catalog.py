@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Literal
+from typing import Literal, TypedDict
 
 from app.autonomy.models import RoutePoint, TerrainObject, TerrainScene, Vector3
 
@@ -226,9 +226,33 @@ SCENES: dict[str, TerrainScene] = {
 }
 
 
+class BundledMapProfile(TypedDict):
+    representation: str
+    coordinate_frame: str
+    resolution_m: float
+    confidence_percent: float
+    semantic_layers: list[str]
+    planning_layers: list[str]
+
+
+class BundledMapManifest(TypedDict):
+    schema_version: str
+    compiler_scene_id: str
+    name: str
+    representation: str
+    coordinate_frame: str
+    resolution_m: float
+    floor_count: int
+    bounds_m: dict[str, float]
+    confidence_percent: float
+    semantic_layers: list[str]
+    planning_layers: list[str]
+    manifest_sha256: str
+
+
 # The server owns the planning contract for every bundled scene.  Frontends may
 # render these values, but they must never invent or independently qualify them.
-_BUNDLED_MAP_PROFILES: dict[str, dict[str, object]] = {
+_BUNDLED_MAP_PROFILES: dict[str, BundledMapProfile] = {
     "stairwell-coffee-return": {
         "representation": "hybrid-3d",
         "coordinate_frame": "ENU",
@@ -274,7 +298,7 @@ _BUNDLED_MAP_PROFILES: dict[str, dict[str, object]] = {
 }
 
 
-def get_bundled_map_manifest(scene_id: str) -> dict[str, object] | None:
+def get_bundled_map_manifest(scene_id: str) -> BundledMapManifest | None:
     """Return the canonical, content-addressed Map Pack contract for one scene."""
 
     scene = SCENES.get(scene_id)

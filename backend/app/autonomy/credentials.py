@@ -82,24 +82,24 @@ def _store(
             "A revoked autonomy asset version cannot be reactivated."
         )
     active = [item for item in history if item.revoked_at is None]
-    for credential in active:
-        if credential.receipt_id != receipt_id:
-            credential.revoked_at = now
-    credential = db.get(orm_models.AutonomyQualificationCredential, receipt_id)
-    if credential is None:
-        credential = orm_models.AutonomyQualificationCredential(receipt_id=receipt_id)
-        db.add(credential)
-    credential.user_id = owner_id
-    credential.asset_kind = asset_kind
-    credential.asset_id = asset_id
-    credential.asset_version = asset_version
-    credential.status = status
-    credential.content_sha256 = content_sha256
-    credential.manifest_sha256 = manifest_sha256
-    credential.request_json = request_json
-    credential.receipt_json = receipt_json
-    credential.created_at = now
-    credential.revoked_at = None
+    for active_credential in active:
+        if active_credential.receipt_id != receipt_id:
+            active_credential.revoked_at = now
+    stored = db.get(orm_models.AutonomyQualificationCredential, receipt_id)
+    if stored is None:
+        stored = orm_models.AutonomyQualificationCredential(receipt_id=receipt_id)
+        db.add(stored)
+    stored.user_id = owner_id
+    stored.asset_kind = asset_kind
+    stored.asset_id = asset_id
+    stored.asset_version = asset_version
+    stored.status = status
+    stored.content_sha256 = content_sha256
+    stored.manifest_sha256 = manifest_sha256
+    stored.request_json = request_json
+    stored.receipt_json = receipt_json
+    stored.created_at = now
+    stored.revoked_at = None
     try:
         db.commit()
     except IntegrityError as exc:
