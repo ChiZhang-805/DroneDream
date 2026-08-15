@@ -1129,6 +1129,67 @@ export interface AutonomyRoutePoint {
   speed_limit_mps: number;
 }
 
+export type AutonomyTaskStatus =
+  | "pending"
+  | "ready"
+  | "active"
+  | "blocked"
+  | "completed"
+  | "failed"
+  | "skipped";
+
+export interface AutonomyTaskNode {
+  task_id: string;
+  label: string;
+  status: AutonomyTaskStatus;
+  depends_on: string[];
+  executor:
+    | "language_model"
+    | "mission_executive"
+    | "perception"
+    | "global_planner"
+    | "local_planner"
+    | "payload_controller"
+    | "px4_bridge"
+    | "operator";
+  risk: "low" | "medium" | "high" | "critical";
+  max_retries: number;
+  timeout_s: number;
+  fallback: "continue" | "hold" | "land" | "abort";
+  expected_output: string;
+  completion_evidence: string[];
+  inserted_by: "compiler" | "runtime" | "operator";
+}
+
+export interface AutonomyTaskGraph {
+  schema_version: "dronedream.autonomy.task-graph.v1";
+  revision: number;
+  nodes: AutonomyTaskNode[];
+  active_node_ids: string[];
+  change_reason: string;
+}
+
+export interface AutonomyPerceivedEntity {
+  track_id: string;
+  kind: "person" | "vehicle" | "animal" | "obstacle" | "unknown";
+  position_m: { x: number; y: number; z: number };
+  velocity_mps: { x: number; y: number; z: number };
+  confidence: number;
+  safety_radius_m: number;
+  age_ms: number;
+  source_stream: string;
+}
+
+export interface AutonomyPerceptionStreamHealth {
+  stream_id: string;
+  kind: "rgb" | "depth" | "stereo" | "thermal" | "lidar" | "vio" | "slam" | "map";
+  source: "simulator" | "onboard" | "cloud" | "external";
+  status: "healthy" | "degraded" | "stale" | "offline";
+  rate_hz: number;
+  latency_ms: number;
+  dropped_percent: number;
+}
+
 export interface AutonomyCompileResponse {
   scene: {
     id: string;
@@ -1149,7 +1210,7 @@ export interface AutonomyCompileResponse {
     tags: string[];
   };
   contract: {
-    schema_version: "dronedream.autonomy.mission.v1";
+    schema_version: "dronedream.autonomy.mission.v2";
     contract_id: string;
     edition: AutonomyEdition;
     execution_target: AutonomyExecutionTarget;
@@ -1162,6 +1223,7 @@ export interface AutonomyCompileResponse {
       label: string;
       payload_delta_kg: number;
     }>;
+    task_graph: AutonomyTaskGraph;
     immutable_safety_rules: string[];
   };
   trajectory: AutonomyRoutePoint[];
@@ -1232,6 +1294,8 @@ export interface AutonomyRuntimeObservation {
   pickup_confirmed?: boolean;
   local_replan_active?: boolean;
   emergency_stop?: boolean;
+  perceived_entities?: AutonomyPerceivedEntity[];
+  stream_health?: AutonomyPerceptionStreamHealth[];
 }
 
 export interface AutonomyRuntimeSession {
@@ -1262,8 +1326,89 @@ export interface AutonomyRuntimeSession {
     accepted: boolean;
     codes: string[];
   };
+  task_graph: AutonomyTaskGraph;
+  perceived_entities: AutonomyPerceivedEntity[];
+  stream_health: AutonomyPerceptionStreamHealth[];
+  decision_events: Array<{
+    revision: number;
+    created_at: string;
+    kind: "session" | "task_transition" | "dynamic_entity" | "safety" | "operator";
+    code: string;
+    summary: string;
+    task_ids: string[];
+    entity_ids: string[];
+  }>;
   evidence_chain_head: string;
   terminal: boolean;
+}
+
+export interface AutonomyVehiclePackQualificationRequest {
+  pack_id: string;
+  version: number;
+  firmware: string;
+  flight_controller: string;
+  control_interface: "px4-ros2" | "mavsdk" | "mavlink" | "simulation-only";
+  dry_mass_kg: number;
+  max_takeoff_mass_kg: number;
+  max_total_thrust_n: number;
+  body_size_m: { x: number; y: number; z: number };
+  rotor_radius_m: number;
+  center_of_gravity_m: { x: number; y: number; z: number };
+  inertia_kg_m2: { x: number; y: number; z: number };
+  battery_energy_wh: number;
+  reserve_battery_percent: number;
+  maximum_pickup_payload_kg: number;
+  maximum_speed_mps: number;
+  maximum_acceleration_mps2: number;
+  maximum_climb_mps: number;
+  maximum_descent_mps: number;
+  command_link_latency_ms: number;
+  command_link_bandwidth_mbps: number;
+  sensors: Array<{
+    sensor_id: string;
+    kind: "rgb" | "depth" | "stereo" | "thermal" | "lidar" | "gps" | "vio";
+    calibrated: boolean;
+    position_m: { x: number; y: number; z: number };
+    roll_pitch_yaw_deg: { x: number; y: number; z: number };
+    rate_hz: number;
+    calibration_age_days: number;
+  }>;
+}
+
+export interface AutonomyQualificationIssue {
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+}
+
+export interface AutonomyVehiclePackQualificationReceipt {
+  schema_version: "dronedream.autonomy.vehicle-pack-receipt.v1";
+  receipt_id: string;
+  pack_id: string;
+  version: number;
+  status: "blocked" | "validated_unsigned";
+  content_sha256: string;
+  planning_radius_m: number;
+  maximum_loaded_mass_kg: number;
+  loaded_thrust_to_weight: number;
+  issues: AutonomyQualificationIssue[];
+  created_at: string;
+  hardware_authority: false;
+}
+
+export interface AutonomyMapAssetAdmissionReceipt {
+  schema_version: "dronedream.autonomy.map-asset-receipt.v1";
+  receipt_id: string;
+  filename: string;
+  format: string;
+  byte_size: number;
+  content_sha256: string;
+  parser: string;
+  status: "admitted" | "rejected";
+  layers: Array<"mesh" | "point-cloud" | "semantic" | "georeference">;
+  issues: AutonomyQualificationIssue[];
+  created_at: string;
+  planning_qualified: false;
 }
 
 export type JobsCompareRequest = JobCompareRequest;

@@ -85,9 +85,7 @@ def _simulator_capabilities() -> dict[str, object]:
         mock_reason = f"SIMULATOR_BACKEND contains unsupported value {override!r}."
     elif override is not None and override != "mock":
         mock_status = "overridden"
-        mock_reason = (
-            f"SIMULATOR_BACKEND forces {override!r}; per-job mock selection is ignored."
-        )
+        mock_reason = f"SIMULATOR_BACKEND forces {override!r}; per-job mock selection is ignored."
     else:
         mock_status = "available"
         mock_reason = None
@@ -175,7 +173,7 @@ def read_capabilities() -> dict[str, object]:
                 },
                 "mission_autonomy": {
                     "available": True,
-                    "mission_schema": "dronedream.autonomy.mission.v1",
+                    "mission_schema": "dronedream.autonomy.mission.v2",
                     "scene_catalog": "dronedream.autonomy.scene-catalog.v1",
                     "editions": ["universal", "sim", "lab", "field"],
                     "simulation_adapter": "px4_gazebo_contract",
@@ -210,9 +208,7 @@ def read_capabilities() -> dict[str, object]:
                     "cma_es": {"ready": True, "status": "available"},
                     "gpt": {
                         "ready": gpt_ready,
-                        "status": (
-                            "available" if gpt_ready else "server_secret_not_configured"
-                        ),
+                        "status": ("available" if gpt_ready else "server_secret_not_configured"),
                         "requires_user_api_key": True,
                         "reason": (
                             None
@@ -225,11 +221,7 @@ def read_capabilities() -> dict[str, object]:
                     },
                     "llm_harness": {
                         "ready": gpt_ready,
-                        "status": (
-                            "experimental"
-                            if gpt_ready
-                            else "server_secret_not_configured"
-                        ),
+                        "status": ("experimental" if gpt_ready else "server_secret_not_configured"),
                         "experimental": True,
                         "requires_user_api_key": True,
                         "tool_registry": "closed",
@@ -247,7 +239,7 @@ def read_capabilities() -> dict[str, object]:
                         ),
                     },
                     **_experimental_optimizer_capabilities(),
-                }
+                },
             },
             "parameter_catalog": {
                 "catalog_version": CATALOG_VERSION,

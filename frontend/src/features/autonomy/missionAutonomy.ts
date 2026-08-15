@@ -131,16 +131,104 @@ function steps(missionId: MissionId, pickupPayloadKg: number) {
   ];
 }
 
+function taskGraph(
+  missionSteps: ReturnType<typeof steps>,
+): AutonomyCompileResponse["contract"]["task_graph"] {
+  const nodes: AutonomyCompileResponse["contract"]["task_graph"]["nodes"] = [
+    {
+      task_id: "preflight-health",
+      label: "Verify aircraft health, calibration, energy and command-link contract",
+      status: "ready",
+      depends_on: [],
+      executor: "mission_executive",
+      risk: "high",
+      max_retries: 0,
+      timeout_s: 20,
+      fallback: "abort",
+      expected_output: "A timestamped preflight qualification receipt",
+      completion_evidence: ["health.receipt", "battery.margin", "link.identity"],
+      inserted_by: "compiler",
+    },
+    {
+      task_id: "world-localization",
+      label: "Bind the Map Pack and establish a bounded localization estimate",
+      status: "pending",
+      depends_on: ["preflight-health"],
+      executor: "perception",
+      risk: "high",
+      max_retries: 2,
+      timeout_s: 45,
+      fallback: "hold",
+      expected_output: "Map-frame transform, covariance and observable free-space layers",
+      completion_evidence: ["map.version", "frame.transform", "localization.covariance"],
+      inserted_by: "compiler",
+    },
+  ];
+  let previous = "world-localization";
+  for (const step of missionSteps) {
+    const taskId = `mission-${String(step.order).padStart(2, "0")}-${step.action.replaceAll("_", "-")}`;
+    const executor = step.action === "takeoff" || step.action === "land"
+      ? "px4_bridge" as const
+      : step.action === "pickup"
+        ? "payload_controller" as const
+        : step.action === "return"
+          ? "global_planner" as const
+          : "local_planner" as const;
+    nodes.push({
+      task_id: taskId,
+      label: step.label,
+      status: "pending",
+      depends_on: [previous],
+      executor,
+      risk: step.action === "transit" || step.action === "return" ? "medium" : "high",
+      max_retries: step.action === "takeoff" || step.action === "land" ? 1 : 2,
+      timeout_s: ["transit", "traverse_stairs", "return"].includes(step.action) ? 120 : 45,
+      fallback: step.action === "return" || step.action === "land" ? "land" : "hold",
+      expected_output: `Qualified completion of ${step.action}`,
+      completion_evidence: ["pose.trace", "clearance.minimum", "controller.acceptance"],
+      inserted_by: "compiler",
+    });
+    previous = taskId;
+  }
+  nodes.push({
+    task_id: "postflight-evidence",
+    label: "Seal mission results, anomalies and replay evidence",
+    status: "pending",
+    depends_on: [previous],
+    executor: "mission_executive",
+    risk: "low",
+    max_retries: 2,
+    timeout_s: 20,
+    fallback: "hold",
+    expected_output: "A hash-chained mission evidence head",
+    completion_evidence: ["mission.result", "decision.log", "evidence.chain-head"],
+    inserted_by: "compiler",
+  });
+  return {
+    schema_version: "dronedream.autonomy.task-graph.v1",
+    revision: 1,
+    nodes,
+    active_node_ids: ["preflight-health"],
+    change_reason: "compiled",
+  };
+}
+
 export function createLocalAutonomyPreview(
   missionId: MissionId,
   request: AutonomyCompileRequest,
 ): AutonomyCompileResponse {
   const meta = SCENE_META[missionId];
   const missionSteps = steps(missionId, request.vehicle.pickup_payload_kg);
+  const missionTaskGraph = taskGraph(missionSteps);
   const launchMass = request.vehicle.dry_mass_kg + request.vehicle.launch_payload_kg;
   const loadedMass = launchMass + (missionId === "coffee" ? request.vehicle.pickup_payload_kg : 0);
   const thrustToWeight = request.vehicle.max_total_thrust_n / (loadedMass * 9.80665);
-  const brakingDistance = request.vehicle.max_speed_mps ** 2
+  const availableStoppingDistance = Math.max(0, meta.clearance - request.vehicle.radius_m);
+  const corridorSpeedMps = Math.min(
+    request.vehicle.max_speed_mps,
+    Math.sqrt(2 * request.vehicle.max_acceleration_mps2 * availableStoppingDistance) * 0.8,
+  );
+  const brakingDistance = corridorSpeedMps ** 2
     / (2 * request.vehicle.max_acceleration_mps2) + request.vehicle.radius_m;
   const issues: AutonomyCompileResponse["issues"] = [];
   if (loadedMass > request.vehicle.max_takeoff_mass_kg) {
@@ -149,7 +237,7 @@ export function createLocalAutonomyPreview(
   if (thrustToWeight < 1.35) {
     issues.push({ code: "vehicle.thrust-margin-insufficient", severity: "error", message: "Post-pickup thrust-to-weight is below 1.35." });
   }
-  if (brakingDistance > meta.clearance) {
+  if (request.vehicle.radius_m >= meta.clearance || brakingDistance > meta.clearance) {
     issues.push({ code: "trajectory.braking-envelope-exceeds-clearance", severity: "error", message: "Stopping envelope exceeds verified scene clearance." });
   }
   if (request.perception_mode === "map") {
@@ -193,7 +281,7 @@ export function createLocalAutonomyPreview(
       tags: meta.tags,
     },
     contract: {
-      schema_version: "dronedream.autonomy.mission.v1",
+      schema_version: "dronedream.autonomy.mission.v2",
       contract_id: `preview-${sceneId}-${request.edition}-${request.execution_target}`,
       edition: request.edition,
       execution_target: request.execution_target,
@@ -201,6 +289,7 @@ export function createLocalAutonomyPreview(
       perception_mode: request.perception_mode,
       intent: request.natural_language,
       steps: missionSteps,
+      task_graph: missionTaskGraph,
       immutable_safety_rules: [
         "Language and vision models propose goals; they cannot issue actuator commands.",
         "Geometry, dynamics, payload and edition-policy checks are mandatory.",
