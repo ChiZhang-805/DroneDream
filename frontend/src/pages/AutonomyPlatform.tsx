@@ -1,6 +1,7 @@
 import {
   Activity,
   Airplay,
+  ArrowUp,
   Box,
   Camera,
   Check,
@@ -14,8 +15,10 @@ import {
   Layers3,
   Map,
   MapPin,
+  Mic,
   Navigation2,
   Orbit,
+  Plus,
   Radar,
   Radio,
   Route,
@@ -42,11 +45,14 @@ import {
   NavLink,
   Outlet,
   useLocation,
+  useNavigate,
   useOutletContext,
 } from "react-router-dom";
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
+import { openAppSettings } from "../appSettings";
+import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   AUTONOMY_AIRCRAFT_LIMITS,
   autonomyAircraftRadiusM,
@@ -63,6 +69,12 @@ import {
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import { consumeAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
+import { useVoiceInput } from "../features/experiment/useVoiceInput";
+import {
+  DEFAULT_MANAGED_MODEL_CATALOG,
+  managedModelAvailableForAssistant,
+} from "../features/settings/cloudModelAccess";
+import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
 import { AutonomyLab } from "./AutonomyLab";
@@ -93,9 +105,7 @@ const SECTION_COPY = {
     mission: "Mission",
     live: "Live",
     evidence: "Evidence",
-    tuningChat: "Tuning Chat",
     title: "Autonomy",
-    draft: "Workspace draft",
   },
   zh: {
     overview: "总览",
@@ -104,9 +114,7 @@ const SECTION_COPY = {
     mission: "任务",
     live: "实时运行",
     evidence: "证据回放",
-    tuningChat: "Tuning Chat",
-    title: "自主任务",
-    draft: "工作区草稿",
+    title: "Autonomy",
   },
 } as const;
 
@@ -176,34 +184,26 @@ export function AutonomyPlatform() {
   return (
     <div className="autonomy-platform-page">
       <header className="autonomy-platform-header">
-        <div>
-          <span>{edition.toUpperCase()} · AUTONOMY</span>
-          <h1>{copy.title}</h1>
-        </div>
-        <div className="autonomy-platform-actions">
-          <small><i />{copy.draft}</small>
-          <Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />{copy.tuningChat}</Link>
-        </div>
+        <h1>{copy.title}</h1>
+        <nav className="autonomy-section-switch" aria-label={copy.title}>
+          {sections.map(({ id, to }) => {
+            const Icon = SECTION_ICONS[id];
+            const selected = currentSectionPath === to;
+            return (
+              <NavLink
+                key={id}
+                to={to}
+                end={id === "overview"}
+                className={({ isActive }) => isActive || selected ? "active" : undefined}
+                aria-current={selected ? "page" : undefined}
+              >
+                <Icon aria-hidden="true" />
+                <span>{copy[id]}</span>
+              </NavLink>
+            );
+          })}
+        </nav>
       </header>
-
-      <nav className="autonomy-section-switch" aria-label={copy.title}>
-        {sections.map(({ id, to }) => {
-          const Icon = SECTION_ICONS[id];
-          const selected = currentSectionPath === to;
-          return (
-            <NavLink
-              key={id}
-              to={to}
-              end={id === "overview"}
-              className={({ isActive }) => isActive || selected ? "active" : undefined}
-              aria-current={selected ? "page" : undefined}
-            >
-              <Icon aria-hidden="true" />
-              <span>{copy[id]}</span>
-            </NavLink>
-          );
-        })}
-      </nav>
 
       <main className="autonomy-platform-content">
         <Outlet context={{ edition, chinese, workspace, persist } satisfies WorkspaceContext} />
@@ -213,71 +213,243 @@ export function AutonomyPlatform() {
 }
 
 export function AutonomyOverview() {
-  const { chinese, workspace, edition } = useAutonomyWorkspace();
-  const aircraft = workspace.aircraft;
-  const mapPack = workspace.mapPack;
-  const payloadKg = Math.max(0, aircraft.maximumTakeoffMassKg - aircraft.dryMassKg);
-  const mapReady = Boolean(mapPack.compilerSceneId) && mapPack.calibrated;
-  const liveState = edition === "sim"
-    ? (chinese ? "仿真可用" : "Simulation ready")
-    : edition === "lab"
-      ? (chinese ? "HITL 影子模式" : "HITL shadow")
-      : (chinese ? "真机保持锁定" : "Aircraft locked");
-  const cards = [
-    {
-      id: "aircraft",
-      icon: Navigation2,
-      title: chinese ? "当前无人机" : "Current aircraft",
-      value: aircraft.name,
-      meta: `${aircraft.dryMassKg.toFixed(2)} kg · ${payloadKg.toFixed(2)} kg ${chinese ? "载荷余量" : "payload margin"}`,
-      state: `${aircraft.sensors.length} ${chinese ? "个传感器" : "sensors"}`,
-      to: "/autonomy/aircraft",
-    },
-    {
-      id: "maps",
-      icon: Layers3,
-      title: chinese ? "当前地图" : "Current map",
-      value: mapPack.name,
-      meta: `${mapPack.representation} · ${mapPack.resolutionM.toFixed(3)} m`,
-      state: mapReady ? (chinese ? "已校准" : "Calibrated") : (chinese ? "需要配置" : "Configuration required"),
-      to: "/autonomy/maps",
-    },
-    {
-      id: "mission",
-      icon: Waypoints,
-      title: chinese ? "任务草稿" : "Mission draft",
-      value: workspace.mission.intent,
-      meta: `${chinese ? "阶段" : "Stage"} ${workspace.mission.currentStep + 1}/6`,
-      state: chinese ? "来自 Tuning Chat" : "From Tuning Chat",
-      to: "/autonomy/mission",
-    },
-    {
-      id: "live",
-      icon: Activity,
-      title: chinese ? "执行状态" : "Execution state",
-      value: liveState,
-      meta: chinese ? "无活动运行会话" : "No active runtime session",
-      state: edition.toUpperCase(),
-      to: "/autonomy/live",
-    },
-  ];
+  const { chinese, workspace, persist } = useAutonomyWorkspace();
+  const navigate = useNavigate();
+  const {
+    settings: modelAccess,
+    profiles: modelProfiles,
+    activeProfileId,
+    selectAccessMode,
+    selectManagedModel,
+    selectProfile,
+  } = useModelAccess();
+  const [composer, setComposer] = useState("");
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [voiceConsentPending, setVoiceConsentPending] = useState(false);
+  const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const managedModels = DEFAULT_MANAGED_MODEL_CATALOG;
+  const configuredProfiles = modelProfiles.filter((profile) => profile.apiKey.trim());
+  const selectedManagedModel = managedModels.find(
+    (model) => model.provider === modelAccess.managedProvider
+      && model.model === modelAccess.managedModel
+      && managedModelAvailableForAssistant(model),
+  ) ?? managedModels.find(managedModelAvailableForAssistant) ?? null;
+  const selectedCustomProfileId = modelAccess.accessMode === "byok"
+    && configuredProfiles.some((profile) => profile.id === activeProfileId)
+    ? activeProfileId
+    : null;
+  const copy = chinese ? {
+    question: "你希望无人机完成什么任务？",
+    placeholder: "描述目标、途经点、环境和需要完成的工作…",
+    workflow: "自主飞行任务",
+    context: "任务上下文",
+    aircraft: "当前无人机",
+    map: "当前地图",
+    mission: "现有任务合同",
+    send: "生成任务合同",
+    model: "模型",
+    microphone: "使用语音输入",
+    stopVoice: "停止语音输入",
+    requestingVoice: "正在请求麦克风权限…",
+    listening: "正在聆听…",
+    voiceConsent: "浏览器可能使用语音服务转写麦克风音频；音频不会写入任务合同。",
+    startVoice: "允许并开始",
+    cancelVoice: "取消",
+    voiceUnavailable: "当前环境无法使用语音输入，你仍可继续输入文字。",
+    tooLong: "任务描述不能超过 12,000 个字符。",
+  } : {
+    question: "What should your drone do?",
+    placeholder: "Describe the goal, waypoints, environment, and work to complete…",
+    workflow: "Autonomous mission",
+    context: "Mission context",
+    aircraft: "Current aircraft",
+    map: "Current map",
+    mission: "Existing mission contract",
+    send: "Build mission contract",
+    model: "Model",
+    microphone: "Use voice input",
+    stopVoice: "Stop voice input",
+    requestingVoice: "Requesting microphone access…",
+    listening: "Listening…",
+    voiceConsent: "Your browser may use a speech service to transcribe microphone audio. Audio is not written to the mission contract.",
+    startVoice: "Allow and start",
+    cancelVoice: "Cancel",
+    voiceUnavailable: "Voice input is unavailable here. You can keep typing.",
+    tooLong: "The mission description must stay within 12,000 characters.",
+  };
+  const appendTranscript = useCallback((transcript: string) => {
+    setComposer((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript);
+  }, []);
+  const voice = useVoiceInput({ locale: chinese ? "zh-CN" : "en", onTranscript: appendTranscript });
+
+  useEffect(() => {
+    if (!contextMenuOpen) return undefined;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!contextMenuRef.current?.contains(event.target as Node)) setContextMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setContextMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextMenuOpen]);
+
+  const submitMission = (event: FormEvent) => {
+    event.preventDefault();
+    const intent = composer.trim();
+    if (!intent) return;
+    if (intent.length > 12_000) {
+      setError(copy.tooLong);
+      return;
+    }
+    voice.stop();
+    const updatedAt = new Date().toISOString();
+    persist(updatedWorkspace(workspace, {
+      mission: {
+        ...workspace.mission,
+        intent,
+        aircraftProfileId: workspace.aircraft.id,
+        mapPackId: workspace.mapPack.id,
+        currentStep: 0,
+        updatedAt,
+      },
+    }));
+    navigate("/autonomy/mission?from=overview");
+  };
+
+  const voiceStatus = voice.state === "requesting"
+    ? copy.requestingVoice
+    : voice.state === "listening"
+      ? copy.listening
+      : voice.error
+        ? copy.voiceUnavailable
+        : null;
+
   return (
-    <section className="autonomy-overview-page">
-      <div className="autonomy-overview-grid">
-        {cards.map(({ id, icon: Icon, title, value, meta, state, to }) => (
-          <Link className={`autonomy-overview-card is-${id}`} to={to} key={id}>
-            <header><Icon aria-hidden="true" /><span>{title}</span><em>{state}</em></header>
-            <strong>{value}</strong>
-            <small>{meta}</small>
-            <ChevronRight aria-hidden="true" />
-          </Link>
-        ))}
-      </div>
-      <div className="autonomy-readiness-strip">
-        <Metric icon={<Weight aria-hidden="true" />} label={chinese ? "最大起飞重量" : "MTOM"} value={`${aircraft.maximumTakeoffMassKg.toFixed(2)} kg`} />
-        <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "机体包络" : "Body envelope"} value={`${aircraft.bodyLengthM.toFixed(2)} × ${aircraft.bodyWidthM.toFixed(2)} m`} />
-        <Metric icon={<MapPin aria-hidden="true" />} label={chinese ? "地图资产" : "Map assets"} value={String(mapPack.sourceFiles.length)} />
-        <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "地图资格" : "Map qualification"} value={mapReady ? "READY" : "BLOCKED"} />
+    <section className="autonomy-command-page" data-grants-hardware-authority="false">
+      <div className="autonomy-command-stage">
+        <div className="autonomy-command-mark" aria-hidden="true"><Sparkles /></div>
+        <h2>{copy.question}</h2>
+        <form className="assistant-composer autonomy-command-composer" onSubmit={submitMission}>
+          <textarea
+            value={composer}
+            maxLength={12_000}
+            rows={3}
+            placeholder={copy.placeholder}
+            aria-label={copy.placeholder}
+            onChange={(event) => {
+              setComposer(event.target.value);
+              setError(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+          <div className="assistant-composer-bar">
+            <div className="assistant-add-menu" ref={contextMenuRef}>
+              <button
+                type="button"
+                className="assistant-add-button"
+                aria-label={copy.context}
+                title={copy.context}
+                aria-haspopup="menu"
+                aria-expanded={contextMenuOpen}
+                onClick={() => setContextMenuOpen((current) => !current)}
+              >
+                <Plus aria-hidden="true" strokeWidth={1.8} />
+              </button>
+              {contextMenuOpen ? (
+                <div className="assistant-add-popover autonomy-context-popover" role="menu">
+                  <strong className="assistant-task-popover-title">{copy.context}</strong>
+                  <Link to="/autonomy/aircraft" role="menuitem" onClick={() => setContextMenuOpen(false)}>
+                    <Navigation2 aria-hidden="true" />
+                    <span><b>{copy.aircraft}</b><small>{workspace.aircraft.name}</small></span>
+                  </Link>
+                  <Link to="/autonomy/maps" role="menuitem" onClick={() => setContextMenuOpen(false)}>
+                    <Layers3 aria-hidden="true" />
+                    <span><b>{copy.map}</b><small>{workspace.mapPack.name}</small></span>
+                  </Link>
+                  <Link to="/autonomy/mission" role="menuitem" onClick={() => setContextMenuOpen(false)}>
+                    <Waypoints aria-hidden="true" />
+                    <span><b>{copy.mission}</b><small>{workspace.mission.intent}</small></span>
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+            <span className="assistant-task-chip is-explicit"><Route aria-hidden="true" />{copy.workflow}</span>
+            <span className="assistant-composer-spacer" />
+            <AssistantModelPicker
+              ariaLabel={copy.model}
+              defaultModels={managedModels}
+              customProfiles={configuredProfiles}
+              selectedDefault={modelAccess.accessMode === "platform" ? selectedManagedModel : null}
+              selectedCustomId={selectedCustomProfileId}
+              onSelectDefault={(model) => {
+                selectAccessMode("platform");
+                selectManagedModel(model.provider, model.model);
+              }}
+              onSelectCustom={(profileId) => {
+                selectProfile(profileId);
+                selectAccessMode("byok");
+              }}
+              onOpenSettings={openAppSettings}
+            />
+            <button
+              type="button"
+              className={`assistant-voice-button ${voice.state === "listening" ? "listening" : ""}`}
+              aria-label={voice.state === "listening" ? copy.stopVoice : copy.microphone}
+              title={voice.state === "listening" ? copy.stopVoice : copy.microphone}
+              onClick={() => {
+                if (voice.state === "listening") {
+                  voice.stop();
+                  return;
+                }
+                if (!voice.supported) {
+                  void voice.start();
+                  return;
+                }
+                if (!voiceConsentGranted) {
+                  setVoiceConsentPending(true);
+                  return;
+                }
+                void voice.start();
+              }}
+            >
+              <Mic aria-hidden="true" strokeWidth={1.9} />
+            </button>
+            <button
+              type="submit"
+              className="assistant-send-button"
+              disabled={!composer.trim()}
+              aria-label={copy.send}
+              title={copy.send}
+            >
+              <ArrowUp aria-hidden="true" strokeWidth={2} />
+            </button>
+          </div>
+          {voiceConsentPending ? (
+            <div className="assistant-voice-consent" role="note">
+              <p>{copy.voiceConsent}</p>
+              <button type="button" className="btn btn-primary" onClick={() => {
+                setVoiceConsentPending(false);
+                setVoiceConsentGranted(true);
+                void voice.start();
+              }}>{copy.startVoice}</button>
+              <button type="button" className="btn" onClick={() => setVoiceConsentPending(false)}>{copy.cancelVoice}</button>
+            </div>
+          ) : null}
+          {voiceStatus ? <p className="assistant-composer-status">{voiceStatus}</p> : null}
+          {error ? <p className="assistant-composer-error" role="alert">{error}</p> : null}
+        </form>
       </div>
     </section>
   );
