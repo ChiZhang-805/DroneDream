@@ -1641,7 +1641,7 @@ html[lang="zh-CN"] .community-cover-art > strong {
   padding: clamp(0.48rem, 0.75vh, 0.68rem) 0;
 }
 
-.community-page .community-hero > .site-eyebrow {
+.community-page .community-hero-copy > .site-eyebrow {
   margin: 0;
   color: #9d3fba;
   font-family: "Space Grotesk Variable", "Space Grotesk", Inter, sans-serif;
@@ -1653,7 +1653,7 @@ html[lang="zh-CN"] .community-cover-art > strong {
   transform: none;
 }
 
-html[lang="zh-CN"] .community-page .community-hero > .site-eyebrow {
+html[lang="zh-CN"] .community-page .community-hero-copy > .site-eyebrow {
   letter-spacing: -0.02em;
 }
 
@@ -2332,22 +2332,30 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   flex: 0 0 auto;
 }
 
-.community-page .community-feed-title {
-  align-items: flex-start;
+.community-page .community-hero {
+  min-height: 118px;
+  padding-block: 1rem;
 }
 
-.community-page .community-feed-title > svg {
-  margin-top: 0.1rem;
+.community-page .community-hero-copy {
+  min-width: 0;
 }
 
-@media (max-width: 900px) {
-  .community-feed-title-copy p {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+.community-page .community-hero-copy > p {
+  margin: 0.42rem 0 0;
+  overflow: hidden;
+  color: #85899a;
+  font-size: clamp(0.72rem, 0.76vw, 0.86rem);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (min-width: 901px) and (min-height: 900px) {
+  .community-page {
+    justify-content: center;
+  }
+
   .community-page.is-all-topics .community-feed {
     max-height: none;
     flex: 0 0 auto;

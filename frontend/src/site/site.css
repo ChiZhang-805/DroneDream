@@ -2038,14 +2038,6 @@ html[lang="zh-CN"] .site-hero h1 {
 .community-feed-heading > div { display: flex; align-items: center; gap: .65rem; }
 .community-feed-heading > div > svg { color: #9541bd; }
 .community-feed h2 { margin: 0; font-size: 1.4rem; white-space: nowrap; }
-.community-feed-title-copy { min-width: 0; }
-.community-feed-title-copy p {
-  margin: .2rem 0 0;
-  color: #85899a;
-  font-size: .75rem;
-  line-height: 1.35;
-  white-space: nowrap;
-}
 .community-search {
   display: flex;
   width: min(100%, 720px);
