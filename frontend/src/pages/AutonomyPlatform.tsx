@@ -49,6 +49,7 @@ import {
   loadAutonomyWorkspace,
   saveAutonomyWorkspace,
   type AutonomyAircraftProfile,
+  type AutonomyEvidenceRecord,
   type AutonomyMapPack,
   type AutonomyMapSourceFile,
   type AutonomySensorKind,
@@ -192,7 +193,7 @@ export function AutonomyOverview() {
   const aircraft = workspace.aircraft;
   const mapPack = workspace.mapPack;
   const payloadKg = Math.max(0, aircraft.maximumTakeoffMassKg - aircraft.dryMassKg);
-  const mapReady = mapPack.sourceFiles.length > 0 && mapPack.calibrated;
+  const mapReady = Boolean(mapPack.compilerSceneId) && mapPack.calibrated;
   const liveState = edition === "sim"
     ? (chinese ? "仿真可用" : "Simulation ready")
     : edition === "lab"
@@ -376,7 +377,7 @@ export function AutonomyMaps() {
   const [form, setForm] = useState(workspace.mapPack);
   const [saved, setSaved] = useState(false);
   useEffect(() => setForm(workspace.mapPack), [workspace.mapPack]);
-  const ready = form.sourceFiles.length > 0 && form.calibrated;
+  const ready = Boolean(form.compilerSceneId) && form.calibrated;
   const addFiles = (files: FileList | null) => {
     if (!files) return;
     const importedAt = new Date().toISOString();
@@ -386,7 +387,11 @@ export function AutonomyMaps() {
       format: file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "unknown",
       importedAt,
     }));
-    setForm((current) => ({ ...current, sourceFiles: [...current.sourceFiles, ...incoming].slice(0, 24) }));
+    setForm((current) => ({
+      ...current,
+      compilerSceneId: null,
+      sourceFiles: [...current.sourceFiles, ...incoming].slice(0, 24),
+    }));
     setSaved(false);
   };
   const save = (event: FormEvent) => {
@@ -419,6 +424,7 @@ export function AutonomyMaps() {
             <label><span>{chinese ? "分辨率 (m)" : "Resolution (m)"}</span><input type="number" min="0.005" step="0.005" value={form.resolutionM} onChange={(event) => setForm({ ...form, resolutionM: Number(event.target.value) })} /></label>
             <label><span>{chinese ? "楼层数" : "Floors"}</span><input type="number" min="1" max="500" step="1" value={form.floorCount} onChange={(event) => setForm({ ...form, floorCount: Number(event.target.value) })} /></label>
             <label><span>{chinese ? "实时更新" : "Live updates"}</span><select value={form.liveUpdates} onChange={(event) => setForm({ ...form, liveUpdates: event.target.value as AutonomyMapPack["liveUpdates"] })}><option value="vision-slam">Vision SLAM</option><option value="depth-fusion">Depth fusion</option><option value="lidar-fusion">LiDAR fusion</option><option value="fixed">Fixed map</option></select></label>
+            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select value={form.compilerSceneId ?? ""} onChange={(event) => setForm({ ...form, compilerSceneId: event.target.value ? event.target.value as AutonomyMapPack["compilerSceneId"] : null })}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
             <label className="autonomy-check-control"><input type="checkbox" checked={form.calibrated} onChange={(event) => setForm({ ...form, calibrated: event.target.checked })} /><span>{chinese ? "比例和坐标已校准" : "Scale and frame calibrated"}</span></label>
           </div>
         </section>
@@ -434,7 +440,7 @@ export function AutonomyMaps() {
           <div className="autonomy-map-assets">
             {form.sourceFiles.length ? form.sourceFiles.map((file, index) => (
               <div key={`${file.name}-${index}`}><HardDrive aria-hidden="true" /><span><strong>{file.name}</strong><small>{file.format.toUpperCase()} · {(file.bytes / 1_000_000).toFixed(2)} MB</small></span><button type="button" onClick={() => setForm({ ...form, sourceFiles: form.sourceFiles.filter((_, itemIndex) => itemIndex !== index) })}>×</button></div>
-            )) : <p className="autonomy-honest-empty">{chinese ? "尚未登记地图资产；系统不会用二维示意图冒充可规划地图。" : "No map assets registered. A diagram is never treated as a planning map."}</p>}
+            )) : <p className="autonomy-honest-empty">{chinese ? "尚未登记地图资产。可选择经过验证的内置三维场景；导入文件必须由后端完成几何摄取后才会获得编译场景资格。" : "No map assets registered. Select a validated built-in 3D scene, or wait for backend geometry ingestion before an imported pack receives a compiled scene binding."}</p>}
           </div>
         </section>
 
@@ -485,11 +491,11 @@ export function AutonomyMission() {
     const updatedAt = new Date().toISOString();
     persist(updatedWorkspace(workspace, { mission: { ...workspace.mission, currentStep, updatedAt } }));
   };
-  const mapReady = workspace.mapPack.sourceFiles.length > 0 && workspace.mapPack.calibrated;
+  const mapReady = Boolean(workspace.mapPack.compilerSceneId) && workspace.mapPack.calibrated;
   const aircraftReady = workspace.aircraft.maximumTakeoffMassKg > workspace.aircraft.dryMassKg;
   const blockers = [
     ...(!aircraftReady ? [chinese ? "机型质量包络无效" : "Aircraft mass envelope is invalid"] : []),
-    ...(!mapReady ? [chinese ? "Map Pack 尚未完成资产登记与校准" : "Map Pack requires assets and calibration"] : []),
+    ...(!mapReady ? [chinese ? "Map Pack 尚未绑定经过验证的编译场景并完成校准" : "Map Pack requires a validated compiled-scene binding and calibration"] : []),
   ];
   return (
     <section className="autonomy-mission-page">
@@ -519,8 +525,12 @@ export function AutonomyMission() {
 }
 
 export function AutonomyLive() {
-  const { workspace } = useAutonomyWorkspace();
-  return <AutonomyLab embedded workspace={workspace} />;
+  const { workspace, persist } = useAutonomyWorkspace();
+  const recordEvidence = useCallback((record: AutonomyEvidenceRecord) => {
+    const evidence = [record, ...workspace.evidence.filter((item) => item.id !== record.id)].slice(0, 50);
+    persist(updatedWorkspace(workspace, { evidence }));
+  }, [persist, workspace]);
+  return <AutonomyLab embedded workspace={workspace} onRunCompleted={recordEvidence} />;
 }
 
 export function AutonomyEvidence() {
@@ -535,12 +545,19 @@ export function AutonomyEvidence() {
       <div className="autonomy-evidence-bindings">
         {snapshots.map(({ icon: Icon, label, value, time }) => <article key={label}><Icon aria-hidden="true" /><span><small>{label}</small><strong>{value}</strong></span><time>{formatTime(time)}</time></article>)}
       </div>
-      <div className="autonomy-evidence-empty">
+      {workspace.evidence.length ? <div className="autonomy-evidence-runs">
+        {workspace.evidence.map((record) => <article key={record.id}>
+          <header><FileClock aria-hidden="true" /><strong>{record.contractId}</strong><em>{record.source.toUpperCase()}</em></header>
+          <p>{record.missionIntent}</p>
+          <dl><div><dt>{chinese ? "无人机" : "Aircraft"}</dt><dd>{record.aircraftName}</dd></div><div><dt>Map Pack</dt><dd>{record.mapName}</dd></div><div><dt>{chinese ? "观测" : "Observations"}</dt><dd>{record.observationCount}</dd></div><div><dt>{chinese ? "证据链" : "Evidence chain"}</dt><dd>{record.evidenceChainHead.slice(0, 18)}</dd></div></dl>
+          <time>{formatTime(record.completedAt)}</time>
+        </article>)}
+      </div> : <div className="autonomy-evidence-empty">
         <FileClock aria-hidden="true" />
         <h2>{chinese ? "尚无已完成的运行证据" : "No completed runtime evidence"}</h2>
         <div><span>Mission Contract</span><ChevronRight /><span>Observations</span><ChevronRight /><span>Decisions</span><ChevronRight /><span>Replay</span></div>
         <Link className="btn btn-primary" to="/autonomy/live"><Video aria-hidden="true" />{chinese ? "打开实时运行" : "Open Live Mission"}</Link>
-      </div>
+      </div>}
     </section>
   );
 }

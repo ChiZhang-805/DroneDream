@@ -752,6 +752,50 @@
 .autonomy-evidence-empty > div { display: flex; align-items: center; gap: 0.55rem; color: #817486; font-size: 0.65rem; }
 .autonomy-evidence-empty > div svg { width: 0.8rem; }
 
+.autonomy-evidence-runs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.autonomy-evidence-runs article {
+  display: grid;
+  min-width: 0;
+  gap: 0.7rem;
+  padding: 1rem;
+  border: 1px solid #e1dae5;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 30px rgba(61, 41, 69, 0.055);
+}
+
+.autonomy-evidence-runs article header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.48rem;
+}
+
+.autonomy-evidence-runs article header svg { width: 1rem; color: var(--dd-brand-middle); }
+.autonomy-evidence-runs article header strong { overflow: hidden; font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
+.autonomy-evidence-runs article header em { margin-left: auto; padding: 0.22rem 0.42rem; border-radius: 999px; color: #0a8067; background: #e8f8f3; font-size: 0.52rem; font-style: normal; font-weight: 900; }
+.autonomy-evidence-runs article p { margin: 0; color: #403446; font-size: 0.76rem; line-height: 1.48; }
+.autonomy-evidence-runs article dl { display: grid; margin: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.42rem; }
+.autonomy-evidence-runs article dl > div { display: grid; min-width: 0; gap: 0.18rem; padding: 0.52rem; border-radius: 10px; background: #f8f6f9; }
+.autonomy-evidence-runs article dt { color: #887c8c; font-size: 0.55rem; }
+.autonomy-evidence-runs article dd { margin: 0; overflow: hidden; font-size: 0.67rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.autonomy-evidence-runs article time { color: #918594; font-size: 0.56rem; }
+
+.autonomy-live-target-switch {
+  flex: 0 0 auto;
+}
+
+.autonomy-live-target-switch button {
+  min-height: 2rem;
+  padding: 0.34rem 0.52rem;
+  font-size: 0.58rem;
+}
+
 .autonomy-lab-page.is-embedded {
   min-height: 760px;
   grid-template-rows: minmax(0, 1fr);
@@ -810,6 +854,7 @@
   .autonomy-readiness-strip,
   .autonomy-stage-metrics,
   .autonomy-evidence-bindings { grid-template-columns: 1fr; }
+  .autonomy-evidence-runs { grid-template-columns: 1fr; }
   .autonomy-choice-grid,
   .autonomy-choice-grid.is-semantic { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .autonomy-form-grid label.is-wide,

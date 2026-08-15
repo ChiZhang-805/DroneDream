@@ -28,7 +28,10 @@ import { Link } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
-import type { AutonomyWorkspaceState } from "../features/autonomy/workspaceStore";
+import type {
+  AutonomyEvidenceRecord,
+  AutonomyWorkspaceState,
+} from "../features/autonomy/workspaceStore";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import {
   consumeAutonomyHandoff,
@@ -519,9 +522,11 @@ function runtimeComponentLabel(
 
 export function AutonomyLab({
   embedded = false,
+  onRunCompleted,
   workspace,
 }: {
   embedded?: boolean;
+  onRunCompleted?: (record: AutonomyEvidenceRecord) => void;
   workspace?: AutonomyWorkspaceState;
 } = {}) {
   const { interfaceLocale } = useI18n();
@@ -553,11 +558,18 @@ export function AutonomyLab({
   const runtimeSequence = useRef(0);
   const runtimeObservationPending = useRef(false);
   const runtimeTerminalSent = useRef(false);
+  const evidenceReported = useRef(false);
+  const workspaceBindingApplied = useRef<string | null>(null);
   const progressRef = useRef(0);
   const dronePositionRef = useRef<Point>([0, 0]);
   const [events, setEvents] = useState(() => [{ time: eventTime(), text: copy.events.ready }]);
+  const workspaceBindingKey = workspace
+    ? `${workspace.aircraft.updatedAt}:${workspace.mapPack.updatedAt}:${workspace.mission.updatedAt}:${workspace.mission.intent}`
+    : "standalone";
 
   useEffect(() => {
+    if (workspaceBindingApplied.current === workspaceBindingKey) return;
+    workspaceBindingApplied.current = workspaceBindingKey;
     if (!workspace) {
       consumeAutonomyHandoff();
       return;
@@ -566,7 +578,7 @@ export function AutonomyLab({
     setMissionId(missionForWorkspace(workspace));
     setPerception(perceptionForWorkspace(workspace));
     setPickupPayloadKg(vehicleForWorkspace(workspace).pickup_payload_kg);
-  }, [workspace]);
+  }, [workspace, workspaceBindingKey]);
 
   useEffect(() => {
     if (EDITION_IS_FIXED) return undefined;
@@ -590,7 +602,7 @@ export function AutonomyLab({
     edition,
     execution_target: target,
     natural_language: command.trim() || promptForMission(missionId, chinese),
-    scene_id: SCENE_ID_BY_MISSION[missionId],
+    scene_id: workspace?.mapPack.compilerSceneId ?? SCENE_ID_BY_MISSION[missionId],
     perception_mode: perception,
     vehicle: { ...workspaceVehicle, pickup_payload_kg: pickupPayloadKg },
     evidence: {
@@ -602,7 +614,7 @@ export function AutonomyLab({
       geofence_ready: false,
       battery_ready: false,
     },
-  }), [chinese, command, edition, missionId, perception, pickupPayloadKg, target, workspaceVehicle]);
+  }), [chinese, command, edition, missionId, perception, pickupPayloadKg, target, workspace?.mapPack.compilerSceneId, workspaceVehicle]);
   const latestCompileRequest = useRef(compileRequest);
   latestCompileRequest.current = compileRequest;
   const provisionalResult = useMemo(
@@ -724,6 +736,28 @@ export function AutonomyLab({
   }, [complete, copy.compileFailed, mission.clearance, missionId, pickupPayloadKg, runtimeSession]);
 
   useEffect(() => {
+    if (!complete || evidenceReported.current || !onRunCompleted) return;
+    if (!publicDemoConsole && !runtimeSession?.terminal) return;
+    evidenceReported.current = true;
+    const completedAt = new Date().toISOString();
+    const sessionId = runtimeSession?.session_id ?? `preview-${qualification.contract.contract_id}`;
+    onRunCompleted({
+      schemaVersion: 1,
+      id: sessionId,
+      sessionId,
+      contractId: qualification.contract.contract_id,
+      completedAt,
+      executionTarget: target,
+      source: runtimeSession ? "backend" : "preview",
+      evidenceChainHead: runtimeSession?.evidence_chain_head ?? "preview-only-no-signed-evidence-chain",
+      observationCount: runtimeSession?.observation_count ?? 0,
+      missionIntent: command,
+      aircraftName: workspace?.aircraft.name ?? "Default preview aircraft",
+      mapName: workspace?.mapPack.name ?? qualification.scene.name,
+    });
+  }, [command, complete, onRunCompleted, qualification.contract.contract_id, qualification.scene.name, runtimeSession, target, workspace?.aircraft.name, workspace?.mapPack.name]);
+
+  useEffect(() => {
     compileGeneration.current += 1;
     setCompileResult(null);
     setCompileSource("preview");
@@ -737,6 +771,7 @@ export function AutonomyLab({
     runtimeRequestId.current = null;
     runtimeSequence.current = 0;
     runtimeTerminalSent.current = false;
+    evidenceReported.current = false;
   }, [compileRequest]);
 
   const appendEvent = (text: string) => {
@@ -862,6 +897,7 @@ export function AutonomyLab({
     runtimeRequestId.current = null;
     runtimeSequence.current = 0;
     runtimeTerminalSent.current = false;
+    evidenceReported.current = false;
     setEvents([{ time: eventTime(), text: planned ? copy.events.planned : copy.events.ready }]);
   };
 
@@ -1027,7 +1063,7 @@ export function AutonomyLab({
 
         <section className="autonomy-panel autonomy-map-panel">
           <div className="autonomy-panel-heading autonomy-map-heading">
-            <div><Map aria-hidden="true" /><span>{copy.environment}</span></div>
+            <div><Map aria-hidden="true" /><span>{workspace?.mapPack.name ?? copy.environment}</span></div>
             <span className="autonomy-world-state">{perception === "vision" ? copy.unknown : copy.mapped}</span>
           </div>
           <div className="autonomy-map-stage">
@@ -1110,6 +1146,9 @@ export function AutonomyLab({
             </div>
           </div>
           <div className="autonomy-map-controls">
+            {embedded ? <div className="autonomy-target-switch autonomy-live-target-switch" role="group" aria-label={copy.executionTarget}>
+              {(Object.keys(copy.targets) as AutonomyExecutionTarget[]).map((candidate) => <button key={candidate} type="button" className={target === candidate ? "is-active" : ""} aria-pressed={target === candidate} onClick={() => setTarget(candidate)}>{copy.targets[candidate]}</button>)}
+            </div> : null}
             {embedded ? <button className="btn" type="button" onClick={() => void planTrajectory()} disabled={planning || command.trim().length < 3}>
               {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Route aria-hidden="true" />}
               {planning ? copy.planning : planned ? copy.replan : copy.plan}

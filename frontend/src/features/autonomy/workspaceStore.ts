@@ -16,6 +16,11 @@ export type MapRepresentation =
   | "occupancy"
   | "terrain";
 
+export type AutonomyCompiledSceneId =
+  | "stairwell-coffee-return"
+  | "forest-gate-inspection"
+  | "service-corridor-dock";
+
 export interface AutonomyAircraftProfile {
   schemaVersion: 1;
   id: string;
@@ -53,9 +58,25 @@ export interface AutonomyMapPack {
   floorCount: number;
   liveUpdates: "vision-slam" | "depth-fusion" | "lidar-fusion" | "fixed";
   calibrated: boolean;
+  compilerSceneId: AutonomyCompiledSceneId | null;
   semanticLayers: Array<"free-space" | "stairs" | "doors" | "gates" | "people" | "pickup-zones">;
   sourceFiles: AutonomyMapSourceFile[];
   updatedAt: string;
+}
+
+export interface AutonomyEvidenceRecord {
+  schemaVersion: 1;
+  id: string;
+  sessionId: string;
+  contractId: string;
+  completedAt: string;
+  executionTarget: "simulation" | "hitl" | "hardware";
+  source: "backend" | "preview";
+  evidenceChainHead: string;
+  observationCount: number;
+  missionIntent: string;
+  aircraftName: string;
+  mapName: string;
 }
 
 export interface AutonomyMissionDraft {
@@ -73,10 +94,17 @@ export interface AutonomyWorkspaceState {
   aircraft: AutonomyAircraftProfile;
   mapPack: AutonomyMapPack;
   mission: AutonomyMissionDraft;
+  evidence: AutonomyEvidenceRecord[];
 }
 
 const STORAGE_PREFIX = "dronedream:autonomy-workspace:v1";
 const MAX_SOURCE_FILES = 24;
+const MAX_EVIDENCE_RECORDS = 50;
+const COMPILED_SCENE_SET = new Set<AutonomyCompiledSceneId>([
+  "stairwell-coffee-return",
+  "forest-gate-inspection",
+  "service-corridor-dock",
+]);
 const SENSOR_SET = new Set<AutonomySensorKind>(["rgb", "depth", "stereo", "thermal", "lidar", "gps", "vio"]);
 const SEMANTIC_SET = new Set<AutonomyMapPack["semanticLayers"][number]>(["free-space", "stairs", "doors", "gates", "people", "pickup-zones"]);
 
@@ -129,6 +157,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       floorCount: 1,
       liveUpdates: "depth-fusion",
       calibrated: false,
+      compilerSceneId: null,
       semanticLayers: ["free-space", "people"],
       sourceFiles: [],
       updatedAt,
@@ -142,6 +171,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       currentStep: 0,
       updatedAt,
     },
+    evidence: [],
   };
 }
 
@@ -199,6 +229,9 @@ function normalize(value: unknown): AutonomyWorkspaceState {
     floorCount: Math.round(boundedNumber(mapPack.floorCount, fallback.mapPack.floorCount, 1, 500)),
     liveUpdates,
     calibrated: mapPack.calibrated === true,
+    compilerSceneId: COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
+      ? mapPack.compilerSceneId as AutonomyCompiledSceneId
+      : null,
     semanticLayers: Array.isArray(mapPack.semanticLayers)
       ? [...new Set(mapPack.semanticLayers.filter((layer): layer is AutonomyMapPack["semanticLayers"][number] => SEMANTIC_SET.has(layer as AutonomyMapPack["semanticLayers"][number])))].slice(0, SEMANTIC_SET.size)
       : fallback.mapPack.semanticLayers,
@@ -227,6 +260,30 @@ function normalize(value: unknown): AutonomyWorkspaceState {
       currentStep: Math.round(boundedNumber(mission.currentStep, 0, 0, 5)),
       updatedAt: boundedText(mission.updatedAt, updatedAt, 40),
     },
+    evidence: Array.isArray(candidate.evidence)
+      ? candidate.evidence.filter((record): record is AutonomyEvidenceRecord => Boolean(
+        record
+        && typeof record === "object"
+        && typeof record.id === "string"
+        && typeof record.sessionId === "string"
+        && typeof record.contractId === "string",
+      )).slice(0, MAX_EVIDENCE_RECORDS).map((record) => ({
+        schemaVersion: 1,
+        id: boundedText(record.id, crypto.randomUUID(), 160),
+        sessionId: boundedText(record.sessionId, "unknown-session", 160),
+        contractId: boundedText(record.contractId, "unknown-contract", 160),
+        completedAt: boundedText(record.completedAt, updatedAt, 40),
+        executionTarget: ["simulation", "hitl", "hardware"].includes(record.executionTarget)
+          ? record.executionTarget
+          : "simulation",
+        source: record.source === "backend" ? "backend" : "preview",
+        evidenceChainHead: boundedText(record.evidenceChainHead, "preview-only", 256),
+        observationCount: Math.round(boundedNumber(record.observationCount, 0, 0, 1_000_000)),
+        missionIntent: boundedText(record.missionIntent, fallback.mission.intent, 2_000),
+        aircraftName: boundedText(record.aircraftName, normalizedAircraft.name, 120),
+        mapName: boundedText(record.mapName, normalizedMap.name, 120),
+      }))
+      : [],
   };
 }
 
