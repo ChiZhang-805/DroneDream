@@ -71,7 +71,9 @@ import { publicDemoConsole } from "../features/demo/publicDemo";
 import { consumeAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
 import { useVoiceInput } from "../features/experiment/useVoiceInput";
 import {
+  completeManagedModelCatalog,
   DEFAULT_MANAGED_MODEL_CATALOG,
+  getManagedModelCatalog,
   managedModelAvailableForAssistant,
 } from "../features/settings/cloudModelAccess";
 import { useModelAccess } from "../features/settings/ModelAccessContext";
@@ -214,6 +216,7 @@ export function AutonomyPlatform() {
 
 export function AutonomyOverview() {
   const { chinese, workspace, persist } = useAutonomyWorkspace();
+  const auth = useOptionalAuth();
   const navigate = useNavigate();
   const {
     settings: modelAccess,
@@ -228,14 +231,15 @@ export function AutonomyOverview() {
   const [voiceConsentPending, setVoiceConsentPending] = useState(false);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [managedModels, setManagedModels] = useState(DEFAULT_MANAGED_MODEL_CATALOG);
+  const [managedModelsReady, setManagedModelsReady] = useState(true);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const managedModels = DEFAULT_MANAGED_MODEL_CATALOG;
   const configuredProfiles = modelProfiles.filter((profile) => profile.apiKey.trim());
   const selectedManagedModel = managedModels.find(
     (model) => model.provider === modelAccess.managedProvider
       && model.model === modelAccess.managedModel
       && managedModelAvailableForAssistant(model),
-  ) ?? managedModels.find(managedModelAvailableForAssistant) ?? null;
+  ) ?? null;
   const selectedCustomProfileId = modelAccess.accessMode === "byok"
     && configuredProfiles.some((profile) => profile.id === activeProfileId)
     ? activeProfileId
@@ -258,7 +262,7 @@ export function AutonomyOverview() {
     startVoice: "允许并开始",
     cancelVoice: "取消",
     voiceUnavailable: "当前环境无法使用语音输入，你仍可继续输入文字。",
-    tooLong: "任务描述不能超过 12,000 个字符。",
+    tooLong: "任务描述不能超过 2,000 个字符。",
   } : {
     question: "What should your drone do?",
     placeholder: "Describe the goal, waypoints, environment, and work to complete…",
@@ -277,12 +281,52 @@ export function AutonomyOverview() {
     startVoice: "Allow and start",
     cancelVoice: "Cancel",
     voiceUnavailable: "Voice input is unavailable here. You can keep typing.",
-    tooLong: "The mission description must stay within 12,000 characters.",
+    tooLong: "The mission description must stay within 2,000 characters.",
   };
   const appendTranscript = useCallback((transcript: string) => {
     setComposer((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript);
   }, []);
   const voice = useVoiceInput({ locale: chinese ? "zh-CN" : "en", onTranscript: appendTranscript });
+
+  useEffect(() => {
+    if (!auth?.account) {
+      setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
+      setManagedModelsReady(true);
+      return;
+    }
+    let active = true;
+    setManagedModelsReady(false);
+    void getManagedModelCatalog()
+      .then((catalog) => {
+        if (!active) return;
+        setManagedModels(completeManagedModelCatalog(catalog.models));
+        setManagedModelsReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
+        setManagedModelsReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth?.account]);
+
+  useEffect(() => {
+    if (
+      modelAccess.accessMode !== "platform"
+      || selectedManagedModel
+      || !managedModelsReady
+    ) return;
+    const fallback = managedModels.find(managedModelAvailableForAssistant);
+    if (fallback) selectManagedModel(fallback.provider, fallback.model);
+  }, [
+    managedModels,
+    managedModelsReady,
+    modelAccess.accessMode,
+    selectManagedModel,
+    selectedManagedModel,
+  ]);
 
   useEffect(() => {
     if (!contextMenuOpen) return undefined;
@@ -304,7 +348,7 @@ export function AutonomyOverview() {
     event.preventDefault();
     const intent = composer.trim();
     if (!intent) return;
-    if (intent.length > 12_000) {
+    if (intent.length > 2_000) {
       setError(copy.tooLong);
       return;
     }
@@ -393,6 +437,7 @@ export function AutonomyOverview() {
               customProfiles={configuredProfiles}
               selectedDefault={modelAccess.accessMode === "platform" ? selectedManagedModel : null}
               selectedCustomId={selectedCustomProfileId}
+              disabled={!managedModelsReady}
               onSelectDefault={(model) => {
                 selectAccessMode("platform");
                 selectManagedModel(model.provider, model.model);
