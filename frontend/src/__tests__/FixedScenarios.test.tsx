@@ -34,20 +34,22 @@ afterEach(() => {
 });
 
 describe("fixed scenario library", () => {
-  it("paginates six groups of versioned scenarios without creating a job", async () => {
+  it("paginates pairs of versioned scenarios without creating a job", async () => {
     const createSpy = vi.spyOn(apiClient, "createJob");
     const { router } = renderPage();
 
     expect(screen.getByRole("heading", { name: "Fixed Scenario Lab" })).toBeVisible();
     expect(screen.getAllByText("Simple")).toHaveLength(2);
-    expect(screen.getAllByText("Medium")).toHaveLength(2);
-    expect(document.querySelectorAll("[data-template-key]")).toHaveLength(4);
-    expect(screen.getAllByText("Local track preview")).toHaveLength(4);
+    expect(screen.queryByText("Medium")).not.toBeInTheDocument();
+    expect(document.querySelectorAll("[data-template-key]")).toHaveLength(2);
+    expect(screen.getAllByText("Local track preview")).toHaveLength(2);
     expect(screen.getByText(/never creates or starts a job/i)).toBeVisible();
-    expect(screen.getByText("1 / 6")).toBeVisible();
+    expect(screen.getByText("1 / 12")).toBeVisible();
     expect(screen.queryByText("PX4 / GAZEBO STUDY")).not.toBeInTheDocument();
     expect(screen.queryByText("Scenario catalog v1")).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Next scenario page" }));
+    expect(screen.getByText("2 / 12")).toBeVisible();
     const combinedCard = screen.getByRole("heading", {
       name: "Wind and sensor-noise circle",
     }).closest("article");
@@ -61,10 +63,10 @@ describe("fixed scenario library", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Next scenario page" }));
-    expect(screen.getByText("2 / 6")).toBeVisible();
+    expect(screen.getByText("3 / 12")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Wide 8 m circle" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Precision U-turn" })).toBeVisible();
-    expect(document.querySelectorAll("[data-template-key]")).toHaveLength(4);
+    expect(screen.getByRole("heading", { name: "Tight 3 m circle" })).toBeVisible();
+    expect(document.querySelectorAll("[data-template-key]")).toHaveLength(2);
     expect(createSpy).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Previous scenario page" }));
@@ -85,8 +87,8 @@ describe("fixed scenario library", () => {
 
     expect(screen.getByRole("heading", { name: "固定场景体验" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "稳定悬停" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "风与传感器噪声圆形" })).toBeVisible();
-    expect(screen.getAllByRole("link", { name: "使用这个场景" })).toHaveLength(4);
+    expect(screen.getByRole("heading", { name: "无风 5 米圆形" })).toBeVisible();
+    expect(screen.getAllByRole("link", { name: "使用这个场景" })).toHaveLength(2);
     router.dispose();
   });
 });

@@ -406,7 +406,7 @@ function AutonomyMissionPlanCard({
       </header>
       <div className="autonomy-inline-plan-bindings">
         <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机" : "Aircraft"}</small><strong>{workspace.aircraft.name} · v{workspace.aircraft.version}</strong></span>
-        <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{workspace.mapPack.name} · v{workspace.mapPack.version}</strong></span>
+        <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{workspace.mapPack.name}</strong></span>
         <span><Radar aria-hidden="true" /><small>{chinese ? "感知" : "Perception"}</small><strong>{plan.perceptionMode.toUpperCase()}</strong></span>
         <span><Route aria-hidden="true" /><small>{chinese ? "路线" : "Route"}</small><strong>{plan.metrics.routeLengthM.toFixed(1)} m · {Math.ceil(plan.metrics.estimatedDurationS)} s</strong></span>
       </div>
@@ -1033,7 +1033,7 @@ export function AutonomyOverview() {
                     <header><span><Layers3 aria-hidden="true" />{copy.map}</span><Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
                     {assetLibrary.maps.map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
                       <input type="radio" name="autonomy-map" value={mapPack.id} checked={mapPack.id === workspace.mapPack.id} onChange={() => selectMap(mapPack.id)} />
-                      <span><b>{mapPack.name}</b><small>{mapPack.representation} · {mapPack.coordinateFrame} · v{mapPack.version}</small></span>
+                      <span><b>{mapPack.name}</b><small>{mapPack.representation} · {mapPack.coordinateFrame}</small></span>
                       {mapPack.id === workspace.mapPack.id ? <em>{copy.selected}</em> : null}
                     </label>)}
                   </section>
@@ -1411,12 +1411,9 @@ export function AutonomyAircraft() {
           <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "资格状态" : "Qualification"} value={form.status.toUpperCase()} />
         </div>
         <div className="autonomy-config-summary-actions">
-          {!valid ? <p className="autonomy-config-error">{chinese ? "请检查质量、推力、电量预留、定位传感器标定和 3 m 规划半径限制。" : "Check mass, thrust, reserve, positioning-sensor calibration, and the 3 m planning-radius limit."}</p> : null}
           <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"}><Save aria-hidden="true" />{form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
-          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
-          {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "公开网页不签发资格凭据。请在连接 DroneDream 后端的桌面或私有控制台完成验证。" : "The public site cannot issue qualification receipts. Use a desktop or private console connected to the DroneDream backend."}</p> : null}
+          <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working" || qualificationState === "unavailable"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "unavailable" ? (chinese ? "需要连接后端" : "Backend required") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
           {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
-          <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.aircraft.updatedAt)}</small>
         </div>
       </aside>
     </form>
@@ -1751,7 +1748,7 @@ export function AutonomyMaps() {
     <form className="autonomy-config-page autonomy-maps-page" onSubmit={save}>
       <div className="autonomy-config-main">
         <section className="autonomy-config-card">
-          <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存地图" : "Saved maps"} value={workspace.mapPack.id} onChange={(event) => selectMap(event.target.value)}>{assetLibrary.maps.map((mapPack) => <option value={mapPack.id} key={mapPack.id}>{mapPack.name} · v{mapPack.version}</option>)}</select><button className="btn" type="button" onClick={createMap}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
+          <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存地图" : "Saved maps"} value={workspace.mapPack.id} onChange={(event) => selectMap(event.target.value)}>{assetLibrary.maps.map((mapPack) => <option value={mapPack.id} key={mapPack.id}>{mapPack.name}</option>)}</select><button className="btn" type="button" onClick={createMap}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
           <div className="autonomy-form-grid is-four">
             <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateMap({ name: event.target.value })} /></label>
             <label><span>{chinese ? "三维表示" : "3D representation"}</span><select value={form.representation} onChange={(event) => updateGeometry({ representation: event.target.value as AutonomyMapPack["representation"] })}><option value="hybrid-3d">Hybrid 3D</option><option value="mesh">Mesh</option><option value="point-cloud">Point cloud</option><option value="occupancy">Occupancy / ESDF</option><option value="terrain">Terrain / DEM</option></select></label>
@@ -1779,11 +1776,13 @@ export function AutonomyMaps() {
             <span>GLB · GLTF · PCD · PLY · GeoJSON</span>
             <input type="file" multiple accept=".glb,.gltf,.pcd,.ply,.json,.geojson" onChange={(event) => void addFiles(event.target.files)} />
           </label>
-          <div className="autonomy-map-assets">
-            {form.sourceFiles.length ? form.sourceFiles.map((file, index) => (
+          {form.sourceFiles.length ? (
+            <div className="autonomy-map-assets">
+              {form.sourceFiles.map((file, index) => (
                <div key={`${file.name}-${index}`} data-admission={file.admission}><HardDrive aria-hidden="true" /><span><strong>{file.name}</strong><small>{file.format.toUpperCase()} · {(file.bytes / 1_000_000).toFixed(2)} MB · {file.admission.toUpperCase()}{file.parser ? ` · ${file.parser}` : ""}</small>{file.sha256 ? <code>{file.sha256.slice(0, 20)}</code> : null}</span><button type="button" onClick={() => { setForm({ ...form, status: "draft", contentHash: null, qualificationReceiptId: null, calibrated: false, compilerSceneId: null, sourceFiles: form.sourceFiles.filter((_, itemIndex) => itemIndex !== index) }); setSaved(false); setQualificationState("idle"); }}>×</button></div>
-            )) : <p className="autonomy-honest-empty">{chinese ? "尚未登记地图资产。可选择经过验证的内置三维场景；导入文件必须由后端完成几何摄取后才会获得编译场景资格。" : "No map assets registered. Select a validated built-in 3D scene, or wait for backend geometry ingestion before an imported pack receives a compiled scene binding."}</p>}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <section className="autonomy-config-card">
@@ -1806,14 +1805,10 @@ export function AutonomyMaps() {
         <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "分辨率" : "Resolution"} value={`${form.resolutionM.toFixed(3)} m`} />
         <Metric icon={<Layers3 aria-hidden="true" />} label={chinese ? "语义图层" : "Semantic layers"} value={String(form.semanticLayers.length)} />
         <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "状态" : "Status"} value={ready ? "READY" : "BLOCKED"} />
-        <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "Map Pack 版本" : "Map Pack version"} value={`v${form.version}`} />
         <Metric icon={<Database aria-hidden="true" />} label={chinese ? "资产准入" : "Asset admission"} value={form.status.toUpperCase()} />
         <Metric icon={<Gauge aria-hidden="true" />} label={chinese ? "地图可信度" : "Map confidence"} value={`${form.confidencePercent.toFixed(0)}%`} />
         <button className="btn btn-primary" type="submit" disabled={saved}><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存 Map Pack" : "Save Map Pack")}</button>
-        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
-        {qualificationState === "blocked" ? <p className="autonomy-config-error">{chinese ? "地图配置与内置场景清单不一致，或导入资产仍缺少几何重建凭据。" : "The map configuration differs from the bundled manifest, or imported assets still lack a reconstruction receipt."}</p> : null}
-        {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "当前控制台无法签发地图资格凭据。请连接 DroneDream 后端后重试。" : "This console cannot issue a map qualification receipt. Connect the DroneDream backend and retry."}</p> : null}
-        <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.mapPack.updatedAt)}</small>
+        <button className="btn" type="button" disabled={!saved || !form.compilerSceneId || !form.calibrated || form.sourceFiles.length > 0 || qualificationState === "working" || qualificationState === "qualified" || qualificationState === "unavailable"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "qualified" ? (chinese ? "已签发资格凭据" : "Qualification issued") : qualificationState === "blocked" ? (chinese ? "资格验证未通过" : "Qualification blocked") : qualificationState === "unavailable" ? (chinese ? "需要连接后端" : "Backend required") : (chinese ? "验证 Map Pack" : "Qualify Map Pack")}</button>
       </aside>
     </form>
   );

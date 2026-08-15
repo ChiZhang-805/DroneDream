@@ -20,7 +20,7 @@ interface FixedScenarioDefinition {
   titleKey: TranslationKey;
 }
 
-const SCENARIOS_PER_PAGE = 4;
+const SCENARIOS_PER_PAGE = 2;
 
 const FIXED_SCENARIO_DEFINITIONS: readonly FixedScenarioDefinition[] = Object.freeze([
   {
@@ -193,16 +193,6 @@ export function FixedScenarios() {
                   <dd>{t("scenarioLibrary.simulator.px4")}</dd>
                 </div>
               </dl>
-              <ExperienceTrackPreview
-                trackType={template.patch.track_type}
-                points={points}
-                altitudeM={Number(template.patch.altitude_m)}
-                title={t("scenarioLibrary.preview")}
-                hoverLabel={t("wizard.preview.hover")}
-                routeLabel={t("wizard.preview.route")}
-                pointCountLabel={t("wizard.preview.pointCount", { count: points.length })}
-                localOnlyLabel={t("scenarioLibrary.localPreview")}
-              />
               <Link
                 className="btn btn-primary fixed-scenario-use"
                 to={`/jobs/new?scenario=${encodeURIComponent(template.key)}`}
@@ -216,6 +206,16 @@ export function FixedScenarios() {
                 {t("scenarioLibrary.use")}
                 <ArrowRight aria-hidden="true" />
               </Link>
+              <ExperienceTrackPreview
+                trackType={template.patch.track_type}
+                points={points}
+                altitudeM={Number(template.patch.altitude_m)}
+                title={t("scenarioLibrary.preview")}
+                hoverLabel={t("wizard.preview.hover")}
+                routeLabel={t("wizard.preview.route")}
+                pointCountLabel={t("wizard.preview.pointCount", { count: points.length })}
+                localOnlyLabel={t("scenarioLibrary.localPreview")}
+              />
             </article>
           );
         })}

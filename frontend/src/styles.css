@@ -123,6 +123,11 @@
   scrollbar-gutter: stable;
 }
 
+.autonomy-platform-content:has(.autonomy-lab-page.is-embedded) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
 .autonomy-command-page,
 .autonomy-evidence-page {
   display: grid;
@@ -1007,6 +1012,10 @@
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
+.autonomy-planning-layers {
+  margin-top: 0.42rem;
+}
+
 .autonomy-choice-grid button,
 .autonomy-planner-choices button {
   display: flex;
@@ -1042,7 +1051,7 @@
   position: sticky;
   top: 0;
   display: flex;
-  height: max(38rem, calc(100dvh - 9.75rem));
+  height: max(37.25rem, calc(100dvh - 10.5rem));
   min-height: 0;
   flex-direction: column;
   gap: 0.58rem;
@@ -1543,19 +1552,21 @@
 }
 
 .autonomy-lab-page.is-embedded {
-  min-height: 760px;
+  height: 100%;
+  min-height: 0;
   grid-template-rows: minmax(0, 1fr);
   gap: 0;
 }
 
 .autonomy-lab-page.is-embedded .autonomy-workspace {
-  min-height: 760px;
+  height: 100%;
+  min-height: 0;
   grid-template-columns: minmax(0, 1.75fr) minmax(310px, 0.58fr);
 }
 
 .autonomy-lab-page.is-embedded .autonomy-config-panel { display: none; }
 .autonomy-lab-page.is-embedded .autonomy-map-panel,
-.autonomy-lab-page.is-embedded .autonomy-brain-panel { overflow: visible; }
+.autonomy-lab-page.is-embedded .autonomy-brain-panel { overflow: hidden; }
 
 @media (max-width: 1200px) {
   .autonomy-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -8162,7 +8173,7 @@ a {
 .autonomy-live-perception > article em { font-size: 0.5rem; font-style: normal; font-weight: 900; }
 
 .autonomy-lab-page.is-embedded .autonomy-brain-panel {
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .autonomy-telemetry dl {
@@ -8496,7 +8507,7 @@ a {
 .fixed-scenarios-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
   gap: 0.72rem;
   min-width: 0;
   min-height: 0;
@@ -8504,8 +8515,8 @@ a {
 
 .fixed-scenario-card {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 0.54rem;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 0.62rem;
   min-width: 0;
   min-height: 0;
   padding: 0.78rem;
@@ -8539,18 +8550,24 @@ a {
 
 .fixed-scenario-facts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.35rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   margin: 0;
+  border-block: 1px solid #eadfeb;
 }
 
 .fixed-scenario-facts > div {
+  display: flex;
   min-width: 0;
-  padding: 0.38rem 0.46rem;
-  border: 1px solid #eadfeb;
-  border-radius: 9px;
-  background: #fcf9fc;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.36rem 0.18rem;
+  border-bottom: 1px solid #f0e7f1;
 }
+
+.fixed-scenario-facts > div:last-child { border-bottom: 0; }
 
 .fixed-scenario-facts dt,
 .fixed-scenario-facts dd {
@@ -8559,15 +8576,19 @@ a {
 
 .fixed-scenario-facts dt {
   color: #887d8c;
-  font-size: 0.68rem;
+  font-size: 0.74rem;
+  white-space: nowrap;
 }
 
 .fixed-scenario-facts dd {
-  margin-top: 0.18rem;
-  overflow-wrap: anywhere;
+  max-width: 70%;
+  overflow: hidden;
   color: #382c3c;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 720;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fixed-scenario-card .experience-preview {
@@ -8581,14 +8602,13 @@ a {
 
 .fixed-scenario-card .experience-preview-canvas {
   height: 100%;
-  min-height: 126px;
-  max-height: 205px;
+  min-height: 220px;
+  max-height: none;
 }
 
 .fixed-scenario-use {
   justify-content: center;
   width: 100%;
-  margin-top: auto;
 }
 
 .fixed-scenario-use svg {
