@@ -277,7 +277,16 @@ def _json_asset(
                     message="Only glTF 2.x assets are admitted.",
                 )
             )
-        return "gltf-2-json", ["mesh"], issues
+        meshes = payload.get("meshes") if isinstance(payload, dict) else None
+        if not isinstance(meshes, list) or not meshes:
+            issues.append(
+                QualificationIssue(
+                    code="map.gltf-meshes-missing",
+                    severity="error",
+                    message="glTF JSON must declare a mesh collection.",
+                )
+            )
+        return "gltf-2-json", [] if issues else ["mesh"], issues
     geo_type = payload.get("type") if isinstance(payload, dict) else None
     if extension == "geojson" or geo_type in {
         *GEOJSON_GEOMETRY_TYPES,
@@ -373,9 +382,8 @@ def _inspect_map_asset(
                 )
             )
             return "glb-2-binary", [], issues
-        if not isinstance(manifest, dict) or not str(
-            manifest.get("asset", {}).get("version", "")
-        ).startswith("2"):
+        asset = manifest.get("asset") if isinstance(manifest, dict) else None
+        if not isinstance(asset, dict) or not str(asset.get("version", "")).startswith("2"):
             issues.append(
                 QualificationIssue(
                     code="map.glb-manifest-invalid",

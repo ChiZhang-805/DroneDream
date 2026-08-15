@@ -128,12 +128,38 @@ def test_map_asset_admission_rejects_header_only_glb_and_empty_geojson() -> None
 
 
 def test_map_asset_admission_rejects_a_malformed_gltf_asset_member() -> None:
-    registry = MapAssetAdmissionRegistry(maximum_receipts=2)
+    registry = MapAssetAdmissionRegistry(maximum_receipts=4)
 
     async def malformed_gltf():
         yield b'{"asset":[],"meshes":[{}]}'
 
+    async def empty_gltf():
+        yield b'{"asset":{"version":"2.0"}}'
+
     receipt = asyncio.run(registry.admit("user-a", "malformed.gltf", malformed_gltf()))
+    empty_receipt = asyncio.run(registry.admit("user-a", "empty.gltf", empty_gltf()))
 
     assert receipt.status == "rejected"
     assert receipt.issues[0].code == "map.gltf-version-unsupported"
+    assert empty_receipt.status == "rejected"
+    assert empty_receipt.issues[0].code == "map.gltf-meshes-missing"
+
+
+def test_map_asset_admission_rejects_a_malformed_glb_asset_member() -> None:
+    registry = MapAssetAdmissionRegistry(maximum_receipts=2)
+    manifest = b'{"asset":null,"meshes":[{}]}'
+    manifest += b" " * (-len(manifest) % 4)
+    glb = (
+        b"glTF"
+        + struct.pack("<II", 2, 20 + len(manifest))
+        + struct.pack("<I4s", len(manifest), b"JSON")
+        + manifest
+    )
+
+    async def malformed_glb():
+        yield glb
+
+    receipt = asyncio.run(registry.admit("user-a", "malformed.glb", malformed_glb()))
+
+    assert receipt.status == "rejected"
+    assert receipt.issues[0].code == "map.glb-manifest-invalid"

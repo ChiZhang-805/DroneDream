@@ -61,6 +61,8 @@ type MissionId = "coffee" | "gates" | "narrow";
 type PerceptionMode = "fusion" | "vision" | "map";
 type Point = readonly [number, number];
 
+const MISSION_STEP_PAYLOAD_LIMIT_KG = 10;
+
 interface MissionPreset {
   id: MissionId;
   icon: typeof Coffee;
@@ -463,6 +465,7 @@ function vehicleForAircraft(aircraft?: AutonomyAircraftProfile): AutonomyCompile
   const pickupCapacityKg = Math.max(0, Math.min(
     aircraft.maximumPickupPayloadKg,
     payloadMarginKg - launchPayloadKg,
+    MISSION_STEP_PAYLOAD_LIMIT_KG,
   ));
   return {
     ...DEFAULT_VEHICLE,
