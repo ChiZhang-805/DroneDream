@@ -625,6 +625,41 @@ function previewRuntimeTaskGraph(
   };
 }
 
+function embeddedTaskGraphNodes(graph: AutonomyTaskGraph): AutonomyTaskGraph["nodes"] {
+  if (graph.nodes.length <= 2) return graph.nodes;
+
+  const activeIds = new Set(graph.active_node_ids);
+  const relevantIndexes = graph.nodes
+    .map((node, index) => ({ node, index }))
+    .filter(({ node }) =>
+      activeIds.has(node.task_id)
+      || node.status === "active"
+      || node.status === "blocked"
+      || node.status === "failed",
+    );
+  const runtimeIndexes = relevantIndexes
+    .filter(({ node }) => node.inserted_by === "runtime")
+    .map(({ index }) => index);
+  const selected = new Set<number>(runtimeIndexes.slice(-2));
+
+  for (const { index } of [...relevantIndexes].reverse()) {
+    if (selected.size >= 2) break;
+    selected.add(index);
+  }
+
+  if (selected.size === 0) {
+    selected.add(graph.nodes.length - 1);
+  }
+  if (selected.size === 1) {
+    const [anchor] = selected;
+    selected.add(anchor > 0 ? anchor - 1 : Math.min(1, graph.nodes.length - 1));
+  }
+
+  return [...selected]
+    .sort((left, right) => left - right)
+    .map((index) => graph.nodes[index]);
+}
+
 export function AutonomyLab({
   embedded = false,
   onRunCompleted,
@@ -1349,9 +1384,9 @@ export function AutonomyLab({
             </button>
           </div> : null}
           <ol className={`autonomy-task-graph is-${taskGraphView}`}>
-            {activeTaskGraph.nodes.slice(0, embedded ? 2 : activeTaskGraph.nodes.length).map((node, index) => (
+            {(embedded ? embeddedTaskGraphNodes(activeTaskGraph) : activeTaskGraph.nodes).map((node) => (
               <li key={node.task_id} data-status={node.status} data-source={node.inserted_by}>
-                <span>{node.status === "completed" ? <Check aria-hidden="true" /> : index + 1}</span>
+                <span>{node.status === "completed" ? <Check aria-hidden="true" /> : activeTaskGraph.nodes.findIndex((candidate) => candidate.task_id === node.task_id) + 1}</span>
                 <div>
                   <strong>{node.label}</strong>
                   <small>{embedded ? node.status.toUpperCase() : `${node.status.toUpperCase()} · ${node.executor.replaceAll("_", " ")}`}</small>
