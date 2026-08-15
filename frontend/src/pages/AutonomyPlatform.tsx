@@ -45,6 +45,7 @@ import {
 } from "react-router-dom";
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
+import { apiClient } from "../api/client";
 import {
   AUTONOMY_AIRCRAFT_LIMITS,
   autonomyAircraftRadiusM,
@@ -59,6 +60,7 @@ import {
   type AutonomyWorkspaceState,
 } from "../features/autonomy/workspaceStore";
 import { useOptionalAuth } from "../features/auth/AuthContext";
+import { publicDemoConsole } from "../features/demo/publicDemo";
 import { consumeAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
 import { useI18n } from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
@@ -276,12 +278,13 @@ export function AutonomyAircraft() {
   const { chinese, workspace, persist, edition } = useAutonomyWorkspace();
   const [form, setForm] = useState(workspace.aircraft);
   const [saved, setSaved] = useState(false);
+  const [qualificationState, setQualificationState] = useState<"idle" | "working" | "qualified" | "blocked" | "unavailable">("idle");
   useEffect(() => setForm(workspace.aircraft), [workspace.aircraft]);
   const payloadMargin = form.maximumTakeoffMassKg - form.dryMassKg;
   const thrustToWeight = form.maximumThrustN / (Math.max(form.maximumTakeoffMassKg, 0.01) * 9.80665);
   const valid = isAutonomyAircraftProfileValid(form);
   const updateAircraft = (patch: Partial<AutonomyAircraftProfile>) => {
-    setForm((current) => ({ ...current, ...patch }));
+    setForm((current) => ({ ...current, ...patch, status: "draft", qualificationReceiptId: null }));
     setSaved(false);
   };
   const numberField = (key: keyof AutonomyAircraftProfile, value: string) => {
@@ -292,7 +295,14 @@ export function AutonomyAircraft() {
   const save = (event: FormEvent) => {
     event.preventDefault();
     if (!valid) return;
-    const next = { ...form, updatedAt: new Date().toISOString() };
+    if (form.status !== "draft" && form.qualificationReceiptId) return;
+    const next = {
+      ...form,
+      version: Math.max(workspace.aircraft.version + 1, form.version),
+      status: "draft" as const,
+      qualificationReceiptId: null,
+      updatedAt: new Date().toISOString(),
+    };
     persist(updatedWorkspace(workspace, {
       aircraft: next,
       mission: { ...workspace.mission, aircraftProfileId: next.id, updatedAt: next.updatedAt },
@@ -302,11 +312,91 @@ export function AutonomyAircraft() {
   const toggleSensor = (sensor: AutonomySensorKind) => {
     setForm((current) => ({
       ...current,
+      status: "draft",
+      qualificationReceiptId: null,
       sensors: current.sensors.includes(sensor)
         ? current.sensors.filter((item) => item !== sensor)
         : [...current.sensors, sensor],
+      sensorMounts: current.sensors.includes(sensor)
+        ? current.sensorMounts.filter((item) => item.kind !== sensor)
+        : [...current.sensorMounts, {
+          id: `${sensor}-${current.sensorMounts.filter((item) => item.kind === sensor).length + 1}`,
+          kind: sensor,
+          calibrated: false,
+          positionM: { x: 0, y: 0, z: 0 },
+          rollPitchYawDeg: { x: 0, y: 0, z: 0 },
+          rateHz: sensor === "gps" ? 10 : 30,
+          calibrationAgeDays: 0,
+        }],
     }));
     setSaved(false);
+  };
+  const updateSensorMount = (id: string, patch: Partial<AutonomyAircraftProfile["sensorMounts"][number]>) => {
+    setForm((current) => ({
+      ...current,
+      status: "draft",
+      qualificationReceiptId: null,
+      sensorMounts: current.sensorMounts.map((sensor) => sensor.id === id ? { ...sensor, ...patch } : sensor),
+    }));
+    setSaved(false);
+    setQualificationState("idle");
+  };
+  const qualify = async () => {
+    if (!valid) {
+      setQualificationState("blocked");
+      return;
+    }
+    if (publicDemoConsole) {
+      setQualificationState("unavailable");
+      return;
+    }
+    setQualificationState("working");
+    try {
+      const receipt = await apiClient.qualifyAutonomyVehiclePack({
+        pack_id: form.id,
+        version: form.version,
+        firmware: form.firmware,
+        flight_controller: form.flightController,
+        control_interface: form.controlInterface,
+        dry_mass_kg: form.dryMassKg,
+        max_takeoff_mass_kg: form.maximumTakeoffMassKg,
+        max_total_thrust_n: form.maximumThrustN,
+        body_size_m: { x: form.bodyLengthM, y: form.bodyWidthM, z: form.bodyHeightM },
+        rotor_radius_m: form.rotorRadiusM,
+        center_of_gravity_m: form.centerOfGravityM,
+        inertia_kg_m2: form.inertiaKgM2,
+        battery_energy_wh: form.batteryEnergyWh,
+        reserve_battery_percent: form.reserveBatteryPercent,
+        maximum_pickup_payload_kg: form.maximumPickupPayloadKg,
+        maximum_speed_mps: form.maximumSpeedMps,
+        maximum_acceleration_mps2: form.maximumAccelerationMps2,
+        maximum_climb_mps: form.maximumClimbMps,
+        maximum_descent_mps: form.maximumDescentMps,
+        command_link_latency_ms: form.commandLink.latencyMs,
+        command_link_bandwidth_mbps: form.commandLink.bandwidthMbps,
+        sensors: form.sensorMounts.map((sensor) => ({
+          sensor_id: sensor.id,
+          kind: sensor.kind,
+          calibrated: sensor.calibrated,
+          position_m: sensor.positionM,
+          roll_pitch_yaw_deg: sensor.rollPitchYawDeg,
+          rate_hz: sensor.rateHz,
+          calibration_age_days: sensor.calibrationAgeDays,
+        })),
+      });
+      const next = {
+        ...form,
+        status: receipt.status === "validated_unsigned" ? "validated-unsigned" as const : "draft" as const,
+        qualificationReceiptId: receipt.receipt_id,
+        updatedAt: new Date().toISOString(),
+      };
+      setForm(next);
+      persist(updatedWorkspace(workspace, { aircraft: next }));
+      setSaved(true);
+      setQualificationState(receipt.status === "validated_unsigned" ? "qualified" : "blocked");
+    } catch {
+      setQualificationState("unavailable");
+    }
   };
   return (
     <form className="autonomy-config-page" onSubmit={save}>
@@ -317,7 +407,10 @@ export function AutonomyAircraft() {
             <label><span>{chinese ? "名称" : "Name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateAircraft({ name: event.target.value })} /></label>
             <label><span>{chinese ? "制造商" : "Manufacturer"}</span><input value={form.manufacturer} maxLength={120} onChange={(event) => updateAircraft({ manufacturer: event.target.value })} /></label>
             <label><span>{chinese ? "机架" : "Airframe"}</span><input value={form.airframe} maxLength={120} onChange={(event) => updateAircraft({ airframe: event.target.value })} /></label>
-            <label className="is-wide"><span>{chinese ? "飞控固件" : "Flight controller firmware"}</span><input value={form.firmware} maxLength={120} onChange={(event) => updateAircraft({ firmware: event.target.value })} /></label>
+            <label><span>{chinese ? "飞控" : "Flight controller"}</span><input value={form.flightController} maxLength={120} onChange={(event) => updateAircraft({ flightController: event.target.value })} /></label>
+            <label><span>{chinese ? "飞控固件" : "Firmware"}</span><input value={form.firmware} maxLength={120} onChange={(event) => updateAircraft({ firmware: event.target.value })} /></label>
+            <label><span>{chinese ? "控制接口" : "Control interface"}</span><select value={form.controlInterface} onChange={(event) => updateAircraft({ controlInterface: event.target.value as AutonomyAircraftProfile["controlInterface"] })}><option value="px4-ros2">PX4 ROS 2</option><option value="mavsdk">MAVSDK</option><option value="mavlink">MAVLink</option><option value="simulation-only">Simulation only</option></select></label>
+            <label><span>{chinese ? "机载计算" : "Onboard compute"}</span><input value={form.computePlatform} maxLength={120} onChange={(event) => updateAircraft({ computePlatform: event.target.value })} /></label>
           </div>
         </section>
 
@@ -333,10 +426,28 @@ export function AutonomyAircraft() {
               ["rotorRadiusM", chinese ? "旋翼半径 (m)" : "Rotor radius (m)"],
               ["maximumThrustN", chinese ? "最大总推力 (N)" : "Maximum thrust (N)"],
               ["batteryEnergyWh", chinese ? "电池能量 (Wh)" : "Battery energy (Wh)"],
+              ["maximumPickupPayloadKg", chinese ? "最大拾取载荷 (kg)" : "Pickup capacity (kg)"],
+              ["maximumSpeedMps", chinese ? "最大速度 (m/s)" : "Maximum speed (m/s)"],
+              ["maximumAccelerationMps2", chinese ? "最大加速度 (m/s²)" : "Maximum acceleration (m/s²)"],
+              ["maximumClimbMps", chinese ? "最大爬升 (m/s)" : "Maximum climb (m/s)"],
+              ["maximumDescentMps", chinese ? "最大下降 (m/s)" : "Maximum descent (m/s)"],
+              ["maximumTiltDeg", chinese ? "最大倾角 (°)" : "Maximum tilt (°)"],
             ] as Array<[keyof typeof AUTONOMY_AIRCRAFT_LIMITS, string]>).map(([key, label]) => (
               <label key={key}><span>{label}</span><input type="number" min={AUTONOMY_AIRCRAFT_LIMITS[key].min} max={AUTONOMY_AIRCRAFT_LIMITS[key].max} step="0.01" value={String(form[key])} onChange={(event) => numberField(key, event.target.value)} /></label>
             ))}
             <label><span>{chinese ? "返航保留电量 (%)" : "Reserve battery (%)"}</span><input type="number" min="10" max="90" step="1" value={form.reserveBatteryPercent} onChange={(event) => numberField("reserveBatteryPercent", event.target.value)} /></label>
+          </div>
+        </section>
+
+        <section className="autonomy-config-card">
+          <header><Orbit aria-hidden="true" /><h2>{chinese ? "重心、惯量与链路" : "Dynamics & command link"}</h2></header>
+          <div className="autonomy-form-grid is-four">
+            {(["x", "y", "z"] as const).map((axis) => <label key={`cog-${axis}`}><span>CG {axis.toUpperCase()} (m)</span><input type="number" step="0.001" value={form.centerOfGravityM[axis]} onChange={(event) => updateAircraft({ centerOfGravityM: { ...form.centerOfGravityM, [axis]: Number(event.target.value) } })} /></label>)}
+            {(["x", "y", "z"] as const).map((axis) => <label key={`inertia-${axis}`}><span>Inertia {axis.toUpperCase()} (kg·m²)</span><input type="number" min="0.000001" step="0.001" value={form.inertiaKgM2[axis]} onChange={(event) => updateAircraft({ inertiaKgM2: { ...form.inertiaKgM2, [axis]: Number(event.target.value) } })} /></label>)}
+            <label><span>{chinese ? "链路类型" : "Link type"}</span><select value={form.commandLink.kind} onChange={(event) => updateAircraft({ commandLink: { ...form.commandLink, kind: event.target.value as AutonomyAircraftProfile["commandLink"]["kind"] } })}><option value="wifi">Wi-Fi</option><option value="radio">Radio</option><option value="lte-5g">LTE / 5G</option><option value="ethernet">Ethernet</option><option value="simulation">Simulation</option></select></label>
+            <label><span>{chinese ? "链路延迟 (ms)" : "Link latency (ms)"}</span><input type="number" min="0" step="1" value={form.commandLink.latencyMs} onChange={(event) => updateAircraft({ commandLink: { ...form.commandLink, latencyMs: Number(event.target.value) } })} /></label>
+            <label><span>{chinese ? "带宽 (Mbps)" : "Bandwidth (Mbps)"}</span><input type="number" min="0.01" step="0.1" value={form.commandLink.bandwidthMbps} onChange={(event) => updateAircraft({ commandLink: { ...form.commandLink, bandwidthMbps: Number(event.target.value) } })} /></label>
+            <label><span>{chinese ? "失联策略" : "Loss action"}</span><select value={form.commandLink.lossAction} onChange={(event) => updateAircraft({ commandLink: { ...form.commandLink, lossAction: event.target.value as AutonomyAircraftProfile["commandLink"]["lossAction"] } })}><option value="hold-land">HOLD → LAND</option><option value="return-land">RETURN → LAND</option><option value="land">LAND</option></select></label>
           </div>
         </section>
 
@@ -351,6 +462,18 @@ export function AutonomyAircraft() {
               </button>
             ))}
           </div>
+          <div className="autonomy-sensor-mounts">
+            {form.sensorMounts.map((sensor) => <article key={sensor.id}>
+              <header><strong>{SENSOR_LABELS[sensor.kind]}</strong><label><input type="checkbox" checked={sensor.calibrated} onChange={(event) => updateSensorMount(sensor.id, { calibrated: event.target.checked })} />{chinese ? "已标定" : "Calibrated"}</label></header>
+              <label className="is-id"><span>ID</span><input value={sensor.id} maxLength={80} onChange={(event) => updateSensorMount(sensor.id, { id: event.target.value })} /></label>
+              <div>
+                {(["x", "y", "z"] as const).map((axis) => <label key={`position-${axis}`}><span>{axis.toUpperCase()} (m)</span><input type="number" step="0.001" value={sensor.positionM[axis]} onChange={(event) => updateSensorMount(sensor.id, { positionM: { ...sensor.positionM, [axis]: Number(event.target.value) } })} /></label>)}
+                {(["x", "y", "z"] as const).map((axis, index) => <label key={`rotation-${axis}`}><span>{["Roll", "Pitch", "Yaw"][index]} (°)</span><input type="number" step="0.1" value={sensor.rollPitchYawDeg[axis]} onChange={(event) => updateSensorMount(sensor.id, { rollPitchYawDeg: { ...sensor.rollPitchYawDeg, [axis]: Number(event.target.value) } })} /></label>)}
+                <label><span>Rate (Hz)</span><input type="number" min="0.1" max="1000" step="1" value={sensor.rateHz} onChange={(event) => updateSensorMount(sensor.id, { rateHz: Number(event.target.value) })} /></label>
+                <label><span>{chinese ? "标定年龄 (天)" : "Calibration age (d)"}</span><input type="number" min="0" max="3650" step="1" value={sensor.calibrationAgeDays} onChange={(event) => updateSensorMount(sensor.id, { calibrationAgeDays: Number(event.target.value) })} /></label>
+              </div>
+            </article>)}
+          </div>
         </section>
       </div>
 
@@ -360,8 +483,12 @@ export function AutonomyAircraft() {
         <Metric icon={<Activity aria-hidden="true" />} label={chinese ? "满载推重比" : "Loaded thrust / weight"} value={thrustToWeight.toFixed(2)} />
         <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "规划半径" : "Planning radius"} value={`${autonomyAircraftRadiusM(form).toFixed(2)} m`} />
         <Metric icon={<Camera aria-hidden="true" />} label={chinese ? "感知设备" : "Perception devices"} value={String(form.sensors.length)} />
+        <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "Vehicle Pack 版本" : "Vehicle Pack version"} value={`v${form.version}`} />
+        <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "资格状态" : "Qualification"} value={form.status.toUpperCase()} />
         {!valid ? <p className="autonomy-config-error">{chinese ? "请检查质量、推力、电量预留和 3 m 规划半径限制。" : "Check mass, thrust, reserve, and the 3 m planning-radius limit."}</p> : null}
-        <button className="btn btn-primary" type="submit" disabled={!valid}><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
+        <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"}><Save aria-hidden="true" />{form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft")}</button>
+        <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working"} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
+        {qualificationState === "unavailable" ? <p className="autonomy-config-error">{chinese ? "公开网页不签发资格凭据。请在连接 DroneDream 后端的桌面或私有控制台完成验证。" : "The public site cannot issue qualification receipts. Use a desktop or private console connected to the DroneDream backend."}</p> : null}
         {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
         <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.aircraft.updatedAt)}</small>
       </aside>
@@ -378,32 +505,79 @@ const SEMANTIC_LABELS: Record<AutonomyMapPack["semanticLayers"][number], string>
   "pickup-zones": "Pickup zones",
 };
 
+const PLANNING_LAYER_LABELS: Record<AutonomyMapPack["planningLayers"][number], string> = {
+  "collision-geometry": "Collision geometry",
+  occupancy: "Occupancy",
+  esdf: "3D ESDF",
+  "dynamic-overlay": "Dynamic overlay",
+  confidence: "Confidence",
+};
+
+async function fileSha256(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export function AutonomyMaps() {
   const { chinese, workspace, persist } = useAutonomyWorkspace();
   const [form, setForm] = useState(workspace.mapPack);
   const [saved, setSaved] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
   useEffect(() => setForm(workspace.mapPack), [workspace.mapPack]);
   const ready = Boolean(form.compilerSceneId) && form.calibrated;
-  const addFiles = (files: FileList | null) => {
+  const addFiles = async (files: FileList | null) => {
     if (!files) return;
+    setIngesting(true);
     const importedAt = new Date().toISOString();
-    const incoming: AutonomyMapSourceFile[] = [...files].slice(0, 24).map((file) => ({
-      name: file.name,
-      bytes: file.size,
-      format: file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "unknown",
-      importedAt,
-    }));
-    setForm((current) => ({
-      ...current,
-      calibrated: false,
-      compilerSceneId: null,
-      sourceFiles: [...current.sourceFiles, ...incoming].slice(0, 24),
-    }));
-    setSaved(false);
+    try {
+      const incoming = await Promise.all([...files].slice(0, 24).map(async (file): Promise<AutonomyMapSourceFile> => {
+        const format = file.name.includes(".") ? file.name.split(".").pop()!.toLowerCase() : "unknown";
+        if (file.size > 25 * 1024 * 1024) {
+          return { name: file.name, bytes: file.size, format, importedAt, sha256: null, receiptId: null, admission: "rejected", parser: null, layers: [] };
+        }
+        const sha256 = await fileSha256(file);
+        if (publicDemoConsole) {
+          return { name: file.name, bytes: file.size, format, importedAt, sha256, receiptId: null, admission: "local-only", parser: null, layers: [] };
+        }
+        try {
+          const receipt = await apiClient.admitAutonomyMapAsset(file);
+          return {
+            name: receipt.filename,
+            bytes: receipt.byte_size,
+            format: receipt.format,
+            importedAt: receipt.created_at,
+            sha256: receipt.content_sha256,
+            receiptId: receipt.receipt_id,
+            admission: receipt.status,
+            parser: receipt.parser,
+            layers: receipt.layers,
+          };
+        } catch {
+          return { name: file.name, bytes: file.size, format, importedAt, sha256, receiptId: null, admission: "rejected", parser: null, layers: [] };
+        }
+      }));
+      setForm((current) => ({
+        ...current,
+        status: incoming.every((file) => file.admission === "admitted") ? "assets-admitted" : "draft",
+        contentHash: null,
+        qualificationReceiptId: null,
+        calibrated: false,
+        compilerSceneId: null,
+        sourceFiles: [...current.sourceFiles, ...incoming].slice(0, 24),
+      }));
+      setSaved(false);
+    } finally {
+      setIngesting(false);
+    }
   };
   const save = (event: FormEvent) => {
     event.preventDefault();
-    const next = { ...form, updatedAt: new Date().toISOString() };
+    const next = {
+      ...form,
+      version: Math.max(workspace.mapPack.version + 1, form.version),
+      status: ready ? "qualified" as const : form.sourceFiles.length && form.sourceFiles.every((file) => file.admission === "admitted") ? "assets-admitted" as const : "draft" as const,
+      updatedAt: new Date().toISOString(),
+    };
     persist(updatedWorkspace(workspace, {
       mapPack: next,
       mission: { ...workspace.mission, mapPackId: next.id, updatedAt: next.updatedAt },
@@ -413,9 +587,26 @@ export function AutonomyMaps() {
   const toggleSemantic = (layer: AutonomyMapPack["semanticLayers"][number]) => {
     setForm((current) => ({
       ...current,
+      status: "draft",
+      contentHash: null,
+      qualificationReceiptId: null,
+      calibrated: false,
+      compilerSceneId: null,
       semanticLayers: current.semanticLayers.includes(layer)
         ? current.semanticLayers.filter((item) => item !== layer)
         : [...current.semanticLayers, layer],
+    }));
+    setSaved(false);
+  };
+  const togglePlanningLayer = (layer: AutonomyMapPack["planningLayers"][number]) => {
+    setForm((current) => ({
+      ...current,
+      calibrated: false,
+      compilerSceneId: null,
+      status: "draft",
+      planningLayers: current.planningLayers.includes(layer)
+        ? current.planningLayers.filter((item) => item !== layer)
+        : [...current.planningLayers, layer],
     }));
     setSaved(false);
   };
@@ -423,12 +614,35 @@ export function AutonomyMaps() {
     setForm((current) => ({ ...current, ...patch }));
     setSaved(false);
   };
+  const selectCompilerScene = (value: string) => {
+    const compilerSceneId = value ? value as NonNullable<AutonomyMapPack["compilerSceneId"]> : null;
+    const sceneNames: Record<NonNullable<AutonomyMapPack["compilerSceneId"]>, string> = {
+      "stairwell-coffee-return": "Building stairwell · pickup · return",
+      "forest-gate-inspection": "Forest circular-gate inspection",
+      "service-corridor-dock": "Service corridor · autonomous dock",
+    };
+    setForm((current) => ({
+      ...current,
+      name: compilerSceneId && current.name === "Unconfigured environment"
+        ? sceneNames[compilerSceneId]
+        : current.name,
+      status: "draft",
+      contentHash: null,
+      qualificationReceiptId: null,
+      calibrated: false,
+      compilerSceneId,
+    }));
+    setSaved(false);
+  };
   const updateGeometry = (
-    patch: Partial<Pick<AutonomyMapPack, "representation" | "coordinateFrame" | "resolutionM" | "floorCount">>,
+    patch: Partial<Pick<AutonomyMapPack, "representation" | "coordinateFrame" | "resolutionM" | "floorCount" | "origin" | "boundsM" | "confidencePercent">>,
   ) => {
     setForm((current) => ({
       ...current,
       ...patch,
+      status: "draft",
+      contentHash: null,
+      qualificationReceiptId: null,
       calibrated: false,
       compilerSceneId: null,
     }));
@@ -446,8 +660,15 @@ export function AutonomyMaps() {
             <label><span>{chinese ? "分辨率 (m)" : "Resolution (m)"}</span><input type="number" min="0.005" step="0.005" value={form.resolutionM} onChange={(event) => updateGeometry({ resolutionM: Number(event.target.value) })} /></label>
             <label><span>{chinese ? "楼层数" : "Floors"}</span><input type="number" min="1" max="500" step="1" value={form.floorCount} onChange={(event) => updateGeometry({ floorCount: Number(event.target.value) })} /></label>
             <label><span>{chinese ? "实时更新" : "Live updates"}</span><select value={form.liveUpdates} onChange={(event) => updateMap({ liveUpdates: event.target.value as AutonomyMapPack["liveUpdates"] })}><option value="vision-slam">Vision SLAM</option><option value="depth-fusion">Depth fusion</option><option value="lidar-fusion">LiDAR fusion</option><option value="fixed">Fixed map</option></select></label>
-            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select disabled={form.sourceFiles.length > 0} value={form.compilerSceneId ?? ""} onChange={(event) => updateMap({ calibrated: false, compilerSceneId: event.target.value ? event.target.value as AutonomyMapPack["compilerSceneId"] : null })}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
-            <label className="autonomy-check-control"><input type="checkbox" checked={form.calibrated} onChange={(event) => updateMap({ calibrated: event.target.checked })} /><span>{chinese ? "比例和坐标已校准" : "Scale and frame calibrated"}</span></label>
+            <label><span>{chinese ? "东西范围 (m)" : "East / west span (m)"}</span><input type="number" min="0.1" step="0.1" value={form.boundsM.x} onChange={(event) => updateGeometry({ boundsM: { ...form.boundsM, x: Number(event.target.value) } })} /></label>
+            <label><span>{chinese ? "南北范围 (m)" : "North / south span (m)"}</span><input type="number" min="0.1" step="0.1" value={form.boundsM.y} onChange={(event) => updateGeometry({ boundsM: { ...form.boundsM, y: Number(event.target.value) } })} /></label>
+            <label><span>{chinese ? "垂直范围 (m)" : "Vertical span (m)"}</span><input type="number" min="0.1" step="0.1" value={form.boundsM.z} onChange={(event) => updateGeometry({ boundsM: { ...form.boundsM, z: Number(event.target.value) } })} /></label>
+            <label><span>{chinese ? "地图可信度 (%)" : "Map confidence (%)"}</span><input type="number" min="0" max="100" step="1" value={form.confidencePercent} onChange={(event) => updateGeometry({ confidencePercent: Number(event.target.value) })} /></label>
+            <label><span>{chinese ? "原点纬度" : "Origin latitude"}</span><input type="number" min="-90" max="90" step="0.000001" placeholder={chinese ? "本地坐标可留空" : "Optional for local frames"} value={form.origin.latitude ?? ""} onChange={(event) => updateGeometry({ origin: { ...form.origin, latitude: event.target.value === "" ? null : Number(event.target.value) } })} /></label>
+            <label><span>{chinese ? "原点经度" : "Origin longitude"}</span><input type="number" min="-180" max="180" step="0.000001" placeholder={chinese ? "本地坐标可留空" : "Optional for local frames"} value={form.origin.longitude ?? ""} onChange={(event) => updateGeometry({ origin: { ...form.origin, longitude: event.target.value === "" ? null : Number(event.target.value) } })} /></label>
+            <label><span>{chinese ? "原点海拔 (m)" : "Origin altitude (m)"}</span><input type="number" step="0.1" value={form.origin.altitudeM ?? ""} onChange={(event) => updateGeometry({ origin: { ...form.origin, altitudeM: event.target.value === "" ? null : Number(event.target.value) } })} /></label>
+            <label className="is-wide"><span>{chinese ? "规划场景资格" : "Planning scene qualification"}</span><select disabled={form.sourceFiles.length > 0} value={form.compilerSceneId ?? ""} onChange={(event) => selectCompilerScene(event.target.value)}><option value="">{chinese ? "未获得编译场景资格" : "No compiled scene binding"}</option><option value="stairwell-coffee-return">Building · stairs · pickup · return</option><option value="forest-gate-inspection">Forest · circular gates</option><option value="service-corridor-dock">Narrow corridor · dock</option></select></label>
+             <label className="autonomy-check-control"><input type="checkbox" disabled={form.sourceFiles.length > 0 || !form.compilerSceneId} checked={form.calibrated} onChange={(event) => updateMap({ calibrated: event.target.checked, status: event.target.checked && form.compilerSceneId ? "qualified" : "draft" })} /><span>{chinese ? "内置场景比例与坐标资格已确认" : "Built-in scene scale and frame verified"}</span></label>
           </div>
         </section>
 
@@ -455,13 +676,13 @@ export function AutonomyMaps() {
           <header><Database aria-hidden="true" /><h2>{chinese ? "地图资产" : "Map assets"}</h2></header>
           <label className="autonomy-map-upload">
             <Upload aria-hidden="true" />
-            <strong>{chinese ? "登记本地地图资产" : "Register local map assets"}</strong>
-            <span>GLB · GLTF · PCD · PLY · LAS · LAZ · GeoTIFF · BT · YAML</span>
-            <input type="file" multiple accept=".glb,.gltf,.pcd,.ply,.las,.laz,.tif,.tiff,.bt,.yaml,.yml,.pgm,.png,.json,.geojson" onChange={(event) => addFiles(event.target.files)} />
+            <strong>{ingesting ? (chinese ? "正在哈希并检查结构" : "Hashing and inspecting") : (chinese ? "摄取三维地图资产" : "Ingest 3D map assets")}</strong>
+            <span>GLB · GLTF · PCD · PLY · GeoJSON</span>
+            <input type="file" multiple accept=".glb,.gltf,.pcd,.ply,.json,.geojson" onChange={(event) => void addFiles(event.target.files)} />
           </label>
           <div className="autonomy-map-assets">
             {form.sourceFiles.length ? form.sourceFiles.map((file, index) => (
-              <div key={`${file.name}-${index}`}><HardDrive aria-hidden="true" /><span><strong>{file.name}</strong><small>{file.format.toUpperCase()} · {(file.bytes / 1_000_000).toFixed(2)} MB</small></span><button type="button" onClick={() => setForm({ ...form, sourceFiles: form.sourceFiles.filter((_, itemIndex) => itemIndex !== index) })}>×</button></div>
+               <div key={`${file.name}-${index}`} data-admission={file.admission}><HardDrive aria-hidden="true" /><span><strong>{file.name}</strong><small>{file.format.toUpperCase()} · {(file.bytes / 1_000_000).toFixed(2)} MB · {file.admission.toUpperCase()}{file.parser ? ` · ${file.parser}` : ""}</small>{file.sha256 ? <code>{file.sha256.slice(0, 20)}</code> : null}</span><button type="button" onClick={() => setForm({ ...form, status: "draft", calibrated: false, compilerSceneId: null, sourceFiles: form.sourceFiles.filter((_, itemIndex) => itemIndex !== index) })}>×</button></div>
             )) : <p className="autonomy-honest-empty">{chinese ? "尚未登记地图资产。可选择经过验证的内置三维场景；导入文件必须由后端完成几何摄取后才会获得编译场景资格。" : "No map assets registered. Select a validated built-in 3D scene, or wait for backend geometry ingestion before an imported pack receives a compiled scene binding."}</p>}
           </div>
         </section>
@@ -473,6 +694,11 @@ export function AutonomyMaps() {
               <button type="button" key={layer} className={form.semanticLayers.includes(layer) ? "is-selected" : ""} onClick={() => toggleSemantic(layer)}><MapPin aria-hidden="true" /><span>{SEMANTIC_LABELS[layer]}</span>{form.semanticLayers.includes(layer) ? <Check aria-hidden="true" /> : null}</button>
             ))}
           </div>
+          <div className="autonomy-choice-grid is-semantic autonomy-planning-layers">
+            {(Object.keys(PLANNING_LAYER_LABELS) as AutonomyMapPack["planningLayers"][number][]).map((layer) => (
+              <button type="button" key={layer} className={form.planningLayers.includes(layer) ? "is-selected" : ""} onClick={() => togglePlanningLayer(layer)}><Layers3 aria-hidden="true" /><span>{PLANNING_LAYER_LABELS[layer]}</span>{form.planningLayers.includes(layer) ? <Check aria-hidden="true" /> : null}</button>
+            ))}
+          </div>
         </section>
       </div>
       <aside className="autonomy-config-summary">
@@ -481,6 +707,9 @@ export function AutonomyMaps() {
         <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "分辨率" : "Resolution"} value={`${form.resolutionM.toFixed(3)} m`} />
         <Metric icon={<Layers3 aria-hidden="true" />} label={chinese ? "语义图层" : "Semantic layers"} value={String(form.semanticLayers.length)} />
         <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "状态" : "Status"} value={ready ? "READY" : "BLOCKED"} />
+        <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "Map Pack 版本" : "Map Pack version"} value={`v${form.version}`} />
+        <Metric icon={<Database aria-hidden="true" />} label={chinese ? "资产准入" : "Asset admission"} value={form.status.toUpperCase()} />
+        <Metric icon={<Gauge aria-hidden="true" />} label={chinese ? "地图可信度" : "Map confidence"} value={`${form.confidencePercent.toFixed(0)}%`} />
         <button className="btn btn-primary" type="submit"><Save aria-hidden="true" />{saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存 Map Pack" : "Save Map Pack")}</button>
         <small>{chinese ? "更新于" : "Updated"} {formatTime(workspace.mapPack.updatedAt)}</small>
       </aside>
@@ -571,7 +800,7 @@ export function AutonomyEvidence() {
         {workspace.evidence.map((record) => <article key={record.id}>
           <header><FileClock aria-hidden="true" /><strong>{record.contractId}</strong><em>{record.source.toUpperCase()}</em></header>
           <p>{record.missionIntent}</p>
-          <dl><div><dt>{chinese ? "无人机" : "Aircraft"}</dt><dd>{record.aircraftName}</dd></div><div><dt>Map Pack</dt><dd>{record.mapName}</dd></div><div><dt>{chinese ? "观测" : "Observations"}</dt><dd>{record.observationCount}</dd></div><div><dt>{chinese ? "证据链" : "Evidence chain"}</dt><dd>{record.evidenceChainHead.slice(0, 18)}</dd></div></dl>
+          <dl><div><dt>{chinese ? "无人机" : "Aircraft"}</dt><dd>{record.aircraftName} · v{record.aircraftVersion}</dd></div><div><dt>Map Pack</dt><dd>{record.mapName} · v{record.mapVersion}</dd></div><div><dt>{chinese ? "观测" : "Observations"}</dt><dd>{record.observationCount}</dd></div><div><dt>{chinese ? "任务图" : "Task graph"}</dt><dd>r{record.taskGraphRevision}</dd></div><div><dt>{chinese ? "决策" : "Decisions"}</dt><dd>{record.decisionCount}</dd></div><div><dt>{chinese ? "跟踪实体" : "Tracked entities"}</dt><dd>{record.trackedEntityCount}</dd></div><div><dt>{chinese ? "证据链" : "Evidence chain"}</dt><dd>{record.evidenceChainHead.slice(0, 18)}</dd></div></dl>
           <time>{formatTime(record.completedAt)}</time>
         </article>)}
       </div> : <div className="autonomy-evidence-empty">

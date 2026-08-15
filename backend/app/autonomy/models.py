@@ -43,6 +43,42 @@ RuntimeComponentId = Literal[
 RuntimeComponentStatus = Literal["available", "shadow", "locked"]
 RuntimeMode = Literal["simulation_contract", "hitl_shadow", "hardware_locked"]
 RuntimeBridge = Literal["px4_gazebo", "px4_hitl_shadow", "px4_hardware_locked"]
+TaskNodeStatus = Literal[
+    "pending",
+    "ready",
+    "active",
+    "blocked",
+    "completed",
+    "failed",
+    "skipped",
+]
+TaskExecutor = Literal[
+    "language_model",
+    "mission_executive",
+    "perception",
+    "global_planner",
+    "local_planner",
+    "payload_controller",
+    "px4_bridge",
+    "operator",
+]
+TaskRisk = Literal["low", "medium", "high", "critical"]
+MissionAction = Literal[
+    "takeoff",
+    "transit",
+    "traverse_stairs",
+    "pass_gate",
+    "pickup",
+    "return",
+    "land",
+]
+RuntimeDecisionKind = Literal[
+    "session",
+    "task_transition",
+    "dynamic_entity",
+    "safety",
+    "operator",
+]
 
 
 class StrictModel(BaseModel):
@@ -89,17 +125,53 @@ class RoutePoint(StrictModel):
 
 class MissionStep(StrictModel):
     order: int = Field(ge=1, le=64)
-    action: Literal[
-        "takeoff",
-        "transit",
-        "traverse_stairs",
-        "pass_gate",
-        "pickup",
-        "return",
-        "land",
-    ]
+    action: MissionAction
     label: str = Field(min_length=1, max_length=160)
     payload_delta_kg: float = Field(default=0.0, ge=0.0, le=10.0)
+
+
+class MissionTaskNode(StrictModel):
+    task_id: str = Field(
+        min_length=1,
+        max_length=96,
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+    )
+    label: str = Field(min_length=1, max_length=200)
+    status: TaskNodeStatus = "pending"
+    depends_on: list[str] = Field(default_factory=list, max_length=16)
+    executor: TaskExecutor
+    risk: TaskRisk
+    max_retries: int = Field(default=1, ge=0, le=20)
+    timeout_s: float = Field(default=30.0, gt=0.0, le=3600.0)
+    fallback: SafetyAction
+    expected_output: str = Field(min_length=1, max_length=240)
+    completion_evidence: list[str] = Field(default_factory=list, max_length=12)
+    inserted_by: Literal["compiler", "runtime", "operator"] = "compiler"
+
+
+class MissionTaskGraph(StrictModel):
+    schema_version: Literal["dronedream.autonomy.task-graph.v1"] = (
+        "dronedream.autonomy.task-graph.v1"
+    )
+    revision: int = Field(default=1, ge=1)
+    nodes: list[MissionTaskNode] = Field(min_length=1, max_length=128)
+    active_node_ids: list[str] = Field(default_factory=list, max_length=16)
+    change_reason: str = Field(default="compiled", min_length=1, max_length=240)
+
+    @model_validator(mode="after")
+    def validate_graph(self) -> MissionTaskGraph:
+        identifiers = [node.task_id for node in self.nodes]
+        if len(identifiers) != len(set(identifiers)):
+            raise ValueError("task graph contains duplicate task_id values")
+        known = set(identifiers)
+        for node in self.nodes:
+            if node.task_id in node.depends_on:
+                raise ValueError("task graph node cannot depend on itself")
+            if any(dependency not in known for dependency in node.depends_on):
+                raise ValueError("task graph dependency is missing")
+        if any(task_id not in known for task_id in self.active_node_ids):
+            raise ValueError("active_node_ids contains an unknown task")
+        return self
 
 
 class VehicleEnvelope(StrictModel):
@@ -164,9 +236,7 @@ class TerrainScene(StrictModel):
 
 
 class MissionContract(StrictModel):
-    schema_version: Literal["dronedream.autonomy.mission.v1"] = (
-        "dronedream.autonomy.mission.v1"
-    )
+    schema_version: Literal["dronedream.autonomy.mission.v2"] = "dronedream.autonomy.mission.v2"
     contract_id: str
     edition: Edition
     execution_target: ExecutionTarget
@@ -174,6 +244,7 @@ class MissionContract(StrictModel):
     perception_mode: PerceptionMode
     intent: str
     steps: list[MissionStep]
+    task_graph: MissionTaskGraph
     immutable_safety_rules: list[str]
 
 
@@ -233,6 +304,35 @@ class OnboardRuntimeProfile(StrictModel):
     fail_safe_actions: list[SafetyAction]
 
 
+class PerceivedEntity(StrictModel):
+    track_id: str = Field(
+        min_length=1,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+    kind: Literal["person", "vehicle", "animal", "obstacle", "unknown"]
+    position_m: Vector3
+    velocity_mps: Vector3
+    confidence: float = Field(ge=0.0, le=1.0)
+    safety_radius_m: float = Field(default=0.8, ge=0.1, le=20.0)
+    age_ms: int = Field(default=0, ge=0, le=60000)
+    source_stream: str = Field(min_length=1, max_length=80)
+
+
+class PerceptionStreamHealth(StrictModel):
+    stream_id: str = Field(
+        min_length=1,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+    kind: Literal["rgb", "depth", "stereo", "thermal", "lidar", "vio", "slam", "map"]
+    source: Literal["simulator", "onboard", "cloud", "external"]
+    status: Literal["healthy", "degraded", "stale", "offline"]
+    rate_hz: float = Field(ge=0.0, le=1000.0)
+    latency_ms: float = Field(ge=0.0, le=60000.0)
+    dropped_percent: float = Field(default=0.0, ge=0.0, le=100.0)
+
+
 class RuntimeObservation(StrictModel):
     schema_version: Literal["dronedream.autonomy.observation.v1"] = (
         "dronedream.autonomy.observation.v1"
@@ -254,6 +354,18 @@ class RuntimeObservation(StrictModel):
     pickup_confirmed: bool = False
     local_replan_active: bool = False
     emergency_stop: bool = False
+    perceived_entities: list[PerceivedEntity] = Field(default_factory=list, max_length=128)
+    stream_health: list[PerceptionStreamHealth] = Field(default_factory=list, max_length=24)
+
+
+class RuntimeDecisionEvent(StrictModel):
+    revision: int = Field(ge=1)
+    created_at: datetime
+    kind: RuntimeDecisionKind
+    code: str = Field(min_length=1, max_length=120)
+    summary: str = Field(min_length=1, max_length=240)
+    task_ids: list[str] = Field(default_factory=list, max_length=16)
+    entity_ids: list[str] = Field(default_factory=list, max_length=32)
 
 
 class SafetyDecision(StrictModel):
@@ -272,7 +384,7 @@ class RuntimeSessionCreateRequest(StrictModel):
 
 
 class RuntimeOperatorCommand(StrictModel):
-    action: Literal["hold", "abort"]
+    action: Literal["hold", "resume", "abort"]
     reason: str = Field(min_length=3, max_length=240)
 
 
@@ -292,6 +404,10 @@ class RuntimeSession(StrictModel):
     latest_monotonic_ms: int
     observation_count: int
     decision: SafetyDecision
+    task_graph: MissionTaskGraph
+    perceived_entities: list[PerceivedEntity] = Field(default_factory=list, max_length=128)
+    stream_health: list[PerceptionStreamHealth] = Field(default_factory=list, max_length=24)
+    decision_events: list[RuntimeDecisionEvent] = Field(default_factory=list, max_length=100)
     evidence_chain_head: str
     terminal: bool
 

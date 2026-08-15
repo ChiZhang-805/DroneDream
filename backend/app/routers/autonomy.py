@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app import models
 from app.auth import get_current_user
@@ -15,6 +15,11 @@ from app.autonomy.models import (
     RuntimeObservation,
     RuntimeOperatorCommand,
     RuntimeSessionCreateRequest,
+)
+from app.autonomy.qualification import (
+    VehiclePackQualificationRequest,
+    map_asset_admissions,
+    qualify_vehicle_pack,
 )
 from app.autonomy.runtime import AutonomyRuntimeError, runtime_sessions
 from app.autonomy.service import AutonomyCompileError, compile_autonomy_mission
@@ -55,6 +60,35 @@ async def compile_mission(
         raise HTTPException(
             status_code=exc.status_code,
             detail={"code": exc.code, "message": exc.message},
+        ) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.post("/vehicle-packs/qualify")
+async def qualify_autonomy_vehicle_pack(
+    request: VehiclePackQualificationRequest,
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Validate a versioned digital Vehicle Pack without granting hardware authority."""
+
+    result = await asyncio.to_thread(qualify_vehicle_pack, request)
+    return ok(result.model_dump(mode="json"))
+
+
+@router.post("/map-assets/admit", status_code=201)
+async def admit_autonomy_map_asset(
+    request: Request,
+    filename: Annotated[str, Query(min_length=1, max_length=255)],
+    current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Hash and structurally inspect one bounded map asset; bytes are not retained."""
+
+    try:
+        result = await map_asset_admissions.admit(current_user.id, filename, request.stream())
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=413,
+            detail={"code": "AUTONOMY_MAP_ASSET_REJECTED", "message": str(exc)},
         ) from exc
     return ok(result.model_dump(mode="json"))
 

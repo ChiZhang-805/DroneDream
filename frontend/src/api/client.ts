@@ -24,6 +24,9 @@ import type {
   AutonomyCompileResponse,
   AutonomyRuntimeObservation,
   AutonomyRuntimeSession,
+  AutonomyMapAssetAdmissionReceipt,
+  AutonomyVehiclePackQualificationReceipt,
+  AutonomyVehiclePackQualificationRequest,
   BackendCapabilitiesResponse,
   BatchCreateRequest,
   BatchJob,
@@ -356,12 +359,13 @@ async function transportRequest(
     "application/json",
   idempotencyKey: string | null = null,
 ): Promise<Response> {
+  const formDataBody = typeof FormData !== "undefined" && init?.body instanceof FormData;
   return fetchWithDeadline(
     `${API_BASE_URL}/api/v1${path}`,
     {
       ...init,
       headers: {
-        "Content-Type": "application/json",
+        ...(formDataBody ? {} : { "Content-Type": "application/json" }),
         Accept: accept,
         ...authHeaders(),
         ...(init?.headers ?? {}),
@@ -395,6 +399,23 @@ export const apiClient = {
     });
   },
 
+  async qualifyAutonomyVehiclePack(
+    req: AutonomyVehiclePackQualificationRequest,
+  ): Promise<AutonomyVehiclePackQualificationReceipt> {
+    return request<AutonomyVehiclePackQualificationReceipt>("/autonomy/vehicle-packs/qualify", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  },
+
+  async admitAutonomyMapAsset(file: File): Promise<AutonomyMapAssetAdmissionReceipt> {
+    return request<AutonomyMapAssetAdmissionReceipt>(`/autonomy/map-assets/admit?filename=${encodeURIComponent(file.name)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: file,
+    });
+  },
+
   async createAutonomyRuntimeSession(
     mission: AutonomyCompileRequest,
     clientRequestId: string,
@@ -425,7 +446,7 @@ export const apiClient = {
 
   async stopAutonomyRuntimeSession(
     sessionId: string,
-    action: "hold" | "abort",
+    action: "hold" | "resume" | "abort",
     reason: string,
   ): Promise<AutonomyRuntimeSession> {
     return request<AutonomyRuntimeSession>(

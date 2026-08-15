@@ -28,6 +28,7 @@ import { Link } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
+import { AutonomyWorld3D } from "../features/autonomy/AutonomyWorld3D";
 import {
   autonomyAircraftRadiusM,
   isAutonomyAircraftProfileValid,
@@ -51,12 +52,16 @@ import type {
   AutonomyCompileResponse,
   AutonomyEdition,
   AutonomyExecutionTarget,
+  AutonomyPerceivedEntity,
   AutonomyRuntimeSession,
+  AutonomyTaskGraph,
 } from "../types/api";
 
 type MissionId = "coffee" | "gates" | "narrow";
 type PerceptionMode = "fusion" | "vision" | "map";
 type Point = readonly [number, number];
+
+const MISSION_STEP_PAYLOAD_LIMIT_KG = 10;
 
 interface MissionPreset {
   id: MissionId;
@@ -221,7 +226,7 @@ const EN_COPY: AutonomyCopy = {
   planned: "Trajectory ready",
   planning: "Building safe corridor…",
   environment: "World & trajectory",
-  cameraFeed: "FRONT RGB-D",
+  cameraFeed: "SIMULATED RGB-D · NO LIVE LINK",
   mapped: "mapped",
   unknown: "revealed live",
   run: "Fly mission",
@@ -330,7 +335,7 @@ const ZH_COPY: AutonomyCopy = {
   planned: "航迹已就绪",
   planning: "正在生成安全走廊…",
   environment: "环境与航迹",
-  cameraFeed: "前视 RGB-D",
+  cameraFeed: "仿真 RGB-D · 未连接真机",
   mapped: "地图已知",
   unknown: "实时发现",
   run: "开始飞行",
@@ -457,15 +462,21 @@ function vehicleForAircraft(aircraft?: AutonomyAircraftProfile): AutonomyCompile
   if (!aircraft) return DEFAULT_VEHICLE;
   const payloadMarginKg = Math.max(0, aircraft.maximumTakeoffMassKg - aircraft.dryMassKg);
   const launchPayloadKg = Math.min(DEFAULT_VEHICLE.launch_payload_kg, payloadMarginKg);
-  const pickupCapacityKg = Math.max(0, payloadMarginKg - launchPayloadKg);
+  const pickupCapacityKg = Math.max(0, Math.min(
+    aircraft.maximumPickupPayloadKg,
+    payloadMarginKg - launchPayloadKg,
+    MISSION_STEP_PAYLOAD_LIMIT_KG,
+  ));
   return {
     ...DEFAULT_VEHICLE,
     dry_mass_kg: aircraft.dryMassKg,
     launch_payload_kg: launchPayloadKg,
-    pickup_payload_kg: Math.min(DEFAULT_VEHICLE.pickup_payload_kg, pickupCapacityKg),
+    pickup_payload_kg: pickupCapacityKg,
     max_takeoff_mass_kg: aircraft.maximumTakeoffMassKg,
     max_total_thrust_n: aircraft.maximumThrustN,
     radius_m: autonomyAircraftRadiusM(aircraft),
+    max_speed_mps: aircraft.maximumSpeedMps,
+    max_acceleration_mps2: aircraft.maximumAccelerationMps2,
     reserve_battery_percent: aircraft.reserveBatteryPercent,
   };
 }
@@ -502,10 +513,6 @@ function interpolatePath(points: readonly Point[], progress: number): Point {
   return [from[0] + (to[0] - from[0]) * local, from[1] + (to[1] - from[1]) * local];
 }
 
-function pathData(points: readonly Point[]) {
-  return points.map(([x, y], index) => `${index === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
-}
-
 function eventTime() {
   return new Intl.DateTimeFormat(undefined, { minute: "2-digit", second: "2-digit" }).format(new Date());
 }
@@ -538,6 +545,85 @@ function runtimeComponentLabel(
   return labels[id];
 }
 
+function simulatedStreamHealth() {
+  return [
+    { stream_id: "front-rgb", kind: "rgb" as const, source: "simulator" as const, status: "healthy" as const, rate_hz: 30, latency_ms: 34, dropped_percent: 0.2 },
+    { stream_id: "front-depth", kind: "depth" as const, source: "simulator" as const, status: "healthy" as const, rate_hz: 30, latency_ms: 41, dropped_percent: 0.4 },
+    { stream_id: "vio-primary", kind: "vio" as const, source: "simulator" as const, status: "healthy" as const, rate_hz: 30, latency_ms: 18, dropped_percent: 0.1 },
+    { stream_id: "local-world", kind: "slam" as const, source: "simulator" as const, status: "healthy" as const, rate_hz: 20, latency_ms: 52, dropped_percent: 0 },
+  ];
+}
+
+function simulatedPerson(position: Point): AutonomyPerceivedEntity {
+  return {
+    track_id: "person-017",
+    kind: "person",
+    position_m: { x: position[0] / 20 + 0.75, y: position[1] / 20, z: 1.1 },
+    velocity_mps: { x: 0, y: 0.65, z: 0 },
+    confidence: 0.94,
+    safety_radius_m: 1.2,
+    age_ms: 38,
+    source_stream: "front-rgb",
+  };
+}
+
+function previewRuntimeTaskGraph(
+  source: AutonomyTaskGraph,
+  progress: number,
+  dynamicEntityActive: boolean,
+  obstacleInjected: boolean,
+): AutonomyTaskGraph {
+  const nodes = source.nodes.map((node) => ({ ...node, depends_on: [...node.depends_on], completion_evidence: [...node.completion_evidence] }));
+  const completedCount = Math.min(nodes.length - 1, Math.floor(progress * nodes.length));
+  nodes.forEach((node, index) => {
+    node.status = index < completedCount ? "completed" : index === completedCount ? "active" : "pending";
+  });
+  if (obstacleInjected) {
+    const anchor = [...nodes].reverse().find((node) => node.status === "completed")?.task_id ?? nodes[0].task_id;
+    nodes.push({
+      task_id: "runtime-hold-person-017",
+      label: "Protect the safety envelope around tracked person person-017",
+      status: dynamicEntityActive ? "active" : "completed",
+      depends_on: [anchor],
+      executor: "mission_executive",
+      risk: "critical",
+      max_retries: 0,
+      timeout_s: 120,
+      fallback: "land",
+      expected_output: "Clearance restored or a bounded alternative corridor selected",
+      completion_evidence: ["entity.track", "entity.range", "safety.decision"],
+      inserted_by: "runtime",
+    });
+    nodes.push({
+      task_id: "runtime-replan-person-017",
+      label: "Repair the local corridor around person-017 and rejoin the mission graph",
+      status: dynamicEntityActive ? "blocked" : "completed",
+      depends_on: ["runtime-hold-person-017"],
+      executor: "local_planner",
+      risk: "high",
+      max_retries: 3,
+      timeout_s: 20,
+      fallback: "hold",
+      expected_output: "A collision-checked trajectory revision inside the approved corridor",
+      completion_evidence: ["trajectory.revision", "clearance.minimum", "planner.receipt"],
+      inserted_by: "runtime",
+    });
+  }
+  return {
+    ...source,
+    revision: source.revision + (obstacleInjected ? 2 : progress > 0 ? 1 : 0),
+    nodes,
+    active_node_ids: nodes.filter((node) => node.status === "active").map((node) => node.task_id),
+    change_reason: dynamicEntityActive
+      ? "dynamic person inserted a safety hold and recovery branch"
+      : obstacleInjected
+        ? "local corridor repaired; mission graph resumed"
+        : progress > 0
+          ? "mission progress advanced compiler tasks"
+          : source.change_reason,
+  };
+}
+
 export function AutonomyLab({
   embedded = false,
   onRunCompleted,
@@ -560,6 +646,9 @@ export function AutonomyLab({
         workspace.aircraft.bodyWidthM,
         workspace.aircraft.rotorRadiusM,
         workspace.aircraft.reserveBatteryPercent,
+        workspace.aircraft.maximumPickupPayloadKg,
+        workspace.aircraft.maximumSpeedMps,
+        workspace.aircraft.maximumAccelerationMps2,
       ].join(":")
     : "default";
   const workspaceVehicleCache = useRef<{ key: string; value: AutonomyCompileRequest["vehicle"] } | null>(null);
@@ -587,17 +676,20 @@ export function AutonomyLab({
   const [complete, setComplete] = useState(false);
   const [progress, setProgress] = useState(0);
   const [obstacleInjected, setObstacleInjected] = useState(false);
+  const [dynamicEntityActive, setDynamicEntityActive] = useState(false);
   const [runtimeSession, setRuntimeSession] = useState<AutonomyRuntimeSession | null>(null);
   const runtimeRequestId = useRef<string | null>(null);
   const runtimeSequence = useRef(0);
   const runtimeObservationPending = useRef(false);
   const runtimeTerminalSent = useRef(false);
   const evidenceReported = useRef(false);
+  const dynamicEntityTimer = useRef<number | null>(null);
   const previewRunId = useRef<string | null>(null);
   const workspaceBindingApplied = useRef<string | null>(null);
   const progressRef = useRef(0);
   const dronePositionRef = useRef<Point>([0, 0]);
   const [events, setEvents] = useState(() => [{ time: eventTime(), text: copy.events.ready }]);
+  const [taskGraphView, setTaskGraphView] = useState<"summary" | "engineering">("summary");
   const workspaceBindingKey = workspace
     ? `${workspace.aircraft.updatedAt}:${workspace.mapPack.updatedAt}:${workspace.mission.updatedAt}:${workspace.mission.intent}`
     : "standalone";
@@ -663,6 +755,13 @@ export function AutonomyLab({
     [compileRequest, missionId],
   );
   const qualification = compileResult ?? provisionalResult;
+  const localTaskGraph = useMemo(
+    () => previewRuntimeTaskGraph(qualification.contract.task_graph, progress, dynamicEntityActive, obstacleInjected),
+    [dynamicEntityActive, obstacleInjected, progress, qualification.contract.task_graph],
+  );
+  const activeTaskGraph = runtimeSession?.task_graph ?? localTaskGraph;
+  const activeEntities = runtimeSession?.perceived_entities
+    ?? (dynamicEntityActive ? [simulatedPerson(dronePositionRef.current)] : []);
   const editionLabel = ({
     universal: "UNIVERSAL",
     sim: "SIM",
@@ -674,7 +773,6 @@ export function AutonomyLab({
   progressRef.current = progress;
   dronePositionRef.current = [droneX, droneY];
   const runtimeSessionId = runtimeSession?.session_id ?? null;
-  const activeStage = complete ? 4 : !planned ? 0 : !running ? 2 : obstacleInjected ? 4 : progress < 0.18 ? 0 : progress < 0.36 ? 1 : progress < 0.56 ? 2 : 3;
   const nextCheckpoint = missionId === "coffee"
     ? progress < 0.42 ? copy.destination : progress < 0.94 ? copy.returnHome : copy.start
     : progress < 0.55 ? copy.via : copy.destination;
@@ -718,7 +816,7 @@ export function AutonomyLab({
         velocity_mps: { x: paused ? 0 : 0.8, y: 0, z: 0 },
         localization_covariance_m2: 0.04,
         perception_age_ms: 45,
-        minimum_clearance_m: obstacleInjected ? 0.52 : Number.parseFloat(mission.clearance),
+        minimum_clearance_m: dynamicEntityActive ? 0.52 : Number.parseFloat(mission.clearance),
         battery_percent: Math.max(35, 92 - currentProgress * 38),
         link_ok: true,
         geofence_ok: true,
@@ -726,7 +824,13 @@ export function AutonomyLab({
         mission_progress: currentProgress,
         pickup_confirmed: currentProgress >= 0.42 && missionId === "coffee",
         local_replan_active: obstacleInjected && currentProgress < 0.7,
-      }).then(setRuntimeSession).catch(() => {
+        perceived_entities: dynamicEntityActive ? [simulatedPerson([currentX, currentY])] : [],
+        stream_health: simulatedStreamHealth(),
+      }).then((session) => {
+        setRuntimeSession(session);
+        if (session.decision.action === "hold") setPaused(true);
+        if (!dynamicEntityActive && session.decision.action === "continue") setPaused(false);
+      }).catch(() => {
         setRunning(false);
         setCompileError(copy.compileFailed);
       }).finally(() => {
@@ -734,7 +838,7 @@ export function AutonomyLab({
       });
     }, 500);
     return () => window.clearInterval(interval);
-  }, [copy.compileFailed, mission.clearance, missionId, obstacleInjected, paused, pickupPayloadKg, running, runtimeSessionId]);
+  }, [copy.compileFailed, dynamicEntityActive, mission.clearance, missionId, obstacleInjected, paused, pickupPayloadKg, running, runtimeSessionId]);
 
   useEffect(() => {
     if (!complete || !runtimeSession || publicDemoConsole || runtimeTerminalSent.current) return;
@@ -765,6 +869,8 @@ export function AutonomyLab({
         payload_mass_kg: missionId === "coffee" ? pickupPayloadKg : 0,
         mission_progress: 1,
         pickup_confirmed: missionId === "coffee",
+        perceived_entities: [],
+        stream_health: simulatedStreamHealth(),
       }).then(setRuntimeSession).catch(() => setCompileError(copy.compileFailed)).finally(() => {
         runtimeObservationPending.current = false;
       });
@@ -784,7 +890,7 @@ export function AutonomyLab({
     const sessionId = runtimeSession?.session_id
       ?? (previewRunId.current ??= `preview-run-${crypto.randomUUID()}`);
     onRunCompleted({
-      schemaVersion: 1,
+      schemaVersion: 2,
       id: sessionId,
       sessionId,
       contractId: qualification.contract.contract_id,
@@ -796,8 +902,15 @@ export function AutonomyLab({
       missionIntent: command,
       aircraftName: workspace?.aircraft.name ?? "Default preview aircraft",
       mapName: workspace?.mapPack.name ?? qualification.scene.name,
+      aircraftVersion: workspace?.aircraft.version ?? 1,
+      mapVersion: workspace?.mapPack.version ?? 1,
+      taskGraphRevision: activeTaskGraph.revision,
+      decisionCount: runtimeSession?.decision_events.length ?? events.length,
+      trackedEntityCount: runtimeSession
+        ? new Set(runtimeSession.decision_events.flatMap((event) => event.entity_ids)).size
+        : (obstacleInjected ? 1 : 0),
     });
-  }, [command, complete, onRunCompleted, qualification.contract.contract_id, qualification.scene.name, runtimeSession, target, workspace?.aircraft.name, workspace?.mapPack.name]);
+  }, [activeTaskGraph.revision, command, complete, events.length, obstacleInjected, onRunCompleted, qualification.contract.contract_id, qualification.scene.name, runtimeSession, target, workspace?.aircraft.name, workspace?.aircraft.version, workspace?.mapPack.name, workspace?.mapPack.version]);
 
   useEffect(() => {
     compileGeneration.current += 1;
@@ -833,6 +946,7 @@ export function AutonomyLab({
     setComplete(false);
     setProgress(0);
     setObstacleInjected(false);
+    setDynamicEntityActive(false);
     setEvents([{ time: eventTime(), text: copy.events.ready }]);
   };
 
@@ -923,6 +1037,8 @@ export function AutonomyLab({
               geofence_ok: true,
               payload_mass_kg: 0,
               mission_progress: 0.02,
+              perceived_entities: [],
+              stream_health: simulatedStreamHealth(),
             },
           );
           setRuntimeSession(started);
@@ -958,6 +1074,7 @@ export function AutonomyLab({
     setComplete(false);
     setProgress(0);
     setObstacleInjected(false);
+    setDynamicEntityActive(false);
     setRuntimeSession(null);
     runtimeRequestId.current = null;
     runtimeSequence.current = 0;
@@ -970,8 +1087,18 @@ export function AutonomyLab({
   const injectObstacle = () => {
     if (!planned || obstacleInjected || complete) return;
     setObstacleInjected(true);
+    setDynamicEntityActive(true);
+    if (dynamicEntityTimer.current !== null) window.clearTimeout(dynamicEntityTimer.current);
+    dynamicEntityTimer.current = window.setTimeout(() => {
+      setDynamicEntityActive(false);
+      appendEvent(chinese ? "人员已离开安全走廊，局部路线通过验证并恢复任务。" : "Person cleared the corridor; the repaired local route was accepted and the mission resumed.");
+    }, 2_400);
     appendEvent(copy.events.obstacle);
   };
+
+  useEffect(() => () => {
+    if (dynamicEntityTimer.current !== null) window.clearTimeout(dynamicEntityTimer.current);
+  }, []);
 
   return (
     <div className={`autonomy-lab-page${embedded ? " is-embedded" : ""}`}>
@@ -1134,80 +1261,21 @@ export function AutonomyLab({
             <span className="autonomy-world-state">{perception === "vision" ? copy.unknown : copy.mapped}</span>
           </div>
           <div className="autonomy-map-stage">
-            <svg viewBox="0 0 900 520" role="img" aria-label={`${mission.name}: ${mission.objective}`}>
-              <defs>
-                <pattern id="autonomy-grid" width="32" height="32" patternUnits="userSpaceOnUse">
-                  <path d="M 32 0 L 0 0 0 32" fill="none" stroke="currentColor" strokeWidth="0.7" />
-                </pattern>
-                <linearGradient id="autonomy-route-gradient" x1="0" x2="1">
-                  <stop offset="0" stopColor="#24cfe5" />
-                  <stop offset="0.52" stopColor="#7565f3" />
-                  <stop offset="1" stopColor="#d545c6" />
-                </linearGradient>
-                <filter id="autonomy-glow"><feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-              </defs>
-              <rect className="autonomy-grid" width="900" height="520" fill="url(#autonomy-grid)" />
-              <g className={`autonomy-map-known ${perception === "vision" ? "is-vision" : ""}`}>
-                <rect x="28" y="30" width="844" height="456" rx="24" className="autonomy-world-boundary" />
-                {missionId === "coffee" ? (
-                  <>
-                    <g className="autonomy-floor-stack">
-                      <path d="M64 365 250 365 310 315 125 315Z" />
-                      <path d="M82 295 268 295 328 245 143 245Z" />
-                      <path d="M100 225 286 225 346 175 161 175Z" />
-                      <text x="118" y="205">FLOOR 3 · OFFICE</text>
-                      <text x="98" y="278">FLOOR 2</text>
-                      <text x="78" y="348">FLOOR 1 · LOBBY</text>
-                    </g>
-                    <rect x="150" y="70" width="120" height="92" rx="8" className="autonomy-obstacle" />
-                    <rect x="385" y="330" width="180" height="110" rx="8" className="autonomy-obstacle" />
-                    <rect x="615" y="52" width="220" height="78" rx="8" className="autonomy-obstacle" />
-                    <g className="autonomy-stairs">
-                      <path d="M286 354h78v-18h-62v-18h46v-18h-30v-18h16" />
-                      <text x="275" y="380">NARROW STAIR CORE</text>
-                    </g>
-                    <g className="autonomy-tree" transform="translate(520 192)"><rect x="-4" y="13" width="8" height="30" /><circle cy="0" r="24" /><circle cx="-17" cy="8" r="15" /><circle cx="17" cy="8" r="15" /></g>
-                    <g className="autonomy-tree" transform="translate(700 304)"><rect x="-4" y="13" width="8" height="30" /><circle cy="0" r="24" /><circle cx="-17" cy="8" r="15" /><circle cx="17" cy="8" r="15" /></g>
-                    <g className="autonomy-sign" transform="translate(615 342)"><line y1="0" y2="48" /><rect x="-22" y="-18" width="44" height="26" rx="3" /><text y="0">SIGN</text></g>
-                    <g className="autonomy-pole" transform="translate(750 218)"><line y1="-32" y2="34" /><circle cy="-34" r="6" /></g>
-                    <text className="autonomy-zone-label" x="570" y="458">OUTDOOR COURTYARD · LIVE OBSTACLES</text>
-                    <g className="autonomy-destination"><rect x="778" y="130" width="58" height="50" rx="10" /><Coffee x="795" y="142" width="24" height="24" /></g>
-                  </>
-                ) : missionId === "gates" ? (
-                  <>
-                    {[250, 455, 665].map((x, index) => <g className="autonomy-gate" key={x}><ellipse cx={x} cy={[300, 275, 238][index]} rx="16" ry="56" /><line x1={x} y1={[244, 219, 182][index]} x2={x} y2={[356, 331, 294][index]} /></g>)}
-                    <rect x="365" y="72" width="90" height="110" rx="8" className="autonomy-obstacle" />
-                    <rect x="545" y="350" width="116" height="106" rx="8" className="autonomy-obstacle" />
-                  </>
-                ) : (
-                  <>
-                    <rect x="136" y="55" width="136" height="270" rx="8" className="autonomy-obstacle" />
-                    <rect x="314" y="370" width="182" height="86" rx="8" className="autonomy-obstacle" />
-                    <rect x="508" y="55" width="122" height="140" rx="8" className="autonomy-obstacle" />
-                    <rect x="678" y="260" width="144" height="194" rx="8" className="autonomy-obstacle" />
-                  </>
-                )}
-              </g>
-              {obstacleInjected ? <g className="autonomy-surprise-obstacle"><circle cx={missionId === "coffee" ? 520 : 505} cy={missionId === "coffee" ? 335 : 320} r="36" /><circle cx={missionId === "coffee" ? 520 : 505} cy={missionId === "coffee" ? 335 : 320} r="49" /></g> : null}
-              <path className={`autonomy-route-shadow ${planned ? "is-visible" : ""}`} d={pathData(activePoints)} />
-              <path className={`autonomy-route ${planned ? "is-visible" : ""}`} d={pathData(activePoints)} pathLength="1" />
-              <g className="autonomy-map-marker autonomy-map-start" transform={`translate(${activePoints[0][0]} ${activePoints[0][1]})`}><circle r="15" /><text y="5">S</text></g>
-              <g className="autonomy-map-marker autonomy-map-goal" transform={`translate(${activePoints[Math.floor(activePoints.length / 2)][0]} ${activePoints[Math.floor(activePoints.length / 2)][1]})`}><circle r="15" /><text y="5">{missionId === "coffee" ? "P" : "G"}</text></g>
-              {planned ? (
-                <g className="autonomy-drone" transform={`translate(${droneX} ${droneY})`} filter="url(#autonomy-glow)">
-                  <circle r="23" />
-                  <path d="M-16-16 16 16M16-16-16 16M-21-21h10M11-21h10M-21 21h10M11 21h10" />
-                  <circle r="6" />
-                </g>
-              ) : null}
-              {perception !== "map" && planned ? <path className="autonomy-camera-cone" d={`M ${droneX} ${droneY} L ${droneX + 115} ${droneY - 65} L ${droneX + 115} ${droneY + 65} Z`} /> : null}
-            </svg>
+            <AutonomyWorld3D
+              missionId={missionId}
+              progress={progress}
+              planned={planned}
+              obstacleInjected={obstacleInjected}
+              dynamicEntityActive={dynamicEntityActive}
+              perception={perception}
+              mapName={workspace?.mapPack.name ?? mission.name}
+            />
 
             <div className="autonomy-camera-card">
               <div><Camera aria-hidden="true" /><span>{copy.cameraFeed}</span><i /></div>
               <div className="autonomy-camera-scene">
                 <span className="autonomy-camera-horizon" />
-                <span className="autonomy-camera-box"><small>{perception === "map" ? "MAP" : "FREE SPACE"}</small></span>
+                <span className="autonomy-camera-box"><small>{perception === "map" ? "MAP TWIN" : "SYNTHETIC DEPTH"}</small></span>
                 <span className="autonomy-camera-depth" />
               </div>
             </div>
@@ -1237,14 +1305,36 @@ export function AutonomyLab({
             <div><BrainCircuit aria-hidden="true" /><span>{copy.brain}</span></div>
             <span className="autonomy-brain-rate">20 Hz safety loop</span>
           </div>
-          <ol className="autonomy-brain-stages">
-            {copy.brainStages.map((stage, index) => (
-              <li key={stage} className={index === activeStage ? "is-active" : index < activeStage || complete ? "is-complete" : ""}>
-                <span>{index < activeStage || complete ? <Check aria-hidden="true" /> : index + 1}</span>
-                <div><strong>{stage}</strong><small>{index === 0 ? copy.modes[perception] : index === 4 && obstacleInjected ? copy.replanning : "ONLINE"}</small></div>
+          <div className="autonomy-task-graph-heading">
+            <span>GRAPH R{activeTaskGraph.revision} · {activeTaskGraph.change_reason}</span>
+            <button type="button" onClick={() => setTaskGraphView((current) => current === "summary" ? "engineering" : "summary")}>
+              {taskGraphView === "summary" ? (chinese ? "工程详情" : "Engineering") : (chinese ? "简洁视图" : "Summary")}
+            </button>
+          </div>
+          <ol className={`autonomy-task-graph is-${taskGraphView}`}>
+            {activeTaskGraph.nodes.map((node, index) => (
+              <li key={node.task_id} data-status={node.status} data-source={node.inserted_by}>
+                <span>{node.status === "completed" ? <Check aria-hidden="true" /> : index + 1}</span>
+                <div>
+                  <strong>{node.label}</strong>
+                  <small>{node.status.toUpperCase()} · {node.executor.replaceAll("_", " ")}</small>
+                  {taskGraphView === "engineering" ? <em>{node.risk.toUpperCase()} · {node.timeout_s}s · {node.max_retries} {chinese ? "次重试" : "retries"} · {node.fallback.toUpperCase()}</em> : null}
+                </div>
               </li>
             ))}
           </ol>
+
+          <div className="autonomy-live-perception">
+            <header><h2><Radar aria-hidden="true" />{chinese ? "实时感知" : "Live perception"}</h2><span>{activeEntities.length} {chinese ? "个跟踪实体" : "tracked"}</span></header>
+            <div className="autonomy-stream-health">
+              {(runtimeSession?.stream_health ?? simulatedStreamHealth()).map((stream) => <span key={stream.stream_id} data-status={stream.status}><i />{stream.kind.toUpperCase()}<small>{stream.rate_hz} Hz · {stream.latency_ms} ms</small></span>)}
+            </div>
+            {activeEntities.map((entity) => <article key={entity.track_id}>
+              <Radar aria-hidden="true" />
+              <span><strong>{entity.kind.toUpperCase()} · {entity.track_id}</strong><small>{Math.round(entity.confidence * 100)}% · {entity.source_stream} · {entity.velocity_mps.y.toFixed(2)} m/s</small></span>
+              <em>{entity.safety_radius_m.toFixed(1)} m</em>
+            </article>)}
+          </div>
 
           <div className="autonomy-runtime-stack">
             <header>

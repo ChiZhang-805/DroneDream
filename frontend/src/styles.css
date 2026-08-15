@@ -570,7 +570,78 @@
 
 .autonomy-map-assets > div strong { font-size: 0.68rem; }
 .autonomy-map-assets > div small { color: #8b7f8e; font-size: 0.55rem; }
+.autonomy-map-assets > div code {
+  overflow: hidden;
+  color: #897493;
+  font-size: 0.48rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.autonomy-map-assets > div[data-admission="admitted"] { box-shadow: inset 3px 0 #22a37e; }
+.autonomy-map-assets > div[data-admission="rejected"] { box-shadow: inset 3px 0 #c84567; }
 .autonomy-map-assets > div button { border: 0; color: #9b4960; background: transparent; cursor: pointer; }
+
+.autonomy-sensor-mounts {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.autonomy-sensor-mounts > article {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.7fr) minmax(0, 2fr);
+  gap: 0.5rem 0.65rem;
+  padding: 0.62rem;
+  border: 1px solid #e5dce8;
+  border-radius: 12px;
+  background: #faf8fb;
+}
+
+.autonomy-sensor-mounts article > header {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.autonomy-sensor-mounts header > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #6f6274;
+  font-size: 0.6rem;
+  font-weight: 750;
+}
+
+.autonomy-sensor-mounts input {
+  width: 100%;
+  min-width: 0;
+}
+
+.autonomy-sensor-mounts input[type="checkbox"] {
+  width: 1rem;
+  min-height: auto;
+}
+
+.autonomy-sensor-mounts article > label,
+.autonomy-sensor-mounts article > div label {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.autonomy-sensor-mounts article > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.42rem;
+}
+
+.autonomy-sensor-mounts article span {
+  color: #867989;
+  font-size: 0.52rem;
+  font-weight: 750;
+}
 
 .autonomy-mission-page {
   display: grid;
@@ -7083,6 +7154,319 @@ a {
 .autonomy-runtime-stack li small {
   color: #a093a5;
   font-size: 0.43rem;
+}
+
+.autonomy-world-3d {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #f4f2f7;
+}
+
+.autonomy-world-3d[data-perception="vision"] {
+  background: #15131b;
+}
+
+.autonomy-world-3d-canvas,
+.autonomy-world-3d-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.autonomy-world-3d-canvas canvas {
+  cursor: grab;
+  outline: none;
+}
+
+.autonomy-world-3d-canvas canvas:active {
+  cursor: grabbing;
+}
+
+.autonomy-world-3d-toolbar {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.65rem;
+  display: flex;
+  max-width: calc(100% - 1.3rem);
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 9px;
+  color: #f8f4fb;
+  background: rgba(28, 22, 34, 0.76);
+  box-shadow: 0 8px 24px rgba(29, 20, 37, 0.18);
+  backdrop-filter: blur(12px);
+}
+
+.autonomy-world-3d-toolbar span,
+.autonomy-world-3d-toolbar small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-world-3d-toolbar span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.autonomy-world-3d-toolbar span i {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: #55d8dc;
+  box-shadow: 0 0 0 3px rgba(85, 216, 220, 0.15);
+}
+
+.autonomy-world-3d-toolbar small {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.47rem;
+}
+
+.autonomy-world-3d-error {
+  position: absolute;
+  inset: auto 1rem 1rem;
+  padding: 0.7rem;
+  border-radius: 10px;
+  color: #8e314b;
+  background: #fff1f4;
+  font-size: 0.65rem;
+  font-weight: 750;
+}
+
+.autonomy-task-graph-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.autonomy-task-graph-heading > span {
+  overflow: hidden;
+  color: #8b7c90;
+  font-size: 0.48rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-task-graph-heading button {
+  flex: 0 0 auto;
+  padding: 0.22rem 0.4rem;
+  border: 1px solid #ded3e4;
+  border-radius: 7px;
+  color: #6f5b78;
+  background: #fff;
+  font: inherit;
+  font-size: 0.5rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.autonomy-task-graph {
+  display: grid;
+  max-height: 18.5rem;
+  gap: 0.22rem;
+  margin: 0;
+  padding: 0 0.12rem 0 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+
+.autonomy-task-graph li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.42rem;
+  padding: 0.38rem 0.44rem;
+  border: 1px solid #ebe4ee;
+  border-radius: 9px;
+  color: #746978;
+  background: #fcfafc;
+}
+
+.autonomy-task-graph li[data-source="runtime"] {
+  border-color: #efb9c8;
+  background: #fff6f8;
+}
+
+.autonomy-task-graph li[data-status="active"] {
+  border-color: #bda6e4;
+  color: #6e41b4;
+  background: #f7f1ff;
+  box-shadow: 0 6px 16px rgba(108, 70, 176, 0.08);
+}
+
+.autonomy-task-graph li[data-status="blocked"] {
+  border-color: #edc1cb;
+  color: #a63d59;
+  background: #fff3f6;
+}
+
+.autonomy-task-graph li[data-status="completed"] {
+  color: #65756f;
+  background: #f5faf8;
+}
+
+.autonomy-task-graph li > span {
+  display: grid;
+  width: 1.38rem;
+  height: 1.38rem;
+  border: 1px solid #ddd2e2;
+  border-radius: 7px;
+  place-items: center;
+  font-size: 0.54rem;
+  font-weight: 900;
+}
+
+.autonomy-task-graph li > span svg {
+  width: 0.76rem;
+  height: 0.76rem;
+}
+
+.autonomy-task-graph li[data-status="completed"] > span {
+  border-color: #b6e0d4;
+  color: #168269;
+  background: #eaf8f3;
+}
+
+.autonomy-task-graph li > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+}
+
+.autonomy-task-graph strong,
+.autonomy-task-graph small,
+.autonomy-task-graph em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.autonomy-task-graph strong {
+  color: #4d4052;
+  font-size: 0.61rem;
+  line-height: 1.3;
+}
+
+.autonomy-task-graph small,
+.autonomy-task-graph em {
+  color: #97899b;
+  font-size: 0.43rem;
+  font-style: normal;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.autonomy-task-graph.is-summary li[data-status="pending"]:not(:nth-child(-n + 2)) {
+  display: none;
+}
+
+.autonomy-live-perception {
+  display: grid;
+  gap: 0.38rem;
+  padding-top: 0.58rem;
+  border-top: 1px solid #eee6f0;
+}
+
+.autonomy-live-perception > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.autonomy-live-perception h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  margin: 0;
+  color: #544659;
+  font-size: 0.7rem;
+}
+
+.autonomy-live-perception h2 svg {
+  width: 0.82rem;
+  color: #8558ca;
+}
+
+.autonomy-live-perception > header > span {
+  color: #887b8d;
+  font-size: 0.48rem;
+  font-weight: 800;
+}
+
+.autonomy-stream-health {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.22rem;
+}
+
+.autonomy-stream-health > span {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.24rem;
+  padding: 0.3rem;
+  border: 1px solid #ece5ee;
+  border-radius: 7px;
+  color: #63566a;
+  background: #fcfafc;
+  font-size: 0.48rem;
+  font-weight: 850;
+}
+
+.autonomy-stream-health i {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: #21a77f;
+}
+
+.autonomy-stream-health span[data-status="degraded"] i,
+.autonomy-stream-health span[data-status="stale"] i { background: #dfa430; }
+.autonomy-stream-health span[data-status="offline"] i { background: #c84567; }
+
+.autonomy-stream-health small {
+  grid-column: 2;
+  overflow: hidden;
+  color: #9a8d9f;
+  font-size: 0.41rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-live-perception > article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.38rem;
+  border: 1px solid #efb7c7;
+  border-radius: 8px;
+  color: #a03455;
+  background: #fff3f6;
+}
+
+.autonomy-live-perception > article > svg { width: 0.85rem; }
+.autonomy-live-perception > article > span { display: grid; min-width: 0; }
+.autonomy-live-perception > article strong { font-size: 0.55rem; }
+.autonomy-live-perception > article small { color: #a87c8b; font-size: 0.44rem; }
+.autonomy-live-perception > article em { font-size: 0.5rem; font-style: normal; font-weight: 900; }
+
+.autonomy-lab-page.is-embedded .autonomy-brain-panel {
+  overflow-y: auto;
 }
 
 .autonomy-telemetry dl {

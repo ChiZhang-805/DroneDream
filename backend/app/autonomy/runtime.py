@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import re
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -17,6 +19,11 @@ from threading import RLock
 
 from app.autonomy.models import (
     AutonomyCompileResponse,
+    MissionTaskGraph,
+    MissionTaskNode,
+    PerceivedEntity,
+    RuntimeDecisionEvent,
+    RuntimeDecisionKind,
     RuntimeObservation,
     RuntimeOperatorCommand,
     RuntimePhase,
@@ -33,6 +40,8 @@ MAX_OBSERVATION_GAP_MS = 2_000
 MAX_PERCEPTION_AGE_MS = 750
 MAX_LOCALIZATION_COVARIANCE_M2 = 0.25
 MIN_CLEARANCE_MARGIN_M = 0.12
+MAX_TASK_GRAPH_NODES = 128
+MAX_ACTIVE_TASK_NODES = 16
 
 
 class AutonomyRuntimeError(ValueError):
@@ -49,6 +58,7 @@ class _SessionRecord:
     client_request_id: str
     vehicle: VehicleEnvelope
     result: RuntimeSession
+    last_observation: RuntimeObservation | None = None
 
 
 def _now() -> datetime:
@@ -97,6 +107,36 @@ def _safety_decision(
         observation.monotonic_ms - previous_monotonic_ms > MAX_OBSERVATION_GAP_MS
     ):
         escalate("hold", "safety.observation-gap")
+    for stream in observation.stream_health:
+        if stream.kind in {"rgb", "depth", "stereo", "thermal", "lidar", "vio", "slam"} and (
+            stream.status in {"stale", "offline"}
+        ):
+            escalate("hold", f"safety.perception-stream-{stream.status}")
+    for entity in observation.perceived_entities:
+        if entity.confidence < 0.5 or entity.age_ms > 1_000:
+            continue
+        distance = math.dist(
+            (observation.position_m.x, observation.position_m.y, observation.position_m.z),
+            (entity.position_m.x, entity.position_m.y, entity.position_m.z),
+        )
+        aircraft_speed = math.sqrt(
+            observation.velocity_mps.x**2
+            + observation.velocity_mps.y**2
+            + observation.velocity_mps.z**2
+        )
+        stop_envelope = (
+            vehicle.radius_m
+            + entity.safety_radius_m
+            + max(
+                0.5,
+                aircraft_speed * 0.75,
+            )
+        )
+        if distance <= stop_envelope:
+            suffix = "person" if entity.kind == "person" else "dynamic-entity"
+            escalate("hold", f"safety.{suffix}-envelope")
+        elif distance <= stop_envelope + 1.5:
+            codes.append("world.dynamic-entity-nearby")
     if not codes:
         codes.append("safety.nominal")
     return SafetyDecision(action=action, accepted=True, codes=sorted(set(codes)))
@@ -124,6 +164,163 @@ def _next_phase(observation: RuntimeObservation, decision: SafetyDecision) -> Ru
     return "navigating"
 
 
+def _runtime_track_suffix(track_id: str) -> str:
+    normalized = re.sub(r"[^a-z0-9._-]+", "-", track_id.casefold()).strip("-.")
+    return normalized[:48] or "entity"
+
+
+def _dynamic_entities(observation: RuntimeObservation) -> list[PerceivedEntity]:
+    return [
+        entity
+        for entity in observation.perceived_entities
+        if entity.confidence >= 0.5 and entity.age_ms <= 1_000
+    ]
+
+
+def _next_decision_revision(events: list[RuntimeDecisionEvent]) -> int:
+    return events[-1].revision + 1 if events else 1
+
+
+def _advance_task_graph(
+    graph: MissionTaskGraph,
+    observation: RuntimeObservation,
+    decision: SafetyDecision,
+) -> MissionTaskGraph:
+    """Advance compiler nodes and insert deterministic runtime recovery branches."""
+
+    original_nodes = [node.model_copy(deep=True) for node in graph.nodes]
+    base_nodes = [node for node in original_nodes if node.inserted_by != "runtime"]
+    maximum_entity_branches = max(
+        0,
+        min(
+            (MAX_TASK_GRAPH_NODES - len(base_nodes)) // 2,
+            (MAX_ACTIVE_TASK_NODES - 1) // 2,
+        ),
+    )
+    entities = sorted(
+        _dynamic_entities(observation),
+        key=lambda entity: math.dist(
+            (observation.position_m.x, observation.position_m.y, observation.position_m.z),
+            (entity.position_m.x, entity.position_m.y, entity.position_m.z),
+        ),
+    )[:maximum_entity_branches]
+    current_suffixes = {_runtime_track_suffix(entity.track_id) for entity in entities}
+    nodes = [
+        *base_nodes,
+        *[
+            node
+            for node in original_nodes
+            if node.inserted_by == "runtime"
+            and node.task_id.removeprefix("runtime-hold-").removeprefix("runtime-replan-")
+            in current_suffixes
+        ],
+    ]
+    compiler_nodes = [node for node in nodes if node.inserted_by == "compiler"]
+    if observation.landed and observation.mission_progress >= 0.995:
+        completed_count = len(compiler_nodes)
+    else:
+        completed_count = min(
+            len(compiler_nodes) - 1,
+            int(observation.mission_progress * len(compiler_nodes)),
+        )
+    for index, node in enumerate(compiler_nodes):
+        if index < completed_count:
+            node.status = "completed"
+        elif index == completed_count:
+            node.status = "blocked" if decision.action != "continue" else "active"
+        else:
+            node.status = "pending"
+
+    entity_ids: set[str] = set()
+    anchor = next(
+        (node.task_id for node in reversed(compiler_nodes) if node.status == "completed"),
+        compiler_nodes[0].task_id,
+    )
+    for entity in entities:
+        suffix = _runtime_track_suffix(entity.track_id)
+        entity_ids.add(suffix)
+        hold_id = f"runtime-hold-{suffix}"
+        replan_id = f"runtime-replan-{suffix}"
+        hold = next((node for node in nodes if node.task_id == hold_id), None)
+        if hold is None:
+            hold = MissionTaskNode(
+                task_id=hold_id,
+                label=f"Protect the safety envelope around tracked {entity.kind} {entity.track_id}",
+                status="active" if decision.action == "hold" else "completed",
+                depends_on=[anchor],
+                executor="mission_executive",
+                risk="critical" if entity.kind == "person" else "high",
+                max_retries=0,
+                timeout_s=120.0,
+                fallback="land",
+                expected_output="Clearance restored or a bounded alternative corridor selected",
+                completion_evidence=["entity.track", "entity.range", "safety.decision"],
+                inserted_by="runtime",
+            )
+            nodes.append(hold)
+        else:
+            hold.status = "active" if decision.action == "hold" else "completed"
+        replan = next((node for node in nodes if node.task_id == replan_id), None)
+        if replan is None:
+            replan = MissionTaskNode(
+                task_id=replan_id,
+                label=(
+                    f"Repair the local corridor around {entity.track_id} and rejoin "
+                    "the mission graph"
+                ),
+                status=(
+                    "blocked"
+                    if decision.action == "hold"
+                    else ("active" if observation.local_replan_active else "completed")
+                ),
+                depends_on=[hold_id],
+                executor="local_planner",
+                risk="high",
+                max_retries=3,
+                timeout_s=20.0,
+                fallback="hold",
+                expected_output=(
+                    "A collision-checked trajectory revision inside the approved corridor"
+                ),
+                completion_evidence=["trajectory.revision", "clearance.minimum", "planner.receipt"],
+                inserted_by="runtime",
+            )
+            nodes.append(replan)
+        else:
+            replan.status = (
+                "blocked"
+                if decision.action == "hold"
+                else ("active" if observation.local_replan_active else "completed")
+            )
+
+    for node in nodes:
+        if node.inserted_by != "runtime":
+            continue
+        suffix = node.task_id.removeprefix("runtime-hold-").removeprefix("runtime-replan-")
+        if suffix in entity_ids:
+            continue
+        node.status = "completed"
+
+    active = [node.task_id for node in nodes if node.status == "active"][:MAX_ACTIVE_TASK_NODES]
+    signature_before = [(node.task_id, node.status) for node in graph.nodes]
+    signature_after = [(node.task_id, node.status) for node in nodes]
+    changed = signature_after != signature_before
+    if entity_ids:
+        reason = "dynamic entities updated the executable task graph"
+    elif decision.action != "continue":
+        reason = f"safety supervisor selected {decision.action}"
+    elif changed:
+        reason = "mission progress advanced compiler tasks"
+    else:
+        reason = graph.change_reason
+    return MissionTaskGraph(
+        revision=graph.revision + (1 if changed else 0),
+        nodes=nodes,
+        active_node_ids=active,
+        change_reason=reason,
+    )
+
+
 class RuntimeSessionRegistry:
     """Bounded, owner-scoped registry for simulation runtime receipts."""
 
@@ -144,7 +341,10 @@ class RuntimeSessionRegistry:
             "hardware_command_authority": False,
             "validated_signed_vehicle_packs": 0,
             "physical_transport_bound": False,
-            "safe_operator_commands": ["hold", "abort"],
+            "safe_operator_commands": ["hold", "resume-if-safe", "abort"],
+            "dynamic_task_graph": True,
+            "tracked_entity_contract": True,
+            "perception_stream_health_contract": True,
         }
 
     def create(self, owner_id: str, request: RuntimeSessionCreateRequest) -> RuntimeSession:
@@ -167,9 +367,10 @@ class RuntimeSessionRegistry:
                     )
                 return existing.result.model_copy(deep=True)
             self._make_room()
-            session_id = "runtime-" + _hash(
-                [owner_id, request.client_request_id, compiled.contract.contract_id]
-            )[:24]
+            session_id = (
+                "runtime-"
+                + _hash([owner_id, request.client_request_id, compiled.contract.contract_id])[:24]
+            )
             now = _now()
             chain_head = _hash(
                 {
@@ -196,6 +397,21 @@ class RuntimeSessionRegistry:
                     accepted=True,
                     codes=["runtime.awaiting-first-observation"],
                 ),
+                task_graph=compiled.contract.task_graph.model_copy(deep=True),
+                perceived_entities=[],
+                stream_health=[],
+                decision_events=[
+                    RuntimeDecisionEvent(
+                        revision=1,
+                        created_at=now,
+                        kind="session",
+                        code="runtime.session-created",
+                        summary=(
+                            "Simulation supervision session created without hardware authority."
+                        ),
+                        task_ids=compiled.contract.task_graph.active_node_ids,
+                    )
+                ],
                 evidence_chain_head=chain_head,
                 terminal=False,
             )
@@ -243,12 +459,42 @@ class RuntimeSessionRegistry:
                 previous_monotonic_ms=current.latest_monotonic_ms,
             )
             phase = _next_phase(observation, decision)
+            task_graph = _advance_task_graph(current.task_graph, observation, decision)
+            all_entity_ids = [entity.track_id for entity in _dynamic_entities(observation)]
+            entity_ids = all_entity_ids[:32]
+            event_kind: RuntimeDecisionKind = (
+                "dynamic_entity"
+                if entity_ids
+                else ("safety" if decision.action != "continue" else "task_transition")
+            )
+            event_code = decision.codes[0]
+            event_summary = (
+                f"Tracked {len(all_entity_ids)} dynamic entities and selected {decision.action}."
+                if all_entity_ids
+                else f"Task graph revision {task_graph.revision}; safety action {decision.action}."
+            )
+            decision_events = [
+                *current.decision_events,
+                RuntimeDecisionEvent(
+                    revision=_next_decision_revision(current.decision_events),
+                    created_at=_now(),
+                    kind=event_kind,
+                    code=event_code,
+                    summary=event_summary,
+                    task_ids=task_graph.active_node_ids,
+                    entity_ids=entity_ids,
+                ),
+            ][-100:]
             chain_head = _hash(
                 {
                     "previous": current.evidence_chain_head,
                     "observation": observation.model_dump(mode="json"),
                     "decision": decision.model_dump(mode="json"),
                     "phase": phase,
+                    "task_graph": task_graph.model_dump(mode="json"),
+                    "perceived_entities": [
+                        entity.model_dump(mode="json") for entity in observation.perceived_entities
+                    ],
                 }
             )
             record.result = current.model_copy(
@@ -260,10 +506,15 @@ class RuntimeSessionRegistry:
                     "latest_monotonic_ms": observation.monotonic_ms,
                     "observation_count": current.observation_count + 1,
                     "decision": decision,
+                    "task_graph": task_graph,
+                    "perceived_entities": observation.perceived_entities,
+                    "stream_health": observation.stream_health,
+                    "decision_events": decision_events,
                     "evidence_chain_head": chain_head,
                     "terminal": phase in {"completed", "aborted"},
                 },
             )
+            record.last_observation = observation.model_copy(deep=True)
             self._records.move_to_end(session_id)
             return record.result.model_copy(deep=True)
 
@@ -281,11 +532,54 @@ class RuntimeSessionRegistry:
                     "AUTONOMY_RUNTIME_TERMINAL",
                     "A completed or aborted session cannot accept operator commands.",
                 )
-            phase: RuntimePhase = "holding" if command.action == "hold" else "aborted"
-            decision = SafetyDecision(
-                action=command.action,
-                accepted=True,
-                codes=[f"operator.{command.action}"],
+            if command.action == "resume":
+                if current.phase != "holding" or record.last_observation is None:
+                    raise AutonomyRuntimeError(
+                        "AUTONOMY_RUNTIME_RESUME_NOT_AVAILABLE",
+                        "Resume requires a held session with a current observation.",
+                    )
+                rechecked = _safety_decision(
+                    record.last_observation,
+                    vehicle=record.vehicle,
+                    previous_monotonic_ms=record.last_observation.monotonic_ms,
+                )
+                if rechecked.action != "continue":
+                    raise AutonomyRuntimeError(
+                        "AUTONOMY_RUNTIME_RESUME_UNSAFE",
+                        "The latest observation still requires a safety hold.",
+                    )
+                phase = _next_phase(record.last_observation, rechecked)
+                decision = SafetyDecision(
+                    action="continue",
+                    accepted=True,
+                    codes=["operator.resume-safe"],
+                )
+                task_graph = _advance_task_graph(
+                    current.task_graph,
+                    record.last_observation,
+                    decision,
+                )
+            else:
+                phase = "holding" if command.action == "hold" else "aborted"
+                decision = SafetyDecision(
+                    action=command.action,
+                    accepted=True,
+                    codes=[f"operator.{command.action}"],
+                )
+                task_graph = current.task_graph.model_copy(deep=True)
+                for node in task_graph.nodes:
+                    if node.status == "active":
+                        node.status = "blocked"
+                task_graph.active_node_ids = []
+                task_graph.revision += 1
+                task_graph.change_reason = f"operator selected {command.action}"
+            event = RuntimeDecisionEvent(
+                revision=_next_decision_revision(current.decision_events),
+                created_at=_now(),
+                kind="operator",
+                code=f"operator.{command.action}",
+                summary=command.reason,
+                task_ids=task_graph.active_node_ids,
             )
             record.result = current.model_copy(
                 deep=True,
@@ -293,6 +587,8 @@ class RuntimeSessionRegistry:
                     "phase": phase,
                     "updated_at": _now(),
                     "decision": decision,
+                    "task_graph": task_graph,
+                    "decision_events": [*current.decision_events, event][-100:],
                     "evidence_chain_head": _hash(
                         {
                             "previous": current.evidence_chain_head,

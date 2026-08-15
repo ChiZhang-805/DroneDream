@@ -12,9 +12,12 @@ from app.autonomy.models import (
     AutonomyCompileResponse,
     ExecutionAdapter,
     ExecutionPolicy,
+    MissionAction,
     MissionContract,
     MissionMetrics,
     MissionStep,
+    MissionTaskGraph,
+    MissionTaskNode,
     OnboardRuntimeProfile,
     PerceptionMode,
     RoutePoint,
@@ -23,6 +26,9 @@ from app.autonomy.models import (
     RuntimeComponentId,
     RuntimeComponentStatus,
     RuntimeMode,
+    SafetyAction,
+    TaskExecutor,
+    TaskRisk,
     ValidationIssue,
 )
 
@@ -151,17 +157,13 @@ def _steps(scene_id: str, pickup_payload_kg: float) -> list[MissionStep]:
         ]
     if scene_id == "forest-gate-inspection":
         return [
-            MissionStep(
-                order=1, action="takeoff", label="Launch into the vegetation corridor"
-            ),
+            MissionStep(order=1, action="takeoff", label="Launch into the vegetation corridor"),
             MissionStep(
                 order=2,
                 action="pass_gate",
                 label="Pass three gates through their geometric centers",
             ),
-            MissionStep(
-                order=3, action="land", label="Complete the inspection hover and land"
-            ),
+            MissionStep(order=3, action="land", label="Complete the inspection hover and land"),
         ]
     return [
         MissionStep(order=1, action="takeoff", label="Launch in the service corridor"),
@@ -172,6 +174,95 @@ def _steps(scene_id: str, pickup_payload_kg: float) -> list[MissionStep]:
         ),
         MissionStep(order=3, action="land", label="Dock on the marked target"),
     ]
+
+
+def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
+    """Expand linear intent into an auditable graph owned by the mission executive."""
+
+    nodes: list[MissionTaskNode] = [
+        MissionTaskNode(
+            task_id="preflight-health",
+            label="Verify aircraft health, calibration, energy and command-link contract",
+            status="ready",
+            executor="mission_executive",
+            risk="high",
+            max_retries=0,
+            timeout_s=20.0,
+            fallback="abort",
+            expected_output="A timestamped preflight qualification receipt",
+            completion_evidence=["health.receipt", "battery.margin", "link.identity"],
+        ),
+        MissionTaskNode(
+            task_id="world-localization",
+            label="Bind the Map Pack and establish a bounded localization estimate",
+            depends_on=["preflight-health"],
+            executor="perception",
+            risk="high",
+            max_retries=2,
+            timeout_s=45.0,
+            fallback="hold",
+            expected_output="Map-frame transform, covariance and observable free-space layers",
+            completion_evidence=["map.version", "frame.transform", "localization.covariance"],
+        ),
+    ]
+    previous = "world-localization"
+    executor_by_action: dict[MissionAction, TaskExecutor] = {
+        "takeoff": "px4_bridge",
+        "transit": "local_planner",
+        "traverse_stairs": "local_planner",
+        "pass_gate": "local_planner",
+        "pickup": "payload_controller",
+        "return": "global_planner",
+        "land": "px4_bridge",
+    }
+    risk_by_action: dict[MissionAction, TaskRisk] = {
+        "takeoff": "high",
+        "transit": "medium",
+        "traverse_stairs": "high",
+        "pass_gate": "high",
+        "pickup": "high",
+        "return": "medium",
+        "land": "high",
+    }
+    for step in steps:
+        task_id = f"mission-{step.order:02d}-{step.action.replace('_', '-')}"
+        fallback: SafetyAction = "land" if step.action in {"return", "land"} else "hold"
+        nodes.append(
+            MissionTaskNode(
+                task_id=task_id,
+                label=step.label,
+                depends_on=[previous],
+                executor=executor_by_action[step.action],
+                risk=risk_by_action[step.action],
+                max_retries=2 if step.action not in {"takeoff", "land"} else 1,
+                timeout_s=120.0
+                if step.action in {"transit", "traverse_stairs", "return"}
+                else 45.0,
+                fallback=fallback,
+                expected_output=f"Qualified completion of {step.action}",
+                completion_evidence=[
+                    "pose.trace",
+                    "clearance.minimum",
+                    "controller.acceptance",
+                ],
+            )
+        )
+        previous = task_id
+    nodes.append(
+        MissionTaskNode(
+            task_id="postflight-evidence",
+            label="Seal mission results, anomalies and replay evidence",
+            depends_on=[previous],
+            executor="mission_executive",
+            risk="low",
+            max_retries=2,
+            timeout_s=20.0,
+            fallback="hold",
+            expected_output="A hash-chained mission evidence head",
+            completion_evidence=["mission.result", "decision.log", "evidence.chain-head"],
+        )
+    )
+    return MissionTaskGraph(nodes=nodes, active_node_ids=["preflight-health"])
 
 
 def _route_metrics(points: list[RoutePoint]) -> tuple[float, float]:
@@ -219,7 +310,9 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
 
     if target == "simulation" and feasible:
         return ExecutionPolicy(
-            readiness="simulation_ready", adapter=adapter, can_execute=True,
+            readiness="simulation_ready",
+            adapter=adapter,
+            can_execute=True,
             validated_signed_pack_count=VALIDATED_SIGNED_PACK_COUNT,
             blockers=[],
             required_next_steps=[
@@ -228,32 +321,41 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
         )
     if blockers:
         if target == "simulation":
-            required.extend([
-                (
-                    "Adjust payload, speed, acceleration, or the vehicle envelope until "
-                    "all trajectory feasibility checks pass."
-                ),
-                (
-                    "Recompile the same simulation mission and review every reported "
-                    "geometry or dynamics issue before qualification."
-                ),
-            ])
+            required.extend(
+                [
+                    (
+                        "Adjust payload, speed, acceleration, or the vehicle envelope until "
+                        "all trajectory feasibility checks pass."
+                    ),
+                    (
+                        "Recompile the same simulation mission and review every reported "
+                        "geometry or dynamics issue before qualification."
+                    ),
+                ]
+            )
         else:
-            required.extend([
-                (
-                    "Complete and sign the simulation qualification for the identical "
-                    "mission contract."
-                ),
-                "Bind a validated signed Vehicle Pack and firmware identity.",
-                "Obtain a short-lived operator confirmation after live preflight checks.",
-            ])
+            required.extend(
+                [
+                    (
+                        "Complete and sign the simulation qualification for the identical "
+                        "mission contract."
+                    ),
+                    "Bind a validated signed Vehicle Pack and firmware identity.",
+                    "Obtain a short-lived operator confirmation after live preflight checks.",
+                ]
+            )
         return ExecutionPolicy(
-            readiness="denied", adapter=adapter, can_execute=False,
+            readiness="denied",
+            adapter=adapter,
+            can_execute=False,
             validated_signed_pack_count=VALIDATED_SIGNED_PACK_COUNT,
-            blockers=sorted(set(blockers)), required_next_steps=required,
+            blockers=sorted(set(blockers)),
+            required_next_steps=required,
         )
     return ExecutionPolicy(
-        readiness="preview_only", adapter=adapter, can_execute=False,
+        readiness="preview_only",
+        adapter=adapter,
+        can_execute=False,
         validated_signed_pack_count=VALIDATED_SIGNED_PACK_COUNT,
         blockers=["runtime.execution-adapter.not-bound"],
         required_next_steps=["Bind the audited runtime adapter before enabling execution."],
@@ -273,6 +375,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         )
     perception = _select_perception(request)
     steps = _steps(scene_id, request.vehicle.pickup_payload_kg)
+    task_graph = _task_graph(steps)
     points = [
         point.model_copy(
             deep=True,
@@ -288,9 +391,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
     route_length, vertical_travel = _route_metrics(points)
     launch_mass = request.vehicle.dry_mass_kg + request.vehicle.launch_payload_kg
     pickup_delta = (
-        request.vehicle.pickup_payload_kg
-        if any(step.action == "pickup" for step in steps)
-        else 0.0
+        request.vehicle.pickup_payload_kg if any(step.action == "pickup" for step in steps) else 0.0
     )
     loaded_mass = launch_mass + pickup_delta
     thrust_to_weight = request.vehicle.max_total_thrust_n / (loaded_mass * GRAVITY)
@@ -317,8 +418,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
                 code="vehicle.thrust-margin-insufficient",
                 severity="error",
                 message=(
-                    "Post-pickup thrust-to-weight must remain at least "
-                    f"{MIN_THRUST_TO_WEIGHT:.2f}."
+                    f"Post-pickup thrust-to-weight must remain at least {MIN_THRUST_TO_WEIGHT:.2f}."
                 ),
             )
         )
@@ -328,8 +428,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
                 code="trajectory.braking-envelope-exceeds-clearance",
                 severity="error",
                 message=(
-                    "The stopping envelope is larger than the scene's verified minimum "
-                    "clearance."
+                    "The stopping envelope is larger than the scene's verified minimum clearance."
                 ),
             )
         )
@@ -374,24 +473,27 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         "scene_id": scene_id,
         "perception_mode": perception,
         "steps": [step.model_dump(mode="json") for step in steps],
+        "task_graph": task_graph.model_dump(mode="json"),
         "vehicle": request.vehicle.model_dump(mode="json"),
     }
     digest = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     contract = MissionContract(
-        contract_id=f"mission-{digest[:20]}", edition=request.edition,
-        execution_target=request.execution_target, scene_id=scene_id,
-        perception_mode=perception, intent=request.natural_language, steps=steps,
+        contract_id=f"mission-{digest[:20]}",
+        edition=request.edition,
+        execution_target=request.execution_target,
+        scene_id=scene_id,
+        perception_mode=perception,
+        intent=request.natural_language,
+        steps=steps,
+        task_graph=task_graph,
         immutable_safety_rules=[
             (
                 "A language or vision model may propose mission goals but cannot issue "
                 "actuator commands."
             ),
-            (
-                "Every trajectory must pass geometry, dynamics, payload and edition-policy "
-                "checks."
-            ),
+            ("Every trajectory must pass geometry, dynamics, payload and edition-policy checks."),
             (
                 "Loss of localization, command link or safety clearance transitions execution "
                 "to hold or abort."
@@ -406,8 +508,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         route_length_m=route_length,
         vertical_travel_m=vertical_travel,
         estimated_duration_s=sum(
-            math.dist((a.x, a.y, a.z), (b.x, b.y, b.z))
-            / min(a.speed_limit_mps, b.speed_limit_mps)
+            math.dist((a.x, a.y, a.z), (b.x, b.y, b.z)) / min(a.speed_limit_mps, b.speed_limit_mps)
             for a, b in zip(points, points[1:], strict=False)
         ),
         minimum_clearance_m=scene.minimum_clearance_m,
@@ -417,8 +518,13 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         braking_distance_m=braking_distance,
     )
     return AutonomyCompileResponse(
-        scene=scene, contract=contract, trajectory=points, feasible=feasible,
-        issues=issues, metrics=metrics, execution_policy=_policy(request, feasible),
+        scene=scene,
+        contract=contract,
+        trajectory=points,
+        feasible=feasible,
+        issues=issues,
+        metrics=metrics,
+        execution_policy=_policy(request, feasible),
         planner={
             "semantic_layer": "bounded-natural-language-contract-v1",
             "global_layer": "prevalidated-corridor-graph-v1",
