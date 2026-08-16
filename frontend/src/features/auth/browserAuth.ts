@@ -3,7 +3,10 @@ import {
   type BrowserAuthSession,
 } from "../../desktop/bridge";
 import { setAuthAccessToken } from "./authTokenStore";
-import { ADOPT_DESKTOP_AUTH_EVENT } from "./desktopAuthActivation";
+import {
+  ADOPT_DESKTOP_AUTH_EVENT,
+  DESKTOP_AUTH_REFRESH_FAILED_EVENT,
+} from "./desktopAuthActivation";
 import { supabaseClient } from "./supabaseClient";
 
 const EXPECTED_PROTOCOL = "desktop-browser-auth-pkce-v1";
@@ -14,6 +17,7 @@ const CLIENT_BY_EDITION = {
   field: "dronedream-desktop-field",
 } as const;
 let refreshTimer: number | null = null;
+const REFRESH_RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000, 300_000] as const;
 
 function tokenExpiryMs(accessToken: string): number | null {
   try {
@@ -29,18 +33,39 @@ function tokenExpiryMs(accessToken: string): number | null {
   }
 }
 
+function armNativeRefresh(accessToken: string, delay: number, retryAttempt: number): void {
+  if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+  refreshTimer = window.setTimeout(() => {
+    refreshTimer = null;
+    void restoreBrowserAuthVault()
+      .then((session) => {
+        if (!session) throw new Error("The desktop credential vault returned no session.");
+        return adoptBrowserAuthSession(session);
+      })
+      .catch(() => {
+        const retryDelay = REFRESH_RETRY_DELAYS_MS[retryAttempt];
+        const expiry = tokenExpiryMs(accessToken);
+        if (
+          retryDelay !== undefined
+          && expiry !== null
+          && Date.now() + retryDelay < expiry
+        ) {
+          armNativeRefresh(accessToken, retryDelay, retryAttempt + 1);
+          return;
+        }
+        setAuthAccessToken(null);
+        window.dispatchEvent(new Event(DESKTOP_AUTH_REFRESH_FAILED_EVENT));
+      });
+  }, delay);
+}
+
 function scheduleNativeRefresh(accessToken: string): void {
   if (refreshTimer !== null) window.clearTimeout(refreshTimer);
   refreshTimer = null;
   const expiry = tokenExpiryMs(accessToken);
   if (expiry === null) return;
   const delay = Math.max(15_000, Math.min(expiry - Date.now() - 60_000, 24 * 60 * 60 * 1000));
-  refreshTimer = window.setTimeout(() => {
-    refreshTimer = null;
-    void restoreBrowserAuthVault()
-      .then((session) => session && adoptBrowserAuthSession(session))
-      .catch(() => undefined);
-  }, delay);
+  armNativeRefresh(accessToken, delay, 0);
 }
 
 export function clearBrowserAuthSessionRefresh(): void {

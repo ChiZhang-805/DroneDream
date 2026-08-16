@@ -73,7 +73,9 @@ RUN git clone --filter=blob:none "${VALKEY_GIT_URL}" /tmp/valkey && \
 
 COPY . /opt/dronedream/source
 ARG DRONEDREAM_SOURCE_COMMIT
+ARG DRONEDREAM_SOURCE_DATE_EPOCH
 RUN test -n "${DRONEDREAM_SOURCE_COMMIT}" && \
+    test -n "${DRONEDREAM_SOURCE_DATE_EPOCH}" && \
     python3 -m venv /opt/dronedream/venv && \
     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir \
       -r /opt/dronedream/source/runtime/locks/python-requirements.lock && \
@@ -137,11 +139,26 @@ RUN test -n "${OIDC_ISSUER}" && test -n "${OIDC_JWKS_URL}" && \
     install -d -m 0750 -o root -g dronedream /etc/dronedream && \
     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/artifacts && \
     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/runtime-smoke && \
+    install -d -m 0750 -o root -g dronedream /var/lib/dronedream && \
     install -d -m 0750 -o valkey -g valkey /var/lib/valkey && \
     install -d -m 0750 -o dronedream -g dronedream \
       /opt/PX4-Autopilot/build/px4_sitl_default/rootfs/log && \
     install -d -m 2755 -o root -g systemd-journal /var/log/journal && \
     chown -R root:root /opt/dronedream && \
+    SOURCE_DATE_EPOCH="${DRONEDREAM_SOURCE_DATE_EPOCH}" \
+      /opt/dronedream/venv/bin/python /opt/dronedream/source/engine-pack/tools/engine_pack.py \
+      build --repository-root /opt/dronedream/source \
+      --output-directory /tmp/dronedream-bootstrap-engine-pack \
+      --source-commit "${DRONEDREAM_SOURCE_COMMIT}" && \
+    /usr/lib/dronedream/engine-pack-manager.py \
+      --descriptor /tmp/dronedream-bootstrap-engine-pack/engine-pack-bundle.json \
+      --archive /tmp/dronedream-bootstrap-engine-pack/DroneDreamEnginePack.tar.gz \
+      --no-services && \
+    test -L /opt/dronedream/engine/current && \
+    test -s /opt/dronedream/engine/current/engine-pack-manifest.json && \
+    test -d /opt/dronedream/engine/current/backend/app && \
+    test -d /opt/dronedream/engine/current/worker/drone_dream_worker && \
+    rm -rf /tmp/dronedream-bootstrap-engine-pack && \
     test -x /usr/lib/dronedream/runtime-init.sh && \
     test -x /usr/local/bin/valkey-server && \
     test -x /opt/dronedream/venv/bin/alembic && \

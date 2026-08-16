@@ -18,6 +18,7 @@ import { clearAllExperimentDrafts } from "../experiment/draftStorage";
 import {
   ACTIVATE_DESKTOP_AUTH_EVENT,
   ADOPT_DESKTOP_AUTH_EVENT,
+  DESKTOP_AUTH_REFRESH_FAILED_EVENT,
 } from "./desktopAuthActivation";
 import { clearBrowserAuthSessionRefresh } from "./browserAuth";
 import { getAuthAccessToken, setAuthAccessToken } from "./authTokenStore";
@@ -198,6 +199,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener(ADOPT_DESKTOP_AUTH_EVENT, adopt);
     return () => window.removeEventListener(ADOPT_DESKTOP_AUTH_EVENT, adopt);
   }, [adoptUser, deferDesktopAuth]);
+
+  useEffect(() => {
+    const expire = () => {
+      adoptUser(null, null);
+      setLoading(false);
+    };
+    window.addEventListener(DESKTOP_AUTH_REFRESH_FAILED_EVENT, expire);
+    return () => window.removeEventListener(DESKTOP_AUTH_REFRESH_FAILED_EVENT, expire);
+  }, [adoptUser]);
 
   useEffect(() => {
     if (!deferDesktopAuth || authActivated) return undefined;

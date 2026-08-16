@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const authMock = vi.hoisted(() => ({
   getUser: vi.fn(),
 }));
+const bridgeMock = vi.hoisted(() => ({
+  restoreBrowserAuthVault: vi.fn(),
+}));
+
+vi.mock("../desktop/bridge", () => ({
+  restoreBrowserAuthVault: bridgeMock.restoreBrowserAuthVault,
+}));
 
 vi.mock("../features/auth/supabaseClient", () => ({
   supabaseClient: {
@@ -12,7 +19,10 @@ vi.mock("../features/auth/supabaseClient", () => ({
   },
 }));
 
-import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
+import {
+  adoptBrowserAuthSession,
+  clearBrowserAuthSessionRefresh,
+} from "../features/auth/browserAuth";
 
 const validSession = {
   protocolVersion: "desktop-browser-auth-pkce-v1" as const,
@@ -29,6 +39,9 @@ const validSession = {
 describe("browser auth session adoption", () => {
   beforeEach(() => {
     authMock.getUser.mockReset();
+    bridgeMock.restoreBrowserAuthVault.mockReset();
+    clearBrowserAuthSessionRefresh();
+    vi.useRealTimers();
   });
 
   it("validates the access token without exposing the native refresh grant", async () => {
@@ -65,5 +78,27 @@ describe("browser auth session adoption", () => {
     })).rejects.toThrow("different DroneDream edition");
 
     expect(authMock.getUser).not.toHaveBeenCalled();
+  });
+
+  it("retries a transient native vault refresh before returning to sign-in", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T08:00:00Z"));
+    const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 120 }));
+    const accessToken = `header.${payload}.signature`;
+    const session = { ...validSession, accessToken };
+    const user = { id: "user-1", email: "pilot@example.com", user_metadata: {} };
+    authMock.getUser.mockResolvedValue({ data: { user }, error: null });
+    bridgeMock.restoreBrowserAuthVault
+      .mockRejectedValueOnce(new Error("temporary native bridge failure"))
+      .mockResolvedValueOnce(session);
+
+    await adoptBrowserAuthSession(session);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(bridgeMock.restoreBrowserAuthVault).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(bridgeMock.restoreBrowserAuthVault).toHaveBeenCalledTimes(2);
+
+    clearBrowserAuthSessionRefresh();
+    vi.useRealTimers();
   });
 });

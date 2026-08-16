@@ -28,7 +28,7 @@ from app.secrets import SecretStoreError, validate_secret_material
 
 _VERSION = "DD-BRIDGE-V2"
 _DERIVATION_LABEL = b"dronedream-desktop-bridge-v2"
-_MAX_BODY_BYTES = 2 * 1024 * 1024
+_MAX_BODY_BYTES = 25 * 1024 * 1024
 
 
 def _rejection(code: str, message: str, status: int = 401) -> JSONResponse:

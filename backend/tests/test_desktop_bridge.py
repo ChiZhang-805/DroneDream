@@ -175,6 +175,22 @@ def test_desktop_bridge_rejects_missing_wrong_runtime_expired_and_body_tamper(
     assert tampered.json()["error"]["code"] == "DESKTOP_BRIDGE_BODY_MISMATCH"
 
 
+def test_desktop_bridge_enforces_the_documented_25_mib_asset_contract(
+    client: TestClient,
+    monkeypatch: object,
+) -> None:
+    _configure(monkeypatch)
+    body = b"x" * (25 * 1024 * 1024 + 1)
+    response = client.post(
+        "/api/v1/autonomy/map-packs/import",
+        headers=_proof("POST", "/api/v1/autonomy/map-packs/import", body=body),
+        content=body,
+    )
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "DESKTOP_BRIDGE_BODY_TOO_LARGE"
+
+
 def test_desktop_bridge_preserves_user_ownership_boundary(
     client: TestClient,
     monkeypatch: object,

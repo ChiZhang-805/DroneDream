@@ -35,38 +35,38 @@
   "sourceFiles": [
     {
       "path": "frontend/scripts/verify-lab-ui.mjs",
-      "sha256": "129dab7c0db9364472efca9cb53e02c2c622cdd56ed516596dc29fe5159b4e6b",
+      "sha256": "1037a4b204b875963520a2db0c617ccc8de2f0352dce24f11b47265ceefaa142",
       "donorEdition": "lab",
       "donorBlob": "125386b98af709fbe559cb1dff6013dd52eee3ed",
       "integration": "semantic-universal-profile-and-final-field-adaptation"
     },
     {
       "path": "frontend/src/__tests__/FieldAssistantWorkspace.test.tsx",
-      "sha256": "78c01f0723d504f6893a541549aae407caaa34aee705a2c042e4d0f63ea9f7b1",
+      "sha256": "d328f46b9e0aed5ed282cf341083675bafdf88063bc3bbc0630f0a2fb461414e",
       "donorEdition": "field",
       "donorBlob": "1311d713f1b5909e8731d99946706e069b83f93c",
-      "integration": "byte-exact"
+      "integration": "semantic-universal-auth-and-workflow-adaptation"
     },
     {
       "path": "frontend/src/field/FieldAssistantWorkspace.tsx",
-      "sha256": "7c4cd169d2f98c241db48335f2e1b4c2639c9359d761cfbfbb3cd3bfa55180f4",
+      "sha256": "2641036493026ef85823ffb0f325434784c43b3e2c8b83cd596eb42a910cd5d8",
       "donorEdition": "field",
       "donorBlob": "17aef3e57559c652b080b1c37e675816d24de118",
-      "integration": "byte-exact"
+      "integration": "semantic-universal-auth-and-workflow-adaptation"
     },
     {
       "path": "frontend/src/field/field.css",
-      "sha256": "027c308144dd5e3b3bf0b56af6870b9978cbec8100cf3ccffdb34592f18c0082",
+      "sha256": "e54167739a20c13dff313c018d5d1567abfa01c5b329d930414fec8373669000",
       "donorEdition": "field",
       "donorBlob": "49d715fd854354277352be5f77dfd2db5d06b51a",
       "integration": "semantic-field-settings-and-responsive-chrome"
     },
     {
       "path": "frontend/src/lab/LabSetup.tsx",
-      "sha256": "ed36285264df4f76de4b13b1c70dc1317b51959085d36286cfea866d5b809f67",
+      "sha256": "f70672fac9d546a6bb4964cc35fedf9f71c71e141532a7e166bb7dcbc2818b02",
       "donorEdition": "lab",
       "donorBlob": "b4a3a2198e8ce3b25cf766fe425b922f516bd546",
-      "integration": "byte-exact"
+      "integration": "semantic-universal-auth-and-runtime-adaptation"
     },
     {
       "path": "frontend/src/lab/__tests__/LabSetup.test.tsx",
@@ -77,42 +77,42 @@
     },
     {
       "path": "frontend/src/lab/lab-hardware.css",
-      "sha256": "2065009c839c0187fb7a07fa522fd2b09f449fb775ab08c7c6dd3be1ee1d510a",
+      "sha256": "a1f0f717beb9430352c0e5c38c1935d4e20b407db66676f77115c397d1e6c38e",
       "donorEdition": "lab",
       "donorBlob": "905ca7b5f783e9a72c3e063e578a2b071aa8e2b5",
       "integration": "semantic-universal-container-height-boundary"
     },
     {
       "path": "frontend/src/lab/lab.css",
-      "sha256": "3985ef22a39067949f3123ac5b85f20577f88d0b2bd1aaa23206f2c8667f1f6e",
+      "sha256": "5904d9a2649e886414ca25f7464e3a04aed3da74d127495f2985eed01698fc58",
       "donorEdition": "lab",
       "donorBlob": "5968461d1f67e16551c88888a93fee137a481e68",
-      "integration": "byte-exact"
+      "integration": "semantic-universal-layout-and-theme-adaptation"
     },
     {
       "path": "frontend/src/pages/ExperimentAssistant.tsx",
-      "sha256": "b38dc6573f9e1ebec0a7039b38b5e4897c5723d43af3cffa75301123088ff877",
+      "sha256": "44ac3ed63351942003b44d7315ff81017ff9811f0b2262db22c28ee112140534",
       "donorEdition": "lab",
       "donorBlob": "c0bcfc6042582014a35e28ce2ff1f01bde3f44ad",
       "integration": "semantic-active-universal-workspace-theme"
     },
     {
       "path": "frontend/src/styles.css",
-      "sha256": "a75feec22077b0ec3240e8f8643e88d9a220de63caa398889a001bba77751122",
+      "sha256": "ab1c0f59ec47730716384b3b6c2629ad1dd76289642b018ab003a0e5f7d94953",
       "donorEdition": "lab",
       "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
       "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
     },
     {
       "path": "frontend/src/field/FieldApp.tsx",
-      "sha256": "f0c8bac40df00185af734c6080a85243280119928afbf17ab782e4ed09082cec",
+      "sha256": "63bfacac56584424962a2579270d7a4ea718e822f6f80ddd861eb7169eb6a6b6",
       "donorEdition": "field",
       "donorBlob": "5c4e3f01f16d831cdf0d995904c5b8b0a9b11c0d",
       "integration": "semantic-universal-shared-locale-adapter"
     },
     {
       "path": "frontend/src/router.tsx",
-      "sha256": "474330bd706be5d816ba1297717ddcf264dd3ffb6b7eed6329d1ed755a503c30",
+      "sha256": "04bc165f1175f55c1854592426165946bff31273b7001ee103279c73df088dc2",
       "donorEdition": "universal",
       "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
       "integration": "semantic-universal-workspace-routing-and-shared-locale"

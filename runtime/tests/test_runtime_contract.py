@@ -460,6 +460,30 @@ class SystemdContractTests(unittest.TestCase):
             dockerfile.index("COPY . /opt/dronedream/source"),
         )
 
+    def test_runtime_seeds_a_verified_bootable_engine_pack_before_enabling_services(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        build_script = (RUNTIME / "build-rootfs.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            'source_date_epoch=$(git -C "$root" show -s --format=%ct "$source_commit")',
+            build_script,
+        )
+        self.assertIn('--build-arg "DRONEDREAM_SOURCE_DATE_EPOCH=$source_date_epoch"', build_script)
+        self.assertIn("ARG DRONEDREAM_SOURCE_DATE_EPOCH", dockerfile)
+        self.assertIn("/opt/dronedream/source/engine-pack/tools/engine_pack.py", dockerfile)
+        self.assertIn("/usr/lib/dronedream/engine-pack-manager.py", dockerfile)
+        self.assertIn("--no-services", dockerfile)
+        for required in (
+            "test -L /opt/dronedream/engine/current",
+            "test -s /opt/dronedream/engine/current/engine-pack-manifest.json",
+            "test -d /opt/dronedream/engine/current/backend/app",
+            "test -d /opt/dronedream/engine/current/worker/drone_dream_worker",
+        ):
+            self.assertIn(required, dockerfile)
+        self.assertLess(
+            dockerfile.index("test -L /opt/dronedream/engine/current"),
+            dockerfile.index("systemctl enable dronedream-runtime-init.service"),
+        )
+
     def test_runtime_diagnostic_tools_are_packaged_and_verified(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
         self.assertRegex(dockerfile, r"\biproute2\b")
