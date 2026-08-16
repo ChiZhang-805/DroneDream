@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AutonomyCompileRequest } from "../../types/api";
+import { loadAutonomyAssetLibrary } from "./assetLibraryStore";
 import { createLocalAutonomyPreview } from "./missionAutonomy";
 import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "./workspaceStore";
 import {
@@ -38,6 +39,56 @@ describe("autonomy mission harness", () => {
     expect(migrated.mapPack.status).toBe("draft");
     expect(migrated.mapPack.qualificationReceiptId).toBeNull();
     expect(migrated.mapPack.contentHash).toBeNull();
+  });
+
+  it("preserves a real imported map that happens to share the retired placeholder name", () => {
+    const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    workspace.mapPack = {
+      ...workspace.mapPack,
+      id: "map-user-import",
+      version: 3,
+      name: "5 environment",
+      status: "assets-admitted",
+      compilerSceneId: null,
+      calibrated: false,
+      confidencePercent: 0,
+      sourceFiles: [{
+        name: "campus.glb",
+        bytes: 1024,
+        format: "glb",
+        importedAt: "2026-08-15T00:00:00.000Z",
+        sha256: "a".repeat(64),
+        receiptId: "receipt-user-import",
+        admission: "admitted",
+        parser: "gltf",
+        layers: ["mesh"],
+      }],
+    };
+
+    const normalized = normalizeAutonomyWorkspace(workspace);
+
+    expect(normalized.mapPack.id).toBe("map-user-import");
+    expect(normalized.mapPack.name).toBe("5 environment");
+    expect(normalized.mapPack.sourceFiles).toHaveLength(1);
+  });
+
+  it("restores public assets when the persisted asset library is malformed", () => {
+    const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    workspace.aircraft = { ...workspace.aircraft, id: "aircraft-custom", name: "Custom aircraft" };
+    workspace.mapPack = { ...workspace.mapPack, id: "map-custom", name: "Custom map" };
+
+    const library = loadAutonomyAssetLibrary("local", "universal", workspace, {
+      getItem: () => "{malformed-json",
+    });
+
+    expect(library.aircraft.map((aircraft) => aircraft.id)).toEqual([
+      "aircraft-custom",
+      "aircraft-my-drone",
+    ]);
+    expect(library.maps.map((mapPack) => mapPack.id)).toEqual([
+      "map-custom",
+      "map-school",
+    ]);
   });
 
   it("publishes My Drone sensor mounts in the Vehicle Pack body frame", () => {

@@ -658,6 +658,11 @@ export function AutonomyOverview() {
       { title: "Unknown environment", body: "Use only the start and goal, build a local map in flight, plan a safe route, and replan as the world changes." },
     ],
   };
+  const publicWorkspace = defaultAutonomyWorkspace();
+  const publicAircraft = assetLibrary.aircraft.find((aircraft) => aircraft.id === publicWorkspace.aircraft.id)
+    ?? publicWorkspace.aircraft;
+  const publicMap = assetLibrary.maps.find((mapPack) => mapPack.id === publicWorkspace.mapPack.id)
+    ?? publicWorkspace.mapPack;
   const appendTranscript = useCallback((transcript: string) => {
     setComposer((current) => {
       const next = current.trim() ? `${current.trim()} ${transcript}` : transcript;
@@ -1024,7 +1029,7 @@ export function AutonomyOverview() {
                   <strong className="assistant-task-popover-title">{copy.context}</strong>
                   <section className="autonomy-context-group" aria-label={copy.aircraft}>
                     <header><span><Navigation2 aria-hidden="true" />{copy.aircraft}</span><Link to="/autonomy/aircraft" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {assetLibrary.aircraft.map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
+                    {[publicAircraft].map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
                       <input type="radio" name="autonomy-aircraft" value={aircraft.id} checked={aircraft.id === workspace.aircraft.id} onChange={() => selectAircraft(aircraft.id)} />
                       <span><b>{aircraft.name}</b><small>{aircraft.airframe} · RGB-D · VIO</small></span>
                       {aircraft.id === workspace.aircraft.id ? <em>{copy.selected}</em> : null}
@@ -1032,7 +1037,7 @@ export function AutonomyOverview() {
                   </section>
                   <section className="autonomy-context-group" aria-label={copy.map}>
                     <header><span><Layers3 aria-hidden="true" />{copy.map}</span><Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {assetLibrary.maps.map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
+                    {[publicMap].map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
                       <input type="radio" name="autonomy-map" value={mapPack.id} checked={mapPack.id === workspace.mapPack.id} onChange={() => selectMap(mapPack.id)} />
                       <span><b>{mapPack.name}</b><small>{mapPack.representation} · {mapPack.coordinateFrame}</small></span>
                       {mapPack.id === workspace.mapPack.id ? <em>{copy.selected}</em> : null}
