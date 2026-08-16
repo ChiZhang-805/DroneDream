@@ -129,6 +129,8 @@ jobs:
       - name: Verify backend
         shell: pwsh
         working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           python -m ruff check app tests
