@@ -11800,7 +11800,7 @@ a {
   height: 0.86rem;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-course-panel {
+.app-shell .settings-course-panel {
   color: #241a26;
   background: linear-gradient(135deg, #fff, color-mix(in srgb, var(--dd-brand-light-surface) 82%, #fff));
 }
@@ -16263,201 +16263,201 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
   }
 }
 
-/* The settings surface is shared with the dark first-run launcher. Keep the
-   launcher's cinematic treatment, but present it as a light workspace dialog
-   once the user is inside the operational application. */
-.app-shell:not(.app-shell-launcher) .launcher-settings-backdrop {
+/* Settings is one product surface across the browser console, the first-run
+   launcher, and the signed desktop application. Edition tokens provide the
+   accent; the opaque workspace palette keeps content readable over 3D scenes. */
+.app-shell .launcher-settings-backdrop {
   z-index: 900;
   background: rgba(31, 18, 35, 0.42);
   backdrop-filter: blur(5px);
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-settings-dialog {
+.app-shell .launcher-settings-dialog {
   color-scheme: light;
   background: #ffffff;
   border-color: #dbc9df;
-  color: var(--text);
+  color: #251b28;
   box-shadow: 0 28px 80px rgba(41, 24, 47, 0.24);
   scrollbar-color: #c99bcf #f2ebf4;
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-settings-close {
+.app-shell .launcher-settings-close {
   background: #f7f0f8;
   border-color: #dbc9df;
   color: #5d4d62;
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-settings-close:hover,
-.app-shell:not(.app-shell-launcher) .launcher-settings-close:focus-visible {
+.app-shell .launcher-settings-close:hover,
+.app-shell .launcher-settings-close:focus-visible {
   background: #f1e3f2;
   border-color: #d267c7;
   color: #8b328f;
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-language-options button {
+.app-shell .launcher-language-options button {
   background: #ffffff;
   border-color: #dfd1e2;
-  color: var(--text);
+  color: #251b28;
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-language-options button:hover,
-.app-shell:not(.app-shell-launcher) .launcher-language-options button:focus-visible {
+.app-shell .launcher-language-options button:hover,
+.app-shell .launcher-language-options button:focus-visible {
   background: #fcf6fc;
   border-color: #d267c7;
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-language-options button.selected {
+.app-shell .launcher-language-options button.selected {
   background: #fbecf8;
   border-color: #d267c7;
   color: #77297c;
   box-shadow: 0 10px 26px rgba(174, 65, 172, 0.09);
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-language-options button.selected i {
+.app-shell .launcher-language-options button.selected i {
   color: #b936aa;
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-language-icon {
+.app-shell .launcher-language-icon {
   background: #edf9fc;
   color: #1988a2;
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-language-icon-east {
+.app-shell .launcher-language-icon-east {
   background: #f8eaf8;
   color: #a637a2;
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-language-icon .launcher-language-region {
+.app-shell .launcher-language-icon .launcher-language-region {
   stroke: #ffffff;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-panel {
+.app-shell .settings-model-panel {
   border-top-color: var(--border);
 }
 
 /* These two model surfaces intentionally remain dark inside the otherwise
    light workspace dialog. Give only those surfaces their matching foreground
    palette so headings elsewhere in the dialog stay dark on white. */
-.app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
-.app-shell:not(.app-shell-launcher) .settings-model-usage {
+.app-shell .settings-model-access-mode > button,
+.app-shell .settings-model-usage {
   color: var(--text);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-access-mode > button span,
-.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-managed-model-row label > span,
-.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-managed-model-row p,
-.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-plan-row span,
-.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-quota-heading span,
-.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-usage-grid span,
-.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-period,
-.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-security-note {
+.app-shell .settings-model-access-mode > button span,
+.app-shell .settings-model-usage .settings-managed-model-row label > span,
+.app-shell .settings-model-usage .settings-managed-model-row p,
+.app-shell .settings-model-usage .settings-model-plan-row span,
+.app-shell .settings-model-usage .settings-model-quota-heading span,
+.app-shell .settings-model-usage .settings-model-usage-grid span,
+.app-shell .settings-model-usage .settings-model-period,
+.app-shell .settings-model-usage .settings-model-security-note {
   color: var(--text-muted);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-security-note {
+.app-shell .settings-model-security-note {
   color: var(--text-muted);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-heading > span {
+.app-shell .settings-model-heading > span {
   border-color: #e7c98d;
   color: #8b6118;
   background: #fff8e9;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-heading > span.configured {
+.app-shell .settings-model-heading > span.configured {
   border-color: #a8dfcb;
   color: #117653;
   background: #effaf6;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-grid label > span {
+.app-shell .settings-model-grid label > span {
   color: var(--text-dim);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-profile-row label > span {
+.app-shell .settings-model-profile-row label > span {
   color: var(--text-dim);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-profile-row select {
+.app-shell .settings-model-profile-row select {
   border-color: var(--border-strong);
   color: var(--text);
   background: #ffffff;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-profile-row select:focus {
+.app-shell .settings-model-profile-row select:focus {
   border-color: var(--primary);
   box-shadow: var(--focus-ring);
   outline: none;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-grid input,
-.app-shell:not(.app-shell-launcher) .settings-model-grid select {
+.app-shell .settings-model-grid input,
+.app-shell .settings-model-grid select {
   border-color: var(--border-strong);
   color: var(--text);
   background: #ffffff;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-grid input:focus,
-.app-shell:not(.app-shell-launcher) .settings-model-grid select:focus {
+.app-shell .settings-model-grid input:focus,
+.app-shell .settings-model-grid select:focus {
   border-color: var(--primary);
   box-shadow: var(--focus-ring);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-panel {
+.app-shell .settings-runtime-panel {
   border-top-color: var(--border);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status {
+.app-shell .settings-runtime-status {
   background: #ffffff;
   border-color: var(--border);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status small {
+.app-shell .settings-runtime-status small {
   color: var(--text-muted);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status-healthy {
+.app-shell .settings-runtime-status-healthy {
   background: #effaf6;
   border-color: #a8dfcb;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status-healthy .settings-runtime-status-icon {
+.app-shell .settings-runtime-status-healthy .settings-runtime-status-icon {
   background: #d8f4e9;
   color: #167052;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status-warning {
+.app-shell .settings-runtime-status-warning {
   background: #fff9eb;
   border-color: #ead39e;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status-warning .settings-runtime-status-icon {
+.app-shell .settings-runtime-status-warning .settings-runtime-status-icon {
   background: #fff0c5;
   color: #8a5a00;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status-error {
+.app-shell .settings-runtime-status-error {
   background: #fff1f5;
   border-color: #efb1c4;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status-error .settings-runtime-status-icon {
+.app-shell .settings-runtime-status-error .settings-runtime-status-icon {
   background: #ffe0e9;
   color: #b92755;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-status-checking .settings-runtime-status-icon {
+.app-shell .settings-runtime-status-checking .settings-runtime-status-icon {
   background: #edf9fc;
   color: #1988a2;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-details {
+.app-shell .settings-runtime-details {
   background: #faf7fb;
   border-color: var(--border);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-runtime-details summary,
-.app-shell:not(.app-shell-launcher) .settings-runtime-details-scroll ul {
+.app-shell .settings-runtime-details summary,
+.app-shell .settings-runtime-details-scroll ul {
   color: var(--text-muted);
 }
 
@@ -20016,13 +20016,13 @@ body {
   --active: var(--dd-brand-start);
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-settings-tabs button {
+.app-shell .launcher-settings-tabs button {
   color: #4e4352;
   border-color: color-mix(in srgb, var(--dd-brand-middle) 24%, #d9cddd);
   background: color-mix(in srgb, var(--dd-brand-light-surface) 82%, #e5dfe7);
 }
 
-.app-shell:not(.app-shell-launcher) .launcher-settings-tabs button[aria-selected="true"] {
+.app-shell .launcher-settings-tabs button[aria-selected="true"] {
   color: #211722;
   border-color: color-mix(in srgb, var(--dd-brand-middle) 68%, #c9b9cd);
   background: linear-gradient(
@@ -20032,8 +20032,8 @@ body {
   );
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
-.app-shell:not(.app-shell-launcher) .settings-model-usage {
+.app-shell .settings-model-access-mode > button,
+.app-shell .settings-model-usage {
   border-color: color-mix(in srgb, var(--dd-brand-middle) 30%, #d9cddd);
   background: linear-gradient(
     145deg,
@@ -20042,7 +20042,7 @@ body {
   );
 }
 
-.app-shell:not(.app-shell-launcher) .settings-model-access-mode > button.selected {
+.app-shell .settings-model-access-mode > button.selected {
   border-color: color-mix(in srgb, var(--dd-brand-start) 60%, #d9cddd);
   background: linear-gradient(
     145deg,
@@ -20051,10 +20051,10 @@ body {
   );
 }
 
-.app-shell:not(.app-shell-launcher) .settings-general-card,
-.app-shell:not(.app-shell-launcher) .settings-memory-switches,
-.app-shell:not(.app-shell-launcher) .settings-memory-grid,
-.app-shell:not(.app-shell-launcher) .settings-model-reset-row {
+.app-shell .settings-general-card,
+.app-shell .settings-memory-switches,
+.app-shell .settings-memory-grid,
+.app-shell .settings-model-reset-row {
   border-color: color-mix(in srgb, var(--dd-brand-middle) 26%, #d9cddd);
   color: #251b28;
   background: linear-gradient(
@@ -20064,27 +20064,171 @@ body {
   );
 }
 
-.app-shell:not(.app-shell-launcher) .settings-general-card .settings-toggle-row,
-.app-shell:not(.app-shell-launcher) .settings-memory-grid input,
-.app-shell:not(.app-shell-launcher) .settings-memory-grid select,
-.app-shell:not(.app-shell-launcher) .settings-model-reset-row select {
+.app-shell .settings-general-card .settings-toggle-row,
+.app-shell .settings-memory-grid input,
+.app-shell .settings-memory-grid select,
+.app-shell .settings-model-reset-row select {
   color: #2c2130;
   background: rgba(255, 255, 255, 0.72);
 }
 
-.app-shell:not(.app-shell-launcher) .settings-memory-scope-grid .settings-toggle-row,
-.app-shell:not(.app-shell-launcher) .settings-memory-scope-grid .settings-toggle-row > span,
-.app-shell:not(.app-shell-launcher) .settings-memory-scope-grid .settings-toggle-row > span > span {
+.app-shell .settings-memory-scope-grid .settings-toggle-row,
+.app-shell .settings-memory-scope-grid .settings-toggle-row > span,
+.app-shell .settings-memory-scope-grid .settings-toggle-row > span > span {
   background: transparent;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-memory-grid label > span {
+.app-shell .settings-memory-grid label > span {
   color: #67596d;
 }
 
-.app-shell:not(.app-shell-launcher) .settings-memory-grid input,
-.app-shell:not(.app-shell-launcher) .settings-memory-grid select {
+.app-shell .settings-memory-grid input,
+.app-shell .settings-memory-grid select {
   border-color: #ded1e2;
+}
+
+/* FIELD uses the same Settings information architecture as the web console,
+   with an edition-specific warm palette instead of the shared purple shell. */
+.launcher-settings-dialog[data-brand-edition="field"] {
+  --accent: #c95727;
+  --active: #ff8c42;
+  color: #3a2117;
+  border-color: #e99b5b;
+  background: linear-gradient(150deg, #fffaf3 0%, #fff3e5 54%, #ffead6 100%);
+  box-shadow: 0 28px 84px rgba(73, 31, 16, 0.34);
+  scrollbar-color: #d98b55 #fff1e2;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-settings-close {
+  color: #75412d;
+  border-color: #e8b58e;
+  background: #fff4e8;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-settings-close:hover,
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-settings-close:focus-visible {
+  color: #512416;
+  border-color: #d96b31;
+  background: #ffe3ca;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-settings-tabs button {
+  color: #724532;
+  border-color: #e9b994;
+  background: #fff6ed;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-settings-tabs button[aria-selected="true"] {
+  color: #422013;
+  border-color: #e76f32;
+  background: linear-gradient(125deg, #ffd39e, #ff9b59);
+  box-shadow: 0 8px 20px rgba(177, 74, 31, 0.16);
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-settings-tabs button:disabled,
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-settings-tabs button[aria-disabled="true"] {
+  color: #aa8b7e;
+  border-color: #ead8ca;
+  background: #f8eee6;
+  opacity: 0.62;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-general-card,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-memory-switches,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-memory-grid,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-model-reset-row,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-course-panel,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-course-editions article,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-runtime-details {
+  color: #3a2117;
+  border-color: #edbf99;
+  background: linear-gradient(145deg, #fffdf9, #fff2e4);
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-toggle-row,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-general-card .settings-toggle-row {
+  color: #47291d;
+  background: #fff8f1;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-toggle-row i {
+  background: #d8c1b2;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-toggle-row input:checked + i {
+  background: linear-gradient(125deg, #ffbd62, #f16838);
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-language-options button {
+  color: #44271c;
+  border-color: #ecc3a3;
+  background: #fffaf5;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-language-options button:hover,
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-language-options button:focus-visible {
+  color: #3f2116;
+  border-color: #dc7a3e;
+  background: #ffecda;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-language-options button.selected {
+  color: #4a2517;
+  border-color: #e36d31;
+  background: linear-gradient(135deg, #ffe3bd, #ffc083);
+  box-shadow: 0 8px 22px rgba(181, 75, 29, 0.13);
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-language-options button.selected i {
+  color: #a9431f;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-language-icon {
+  color: #137a71;
+  background: #e7f6f2;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .launcher-language-icon-east {
+  color: #b55426;
+  background: #ffead8;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-interface-card .settings-appearance-options button {
+  color: #40251b;
+  border-color: #ebc5a8;
+  background: #fff8f0;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-interface-card .settings-appearance-options button.selected {
+  color: #fff8f1;
+  border-color: #9b4024;
+  background: linear-gradient(135deg, #9c472d, #6f2e20);
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-interface-card .settings-appearance-options button.selected i {
+  color: #ffd064;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-memory-grid input,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-memory-grid select,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-model-reset-row select {
+  color: #3c241a;
+  border-color: #e5b995;
+  background: #fffdf9;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-memory-grid label > span,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-course-overview p,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-course-editions p,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-runtime-details summary,
+.launcher-settings-dialog[data-brand-edition="field"] .settings-runtime-details-scroll ul {
+  color: #76584b;
+}
+
+.launcher-settings-dialog[data-brand-edition="field"] .settings-runtime-status {
+  color: #3b241a;
+  border-color: #e8bd9b;
+  background: #fffaf4;
 }
 
 .launcher-settings-dialog input:focus,

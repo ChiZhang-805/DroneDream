@@ -29,7 +29,7 @@ function FieldSettingsFixture({ onClose = () => undefined }: { onClose?: () => v
         onTabChange={setActiveTab}
         tabs={tabs}
         title="Settings"
-        consumerProfile="field-lightweight"
+        consumerProfile="field"
       >
         {tabs.map((tab) => (
           <EditionSettingsPanel key={tab.id} active={activeTab === tab.id} id={tab.id}>
@@ -47,7 +47,7 @@ describe("EditionSettingsSurface", () => {
     const { container } = render(<FieldSettingsFixture onClose={onClose} />);
     const dialog = screen.getByRole("dialog", { name: "Settings" });
 
-    expect(dialog).toHaveAttribute("data-settings-consumer", "field-lightweight");
+    expect(dialog).toHaveAttribute("data-settings-consumer", "field");
     expect(dialog).toHaveAttribute("data-brand-edition", "field");
     expect(dialog).toHaveAttribute("data-presentation-only", "true");
     expect(dialog).toHaveAttribute("data-grants-hardware-authority", "false");
@@ -92,7 +92,7 @@ describe("EditionSettingsSurface", () => {
     );
 
     expect(screen.getAllByRole("tab")).toHaveLength(5);
-    expect(screen.getByRole("tab", { name: "Models" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Model" })).toBeDisabled();
     expect(screen.getByRole("tab", { name: "General" })).toBeEnabled();
     expect(screen.getByRole("tab", { name: "Memory" })).toBeEnabled();
     expect(screen.getByRole("tab", { name: "ECE498BH" })).toBeEnabled();

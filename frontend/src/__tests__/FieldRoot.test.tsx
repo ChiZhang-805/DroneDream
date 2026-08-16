@@ -98,8 +98,8 @@ describe("FieldRoot", () => {
     expect(container).not.toHaveTextContent(/PX4|Gazebo|SITL|HITL/i);
 
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
-    expect(screen.getByRole("dialog", { name: "Field settings" }))
-      .toHaveAttribute("data-settings-consumer", "field-lightweight");
+    expect(screen.getByRole("dialog", { name: "Settings" }))
+      .toHaveAttribute("data-settings-consumer", "field");
   });
 
   it("keeps language inside settings and enters the localized Field workspace after auth", async () => {
@@ -112,7 +112,7 @@ describe("FieldRoot", () => {
     expect(screen.queryByRole("button", { name: "Switch to Simplified Chinese" }))
       .not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
-    fireEvent.click(screen.getByRole("button", { name: "Simplified Chinese" }));
+    fireEvent.click(screen.getByRole("button", { name: "简体中文" }));
     fireEvent.click(screen.getByRole("button", { name: "关闭设置" }));
     await finishLoading();
 

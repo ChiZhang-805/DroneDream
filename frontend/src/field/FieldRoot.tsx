@@ -69,7 +69,7 @@ function FieldLaunchScreen({
   };
   return (
     <div
-      className="app-shell-launcher field-launcher"
+      className="app-shell app-shell-launcher field-launcher"
       data-authority="false"
       data-launch-ready={ready ? "true" : "false"}
     >

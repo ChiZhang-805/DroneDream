@@ -1,62 +1,204 @@
-import { Check, ExternalLink, Languages, ShieldCheck } from "lucide-react";
-import { useState, type RefObject } from "react";
+import {
+  ArrowRight,
+  Bell,
+  BrainCircuit,
+  GraduationCap,
+  MapPinned,
+  MonitorCog,
+  Moon,
+  Plane,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Sun,
+  Workflow,
+} from "lucide-react";
+import { useRef, useState, type RefObject } from "react";
 
+import { BrandLockup } from "../components/BrandLockup";
 import {
   EditionSettingsPanel,
   EditionSettingsSurface,
   type SettingsSurfaceTab,
   type SettingsSurfaceTabId,
 } from "../components/EditionSettingsSurface";
+import {
+  SETTINGS_LOCALES,
+  SettingsLanguageRegionIcon,
+  SettingsToggle,
+} from "../components/SettingsPrimitives";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
+import type { InterfaceLocale } from "../i18n/I18nProvider";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type { FieldLocale } from "./catalog";
 
 const ECE498BH_COURSE_URL =
   "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
 
+type NotificationPreferenceKey =
+  | "master"
+  | "experiment"
+  | "assistant"
+  | "updates"
+  | "approval"
+  | "allowance"
+  | "security"
+  | "runtime";
+type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
+type MemoryScopeKey =
+  | "chat"
+  | "experiment"
+  | "vehicle"
+  | "constraints"
+  | "safety"
+  | "workflow"
+  | "reports";
+
+const DEFAULT_NOTIFICATIONS: NotificationPreferences = {
+  master: true,
+  experiment: true,
+  assistant: true,
+  updates: false,
+  approval: true,
+  allowance: true,
+  security: true,
+  runtime: true,
+};
+
+const DEFAULT_MEMORY_SCOPES: Record<MemoryScopeKey, boolean> = {
+  chat: true,
+  experiment: true,
+  vehicle: true,
+  constraints: true,
+  safety: true,
+  workflow: true,
+  reports: true,
+};
+
 const COPY = {
   en: {
-    title: "Field settings",
+    title: "Settings",
     close: "Close settings",
-    general: "General",
+    tabs: ["General", "Memory", "Model", "Safety"] as const,
+    language: "Language",
+    interface: "Interface",
+    notifications: "Notifications",
+    appearance: ["Dark", "Light", "System", "Customize"] as const,
+    notificationLabels: [
+      "Allow notifications",
+      "Experiment and task completed",
+      "AI response completed",
+      "Product updates",
+      "Approval required",
+      "Allowance or card expiring",
+      "Security and sign-in",
+      "Device or runtime status",
+    ] as const,
     memory: "Memory",
-    model: "Models",
-    safety: "Safety",
-    course: "ECE498BH",
+    memoryState: ["Memory off", "Memory on"] as const,
+    crossSession: "Cross-session memory",
+    scopes: [
+      "Chat preferences",
+      "Experiment defaults",
+      "Device and vehicle",
+      "Metrics and constraints",
+      "Safety and approvals",
+      "Workflow and tools",
+      "Reports and delivery",
+    ] as const,
+    defaults: [
+      "Default vehicle",
+      "Default map",
+      "Default safety profile",
+      "Default units",
+      "Default report format",
+    ] as const,
+    courseOverview:
+      "The course connects model reasoning, controls, and aerospace engineering tools with reviewable UAV workflows.",
     openCourse: "Open course",
-    language: "Interface language",
-    english: "English",
-    chinese: "Simplified Chinese",
-    profile: "Execution profile",
-    profileValue: "field-lightweight",
-    packs: "Validated Vehicle Packs",
+    courseActions: ["Read manual", "Explore product"] as const,
+    safetyTitle: "Field safety boundary",
+    executionProfile: "Execution profile",
+    vehiclePacks: "Validated Vehicle Packs",
     quorum: "Three-layer quorum",
     authority: "Hardware authority",
     missing: "Missing",
     denied: "Denied",
-    missionMemory: "Mission memory",
-    modelAccount: "Model account",
   },
   "zh-CN": {
-    title: "Field 设置",
+    title: "设置",
     close: "关闭设置",
-    general: "常规",
+    tabs: ["常规", "记忆", "模型", "安全"] as const,
+    language: "语言",
+    interface: "界面",
+    notifications: "通知",
+    appearance: ["深色", "浅色", "跟随系统", "自定义"] as const,
+    notificationLabels: [
+      "允许通知",
+      "实验与任务完成",
+      "AI 回复完成",
+      "产品更新",
+      "需要审批",
+      "额度或重置卡即将到期",
+      "安全与登录提醒",
+      "设备或运行环境状态",
+    ] as const,
     memory: "记忆",
-    model: "模型",
-    safety: "安全",
-    language: "界面语言",
-    english: "English",
-    chinese: "简体中文",
-    profile: "执行配置",
-    profileValue: "field-lightweight",
-    packs: "已验证机型包",
+    memoryState: ["记忆已关闭", "记忆已开启"] as const,
+    crossSession: "跨会话记忆",
+    scopes: [
+      "对话偏好",
+      "实验默认值",
+      "设备与机型",
+      "指标与约束",
+      "安全与审批",
+      "工作流与工具",
+      "报告与交付",
+    ] as const,
+    defaults: ["默认机型", "默认地图", "默认安全配置", "默认单位制", "默认报告格式"] as const,
+    courseOverview: "课程把模型推理、控制与航空航天工程工具连接为可复核的无人机工作流。",
+    openCourse: "打开课程",
+    courseActions: ["阅读说明书", "查看产品"] as const,
+    safetyTitle: "现场安全边界",
+    executionProfile: "执行配置",
+    vehiclePacks: "已验证机型包",
     quorum: "三层仲裁",
     authority: "硬件权限",
     missing: "缺失",
     denied: "拒绝",
-    missionMemory: "任务记忆",
-    modelAccount: "模型账户",
   },
 } as const;
+
+const MEMORY_SCOPE_ICONS = [
+  BrainCircuit,
+  Sparkles,
+  Plane,
+  SlidersHorizontal,
+  ShieldCheck,
+  Workflow,
+  MapPinned,
+] as const;
+
+function readJson<T extends Record<string, boolean>>(key: string, fallback: T): T {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value ? { ...fallback, ...JSON.parse(value) as Partial<T> } : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readInterfaceLocale(fallback: FieldLocale): InterfaceLocale {
+  try {
+    const value = window.localStorage.getItem("drone-dream:locale");
+    if (SETTINGS_LOCALES.some((locale) => locale.id === value)) {
+      return value as InterfaceLocale;
+    }
+  } catch {
+    // The first-run settings remain usable when persistence is unavailable.
+  }
+  return fallback;
+}
 
 export function FieldSettingsDialog({
   closeRef,
@@ -70,7 +212,12 @@ export function FieldSettingsDialog({
   onLocaleChange: (locale: FieldLocale) => void;
 }) {
   const [activeTab, setActiveTab] = useState<SettingsSurfaceTabId>("general");
-  const { account } = useAuthOrLocal();
+  const [interfaceLocale, setInterfaceLocale] = useState<InterfaceLocale>(() =>
+    readInterfaceLocale(locale)
+  );
+  const [notifications, setNotifications] = useState<NotificationPreferences>(() =>
+    readJson("dd.notification-preferences.v1", DEFAULT_NOTIFICATIONS)
+  );
   const [memoryEnabled, setMemoryEnabled] = useState(() => {
     try {
       return window.localStorage.getItem("dd.field.memory.enabled") !== "false";
@@ -78,16 +225,67 @@ export function FieldSettingsDialog({
       return true;
     }
   });
-  const copy = COPY[locale];
-  const courseLabel = locale === "zh-CN" ? "\u6253\u5f00\u8bfe\u7a0b" : "Open course";
-  const courseBody = locale === "zh-CN" ? "\u5de5\u7a0b\u63a8\u7406\u8bfe\u7a0b\u8d44\u6e90" : "Engineering reasoning course resources";
+  const [memoryScopes, setMemoryScopes] = useState(() =>
+    readJson("dd.field.memory.scopes", DEFAULT_MEMORY_SCOPES)
+  );
+  const customColorInputRef = useRef<HTMLInputElement>(null);
+  const { account } = useAuthOrLocal();
+  const editionTheme = useEditionTheme();
+  const copy = COPY[interfaceLocale === "zh-CN" ? "zh-CN" : "en"];
   const tabs: readonly SettingsSurfaceTab[] = [
-    { id: "general", label: copy.general },
-    { id: "memory", label: copy.memory },
-    { id: "model", label: copy.model, disabled: !account },
+    { id: "general", label: copy.tabs[0] },
+    { id: "memory", label: copy.tabs[1] },
+    { id: "model", label: copy.tabs[2], disabled: !account },
     { id: "course", label: "ECE498BH" },
-    { id: "runtime", label: copy.safety },
+    { id: "runtime", label: copy.tabs[3] },
   ];
+
+  const selectLocale = (next: InterfaceLocale) => {
+    setInterfaceLocale(next);
+    try {
+      window.localStorage.setItem("drone-dream:locale", next);
+    } catch {
+      // Keep the language selection for this session when storage is unavailable.
+    }
+    onLocaleChange(next === "zh-CN" ? "zh-CN" : "en");
+  };
+
+  const updateNotification = (key: NotificationPreferenceKey, checked: boolean) => {
+    setNotifications((current) => {
+      const next = key === "master"
+        ? Object.fromEntries(
+            Object.keys(current).map((preference) => [preference, checked]),
+          ) as NotificationPreferences
+        : { ...current, [key]: checked };
+      try {
+        window.localStorage.setItem("dd.notification-preferences.v1", JSON.stringify(next));
+      } catch {
+        // The current session still reflects the user's selection.
+      }
+      return next;
+    });
+  };
+
+  const updateMemoryEnabled = (enabled: boolean) => {
+    setMemoryEnabled(enabled);
+    try {
+      window.localStorage.setItem("dd.field.memory.enabled", String(enabled));
+    } catch {
+      // The current session still reflects the user's selection.
+    }
+  };
+
+  const updateMemoryScope = (key: MemoryScopeKey, enabled: boolean) => {
+    setMemoryScopes((current) => {
+      const next = { ...current, [key]: enabled };
+      try {
+        window.localStorage.setItem("dd.field.memory.scopes", JSON.stringify(next));
+      } catch {
+        // The current session still reflects the user's selection.
+      }
+      return next;
+    });
+  };
 
   return (
     <EditionSettingsSurface
@@ -99,70 +297,178 @@ export function FieldSettingsDialog({
       onTabChange={setActiveTab}
       tabs={tabs}
       title={copy.title}
-      consumerProfile="field-lightweight"
+      consumerProfile="field"
     >
       <EditionSettingsPanel active={activeTab === "general"} id="general">
-        <fieldset className="field-settings-languages" aria-label={copy.language}>
-          {([
-            ["en", copy.english],
-            ["zh-CN", copy.chinese],
-          ] as const).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={locale === id ? "selected" : undefined}
-              aria-pressed={locale === id}
-              onClick={() => onLocaleChange(id)}
-            >
-              <Languages aria-hidden="true" />
-              <span>{label}</span>
-              {locale === id ? <Check aria-hidden="true" /> : null}
-            </button>
-          ))}
-        </fieldset>
-      </EditionSettingsPanel>
-      <EditionSettingsPanel active={activeTab === "memory"} id="memory">
-        <div className="field-settings-memory">
-          <label>
-            <span>{copy.missionMemory}</span>
+        <section className="settings-general-panel">
+          <div className="settings-general-card settings-language-card">
+            <div className="settings-card-heading">
+              <span><SettingsLanguageRegionIcon region="west" />{copy.language}</span>
+            </div>
+            <fieldset className="launcher-language-options" aria-label={copy.language}>
+              {SETTINGS_LOCALES.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={interfaceLocale === option.id ? "selected" : undefined}
+                  aria-label={option.label}
+                  aria-pressed={interfaceLocale === option.id}
+                  onClick={() => selectLocale(option.id)}
+                >
+                  <SettingsLanguageRegionIcon region={option.region} />
+                  <strong>{option.label}</strong>
+                  <i aria-hidden="true">✓</i>
+                </button>
+              ))}
+            </fieldset>
+          </div>
+          <div className="settings-general-card settings-interface-card">
+            <div className="settings-card-heading">
+              <span><SlidersHorizontal aria-hidden="true" />{copy.interface}</span>
+            </div>
+            <div className="settings-appearance-options" role="group" aria-label={copy.interface}>
+              {([
+                ["dark", Moon],
+                ["light", Sun],
+                ["system", MonitorCog],
+                ["custom", Sparkles],
+              ] as const).map(([appearance, Icon], index) => (
+                <button
+                  key={appearance}
+                  type="button"
+                  className={editionTheme.appearancePreference === appearance ? "selected" : undefined}
+                  aria-pressed={editionTheme.appearancePreference === appearance}
+                  onClick={() => {
+                    editionTheme.setAppearance(appearance);
+                    if (appearance === "custom") {
+                      window.requestAnimationFrame(() => customColorInputRef.current?.click());
+                    }
+                  }}
+                >
+                  <Icon aria-hidden="true" />
+                  <strong>{copy.appearance[index]}</strong>
+                  <i aria-hidden="true">✓</i>
+                </button>
+              ))}
+            </div>
             <input
-              type="checkbox"
-              checked={memoryEnabled}
-              onChange={(event) => {
-                const enabled = event.target.checked;
-                setMemoryEnabled(enabled);
-                try {
-                  window.localStorage.setItem("dd.field.memory.enabled", String(enabled));
-                } catch {
-                  // Storage is optional; the setting remains valid for this session.
-                }
-              }}
+              ref={customColorInputRef}
+              className="settings-custom-color-input"
+              type="color"
+              tabIndex={-1}
+              aria-label={copy.appearance[3]}
+              value={editionTheme.customAccent}
+              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
             />
-          </label>
-        </div>
+          </div>
+          <div className="settings-general-card settings-notification-card">
+            <div className="settings-card-heading">
+              <span><Bell aria-hidden="true" />{copy.notifications}</span>
+            </div>
+            {(Object.keys(DEFAULT_NOTIFICATIONS) as NotificationPreferenceKey[]).map((key, index) => (
+              <SettingsToggle
+                key={key}
+                checked={notifications[key]}
+                disabled={key !== "master" && !notifications.master}
+                label={copy.notificationLabels[index]}
+                onChange={(checked) => updateNotification(key, checked)}
+              />
+            ))}
+          </div>
+        </section>
       </EditionSettingsPanel>
+
+      <EditionSettingsPanel active={activeTab === "memory"} id="memory">
+        <section className="settings-memory-panel" aria-labelledby="field-settings-memory-title">
+          <div className="settings-memory-heading">
+            <h3 id="field-settings-memory-title">{copy.memory}</h3>
+            <span className={memoryEnabled ? "configured" : undefined}>
+              {copy.memoryState[memoryEnabled ? 1 : 0]}
+            </span>
+          </div>
+          <div className="settings-memory-body">
+            <div className="settings-memory-switches">
+              <SettingsToggle
+                checked={memoryEnabled}
+                className="settings-memory-master-toggle"
+                label={<><BrainCircuit aria-hidden="true" />{copy.crossSession}</>}
+                onChange={updateMemoryEnabled}
+              />
+              <div className="settings-memory-scope-grid">
+                {(Object.keys(DEFAULT_MEMORY_SCOPES) as MemoryScopeKey[]).map((key, index) => {
+                  const Icon = MEMORY_SCOPE_ICONS[index];
+                  return (
+                    <SettingsToggle
+                      key={key}
+                      checked={memoryScopes[key]}
+                      disabled={!memoryEnabled}
+                      label={<><Icon aria-hidden="true" /><span>{copy.scopes[index]}</span></>}
+                      onChange={(checked) => updateMemoryScope(key, checked)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            <div className="settings-memory-defaults">
+              <div className="settings-memory-grid">
+                <label><span>{copy.defaults[0]}</span><input value="My Drone" readOnly disabled={!memoryEnabled} /></label>
+                <label><span>{copy.defaults[1]}</span><input value="School Map" readOnly disabled={!memoryEnabled} /></label>
+                <label><span>{copy.defaults[2]}</span><select defaultValue="strict" disabled={!memoryEnabled}><option value="strict">Strict</option></select></label>
+                <label><span>{copy.defaults[3]}</span><select defaultValue="metric" disabled={!memoryEnabled}><option value="metric">Metric</option></select></label>
+                <label><span>{copy.defaults[4]}</span><select defaultValue="evidence" disabled={!memoryEnabled}><option value="evidence">Evidence</option></select></label>
+              </div>
+            </div>
+          </div>
+        </section>
+      </EditionSettingsPanel>
+
       <EditionSettingsPanel active={activeTab === "model"} id="model">
-        {account ? (
-          <dl className="field-settings-safety">
-            <div><dt>{copy.modelAccount}</dt><dd>{account.displayName}</dd></div>
-          </dl>
-        ) : null}
+        <section className="settings-model-panel" aria-label={copy.tabs[2]} />
       </EditionSettingsPanel>
-      <EditionSettingsPanel active={activeTab === "runtime"} id="runtime">
-        <dl className="field-settings-safety" data-authority="false">
-          <div><dt>{copy.profile}</dt><dd>{copy.profileValue}</dd></div>
-          <div><dt>{copy.packs}</dt><dd>0</dd></div>
-          <div><dt>{copy.quorum}</dt><dd>{copy.missing}</dd></div>
-          <div><dt>{copy.authority}</dt><dd><ShieldCheck aria-hidden="true" />{copy.denied}</dd></div>
-        </dl>
-      </EditionSettingsPanel>
+
       <EditionSettingsPanel active={activeTab === "course"} id="course">
-        <div className="field-settings-course">
-          <div><strong>ECE498BH</strong><span>{courseBody}</span></div>
-          <a href={ECE498BH_COURSE_URL} target="_blank" rel="noreferrer">
-            {courseLabel}<ExternalLink aria-hidden="true" />
-          </a>
-        </div>
+        <section className="settings-course-panel" aria-labelledby="field-settings-course-title">
+          <div className="settings-course-overview">
+            <div className="settings-course-mark" aria-hidden="true"><GraduationCap /></div>
+            <div>
+              <h3 id="field-settings-course-title">ECE498BH</h3>
+              <p>{copy.courseOverview}</p>
+            </div>
+            <a href={ECE498BH_COURSE_URL} target="_blank" rel="noreferrer">
+              {copy.openCourse}<ArrowRight aria-hidden="true" />
+            </a>
+          </div>
+          <div className="settings-course-editions">
+            {(["universal", "sim", "lab", "field"] as const).map((edition, index) => (
+              <article key={edition}>
+                <BrandLockup edition={edition} />
+                <p>{copy.courseOverview}</p>
+                <a
+                  className="settings-course-edition-link"
+                  href={edition === "universal" ? "https://getdronedream.com/manual/" : "https://getdronedream.com/product/"}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {copy.courseActions[index === 0 ? 0 : 1]}<ArrowRight aria-hidden="true" />
+                </a>
+              </article>
+            ))}
+          </div>
+        </section>
+      </EditionSettingsPanel>
+
+      <EditionSettingsPanel active={activeTab === "runtime"} id="runtime">
+        <section className="settings-runtime-panel" aria-labelledby="field-settings-safety-title">
+          <div className="settings-runtime-heading">
+            <h3 id="field-settings-safety-title">{copy.safetyTitle}</h3>
+          </div>
+          <dl className="field-settings-safety" data-authority="false">
+            <div><dt>{copy.executionProfile}</dt><dd>field-lightweight</dd></div>
+            <div><dt>{copy.vehiclePacks}</dt><dd>0</dd></div>
+            <div><dt>{copy.quorum}</dt><dd>{copy.missing}</dd></div>
+            <div><dt>{copy.authority}</dt><dd><ShieldCheck aria-hidden="true" />{copy.denied}</dd></div>
+          </dl>
+        </section>
       </EditionSettingsPanel>
     </EditionSettingsSurface>
   );

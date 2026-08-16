@@ -60,7 +60,7 @@ const inspectableFiles = distFiles.filter((file) => /\.(?:css|html|js)$/i.test(f
 const payloadText = (await Promise.all(
   inspectableFiles.map((file) => readFile(file, "utf8")),
 )).join("\n");
-assert(payloadText.includes("field-lightweight"), "Field Settings consumer marker is missing");
+assert(payloadText.includes('consumerProfile:"field"'), "Field Settings consumer marker is missing");
 assert(payloadText.includes("data-settings-consumer"), "Shared Settings surface is missing");
 assert(payloadText.includes("drone-launch-scene"), "Shared 3D launch scene is missing");
 assert(payloadText.includes("REAL DEVICE DOMAIN"), "Field launch telemetry is missing");

@@ -6,7 +6,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { ChangeEvent, MouseEvent, ReactNode, RefObject } from "react";
+import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
@@ -66,6 +66,11 @@ import {
   type SettingsSurfaceTab,
   type SettingsSurfaceTabId,
 } from "./components/EditionSettingsSurface";
+import {
+  SETTINGS_LOCALES,
+  SettingsLanguageRegionIcon,
+  SettingsToggle,
+} from "./components/SettingsPrimitives";
 import { UniversalModeSwitch } from "./components/UniversalModeSwitch";
 import {
   EDITION_BRAND_TOKENS,
@@ -433,15 +438,6 @@ const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   runtime: true,
 };
 
-const SETTINGS_LOCALES = [
-  { id: "en", label: "English", region: "west" },
-  { id: "zh-CN", label: "简体中文", region: "east" },
-  { id: "zh-TW", label: "繁體中文", region: "east" },
-  { id: "es", label: "Español", region: "west" },
-  { id: "ja", label: "日本語", region: "east" },
-  { id: "ko", label: "한국어", region: "east" },
-] as const;
-
 type SettingsCopy = Readonly<{
   title: string;
   tabs: readonly [string, string, string, string];
@@ -571,33 +567,6 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     courseEditions: ["기체 모델링, 반복 가능한 시뮬레이션, 실험실 검증, 현장 전달을 하나의 작업 공간에서 연결합니다. 요구 사항, 매개변수, 승인, 보고서와 버전 기록을 유지하여 모든 판단을 추적·검토·검증할 수 있는 엔지니어링 증거로 만듭니다.", "PX4와 Gazebo에서 시나리오, 매개변수 범위, 예산, 목표와 안전 제약을 명확히 한 반복 연구를 설계합니다. 공통 지표로 후보와 독립 증거를 비교하고 실패를 설명하며 결과를 구조화된 실험 기록으로 보존합니다.", "시뮬레이션 증거와 실제 하드웨어 데이터를 보정, 차이 진단, 통제 시험과 안전 게이트로 연결합니다. Sim-to-Real 및 Real-to-Sim 변경, 승인과 자격 검증을 기록하여 모든 모델 업데이트의 근거와 이력을 유지합니다.", "호환성 확인, 운영자 승인, 텔레메트리 경계, 매개변수 스냅샷, 중단 규칙과 신뢰할 롤백 계획으로 실제 기체 튜닝을 준비합니다. 모든 현장 작업은 실행 전 검토되고 완료 후 안전한 후속 결정을 위한 감사 기록을 남깁니다."],
   },
 };
-
-function SettingsToggle({
-  checked,
-  className,
-  disabled = false,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  className?: string;
-  disabled?: boolean;
-  label: ReactNode;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className={`settings-toggle-row${className ? ` ${className}` : ""}`}>
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <i aria-hidden="true" />
-    </label>
-  );
-}
 
 function AllowanceCardIcon({
   card,
@@ -754,18 +723,6 @@ function AccountScopedModelAccessProvider() {
     <ModelAccessProvider accountScope={auth.account?.id ?? null}>
       <AppShellContent />
     </ModelAccessProvider>
-  );
-}
-
-function LanguageRegionIcon({ region }: { region: "west" | "east" }) {
-  return (
-    <span className={`launcher-language-icon launcher-language-icon-${region}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="8.25" />
-        <path d="M3.9 12h16.2M12 3.75c2.1 2.25 3.2 5 3.2 8.25S14.1 18 12 20.25C9.9 18 8.8 15.25 8.8 12S9.9 6 12 3.75Z" />
-        <circle className="launcher-language-region" cx={region === "west" ? "8" : "16"} cy="10" r="1.65" />
-      </svg>
-    </span>
   );
 }
 
@@ -1398,13 +1355,13 @@ function SettingsDialog({
       onTabChange={setActiveSettingsTab}
       tabs={settingsTabs}
       title={settingsCopy.title}
-      consumerProfile={edition === "field" ? "field-lightweight" : edition}
+      consumerProfile={edition}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
         <section className="settings-general-panel">
           <div className="settings-general-card settings-language-card">
             <div className="settings-card-heading">
-              <span><LanguageRegionIcon region="west" />{settingsCopy.language}</span>
+              <span><SettingsLanguageRegionIcon region="west" />{settingsCopy.language}</span>
             </div>
             <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
               {SETTINGS_LOCALES.map((option) => (
@@ -1416,7 +1373,7 @@ function SettingsDialog({
                   aria-pressed={interfaceLocale === option.id}
                   onClick={() => setLocale(option.id)}
                 >
-                  <LanguageRegionIcon region={option.region} />
+                  <SettingsLanguageRegionIcon region={option.region} />
                   <strong>{option.label}</strong>
                   <i aria-hidden="true">✓</i>
                 </button>
