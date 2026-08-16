@@ -1331,7 +1331,7 @@ function SettingsDialog({
   const settingsTabs: readonly SettingsSurfaceTab[] = [
     { id: "general", label: settingsCopy.tabs[0] },
     { id: "memory", label: settingsCopy.tabs[1] },
-    { id: "model", label: settingsCopy.tabs[2] },
+    { id: "model", label: settingsCopy.tabs[2], disabled: !auth.account },
     { id: "course", label: "ECE498BH" },
     ...(access.desktopRuntime
       ? [{ id: "runtime", label: settingsCopy.tabs[3] } as const]

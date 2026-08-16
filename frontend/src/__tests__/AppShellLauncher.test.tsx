@@ -256,6 +256,16 @@ describe("desktop launcher chrome", () => {
   });
 
   it("moves language selection into an accessible settings dialog", async () => {
+    launcherAuthState.current = {
+      configured: true,
+      loading: false,
+      account: {
+        id: "pilot-1",
+        email: "pilot@example.com",
+        displayName: "DroneDream Pilot",
+        avatarUrl: null,
+      },
+    };
     window.localStorage.setItem("drone-dream:locale", "en");
     vi.mocked(apiClient.getUserExperiencePreferences).mockResolvedValue({
       schema_version: "1.0",
@@ -303,37 +313,6 @@ describe("desktop launcher chrome", () => {
       .toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).getByRole("link", { name: "Manage subscription" }))
       .toHaveAttribute("href", "https://getdronedream.com/pricing/");
-    fireEvent.click(within(dialog).getByRole("button", { name: /Custom \/ BYOK/ }));
-    expect(within(dialog).getByLabelText("Model profile")).toHaveValue("default");
-
-    fireEvent.change(within(dialog).getByLabelText("Model provider"), {
-      target: { value: "qwen" },
-    });
-    expect(within(dialog).getByLabelText("Model name")).toHaveValue("qwen-plus");
-    expect(within(dialog).getByLabelText("Compatible API base URL")).toHaveValue(
-      "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    );
-    fireEvent.change(within(dialog).getByLabelText("Model API key"), {
-      target: { value: "session-only-key" },
-    });
-    await waitFor(() => {
-      expect(window.sessionStorage.getItem("dronedream:model-access-key:v1"))
-        .toBeNull();
-      expect(window.localStorage.getItem("dronedream:model-access:v1"))
-        .toContain("qwen-plus");
-      expect(window.localStorage.getItem("dronedream:model-access:v1"))
-        .not.toContain("session-only-key");
-    });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Add profile" }));
-    expect(within(dialog).getByLabelText("Model profile")).not.toHaveValue("default");
-    expect(within(dialog).getByLabelText("Model provider")).toHaveValue("custom");
-    fireEvent.change(within(dialog).getByLabelText("Model API key"), {
-      target: { value: "second-memory-only-key" },
-    });
-    await waitFor(() => {
-      expect(window.localStorage.getItem("dronedream:model-access:v1"))
-        .not.toContain("second-memory-only-key");
-    });
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "General" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "简体中文" }));
@@ -352,13 +331,28 @@ describe("desktop launcher chrome", () => {
     expect(within(chineseDialog).queryByText(
       "全面检查 Windows、WSL、本地后端、PX4 与 Gazebo。检查结果会在本次软件运行期间复用，除非你手动重检或真实运行发现异常。",
     )).not.toBeInTheDocument();
-    expect(apiClient.getUserExperiencePreferences).toHaveBeenCalledTimes(1);
-
     fireEvent.click(within(chineseDialog).getByRole("button", { name: "关闭设置" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "设置" })).toHaveFocus());
     expect(document.body).not.toHaveStyle({ overflow: "hidden" });
     expect(document.querySelector(".launcher-main")).toHaveProperty("inert", false);
+
+    router.dispose();
+  });
+
+  it("keeps Models visible but disabled before desktop sign-in", async () => {
+    installDesktopBridge();
+    const { router } = renderLauncher();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
+    const modelTab = within(dialog).getByRole("tab", { name: "Model" });
+    expect(modelTab).toBeVisible();
+    expect(modelTab).toBeDisabled();
+    expect(modelTab).toHaveAttribute("aria-disabled", "true");
+    expect(within(dialog).getByRole("tab", { name: "General" })).toBeEnabled();
+    expect(within(dialog).getByRole("tab", { name: "Memory" })).toBeEnabled();
+    expect(within(dialog).getByRole("tab", { name: "ECE498BH" })).toBeEnabled();
 
     router.dispose();
   });

@@ -91,7 +91,11 @@ describe("EditionSettingsSurface", () => {
       </EditionThemeProvider>,
     );
 
-    expect(screen.getAllByRole("tab")).toHaveLength(3);
+    expect(screen.getAllByRole("tab")).toHaveLength(5);
+    expect(screen.getByRole("tab", { name: "Models" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "General" })).toBeEnabled();
+    expect(screen.getByRole("tab", { name: "Memory" })).toBeEnabled();
+    expect(screen.getByRole("tab", { name: "ECE498BH" })).toBeEnabled();
     fireEvent.click(screen.getByRole("tab", { name: "ECE498BH" }));
     expect(screen.getByRole("link", { name: "Open course" })).toHaveAttribute(
       "href",

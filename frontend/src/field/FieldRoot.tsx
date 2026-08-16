@@ -21,7 +21,6 @@ const COPY = {
     system: "REAL DEVICE DOMAIN",
     active: "SAFETY GATES ACTIVE",
     standby: "SAFE STANDBY",
-    language: "Switch to Simplified Chinese",
     settings: "Open settings",
     tagline: "Let Every Flight Flow Like a Dream",
     attitude: "ATTITUDE",
@@ -35,7 +34,6 @@ const COPY = {
     system: "真机工作域",
     active: "安全门已启用",
     standby: "安全待机",
-    language: "切换到 English",
     settings: "打开设置",
     tagline: "蝶 梦 水 云 乡",
     attitude: "飞行姿态",
@@ -85,15 +83,6 @@ function FieldLaunchScreen({
             {ready ? copy.ready : copy.loading}
           </span>
           <button
-            className="field-launcher-language"
-            type="button"
-            aria-label={copy.language}
-            title={copy.language}
-            onClick={() => onLocaleChange(locale === "en" ? "zh-CN" : "en")}
-          >
-            {locale === "en" ? "中" : "EN"}
-          </button>
-          <button
             ref={settingsButtonRef}
             className="launcher-settings-button"
             type="button"
@@ -102,7 +91,7 @@ function FieldLaunchScreen({
             aria-expanded={settingsOpen}
             onClick={onSettingsOpen}
           >
-            <Settings aria-hidden="true" />
+            <Settings aria-hidden="true" strokeWidth={1.85} />
           </button>
         </div>
       </header>

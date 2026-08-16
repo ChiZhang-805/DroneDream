@@ -111,25 +111,6 @@ input:focus-visible {
   box-shadow: 0 0 14px color-mix(in srgb, var(--dd-brand-start) 72%, transparent);
 }
 
-.field-launcher-language {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--dd-brand-start) 36%, transparent);
-  border-radius: 6px;
-  color: var(--dd-brand-light-surface);
-  background: rgb(255 255 255 / 4%);
-  cursor: pointer;
-}
-
-.field-launcher-language:hover,
-.field-launcher-language:focus-visible {
-  border-color: var(--dd-brand-start);
-  color: var(--dd-brand-start);
-}
-
 .field-auth-control-launcher {
   align-items: center;
 }
@@ -491,6 +472,33 @@ input:focus-visible {
 .field-settings-languages svg {
   width: 18px;
   height: 18px;
+}
+
+.field-settings-memory {
+  display: grid;
+  height: 100%;
+  padding: 18px;
+  align-content: start;
+}
+
+.field-settings-memory label {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, transparent);
+  border-radius: 12px;
+  color: #ffffff;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 64%, transparent);
+  font-weight: 720;
+}
+
+.field-settings-memory input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--dd-brand-middle);
 }
 
 .field-settings-safety {

@@ -102,14 +102,18 @@ describe("FieldRoot", () => {
       .toHaveAttribute("data-settings-consumer", "field-lightweight");
   });
 
-  it("switches the launcher to Chinese and enters the Field workspace after auth", async () => {
+  it("keeps language inside settings and enters the localized Field workspace after auth", async () => {
     vi.useFakeTimers();
     render(
       <FieldLocaleProvider>
         <FieldRoot />
       </FieldLocaleProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Switch to Simplified Chinese" }));
+    expect(screen.queryByRole("button", { name: "Switch to Simplified Chinese" }))
+      .not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Simplified Chinese" }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭设置" }));
     await finishLoading();
 
     const enter = screen.getByRole("button", { name: "登录并进入调优平台" });

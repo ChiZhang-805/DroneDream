@@ -11911,6 +11911,15 @@ a {
   outline-offset: 2px;
 }
 
+.launcher-settings-tabs button:disabled,
+.launcher-settings-tabs button[aria-disabled="true"] {
+  color: color-mix(in srgb, #cfc4db 42%, transparent);
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 10%, transparent);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 34%, transparent);
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .launcher-settings-panels,
 .launcher-settings-panel {
   min-width: 0;
