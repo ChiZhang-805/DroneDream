@@ -95,6 +95,42 @@ if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
     throw "npm was not found. Install Node.js before building DroneDream Desktop."
 }
 
+$pythonCandidates = New-Object Collections.Generic.List[string]
+if ($env:PYTHON) {
+    $pythonCandidates.Add($env:PYTHON)
+}
+$perUserPython = Join-Path $env:LOCALAPPDATA "Programs\Python\Python311\python.exe"
+if (Test-Path -LiteralPath $perUserPython -PathType Leaf) {
+    $pythonCandidates.Add($perUserPython)
+}
+$pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
+if ($pythonCommand -and $pythonCommand.Source -notlike "*\Microsoft\WindowsApps\*") {
+    $pythonCandidates.Add($pythonCommand.Source)
+}
+$pythonExecutable = $null
+foreach ($candidate in @($pythonCandidates | Select-Object -Unique)) {
+    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $pythonVersion = (& $candidate --version 2>&1 | Out-String).Trim()
+        $pythonExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($pythonExitCode -eq 0 -and $pythonVersion -match '^Python 3\.11\.[0-9]+$') {
+        $pythonExecutable = [IO.Path]::GetFullPath($candidate)
+        break
+    }
+}
+if (-not $pythonExecutable) {
+    throw @"
+Python 3.11 x64 was not found. Install it once with:
+  winget install --id Python.Python.3.11 -e --scope user
+"@
+}
+$env:PYTHON = $pythonExecutable
+
 $requiredRustVersion = "1.97.0"
 $toolchainCandidates = @(
     "1.97.0-x86_64-pc-windows-msvc",
@@ -244,7 +280,10 @@ if (-not $AdditionalConfigPath -and -not $AllowUnsignedUpdater) {
 & (Join-Path $PSScriptRoot "verify-desktop-version.ps1")
 & (Join-Path $PSScriptRoot "verify-nsis-template.ps1")
 
-Write-Host "Building DroneDream Desktop with $toolchain and MSVC from $visualStudioRoot"
+Write-Host (
+    "Building DroneDream Desktop with $toolchain, $pythonExecutable, " +
+    "and MSVC from $visualStudioRoot"
+)
 $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $tauriConfigArguments = @("--target", $targetTriple)
 if ($additionalConfig) {

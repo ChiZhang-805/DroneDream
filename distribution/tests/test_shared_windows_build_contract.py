@@ -79,6 +79,8 @@ def test_shared_msvc_build_is_pinned_native_and_fail_closed() -> None:
         'Resolve-EditionGeneratedFrontendContract',
         'Test-PostBuildSourceStatus',
         'System32\\WindowsPowerShell\\v1.0\\Modules',
+        'Programs\\Python\\Python311\\python.exe',
+        "'^Python 3\\.11\\.[0-9]+$'",
     ):
         assert fragment in script
     assert 'tauri.llvm.conf.json' not in script
