@@ -3095,12 +3095,17 @@ body:has(.field-app),
 }
 
 .field-device-port-list span {
+  min-width: 0;
+  flex: 1 1 auto;
   color: var(--field-muted);
   font-size: 12px;
 }
 
 .field-device-port-list strong {
+  min-width: 7.25rem;
+  flex: 0 1 54%;
   overflow: hidden;
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
