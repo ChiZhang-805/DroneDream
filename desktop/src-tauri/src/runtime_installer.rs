@@ -2955,6 +2955,16 @@ enum RuntimeInstallMode {
     },
 }
 
+struct RuntimeInstallContext<'a> {
+    installer: &'a RuntimeInstaller,
+    target: &'a Path,
+    manifest: &'a ReleaseManifest,
+    raw_manifest: &'a [u8],
+    transport: &'a dyn ReleaseTransport,
+    executor: &'a dyn WslExecutor,
+    cancel: &'a AtomicBool,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum RuntimeUpgradePhase {
@@ -3163,13 +3173,15 @@ fn run_production_upgrade(
     verify_bytes_sha256(&smoke_report, &manifest.smoke.report_sha256, "smoke report")?;
 
     run_install_core_with_mode(
-        installer,
-        Path::new(&target),
-        &manifest,
-        &raw_manifest,
-        &transport,
-        &executor,
-        &cancel,
+        RuntimeInstallContext {
+            installer,
+            target: Path::new(&target),
+            manifest: &manifest,
+            raw_manifest: &raw_manifest,
+            transport: &transport,
+            executor: &executor,
+            cancel: &cancel,
+        },
         RuntimeInstallMode::Upgrade {
             old_build_id,
             old_version,
@@ -4294,6 +4306,24 @@ fn run_install_core(
     cancel: &AtomicBool,
 ) -> Result<InstallSuccess, InstallFailure> {
     run_install_core_with_mode(
+        RuntimeInstallContext {
+            installer,
+            target,
+            manifest,
+            raw_manifest,
+            transport,
+            executor,
+            cancel,
+        },
+        RuntimeInstallMode::Fresh,
+    )
+}
+
+fn run_install_core_with_mode(
+    context: RuntimeInstallContext<'_>,
+    mode: RuntimeInstallMode,
+) -> Result<InstallSuccess, InstallFailure> {
+    let RuntimeInstallContext {
         installer,
         target,
         manifest,
@@ -4301,20 +4331,7 @@ fn run_install_core(
         transport,
         executor,
         cancel,
-        RuntimeInstallMode::Fresh,
-    )
-}
-
-fn run_install_core_with_mode(
-    installer: &RuntimeInstaller,
-    target: &Path,
-    manifest: &ReleaseManifest,
-    raw_manifest: &[u8],
-    transport: &dyn ReleaseTransport,
-    executor: &dyn WslExecutor,
-    cancel: &AtomicBool,
-    mode: RuntimeInstallMode,
-) -> Result<InstallSuccess, InstallFailure> {
+    } = context;
     check_cancel(cancel)?;
     match &mode {
         RuntimeInstallMode::Fresh if executor.is_registered()? => {

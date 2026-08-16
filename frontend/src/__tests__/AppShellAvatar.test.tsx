@@ -135,6 +135,7 @@ describe("workspace profile photo editor", () => {
     });
     vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
     window.localStorage.setItem("drone-dream:locale", "en");
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "sim");
     const { container, router } = renderWorkspace();
 
     const editionSwitch = screen.getByRole("button", { name: "Switch DroneDream edition" });

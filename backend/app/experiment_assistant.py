@@ -553,9 +553,7 @@ def _document_context_receipt(
         }
         for chunk in context.chunks
     ]
-    total_content_bytes = sum(
-        len(chunk.content.encode("utf-8")) for chunk in context.chunks
-    )
+    total_content_bytes = sum(len(chunk.content.encode("utf-8")) for chunk in context.chunks)
     canonical = json.dumps(
         {
             "schema_version": context.schema_version,
@@ -618,6 +616,13 @@ def _provider_generate(
     user: str,
 ) -> tuple[dict[str, Any], schemas.ExperimentAssistantUsage, str]:
     settings = get_settings()
+    llm = request.llm
+    if llm is None:
+        raise ExperimentAssistantError(
+            "MODEL_CONFIGURATION_REQUIRED",
+            "A managed-model grant or BYOK model configuration is required.",
+            status_code=422,
+        )
     prompt_bytes = len(system.encode("utf-8")) + len(user.encode("utf-8"))
     if prompt_bytes > settings.llm_max_prompt_bytes:
         raise ExperimentAssistantError(
@@ -634,11 +639,11 @@ def _provider_generate(
             status_code=503,
         ) from exc
 
-    platform_access = request.llm.access_mode == "platform"
+    platform_access = llm.access_mode == "platform"
     base_url: str | None
     if platform_access:
         model = settings.model_gateway_managed_model_alias
-        api_key = request.llm.platform_grant
+        api_key = llm.platform_grant
         base_url = settings.model_gateway_base_url.strip().rstrip("/")
         if not base_url or not api_key:
             raise ExperimentAssistantError(
@@ -647,9 +652,9 @@ def _provider_generate(
                 status_code=503,
             )
     else:
-        model = request.llm.model or _DEFAULT_MODEL
-        api_key = request.llm.api_key
-        base_url = request.llm.base_url
+        model = llm.model or _DEFAULT_MODEL
+        api_key = llm.api_key
+        base_url = llm.base_url
         if not api_key:
             raise ExperimentAssistantError(
                 "MODEL_AUTHENTICATION_FAILED",
@@ -863,17 +868,13 @@ def _validate_patches(
                 )
             )
             continue
-        if (
-            patch.field_id in request.explicit_field_ids
-            and patch.provenance != "explicit"
-        ):
+        if patch.field_id in request.explicit_field_ids and patch.provenance != "explicit":
             rejected.append(
                 schemas.ExperimentAssistantRejectedPatch(
                     field_id=patch.field_id,
                     code="EXPLICIT_VALUE_PRESERVED",
                     message=(
-                        "A model-derived or default patch cannot replace an "
-                        "explicit user value."
+                        "A model-derived or default patch cannot replace an explicit user value."
                     ),
                 )
             )
@@ -964,10 +965,7 @@ def _validate_parameter_patches(
                 )
             )
             continue
-        if (
-            "parameters" in request.explicit_field_ids
-            and patch.provenance != "explicit"
-        ):
+        if "parameters" in request.explicit_field_ids and patch.provenance != "explicit":
             rejected.append(
                 schemas.ExperimentAssistantRejectedPatch(
                     field_id=patch.name,
@@ -1041,10 +1039,14 @@ def compile_experiment_turn(
 ) -> schemas.ExperimentAssistantTurnResponse:
     """Call one configured model and compile a safe draft-only response."""
 
-    if (
-        request.llm.access_mode == "byok"
-        and not llm_base_url_is_allowed(request.llm.base_url)
-    ):
+    llm = request.llm
+    if llm is None:
+        raise ExperimentAssistantError(
+            "MODEL_CONFIGURATION_REQUIRED",
+            "A managed-model grant or BYOK model configuration is required.",
+            status_code=422,
+        )
+    if llm.access_mode == "byok" and not llm_base_url_is_allowed(llm.base_url):
         raise ExperimentAssistantError(
             "LLM_BASE_URL_NOT_ALLOWED",
             (
@@ -1083,9 +1085,7 @@ def compile_experiment_turn(
     explicit_fields = set(request.explicit_field_ids)
     explicit_fields.update(patch.field_id for patch in accepted if patch.provenance == "explicit")
     selected_parameters = {
-        parameter.name
-        for parameter in request.current_parameters
-        if parameter.selected
+        parameter.name for parameter in request.current_parameters if parameter.selected
     }
     parameters_were_explicit = "parameters" in explicit_fields
     for patch in accepted_parameters:
@@ -1095,10 +1095,7 @@ def compile_experiment_turn(
             selected_parameters.add(patch.name)
         else:
             selected_parameters.discard(patch.name)
-    if (
-        selected_parameters
-        and any(patch.provenance == "explicit" for patch in accepted_parameters)
-    ):
+    if selected_parameters and any(patch.provenance == "explicit" for patch in accepted_parameters):
         explicit_fields.add("parameters")
     missing: list[str] = []
     if "display_name" not in explicit_fields:
@@ -1133,7 +1130,7 @@ def compile_experiment_turn(
         questions=questions,
         document_context_receipt=_document_context_receipt(request.document_context),
         usage=usage,
-        provider=request.llm.provider,
+        provider=llm.provider,
         model=model,
     )
 

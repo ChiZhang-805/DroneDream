@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Final, Literal
+from typing import Final, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -30,6 +30,13 @@ TaskType = Literal[
 RequestedTaskType = TaskType | Literal["auto_detect"]
 WorkflowStatus = Literal["draft", "blocked"]
 RiskLevel = Literal["low", "medium", "high", "critical"]
+
+
+class ToolDefinition(TypedDict):
+    authority: Literal["read", "proposal", "simulation", "hardware", "write_evidence"]
+    editions: tuple[EditionId, ...]
+    description: str
+
 
 SYSTEM_PROMPT_REGISTRY_VERSION: Final = "dronedream.workflow-prompts.v1"
 TOOL_REGISTRY_VERSION: Final = "dronedream.workflow-tools.v1"
@@ -117,7 +124,7 @@ EDITION_TASKS: Final[dict[EditionId, frozenset[TaskType]]] = {
     "field": frozenset({"control_tuning", "mission_autonomy", "field_task"}),
 }
 
-TOOL_REGISTRY: Final[dict[str, dict[str, object]]] = {
+TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
     "context.inspect": {
         "authority": "read",
         "editions": tuple(EDITION_TASKS),

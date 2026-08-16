@@ -96,6 +96,7 @@ describe("workspace account entry", () => {
 
   it("uses a consistent icon and label for every item in the active SIM workspace", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "sim");
     const { container, router } = renderWorkspace();
 
     const links = container.querySelectorAll(".app-nav a");
