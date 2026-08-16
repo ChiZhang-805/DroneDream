@@ -20,6 +20,20 @@ from app.simulator.scenario_effects import bundled_launcher_capabilities
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SUBJECT_COMMIT = "a" * 40
 GENERATED_AT = "2026-07-28T23:30:00Z"
+PHYSICS_EVIDENCE_AVAILABLE = all(
+    (REPOSITORY_ROOT / relative).is_file()
+    for source in EVIDENCE_SOURCES
+    for relative in (
+        [source.receipt_path]
+        if source.manifest_path is None
+        else [source.receipt_path, source.manifest_path]
+    )
+)
+
+pytestmark = pytest.mark.skipif(
+    not PHYSICS_EVIDENCE_AVAILABLE,
+    reason="requires frozen technical-report physics evidence assets",
+)
 
 
 def _copy_evidence_sources(destination: Path) -> None:

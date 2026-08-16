@@ -677,9 +677,7 @@ def test_ulog_secondary_state_is_aligned_by_timestamp_not_array_index(
     assert [sample["armed"] for sample in samples] == [False, False, False, True]
     assert [sample["mode"] for sample in samples] == ["unknown", "3", "3", "14"]
     assert [sample["crashed"] for sample in samples] == [False, False, False, True]
-    assert [sample["yaw"] for sample in samples] == pytest.approx(
-        [0.0, 0.0, 0.0, math.pi / 2]
-    )
+    assert [sample["yaw"] for sample in samples] == pytest.approx([0.0, 0.0, 0.0, math.pi / 2])
 
 
 def test_ulog_conversion_downsamples_evenly_and_preserves_endpoints(
@@ -1066,11 +1064,10 @@ def test_sdf_profile_mutators_round_trip_generated_runtime_sdf(tmp_path: Path) -
         assert float(
             navsat.findtext(f"./{axis}/noise/dynamic_bias_stddev", default="nan")
         ) == pytest.approx(math.sqrt(4.0 - 0.0004))
-        assert float(
-            navsat.findtext(
-                f"./{axis}/noise/dynamic_bias_correlation_time", default="nan"
-            )
-        ) == 60.0
+        assert (
+            float(navsat.findtext(f"./{axis}/noise/dynamic_bias_correlation_time", default="nan"))
+            == 60.0
+        )
     vehicle_root = ET.fromstring(
         """
 <sdf version="1.9">
@@ -2449,14 +2446,15 @@ def test_wrapper_windows_cleanup_timeout_is_best_effort(
         wait=lambda timeout: None,
     )
     stderr_log = tmp_path / "stderr.log"
-    monkeypatch.setattr(wrapper.os, "name", "nt")
     monkeypatch.setattr(wrapper.subprocess, "run", timeout_taskkill)
 
-    wrapper._terminate_process_group(
-        fake_proc,
-        stderr_log,
-        label="PX4",
-    )
+    with monkeypatch.context() as windows_context:
+        windows_context.setattr(wrapper.os, "name", "nt")
+        wrapper._terminate_process_group(
+            fake_proc,
+            stderr_log,
+            label="PX4",
+        )
 
     assert state["killed"] is True
     assert "Timed out terminating PX4 process tree" in stderr_log.read_text(encoding="utf-8")
@@ -2474,14 +2472,14 @@ def test_wrapper_posix_cleanup_terminates_group_after_launcher_exits(
             raise ProcessLookupError
 
     fake_proc = SimpleNamespace(pid=12345, poll=lambda: 0)
-    monkeypatch.setattr(wrapper.os, "name", "posix")
-    monkeypatch.setattr(wrapper.os, "killpg", fake_killpg, raising=False)
-
-    wrapper._terminate_process_group(
-        fake_proc,
-        tmp_path / "stderr.log",
-        label="PX4",
-    )
+    with monkeypatch.context() as posix_context:
+        posix_context.setattr(wrapper.os, "name", "posix")
+        posix_context.setattr(wrapper.os, "killpg", fake_killpg, raising=False)
+        wrapper._terminate_process_group(
+            fake_proc,
+            tmp_path / "stderr.log",
+            label="PX4",
+        )
 
     assert sent_signals == [wrapper.signal.SIGTERM, 0]
 

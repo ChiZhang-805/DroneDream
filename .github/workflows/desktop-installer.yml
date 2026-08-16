@@ -31,6 +31,10 @@ permissions:
   actions: read
   contents: read
 
+concurrency:
+  group: desktop-installer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   windows-nsis:
     name: Windows x64 NSIS
@@ -665,7 +669,7 @@ jobs:
         with:
           name: DroneDream-Windows-x64
           if-no-files-found: error
-          retention-days: 14
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || (github.event_name == 'workflow_dispatch' && 14 || 30) }}
           compression-level: 0
           path: |
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe

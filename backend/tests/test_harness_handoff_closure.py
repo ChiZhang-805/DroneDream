@@ -15,6 +15,15 @@ from app.orchestration.harness_handoff_closure import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 GENERATED_AT = "2026-07-29T12:00:00Z"
+HANDOFF_EVIDENCE_AVAILABLE = (
+    REPOSITORY_ROOT
+    / "artifacts/test-runs/harness-routing-evidence-2.9-d36ef16/campaign-receipt.json"
+).is_file()
+
+pytestmark = pytest.mark.skipif(
+    not HANDOFF_EVIDENCE_AVAILABLE,
+    reason="requires frozen technical-report harness evidence assets",
+)
 
 
 def _head() -> str:
