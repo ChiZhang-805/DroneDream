@@ -3,12 +3,17 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
 import {
+  checkComponentUpdates as checkSignedComponentUpdates,
   ensureAppUpdateIdle,
   getEnginePackStatus,
   installEmbeddedEnginePack,
+  installComponentUpdate,
   isDesktopRuntime,
+  type ComponentUpdateId,
+  type ComponentUpdateReport,
   type EnginePackStatus,
 } from "./bridge";
+import { BUILD_EDITION } from "../edition";
 
 export type AppUpdateStatus =
   | "checking"
@@ -19,6 +24,10 @@ export type AppUpdateStatus =
   | "reconcilingEngine"
   | "engineUpdateDeferred"
   | "engineError"
+  | "componentAvailable"
+  | "installingComponents"
+  | "componentUpdateDeferred"
+  | "componentError"
   | "runtimeBaseRequired"
   | "error";
 
@@ -29,6 +38,7 @@ interface AppUpdateState {
   progress: number | null;
   error: string | null;
   enginePack: EnginePackStatus | null;
+  componentUpdates: ComponentUpdateReport | null;
 }
 
 const CURRENT_STATE: AppUpdateState = {
@@ -38,7 +48,22 @@ const CURRENT_STATE: AppUpdateState = {
   progress: null,
   error: null,
   enginePack: null,
+  componentUpdates: null,
 };
+
+const COMPONENT_INSTALL_ORDER: ComponentUpdateId[] = [
+  "capability-pack",
+  "asset-pack",
+];
+
+function componentCatalogEnabled(): boolean {
+  return import.meta.env.VITE_COMPONENT_UPDATE_CATALOG_ENABLED === "true"
+    && BUILD_EDITION !== "field";
+}
+
+function componentCatalogUrl(): string | undefined {
+  return import.meta.env.VITE_COMPONENT_UPDATE_CATALOG_URL?.trim() || undefined;
+}
 
 const UPDATE_POLICY_PATTERN = /^update-policy:\s*(recommended|required)$/gmu;
 
@@ -75,6 +100,50 @@ export function useAppUpdater() {
       : CURRENT_STATE
   ));
 
+  const reconcileComponentPacks = useCallback(async (
+    generation?: number,
+    enginePack?: EnginePackStatus | null,
+  ) => {
+    if (!desktopRuntime || import.meta.env.MODE === "test") return;
+    if (!componentCatalogEnabled()) {
+      setState({ ...CURRENT_STATE, enginePack: enginePack ?? null });
+      return;
+    }
+    try {
+      const report = await checkSignedComponentUpdates(componentCatalogUrl());
+      if (generation !== undefined && generation !== checkGenerationRef.current) return;
+      const candidates = report.candidates.filter((candidate) => candidate.available);
+      if (candidates.length === 0) {
+        setState({
+          ...CURRENT_STATE,
+          enginePack: enginePack ?? null,
+          componentUpdates: report,
+        });
+        return;
+      }
+      setState({
+        status: "componentAvailable",
+        availableVersion: null,
+        updateRequired: candidates.some((candidate) => candidate.policy === "required"),
+        progress: null,
+        error: null,
+        enginePack: enginePack ?? null,
+        componentUpdates: report,
+      });
+    } catch (error) {
+      if (generation !== undefined && generation !== checkGenerationRef.current) return;
+      setState({
+        status: "componentError",
+        availableVersion: null,
+        updateRequired: false,
+        progress: null,
+        error: errorMessage(error),
+        enginePack: enginePack ?? null,
+        componentUpdates: null,
+      });
+    }
+  }, [desktopRuntime]);
+
   const reconcileEnginePack = useCallback(async (generation?: number) => {
     if (!desktopRuntime || import.meta.env.MODE === "test") return;
     setState((current) => ({
@@ -94,16 +163,17 @@ export function useAppUpdater() {
           progress: null,
           error: observed.message,
           enginePack: observed,
+          componentUpdates: null,
         });
         return;
       }
       if (!observed.updateRequired) {
-        setState({ ...CURRENT_STATE, enginePack: observed });
+        await reconcileComponentPacks(generation, observed);
         return;
       }
       const installed = await installEmbeddedEnginePack();
       if (generation !== undefined && generation !== checkGenerationRef.current) return;
-      setState({ ...CURRENT_STATE, enginePack: installed });
+      await reconcileComponentPacks(generation, installed);
     } catch (error) {
       if (generation !== undefined && generation !== checkGenerationRef.current) return;
       const message = errorMessage(error);
@@ -116,7 +186,7 @@ export function useAppUpdater() {
         error: message,
       }));
     }
-  }, [desktopRuntime]);
+  }, [desktopRuntime, reconcileComponentPacks]);
 
   const checkForUpdates = useCallback(async () => {
     if (!desktopRuntime || import.meta.env.MODE === "test") {
@@ -151,6 +221,7 @@ export function useAppUpdater() {
         progress: null,
         error: null,
         enginePack: null,
+        componentUpdates: null,
       });
     } catch (error) {
       if (generation !== checkGenerationRef.current) return;
@@ -161,6 +232,7 @@ export function useAppUpdater() {
         progress: null,
         error: errorMessage(error),
         enginePack: null,
+        componentUpdates: null,
       });
     }
   }, [desktopRuntime, reconcileEnginePack]);
@@ -207,6 +279,55 @@ export function useAppUpdater() {
     }
   }, [state.status]);
 
+  const installComponentUpdates = useCallback(async () => {
+    const report = state.componentUpdates;
+    if (
+      !report
+      || state.status !== "componentAvailable"
+      || installInFlightRef.current
+    ) return;
+    const availableIds = new Set(
+      report.candidates
+        .filter((candidate) => candidate.available)
+        .map((candidate) => candidate.componentId),
+    );
+    const componentIds = COMPONENT_INSTALL_ORDER.filter((componentId) => (
+      availableIds.has(componentId)
+    ));
+    if (componentIds.length === 0) return;
+
+    installInFlightRef.current = true;
+    setState((current) => ({
+      ...current,
+      status: "installingComponents",
+      progress: 0,
+      error: null,
+    }));
+    try {
+      await ensureAppUpdateIdle();
+      for (let index = 0; index < componentIds.length; index += 1) {
+        await installComponentUpdate(componentIds[index], componentCatalogUrl());
+        setState((current) => ({
+          ...current,
+          progress: Math.round(((index + 1) / componentIds.length) * 100),
+        }));
+      }
+      await reconcileComponentPacks(undefined, state.enginePack);
+    } catch (error) {
+      const message = errorMessage(error);
+      setState((current) => ({
+        ...current,
+        status: isActiveExperimentDeferral(message)
+          ? "componentUpdateDeferred"
+          : "componentError",
+        progress: null,
+        error: message,
+      }));
+    } finally {
+      installInFlightRef.current = false;
+    }
+  }, [reconcileComponentPacks, state.componentUpdates, state.enginePack, state.status]);
+
   useEffect(() => {
     void checkForUpdates();
     return () => {
@@ -221,6 +342,8 @@ export function useAppUpdater() {
     desktopRuntime,
     checkForUpdates,
     installAvailableUpdate,
+    installComponentUpdates,
     reconcileEnginePack,
+    reconcileComponentPacks,
   };
 }

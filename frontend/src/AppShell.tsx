@@ -3203,12 +3203,17 @@ function AppShellContent() {
     "engineUpdateDeferred",
     "reconcilingEngine",
     "engineError",
+    "componentAvailable",
+    "installingComponents",
+    "componentUpdateDeferred",
+    "componentError",
     "runtimeBaseRequired",
   ].includes(updater.status);
   const sidebarUpdateBusy = [
     "downloading",
     "installing",
     "reconcilingEngine",
+    "installingComponents",
   ].includes(updater.status);
 
   useEffect(() => {
@@ -3241,6 +3246,10 @@ function AppShellContent() {
     ? updater.error
       ? t("updater.sidebarDeferred")
       : t("updater.sidebarAvailable")
+    : updater.status === "componentAvailable"
+      ? t("updater.sidebarComponents")
+    : updater.status === "installingComponents"
+      ? t("updater.components")
     : updater.status === "runtimeBaseRequired"
       ? t("updater.sidebarRuntimeBase")
       : sidebarUpdateBusy
@@ -3253,6 +3262,17 @@ function AppShellContent() {
     }
     if (updater.status === "engineUpdateDeferred") {
       void updater.reconcileEnginePack();
+      return;
+    }
+    if (updater.status === "componentAvailable") {
+      void updater.installComponentUpdates();
+      return;
+    }
+    if (
+      updater.status === "componentUpdateDeferred"
+      || updater.status === "componentError"
+    ) {
+      void updater.checkForUpdates();
       return;
     }
     if (updater.status === "runtimeBaseRequired") {
@@ -3289,7 +3309,8 @@ function AppShellContent() {
       updater.status === "checking" ||
       updater.status === "downloading" ||
       updater.status === "installing" ||
-      updater.status === "reconcilingEngine"
+      updater.status === "reconcilingEngine" ||
+      updater.status === "installingComponents"
     ) {
       setDesktopStartupGateState("checking", {
         accountId: auth.account?.id ?? null,
@@ -3297,8 +3318,13 @@ function AppShellContent() {
       return;
     }
     if (
-      updater.status === "available" ||
+      (updater.status === "available" && updater.updateRequired) ||
       updater.status === "engineError" ||
+      ([
+        "componentAvailable",
+        "componentUpdateDeferred",
+        "componentError",
+      ].includes(updater.status) && updater.updateRequired) ||
       updater.status === "runtimeBaseRequired"
     ) {
       setDesktopStartupGateState("blocked", {
@@ -3356,6 +3382,7 @@ function AppShellContent() {
     updater.availableVersion,
     updater.error,
     updater.status,
+    updater.updateRequired,
   ]);
 
   const closeSettings = useCallback(() => {

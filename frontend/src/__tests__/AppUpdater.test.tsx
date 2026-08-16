@@ -15,10 +15,13 @@ const updaterState = vi.hoisted(() => ({
     progress: null as number | null,
     error: null as string | null,
     enginePack: null,
+    componentUpdates: null as import("../desktop/bridge").ComponentUpdateReport | null,
     desktopRuntime: true,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    installComponentUpdates: vi.fn(async () => undefined),
     reconcileEnginePack: vi.fn(async () => undefined),
+    reconcileComponentPacks: vi.fn(async () => undefined),
   },
 }));
 
@@ -111,9 +114,12 @@ afterEach(() => {
     progress: null,
     error: null,
     enginePack: null,
+    componentUpdates: null,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    installComponentUpdates: vi.fn(async () => undefined),
     reconcileEnginePack: vi.fn(async () => undefined),
+    reconcileComponentPacks: vi.fn(async () => undefined),
   };
 });
 
@@ -149,6 +155,32 @@ describe("workspace sidebar version module", () => {
     expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
     fireEvent.click(update);
     expect(installAvailableUpdate).toHaveBeenCalledOnce();
+
+    router.dispose();
+  });
+
+  it("uses the same account-adjacent action for signed workflow and asset updates", () => {
+    const installComponentUpdates = vi.fn(async () => undefined);
+    updaterState.current = {
+      ...updaterState.current,
+      status: "componentAvailable",
+      componentUpdates: {
+        catalogSequence: 1,
+        generatedAt: "2026-08-16T00:00:00Z",
+        expiresAt: "2026-08-23T00:00:00Z",
+        candidates: [],
+      },
+      installComponentUpdates,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const update = screen.getByRole("button", {
+      name: "Update DroneDream workflows and assets",
+    });
+    fireEvent.click(update);
+    expect(installComponentUpdates).toHaveBeenCalledOnce();
 
     router.dispose();
   });

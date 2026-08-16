@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   autoStartInstallerRuntime,
   beginBrowserAuth,
+  checkComponentUpdates,
   cancelBrowserAuth,
   clearBrowserAuthVault,
   cancelRuntimeInstall,
@@ -22,6 +23,7 @@ import {
   repairRuntime,
   restoreBrowserAuthVault,
   installEmbeddedEnginePack,
+  installComponentUpdate,
   startRuntime,
   startRuntimeInstall,
   stopRuntimeForExit,
@@ -369,6 +371,60 @@ describe("desktop bridge", () => {
     await expect(getEnginePackStatus()).rejects.toMatchObject({
       name: "DesktopCommandContractError",
       command: "get_engine_pack_status",
+    });
+  });
+
+  it("validates signed component update reports before exposing them to the UI", async () => {
+    const report = {
+      catalogSequence: 7,
+      generatedAt: "2026-08-16T00:00:00Z",
+      expiresAt: "2026-08-23T00:00:00Z",
+      candidates: [{
+        componentId: "capability-pack",
+        version: "1.2.0",
+        releaseSequence: 12,
+        policy: "required",
+        packId: `sha256:${"5".repeat(64)}`,
+        installedVersion: "1.1.0",
+        installedReleaseSequence: 11,
+        available: true,
+      }],
+    };
+    const installResult = {
+      componentId: "capability-pack",
+      packId: `sha256:${"5".repeat(64)}`,
+      version: "1.2.0",
+      releaseSequence: 12,
+      activated: true,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "check_component_updates") return report;
+      if (command === "install_component_update") return installResult;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(checkComponentUpdates("https://updates.example/catalog.json"))
+      .resolves.toEqual(report);
+    await expect(installComponentUpdate(
+      "capability-pack",
+      "https://updates.example/catalog.json",
+    )).resolves.toEqual(installResult);
+    expect(invoke).toHaveBeenNthCalledWith(1, "check_component_updates", {
+      catalogUrl: "https://updates.example/catalog.json",
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, "install_component_update", {
+      componentId: "capability-pack",
+      catalogUrl: "https://updates.example/catalog.json",
+    });
+
+    invoke.mockResolvedValueOnce({
+      ...report,
+      candidates: [{ ...report.candidates[0], policy: "critical" }],
+    });
+    await expect(checkComponentUpdates()).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "check_component_updates",
     });
   });
 

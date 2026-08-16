@@ -388,15 +388,26 @@ export function DesktopSetup() {
     updater.status === "checking" ||
     updater.status === "downloading" ||
     updater.status === "installing" ||
-    updater.status === "reconcilingEngine";
+    updater.status === "reconcilingEngine" ||
+    updater.status === "installingComponents";
   const updaterBlocksWorkspace =
     updaterBusy ||
     (updater.status === "available" && updater.updateRequired) ||
     updater.status === "engineError" ||
+    ([
+      "componentAvailable",
+      "componentUpdateDeferred",
+      "componentError",
+    ].includes(updater.status) && updater.updateRequired) ||
     updater.status === "runtimeBaseRequired";
   const updaterActionRequired =
-    updater.status === "available" ||
+    (updater.status === "available" && updater.updateRequired) ||
     updater.status === "engineError" ||
+    ([
+      "componentAvailable",
+      "componentUpdateDeferred",
+      "componentError",
+    ].includes(updater.status) && updater.updateRequired) ||
     updater.status === "runtimeBaseRequired";
   const localChecksReady =
     localRuntimeReady &&
@@ -564,7 +575,8 @@ export function DesktopSetup() {
       updater.status === "checking" ||
       updater.status === "downloading" ||
       updater.status === "installing" ||
-      updater.status === "reconcilingEngine"
+      updater.status === "reconcilingEngine" ||
+      updater.status === "installingComponents"
     ) {
       setDesktopStartupGateState("checking", {
         accountId: signedInAccount?.id ?? null,
@@ -572,8 +584,13 @@ export function DesktopSetup() {
       return;
     }
     if (
-      updater.status === "available" ||
+      (updater.status === "available" && updater.updateRequired) ||
       updater.status === "engineError" ||
+      ([
+        "componentAvailable",
+        "componentUpdateDeferred",
+        "componentError",
+      ].includes(updater.status) && updater.updateRequired) ||
       updater.status === "runtimeBaseRequired"
     ) {
       setDesktopStartupGateState("blocked", {
@@ -594,6 +611,7 @@ export function DesktopSetup() {
     updater.availableVersion,
     updater.error,
     updater.status,
+    updater.updateRequired,
   ]);
 
   useEffect(() => {
@@ -1404,7 +1422,7 @@ export function DesktopSetup() {
           </Alert>
         ) : null}
 
-        {updater.status === "available" ? (
+        {updater.status === "available" && updater.updateRequired ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
@@ -1416,6 +1434,27 @@ export function DesktopSetup() {
                 : t("updater.available", {
                     version: updater.availableVersion ?? "",
                   })}
+            </button>
+          </div>
+        ) : updater.status === "componentAvailable" && updater.updateRequired ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void updater.installComponentUpdates()}
+            >
+              {t("updater.componentsAvailable")}
+            </button>
+          </div>
+        ) : (["componentUpdateDeferred", "componentError"].includes(updater.status)
+          && updater.updateRequired) ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void updater.checkForUpdates()}
+            >
+              {t("updater.sidebarRetry")}
             </button>
           </div>
         ) : updater.status === "engineError" ? (

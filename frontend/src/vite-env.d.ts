@@ -4,6 +4,8 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
   readonly VITE_GAZEBO_VIEWER_URL?: string;
   readonly VITE_RUNTIME_RELEASE_MANIFEST_URL?: string;
+  readonly VITE_COMPONENT_UPDATE_CATALOG_URL?: string;
+  readonly VITE_COMPONENT_UPDATE_CATALOG_ENABLED?: "true" | "false";
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
   readonly VITE_MODEL_GATEWAY_URL?: string;

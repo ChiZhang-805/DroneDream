@@ -82,6 +82,35 @@ export interface EnginePackStatus {
   message: string | null;
 }
 
+export type ComponentUpdateId = "capability-pack" | "asset-pack";
+export type ComponentUpdatePolicy = "recommended" | "required";
+
+export interface ComponentUpdateCandidate {
+  componentId: ComponentUpdateId;
+  version: string;
+  releaseSequence: number;
+  policy: ComponentUpdatePolicy;
+  packId: string;
+  installedVersion: string | null;
+  installedReleaseSequence: number;
+  available: boolean;
+}
+
+export interface ComponentUpdateReport {
+  catalogSequence: number;
+  generatedAt: string;
+  expiresAt: string;
+  candidates: ComponentUpdateCandidate[];
+}
+
+export interface ComponentInstallResult {
+  componentId: ComponentUpdateId;
+  packId: string;
+  version: string;
+  releaseSequence: number;
+  activated: boolean;
+}
+
 export type HardwareDomainEdition = "lab" | "field";
 
 export interface FieldTuningStatus {
@@ -1377,6 +1406,27 @@ export function installEmbeddedEnginePack(): Promise<EnginePackStatus> {
   return invokeDesktop("install_embedded_engine_pack", parseEnginePackStatus);
 }
 
+export function checkComponentUpdates(
+  catalogUrl?: string,
+): Promise<ComponentUpdateReport> {
+  return invokeDesktop(
+    "check_component_updates",
+    parseComponentUpdateReport,
+    catalogUrl ? { catalogUrl } : undefined,
+  );
+}
+
+export function installComponentUpdate(
+  componentId: ComponentUpdateId,
+  catalogUrl?: string,
+): Promise<ComponentInstallResult> {
+  return invokeDesktop(
+    "install_component_update",
+    parseComponentInstallResult,
+    { componentId, ...(catalogUrl ? { catalogUrl } : {}) },
+  );
+}
+
 export async function getRuntimeInstallPlan(
   targetRoot?: string,
 ): Promise<RuntimeInstallPlan> {
@@ -1991,6 +2041,104 @@ function parseEnginePackStatus(value: unknown): EnginePackStatus {
     throw new Error("an unsupported Engine Pack manager must require a Runtime Base update");
   }
   return status;
+}
+
+function parseComponentUpdateId(value: unknown, path: string): ComponentUpdateId {
+  const componentId = expectString(value, path);
+  if (componentId !== "capability-pack" && componentId !== "asset-pack") {
+    throw new Error(`${path} must be a supported component pack`);
+  }
+  return componentId;
+}
+
+function parseComponentUpdatePolicy(
+  value: unknown,
+  path: string,
+): ComponentUpdatePolicy {
+  const policy = expectString(value, path);
+  if (policy !== "recommended" && policy !== "required") {
+    throw new Error(`${path} must be recommended or required`);
+  }
+  return policy;
+}
+
+function parseComponentVersion(value: unknown, path: string): string {
+  const version = expectString(value, path);
+  if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u.test(version)) {
+    throw new Error(`${path} must be semantic versioning`);
+  }
+  return version;
+}
+
+function parseComponentUpdateCandidate(
+  value: unknown,
+  index: number,
+): ComponentUpdateCandidate {
+  const path = `componentUpdate.candidates[${index}]`;
+  const record = expectRecord(value, path);
+  return {
+    componentId: parseComponentUpdateId(record.componentId, `${path}.componentId`),
+    version: parseComponentVersion(record.version, `${path}.version`),
+    releaseSequence: expectPositiveInteger(
+      record.releaseSequence,
+      `${path}.releaseSequence`,
+    ),
+    policy: parseComponentUpdatePolicy(record.policy, `${path}.policy`),
+    packId: expectSha256Id(record.packId, `${path}.packId`),
+    installedVersion: record.installedVersion == null
+      ? null
+      : parseComponentVersion(record.installedVersion, `${path}.installedVersion`),
+    installedReleaseSequence: expectNonNegativeInteger(
+      record.installedReleaseSequence,
+      `${path}.installedReleaseSequence`,
+    ),
+    available: expectBoolean(record.available, `${path}.available`),
+  };
+}
+
+function parseComponentUpdateReport(value: unknown): ComponentUpdateReport {
+  const record = expectRecord(value, "componentUpdate");
+  const candidates = expectArray(
+    record.candidates,
+    "componentUpdate.candidates",
+  ).map(parseComponentUpdateCandidate);
+  if (candidates.length > 2) {
+    throw new Error("componentUpdate.candidates exceeds the signed catalog limit");
+  }
+  assertUnique(
+    candidates.map((candidate) => candidate.componentId),
+    "componentUpdate.candidates component ids",
+  );
+  const report = {
+    catalogSequence: expectPositiveInteger(
+      record.catalogSequence,
+      "componentUpdate.catalogSequence",
+    ),
+    generatedAt: expectIsoTimestamp(record.generatedAt, "componentUpdate.generatedAt"),
+    expiresAt: expectIsoTimestamp(record.expiresAt, "componentUpdate.expiresAt"),
+    candidates,
+  };
+  if (Date.parse(report.expiresAt) <= Date.parse(report.generatedAt)) {
+    throw new Error("componentUpdate expiry must follow generation time");
+  }
+  return report;
+}
+
+function parseComponentInstallResult(value: unknown): ComponentInstallResult {
+  const record = expectRecord(value, "componentInstall");
+  return {
+    componentId: parseComponentUpdateId(
+      record.componentId,
+      "componentInstall.componentId",
+    ),
+    packId: expectSha256Id(record.packId, "componentInstall.packId"),
+    version: parseComponentVersion(record.version, "componentInstall.version"),
+    releaseSequence: expectPositiveInteger(
+      record.releaseSequence,
+      "componentInstall.releaseSequence",
+    ),
+    activated: expectBoolean(record.activated, "componentInstall.activated"),
+  };
 }
 
 function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
