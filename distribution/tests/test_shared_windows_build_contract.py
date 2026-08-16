@@ -262,7 +262,9 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
     for edition, overlay in cases.items():
         overlay.parent.mkdir(parents=True, exist_ok=True)
         frontend_dist = (
-            "../../frontend/dist" if edition == "universal" else f"../../frontend/{edition}-dist"
+            "../../frontend/dist"
+            if edition in {"universal", "field"}
+            else f"../../frontend/{edition}-dist"
         )
         overlay_payload = (
             {"productName": "DroneDream-Universal"}
@@ -283,7 +285,11 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
         result = _run_powershell(command, cwd=tmp_path)
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
-        expected_path = f"frontend/{edition}-dist" if edition != "universal" else "frontend/dist"
+        expected_path = (
+            "frontend/dist"
+            if edition in {"universal", "field"}
+            else f"frontend/{edition}-dist"
+        )
         assert payload["relativePath"] == expected_path
 
         status_result = _run_powershell(
@@ -306,7 +312,7 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
 
     absolute = external_overlays / "tauri.field.absolute.json"
     absolute.write_text(
-        json.dumps({"build": {"frontendDist": str(repo / "frontend" / "field-dist")}}),
+        json.dumps({"build": {"frontendDist": str(repo / "frontend" / "dist")}}),
         encoding="utf-8",
     )
     absolute_result = _run_powershell(
@@ -323,7 +329,7 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
         cwd=tmp_path,
     )
     assert absolute_result.returncode == 0, absolute_result.stderr
-    assert json.loads(absolute_result.stdout)["relativePath"] == "frontend/field-dist"
+    assert json.loads(absolute_result.stdout)["relativePath"] == "frontend/dist"
 
     absolute_outside = external_overlays / "tauri.field.absolute-outside.json"
     absolute_outside.write_text(

@@ -125,15 +125,15 @@ function Resolve-EditionGeneratedFrontendContract {
     $frontendDistRelative = $frontendDistFull.Substring($repoPrefix.Length).
         Replace('\', '/')
 
-    # Universal and the current shared-core Sim/Lab overlays use the canonical
-    # Vite dist. Dedicated Edition frontends may use only their namespaced
-    # directory. Field already uses field-dist. No arbitrary config path is an
-    # accepted source-cleanliness exemption.
+    # All four desktop editions now use the canonical website-console AppShell
+    # and Vite dist. Legacy namespaced outputs remain valid only for the older
+    # Sim/Lab overlays; no arbitrary config path is a source-cleanliness
+    # exemption.
     $allowedRelativePaths = switch ($EditionId) {
         "universal" { @("frontend/dist") }
         "sim" { @("frontend/dist", "frontend/sim-dist") }
         "lab" { @("frontend/dist", "frontend/lab-dist") }
-        "field" { @("frontend/field-dist") }
+        "field" { @("frontend/dist") }
     }
     if ($frontendDistRelative -cnotin $allowedRelativePaths) {
         throw (
