@@ -84,7 +84,7 @@ describe("environment-aware routing", () => {
     router.dispose();
   });
 
-  it("routes a true desktop cold start through the 3D launcher", async () => {
+  it("routes a true desktop cold start into the edition console", async () => {
     installDesktopBridge();
     window.history.replaceState(null, "", "/#/");
     vi.resetModules();
@@ -94,7 +94,7 @@ describe("environment-aware routing", () => {
       element?: { props?: { to?: string; replace?: boolean } };
     } | undefined)?.element;
 
-    expect(indexElement?.props?.to).toBe("/desktop/setup");
+    expect(indexElement?.props?.to).toBe("/assistant");
     expect(indexElement?.props?.replace).toBe(true);
 
     router.dispose();

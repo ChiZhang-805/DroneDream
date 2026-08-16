@@ -33,9 +33,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
       children: [
         {
           index: true,
-          element: desktopRuntime
-            ? <Navigate to="/desktop/setup" replace />
-            : <Navigate to={fallbackPath} replace />,
+          element: <Navigate to={fallbackPath} replace />,
         },
         ...(BUILD_HAS_SIM_WORKSPACE ? [{
           path: "sim",
@@ -213,9 +211,11 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
 
 export function createAppRouter(desktopRuntime = isDesktopRuntime()) {
   const routes = appRoutes(desktopRuntime);
-  // A packaged Tauri app has no HTTP server to resolve /desktop/setup after a
+  // A packaged Tauri app has no HTTP server to resolve a console route after a
   // WebView reload. Hash history keeps every asset request on index.html while
-  // the hosted web app retains clean browser URLs and normal deep links.
+  // the hosted web app retains clean browser URLs and normal deep links. The
+  // desktop index now opens the same edition landing surface as the website;
+  // /desktop/setup remains an explicit Runtime install and repair destination.
   if (desktopRuntime) return createHashRouter(routes);
   const pathname = window.location.pathname;
   const basename =

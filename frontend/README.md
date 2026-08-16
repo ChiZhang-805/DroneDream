@@ -25,9 +25,11 @@ available only as an API compatibility surface; the desktop product creates and
 runs one optimization experiment at a time.
 
 Browser builds use history routing. The packaged desktop uses hash routing so
-navigation continues to work from bundled files. On first launch the desktop
-readiness layer starts the managed Runtime once, reuses the result for later
-route changes, and exposes an explicit full re-check from Settings.
+navigation continues to work from bundled files. A desktop cold start opens the
+same edition landing surface as the browser console. Runtime-backed actions stay
+closed until the user completes the explicit install, repair, or full re-check
+flow in Settings; the retained `/desktop/setup` route owns that flow without
+replacing the product workspace at every launch.
 
 ## Source layout
 
