@@ -262,7 +262,9 @@ export function History() {
         </div>
       </header>
 
-      {!runtimeAccess.canUseRuntime ? <RuntimeAccessNotice page="history" /> : null}
+      {!runtimeAccess.canUseRuntime ? (
+        <RuntimeAccessNotice page="history" showAction={false} />
+      ) : null}
       <div className="history-body">
       <SectionCard title={t("history.filters")}>
         <div className="history-filter-grid">

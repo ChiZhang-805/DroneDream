@@ -5,8 +5,10 @@ import { Alert } from "./Alert";
 
 export function RuntimeAccessNotice({
   page,
+  showAction = true,
 }: {
   page: "dashboard" | "history";
+  showAction?: boolean;
 }) {
   const runtimeAccess = useDesktopRuntimeAccess();
   const { t } = useI18n();
@@ -37,7 +39,7 @@ export function RuntimeAccessNotice({
                 ? t("runtimeGate.dashboardPreviewBody")
                 : t("runtimeGate.historyPreviewBody")}
       </p>
-      {!busy ? (
+      {!busy && showAction ? (
         <button className="btn btn-primary" type="button" onClick={openAppSettings}>
           {t("runtimeGate.openSetup")}
         </button>

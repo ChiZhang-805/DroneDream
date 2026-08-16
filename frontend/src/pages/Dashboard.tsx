@@ -140,7 +140,7 @@ export function Dashboard() {
 
       {!runtimeAccess.canUseRuntime ? (
         <div className="dashboard-runtime-fallback">
-          <RuntimeAccessNotice page="dashboard" />
+          <RuntimeAccessNotice page="dashboard" showAction={false} />
           <DashboardBody
             recentJobs={[]}
             totalJobs={0}
@@ -152,7 +152,7 @@ export function Dashboard() {
         <Loading label={t("dashboard.loading")} />
       ) : runtimeNetworkUnavailable ? (
         <div className="dashboard-runtime-fallback">
-          <RuntimeAccessNotice page="dashboard" />
+          <RuntimeAccessNotice page="dashboard" showAction={false} />
           <DashboardBody recentJobs={[]} totalJobs={0} counts={{}} />
         </div>
       ) : jobsQuery.isError ? (

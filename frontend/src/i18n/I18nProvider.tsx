@@ -170,11 +170,11 @@ const enTranslations = {
     "runtimeGate.startFailedTitle": "The local runtime could not start",
     "runtimeGate.startFailedBody":
       "DroneDream could not start the installed runtime automatically. Open Settings to diagnose or repair it.",
-    "runtimeGate.previewTitle": "Runtime data is not available yet",
+    "runtimeGate.previewTitle": "Runtime disconnected",
     "runtimeGate.dashboardPreviewBody":
-      "You can view the Dashboard, but live job summaries and tuning actions remain unavailable until DroneDreamRuntime is installed and running.",
+      "Live job data appears after DroneDreamRuntime connects.",
     "runtimeGate.historyPreviewBody":
-      "You can open History / Reports, but local job records and report actions remain unavailable until DroneDreamRuntime is installed and running.",
+      "Local job records appear after DroneDreamRuntime connects.",
     "runtimeGate.openSetup": "Open settings",
     "runtimeGate.redirectTitle": "This feature needs DroneDreamRuntime",
     "runtimeGate.redirectBody":
@@ -1757,9 +1757,9 @@ const zhTranslations = {
     "runtimeGate.startingBody": "已检测到安装完成的 DroneDreamRuntime，正在自动启动，请稍候。",
     "runtimeGate.startFailedTitle": "运行环境启动失败",
     "runtimeGate.startFailedBody": "DroneDream 未能自动启动已安装的运行环境，请打开设置进行诊断或修复。",
-    "runtimeGate.previewTitle": "运行数据暂不可用",
-    "runtimeGate.dashboardPreviewBody": "你可以浏览控制台，但在 DroneDreamRuntime 安装并运行前，实时任务汇总与调优操作暂不可用。",
-    "runtimeGate.historyPreviewBody": "你可以打开历史与报告页面，但在 DroneDreamRuntime 安装并运行前，本地任务记录与报告操作暂不可用。",
+    "runtimeGate.previewTitle": "运行环境未连接",
+    "runtimeGate.dashboardPreviewBody": "连接 DroneDreamRuntime 后显示实时任务数据。",
+    "runtimeGate.historyPreviewBody": "连接 DroneDreamRuntime 后显示本地任务记录。",
     "runtimeGate.openSetup": "打开设置",
     "runtimeGate.redirectTitle": "此功能需要 DroneDreamRuntime",
     "runtimeGate.redirectBody": "本次操作已被安全拦截。请在下方完成安装、启动或修复，然后重新打开该功能。",
