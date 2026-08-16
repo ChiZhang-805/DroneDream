@@ -469,7 +469,10 @@ async function verifySettings(page, testCase) {
   assert.equal(metrics.foregroundColor, "rgb(30, 23, 33)");
   assert.equal(metrics.mutedColor, "rgb(117, 108, 121)");
   assert.equal(metrics.accessModeColor, "rgb(30, 23, 33)");
-  assert.equal(metrics.headingColor, "rgb(30, 23, 33)");
+  assert.equal(
+    metrics.headingColor,
+    testCase.edition === "field" ? "rgb(58, 33, 23)" : "rgb(37, 27, 40)",
+  );
   const manage = usage.locator(".settings-model-plan-row .btn");
   const resetCards = usage.locator(".settings-reset-card-trigger");
   const refresh = usage.locator(".settings-model-refresh");
