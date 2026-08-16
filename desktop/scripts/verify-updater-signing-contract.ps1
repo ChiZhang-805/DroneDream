@@ -129,7 +129,7 @@ fs.writeFileSync(
   `${JSON.stringify({
     script_path: process.argv[1],
     arguments: capturedArguments,
-    password_present: password !== undefined,
+    password_present: typeof password === "string" && password.length > 0,
     password_length: password?.length ?? 0,
   }, null, 2)}\n`,
   "utf8",
