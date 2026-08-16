@@ -109,12 +109,17 @@ COPY runtime/scripts/runtime-init.sh /usr/lib/dronedream/runtime-init.sh
 COPY runtime/scripts/runtime-check.sh /usr/lib/dronedream/runtime-check.sh
 COPY runtime/scripts/px4-gazebo-smoke.py /usr/lib/dronedream/px4-gazebo-smoke.py
 COPY runtime/scripts/px4-log-cleanup.py /usr/lib/dronedream/px4-log-cleanup.py
+COPY runtime/scripts/engine-pack-manager.py /usr/lib/dronedream/engine-pack-manager.py
+COPY runtime/scripts/component-pack-manager.py /usr/lib/dronedream/component-pack-manager.py
+COPY engine-pack/tools/engine_pack.py /usr/lib/dronedream/engine_pack.py
 COPY runtime/systemd/*.service /etc/systemd/system/
 COPY runtime/systemd/*.timer /etc/systemd/system/
 
 RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh \
       /usr/lib/dronedream/runtime-check.sh /usr/lib/dronedream/px4-gazebo-smoke.py \
-      /usr/lib/dronedream/px4-log-cleanup.py && \
+      /usr/lib/dronedream/px4-log-cleanup.py /usr/lib/dronedream/engine-pack-manager.py \
+      /usr/lib/dronedream/component-pack-manager.py && \
+    chmod 0644 /usr/lib/dronedream/engine_pack.py && \
     install -d -m 0750 -o root -g dronedream /etc/dronedream && \
     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/artifacts && \
     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/runtime-smoke && \
@@ -129,6 +134,9 @@ RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh \
     test -x /opt/dronedream/venv/bin/uvicorn && \
     test -x /opt/dronedream/venv/bin/drone-dream-worker && \
     test -x /usr/lib/dronedream/px4-log-cleanup.py && \
+    test -x /usr/lib/dronedream/engine-pack-manager.py && \
+    test -x /usr/lib/dronedream/component-pack-manager.py && \
+    test -s /usr/lib/dronedream/engine_pack.py && \
     test -x /usr/bin/curl && \
     test -x /usr/bin/timeout && \
     test -x /usr/bin/head && \
