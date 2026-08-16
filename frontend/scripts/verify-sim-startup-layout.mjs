@@ -16,6 +16,11 @@ const args = new Map(process.argv.slice(2).map((argument) => {
   const [key, ...value] = argument.split("=");
   return [key, value.join("=") || true];
 }));
+const edition = String(args.get("--edition") || "sim");
+assert(
+  ["universal", "sim", "lab"].includes(edition),
+  `Unsupported shared desktop launcher edition: ${edition}`,
+);
 const label = String(args.get("--label") || "working-tree");
 const outputRoot = path.resolve(
   repoRoot,
@@ -33,7 +38,7 @@ const origin = `http://${host}:${port}`;
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
-process.env.VITE_DRONEDREAM_EDITION = "sim";
+process.env.VITE_DRONEDREAM_EDITION = edition;
 process.env.VITE_SUPABASE_URL = "https://visual-fixture.supabase.co";
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_visual_fixture";
 const productionEnvironment = await readFile(
@@ -367,17 +372,19 @@ async function verifyCase(browser, testCase) {
     assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
     assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
     assert.equal(dimensions.appearance, testCase.appearance);
-    assert.equal(dimensions.brandEdition, "sim");
+    assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
     assert.equal(dimensions.sceneStars, testCase.appearance === "light" ? "false" : "true");
     assert.equal(dimensions.sceneParticles, testCase.appearance === "light" ? "false" : "true");
     if (testCase.appearance === "light") {
       assert(dimensions.lightContrast, `${testCase.id}: light contrast metrics are missing`);
-      assert.equal(
-        dimensions.lightContrast.runtimeIndicatorColor,
-        testCase.scenario === "ready" ? "rgb(16, 40, 59)" : "rgb(23, 51, 75)",
-      );
-      assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(23, 51, 75)");
+      if (edition === "sim") {
+        assert.equal(
+          dimensions.lightContrast.runtimeIndicatorColor,
+          testCase.scenario === "ready" ? "rgb(16, 40, 59)" : "rgb(23, 51, 75)",
+        );
+        assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(23, 51, 75)");
+      }
       assert.equal(dimensions.lightContrast.hudColor, "rgba(255, 255, 255, 0.82)");
       assert.equal(dimensions.lightContrast.hudStrongColor, "rgb(255, 255, 255)");
       assert.match(dimensions.lightContrast.hudBackground, /rgba\(7, 42, 86, 0\.96\)/u);
@@ -520,6 +527,7 @@ try {
 
 const receipt = {
   schema_version: 1,
+  edition,
   subject_commit: git("rev-parse", "HEAD"),
   subject_dirty: Boolean(git("status", "--short")),
   branch: git("branch", "--show-current"),

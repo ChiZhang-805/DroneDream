@@ -26,6 +26,7 @@
     "test:lab-ui": "vitest run src/lab src/__tests__/router.test.ts",
     "test:lab-ui-layout": "node scripts/verify-lab-ui.mjs",
     "test:sim-startup-layout": "node scripts/verify-sim-startup-layout.mjs",
+    "test:desktop-startup-layout": "node scripts/verify-sim-startup-layout.mjs",
     "test:field-ui-layout": "node scripts/verify-field-ui-layout.mjs",
     "test:assistant-orchestration": "node scripts/verify-assistant-orchestration.mjs",
     "test:autonomy-mission-entry": "node scripts/verify-autonomy-mission-entry.mjs",

@@ -1567,7 +1567,7 @@ input:focus-visible {
   .field-launcher .launcher-brand .brand-lockup {
     width: min(220px, calc(100vw - 132px));
     height: auto;
-    max-height: 22px;
+    max-height: 38px;
   }
 
   .field-launcher .launcher-chrome-actions {
