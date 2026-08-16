@@ -13,7 +13,6 @@ import {
   type ComponentUpdateReport,
   type EnginePackStatus,
 } from "./bridge";
-import { BUILD_EDITION } from "../edition";
 
 export type AppUpdateStatus =
   | "checking"
@@ -57,8 +56,7 @@ const COMPONENT_INSTALL_ORDER: ComponentUpdateId[] = [
 ];
 
 function componentCatalogEnabled(): boolean {
-  return import.meta.env.VITE_COMPONENT_UPDATE_CATALOG_ENABLED === "true"
-    && BUILD_EDITION !== "field";
+  return import.meta.env.VITE_COMPONENT_UPDATE_CATALOG_ENABLED === "true";
 }
 
 function componentCatalogUrl(): string | undefined {

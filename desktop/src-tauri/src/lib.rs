@@ -2,13 +2,10 @@ mod app_update;
 mod browser_auth;
 mod browser_auth_audit;
 mod browser_auth_vault;
-#[cfg(not(dronedream_field))]
 mod component_update;
-#[cfg(not(dronedream_field))]
 mod desktop_api_bridge;
 mod distribution_plan;
 mod edition_safety;
-#[cfg(not(dronedream_field))]
 mod engine_pack;
 #[cfg(dronedream_hardware_domain)]
 mod field_adapters;
@@ -16,8 +13,6 @@ mod field_adapters;
 mod field_device;
 #[cfg(dronedream_hardware_domain)]
 mod field_harness;
-#[cfg(dronedream_field)]
-mod field_installer_handoff;
 #[cfg(dronedream_hardware_domain)]
 mod field_preflight;
 #[cfg(dronedream_hardware_domain)]
@@ -26,22 +21,16 @@ mod field_recovery;
 mod field_tuning;
 #[cfg(dronedream_hardware_domain)]
 mod hardware_domain;
-#[cfg(not(dronedream_field))]
 mod installer_handoff;
 #[cfg(dronedream_lab)]
 mod lab_calibration;
 mod preferences;
-#[cfg(not(dronedream_field))]
 mod prerequisites;
 #[cfg(target_os = "windows")]
 mod process;
-#[cfg(not(dronedream_field))]
 mod runtime;
-#[cfg(not(dronedream_field))]
 mod runtime_cache;
-#[cfg(not(dronedream_field))]
 mod runtime_installer;
-#[cfg(not(dronedream_field))]
 mod runtime_keepalive;
 mod webview2_preflight;
 
@@ -51,17 +40,6 @@ pub(crate) const MINIMUM_WINDOWS_BUILD: u32 = 19041;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(dronedream_field)]
-    match field_installer_handoff::handle_early_command_line() {
-        Ok(true) => return,
-        Ok(false) => {}
-        Err(error) => {
-            eprintln!("Field installer command failed: {error}");
-            std::process::exit(64);
-        }
-    }
-
-    #[cfg(not(dronedream_field))]
     match installer_handoff::handle_early_command_line() {
         Ok(true) => return,
         Ok(false) => {}
@@ -109,7 +87,6 @@ pub fn run() {
         }))
         .manage(browser_auth::BrowserAuthCoordinator::default());
 
-    #[cfg(not(dronedream_field))]
     let builder = builder
         .manage(runtime_installer::RuntimeInstaller::default())
         .manage(runtime_keepalive::RuntimeKeepalive::default())
@@ -121,7 +98,27 @@ pub fn run() {
         browser_auth::cancel_browser_auth,
         browser_auth::clear_browser_auth_vault,
         browser_auth::restore_browser_auth_vault,
+        prerequisites::probe_system_prerequisites,
         preferences::get_installer_locale,
+        installer_handoff::get_installer_runtime_intent,
+        installer_handoff::auto_start_installer_runtime,
+        installer_handoff::discard_installer_runtime_intent,
+        engine_pack::get_engine_pack_status,
+        engine_pack::ensure_app_update_idle,
+        engine_pack::install_embedded_engine_pack,
+        runtime::probe_runtime_status,
+        runtime::get_runtime_install_plan,
+        runtime_installer::start_runtime_install,
+        runtime_installer::get_runtime_install_progress,
+        runtime_installer::cancel_runtime_install,
+        runtime_installer::start_runtime,
+        runtime_installer::repair_runtime,
+        distribution_plan::validate_distribution_plan,
+        desktop_api_bridge::desktop_api_request,
+        desktop_api_bridge::desktop_download_artifact,
+        runtime_keepalive::stop_runtime_for_exit,
+        component_update::check_component_updates,
+        component_update::install_component_update,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
         field_adapters::inspect_field_protocol_frame,
