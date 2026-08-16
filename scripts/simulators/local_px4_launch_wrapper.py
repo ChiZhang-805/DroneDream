@@ -137,9 +137,10 @@ def _resolve_gazebo_transport_ip() -> str:
     if not _is_wsl_runtime():
         return "127.0.0.1"
 
+    ip_executable = shutil.which("ip") or "/usr/sbin/ip"
     try:
         result = subprocess.run(  # noqa: S603
-            ["ip", "-4", "route", "get", "1.1.1.1"],
+            [ip_executable, "-4", "route", "get", "1.1.1.1"],
             text=True,
             capture_output=True,
             check=False,
