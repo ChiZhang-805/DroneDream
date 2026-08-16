@@ -183,7 +183,7 @@ describe("desktop launcher chrome", () => {
     router.dispose();
   });
 
-  it("saves opt-in defaults and confirms permanent memory deletion", async () => {
+  it("keeps pre-login defaults local and never crosses the account API boundary", async () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     installDesktopBridge();
     const update = vi.spyOn(apiClient, "updateUserExperiencePreferences").mockResolvedValue({
@@ -211,10 +211,8 @@ describe("desktop launcher chrome", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     const dialog = screen.getByRole("dialog", { name: "Settings" });
     fireEvent.click(within(dialog).getByRole("tab", { name: "Memory" }));
-    await waitFor(() => {
-      expect(apiClient.getUserExperiencePreferences).toHaveBeenCalledTimes(1);
-    });
     const memory = await within(dialog).findByLabelText(/Cross-session memory/);
+    expect(apiClient.getUserExperiencePreferences).not.toHaveBeenCalled();
     expect(memory).not.toBeChecked();
     fireEvent.click(memory);
     fireEvent.change(within(dialog).getByLabelText("Default starter template"), {
@@ -228,13 +226,10 @@ describe("desktop launcher chrome", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save personal defaults" }));
 
-    await waitFor(() => expect(update).toHaveBeenCalledWith({
-      memory_enabled: true,
-      locale: "en",
-      default_template_key: "hover-basics@1",
-      default_track_type: "hover",
-      default_altitude_m: 4,
-    }));
+    await waitFor(() => {
+      expect(within(dialog).getByText("Personal defaults saved.")).toBeVisible();
+    });
+    expect(update).not.toHaveBeenCalled();
     expect(within(dialog).getByText("Personal defaults saved.")).toBeVisible();
 
     fireEvent.click(
@@ -246,11 +241,11 @@ describe("desktop launcher chrome", () => {
     expect(erase).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete permanently" }));
 
-    await waitFor(() => expect(erase).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(memory).not.toBeChecked());
+    expect(erase).not.toHaveBeenCalled();
     expect(
-      within(dialog).getByText("Personal defaults deleted; 2 memory rows erased."),
+      within(dialog).getByText("Personal defaults deleted; 0 memory rows erased."),
     ).toBeVisible();
-    expect(memory).not.toBeChecked();
 
     router.dispose();
   });

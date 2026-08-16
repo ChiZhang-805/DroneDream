@@ -782,7 +782,7 @@ function SettingsDialog({
   } = useModelAccess();
   const docsPreview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).has("docsPreview");
-  const legacyDesktopPreferences = !auth.account && !docsPreview && isDesktopRuntime();
+  const localDesktopPreferences = !auth.account && !docsPreview && isDesktopRuntime();
   const [managedUsage, setManagedUsage] =
     useState<ManagedModelUsageSnapshot | null>(
       docsPreview ? DOCS_PREVIEW_MANAGED_USAGE : null,
@@ -807,18 +807,13 @@ function SettingsDialog({
     useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
   const [experiencePreferenceState, setExperiencePreferenceState] =
     useState<"blocked" | "loading" | "ready" | "saving" | "saved" | "error">(
-      auth.account || docsPreview || legacyDesktopPreferences ? "loading" : "blocked",
+      auth.account || docsPreview || localDesktopPreferences ? "loading" : "blocked",
     );
   const [experiencePreferenceMessage, setExperiencePreferenceMessage] =
     useState<string | null>(null);
   const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
     useState(false);
   const preferenceHydratedRef = useRef(false);
-  const initialPreferencePresentationRef = useRef({
-    interfaceLocale,
-    appearanceMode: editionTheme.appearancePreference,
-    customAccent: editionTheme.customAccent,
-  });
   const [notificationPreferences, setNotificationPreferences] =
     useState<NotificationPreferences>(() => {
       try {
@@ -954,7 +949,7 @@ function SettingsDialog({
   ]);
   useEffect(() => {
     preferenceHydratedRef.current = false;
-    if (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) {
+    if (!preferenceBoundary && !docsPreview && !localDesktopPreferences) {
       setExperiencePreferenceState("blocked");
       setExperiencePreferenceMessage(null);
       setConfirmExperiencePreferenceDelete(false);
@@ -963,32 +958,11 @@ function SettingsDialog({
     let active = true;
     setExperiencePreferenceState("loading");
     setExperiencePreferenceMessage(null);
-    const load = docsPreview
+    const load = docsPreview || localDesktopPreferences
       ? Promise.resolve(null)
       : preferenceBoundary
         ? loadConsolePreferences(preferenceBoundary)
-        : apiClient.getUserExperiencePreferences().then((preferences): ConsolePreferenceRecord => ({
-            interface_locale: initialPreferencePresentationRef.current.interfaceLocale,
-            appearance_mode: initialPreferencePresentationRef.current.appearanceMode,
-            custom_accent: initialPreferencePresentationRef.current.customAccent,
-            notifications: DEFAULT_NOTIFICATION_PREFERENCES,
-            memory_enabled: preferences.memory_enabled,
-            memory_scopes: {
-              ...EMPTY_EXPERIENCE_PREFERENCE_DRAFT.memory_scopes,
-              chat_preferences: preferences.memory_enabled,
-              experiment_defaults: preferences.memory_enabled,
-            },
-            defaults: {
-              template: preferences.default_template_key,
-              vehicle: null,
-              track: preferences.default_track_type,
-              altitude_m: preferences.default_altitude_m,
-              objective: null,
-              safety_profile: null,
-              units: null,
-              report_format: null,
-            },
-          }));
+        : Promise.resolve(null);
     void load
       .then((preferences) => {
         if (!active) return;
@@ -1031,7 +1005,7 @@ function SettingsDialog({
     };
   }, [
     docsPreview,
-    legacyDesktopPreferences,
+    localDesktopPreferences,
     preferenceBoundary,
     setAppearancePreference,
     setCustomAccentPreference,
@@ -1062,7 +1036,7 @@ function SettingsDialog({
   ]);
   const saveExperiencePreferences = async () => {
     if (
-      (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) ||
+      (!preferenceBoundary && !docsPreview && !localDesktopPreferences) ||
       experiencePreferenceState === "blocked" ||
       experiencePreferenceState === "loading" ||
       experiencePreferenceState === "saving"
@@ -1074,14 +1048,9 @@ function SettingsDialog({
     try {
       if (preferenceBoundary) {
         await saveConsolePreferences(preferenceBoundary, consolePreferenceRecord());
-      } else if (legacyDesktopPreferences) {
-        await apiClient.updateUserExperiencePreferences({
-          memory_enabled: experiencePreferenceDraft.memory_enabled,
-          locale: interfaceLocale === "zh-CN" ? "zh-CN" : "en",
-          default_template_key: experiencePreferenceDraft.default_template_key,
-          default_track_type: experiencePreferenceDraft.default_track_type,
-          default_altitude_m: experiencePreferenceDraft.default_altitude_m,
-        });
+      } else if (localDesktopPreferences) {
+        // Pre-login settings remain usable, but account-scoped Memory is never
+        // sent to the Runtime without an authenticated account boundary.
       }
       preferenceHydratedRef.current = true;
       setExperiencePreferenceState("saved");
@@ -1093,7 +1062,7 @@ function SettingsDialog({
   };
   const deleteExperiencePreferences = async () => {
     if (
-      (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) ||
+      (!preferenceBoundary && !docsPreview && !localDesktopPreferences) ||
       experiencePreferenceState === "blocked" ||
       experiencePreferenceState === "loading" ||
       experiencePreferenceState === "saving"
@@ -1105,8 +1074,8 @@ function SettingsDialog({
     try {
       const deletedCount = preferenceBoundary
         ? await deleteConsolePreferencesAndMemory(preferenceBoundary)
-        : legacyDesktopPreferences
-          ? (await apiClient.deleteUserExperiencePreferences()).deleted_memory_count
+        : localDesktopPreferences
+          ? 0
           : 0;
       preferenceHydratedRef.current = false;
       setExperiencePreferenceDraft(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);

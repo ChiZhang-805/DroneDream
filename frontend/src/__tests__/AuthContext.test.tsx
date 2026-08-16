@@ -2,7 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
-import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
+import {
+  activateDesktopAuthSession,
+  ADOPT_DESKTOP_AUTH_EVENT,
+} from "../features/auth/desktopAuthActivation";
 
 const authMock = vi.hoisted(() => {
   const state = {
@@ -128,6 +131,15 @@ function AccountProbe() {
   );
 }
 
+function adoptDesktopAccount(): void {
+  window.dispatchEvent(new CustomEvent(ADOPT_DESKTOP_AUTH_EVENT, {
+    detail: {
+      user: authMock.state.user,
+      accessToken: "session-token",
+    },
+  }));
+}
+
 describe("AuthContext account profile", () => {
   afterEach(() => {
     authMock.state.user = {
@@ -243,7 +255,7 @@ describe("AuthContext account profile", () => {
   });
 
   it.each(["/", "/#/desktop/setup"])(
-    "does not hydrate the desktop launcher at %s until the 100 percent sign-in action activates it",
+    "keeps Supabase session state out of the desktop launcher at %s and adopts only the native access token",
     async (launcherUrl) => {
     window.__TAURI__ = {
       core: {
@@ -264,10 +276,11 @@ describe("AuthContext account profile", () => {
     expect(screen.getByLabelText("username")).toHaveTextContent("");
 
     activateDesktopAuthSession();
+    adoptDesktopAccount();
 
     await waitFor(() => {
-      expect(authMock.getSession).toHaveBeenCalledTimes(1);
-      expect(authMock.onAuthStateChange).toHaveBeenCalledTimes(1);
+      expect(authMock.getSession).not.toHaveBeenCalled();
+      expect(authMock.onAuthStateChange).not.toHaveBeenCalled();
       expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name");
     });
     },
@@ -337,6 +350,7 @@ describe("AuthContext account profile", () => {
       </AuthProvider>,
     );
     activateDesktopAuthSession();
+    adoptDesktopAccount();
     await screen.findByText("pilot.name");
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
@@ -363,6 +377,7 @@ describe("AuthContext account profile", () => {
       </AuthProvider>,
     );
     activateDesktopAuthSession();
+    adoptDesktopAccount();
     await screen.findByText("pilot.name");
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
