@@ -58,9 +58,17 @@ if ($desktopVisualQa -and -not $AllowUnsignedUpdater) {
     throw "Desktop visual-QA mode is forbidden for signed updater builds."
 }
 $visualQaConfig = if ($desktopVisualQa) {
-    [ordered]@{
-        identifier = "io.dronedream.desktop.$EditionId.visual-qa"
-    } | ConvertTo-Json -Compress
+    $candidate = Join-Path $PSScriptRoot (
+        "..\src-tauri\visual-qa\tauri.$EditionId.visual-qa.conf.json"
+    )
+    $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction Stop
+    $config = Get-Content -LiteralPath $resolved.Path -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+    $expectedIdentifier = "io.dronedream.desktop.$EditionId.visual-qa"
+    if ([string]$config.identifier -cne $expectedIdentifier) {
+        throw "Desktop visual-QA config must use isolated identifier $expectedIdentifier."
+    }
+    $resolved.Path
 } else {
     $null
 }
