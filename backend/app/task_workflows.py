@@ -612,15 +612,12 @@ def compile_task_workflow(
     owner_id: str, request: TaskWorkflowCompileRequest
 ) -> TaskWorkflowContract:
     owner_binding = hashlib.sha256(f"task-workflow:{owner_id}".encode()).hexdigest()
-    routing_source: Literal["explicit", "auto_detect"] = (
-        "auto_detect" if request.requested_task_type == "auto_detect" else "explicit"
-    )
-    task_type = (
-        classify_task(request.message, request.edition)
-        if routing_source == "auto_detect"
-        else request.requested_task_type
-    )
-    assert task_type != "auto_detect"
+    if request.requested_task_type == "auto_detect":
+        routing_source: Literal["explicit", "auto_detect"] = "auto_detect"
+        task_type = classify_task(request.message, request.edition)
+    else:
+        routing_source = "explicit"
+        task_type = request.requested_task_type
     blockers: list[str] = []
     if task_type not in EDITION_TASKS[request.edition]:
         blockers.append(f"edition.{request.edition}.task.{task_type}.denied")
