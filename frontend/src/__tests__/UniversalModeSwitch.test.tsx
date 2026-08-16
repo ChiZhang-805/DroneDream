@@ -19,9 +19,9 @@ describe("UniversalModeSwitch", () => {
     delete document.documentElement.dataset.themeGrantsHardwareAuthority;
   });
 
-  it("fails unknown persisted values back to the SIM workspace", () => {
-    expect(parseUniversalMode("unknown")).toBe("sim");
-    expect(loadUniversalMode()).toBe("sim");
+  it("fails unknown persisted values back to the Universal workspace", () => {
+    expect(parseUniversalMode("unknown")).toBe("universal");
+    expect(loadUniversalMode()).toBe("universal");
   });
 
   it("persists and applies a presentation-only mode without changing install selection", () => {
