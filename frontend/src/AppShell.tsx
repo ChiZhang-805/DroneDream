@@ -6,7 +6,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { ChangeEvent, MouseEvent, ReactNode, RefObject } from "react";
+import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
@@ -66,6 +66,11 @@ import {
   type SettingsSurfaceTab,
   type SettingsSurfaceTabId,
 } from "./components/EditionSettingsSurface";
+import {
+  SETTINGS_LOCALES,
+  SettingsLanguageRegionIcon,
+  SettingsToggle,
+} from "./components/SettingsPrimitives";
 import { UniversalModeSwitch } from "./components/UniversalModeSwitch";
 import {
   EDITION_BRAND_TOKENS,
@@ -433,15 +438,6 @@ const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   runtime: true,
 };
 
-const SETTINGS_LOCALES = [
-  { id: "en", label: "English", region: "west" },
-  { id: "zh-CN", label: "简体中文", region: "east" },
-  { id: "zh-TW", label: "繁體中文", region: "east" },
-  { id: "es", label: "Español", region: "west" },
-  { id: "ja", label: "日本語", region: "east" },
-  { id: "ko", label: "한국어", region: "east" },
-] as const;
-
 type SettingsCopy = Readonly<{
   title: string;
   tabs: readonly [string, string, string, string];
@@ -571,33 +567,6 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     courseEditions: ["기체 모델링, 반복 가능한 시뮬레이션, 실험실 검증, 현장 전달을 하나의 작업 공간에서 연결합니다. 요구 사항, 매개변수, 승인, 보고서와 버전 기록을 유지하여 모든 판단을 추적·검토·검증할 수 있는 엔지니어링 증거로 만듭니다.", "PX4와 Gazebo에서 시나리오, 매개변수 범위, 예산, 목표와 안전 제약을 명확히 한 반복 연구를 설계합니다. 공통 지표로 후보와 독립 증거를 비교하고 실패를 설명하며 결과를 구조화된 실험 기록으로 보존합니다.", "시뮬레이션 증거와 실제 하드웨어 데이터를 보정, 차이 진단, 통제 시험과 안전 게이트로 연결합니다. Sim-to-Real 및 Real-to-Sim 변경, 승인과 자격 검증을 기록하여 모든 모델 업데이트의 근거와 이력을 유지합니다.", "호환성 확인, 운영자 승인, 텔레메트리 경계, 매개변수 스냅샷, 중단 규칙과 신뢰할 롤백 계획으로 실제 기체 튜닝을 준비합니다. 모든 현장 작업은 실행 전 검토되고 완료 후 안전한 후속 결정을 위한 감사 기록을 남깁니다."],
   },
 };
-
-function SettingsToggle({
-  checked,
-  className,
-  disabled = false,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  className?: string;
-  disabled?: boolean;
-  label: ReactNode;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className={`settings-toggle-row${className ? ` ${className}` : ""}`}>
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <i aria-hidden="true" />
-    </label>
-  );
-}
 
 function AllowanceCardIcon({
   card,
@@ -757,18 +726,6 @@ function AccountScopedModelAccessProvider() {
   );
 }
 
-function LanguageRegionIcon({ region }: { region: "west" | "east" }) {
-  return (
-    <span className={`launcher-language-icon launcher-language-icon-${region}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="8.25" />
-        <path d="M3.9 12h16.2M12 3.75c2.1 2.25 3.2 5 3.2 8.25S14.1 18 12 20.25C9.9 18 8.8 15.25 8.8 12S9.9 6 12 3.75Z" />
-        <circle className="launcher-language-region" cx={region === "west" ? "8" : "16"} cy="10" r="1.65" />
-      </svg>
-    </span>
-  );
-}
-
 type RuntimeHealthLevel = "unknown" | "healthy" | "warning" | "error";
 
 const COMPONENT_STATE_KEY: Record<RuntimeComponentState, TranslationKey> = {
@@ -825,7 +782,7 @@ function SettingsDialog({
   } = useModelAccess();
   const docsPreview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).has("docsPreview");
-  const legacyDesktopPreferences = !auth.account && !docsPreview && isDesktopRuntime();
+  const localDesktopPreferences = !auth.account && !docsPreview && isDesktopRuntime();
   const [managedUsage, setManagedUsage] =
     useState<ManagedModelUsageSnapshot | null>(
       docsPreview ? DOCS_PREVIEW_MANAGED_USAGE : null,
@@ -850,18 +807,13 @@ function SettingsDialog({
     useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
   const [experiencePreferenceState, setExperiencePreferenceState] =
     useState<"blocked" | "loading" | "ready" | "saving" | "saved" | "error">(
-      auth.account || docsPreview || legacyDesktopPreferences ? "loading" : "blocked",
+      auth.account || docsPreview || localDesktopPreferences ? "loading" : "blocked",
     );
   const [experiencePreferenceMessage, setExperiencePreferenceMessage] =
     useState<string | null>(null);
   const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
     useState(false);
   const preferenceHydratedRef = useRef(false);
-  const initialPreferencePresentationRef = useRef({
-    interfaceLocale,
-    appearanceMode: editionTheme.appearancePreference,
-    customAccent: editionTheme.customAccent,
-  });
   const [notificationPreferences, setNotificationPreferences] =
     useState<NotificationPreferences>(() => {
       try {
@@ -997,7 +949,7 @@ function SettingsDialog({
   ]);
   useEffect(() => {
     preferenceHydratedRef.current = false;
-    if (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) {
+    if (!preferenceBoundary && !docsPreview && !localDesktopPreferences) {
       setExperiencePreferenceState("blocked");
       setExperiencePreferenceMessage(null);
       setConfirmExperiencePreferenceDelete(false);
@@ -1006,32 +958,11 @@ function SettingsDialog({
     let active = true;
     setExperiencePreferenceState("loading");
     setExperiencePreferenceMessage(null);
-    const load = docsPreview
+    const load = docsPreview || localDesktopPreferences
       ? Promise.resolve(null)
       : preferenceBoundary
         ? loadConsolePreferences(preferenceBoundary)
-        : apiClient.getUserExperiencePreferences().then((preferences): ConsolePreferenceRecord => ({
-            interface_locale: initialPreferencePresentationRef.current.interfaceLocale,
-            appearance_mode: initialPreferencePresentationRef.current.appearanceMode,
-            custom_accent: initialPreferencePresentationRef.current.customAccent,
-            notifications: DEFAULT_NOTIFICATION_PREFERENCES,
-            memory_enabled: preferences.memory_enabled,
-            memory_scopes: {
-              ...EMPTY_EXPERIENCE_PREFERENCE_DRAFT.memory_scopes,
-              chat_preferences: preferences.memory_enabled,
-              experiment_defaults: preferences.memory_enabled,
-            },
-            defaults: {
-              template: preferences.default_template_key,
-              vehicle: null,
-              track: preferences.default_track_type,
-              altitude_m: preferences.default_altitude_m,
-              objective: null,
-              safety_profile: null,
-              units: null,
-              report_format: null,
-            },
-          }));
+        : Promise.resolve(null);
     void load
       .then((preferences) => {
         if (!active) return;
@@ -1074,7 +1005,7 @@ function SettingsDialog({
     };
   }, [
     docsPreview,
-    legacyDesktopPreferences,
+    localDesktopPreferences,
     preferenceBoundary,
     setAppearancePreference,
     setCustomAccentPreference,
@@ -1105,7 +1036,7 @@ function SettingsDialog({
   ]);
   const saveExperiencePreferences = async () => {
     if (
-      (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) ||
+      (!preferenceBoundary && !docsPreview && !localDesktopPreferences) ||
       experiencePreferenceState === "blocked" ||
       experiencePreferenceState === "loading" ||
       experiencePreferenceState === "saving"
@@ -1117,14 +1048,9 @@ function SettingsDialog({
     try {
       if (preferenceBoundary) {
         await saveConsolePreferences(preferenceBoundary, consolePreferenceRecord());
-      } else if (legacyDesktopPreferences) {
-        await apiClient.updateUserExperiencePreferences({
-          memory_enabled: experiencePreferenceDraft.memory_enabled,
-          locale: interfaceLocale === "zh-CN" ? "zh-CN" : "en",
-          default_template_key: experiencePreferenceDraft.default_template_key,
-          default_track_type: experiencePreferenceDraft.default_track_type,
-          default_altitude_m: experiencePreferenceDraft.default_altitude_m,
-        });
+      } else if (localDesktopPreferences) {
+        // Pre-login settings remain usable, but account-scoped Memory is never
+        // sent to the Runtime without an authenticated account boundary.
       }
       preferenceHydratedRef.current = true;
       setExperiencePreferenceState("saved");
@@ -1136,7 +1062,7 @@ function SettingsDialog({
   };
   const deleteExperiencePreferences = async () => {
     if (
-      (!preferenceBoundary && !docsPreview && !legacyDesktopPreferences) ||
+      (!preferenceBoundary && !docsPreview && !localDesktopPreferences) ||
       experiencePreferenceState === "blocked" ||
       experiencePreferenceState === "loading" ||
       experiencePreferenceState === "saving"
@@ -1148,8 +1074,8 @@ function SettingsDialog({
     try {
       const deletedCount = preferenceBoundary
         ? await deleteConsolePreferencesAndMemory(preferenceBoundary)
-        : legacyDesktopPreferences
-          ? (await apiClient.deleteUserExperiencePreferences()).deleted_memory_count
+        : localDesktopPreferences
+          ? 0
           : 0;
       preferenceHydratedRef.current = false;
       setExperiencePreferenceDraft(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
@@ -1331,7 +1257,7 @@ function SettingsDialog({
   const settingsTabs: readonly SettingsSurfaceTab[] = [
     { id: "general", label: settingsCopy.tabs[0] },
     { id: "memory", label: settingsCopy.tabs[1] },
-    { id: "model", label: settingsCopy.tabs[2] },
+    { id: "model", label: settingsCopy.tabs[2], disabled: !auth.account },
     { id: "course", label: "ECE498BH" },
     ...(access.desktopRuntime
       ? [{ id: "runtime", label: settingsCopy.tabs[3] } as const]
@@ -1398,13 +1324,13 @@ function SettingsDialog({
       onTabChange={setActiveSettingsTab}
       tabs={settingsTabs}
       title={settingsCopy.title}
-      consumerProfile={edition === "field" ? "field-lightweight" : edition}
+      consumerProfile={edition}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
         <section className="settings-general-panel">
           <div className="settings-general-card settings-language-card">
             <div className="settings-card-heading">
-              <span><LanguageRegionIcon region="west" />{settingsCopy.language}</span>
+              <span><SettingsLanguageRegionIcon region="west" />{settingsCopy.language}</span>
             </div>
             <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
               {SETTINGS_LOCALES.map((option) => (
@@ -1416,7 +1342,7 @@ function SettingsDialog({
                   aria-pressed={interfaceLocale === option.id}
                   onClick={() => setLocale(option.id)}
                 >
-                  <LanguageRegionIcon region={option.region} />
+                  <SettingsLanguageRegionIcon region={option.region} />
                   <strong>{option.label}</strong>
                   <i aria-hidden="true">✓</i>
                 </button>
@@ -3203,12 +3129,17 @@ function AppShellContent() {
     "engineUpdateDeferred",
     "reconcilingEngine",
     "engineError",
+    "componentAvailable",
+    "installingComponents",
+    "componentUpdateDeferred",
+    "componentError",
     "runtimeBaseRequired",
   ].includes(updater.status);
   const sidebarUpdateBusy = [
     "downloading",
     "installing",
     "reconcilingEngine",
+    "installingComponents",
   ].includes(updater.status);
 
   useEffect(() => {
@@ -3241,6 +3172,10 @@ function AppShellContent() {
     ? updater.error
       ? t("updater.sidebarDeferred")
       : t("updater.sidebarAvailable")
+    : updater.status === "componentAvailable"
+      ? t("updater.sidebarComponents")
+    : updater.status === "installingComponents"
+      ? t("updater.components")
     : updater.status === "runtimeBaseRequired"
       ? t("updater.sidebarRuntimeBase")
       : sidebarUpdateBusy
@@ -3253,6 +3188,17 @@ function AppShellContent() {
     }
     if (updater.status === "engineUpdateDeferred") {
       void updater.reconcileEnginePack();
+      return;
+    }
+    if (updater.status === "componentAvailable") {
+      void updater.installComponentUpdates();
+      return;
+    }
+    if (
+      updater.status === "componentUpdateDeferred"
+      || updater.status === "componentError"
+    ) {
+      void updater.checkForUpdates();
       return;
     }
     if (updater.status === "runtimeBaseRequired") {
@@ -3289,7 +3235,8 @@ function AppShellContent() {
       updater.status === "checking" ||
       updater.status === "downloading" ||
       updater.status === "installing" ||
-      updater.status === "reconcilingEngine"
+      updater.status === "reconcilingEngine" ||
+      updater.status === "installingComponents"
     ) {
       setDesktopStartupGateState("checking", {
         accountId: auth.account?.id ?? null,
@@ -3297,8 +3244,13 @@ function AppShellContent() {
       return;
     }
     if (
-      updater.status === "available" ||
+      (updater.status === "available" && updater.updateRequired) ||
       updater.status === "engineError" ||
+      ([
+        "componentAvailable",
+        "componentUpdateDeferred",
+        "componentError",
+      ].includes(updater.status) && updater.updateRequired) ||
       updater.status === "runtimeBaseRequired"
     ) {
       setDesktopStartupGateState("blocked", {
@@ -3356,6 +3308,7 @@ function AppShellContent() {
     updater.availableVersion,
     updater.error,
     updater.status,
+    updater.updateRequired,
   ]);
 
   const closeSettings = useCallback(() => {

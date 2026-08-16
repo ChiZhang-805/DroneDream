@@ -28,6 +28,7 @@ import {
   isDesktopRuntime,
   probeRuntimeStatus,
   startRuntimeInstall,
+  startRuntimeUpgrade,
 } from "../desktop/bridge";
 import type {
   DiskInfo,
@@ -54,7 +55,7 @@ import {
   isRuntimeFullyReady,
   MINIMUM_MEMORY_BYTES,
 } from "../desktop/readiness";
-import { useLauncherProgress } from "../desktop/launcherProgress";
+import { launcherProgressFromEvidence } from "../desktop/launcherProgress";
 import {
   runtimeSessionContractFailure,
   verifyRuntimeSessionContract,
@@ -150,9 +151,11 @@ const ACTIVE_INSTALL_PHASES = new Set<RuntimeInstallPhase>([
   "verifyingManifest",
   "downloading",
   "verifyingArchive",
+  "backingUp",
   "importing",
   "starting",
   "healthChecking",
+  "restoring",
 ]);
 
 const GIB = 1024 ** 3;
@@ -388,15 +391,26 @@ export function DesktopSetup() {
     updater.status === "checking" ||
     updater.status === "downloading" ||
     updater.status === "installing" ||
-    updater.status === "reconcilingEngine";
+    updater.status === "reconcilingEngine" ||
+    updater.status === "installingComponents";
   const updaterBlocksWorkspace =
     updaterBusy ||
-    updater.status === "available" ||
+    (updater.status === "available" && updater.updateRequired) ||
     updater.status === "engineError" ||
+    ([
+      "componentAvailable",
+      "componentUpdateDeferred",
+      "componentError",
+    ].includes(updater.status) && updater.updateRequired) ||
     updater.status === "runtimeBaseRequired";
   const updaterActionRequired =
-    updater.status === "available" ||
+    (updater.status === "available" && updater.updateRequired) ||
     updater.status === "engineError" ||
+    ([
+      "componentAvailable",
+      "componentUpdateDeferred",
+      "componentError",
+    ].includes(updater.status) && updater.updateRequired) ||
     updater.status === "runtimeBaseRequired";
   const localChecksReady =
     localRuntimeReady &&
@@ -432,12 +446,16 @@ export function DesktopSetup() {
         : "launcher.accountVerificationFailed";
   const environmentBlocked =
     localRuntimeReady && !localChecksReady && !environmentChecking;
-  const launcherProgress = useLauncherProgress({
+  const launcherProgress = launcherProgressFromEvidence({
     enabled: Boolean(
       desktopAvailable &&
       state.runtimeFresh &&
       state.runtime?.installed,
     ),
+    prerequisitesFresh: state.prerequisitesFresh,
+    runtimeFresh: state.runtimeFresh,
+    runtime: state.runtime,
+    runtimeAccessStatus: runtimeAccess.status,
     complete: localChecksReady && !updaterBlocksWorkspace,
     blocked: Boolean(
       runtimeSessionFailure ||
@@ -560,7 +578,8 @@ export function DesktopSetup() {
       updater.status === "checking" ||
       updater.status === "downloading" ||
       updater.status === "installing" ||
-      updater.status === "reconcilingEngine"
+      updater.status === "reconcilingEngine" ||
+      updater.status === "installingComponents"
     ) {
       setDesktopStartupGateState("checking", {
         accountId: signedInAccount?.id ?? null,
@@ -568,8 +587,13 @@ export function DesktopSetup() {
       return;
     }
     if (
-      updater.status === "available" ||
+      (updater.status === "available" && updater.updateRequired) ||
       updater.status === "engineError" ||
+      ([
+        "componentAvailable",
+        "componentUpdateDeferred",
+        "componentError",
+      ].includes(updater.status) && updater.updateRequired) ||
       updater.status === "runtimeBaseRequired"
     ) {
       setDesktopStartupGateState("blocked", {
@@ -590,6 +614,7 @@ export function DesktopSetup() {
     updater.availableVersion,
     updater.error,
     updater.status,
+    updater.updateRequired,
   ]);
 
   useEffect(() => {
@@ -868,6 +893,42 @@ export function DesktopSetup() {
     state.plan,
   ]);
 
+  const beginRuntimeUpgrade = useCallback(async () => {
+    if (
+      !desktopAvailable ||
+      updater.status !== "runtimeBaseRequired" ||
+      installState.commandBusy ||
+      isActiveInstall(installState.snapshot) ||
+      !state.runtimeFresh ||
+      state.runtime?.installed !== true ||
+      !releaseManifestUrl
+    ) return;
+
+    setInstallState((current) => ({
+      ...current,
+      commandError: null,
+      commandBusy: true,
+    }));
+    try {
+      const snapshot = await startRuntimeUpgrade({ releaseManifestUrl });
+      setInstallState({ snapshot, commandError: null, commandBusy: false });
+    } catch (error) {
+      setInstallState((current) => ({
+        ...current,
+        commandError: `start_runtime_upgrade: ${errorMessage(error)}`,
+        commandBusy: false,
+      }));
+    }
+  }, [
+    desktopAvailable,
+    installState.commandBusy,
+    installState.snapshot,
+    releaseManifestUrl,
+    state.runtime,
+    state.runtimeFresh,
+    updater.status,
+  ]);
+
   const cancelInstall = useCallback(async () => {
     if (
       !desktopAvailable ||
@@ -943,7 +1004,8 @@ export function DesktopSetup() {
     ) return;
     completedOperation.current = snapshot.operationId;
     void refresh();
-  }, [installState.snapshot, refresh]);
+    void updater.checkForUpdates();
+  }, [installState.snapshot, refresh, updater.checkForUpdates]);
 
   useEffect(() => {
     if (!desktopAvailable) return;
@@ -1400,7 +1462,7 @@ export function DesktopSetup() {
           </Alert>
         ) : null}
 
-        {updater.status === "available" ? (
+        {updater.status === "available" && updater.updateRequired ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
@@ -1414,6 +1476,27 @@ export function DesktopSetup() {
                   })}
             </button>
           </div>
+        ) : updater.status === "componentAvailable" && updater.updateRequired ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void updater.installComponentUpdates()}
+            >
+              {t("updater.componentsAvailable")}
+            </button>
+          </div>
+        ) : (["componentUpdateDeferred", "componentError"].includes(updater.status)
+          && updater.updateRequired) ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void updater.checkForUpdates()}
+            >
+              {t("updater.sidebarRetry")}
+            </button>
+          </div>
         ) : updater.status === "engineError" ? (
           <div className="launcher-ready-actions">
             <button
@@ -1425,9 +1508,16 @@ export function DesktopSetup() {
             </button>
           </div>
         ) : updater.status === "runtimeBaseRequired" ? (
-          <Alert tone="warning" title={t("launcher.runtimeSessionApiTitle")}>
-            <p>{t("updater.runtimeBaseRequired")}</p>
-          </Alert>
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              disabled={busy || !releaseManifestUrl}
+              onClick={() => void beginRuntimeUpgrade()}
+            >
+              {t("updater.upgradeRuntimeBase")}
+            </button>
+          </div>
         ) : runtimeSessionFailureKey ? (
           <div className="launcher-ready-actions">
             <button
@@ -2495,10 +2585,12 @@ const LAUNCHER_STATUS_KEYS: Record<RuntimeInstallPhase, TranslationKey> = {
   verifyingManifest: "launcher.status.verifyingManifest",
   downloading: "launcher.status.downloading",
   verifyingArchive: "launcher.status.verifyingArchive",
+  backingUp: "launcher.status.backingUp",
   importing: "launcher.status.importing",
   waitingForRestart: "launcher.status.waitingForRestart",
   starting: "launcher.status.starting",
   healthChecking: "launcher.status.healthChecking",
+  restoring: "launcher.status.restoring",
   completed: "launcher.status.ready",
   failed: "launcher.status.failed",
   cancelled: "launcher.status.cancelled",
@@ -2753,9 +2845,11 @@ const INSTALL_PROGRESS_PHASES: RuntimeInstallPhase[] = [
   "verifyingManifest",
   "downloading",
   "verifyingArchive",
+  "backingUp",
   "importing",
   "starting",
   "healthChecking",
+  "restoring",
 ];
 
 function RuntimeInstallControls({
@@ -3029,9 +3123,11 @@ const INSTALL_PHASE_KEYS: Record<RuntimeInstallPhase, TranslationKey> = {
   verifyingManifest: "desktop.installPhase.verifyingManifest",
   downloading: "desktop.installPhase.downloading",
   verifyingArchive: "desktop.installPhase.verifyingArchive",
+  backingUp: "desktop.installPhase.backingUp",
   importing: "desktop.installPhase.importing",
   starting: "desktop.installPhase.starting",
   healthChecking: "desktop.installPhase.healthChecking",
+  restoring: "desktop.installPhase.restoring",
   waitingForRestart: "desktop.installPhase.waitingForRestart",
   completed: "desktop.installPhase.completed",
   failed: "desktop.installPhase.failed",

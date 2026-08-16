@@ -11,46 +11,99 @@
 ; uninstall and never deletes shared WebView2 files or registry keys.
 
 !include "${__FILEDIR__}\runtime-mode.nsh"
+!define DRONEDREAM_EDITION_IDENTITY_FILE "${__FILEDIR__}\edition-identity.nsh"
+!macro DRONEDREAM_EDITION_IDENTITY_TABLE
+  !include "${DRONEDREAM_EDITION_IDENTITY_FILE}"
+!macroend
+
+; Recreate only shortcuts that already belong to this installation. The main
+; executable carries the canonical icon selected by the exact Edition overlay,
+; so a shared resource can never make SIM/LAB/FIELD shortcuts look Universal.
+; Missing shortcuts stay missing, including when the user chose /NS.
+!macro DRONEDREAM_REFRESH_BRANDED_SHORTCUT SHORTCUT_PATH
+  !insertmacro IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $0
+  ${If} $0 != 1
+    !insertmacro IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\$OldMainBinaryName"
+    Pop $0
+  ${EndIf}
+  ${If} $0 = 1
+    Delete "${SHORTCUT_PATH}"
+    CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
+    !insertmacro SetLnkAppUserModelId "${SHORTCUT_PATH}"
+  ${EndIf}
+!macroend
+
+; Early edition candidates used PRODUCTNAME as the shortcut filename. Migrate
+; that link only when it belongs to this exact installation and the canonical
+; display-name path is free. Cross-edition and legacy collisions are preserved.
+!macro DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT DISPLAY_PATH INTERNAL_PATH LABEL_PREFIX
+  !if "${DRONEDREAM_SHORTCUTNAME}" != "${PRODUCTNAME}"
+    IfFileExists "${INTERNAL_PATH}" 0 ${LABEL_PREFIX}_done
+    !insertmacro IsShortcutTarget "${INTERNAL_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"
+    Pop $0
+    ${If} $0 != 1
+      !insertmacro IsShortcutTarget "${INTERNAL_PATH}" "$INSTDIR\$OldMainBinaryName"
+      Pop $0
+    ${EndIf}
+    ${If} $0 = 1
+      IfFileExists "${DISPLAY_PATH}" ${LABEL_PREFIX}_display_exists 0
+      Rename "${INTERNAL_PATH}" "${DISPLAY_PATH}"
+      Goto ${LABEL_PREFIX}_done
+      ${LABEL_PREFIX}_display_exists:
+        !insertmacro IsShortcutTarget "${DISPLAY_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"
+        Pop $0
+        ${If} $0 = 1
+          Delete "${INTERNAL_PATH}"
+        ${Else}
+          DetailPrint "$(DD_ShortcutConflict)"
+        ${EndIf}
+    ${EndIf}
+    ${LABEL_PREFIX}_done:
+  !endif
+!macroend
 
 !macro NSIS_HOOK_PREINSTALL
   Push $0
   Push $1
 
-  ; Protocol 2 installers hold a durable native quiesce across running-process
-  ; checks, old-version uninstall, executable replacement and receipt clearing.
-  ; Protocol 1 is retained only as a compatibility gate for the status commands
-  ; that version actually implemented.
-  IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_no_existing_operation
-    ReadRegDWORD $1 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
-    ${If} $1 >= 2
-      Call DroneDreamRevalidateRuntimeQuiesce
-      Pop $0
-      ${If} $0 != "ok"
-        StrCpy $1 $0
-        Call DroneDreamBestEffortEndRuntimeQuiesce
-        ${If} $1 == "pending"
+  !if "${DRONEDREAM_EDITION_ID}" != "field"
+    ; Protocol 2 installers hold a durable native quiesce across running-process
+    ; checks, old-version uninstall, executable replacement and receipt clearing.
+    ; Protocol 1 is retained only as a compatibility gate for the status commands
+    ; that version actually implemented. FIELD has no Runtime state to quiesce.
+    IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_no_existing_operation
+      ReadRegDWORD $1 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
+      ${If} $1 >= 2
+        Call DroneDreamRevalidateRuntimeQuiesce
+        Pop $0
+        ${If} $0 != "ok"
+          StrCpy $1 $0
+          Call DroneDreamBestEffortEndRuntimeQuiesce
+          ${If} $1 == "pending"
+            Abort "$(DD_UpdatePending)"
+          ${ElseIf} $1 == "busy"
+            Abort "$(DD_UpdateBusy)"
+          ${Else}
+            Abort "$(DD_UpdateIsolationInvalid)"
+          ${EndIf}
+        ${EndIf}
+      ${ElseIf} $1 == 1
+        ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --runtime-operation-status' $0
+        ${If} $0 == 75
+          Abort "$(DD_LegacyRuntimeBusy)"
+        ${ElseIf} $0 != 0
+          Abort "$(DD_RuntimeStateUnknown)"
+        ${EndIf}
+        ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-handoff-status' $0
+        ${If} $0 == 76
           Abort "$(DD_UpdatePending)"
-        ${ElseIf} $1 == "busy"
-          Abort "$(DD_UpdateBusy)"
-        ${Else}
-          Abort "$(DD_UpdateIsolationInvalid)"
+        ${ElseIf} $0 != 0
+          Abort "$(DD_RuntimeRequestUnknown)"
         ${EndIf}
       ${EndIf}
-    ${ElseIf} $1 == 1
-      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --runtime-operation-status' $0
-      ${If} $0 == 75
-        Abort "$(DD_LegacyRuntimeBusy)"
-      ${ElseIf} $0 != 0
-        Abort "$(DD_RuntimeStateUnknown)"
-      ${EndIf}
-      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-handoff-status' $0
-      ${If} $0 == 76
-        Abort "$(DD_UpdatePending)"
-      ${ElseIf} $0 != 0
-        Abort "$(DD_RuntimeRequestUnknown)"
-      ${EndIf}
-    ${EndIf}
-  dronedream_no_existing_operation:
+    dronedream_no_existing_operation:
+  !endif
 
   Call DroneDreamWebView2IsUsable
   Pop $0
@@ -91,31 +144,53 @@
     Abort "$(DD_ClearRequestFailed)"
   ${EndIf}
 
-  ; Keep the user's verified Runtime choice across repair installs and updates.
-  ; The native sealing command revalidates the target before any automatic
-  ; operation can start, so a stale or edited registry value still fails closed.
-  WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode" "$DroneDreamInstallMode"
-  WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive" "$DroneDreamRuntimeDrive"
+  !if "${DRONEDREAM_EDITION_ID}" == "field"
+    ; FIELD is always app-only. Remove any metadata written by an early
+    ; candidate instead of advertising a Runtime protocol it cannot execute.
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode"
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive"
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
+  !else
+    ; Keep the user's verified Runtime choice across repair installs and updates.
+    ; The native sealing command revalidates the target before any automatic
+    ; operation can start, so a stale or edited registry value still fails closed.
+    WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode" "$DroneDreamInstallMode"
+    WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive" "$DroneDreamRuntimeDrive"
 
-  ${If} $DroneDreamInstallMode != "install-app-only"
-    ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --seal-installer-handoff "$DroneDreamInstallMode" "$DroneDreamRuntimeDrive"' $0
-    ${If} $0 != 0
-      ; The old receipt is already gone, so failure is safe and cannot be
-      ; converted into an automatic install by launching the app.
-      Call DroneDreamBestEffortEndRuntimeQuiesce
-      Abort "$(DD_SaveRequestFailed)"
+    ${If} $DroneDreamInstallMode != "install-app-only"
+      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --seal-installer-handoff "$DroneDreamInstallMode" "$DroneDreamRuntimeDrive"' $0
+      ${If} $0 != 0
+        ; The old receipt is already gone, so failure is safe and cannot be
+        ; converted into an automatic install by launching the app.
+        Call DroneDreamBestEffortEndRuntimeQuiesce
+        Abort "$(DD_SaveRequestFailed)"
+      ${EndIf}
     ${EndIf}
-  ${EndIf}
 
-  WriteRegDWORD SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol" 2
+    WriteRegDWORD SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol" 2
 
-  ; Clear/seal ran under quiesce. Release it with the newly installed binary
-  ; before .onInstSuccess is allowed to auto-launch the application.
-  Call DroneDreamEndRuntimeQuiesce
-  Pop $0
-  ${If} $0 != "ok"
-    Abort "$(DD_ReleaseIsolationFailed)"
-  ${EndIf}
+    ; Clear/seal ran under quiesce. Release it with the newly installed binary
+    ; before .onInstSuccess is allowed to auto-launch the application.
+    Call DroneDreamEndRuntimeQuiesce
+    Pop $0
+    ${If} $0 != "ok"
+      Abort "$(DD_ReleaseIsolationFailed)"
+    ${EndIf}
+  !endif
+
+  ; The standard Tauri shortcut functions intentionally skip existing links
+  ; during update mode. Refresh those links after the new executable and icon
+  ; resource are in place so desktop and Start Menu both adopt the wing mark.
+  !insertmacro DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk" "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" dronedream_migrate_startmenu_folder
+  !insertmacro DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk" "$SMPROGRAMS\${PRODUCTNAME}.lnk" dronedream_migrate_startmenu_root
+  !insertmacro DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk" "$DESKTOP\${PRODUCTNAME}.lnk" dronedream_migrate_desktop
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$DESKTOP\${PRODUCTNAME}.lnk"
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk"
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk"
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 
   Pop $0
 !macroend
@@ -123,7 +198,8 @@
 !macro NSIS_HOOK_PREUNINSTALL
   Push $0
   Push $1
-  IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_uninstall_no_binary
+  !if "${DRONEDREAM_EDITION_ID}" != "field"
+    IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_uninstall_no_binary
     ReadRegDWORD $1 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
     ${If} $1 >= 2
       Call un.DroneDreamPrepareRuntimeQuiesce
@@ -158,7 +234,8 @@
         Abort "$(DD_UninstallClearFailed)"
       ${EndIf}
     ${EndIf}
-  dronedream_uninstall_no_binary:
+    dronedream_uninstall_no_binary:
+  !endif
   ; On successful protocol-2 uninstall the marker intentionally remains until
   ; this uninstaller (or the live parent updater) exits. No new runtime
   ; operation can begin between the running-process check and binary deletion.

@@ -55,7 +55,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 ignore = ["UP017"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "scripts"]
+known-first-party = ["app", "distribution", "scripts"]
 known-third-party = ["alembic", "sqlalchemy"]
 
 [tool.mypy]

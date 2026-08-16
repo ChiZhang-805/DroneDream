@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const SUPPORTED_DESKTOP_EDITIONS = new Set(["universal", "sim", "lab"]);
+const SUPPORTED_DESKTOP_EDITIONS = new Set(["universal", "sim", "lab", "field"]);
 
 export default defineConfig(() => {
   const edition = (process.env.VITE_DRONEDREAM_EDITION ?? "universal")

@@ -40,7 +40,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check \
             --requirement runtime/locks/release-tools-requirements.lock \
-            "ruff==0.15.21"
+            "ruff==0.15.21" "pytest==9.1.1"
           python -m ruff check runtime/tools runtime/tests runtime/scripts scripts/simulators
           python -m ruff check runtime/tools runtime/scripts scripts/simulators --select S
           python -m ruff format --check runtime/tools runtime/tests runtime/scripts \

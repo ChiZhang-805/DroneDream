@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-manifest",
+  "editionId": "field",
+  "editionVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "displayName": {
+    "en": "DroneDream Field",
+    "zh-CN": "DroneDream 真机轻量版"
+  },
+  "description": {
+    "en": "A lightweight hardware and ground-station edition that omits Gazebo while retaining qualification and preflight safety contracts.",
+    "zh-CN": "不安装大型 Gazebo 的轻量真机与地面站版本，同时保留可信资格回执和规定安全预检。"
+  },
+  "implementationStatus": "contract-only",
+  "validationTier": "contract-only",
+  "artifactBaseName": "DroneDream-Field-1.0.0.exe",
+  "capabilityPolicy": {
+    "policyId": "core-capabilities",
+    "policyVersion": "1.0.0",
+    "sha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903"
+  },
+  "modules": {
+    "required": [
+      "desktop-core",
+      "engine-pack",
+      "hardware-bridge",
+      "runtime-core",
+      "vehicle-pack-hardware",
+      "vehicle-pack-validation"
+    ],
+    "optional": ["qgroundcontrol-external"],
+    "forbidden": [
+      "runtime-simulation",
+      "simulator-gazebo-harmonic",
+      "simulator-px4-sitl",
+      "vehicle-pack-sim"
+    ]
+  },
+  "capabilities": {
+    "enabledOrConditioned": [
+      "external.qgroundcontrol.launch",
+      "hardware.arm",
+      "hardware.discover",
+      "hardware.emergency-stop",
+      "hardware.flight",
+      "hardware.parameter.read",
+      "hardware.parameter.write",
+      "hardware.preflight.execute",
+      "qualification.trusted.consume",
+      "updater.module.apply",
+      "vehicle-pack.install"
+    ],
+    "forbidden": [
+      "hardware.hitl.execute",
+      "qualification.simulation.issue",
+      "simulation.execute",
+      "simulation.parameter.write",
+      "simulation.vehicle.arm"
+    ]
+  },
+  "runtimeProfile": {
+    "profileId": "lightweight-hardware",
+    "currentAvailability": "contract-only",
+    "includesLargeSimulator": false
+  },
+  "qualification": {
+    "mayIssueSimulationReceipt": false,
+    "mayConsumeTrustedReceipt": true,
+    "hardwareActionRule": "trusted-sim-or-hitl-receipt-or-prescribed-preflight",
+    "receiptCompatibilityFailClosed": true
+  },
+  "sourcePolicy": {
+    "developmentBranch": "codex/software",
+    "integrationBranch": "main",
+    "editionSourceDivergenceAllowed": false,
+    "hotfixMustReturnToCore": true,
+    "commonCoreHashRequired": true
+  },
+  "releaseChannel": {
+    "branch": "codex/release-field",
+    "creationState": "planned-not-created",
+    "promotionManifestRequired": true,
+    "forcePushAllowed": false
+  },
+  "knownGaps": [
+    "The current Runtime Base is a full simulation image; the lightweight hardware profile does not yet exist.",
+    "Read-only discovery, protocol inspection, evidence, snapshot, rollback-planning, and preflight surfaces are implemented, but no parameter-write, arm, flight, or HITL authority is validated by this manifest alone.",
+    "This source manifest does not attest a particular installer; release acceptance requires an exact external build receipt, checksum, updater signature, and headed edition-identity validation."
+  ]
+}

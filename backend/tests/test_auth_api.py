@@ -36,6 +36,28 @@ def test_demo_token_requires_auth(client: TestClient, monkeypatch) -> None:
     assert "x" * 100 not in oversized.text
 
 
+def test_authenticated_session_requires_and_returns_current_identity(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AUTH_MODE", "demo_token")
+    monkeypatch.setenv("DEMO_AUTH_TOKENS", "a@example.com:token-a")
+    get_settings.cache_clear()
+
+    denied = client.get("/api/v1/session")
+    assert denied.status_code == 401
+
+    accepted = client.get(
+        "/api/v1/session",
+        headers={"Authorization": "Bearer token-a"},
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["data"] == {
+        "status": "ready",
+        "user_id": "a@example.com",
+    }
+
+
 def test_demo_token_isolates_jobs_by_user(client: TestClient, monkeypatch) -> None:
     monkeypatch.setenv("AUTH_MODE", "demo_token")
     monkeypatch.setenv("DEMO_AUTH_TOKENS", "a@example.com:token-a,b@example.com:token-b")

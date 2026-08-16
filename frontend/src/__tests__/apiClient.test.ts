@@ -576,23 +576,44 @@ describe("apiClient envelope handling", () => {
       if (command === "probe_system_prerequisites") return desktopPrerequisites;
       if (command === "probe_runtime_status") return readyRuntime;
       if (command === "start_runtime") return readyRuntime;
+      if (command === "desktop_api_request") {
+        return {
+          status: 200,
+          contentType: "application/json",
+          bodyBase64: btoa(JSON.stringify({
+            success: true,
+            data: { id: "job_1" },
+            error: null,
+          })),
+        };
+      }
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
     await ensureOverallDesktopReadiness({ autoStart: true });
     approveDesktopStartupGateWithoutCloudAuth();
     invoke.mockClear();
-    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      success: true,
-      data: { id: "job_1" },
-      error: null,
-    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
     await expect(apiClient.createJob({} as never)).resolves.toMatchObject({ id: "job_1" });
-    expect(fetchSpy).toHaveBeenCalledOnce();
-    expect(invoke).toHaveBeenCalledOnce();
-    expect(invoke).toHaveBeenCalledWith("probe_runtime_status", undefined);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).toHaveBeenNthCalledWith(1, "probe_runtime_status", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      "desktop_api_request",
+      {
+        request: expect.objectContaining({
+          method: "POST",
+          path: "/api/v1/jobs",
+          contentType: "application/json",
+          accessToken: null,
+          accept: "application/json",
+          idempotencyKey: expect.any(String),
+        }),
+      },
+    );
   });
 
   it("blocks a real run without a cached manual check and never probes automatically", async () => {
@@ -624,14 +645,21 @@ describe("apiClient envelope handling", () => {
       if (command === "probe_system_prerequisites") return desktopPrerequisites;
       if (command === "probe_runtime_status") return readyRuntime;
       if (command === "start_runtime") return readyRuntime;
+      if (command === "desktop_api_request") {
+        return {
+          status: 200,
+          contentType: "application/json",
+          bodyBase64: btoa(JSON.stringify({
+            success: true,
+            data: { id: "job_1", display_name: "safe write" },
+            error: null,
+          })),
+        };
+      }
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
-    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      success: true,
-      data: { id: "job_1", display_name: "safe write" },
-      error: null,
-    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
 
     await apiClient.updateJob(
@@ -640,8 +668,21 @@ describe("apiClient envelope handling", () => {
       7,
     );
 
-    expect(fetchSpy).toHaveBeenCalledOnce();
-    expect(invoke).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledOnce();
+    expect(invoke).toHaveBeenCalledWith(
+      "desktop_api_request",
+      {
+        request: expect.objectContaining({
+          method: "PATCH",
+          path: "/api/v1/jobs/job_1?control_version=7",
+          contentType: "application/json",
+          accessToken: null,
+          accept: "application/json",
+          idempotencyKey: expect.any(String),
+        }),
+      },
+    );
   });
 
   it("forwards preference updates over the current HTTP transport with PUT", async () => {

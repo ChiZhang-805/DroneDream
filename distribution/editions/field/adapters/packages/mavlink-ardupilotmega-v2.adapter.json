@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-adapter-package",
+  "adapterId": "mavlink-ardupilotmega-v2",
+  "version": "1.0.0",
+  "editionId": "field",
+  "protocol": {
+    "family": "MAVLink",
+    "dialect": "ardupilotmega",
+    "versions": [2],
+    "engine": "native-rust-mavlink",
+    "transportPolicy": "passive-read-before-any-command"
+  },
+  "capabilities": {
+    "deviceDiscovery": "read-only",
+    "telemetryRead": "read-only",
+    "parameterRead": "quorum-required",
+    "parameterWrite": "quorum-required",
+    "arm": "quorum-required",
+    "flight": "quorum-required",
+    "autonomousTuning": "quorum-required"
+  },
+  "safety": {
+    "executableCode": false,
+    "installationGrantsAuthority": false,
+    "discoveryGrantsAuthority": false,
+    "zeroValidatedPackDecision": "deny"
+  },
+  "license": {
+    "protocolSpecification": "MAVLink",
+    "packageContent": "DroneDream-1.0"
+  }
+}

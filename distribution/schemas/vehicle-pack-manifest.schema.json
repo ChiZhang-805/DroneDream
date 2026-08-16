@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/vehicle-pack-manifest.v1.json",
+  "title": "DroneDream Vehicle Pack manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "packId",
+    "packVersion",
+    "displayName",
+    "manufacturer",
+    "vehicleClass",
+    "availabilityRegions",
+    "supportedEditions",
+    "validationStatus",
+    "validationTier",
+    "autopilot",
+    "controllers",
+    "components",
+    "safety",
+    "sourceBindings",
+    "licenses",
+    "integrity",
+    "knownGaps"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-vehicle-pack"},
+    "packId": {"$ref": "#/$defs/kebabId"},
+    "packVersion": {"$ref": "#/$defs/semver"},
+    "displayName": {"$ref": "#/$defs/localizedText"},
+    "manufacturer": {"type": "string", "minLength": 1, "maxLength": 128},
+    "vehicleClass": {
+      "enum": [
+        "multicopter-small",
+        "multicopter-medium",
+        "multicopter-research",
+        "fixed-wing",
+        "hybrid-vtol"
+      ]
+    },
+    "availabilityRegions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["cn", "global"]}
+    },
+    "supportedEditions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["sim", "lab", "field"]}
+    },
+    "validationStatus": {"enum": ["validated", "contract-only", "planned"]},
+    "validationTier": {
+      "enum": ["sim-validated", "hardware-validated", "contract-only", "planned"]
+    },
+    "autopilot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "adapterStatus", "supportedFirmwareVersions"],
+      "properties": {
+        "family": {"enum": ["px4", "ardupilot", "crazyflie"]},
+        "adapterStatus": {"enum": ["integrated-contract", "contract-only", "planned"]},
+        "supportedFirmwareVersions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        }
+      }
+    },
+    "controllers": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/controller"}
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sim", "hardware", "sensors", "validation"],
+      "properties": {
+        "sim": {"$ref": "#/$defs/component"},
+        "hardware": {"$ref": "#/$defs/component"},
+        "sensors": {"$ref": "#/$defs/component"},
+        "validation": {"$ref": "#/$defs/component"}
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityPolicySha256",
+        "frontendIsAuthority",
+        "hardwareActionsRequireValidatedTier",
+        "parameterBounds"
+      ],
+      "properties": {
+        "capabilityPolicySha256": {"$ref": "#/$defs/sha256"},
+        "frontendIsAuthority": {"const": false},
+        "hardwareActionsRequireValidatedTier": {"const": true},
+        "parameterBounds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/parameterBound"}
+        }
+      }
+    },
+    "sourceBindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/sourceBinding"}
+    },
+    "licenses": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/licenseBinding"}
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalization", "payloadSha256", "signature"],
+      "properties": {
+        "canonicalization": {"const": "RFC8785-JCS"},
+        "payloadSha256": {"$ref": "#/$defs/sha256"},
+        "signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "algorithm", "keyId", "detachedSignatureSha256"],
+          "properties": {
+            "state": {"enum": ["verified", "not-issued"]},
+            "algorithm": {"const": "Ed25519"},
+            "keyId": {
+              "oneOf": [
+                {"type": "null"},
+                {"type": "string", "pattern": "^ed25519:[0-9a-f]{64}$"}
+              ]
+            },
+            "detachedSignatureSha256": {
+              "oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]
+            }
+          }
+        }
+      }
+    },
+    "knownGaps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1, "maxLength": 512}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "kebabId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "zh-CN"],
+      "properties": {
+        "en": {"type": "string", "minLength": 1, "maxLength": 256},
+        "zh-CN": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vendor", "model", "status", "regions"],
+      "properties": {
+        "vendor": {"type": "string", "minLength": 1, "maxLength": 128},
+        "model": {"type": "string", "minLength": 1, "maxLength": 128},
+        "status": {"enum": ["validated", "contract-only", "planned"]},
+        "regions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["cn", "global"]}
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "sourceIds", "artifacts"],
+      "properties": {
+        "status": {"enum": ["included", "external", "unsupported", "planned"]},
+        "sourceIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/kebabId"}
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/artifact"}
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sizeBytes", "sha256", "licenseIds"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "sizeBytes": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "licenseIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/kebabId"}
+        }
+      }
+    },
+    "parameterBound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "minimum", "maximum", "unit"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$"},
+        "minimum": {"type": "number"},
+        "maximum": {"type": "number"},
+        "unit": {"type": "string", "minLength": 1, "maxLength": 32}
+      }
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "pinSha256"],
+      "properties": {
+        "sourceId": {"$ref": "#/$defs/kebabId"},
+        "pinSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "licenseBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "spdxExpression", "noticePath", "redistribution"],
+      "properties": {
+        "id": {"$ref": "#/$defs/kebabId"},
+        "spdxExpression": {"type": "string", "minLength": 1, "maxLength": 256},
+        "noticePath": {"$ref": "#/$defs/safePath"},
+        "redistribution": {"enum": ["bundled", "external-launch", "not-distributed"]}
+      }
+    }
+  }
+}

@@ -46,6 +46,45 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     assert job["sensor_noise_level"] == "medium"
     assert job["objective_profile"] == "robust"
     assert job["source_job_id"] is None
+    assert job["completion_policy"] == "first_qualified_stop"
+    assert job["job_kind"] == "primary"
+    assert job["cognitive_policy_version"] == "adaptive-2-4-v1"
+    assert job["provider_turn_cap"] == 64
+    assert job["provider_turns_attempted"] == 0
+    assert job["provider_turns_succeeded"] == 0
+    assert job["provider_request_cap"] == 128
+    assert job["provider_max_retries"] == 1
+    assert job["provider_requests_attempted"] == 0
+    assert job["provider_requests_succeeded"] == 0
+    assert job["first_qualified_candidate_id"] is None
+    assert job["first_qualified_freeze_receipt_id"] is None
+    assert job["continue_exploration_requested"] is False
+    assert job["holdout_policy_version"] == "legacy-visible-v0"
+
+
+def test_rerun_preserves_bounded_completion_contract(client: TestClient) -> None:
+    created = client.post(
+        "/api/v1/jobs",
+        json={
+            **HEURISTIC_JOB_PAYLOAD,
+            "provider_turn_cap": 7,
+            "provider_request_cap": 11,
+            "provider_max_retries": 0,
+        },
+    )
+    assert created.status_code == 200, created.text
+    source = created.json()["data"]
+
+    rerun = client.post(f"/api/v1/jobs/{source['id']}/rerun")
+    assert rerun.status_code == 200, rerun.text
+    child = rerun.json()["data"]
+
+    assert child["completion_policy"] == "first_qualified_stop"
+    assert child["provider_turn_cap"] == 7
+    assert child["provider_request_cap"] == 11
+    assert child["provider_max_retries"] == 0
+    assert child["job_kind"] == "primary"
+    assert child["continuation_parent_job_id"] is None
 
 
 def test_baseline_only_job_accepts_locked_catalog_parameters(client: TestClient) -> None:
@@ -86,9 +125,7 @@ def test_create_job_exposes_job_id_alias(client: TestClient) -> None:
     assert job["status"] == "QUEUED"
 
 
-def test_cancelling_gpt_job_purges_encrypted_api_key(
-    client: TestClient, monkeypatch
-) -> None:
+def test_cancelling_gpt_job_purges_encrypted_api_key(client: TestClient, monkeypatch) -> None:
     monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
     created = client.post(
         "/api/v1/jobs",
@@ -112,16 +149,12 @@ def test_cancelling_gpt_job_purges_encrypted_api_key(
     from app.db import SessionLocal
 
     with SessionLocal() as db:
-        secret = db.scalars(
-            select(models.JobSecret).where(models.JobSecret.job_id == job_id)
-        ).one()
+        secret = db.scalars(select(models.JobSecret).where(models.JobSecret.job_id == job_id)).one()
         assert secret.deleted_at is not None
         assert secret.encrypted_api_key == ""
         events = {
             event.event_type
-            for event in db.scalars(
-                select(models.JobEvent).where(models.JobEvent.job_id == job_id)
-            )
+            for event in db.scalars(select(models.JobEvent).where(models.JobEvent.job_id == job_id))
         }
         assert "job_secrets_purged" in events
 
@@ -151,9 +184,7 @@ def test_gpt_job_secret_has_bounded_lifetime(client: TestClient, monkeypatch) ->
 
     with SessionLocal() as db:
         secret = db.scalars(
-            select(models.JobSecret).where(
-                models.JobSecret.job_id == created.json()["data"]["id"]
-            )
+            select(models.JobSecret).where(models.JobSecret.job_id == created.json()["data"]["id"])
         ).one()
         assert secret.expires_at is not None
         expires_at = secret.expires_at
@@ -180,9 +211,7 @@ def test_gpt_job_rejects_blank_server_secret(client: TestClient, monkeypatch) ->
     assert response.json()["error"]["code"] == "CONFIGURATION_ERROR"
 
 
-def test_housekeeping_wipes_expired_secret_without_worker(
-    client: TestClient, monkeypatch
-) -> None:
+def test_housekeeping_wipes_expired_secret_without_worker(client: TestClient, monkeypatch) -> None:
     monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
     created = client.post(
         "/api/v1/jobs",
@@ -205,9 +234,7 @@ def test_housekeeping_wipes_expired_secret_without_worker(
 
     with SessionLocal() as db:
         secret = db.scalars(
-            select(models.JobSecret).where(
-                models.JobSecret.job_id == created.json()["data"]["id"]
-            )
+            select(models.JobSecret).where(models.JobSecret.job_id == created.json()["data"]["id"])
         ).one()
         secret.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
         db.commit()
@@ -332,6 +359,51 @@ def test_create_job_accepts_advanced_scenario_config(client: TestClient) -> None
     assert data["advanced_scenario_config"]["battery"]["initial_percent"] == 70
 
 
+def test_real_job_accepts_collinear_steady_wind_and_gust(client: TestClient) -> None:
+    payload = {
+        **VALID_JOB_PAYLOAD,
+        "simulator_backend": "real_cli",
+        "optimizer_strategy": "none",
+        "wind": {"north": 0, "east": 2, "south": 0, "west": 0},
+        "advanced_scenario_config": {
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4,
+                "direction_deg": 90,
+                "period_s": 12,
+            }
+        },
+    }
+
+    response = client.post("/api/v1/jobs", json=payload)
+
+    assert response.status_code == 200, response.text
+
+
+def test_real_job_rejects_non_collinear_wind_before_persistence(client: TestClient) -> None:
+    payload = {
+        **VALID_JOB_PAYLOAD,
+        "simulator_backend": "real_cli",
+        "optimizer_strategy": "none",
+        "wind": {"north": 2, "east": 0, "south": 0, "west": 0},
+        "advanced_scenario_config": {
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4,
+                "direction_deg": 90,
+                "period_s": 12,
+            }
+        },
+    }
+
+    response = client.post("/api/v1/jobs", json=payload)
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_SCENARIO_EFFECT_CONTRACT"
+    assert "share the same horizontal direction" in error["message"]
+
+
 def test_create_job_rejects_invalid_advanced_dropout_rate(client: TestClient) -> None:
     payload = {
         **HEURISTIC_JOB_PAYLOAD,
@@ -357,7 +429,7 @@ def test_create_job_rejects_invalid_battery_percent(client: TestClient) -> None:
     assert resp.status_code == 422
 
 
-@pytest.mark.parametrize("track_type", ["circle", "u_turn", "lemniscate"])
+@pytest.mark.parametrize("track_type", ["hover", "circle", "u_turn", "lemniscate"])
 def test_non_custom_track_creation_unchanged(client: TestClient, track_type: str) -> None:
     payload = {**HEURISTIC_JOB_PAYLOAD, "track_type": track_type}
     resp = client.post("/api/v1/jobs", json=payload)
@@ -365,6 +437,29 @@ def test_non_custom_track_creation_unchanged(client: TestClient, track_type: str
     body = resp.json()["data"]
     assert body["track_type"] == track_type
     assert body["reference_track"] is None
+
+
+def test_hover_track_rejects_non_origin_or_moving_reference(client: TestClient) -> None:
+    non_origin = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "track_type": "hover",
+        "start_point": {"x": 1, "y": 0},
+    }
+    response = client.post("/api/v1/jobs", json=non_origin)
+    assert response.status_code == 422
+    assert "start_point x=0 and y=0" in response.text
+
+    moving_reference = {
+        **HEURISTIC_JOB_PAYLOAD,
+        "track_type": "hover",
+        "reference_track": [
+            {"x": 0, "y": 0, "z": 5},
+            {"x": 0.5, "y": 0, "z": 5},
+        ],
+    }
+    response = client.post("/api/v1/jobs", json=moving_reference)
+    assert response.status_code == 422
+    assert "hover reference_track must remain" in response.text
 
 
 def test_create_job_rejects_invalid_sensor_noise(client: TestClient) -> None:
@@ -432,6 +527,40 @@ def test_list_trials_for_job_is_empty(client: TestClient) -> None:
     assert resp.json() == {"success": True, "data": [], "error": None}
 
 
+def test_list_trials_surfaces_persisted_failure_diagnosis(client: TestClient) -> None:
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        candidate = models.CandidateParameterSet(
+            job_id=job["id"],
+            parameter_json={},
+            label="failed candidate",
+        )
+        db.add(candidate)
+        db.flush()
+        db.add(
+            models.Trial(
+                job_id=job["id"],
+                candidate_id=candidate.id,
+                seed=42,
+                status="FAILED",
+                failure_code="SIMULATION_FAILED",
+                failure_reason="PX4 rejected the arm command",
+            )
+        )
+        db.commit()
+
+    response = client.get(f"/api/v1/jobs/{job['id']}/trials")
+
+    assert response.status_code == 200, response.text
+    [trial] = response.json()["data"]
+    assert trial["failure_code"] == "SIMULATION_FAILED"
+    assert trial["failure_reason"] == "PX4 rejected the arm command"
+
+
 def test_list_trials_keeps_array_contract_and_exposes_page_metadata(
     client: TestClient,
 ) -> None:
@@ -472,9 +601,9 @@ def test_list_trials_keeps_array_contract_and_exposes_page_metadata(
     second = client.get(f"/api/v1/jobs/{job['id']}/trials?page=2&page_size=2")
     assert second.status_code == 200, second.text
     assert len(second.json()["data"]) == 1
-    assert {
-        item["id"] for item in first.json()["data"]
-    }.isdisjoint({item["id"] for item in second.json()["data"]})
+    assert {item["id"] for item in first.json()["data"]}.isdisjoint(
+        {item["id"] for item in second.json()["data"]}
+    )
 
 
 def test_trial_not_found(client: TestClient) -> None:
@@ -555,6 +684,16 @@ def test_compare_jobs_returns_completed_metrics(client: TestClient) -> None:
             job = db.get(models.Job, job_id)
             assert job is not None
             job.status = "COMPLETED"
+            candidate = models.CandidateParameterSet(
+                id=f"cand_{job_id.removeprefix('job_')}",
+                job_id=job.id,
+                parameter_json={"MPC_XY_P": 0.9},
+                is_baseline=True,
+                is_best=True,
+            )
+            db.add(candidate)
+            job.baseline_candidate_id = candidate.id
+            job.best_candidate_id = candidate.id
             job.report = models.JobReport(
                 job_id=job.id,
                 report_status="READY",
@@ -567,6 +706,94 @@ def test_compare_jobs_returns_completed_metrics(client: TestClient) -> None:
     items = resp.json()["data"]["items"]
     assert len(items) == 2
     assert items[0]["optimized_metrics"]["rmse"] == 0.8
+
+
+def test_compare_jobs_rejects_invalid_real_cli_winner_freeze(
+    client: TestClient,
+) -> None:
+    from app import models
+    from app.db import SessionLocal
+
+    job_ids = [
+        client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+        for _ in range(2)
+    ]
+    with SessionLocal() as db:
+        for index, job_id in enumerate(job_ids):
+            job = db.get(models.Job, job_id)
+            assert job is not None
+            job.status = "COMPLETED"
+            job.simulator_backend_requested = "real_cli"
+            candidate = models.CandidateParameterSet(
+                id=f"cand_compare_invalid_freeze_{index}",
+                job_id=job.id,
+                parameter_json={"MPC_XY_P": 0.9},
+                is_baseline=True,
+                is_best=True,
+            )
+            receipt = models.WinnerFreezeReceipt(
+                job_id=job.id,
+                receipt_schema="dronedream.winner-freeze-receipt/v1",
+                evidence_id=f"sha256:{index + 1:064x}",
+                outcome_contract_id=f"sha256:{index + 11:064x}",
+                baseline_candidate_id=candidate.id,
+                winner_candidate_id=candidate.id,
+                evidence_json={},
+            )
+            job.candidates.append(candidate)
+            job.baseline_candidate_id = candidate.id
+            job.best_candidate_id = candidate.id
+            job.winner_freeze = receipt
+            job.report = models.JobReport(
+                job_id=job.id,
+                report_status="READY",
+                best_candidate_id=candidate.id,
+                baseline_metric_json={"rmse": 1.0},
+                optimized_metric_json={"rmse": 0.8},
+                winner_evidence_json={},
+                winner_freeze_receipt=receipt,
+            )
+        db.commit()
+
+    response = client.post("/api/v1/jobs/compare", json={"job_ids": job_ids})
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "REPORT_EVIDENCE_INVALID"
+
+
+def test_compare_jobs_keeps_no_winner_report_metrics_diagnostic(client: TestClient) -> None:
+    from app import models
+    from app.db import SessionLocal
+
+    job_ids = [
+        client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+        for _ in range(2)
+    ]
+    with SessionLocal() as db:
+        for job_id in job_ids:
+            job = db.get(models.Job, job_id)
+            assert job is not None
+            job.status = "COMPLETED"
+            job.optimization_outcome = "no_usable_candidate"
+            job.best_candidate_id = None
+            job.report = models.JobReport(
+                job_id=job.id,
+                report_status="READY",
+                baseline_metric_json={"rmse": 8.4},
+                optimized_metric_json={"rmse": 8.4},
+                best_candidate_id=job.baseline_candidate_id,
+                best_parameter_json={"MPC_XY_P": 0.95},
+            )
+        db.commit()
+
+    response = client.post("/api/v1/jobs/compare", json={"job_ids": job_ids})
+
+    assert response.status_code == 200, response.text
+    for item in response.json()["data"]["items"]:
+        assert item["baseline_metrics"] == {"rmse": 8.4}
+        assert item["optimized_metrics"] is None
+        assert item["best_candidate_id"] is None
+        assert item["best_parameters"] == {}
 
 
 def test_compare_jobs_active_job_metrics_are_null(client: TestClient) -> None:
@@ -627,6 +854,8 @@ def test_rerun_gpt_stays_gpt_with_new_openai_key(
     assert resp.status_code == 200
     rerun = resp.json()["data"]
     assert rerun["optimizer_strategy"] == "gpt"
+    assert rerun["llm_access_mode"] == "byok"
+    assert rerun["llm_provider"] == "openai"
 
 
 def test_rerun_gpt_accepts_provider_neutral_llm_configuration(
@@ -663,6 +892,7 @@ def test_rerun_gpt_accepts_provider_neutral_llm_configuration(
     assert resp.status_code == 200, resp.text
     rerun = resp.json()["data"]
     assert rerun["optimizer_strategy"] == "gpt"
+    assert rerun["llm_access_mode"] == "byok"
     assert rerun["llm_provider"] == "deepseek"
     assert rerun["llm_base_url"] == "https://api.deepseek.com/v1"
     assert rerun["openai_model"] == "deepseek-reasoner"
@@ -757,20 +987,36 @@ def _seed_job_with_report(
     from app import models
 
     baseline = {
-        "rmse": 1.2, "max_error": 2.0, "overshoot_count": 3,
-        "completion_time": 9.0, "score": 4.2,
+        "rmse": 1.2,
+        "max_error": 2.0,
+        "overshoot_count": 3,
+        "completion_time": 9.0,
+        "score": 4.2,
     }
     optimized = {
-        "rmse": 0.9, "max_error": 1.5, "overshoot_count": 2,
-        "completion_time": 8.0, "score": 3.0,
+        "rmse": 0.9,
+        "max_error": 1.5,
+        "overshoot_count": 2,
+        "completion_time": 8.0,
+        "score": 3.0,
     }
     comparison = [
-        {"metric": "rmse", "label": "RMSE", "baseline": 1.2,
-         "optimized": 0.9, "lower_is_better": True, "unit": "m"}
+        {
+            "metric": "rmse",
+            "label": "RMSE",
+            "baseline": 1.2,
+            "optimized": 0.9,
+            "lower_is_better": True,
+            "unit": "m",
+        }
     ]
     best_params = {
-        "kp_xy": 1.1, "kd_xy": 0.21, "ki_xy": 0.05,
-        "vel_limit": 5.0, "accel_limit": 4.0, "disturbance_rejection": 0.5,
+        "kp_xy": 1.1,
+        "kd_xy": 0.21,
+        "ki_xy": 0.05,
+        "vel_limit": 5.0,
+        "accel_limit": 4.0,
+        "disturbance_rejection": 0.5,
     }
 
     with db_module.SessionLocal() as db:
@@ -780,7 +1026,10 @@ def _seed_job_with_report(
             start_point_x=0.0,
             start_point_y=0.0,
             altitude_m=3.0,
-            wind_north=0.0, wind_east=0.0, wind_south=0.0, wind_west=0.0,
+            wind_north=0.0,
+            wind_east=0.0,
+            wind_south=0.0,
+            wind_west=0.0,
             sensor_noise_level="medium",
             objective_profile="robust",
             status=status,
@@ -912,9 +1161,11 @@ def test_artifacts_includes_trial_scoped_artifacts(client: TestClient) -> None:
     assert "trial" in owner_types and "job" in owner_types
     assert "trajectory_plot" in kinds and "report_summary" in kinds
 
+
 def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) -> None:
     from app import models
     from app.db import SessionLocal
+    from app.storage.integrity import bind_artifact_integrity
 
     job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     other = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
@@ -931,6 +1182,21 @@ def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) 
         art_file = tmp_path / "mock_artifacts" / "artifact.bin"
         art_file.parent.mkdir(parents=True, exist_ok=True)
         art_file.write_bytes(b"x")
+        sealed_file = art_file.with_name("sealed.bin")
+        sealed_file.write_bytes(b"sealed")
+        sealed_artifact = models.Artifact(
+            owner_type="job",
+            owner_id=j.id,
+            artifact_type="report_json",
+            storage_path=str(sealed_file),
+        )
+        db.add(sealed_artifact)
+        db.flush()
+        bind_artifact_integrity(
+            db,
+            artifact=sealed_artifact,
+            content=sealed_file,
+        )
         db.add(
             models.Artifact(
                 owner_type="job",
@@ -960,48 +1226,143 @@ def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) 
     assert resp.status_code == 200
     assert resp.json()["data"] == {"id": job["id"], "deleted": True}
     assert client.get(f"/api/v1/jobs/{job['id']}").status_code == 404
-    ids = [x['id'] for x in client.get('/api/v1/jobs').json()['data']['items']]
-    assert job['id'] not in ids and other['id'] in ids
+    ids = [x["id"] for x in client.get("/api/v1/jobs").json()["data"]["items"]]
+    assert job["id"] not in ids and other["id"] in ids
     with SessionLocal() as db:
         remaining = list(db.query(models.Artifact).all())
-        assert all(a.owner_id != job['id'] for a in remaining)
-        assert any(a.owner_id == other['id'] for a in remaining)
+        assert all(a.owner_id != job["id"] for a in remaining)
+        assert any(a.owner_id == other["id"] for a in remaining)
         assert not art_file.exists()
+        assert not sealed_file.exists()
+        assert db.query(models.ArtifactDigestReceipt).count() == 0
+        assert db.query(models.ArtifactDigestDeleteAuthorization).count() == 0
+
+
+def test_delete_job_commit_failure_preserves_artifact_payload(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app import models
+    from app.db import SessionLocal
+    from app.services import jobs as job_service
+
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    artifact_file = tmp_path / "mock_artifacts" / "commit-fence.bin"
+    artifact_file.parent.mkdir(parents=True, exist_ok=True)
+    artifact_file.write_bytes(b"must survive a database rollback")
+    with SessionLocal() as db:
+        stored_job = db.get(models.Job, job["id"])
+        assert stored_job is not None
+        stored_job.status = "COMPLETED"
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=stored_job.id,
+                artifact_type="log",
+                storage_path=str(artifact_file),
+            )
+        )
+        db.commit()
+
+    with SessionLocal() as db:
+        monkeypatch.setattr(
+            db,
+            "commit",
+            lambda: (_ for _ in ()).throw(RuntimeError("forced commit failure")),
+        )
+        with pytest.raises(RuntimeError, match="forced commit failure"):
+            job_service.delete_job(db, job["id"])
+
+    assert artifact_file.read_bytes() == b"must survive a database rollback"
+    with SessionLocal() as db:
+        assert db.get(models.Job, job["id"]) is not None
+        artifact = db.query(models.Artifact).filter_by(owner_id=job["id"]).one()
+        assert artifact.storage_path == str(artifact_file)
+
+
+def test_delete_job_keeps_committed_deletion_when_payload_cleanup_fails(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app import models
+    from app.db import SessionLocal
+    from app.services import jobs as job_service
+
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    artifact_file = tmp_path / "mock_artifacts" / "orphan-after-delete.bin"
+    artifact_file.parent.mkdir(parents=True, exist_ok=True)
+    artifact_file.write_bytes(b"retention cleanup may reclaim this orphan")
+    with SessionLocal() as db:
+        stored_job = db.get(models.Job, job["id"])
+        assert stored_job is not None
+        stored_job.status = "COMPLETED"
+        db.add(
+            models.Artifact(
+                owner_type="job",
+                owner_id=stored_job.id,
+                artifact_type="log",
+                storage_path=str(artifact_file),
+            )
+        )
+        db.commit()
+
+    class FailingStorage:
+        def exists(self, _storage_path: str) -> bool:
+            return True
+
+        def delete(self, _storage_path: str) -> None:
+            raise RuntimeError("forced payload cleanup failure")
+
+    monkeypatch.setattr(
+        job_service,
+        "get_artifact_storage",
+        lambda: FailingStorage(),
+    )
+    response = client.delete(f"/api/v1/jobs/{job['id']}")
+    assert response.status_code == 200, response.text
+    assert response.json()["data"] == {"id": job["id"], "deleted": True}
+    assert artifact_file.exists()
+    with SessionLocal() as db:
+        assert db.get(models.Job, job["id"]) is None
+        assert db.query(models.Artifact).filter_by(owner_id=job["id"]).count() == 0
 
 
 def test_delete_active_job_conflict(client: TestClient) -> None:
-    job = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     resp = client.delete(f"/api/v1/jobs/{job['id']}")
     assert resp.status_code == 409
-    assert resp.json()['error']['code'] == 'JOB_NOT_DELETABLE'
+    assert resp.json()["error"]["code"] == "JOB_NOT_DELETABLE"
 
 
 def test_delete_source_job_nulls_child_source_id(client: TestClient) -> None:
     from app import models
     from app.db import SessionLocal
-    parent = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
-    child = client.post(f"/api/v1/jobs/{parent['id']}/rerun").json()['data']
+
+    parent = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    child = client.post(f"/api/v1/jobs/{parent['id']}/rerun").json()["data"]
     with SessionLocal() as db:
-        p = db.get(models.Job, parent['id'])
+        p = db.get(models.Job, parent["id"])
         assert p is not None
-        p.status = 'COMPLETED'
+        p.status = "COMPLETED"
         db.commit()
     assert client.delete(f"/api/v1/jobs/{parent['id']}").status_code == 200
     child_detail = client.get(f"/api/v1/jobs/{child['id']}")
     assert child_detail.status_code == 200
-    assert child_detail.json()['data']['source_job_id'] is None
+    assert child_detail.json()["data"]["source_job_id"] is None
 
 
 def test_delete_job_ignores_missing_artifact_file(client: TestClient, tmp_path: Path) -> None:
     from app import models
     from app.db import SessionLocal
 
-    job = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
-    missing_path = tmp_path / 'artifacts' / 'missing.bin'
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    missing_path = tmp_path / "artifacts" / "missing.bin"
     with SessionLocal() as db:
-        j = db.get(models.Job, job['id'])
+        j = db.get(models.Job, job["id"])
         assert j is not None
-        j.status = 'COMPLETED'
+        j.status = "COMPLETED"
         db.add(
             models.Artifact(
                 owner_type="job",
@@ -1043,5 +1404,5 @@ def test_delete_job_never_deletes_artifact_outside_allowed_roots(
     assert response.status_code == 200, response.text
     assert outside_path.read_bytes() == b"must remain"
     with SessionLocal() as db:
-        assert db.get(models.Job, job['id']) is None
-        assert db.query(models.Artifact).filter(models.Artifact.owner_id == job['id']).count() == 0
+        assert db.get(models.Job, job["id"]) is None
+        assert db.query(models.Artifact).filter(models.Artifact.owner_id == job["id"]).count() == 0

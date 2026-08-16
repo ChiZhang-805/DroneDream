@@ -2,7 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
-import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
+import {
+  activateDesktopAuthSession,
+  ADOPT_DESKTOP_AUTH_EVENT,
+} from "../features/auth/desktopAuthActivation";
 
 const authMock = vi.hoisted(() => {
   const state = {
@@ -54,6 +57,10 @@ const authMock = vi.hoisted(() => {
 
 vi.mock("../features/auth/supabaseClient", () => ({
   appleAuthEnabled: false,
+  browserAuthConfiguration: () => ({
+    supabaseUrl: "https://accounts.example.test",
+    publishableKey: "public-browser-key",
+  }),
   cloudAuthConfigured: true,
   googleAuthEnabled: false,
   supabaseClient: {
@@ -128,6 +135,15 @@ function AccountProbe() {
   );
 }
 
+function adoptDesktopAccount(): void {
+  window.dispatchEvent(new CustomEvent(ADOPT_DESKTOP_AUTH_EVENT, {
+    detail: {
+      user: authMock.state.user,
+      accessToken: "session-token",
+    },
+  }));
+}
+
 describe("AuthContext account profile", () => {
   afterEach(() => {
     authMock.state.user = {
@@ -144,10 +160,28 @@ describe("AuthContext account profile", () => {
     authMock.signOut.mockReset();
     authMock.signOut.mockResolvedValue({ data: {}, error: null });
     authMock.unsubscribe.mockClear();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     delete window.__TAURI__;
     window.history.replaceState(null, "", "/");
     window.localStorage.clear();
     window.sessionStorage.clear();
+  });
+
+  it("uses a local preview identity only in desktop visual-QA mode", async () => {
+    vi.stubEnv("VITE_DESKTOP_VISUAL_QA", "true");
+    window.__TAURI__ = { core: { invoke: vi.fn() } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByLabelText("username"))
+      .toHaveTextContent("DroneDream Pilot");
+    expect(screen.getByLabelText("email")).toHaveTextContent("pilot@example.com");
+    expect(authMock.getSession).not.toHaveBeenCalled();
   });
 
   it("defaults to the email prefix and lets the user save a custom username", async () => {
@@ -226,7 +260,7 @@ describe("AuthContext account profile", () => {
   });
 
   it.each(["/", "/#/desktop/setup"])(
-    "does not hydrate the desktop launcher at %s until the 100 percent sign-in action activates it",
+    "keeps Supabase session state out of the desktop launcher at %s and adopts only the native access token",
     async (launcherUrl) => {
     window.__TAURI__ = {
       core: {
@@ -247,14 +281,50 @@ describe("AuthContext account profile", () => {
     expect(screen.getByLabelText("username")).toHaveTextContent("");
 
     activateDesktopAuthSession();
+    adoptDesktopAccount();
 
     await waitFor(() => {
-      expect(authMock.getSession).toHaveBeenCalledTimes(1);
-      expect(authMock.onAuthStateChange).toHaveBeenCalledTimes(1);
+      expect(authMock.getSession).not.toHaveBeenCalled();
+      expect(authMock.onAuthStateChange).not.toHaveBeenCalled();
       expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name");
     });
     },
   );
+
+  it("updates a desktop username with the native-adopted access token", async () => {
+    const request = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", request);
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    adoptDesktopAccount();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("username")).toHaveTextContent("Flight Pilot");
+    });
+    expect(request).toHaveBeenCalledWith(
+      "https://accounts.example.test/auth/v1/user",
+      expect.objectContaining({
+        method: "PUT",
+        headers: {
+          apikey: "public-browser-key",
+          Authorization: "Bearer session-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ data: { display_name: "Flight Pilot" } }),
+      }),
+    );
+    expect(authMock.updateUser).not.toHaveBeenCalled();
+    expect(authMock.getSession).not.toHaveBeenCalled();
+  });
 
   it("adopts an authenticated account when optional avatar storage is unavailable", async () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem")
@@ -320,6 +390,7 @@ describe("AuthContext account profile", () => {
       </AuthProvider>,
     );
     activateDesktopAuthSession();
+    adoptDesktopAccount();
     await screen.findByText("pilot.name");
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
@@ -346,6 +417,7 @@ describe("AuthContext account profile", () => {
       </AuthProvider>,
     );
     activateDesktopAuthSession();
+    adoptDesktopAccount();
     await screen.findByText("pilot.name");
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));

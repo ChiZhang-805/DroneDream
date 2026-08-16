@@ -14,7 +14,13 @@ from pathlib import Path
 from typing import Any
 
 from app import models
-from app.orchestration.constants import BASELINE_PARAMETERS, PARAMETER_SAFE_RANGES
+from app.optimization.outcome_contract import compile_job_outcome_contract
+from app.optimization.outcome_evidence import (
+    require_authoritative_candidate_report_projection,
+)
+from app.orchestration.constants import BASELINE_PARAMETERS, PARAMETER_SAFE_RANGES, SCORE_WEIGHTS
+from app.orchestration.winner_freeze import require_winner_freeze_receipt
+from app.time_utils import canonical_utc_iso
 
 _SAFE_ENV_ALLOWLIST: tuple[str, ...] = (
     "PX4_GAZEBO_WORLD",
@@ -30,11 +36,20 @@ _SAFE_ENV_ALLOWLIST: tuple[str, ...] = (
     "DRONEDREAM_PX4_EXECUTABLE",
     "DRONEDREAM_GAZEBO_EXECUTABLE",
 )
-_SENSITIVE_ENV_TOKENS: tuple[str, ...] = ("KEY", "TOKEN", "SECRET", "PASSWORD")
+_SENSITIVE_ENV_TOKENS: tuple[str, ...] = (
+    "KEY",
+    "TOKEN",
+    "SECRET",
+    "PASSWORD",
+    "CREDENTIAL",
+    "AUTHORIZATION",
+    "COOKIE",
+    "BEARER",
+)
 
 
 def _fmt_dt(value: datetime | None) -> str | None:
-    return value.isoformat() if value is not None else None
+    return canonical_utc_iso(value)
 
 
 def _find_repo_root(start: Path) -> Path | None:
@@ -156,24 +171,44 @@ def sanitize_payload(payload: Any) -> Any:
 
 
 def _candidate_summaries(job: models.Job) -> list[dict[str, Any]]:
-    rows = sorted(job.candidates, key=lambda c: (c.generation_index, c.created_at))
-    return [
-        {
-            "id": c.id,
-            "label": c.label,
-            "generation": c.generation_index,
-            "source": c.source_type,
-            "parameters": sanitize_payload(c.parameter_json),
-            "aggregated_score": c.aggregated_score,
-            "aggregated_feedback": sanitize_payload(c.aggregated_metric_json),
-            "optimizer_metadata": sanitize_payload(c.optimizer_metadata_json),
-        }
-        for c in rows
-    ]
+    rows = sorted(
+        job.candidates,
+        key=lambda candidate: (
+            candidate.generation_index,
+            canonical_utc_iso(candidate.created_at) or "",
+            candidate.id,
+        ),
+    )
+    summaries: list[dict[str, Any]] = []
+    for candidate in rows:
+        aggregate = require_authoritative_candidate_report_projection(
+            candidate
+        )
+        summaries.append(
+            {
+                "id": candidate.id,
+                "label": candidate.label,
+                "generation": candidate.generation_index,
+                "source": candidate.source_type,
+                "parameters": sanitize_payload(candidate.parameter_json),
+                "aggregated_score": aggregate.get("aggregated_score"),
+                "aggregated_feedback": sanitize_payload(aggregate),
+                "optimizer_metadata": sanitize_payload(
+                    candidate.optimizer_metadata_json
+                ),
+            }
+        )
+    return summaries
 
 
 def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
-    rows = sorted(job.trials, key=lambda t: t.created_at)
+    rows = sorted(
+        job.trials,
+        key=lambda trial: (
+            canonical_utc_iso(trial.created_at) or "",
+            trial.id,
+        ),
+    )
     return [
         {
             "trial_id": t.id,
@@ -197,6 +232,26 @@ def _trial_summaries(job: models.Job) -> list[dict[str, Any]]:
 
 def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet) -> dict[str, Any]:
     git = _git_info()
+    best_aggregate = require_authoritative_candidate_report_projection(best)
+    winner_freeze = job.winner_freeze
+    verified_winner = (
+        require_winner_freeze_receipt(
+            winner_freeze,
+            job=job,
+            evidence=(
+                job.report.winner_evidence_json
+                if job.report is not None
+                else None
+            ),
+        )
+        if winner_freeze is not None
+        else None
+    )
+    candidate_summaries = _candidate_summaries(job)
+    outcome_contract = compile_job_outcome_contract(
+        job,
+        failed_trial_weight=SCORE_WEIGHTS["failed_trial"],
+    )
     real_command = os.environ.get("REAL_SIMULATOR_COMMAND")
     px4_dir = os.environ.get("PX4_AUTOPILOT_DIR")
     acceptance_criteria = {
@@ -263,6 +318,23 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
             "acceptance_criteria": acceptance_criteria,
         },
         "optimizer": {
+            "optimization_outcome_contract": outcome_contract.model_dump(mode="json"),
+            "winner_selection_evidence": sanitize_payload(
+                verified_winner.model_dump(mode="json")
+                if verified_winner is not None
+                else None
+            ),
+            "winner_freeze_receipt": sanitize_payload(
+                {
+                    "receipt_id": winner_freeze.id,
+                    "receipt_schema": winner_freeze.receipt_schema,
+                    "evidence_id": winner_freeze.evidence_id,
+                    "frozen_at": canonical_utc_iso(winner_freeze.frozen_at),
+                }
+                if verified_winner is not None
+                and winner_freeze is not None
+                else None
+            ),
             "parameter_safe_ranges": {
                 key: {"min": lo, "max": hi} for key, (lo, hi) in PARAMETER_SAFE_RANGES.items()
             },
@@ -273,11 +345,11 @@ def build_repro_manifest(*, job: models.Job, best: models.CandidateParameterSet)
                 "label": best.label,
                 "generation_index": best.generation_index,
                 "source_type": best.source_type,
-                "aggregated_score": best.aggregated_score,
+                "aggregated_score": best_aggregate.get("aggregated_score"),
                 "optimizer_metadata": sanitize_payload(best.optimizer_metadata_json),
             },
             "best_parameters": sanitize_payload(dict(best.parameter_json or {})),
-            "candidate_summaries": _candidate_summaries(job),
+            "candidate_summaries": candidate_summaries,
         },
         "simulator": {
             "real_simulator_command": _hash_or_redact_command(real_command),

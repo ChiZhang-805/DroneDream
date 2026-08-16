@@ -1,4 +1,88 @@
+param(
+    [string]$AdditionalConfigPath,
+    [string]$CargoTargetDir,
+    [string]$LlvmRoot,
+    [string]$DetachedNodeDependencyManifest,
+    [string]$ExpectedProductName = "DroneDream",
+    [ValidateSet("universal", "sim", "lab", "field")]
+    [string]$EditionId = "universal",
+    [switch]$AllowUnsignedUpdater,
+    [switch]$PreserveBundleHistory
+)
+
 $ErrorActionPreference = "Stop"
+
+if ($PSVersionTable.PSEdition -ceq "Desktop") {
+    $inboxModuleRoot = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\Modules"
+    if (Test-Path -LiteralPath $inboxModuleRoot -PathType Container) {
+        $modulePaths = @($inboxModuleRoot) + @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -and $_ -cne $inboxModuleRoot }
+        )
+        $env:PSModulePath = $modulePaths -join [IO.Path]::PathSeparator
+    }
+}
+
+Import-Module (Join-Path $PSScriptRoot "release-build-driver.psm1") -Force
+
+& (Join-Path $PSScriptRoot "verify-updater-signing-contract.ps1")
+& (Join-Path $PSScriptRoot "verify-updater-build-contract.ps1")
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$releaseSourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $releaseSourceCommit -cnotmatch '^[0-9a-f]{40}$') {
+    throw "Unable to freeze the exact release source commit."
+}
+$releaseSourceTree = (& git -C $repoRoot rev-parse 'HEAD^{tree}').Trim()
+if ($LASTEXITCODE -ne 0 -or $releaseSourceTree -cnotmatch '^[0-9a-f]{40}$') {
+    throw "Unable to freeze the exact release source tree."
+}
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $releaseBranch = (& git -C $repoRoot symbolic-ref --short -q HEAD 2>$null | Out-String).Trim()
+    $releaseBranchExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($releaseBranchExitCode -notin @(0, 1)) {
+    throw "Unable to classify the release source branch state."
+}
+if (-not $releaseBranch -and -not $DetachedNodeDependencyManifest) {
+    throw "Detached release sources require an exact attested Node dependency manifest."
+}
+$releaseBuildNumber = (& git -C $repoRoot rev-list --count $releaseSourceCommit).Trim()
+if ($LASTEXITCODE -ne 0 -or $releaseBuildNumber -notmatch '^[1-9][0-9]*$') {
+    throw "Unable to freeze the exact release build number."
+}
+$releaseSourceStatus = (& git -C $repoRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $releaseSourceStatus) {
+    throw "The desktop release source must be an exact clean Git commit."
+}
+$env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $releaseSourceCommit
+$env:DRONEDREAM_RELEASE_BUILD_NUMBER = $releaseBuildNumber
+$desktopVisualQa = [Environment]::GetEnvironmentVariable(
+    "VITE_DESKTOP_VISUAL_QA",
+    "Process"
+) -ceq "true"
+if ($desktopVisualQa -and -not $AllowUnsignedUpdater) {
+    throw "Desktop visual-QA mode is forbidden for signed updater builds."
+}
+$visualQaConfig = if ($desktopVisualQa) {
+    $candidate = Join-Path $PSScriptRoot (
+        "..\src-tauri\visual-qa\tauri.$EditionId.visual-qa.conf.json"
+    )
+    $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction Stop
+    $config = Get-Content -LiteralPath $resolved.Path -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+    $expectedIdentifier = "io.dronedream.desktop.$EditionId.visual-qa"
+    if ([string]$config.identifier -cne $expectedIdentifier) {
+        throw "Desktop visual-QA config must use isolated identifier $expectedIdentifier."
+    }
+    $resolved.Path
+} else {
+    $null
+}
 
 $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
 if (Test-Path -LiteralPath $cargoBin) {
@@ -6,10 +90,19 @@ if (Test-Path -LiteralPath $cargoBin) {
 }
 
 $packageRoot = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Packages"
-$llvmPackage = Get-ChildItem -LiteralPath $packageRoot -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like "MartinStorsjo.LLVM-MinGW.UCRT_*" } |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+$llvmPackage = if ($LlvmRoot) {
+    $resolvedLlvmRoot = Resolve-Path -LiteralPath $LlvmRoot -ErrorAction SilentlyContinue
+    if (-not $resolvedLlvmRoot -or
+        -not (Test-Path -LiteralPath $resolvedLlvmRoot.Path -PathType Container)) {
+        throw "The requested LLVM-MinGW root does not exist: $LlvmRoot"
+    }
+    Get-Item -LiteralPath $resolvedLlvmRoot.Path
+} else {
+    Get-ChildItem -LiteralPath $packageRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "MartinStorsjo.LLVM-MinGW.UCRT_*" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
 
 $clang = if ($llvmPackage) {
     Get-ChildItem -LiteralPath $llvmPackage.FullName -Recurse -Filter "x86_64-w64-mingw32-clang.exe" -File -ErrorAction SilentlyContinue |
@@ -61,6 +154,19 @@ if (-not $env:CARGO_BUILD_JOBS) {
     $env:CARGO_BUILD_JOBS = "4"
 }
 
+$defaultCargoTarget = Join-Path $PSScriptRoot "..\src-tauri\target"
+$cargoTargetRoot = if ($CargoTargetDir) {
+    [IO.Path]::GetFullPath($CargoTargetDir)
+} elseif ($env:CARGO_TARGET_DIR) {
+    [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)
+} else {
+    [IO.Path]::GetFullPath($defaultCargoTarget)
+}
+$env:CARGO_TARGET_DIR = $cargoTargetRoot
+$targetOutputRoot = Join-Path $cargoTargetRoot "x86_64-pc-windows-gnullvm\release"
+$installerBundleRoot = Join-Path $targetOutputRoot "bundle\nsis"
+$detachedDependencyContract = $null
+
 # The gnullvm target otherwise links libunwind.dll dynamically. Tauri's NSIS
 # bundler does not discover that toolchain DLL, so the installed application
 # would fail before Rust can start. Keep this fallback build deterministic and
@@ -109,19 +215,141 @@ if (-not (Test-Path -LiteralPath $llvmBundleConfig -PathType Leaf)) {
     throw "The LLVM bundle configuration was not found at $llvmBundleConfig"
 }
 
+if ($AdditionalConfigPath) {
+    $additionalConfig = (Resolve-Path -LiteralPath $AdditionalConfigPath -ErrorAction Stop).Path
+    $additionalConfigText = Get-Content -LiteralPath $additionalConfig -Raw -Encoding UTF8
+    try {
+        $additionalConfigObject = $additionalConfigText | ConvertFrom-Json
+    } catch {
+        throw "The additional edition config is not valid JSON: $AdditionalConfigPath"
+    }
+    if ($additionalConfigObject.productName -cne $ExpectedProductName) {
+        throw "The additional edition config productName does not match $ExpectedProductName."
+    }
+}
+$frontendDistContract = Resolve-EditionGeneratedFrontendContract `
+    -RepoRoot $repoRoot `
+    -BaseConfigPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") `
+    -AdditionalConfigPath $additionalConfig `
+    -EditionId $EditionId
+if ($DetachedNodeDependencyManifest) {
+    $detachedDependencyContract = & (Join-Path $PSScriptRoot "verify-detached-node-dependencies.ps1") `
+        -ManifestPath $DetachedNodeDependencyManifest `
+        -RepoRoot $repoRoot `
+        -EditionId $EditionId `
+        -ExpectedSourceCommit $releaseSourceCommit `
+        -ExpectedSourceTree $releaseSourceTree `
+        -FrontendDistPath $frontendDistContract.absolutePath `
+        -InstallerBundlePath $installerBundleRoot
+    if (-not $detachedDependencyContract.liveMountValidated -or
+        $detachedDependencyContract.mountCount -ne 2) {
+        throw "The detached Node dependency mounts were not live-validated."
+    }
+    $env:npm_config_offline = "true"
+    $env:npm_config_audit = "false"
+    $env:npm_config_fund = "false"
+    $env:npm_config_update_notifier = "false"
+}
+$runtimeUpdateFamilies = Get-Content -LiteralPath (
+    Join-Path $repoRoot "distribution\desktop\edition-runtime-update-families.v1.json"
+) -Raw -Encoding UTF8 | ConvertFrom-Json
+$editionFamilies = @($runtimeUpdateFamilies.editions | Where-Object {
+    $_.editionId -ceq $EditionId
+})
+if ($runtimeUpdateFamilies.kind -cne "dronedream-desktop-runtime-update-families" -or
+    $editionFamilies.Count -ne 1) {
+    throw "The desktop updater family contract is unavailable or ambiguous."
+}
+$editionFamily = $editionFamilies[0]
+if ($env:DRONEDREAM_DESKTOP_EDITION_ID -and
+    $env:DRONEDREAM_DESKTOP_EDITION_ID -cne $EditionId) {
+    throw "The compiled desktop edition does not match its updater family."
+}
+if ($AdditionalConfigPath -and
+    $ExpectedProductName -cne [string]$editionFamily.installerProductName) {
+    throw "The edition overlay productName does not match its updater family."
+}
+if (-not $AdditionalConfigPath -and -not $AllowUnsignedUpdater) {
+    throw "Signed updater builds require an explicit edition config overlay."
+}
+
 & (Join-Path $PSScriptRoot "verify-desktop-version.ps1")
 & (Join-Path $PSScriptRoot "verify-nsis-template.ps1")
 
 Write-Host "Building DroneDream Desktop with $toolchain"
 $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-& npm.cmd --prefix $desktopRoot run build -- `
-    --target x86_64-pc-windows-gnullvm `
-    --config $llvmBundleConfig
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+if ($additionalConfig) {
+    # Tauri merges repeated --config values in order. Keep the edition overlay
+    # first and add the LLVM resource overlay without replacing edition fields.
+    $tauriConfigArguments = @(
+        "--target", "x86_64-pc-windows-gnullvm",
+        "--config", $additionalConfig,
+        "--config", $llvmBundleConfig
+    )
+    if ($visualQaConfig) {
+        $tauriConfigArguments += @("--config", $visualQaConfig)
+    }
+    Invoke-CheckedNativeCommand `
+        -FilePath "npm.cmd" `
+        -DisplayName "Tauri desktop build" `
+        -ArgumentList (@("--prefix", $desktopRoot, "run", "build", "--") + $tauriConfigArguments)
+} else {
+    Invoke-CheckedNativeCommand `
+        -FilePath "npm.cmd" `
+        -DisplayName "Tauri desktop build" `
+        -ArgumentList @(
+            "--prefix", $desktopRoot, "run", "build", "--",
+            "--target", "x86_64-pc-windows-gnullvm",
+            "--config", $llvmBundleConfig
+        )
 }
 
-$application = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\drone-dream-desktop.exe"
+Invoke-CheckedNativeCommand `
+    -FilePath "node.exe" `
+    -DisplayName "$EditionId frontend ownership verification" `
+    -ArgumentList @(
+        (Join-Path $repoRoot "frontend\scripts\verify-edition-build-boundaries.mjs"),
+        "--edition", $EditionId,
+        "--dist", $frontendDistContract.absolutePath
+    )
+
+$postBuildCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
+$postBuildStatusLines = @(
+    & git -C $repoRoot status --porcelain=v1 --untracked-files=all
+)
+$postBuildStatusExitCode = $LASTEXITCODE
+$postBuildStatus = Test-PostBuildSourceStatus `
+    -StatusLines $postBuildStatusLines `
+    -AllowedGeneratedPath $frontendDistContract.relativePath
+if ($postBuildStatusExitCode -ne 0 -or
+    $postBuildCommit -cne $releaseSourceCommit -or
+    $postBuildStatus.unexpectedCount -ne 0) {
+    throw "The release source changed while the desktop installer was building."
+}
+if ($postBuildStatus.allowedGeneratedCount -gt 0) {
+    Write-Host (
+        "Accepted $($postBuildStatus.allowedGeneratedCount) generated frontend files " +
+        "under $($frontendDistContract.relativePath)."
+    )
+}
+if ($detachedDependencyContract) {
+    $postBuildDependencyContract = & (Join-Path $PSScriptRoot "verify-detached-node-dependencies.ps1") `
+        -ManifestPath $DetachedNodeDependencyManifest `
+        -RepoRoot $repoRoot `
+        -EditionId $EditionId `
+        -ExpectedSourceCommit $releaseSourceCommit `
+        -ExpectedSourceTree $releaseSourceTree `
+        -FrontendDistPath $frontendDistContract.absolutePath `
+        -InstallerBundlePath $installerBundleRoot `
+        -InspectOutputPayload
+    if (-not $postBuildDependencyContract.liveMountValidated -or
+        $postBuildDependencyContract.treeFingerprint -cne $detachedDependencyContract.treeFingerprint -or
+        $postBuildDependencyContract.manifestSha256 -cne $detachedDependencyContract.manifestSha256) {
+        throw "The detached Node dependency bundle changed during the release build."
+    }
+}
+
+$application = Join-Path $targetOutputRoot "drone-dream-desktop.exe"
 if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
     throw "The LLVM build completed without producing $application"
 }
@@ -161,7 +389,7 @@ if ($importReport -notmatch "(?im)^\s*Name:\s*WebView2Loader\.dll\s*$") {
 }
 Write-Host "Verified static LLVM runtime linkage and the bundled WebView2 loader."
 
-$generatedNsi = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\nsis\x64\installer.nsi"
+$generatedNsi = Join-Path $targetOutputRoot "nsis\x64\installer.nsi"
 if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
     throw "The LLVM build completed without producing $generatedNsi"
 }
@@ -170,45 +398,51 @@ if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
 & (Join-Path $PSScriptRoot "verify-installer-locales.ps1") -GeneratedNsi $generatedNsi
 & (Join-Path $PSScriptRoot "verify-installer-planner.ps1") `
     -Application $application `
-    -WebViewLoader $webViewLoaderStaged
+    -WebViewLoader $webViewLoaderStaged `
+    -EditionId $EditionId
 
 $tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
     ConvertFrom-Json
-$bundleDirectory = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\bundle\nsis"
-$installer = Join-Path $bundleDirectory "DroneDream_$($tauriConfig.version)_x64-setup.exe"
+$bundleDirectory = Join-Path $targetOutputRoot "bundle\nsis"
+$installer = Join-Path $bundleDirectory "${ExpectedProductName}_$($tauriConfig.version)_x64-setup.exe"
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
     throw "The LLVM build completed without producing the versioned installer $installer"
 }
 
 # Sign the final NSIS bytes for the in-app updater after bundling. This updater
-# signature is separate from Authenticode. Explicit --password= handles the
-# current empty-password encrypted key without an interactive prompt.
-$updaterKeyPath = $env:TAURI_SIGNING_PRIVATE_KEY_PATH
-if (-not $updaterKeyPath) {
-    $localUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
-    if (Test-Path -LiteralPath $localUpdaterKey -PathType Leaf) {
-        $updaterKeyPath = $localUpdaterKey
+# signature is separate from Authenticode. The helper keeps a complete, typed
+# argv vector so PowerShell cannot unwrap a one-item password array and splat
+# it character by character.
+$updaterSignature = "${installer}.sig"
+if ($AllowUnsignedUpdater) {
+    if (Test-Path -LiteralPath $updaterSignature -PathType Leaf) {
+        throw "Unsigned builds require an empty updater-signature slot: $updaterSignature"
     }
-}
-if (-not $updaterKeyPath -or
-    -not (Test-Path -LiteralPath $updaterKeyPath -PathType Leaf)) {
-    throw "Set TAURI_SIGNING_PRIVATE_KEY_PATH before signing the updater artifact."
-}
-$tauriCli = Join-Path $PSScriptRoot "..\node_modules\@tauri-apps\cli\tauri.js"
-if (-not (Test-Path -LiteralPath $tauriCli -PathType Leaf)) {
-    throw "The installed Tauri CLI was not found at $tauriCli"
-}
-$updaterPasswordArgument = if ($null -eq $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
-    "--password="
 } else {
-    "--password=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)"
-}
-& node.exe $tauriCli signer sign `
-    --private-key-path $updaterKeyPath `
-    $updaterPasswordArgument `
-    $installer
-if ($LASTEXITCODE -ne 0) {
-    throw "Tauri updater signing failed."
+    $updaterKeyPath = $env:TAURI_SIGNING_PRIVATE_KEY_PATH
+    if (-not $updaterKeyPath) {
+        $localUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
+        if (Test-Path -LiteralPath $localUpdaterKey -PathType Leaf) {
+            $updaterKeyPath = $localUpdaterKey
+        }
+    }
+    if (-not $updaterKeyPath -or
+        -not (Test-Path -LiteralPath $updaterKeyPath -PathType Leaf)) {
+        throw "Set TAURI_SIGNING_PRIVATE_KEY_PATH before signing the updater artifact."
+    }
+    $tauriCli = if ($detachedDependencyContract) {
+        [string]$detachedDependencyContract.tauriCliPath
+    } else {
+        Join-Path $PSScriptRoot "..\node_modules\@tauri-apps\cli\tauri.js"
+    }
+    if (-not (Test-Path -LiteralPath $tauriCli -PathType Leaf)) {
+        throw "The installed Tauri CLI was not found at $tauriCli"
+    }
+    & (Join-Path $PSScriptRoot "invoke-tauri-updater-signer.ps1") `
+        -NodeExecutable "node.exe" `
+        -TauriCliPath $tauriCli `
+        -UpdaterKeyPath $updaterKeyPath `
+        -InstallerPath $installer
 }
 
 $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer
@@ -217,12 +451,16 @@ $checksumPath = "$installer.sha256"
     Set-Content -Encoding ascii -LiteralPath $checksumPath
 Write-Host "Wrote verified installer checksum to $checksumPath"
 
-$updaterSignature = "${installer}.sig"
-if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
-    throw "The signed Tauri updater artifact is missing: $updaterSignature"
+if (-not $AllowUnsignedUpdater) {
+    if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
+        throw "The signed Tauri updater artifact is missing: $updaterSignature"
+    }
+    & (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
+        -BundleDirectory $bundleDirectory `
+        -EditionId $EditionId `
+        -SourceCommit $releaseSourceCommit `
+        -BuildNumber ([UInt64]$releaseBuildNumber)
 }
-& (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
-    -BundleDirectory $bundleDirectory
 
 # A developer bundle directory otherwise accumulates every historical setup
 # executable, which makes manual testing error-prone. Prune only versioned
@@ -231,21 +469,25 @@ if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
 # output directory.
 $bundleDirectoryFull = [IO.Path]::GetFullPath($bundleDirectory).TrimEnd('\', '/')
 $expectedBundleRoot = [IO.Path]::GetFullPath(
-    (Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\bundle\nsis")
+    (Join-Path $targetOutputRoot "bundle\nsis")
 ).TrimEnd('\', '/')
 if (-not $bundleDirectoryFull.Equals($expectedBundleRoot, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to prune installer artifacts outside the LLVM NSIS bundle directory."
 }
 $currentArtifacts = @(
     [IO.Path]::GetFullPath($installer),
-    [IO.Path]::GetFullPath($checksumPath)
+    [IO.Path]::GetFullPath($checksumPath),
+    [IO.Path]::GetFullPath($updaterSignature)
 )
-Get-ChildItem -LiteralPath $bundleDirectoryFull -File |
-    Where-Object {
-        $_.Name -match '^DroneDream_.+_x64-setup\.exe(?:\.sha256)?$' -and
-        $_.FullName -notin $currentArtifacts
-    } |
-    ForEach-Object {
-        Remove-Item -LiteralPath $_.FullName -Force
-        Write-Host "Removed stale local installer artifact $($_.Name)"
-    }
+if (-not $PreserveBundleHistory) {
+    Get-ChildItem -LiteralPath $bundleDirectoryFull -File |
+        Where-Object {
+            $_.Name -match ("^" + [regex]::Escape($ExpectedProductName) +
+                "_.+_x64-setup\.exe(?:\.sha256|\.sig)?$") -and
+            $_.FullName -notin $currentArtifacts
+        } |
+        ForEach-Object {
+            Remove-Item -LiteralPath $_.FullName -Force
+            Write-Host "Removed stale local installer artifact $($_.Name)"
+        }
+}

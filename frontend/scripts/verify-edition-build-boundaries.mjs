@@ -35,35 +35,41 @@ const forbidChunk = (name) => {
   if (ownsChunk(name)) throw new Error(`${edition} contains foreign ${name} code`);
 };
 
+if (!files.includes("index.html")) {
+  throw new Error(`${edition} build is missing the shared AppShell entrypoint`);
+}
+
+// These routes are the common website-console contract. SimOverview used to
+// be a separately named chunk, but its content now lives in the shared console
+// shell; checking that historical filename would reject a valid current build.
+for (const name of [
+  "AutonomyPlatform",
+  "Dashboard",
+  "ExperimentAssistant",
+  "FixedScenarios",
+  "History",
+  "NewJobRoute",
+]) requireChunk(name);
+
+const labChunks = ["LabSetup", "LabHardwareWorkspace", "LabValidationWorkspace"];
+
 if (edition === "universal") {
   for (const name of [
-    "SimOverview",
-    "LabSetup",
-    "LabHardwareWorkspace",
+    ...labChunks,
     "FieldApp",
+    "UniversalFieldApp",
     "VehicleStudio",
   ]) requireChunk(name);
 } else if (edition === "sim") {
-  requireChunk("SimOverview");
-  for (const name of [
-    "LabSetup",
-    "LabHardwareWorkspace",
-    "FieldApp",
-    "VehicleStudio",
-  ]) forbidChunk(name);
-} else if (edition === "lab") {
-  requireChunk("LabSetup");
-  requireChunk("LabHardwareWorkspace");
-  forbidChunk("SimOverview");
-  forbidChunk("FieldApp");
-  forbidChunk("VehicleStudio");
-} else {
-  if (!files.includes("field.html")) {
-    throw new Error("Field build is missing field.html");
-  }
-  for (const name of ["SimOverview", "LabSetup", "VehicleStudio"]) {
+  for (const name of [...labChunks, "FieldApp", "UniversalFieldApp", "VehicleStudio"]) {
     forbidChunk(name);
   }
+} else if (edition === "lab") {
+  for (const name of labChunks) requireChunk(name);
+  for (const name of ["FieldApp", "UniversalFieldApp", "VehicleStudio"]) forbidChunk(name);
+} else {
+  requireChunk("UniversalFieldApp");
+  for (const name of [...labChunks, "FieldApp", "VehicleStudio"]) forbidChunk(name);
 }
 
 console.log(JSON.stringify({

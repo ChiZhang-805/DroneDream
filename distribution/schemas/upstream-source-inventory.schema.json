@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/upstream-source-inventory.v1.json",
+  "title": "DroneDream upstream source and license inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "auditDate",
+    "policy",
+    "sources"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-upstream-source-inventory"},
+    "auditDate": {"type": "string", "format": "date"},
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mutableReferencesForbidden",
+        "copyRequiresLicenseReview",
+        "validationLabelsAreEvidenceBound"
+      ],
+      "properties": {
+        "mutableReferencesForbidden": {"const": true},
+        "copyRequiresLicenseReview": {"const": true},
+        "validationLabelsAreEvidenceBound": {"const": true}
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/source"}
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "immutableHttpsUrl": {
+      "type": "string",
+      "pattern": "^https://[^@/?#]+(?:/[^?#]*)?$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "project",
+        "officialRepository",
+        "integrationStatus",
+        "integrationMode",
+        "distributionMode",
+        "copiedIntoRepository",
+        "pin",
+        "licenseConclusion",
+        "licenseEvidence",
+        "noticeObligations",
+        "validationTier",
+        "validationNotes"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "project": {"type": "string", "minLength": 1, "maxLength": 128},
+        "officialRepository": {"$ref": "#/$defs/immutableHttpsUrl"},
+        "integrationStatus": {
+          "enum": ["current", "transitive", "evaluated", "planned"]
+        },
+        "integrationMode": {
+          "enum": [
+            "compiled-at-runtime-build",
+            "apt-metapackage",
+            "python-package",
+            "px4-submodule",
+            "external-launch-only",
+            "contract-only"
+          ]
+        },
+        "distributionMode": {
+          "enum": [
+            "runtime-bundled",
+            "runtime-transitive",
+            "not-distributed"
+          ]
+        },
+        "copiedIntoRepository": {"const": false},
+        "pin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value", "authority"],
+          "properties": {
+            "kind": {
+              "enum": ["commit", "tag-and-commit", "apt-version", "oci-digest"]
+            },
+            "value": {"type": "string", "minLength": 1, "maxLength": 256},
+            "commit": {"$ref": "#/$defs/commit"},
+            "authority": {"type": "string", "minLength": 1, "maxLength": 256}
+          }
+        },
+        "auditedUpstreamCommit": {"$ref": "#/$defs/commit"},
+        "licenseConclusion": {
+          "type": "string",
+          "pattern": "^(?:[A-Za-z0-9.+-]+(?: (?:AND|OR) [A-Za-z0-9.+-]+)*|NOASSERTION)$"
+        },
+        "declaredLicenses": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 64}
+        },
+        "licenseEvidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["url", "scope"],
+            "properties": {
+              "url": {"$ref": "#/$defs/immutableHttpsUrl"},
+              "sha256": {"$ref": "#/$defs/sha256"},
+              "scope": {"type": "string", "minLength": 1, "maxLength": 256}
+            }
+          }
+        },
+        "noticeObligations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "validationTier": {
+          "enum": [
+            "integrated-contract",
+            "external-integration-reviewed",
+            "contract-only",
+            "legal-review-required"
+          ]
+        },
+        "validationNotes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "maxLength": 512}
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"pin": {"properties": {"kind": {"const": "commit"}}}}
+          },
+          "then": {
+            "properties": {"pin": {"required": ["commit"]}}
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "integrationMode": {
+                "enum": ["external-launch-only", "contract-only"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "distributionMode": {"const": "not-distributed"},
+              "integrationStatus": {"enum": ["evaluated", "planned"]}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"licenseConclusion": {"const": "NOASSERTION"}}
+          },
+          "then": {
+            "required": ["declaredLicenses"],
+            "properties": {
+              "validationTier": {"const": "legal-review-required"}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

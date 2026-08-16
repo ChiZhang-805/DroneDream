@@ -20,12 +20,14 @@
         "minWidth": 1100,
         "minHeight": 700,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "transparent": false,
+        "backgroundColor": "#ffffff"
       }
     ],
     "security": {
-      "csp": "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:8000 ws://127.0.0.1:* https://yggabfynndpzymlqvnim.supabase.co wss://yggabfynndpzymlqvnim.supabase.co; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost http://127.0.0.1:8000 data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
-      "devCsp": "default-src 'self' http://127.0.0.1:5173; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:* https://yggabfynndpzymlqvnim.supabase.co wss://yggabfynndpzymlqvnim.supabase.co; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost http://127.0.0.1:* data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-eval'"
+      "csp": "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src ipc: http://ipc.localhost ws://127.0.0.1:* https://yggabfynndpzymlqvnim.supabase.co wss://yggabfynndpzymlqvnim.supabase.co; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
+      "devCsp": "default-src 'self' http://127.0.0.1:5173; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; connect-src ipc: http://ipc.localhost http://127.0.0.1:5173 ws://127.0.0.1:* https://yggabfynndpzymlqvnim.supabase.co wss://yggabfynndpzymlqvnim.supabase.co; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-eval'"
     }
   },
   "bundle": {
@@ -38,7 +40,8 @@
     "resources": {
       "../../LICENSE": "licenses/DroneDream-LICENSE.txt",
       "../../runtime/THIRD_PARTY_NOTICES.md": "licenses/THIRD_PARTY_NOTICES.md",
-      "../../runtime/licenses/valkey-COPYING": "licenses/Valkey-COPYING.txt"
+      "../../runtime/licenses/valkey-COPYING": "licenses/Valkey-COPYING.txt",
+      "icons/icon.ico": "icons/DroneDream.ico"
     },
     "icon": [
       "icons/32x32.png",
@@ -67,9 +70,6 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaW5pIHB1YmxpYyBrZXk6IEJBM0ZEQ0FGNzFDRTJGRjUKUldUMUw4NXhyOXcvdXF3aTFMbFM1TVpNQ3J3T1czMVRXMkduWVA3ajlPSmdCSEtsbTVWeTVFS0cK",
-      "endpoints": [
-        "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/latest.json"
-      ],
       "windows": {
         "installMode": "passive"
       }

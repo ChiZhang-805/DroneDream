@@ -31,20 +31,30 @@ permissions:
   actions: read
   contents: read
 
+concurrency:
+  group: desktop-installer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   windows-nsis:
     name: Windows x64 NSIS
     runs-on: windows-2022
     # Two SignPath requests require explicit release approval. Keep enough
     # headroom for review without turning a stalled request into an endless job.
-    timeout-minutes: 90
+    timeout-minutes: 180
     env:
       CARGO_BUILD_JOBS: "4"
+      # These are public browser client identifiers, not service credentials.
+      # Keep them in repository variables so CI exercises the same approved
+      # account endpoint as formal desktop builds.
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Verify release version consistency
@@ -105,6 +115,10 @@ jobs:
           toolchain: 1.97.0
           components: rustfmt, clippy
 
+      - name: Verify desktop browser-auth public configuration
+        shell: pwsh
+        run: node ./desktop/scripts/verify-browser-auth-config.mjs
+
       - name: Install JavaScript dependencies
         shell: pwsh
         run: |
@@ -115,6 +129,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install backend test dependencies
+        # Pull requests are already gated by the repository quality workflow.
+        # Keep the duplicated full backend suite only for immutable release tags,
+        # where this workflow must remain independently reproducible.
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -127,8 +145,11 @@ jobs:
         run: npm --prefix desktop run verify:release-source
 
       - name: Verify backend
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
         shell: pwsh
         working-directory: backend
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           python -m ruff check app tests
@@ -139,6 +160,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify shared frontend
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -153,6 +175,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify desktop Rust
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -663,7 +686,7 @@ jobs:
         with:
           name: DroneDream-Windows-x64
           if-no-files-found: error
-          retention-days: 14
+          retention-days: ${{ github.event_name == 'pull_request' && 3 || (github.event_name == 'workflow_dispatch' && 14 || 30) }}
           compression-level: 0
           path: |
             desktop/src-tauri/target/release/bundle/nsis/*-setup.exe

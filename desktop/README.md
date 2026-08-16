@@ -73,13 +73,14 @@ back to desktop-only.
 After the user confirms the installer once, NSIS copies the desktop program
 and writes a version-bound, current-user-protected Runtime choice. A successful
 fresh install-all or custom-Runtime install launches DroneDream exactly once;
-the ordinary finish-page Run callback is suppressed so it cannot open a second
-copy. If Windows cannot start that process, the protected choice remains for
-the next manual launch. The setup page first renders the exact confirmed target
-and read-only plan, then automatically downloads, verifies, imports, starts,
-and health-checks `DroneDreamRuntime`. The in-app Runtime button is not part of
-the normal first-install path; it is retained for a safe retry,
-post-cancellation continuation, or repair.
+the standard finish-page Run action owns that launch, and no separate
+post-install callback opens a second copy. If Windows cannot start that process,
+the protected choice remains for the next manual launch. The setup page first
+renders the exact confirmed target and read-only plan, then automatically
+downloads, verifies, imports, starts, and health-checks
+`DroneDreamRuntime`. The in-app Runtime button is not part of the normal
+first-install path; it is retained for a safe retry, post-cancellation
+continuation, or repair.
 
 The desktop install itself is per-user and does not request elevation. If WSL2
 must be enabled, Runtime setup may show a separate Windows UAC prompt for
@@ -174,7 +175,7 @@ const install = await window.__TAURI__.core.invoke(
     request: {
       targetRoot: "E:\\DroneDream",
       releaseManifestUrl:
-        "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.1/runtime-release.json",
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/runtime-release.json",
     },
   },
 );
@@ -200,6 +201,7 @@ missing, credential-bearing, or non-HTTPS values.
 
 - Node.js and npm
 - Rust 1.97.0 MSVC (`rustup` / `cargo`)
+- Python 3.11 x64 for deterministic embedded Engine Pack generation
 - Microsoft C++ Build Tools with **Desktop development with C++**
 - Microsoft Edge WebView2 runtime (normally already present on Windows 10/11)
 
@@ -214,12 +216,23 @@ npm ci
 npm run check:frontend
 npm run dev
 npm run build
+npm run build:msvc
 npm run build:llvm
+npm run build:four
 ```
 
 `npm run dev` starts the existing frontend dev server automatically. `npm run
 build` first runs the existing frontend build and then compiles the desktop
 executable and `DroneDream_<version>_x64-setup.exe` NSIS installer.
+
+`npm run build:msvc` is the pinned native Windows release build. It loads the
+repository `.vsconfig` toolchain, requires Python 3.11 and Rust
+`1.97.0-x86_64-pc-windows-msvc`, verifies `cl`, `link`, `rc`, and `dumpbin`, and
+checks the produced PE dependency table before accepting the NSIS installer.
+Windows Store Python execution aliases are rejected.
+`npm run build:four` uses this MSVC path to build Universal, SIM, LAB, and FIELD
+from one clean source commit. Use `npm run build:four:llvm` only as the explicit
+portable fallback.
 
 `npm run build:llvm` is the no-administrator fallback for Windows development
 machines without a usable MSVC installation. It expects the official Rust
@@ -231,9 +244,10 @@ aligned with GitHub Actions instead of silently moving with the `stable`
 channel. It statically links the LLVM runtime, stages the locked WebView2 loader
 for NSIS, and inspects both PE import tables so the installer cannot accidentally
 depend on toolchain DLLs from the developer's machine. GitHub Actions and public
-releases continue to use the standard MSVC toolchain. The standard installer is
-written below `src-tauri/target/release/bundle/nsis`; the LLVM fallback uses
-`src-tauri/target/x86_64-pc-windows-gnullvm/release/bundle/nsis`.
+releases continue to use the standard MSVC toolchain. The pinned MSVC installer
+is written below
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis`; the LLVM fallback
+uses `src-tauri/target/x86_64-pc-windows-gnullvm/release/bundle/nsis`.
 
 The LLVM fallback also verifies the pinned NSIS template and the generated
 WebView2 health gate, then rewrites the SHA-256 file for the exact configured

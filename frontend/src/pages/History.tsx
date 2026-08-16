@@ -263,9 +263,8 @@ export function History() {
       </header>
 
       {!runtimeAccess.canUseRuntime ? (
-        <RuntimeAccessNotice page="history" />
-      ) : (
-        <>
+        <RuntimeAccessNotice page="history" showAction={false} />
+      ) : null}
       <div className="history-body">
       <SectionCard title={t("history.filters")}>
         <div className="history-filter-grid">
@@ -501,7 +500,7 @@ export function History() {
         )}
       </SectionCard>
       </div>
-      {deleteTarget ? (
+      {runtimeAccess.canUseRuntime && deleteTarget ? (
         <div className="confirm-dialog-backdrop" role="presentation">
           <div ref={deleteDialogRef} className="confirm-dialog-card" role="dialog" aria-modal="true" aria-labelledby="delete-job-dialog-title">
             <h3 id="delete-job-dialog-title">{t("history.confirmDeleteTitle")}</h3>
@@ -516,8 +515,6 @@ export function History() {
           </div>
         </div>
       ) : null}
-        </>
-      )}
     </section>
   );
 }

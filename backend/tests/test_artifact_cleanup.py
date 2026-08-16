@@ -29,6 +29,8 @@ from app.storage.registration import (
 @pytest.fixture()
 def db(tmp_path: Path) -> Iterator[Session]:
     engine = create_engine(f"sqlite:///{tmp_path / 'cleanup.db'}")
+    with engine.begin() as connection:
+        connection.execute(text("PRAGMA foreign_keys=ON"))
     Base.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
@@ -165,6 +167,8 @@ def test_disabled_default_and_manual_dry_run_never_delete(tmp_path: Path, db: Se
 def test_age_cleanup_commits_rows_and_event_before_unlink_and_protects_jobs(
     tmp_path: Path, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from app.storage.integrity import bind_artifact_integrity
+
     now = datetime(2026, 7, 11, tzinfo=timezone.utc)
     root = tmp_path / "artifacts"
     old_time = now - timedelta(days=10)
@@ -177,10 +181,16 @@ def test_age_cleanup_commits_rows_and_event_before_unlink_and_protects_jobs(
     active_orphan = _file(root, active.id, "active-orphan.bin", 3, old_time)
     old_file = _file(root, old_terminal.id, "old.bin", 11, old_time)
     recent_file = _file(root, recent_terminal.id, "recent.bin", 13, old_time)
+    old_artifact = _artifact(
+        "art_old",
+        job_id=old_terminal.id,
+        path=old_file,
+        created_at=old_time,
+    )
     db.add_all(
         [
             _artifact("art_active", job_id=active.id, path=active_file, created_at=old_time),
-            _artifact("art_old", job_id=old_terminal.id, path=old_file, created_at=old_time),
+            old_artifact,
             _artifact(
                 "art_recent",
                 job_id=recent_terminal.id,
@@ -188,6 +198,12 @@ def test_age_cleanup_commits_rows_and_event_before_unlink_and_protects_jobs(
                 created_at=old_time,
             ),
         ]
+    )
+    db.flush()
+    bind_artifact_integrity(
+        db,
+        artifact=old_artifact,
+        content=old_file,
     )
     db.commit()
 
@@ -221,6 +237,10 @@ def test_age_cleanup_commits_rows_and_event_before_unlink_and_protects_jobs(
     assert result.audit_events_created == 1
     assert not old_file.exists()
     assert db.get(models.Artifact, "art_old") is None
+    assert db.query(models.ArtifactDigestReceipt).count() == 0
+    assert (
+        db.query(models.ArtifactDigestDeleteAuthorization).count() == 0
+    )
     assert active_file.exists() and active_orphan.exists()
     assert recent_file.exists()
     assert db.get(models.Artifact, "art_active") is not None

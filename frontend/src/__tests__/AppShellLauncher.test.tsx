@@ -183,7 +183,7 @@ describe("desktop launcher chrome", () => {
     router.dispose();
   });
 
-  it("saves opt-in defaults and confirms permanent memory deletion", async () => {
+  it("keeps pre-login defaults local and never crosses the account API boundary", async () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     installDesktopBridge();
     const update = vi.spyOn(apiClient, "updateUserExperiencePreferences").mockResolvedValue({
@@ -211,10 +211,8 @@ describe("desktop launcher chrome", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     const dialog = screen.getByRole("dialog", { name: "Settings" });
     fireEvent.click(within(dialog).getByRole("tab", { name: "Memory" }));
-    await waitFor(() => {
-      expect(apiClient.getUserExperiencePreferences).toHaveBeenCalledTimes(1);
-    });
     const memory = await within(dialog).findByLabelText(/Cross-session memory/);
+    expect(apiClient.getUserExperiencePreferences).not.toHaveBeenCalled();
     expect(memory).not.toBeChecked();
     fireEvent.click(memory);
     fireEvent.change(within(dialog).getByLabelText("Default starter template"), {
@@ -228,13 +226,10 @@ describe("desktop launcher chrome", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save personal defaults" }));
 
-    await waitFor(() => expect(update).toHaveBeenCalledWith({
-      memory_enabled: true,
-      locale: "en",
-      default_template_key: "hover-basics@1",
-      default_track_type: "hover",
-      default_altitude_m: 4,
-    }));
+    await waitFor(() => {
+      expect(within(dialog).getByText("Personal defaults saved.")).toBeVisible();
+    });
+    expect(update).not.toHaveBeenCalled();
     expect(within(dialog).getByText("Personal defaults saved.")).toBeVisible();
 
     fireEvent.click(
@@ -246,16 +241,26 @@ describe("desktop launcher chrome", () => {
     expect(erase).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete permanently" }));
 
-    await waitFor(() => expect(erase).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(memory).not.toBeChecked());
+    expect(erase).not.toHaveBeenCalled();
     expect(
-      within(dialog).getByText("Personal defaults deleted; 2 memory rows erased."),
+      within(dialog).getByText("Personal defaults deleted; 0 memory rows erased."),
     ).toBeVisible();
-    expect(memory).not.toBeChecked();
 
     router.dispose();
   });
 
   it("moves language selection into an accessible settings dialog", async () => {
+    launcherAuthState.current = {
+      configured: true,
+      loading: false,
+      account: {
+        id: "pilot-1",
+        email: "pilot@example.com",
+        displayName: "DroneDream Pilot",
+        avatarUrl: null,
+      },
+    };
     window.localStorage.setItem("drone-dream:locale", "en");
     vi.mocked(apiClient.getUserExperiencePreferences).mockResolvedValue({
       schema_version: "1.0",
@@ -303,37 +308,6 @@ describe("desktop launcher chrome", () => {
       .toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).getByRole("link", { name: "Manage subscription" }))
       .toHaveAttribute("href", "https://getdronedream.com/pricing/");
-    fireEvent.click(within(dialog).getByRole("button", { name: /Custom \/ BYOK/ }));
-    expect(within(dialog).getByLabelText("Model profile")).toHaveValue("default");
-
-    fireEvent.change(within(dialog).getByLabelText("Model provider"), {
-      target: { value: "qwen" },
-    });
-    expect(within(dialog).getByLabelText("Model name")).toHaveValue("qwen-plus");
-    expect(within(dialog).getByLabelText("Compatible API base URL")).toHaveValue(
-      "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    );
-    fireEvent.change(within(dialog).getByLabelText("Model API key"), {
-      target: { value: "session-only-key" },
-    });
-    await waitFor(() => {
-      expect(window.sessionStorage.getItem("dronedream:model-access-key:v1"))
-        .toBeNull();
-      expect(window.localStorage.getItem("dronedream:model-access:v1"))
-        .toContain("qwen-plus");
-      expect(window.localStorage.getItem("dronedream:model-access:v1"))
-        .not.toContain("session-only-key");
-    });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Add profile" }));
-    expect(within(dialog).getByLabelText("Model profile")).not.toHaveValue("default");
-    expect(within(dialog).getByLabelText("Model provider")).toHaveValue("custom");
-    fireEvent.change(within(dialog).getByLabelText("Model API key"), {
-      target: { value: "second-memory-only-key" },
-    });
-    await waitFor(() => {
-      expect(window.localStorage.getItem("dronedream:model-access:v1"))
-        .not.toContain("second-memory-only-key");
-    });
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "General" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "简体中文" }));
@@ -352,13 +326,28 @@ describe("desktop launcher chrome", () => {
     expect(within(chineseDialog).queryByText(
       "全面检查 Windows、WSL、本地后端、PX4 与 Gazebo。检查结果会在本次软件运行期间复用，除非你手动重检或真实运行发现异常。",
     )).not.toBeInTheDocument();
-    expect(apiClient.getUserExperiencePreferences).toHaveBeenCalledTimes(1);
-
     fireEvent.click(within(chineseDialog).getByRole("button", { name: "关闭设置" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "设置" })).toHaveFocus());
     expect(document.body).not.toHaveStyle({ overflow: "hidden" });
     expect(document.querySelector(".launcher-main")).toHaveProperty("inert", false);
+
+    router.dispose();
+  });
+
+  it("keeps Models visible but disabled before desktop sign-in", async () => {
+    installDesktopBridge();
+    const { router } = renderLauncher();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
+    const modelTab = within(dialog).getByRole("tab", { name: "Model" });
+    expect(modelTab).toBeVisible();
+    expect(modelTab).toBeDisabled();
+    expect(modelTab).toHaveAttribute("aria-disabled", "true");
+    expect(within(dialog).getByRole("tab", { name: "General" })).toBeEnabled();
+    expect(within(dialog).getByRole("tab", { name: "Memory" })).toBeEnabled();
+    expect(within(dialog).getByRole("tab", { name: "ECE498BH" })).toBeEnabled();
 
     router.dispose();
   });

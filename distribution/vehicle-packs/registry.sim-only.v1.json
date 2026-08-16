@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-vehicle-pack-profile-registry",
+  "registryId": "sim-only-x500",
+  "registryVersion": "1.0.0",
+  "profileId": "sim-only",
+  "sourceRegistry": {
+    "path": "distribution/vehicle-packs/registry.v1.json",
+    "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7",
+    "registryId": "initial-vehicle-packs",
+    "registryVersion": "1.0.0",
+    "auditDate": "2026-08-05"
+  },
+  "policy": {
+    "exactPackCount": 1,
+    "allowedPackIds": ["px4-gazebo-x500-reference"],
+    "hardwareMetadataAllowed": false,
+    "validatedRequiresSignedReceipt": true,
+    "stockDoesNotImplyCompatibility": true,
+    "parameterBoundsAreProvisionalUntilValidated": true
+  },
+  "packs": [
+    {
+      "packId": "px4-gazebo-x500-reference",
+      "manifestPath": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+      "manifestSha256": "cb5b9bf431571292024dacbbf8fdf03d1e7f19ae0cac0f614b42c1ee3a0b56c4",
+      "currentValidationStatus": "contract-only",
+      "currentValidationTier": "contract-only",
+      "segments": ["simulation-reference", "research"],
+      "goldenCandidate": true,
+      "productAvailability": "simulation-only",
+      "supportRegions": ["cn", "global"],
+      "availabilityEvidence": [
+        {
+          "url": "https://docs.px4.io/v1.17/en/sim_gazebo_gz/vehicles",
+          "scope": "Official PX4 documentation lists the new-Gazebo X500 family and its launch targets; this is simulator support evidence, not a physical-product listing.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    }
+  ]
+}

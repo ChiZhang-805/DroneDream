@@ -15,10 +15,16 @@ import {
   isDesktopRuntime,
 } from "../../desktop/bridge";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
-import { ACTIVATE_DESKTOP_AUTH_EVENT } from "./desktopAuthActivation";
-import { setAuthAccessToken } from "./authTokenStore";
+import {
+  ACTIVATE_DESKTOP_AUTH_EVENT,
+  ADOPT_DESKTOP_AUTH_EVENT,
+  DESKTOP_AUTH_REFRESH_FAILED_EVENT,
+} from "./desktopAuthActivation";
+import { clearBrowserAuthSessionRefresh } from "./browserAuth";
+import { getAuthAccessToken, setAuthAccessToken } from "./authTokenStore";
 import {
   appleAuthEnabled,
+  browserAuthConfiguration,
   cloudAuthConfigured,
   googleAuthEnabled,
   supabaseClient,
@@ -150,8 +156,10 @@ function providerRedirectUrl(): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const docsPreview = import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).has("docsPreview");
+  const desktopVisualQa = isDesktopRuntime()
+    && import.meta.env.VITE_DESKTOP_VISUAL_QA === "true";
+  const docsPreview = desktopVisualQa || (import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).has("docsPreview"));
   const deferDesktopAuth = useRef(shouldDeferDesktopAuth()).current;
   const [authActivated, setAuthActivated] = useState(!deferDesktopAuth);
   const [loading, setLoading] = useState(
@@ -160,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<DroneDreamAccount | null>(
     docsPreview
       ? {
-          id: "docs-preview",
+          id: desktopVisualQa ? "desktop-visual-qa" : "docs-preview",
           email: "pilot@example.com",
           displayName: "DroneDream Pilot",
           avatarUrl: null,
@@ -181,6 +189,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!deferDesktopAuth) return undefined;
+    const adopt = (event: Event) => {
+      const detail = (event as CustomEvent<{ user: User; accessToken: string }>).detail;
+      if (!detail?.user || !detail.accessToken) return;
+      adoptUser(detail.user, detail.accessToken);
+      setLoading(false);
+    };
+    window.addEventListener(ADOPT_DESKTOP_AUTH_EVENT, adopt);
+    return () => window.removeEventListener(ADOPT_DESKTOP_AUTH_EVENT, adopt);
+  }, [adoptUser, deferDesktopAuth]);
+
+  useEffect(() => {
+    const expire = () => {
+      adoptUser(null, null);
+      setLoading(false);
+    };
+    window.addEventListener(DESKTOP_AUTH_REFRESH_FAILED_EVENT, expire);
+    return () => window.removeEventListener(DESKTOP_AUTH_REFRESH_FAILED_EVENT, expire);
+  }, [adoptUser]);
+
+  useEffect(() => {
     if (!deferDesktopAuth || authActivated) return undefined;
     const activate = () => {
       setLoading(cloudAuthConfigured && !docsPreview);
@@ -192,6 +221,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (docsPreview || !authActivated) return undefined;
+    if (deferDesktopAuth) {
+      setLoading(false);
+      return undefined;
+    }
     if (!supabaseClient) {
       setLoading(false);
       return undefined;
@@ -292,6 +325,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("Username contains unsupported characters.");
     }
 
+    if (isDesktopRuntime()) {
+      const configuration = browserAuthConfiguration();
+      const accessToken = getAuthAccessToken();
+      if (!configuration || !accessToken) {
+        throw new Error("Sign in before changing the username.");
+      }
+      const response = await fetch(`${configuration.supabaseUrl}/auth/v1/user`, {
+        method: "PUT",
+        headers: {
+          apikey: configuration.publishableKey,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ data: { display_name: normalized } }),
+      });
+      if (!response.ok) {
+        throw new Error("The username could not be saved.");
+      }
+      setAccount((current) =>
+        current ? { ...current, displayName: normalized } : current,
+      );
+      return;
+    }
+
     const client = requireClient();
     const { data, error } = await client.auth.updateUser({
       data: { display_name: normalized },
@@ -333,6 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     let vaultClearFailed = false;
     if (isDesktopRuntime()) {
+      clearBrowserAuthSessionRefresh();
       try {
         await clearBrowserAuthVault();
       } catch {

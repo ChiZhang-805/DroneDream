@@ -7,6 +7,7 @@ import re
 import pytest
 
 from app import models, schemas
+from app.optimization.outcome_contract import build_selection_key
 from app.orchestration import constants
 from app.orchestration.cma_es_optimizer import propose_next_generation
 
@@ -41,6 +42,7 @@ def _candidate(
     label: str,
     params: dict[str, float],
     is_baseline: bool = False,
+    aggregate: dict[str, object] | None = None,
 ) -> models.CandidateParameterSet:
     return models.CandidateParameterSet(
         id=cid,
@@ -51,6 +53,7 @@ def _candidate(
         parameter_json=params,
         is_baseline=is_baseline,
         aggregated_score=score,
+        aggregated_metric_json=aggregate,
     )
 
 
@@ -264,6 +267,52 @@ def test_cma_es_ignores_corrupt_scored_history_when_selecting_center() -> None:
 
     assert "center=baseline" in proposal.strategy
     assert all(value == value for value in proposal.parameters.values())
+
+
+def test_cma_es_center_respects_hard_feasibility_before_numeric_score() -> None:
+    baseline = dict(constants.BASELINE_PARAMETERS)
+    infeasible = _candidate(
+        cid="unsafe-low-score",
+        generation_index=1,
+        score=0.0,
+        label="unsafe",
+        params={**baseline, "kp_xy": 2.0},
+        aggregate={
+            "selection_key": build_selection_key(
+                evidence_complete=True,
+                hard_feasible=False,
+                hard_constraint_violation=0.01,
+                training_failure_rate=0,
+                decision_loss=0,
+            )
+        },
+    )
+    feasible = _candidate(
+        cid="safe-high-score",
+        generation_index=1,
+        score=5000.0,
+        label="safe",
+        params={**baseline, "kp_xy": 0.5},
+        aggregate={
+            "selection_key": build_selection_key(
+                evidence_complete=True,
+                hard_feasible=True,
+                hard_constraint_violation=0,
+                training_failure_rate=0,
+                decision_loss=5000,
+            )
+        },
+    )
+
+    proposal = propose_next_generation(
+        job=_make_job("job_feasibility_first"),
+        candidates=[infeasible, feasible],
+        safe_ranges=constants.PARAMETER_SAFE_RANGES,
+        baseline_parameters=baseline,
+        generation_index=2,
+    )
+
+    assert "center=safe" in proposal.strategy
 
 
 @pytest.mark.parametrize("generation", [True, -1])

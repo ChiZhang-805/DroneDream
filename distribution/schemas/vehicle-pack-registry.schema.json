@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/vehicle-pack-registry.v1.json",
+  "title": "DroneDream Vehicle Pack registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "registryId",
+    "registryVersion",
+    "auditDate",
+    "policy",
+    "packs"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-vehicle-pack-registry"},
+    "registryId": {"$ref": "#/$defs/kebabId"},
+    "registryVersion": {"$ref": "#/$defs/semver"},
+    "auditDate": {"type": "string", "format": "date"},
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimumPackCount",
+        "maximumPackCount",
+        "goldenCandidateCount",
+        "validatedRequiresSignedReceipt",
+        "stockDoesNotImplyCompatibility",
+        "hardwareActionsRequireValidatedTier",
+        "parameterBoundsAreProvisionalUntilValidated",
+        "mutableAvailabilityEvidenceRequiresObservedDate"
+      ],
+      "properties": {
+        "minimumPackCount": {"const": 6},
+        "maximumPackCount": {"const": 8},
+        "goldenCandidateCount": {"const": 3},
+        "validatedRequiresSignedReceipt": {"const": true},
+        "stockDoesNotImplyCompatibility": {"const": true},
+        "hardwareActionsRequireValidatedTier": {"const": true},
+        "parameterBoundsAreProvisionalUntilValidated": {"const": true},
+        "mutableAvailabilityEvidenceRequiresObservedDate": {"const": true}
+      }
+    },
+    "packs": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/packEntry"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "kebabId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "packEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packId",
+        "manifestPath",
+        "manifestSha256",
+        "currentValidationStatus",
+        "currentValidationTier",
+        "segments",
+        "goldenCandidate",
+        "productAvailability",
+        "supportRegions",
+        "availabilityEvidence"
+      ],
+      "properties": {
+        "packId": {"$ref": "#/$defs/kebabId"},
+        "manifestPath": {"$ref": "#/$defs/safePath"},
+        "manifestSha256": {"$ref": "#/$defs/sha256"},
+        "currentValidationStatus": {"enum": ["validated", "contract-only", "planned"]},
+        "currentValidationTier": {
+          "enum": ["sim-validated", "hardware-validated", "contract-only", "planned"]
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["simulation-reference", "student", "teaching", "research", "racing"]
+          }
+        },
+        "goldenCandidate": {"type": "boolean"},
+        "productAvailability": {
+          "enum": [
+            "simulation-only",
+            "listed-available",
+            "variant-limited",
+            "listed-sold-out",
+            "documentation-only"
+          ]
+        },
+        "supportRegions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["cn", "global"]}
+        },
+        "availabilityEvidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/availabilityEvidence"}
+        }
+      }
+    },
+    "availabilityEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "scope", "observedDate"],
+      "properties": {
+        "url": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "scope": {"type": "string", "minLength": 1, "maxLength": 512},
+        "observedDate": {"type": "string", "format": "date"}
+      }
+    }
+  }
+}

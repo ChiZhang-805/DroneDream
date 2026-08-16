@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-desktop-edition-browser-auth",
+  "contractVersion": "1.0.0",
+  "identityBinding": {
+    "contractPath": "distribution/desktop/edition-coexistence.v1.json",
+    "contractSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a"
+  },
+  "accountAuthority": {
+    "provider": "supabase",
+    "projectUrl": "https://yggabfynndpzymlqvnim.supabase.co",
+    "sharedAccountSubject": true,
+    "sharedCloudAuthorization": true,
+    "explicitPerEditionAuthorizationRequired": true,
+    "browserSessionMayReduceCredentialEntry": true,
+    "automaticCrossEditionAuthentication": false,
+    "desktopTokenImport": false
+  },
+  "authorizationProtocol": {
+    "protocolVersion": "desktop-browser-auth-pkce-v1",
+    "flow": "hosted-authorization-code-pkce",
+    "pkceMethod": "S256",
+    "nativeVerifierBytes": 32,
+    "stateBytes": 32,
+    "nonceBytes": 32,
+    "attemptIdBytes": 16,
+    "transactionTtlSeconds": 600,
+    "singleActiveAttemptPerEdition": true,
+    "oneTimeCallback": true,
+    "oneTimeCodeExchange": true,
+    "providerRetryCount": 0,
+    "authorizationEndpoint": "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize",
+    "tokenExchangeEndpoint": "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/token",
+    "authorizationUiEndpoint": "https://getdronedream.com/oauth/consent",
+    "callbackTransport": "loopback-http",
+    "loopbackHost": "127.0.0.1",
+    "fixedRegisteredLoopbackPortRequired": true,
+    "strictHostAndOriginRequired": true,
+    "callbackPathTemplate": "/desktop-auth/{editionId}/callback",
+    "callbackFields": [
+      "code",
+      "state"
+    ],
+    "nativeBoundContext": [
+      "editionId",
+      "authClientId",
+      "attemptId",
+      "callbackPort",
+      "codeVerifier",
+      "nonce"
+    ],
+    "callbackMustNotContain": [
+      "accessToken",
+      "refreshToken",
+      "password",
+      "cookie"
+    ],
+    "browserConfirmationRequired": true,
+    "uninitiatedCallbackDenied": true,
+    "crossEditionCallbackDenied": true,
+    "crossPortCallbackDenied": true,
+    "expiredCallbackDenied": true,
+    "replayedCallbackDenied": true,
+    "directPasswordPageAllowed": false,
+    "rawTokenLoopbackAllowed": false
+  },
+  "credentialStorage": {
+    "refreshTokenPersistence": "windows-credential-manager",
+    "accessTokenPersistence": "edition-webview-session-cache",
+    "plainTextPasswordPersistence": false,
+    "plainTextTokenFileAllowed": false,
+    "crossEditionDiscoveryAllowed": false,
+    "crossEditionImportAllowed": false,
+    "vaultEntryKeyTemplate": "{credentialVaultNamespace}/{accountSubjectHash}",
+    "webViewStorageMustMatchBundleIdentifier": true
+  },
+  "logoutSemantics": {
+    "localEditionLogout": "revoke-current-edition-session-and-clear-current-edition-vault-only",
+    "globalLogout": "explicit-server-side-revoke-all-sessions",
+    "localLogoutMustNotClearOtherEditions": true,
+    "globalLogoutRequiresSeparateConfirmation": true
+  },
+  "auditReceipt": {
+    "kind": "dronedream-desktop-browser-auth-attempt",
+    "receiptVersion": 1,
+    "allowedFields": [
+      "kind",
+      "receiptVersion",
+      "contractVersion",
+      "editionId",
+      "authClientId",
+      "attemptIdHash",
+      "stateHash",
+      "subjectHash",
+      "result",
+      "failureCode",
+      "issuedAt",
+      "completedAt",
+      "callbackTransport",
+      "brokerOrigin"
+    ],
+    "forbiddenFields": [
+      "accessToken",
+      "refreshToken",
+      "password",
+      "cookie",
+      "rawCallback",
+      "providerRequestId"
+    ]
+  },
+  "editions": [
+    {
+      "editionId": "universal",
+      "authClientId": "dronedream-desktop-universal",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
+      "bundleIdentifier": "io.dronedream.desktop.universal",
+      "loopbackPathPrefix": "/desktop-auth/universal/",
+      "loopbackPort": 49210,
+      "redirectUri": "http://127.0.0.1:49210/desktop-auth/universal/callback",
+      "customProtocol": "dronedream-universal",
+      "credentialVaultNamespace": "DroneDream/Auth/universal/v1",
+      "webViewDataNamespace": "io.dronedream.desktop.universal"
+    },
+    {
+      "editionId": "sim",
+      "authClientId": "dronedream-desktop-sim",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
+      "bundleIdentifier": "io.dronedream.desktop.sim",
+      "loopbackPathPrefix": "/desktop-auth/sim/",
+      "loopbackPort": 49211,
+      "redirectUri": "http://127.0.0.1:49211/desktop-auth/sim/callback",
+      "customProtocol": "dronedream-sim",
+      "credentialVaultNamespace": "DroneDream/Auth/sim/v1",
+      "webViewDataNamespace": "io.dronedream.desktop.sim"
+    },
+    {
+      "editionId": "lab",
+      "authClientId": "dronedream-desktop-lab",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
+      "bundleIdentifier": "io.dronedream.desktop.lab",
+      "loopbackPathPrefix": "/desktop-auth/lab/",
+      "loopbackPort": 49212,
+      "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+      "customProtocol": "dronedream-lab",
+      "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
+      "webViewDataNamespace": "io.dronedream.desktop.lab"
+    },
+    {
+      "editionId": "field",
+      "authClientId": "dronedream-desktop-field",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
+      "bundleIdentifier": "io.dronedream.desktop.field",
+      "loopbackPathPrefix": "/desktop-auth/field/",
+      "loopbackPort": 49213,
+      "redirectUri": "http://127.0.0.1:49213/desktop-auth/field/callback",
+      "customProtocol": "dronedream-field",
+      "credentialVaultNamespace": "DroneDream/Auth/field/v1",
+      "webViewDataNamespace": "io.dronedream.desktop.field"
+    }
+  ],
+  "releaseGate": {
+    "nativeProtocolEnforcementReceiptRequired": true,
+    "hostedBrokerReceiptRequired": true,
+    "credentialVaultReceiptRequired": true,
+    "fourEditionConcurrencyReceiptRequired": true,
+    "cancelTimeoutOfflineSwitchAccountReceiptRequired": true,
+    "releaseMayUseLegacyDirectTokenLoopback": false
+  }
+}

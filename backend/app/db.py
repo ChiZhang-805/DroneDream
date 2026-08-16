@@ -52,6 +52,36 @@ engine: Engine = _build_engine(_settings.database_url)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
 
 
+def rebind_database_for_testing(database_url: str) -> None:
+    """Rebind the process-wide session factory without reloading ORM modules.
+
+    Pytest imports test modules during collection, so reloading ``app.db`` or
+    ``app.models`` later creates duplicate ``Base``/model class identities.
+    SQLAlchemy then correctly rejects objects created from the stale class,
+    and FastAPI dependencies can remain bound to stale session factories.
+
+    Tests instead keep one module graph and reconfigure the *same*
+    ``SessionLocal`` object that services and routers imported.  The guard is
+    deliberately fail-closed: production/development code may not redirect a
+    live process to a different database through this helper.
+    """
+
+    global _settings, engine
+
+    settings = get_settings()
+    if settings.app_env.strip().lower() != "test":
+        raise RuntimeError("Database rebinding is allowed only when APP_ENV=test")
+    if database_url != settings.database_url:
+        raise RuntimeError("Test database URL must match the active Settings value")
+
+    previous_engine = engine
+    replacement_engine = _build_engine(database_url)
+    SessionLocal.configure(bind=replacement_engine)
+    engine = replacement_engine
+    _settings = settings
+    previous_engine.dispose()
+
+
 def init_db() -> None:
     """Create development tables unless schema management is external.
 
@@ -81,17 +111,12 @@ def _apply_sqlite_lightweight_migrations() -> None:
         }
         if "users" in table_names:
             user_columns = {
-                row[1]
-                for row in conn.execute(text("PRAGMA table_info('users')")).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('users')")).fetchall()
             }
             if "identity_provider" not in user_columns:
-                conn.execute(
-                    text("ALTER TABLE users ADD COLUMN identity_provider VARCHAR(255)")
-                )
+                conn.execute(text("ALTER TABLE users ADD COLUMN identity_provider VARCHAR(255)"))
             if "external_subject" not in user_columns:
-                conn.execute(
-                    text("ALTER TABLE users ADD COLUMN external_subject VARCHAR(255)")
-                )
+                conn.execute(text("ALTER TABLE users ADD COLUMN external_subject VARCHAR(255)"))
             conn.execute(
                 text(
                     "CREATE UNIQUE INDEX IF NOT EXISTS "
@@ -100,10 +125,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     "WHERE external_subject IS NOT NULL"
                 )
             )
-        job_columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info('jobs')")).fetchall()
-        }
+        job_columns = {row[1] for row in conn.execute(text("PRAGMA table_info('jobs')")).fetchall()}
         if "advanced_scenario_config_json" not in job_columns:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN advanced_scenario_config_json JSON"))
         if "baseline_parameter_json" not in job_columns:
@@ -112,19 +134,123 @@ def _apply_sqlite_lightweight_migrations() -> None:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN display_name VARCHAR(255)"))
         if "batch_id" not in job_columns:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN batch_id VARCHAR(64)"))
+        if "control_version" not in job_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE jobs ADD COLUMN control_version "
+                    "INTEGER NOT NULL DEFAULT 1"
+                )
+            )
         experiment_columns = {
             "vehicle_profile_json": "JSON",
             "parameter_space_json": "JSON",
             "objective_config_json": "JSON",
             "scenario_suite_json": "JSON",
+            "llm_access_mode": "VARCHAR(16)",
             "llm_provider": "VARCHAR(64)",
             "llm_base_url": "VARCHAR(2048)",
         }
         for column_name, column_type in experiment_columns.items():
             if column_name not in job_columns:
+                conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
+        first_qualified_columns = {
+            "completion_policy": (
+                "VARCHAR(32) NOT NULL DEFAULT 'first_qualified_stop'"
+            ),
+            "job_kind": "VARCHAR(32) NOT NULL DEFAULT 'primary'",
+            "cognitive_policy_version": (
+                "VARCHAR(32) NOT NULL DEFAULT 'adaptive-2-4-v1'"
+            ),
+            "provider_turn_cap": "INTEGER NOT NULL DEFAULT 64",
+            "provider_turns_attempted": "INTEGER NOT NULL DEFAULT 0",
+            "provider_turns_succeeded": "INTEGER NOT NULL DEFAULT 0",
+            "provider_request_cap": "INTEGER NOT NULL DEFAULT 128",
+            "provider_max_retries": "INTEGER NOT NULL DEFAULT 1",
+            "provider_requests_attempted": "INTEGER NOT NULL DEFAULT 0",
+            "provider_requests_succeeded": "INTEGER NOT NULL DEFAULT 0",
+            "next_candidate_dispatch_ordinal": "BIGINT NOT NULL DEFAULT 1",
+            "next_qualification_sequence": "BIGINT NOT NULL DEFAULT 1",
+            "first_qualified_candidate_id": "VARCHAR(64)",
+            "first_qualified_at": "DATETIME",
+            "continue_exploration_requested": "BOOLEAN NOT NULL DEFAULT 0",
+            "exploration_budget_json": "JSON",
+            "continuation_parent_job_id": "VARCHAR(64)",
+            "continuation_root_job_id": "VARCHAR(64)",
+            "holdout_policy_version": (
+                "VARCHAR(32) NOT NULL DEFAULT 'legacy-visible-v0'"
+            ),
+            "holdout_contract_json": "JSON",
+        }
+        for column_name, column_type in first_qualified_columns.items():
+            if column_name not in job_columns:
                 conn.execute(
                     text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}")
                 )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_first_qualified_candidate_id "
+                "ON jobs(first_qualified_candidate_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_continuation_parent_job_id "
+                "ON jobs(continuation_parent_job_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "ux_jobs_continuation_parent_job_id "
+                "ON jobs(continuation_parent_job_id) "
+                "WHERE continuation_parent_job_id IS NOT NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_continuation_root_job_id "
+                "ON jobs(continuation_root_job_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE jobs SET llm_access_mode = CASE "
+                "WHEN llm_provider = 'dronedream' THEN 'platform' "
+                "WHEN llm_provider IS NOT NULL THEN 'byok' "
+                "ELSE NULL END "
+                "WHERE llm_access_mode IS NULL"
+            )
+        )
+        finalization_claim_columns = {
+            "finalization_claim_token": "VARCHAR(64)",
+            "finalization_claim_generation": "INTEGER",
+            "finalization_lease_expires_at": "DATETIME",
+        }
+        for column_name, column_type in finalization_claim_columns.items():
+            if column_name not in job_columns:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE jobs ADD COLUMN {column_name} "
+                        f"{column_type}"
+                    )
+                )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_finalization_claim_token "
+                "ON jobs(finalization_claim_token)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_finalization_lease_expires_at "
+                "ON jobs(finalization_lease_expires_at)"
+            )
+        )
         if "parameter_catalog_version" not in job_columns:
             conn.execute(
                 text(
@@ -134,22 +260,23 @@ def _apply_sqlite_lightweight_migrations() -> None:
             )
         if "batch_jobs" in table_names:
             batch_columns = {
-                row[1]
-                for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
             }
             if "cancelled_at" not in batch_columns:
                 conn.execute(text("ALTER TABLE batch_jobs ADD COLUMN cancelled_at DATETIME"))
+            if "control_version" not in batch_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE batch_jobs ADD COLUMN control_version "
+                        "INTEGER NOT NULL DEFAULT 1"
+                    )
+                )
         if "job_secrets" in table_names:
             secret_columns = {
-                row[1]
-                for row in conn.execute(
-                    text("PRAGMA table_info('job_secrets')")
-                ).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('job_secrets')")).fetchall()
             }
             if "expires_at" not in secret_columns:
-                conn.execute(
-                    text("ALTER TABLE job_secrets ADD COLUMN expires_at DATETIME")
-                )
+                conn.execute(text("ALTER TABLE job_secrets ADD COLUMN expires_at DATETIME"))
         if "candidate_parameter_sets" in table_names:
             candidate_columns = {
                 row[1]
@@ -164,10 +291,452 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         "ADD COLUMN optimizer_metadata_json JSON"
                     )
                 )
-        columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()
-        }
+            first_qualified_candidate_columns = {
+                "dispatch_ordinal": "BIGINT",
+                "qualification_sequence": "BIGINT",
+                "qualified_at": "DATETIME",
+            }
+            for column_name, column_type in first_qualified_candidate_columns.items():
+                if column_name not in candidate_columns:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE candidate_parameter_sets "
+                            f"ADD COLUMN {column_name} {column_type}"
+                        )
+                    )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_candidate_job_dispatch_ordinal "
+                    "ON candidate_parameter_sets(job_id, dispatch_ordinal) "
+                    "WHERE dispatch_ordinal IS NOT NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_candidate_job_qualification_sequence "
+                    "ON candidate_parameter_sets(job_id, qualification_sequence) "
+                    "WHERE qualification_sequence IS NOT NULL"
+                )
+            )
+            if "evidence_ledger_required" not in candidate_columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE candidate_parameter_sets "
+                        "ADD COLUMN evidence_ledger_required BOOLEAN "
+                        "NOT NULL DEFAULT 0"
+                    )
+                )
+            if "aggregated_metric_json" in candidate_columns:
+                conn.execute(
+                    text(
+                        "UPDATE candidate_parameter_sets "
+                        "SET evidence_ledger_required = 1 "
+                        "WHERE evidence_ledger_required = 0 "
+                        "AND aggregated_metric_json IS NOT NULL "
+                        "AND ("
+                        "json_extract(aggregated_metric_json, "
+                        "'$.candidate_outcome_evidence.schema_id') = "
+                        "'dronedream.candidate-outcome-evidence/v3' "
+                        "OR json_extract(aggregated_metric_json, "
+                        "'$.candidate_report_evidence.schema_id') = "
+                        "'dronedream.candidate-report-evidence/v3'"
+                        ")"
+                    )
+                )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_candidate_evidence_required_no_downgrade
+                    BEFORE UPDATE OF evidence_ledger_required
+                    ON candidate_parameter_sets
+                    WHEN OLD.evidence_ledger_required = 1
+                     AND NEW.evidence_ledger_required IS NOT 1
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'Candidate evidence requirement is irreversible'
+                        );
+                    END
+                    """
+                )
+            )
+        if "trials" in table_names:
+            trial_columns = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info('trials')")
+                ).fetchall()
+            }
+            qualification_trial_columns = {
+                "qualification_id": "VARCHAR(64)",
+                "evaluation_phase": (
+                    "VARCHAR(32) NOT NULL DEFAULT 'optimization'"
+                ),
+                "qualification_ordinal": "INTEGER",
+            }
+            for column_name, column_type in qualification_trial_columns.items():
+                if column_name not in trial_columns:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE trials "
+                            f"ADD COLUMN {column_name} {column_type}"
+                        )
+                    )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS "
+                    "ix_trials_qualification_id ON trials(qualification_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_trial_qualification_phase_ordinal "
+                    "ON trials(qualification_id, evaluation_phase, qualification_ordinal) "
+                    "WHERE qualification_id IS NOT NULL"
+                )
+            )
+        if "job_reports" in table_names:
+            report_columns = {
+                row[1] for row in conn.execute(text("PRAGMA table_info('job_reports')")).fetchall()
+            }
+            if "winner_evidence_json" not in report_columns:
+                conn.execute(text("ALTER TABLE job_reports ADD COLUMN winner_evidence_json JSON"))
+            if "winner_freeze_receipt_id" not in report_columns:
+                conn.execute(
+                    text("ALTER TABLE job_reports ADD COLUMN winner_freeze_receipt_id VARCHAR(64)")
+                )
+        if "winner_freeze_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    winner_freeze_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES winner_freeze_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_winner_freeze_receipts_no_update
+                    BEFORE UPDATE ON winner_freeze_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'winner freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(text("DROP TRIGGER IF EXISTS trg_winner_freeze_receipts_no_delete"))
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_winner_freeze_receipts_no_delete
+                    BEFORE DELETE ON winner_freeze_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM winner_freeze_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'winner freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "first_qualified_freeze_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    first_qualified_freeze_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES first_qualified_freeze_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_first_qualified_freeze_receipts_no_update
+                    BEFORE UPDATE ON first_qualified_freeze_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'first-qualified freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "DROP TRIGGER IF EXISTS "
+                    "trg_first_qualified_freeze_receipts_no_delete"
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER
+                    trg_first_qualified_freeze_receipts_no_delete
+                    BEFORE DELETE ON first_qualified_freeze_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM first_qualified_freeze_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'first-qualified freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "harness_cognitive_turn_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    harness_cognitive_turn_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES harness_cognitive_turn_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_receipts_no_update
+                    BEFORE UPDATE ON harness_cognitive_turn_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_receipts_no_delete
+                    BEFORE DELETE ON harness_cognitive_turn_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "harness_cognitive_turn_outcomes" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_outcomes_no_update
+                    BEFORE UPDATE ON harness_cognitive_turn_outcomes
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_outcomes_no_delete
+                    BEFORE DELETE ON harness_cognitive_turn_outcomes
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.turn_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "provider_network_request_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_receipts_no_update
+                    BEFORE UPDATE ON provider_network_request_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_receipts_no_delete
+                    BEFORE DELETE ON provider_network_request_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.cognitive_turn_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "provider_network_request_outcomes" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_outcomes_no_update
+                    BEFORE UPDATE ON provider_network_request_outcomes
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_outcomes_no_delete
+                    BEFORE DELETE ON provider_network_request_outcomes
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations AS authorization
+                        JOIN provider_network_request_receipts AS receipt
+                          ON receipt.cognitive_turn_receipt_id = authorization.receipt_id
+                        WHERE receipt.id = OLD.request_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "artifacts" in table_names:
+            artifact_columns = {
+                row[1] for row in conn.execute(text("PRAGMA table_info('artifacts')")).fetchall()
+            }
+            if "integrity_policy" not in artifact_columns:
+                conn.execute(text("ALTER TABLE artifacts ADD COLUMN integrity_policy VARCHAR(32)"))
+        if "artifact_digest_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    artifact_digest_delete_authorizations (
+                        artifact_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(artifact_id)
+                            REFERENCES artifacts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_artifact_digest_receipts_no_update
+                    BEFORE UPDATE ON artifact_digest_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'artifact digest receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_artifact_digest_receipts_no_delete
+                    BEFORE DELETE ON artifact_digest_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM artifact_digest_delete_authorizations
+                        WHERE artifact_id = OLD.artifact_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'artifact digest receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()}
         add_sql: list[str] = []
         if "lease_owner" not in columns:
             add_sql.append("ALTER TABLE trials ADD COLUMN lease_owner VARCHAR(64)")
@@ -175,8 +744,407 @@ def _apply_sqlite_lightweight_migrations() -> None:
             add_sql.append("ALTER TABLE trials ADD COLUMN lease_expires_at DATETIME")
         if "claimed_at" not in columns:
             add_sql.append("ALTER TABLE trials ADD COLUMN claimed_at DATETIME")
+        if "accepted_attempt_id" not in columns:
+            add_sql.append("ALTER TABLE trials ADD COLUMN accepted_attempt_id VARCHAR(64)")
         for stmt in add_sql:
             conn.execute(text(stmt))
+        if "trial_execution_attempts" in table_names:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_trials_accepted_attempt_id "
+                    "ON trials(accepted_attempt_id) "
+                    "WHERE accepted_attempt_id IS NOT NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    trial_execution_attempt_delete_authorizations (
+                        attempt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(attempt_id)
+                            REFERENCES trial_execution_attempts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trial_execution_attempts_no_update
+                    BEFORE UPDATE ON trial_execution_attempts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'trial execution attempts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trial_execution_attempts_no_delete
+                    BEFORE DELETE ON trial_execution_attempts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM trial_execution_attempt_delete_authorizations
+                        WHERE attempt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'trial execution attempts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trial_execution_attempt_outcomes_no_update
+                    BEFORE UPDATE ON trial_execution_attempt_outcomes
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'trial execution attempt outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trial_execution_attempt_outcomes_no_delete
+                    BEFORE DELETE ON trial_execution_attempt_outcomes
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM trial_execution_attempt_delete_authorizations
+                        WHERE attempt_id = OLD.attempt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'trial execution attempt outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_trials_accepted_attempt_immutable
+                    BEFORE UPDATE OF accepted_attempt_id ON trials
+                    WHEN (
+                        OLD.accepted_attempt_id IS NOT NULL
+                        AND NEW.accepted_attempt_id
+                            IS NOT OLD.accepted_attempt_id
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM trial_execution_attempt_delete_authorizations
+                            WHERE attempt_id = OLD.accepted_attempt_id
+                        )
+                    ) OR (
+                        NEW.accepted_attempt_id IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM trial_execution_attempts
+                            WHERE id = NEW.accepted_attempt_id
+                              AND trial_id = OLD.id
+                        )
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'accepted Trial execution attempt is immutable or mismatched'
+                        );
+                    END
+                    """
+                )
+            )
+        if "candidate_evidence_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    candidate_evidence_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES candidate_evidence_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_candidate_evidence_receipts_no_update
+                    BEFORE UPDATE ON candidate_evidence_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'Candidate evidence receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_candidate_evidence_receipts_no_delete
+                    BEFORE DELETE ON candidate_evidence_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM candidate_evidence_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'Candidate evidence receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_candidate_provenance_no_mutation
+                    BEFORE UPDATE OF source_type, optimizer_metadata_json
+                    ON candidate_parameter_sets
+                    WHEN OLD.evidence_ledger_required = 1
+                     AND (
+                            NEW.source_type IS NOT OLD.source_type
+                         OR NEW.optimizer_metadata_json
+                            IS NOT OLD.optimizer_metadata_json
+                     )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'Candidate provenance is immutable after evidence sealing'
+                        );
+                    END
+                    """
+                )
+            )
+        if "benchmark_campaigns" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_campaign_manifest_immutable
+                    BEFORE UPDATE ON benchmark_campaigns
+                    WHEN NEW.user_id IS NOT OLD.user_id
+                      OR NEW.campaign_key IS NOT OLD.campaign_key
+                      OR NEW.campaign_version IS NOT OLD.campaign_version
+                      OR NEW.name IS NOT OLD.name
+                      OR NEW.panel IS NOT OLD.panel
+                      OR NEW.protocol_sha256 IS NOT OLD.protocol_sha256
+                      OR NEW.manifest_sha256 IS NOT OLD.manifest_sha256
+                      OR NEW.manifest_json IS NOT OLD.manifest_json
+                      OR NEW.composite_inventory_sha256
+                         IS NOT OLD.composite_inventory_sha256
+                      OR NEW.composite_inventory_json
+                         IS NOT OLD.composite_inventory_json
+                      OR NEW.job_cap IS NOT OLD.job_cap
+                      OR NEW.trial_cap IS NOT OLD.trial_cap
+                      OR NEW.logical_turn_cap IS NOT OLD.logical_turn_cap
+                      OR NEW.network_request_cap IS NOT OLD.network_request_cap
+                      OR NEW.input_utf8_byte_cap IS NOT OLD.input_utf8_byte_cap
+                      OR NEW.output_utf8_byte_cap IS NOT OLD.output_utf8_byte_cap
+                      OR NEW.provider_token_cap IS NOT OLD.provider_token_cap
+                      OR NEW.provider_cost_microusd_cap
+                         IS NOT OLD.provider_cost_microusd_cap
+                      OR NEW.wall_time_second_cap IS NOT OLD.wall_time_second_cap
+                      OR NEW.disk_byte_cap IS NOT OLD.disk_byte_cap
+                      OR NEW.preregistered_at IS NOT OLD.preregistered_at
+                      OR NEW.created_at IS NOT OLD.created_at
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark campaign preregistration is immutable'
+                        );
+                    END
+                    """
+                )
+            )
+        if "benchmark_arms" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_arm_manifest_immutable
+                    BEFORE UPDATE ON benchmark_arms
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark arm preregistration is immutable'
+                        );
+                    END
+                    """
+                )
+            )
+        if {
+            "benchmark_campaigns",
+            "benchmark_campaign_coordinator_states",
+        }.issubset(table_names):
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO benchmark_campaign_coordinator_states (
+                        campaign_id,
+                        lease_generation,
+                        next_batch_ordinal,
+                        next_run_ordinal,
+                        jobs_used,
+                        trials_used,
+                        logical_turns_used,
+                        network_requests_used,
+                        input_utf8_bytes_used,
+                        output_utf8_bytes_used,
+                        provider_tokens_used,
+                        provider_cost_microusd_used,
+                        wall_time_seconds_used,
+                        disk_bytes_used,
+                        created_at,
+                        updated_at
+                    )
+                    SELECT
+                        campaign.id, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    FROM benchmark_campaigns AS campaign
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM benchmark_campaign_coordinator_states AS state
+                        WHERE state.campaign_id = campaign.id
+                    )
+                    """
+                )
+            )
+        if "benchmark_budget_reservations" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_budget_reservation_no_update
+                    BEFORE UPDATE ON benchmark_budget_reservations
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark budget reservations are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_budget_reservation_no_delete
+                    BEFORE DELETE ON benchmark_budget_reservations
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark budget reservations are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        for table_name, trigger_prefix in (
+            ("benchmark_campaign_batch_bindings", "batch"),
+            ("benchmark_campaign_run_bindings", "run"),
+        ):
+            if table_name not in table_names:
+                continue
+            if table_name == "benchmark_campaign_run_bindings":
+                run_binding_columns = {
+                    row[1]
+                    for row in conn.execute(
+                        text("PRAGMA table_info('benchmark_campaign_run_bindings')")
+                    ).fetchall()
+                }
+                for column_name in (
+                    "qualification_policy_version",
+                    "scenario_suite_sha256",
+                    "qualification_contract_sha256",
+                ):
+                    if column_name not in run_binding_columns:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE benchmark_campaign_run_bindings "
+                                f"ADD COLUMN {column_name} VARCHAR(64)"
+                            )
+                        )
+            conn.execute(
+                text(
+                    f"""
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_{trigger_prefix}_binding_no_update
+                    BEFORE UPDATE ON {table_name}
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark execution bindings are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_{trigger_prefix}_binding_no_delete
+                    BEFORE DELETE ON {table_name}
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark execution bindings are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "qualification_trial_receipts" in table_names:
+            for operation in ("update", "delete"):
+                conn.execute(
+                    text(
+                        f"""
+                        CREATE TRIGGER IF NOT EXISTS
+                        trg_qualification_trial_receipts_no_{operation}
+                        BEFORE {operation.upper()} ON qualification_trial_receipts
+                        BEGIN
+                            SELECT RAISE(
+                                ABORT,
+                                'qualification Trial receipts are append-only'
+                            );
+                        END
+                        """
+                    )
+                )
 
 
 def get_db() -> Iterator[Session]:
@@ -189,4 +1157,11 @@ def get_db() -> Iterator[Session]:
         db.close()
 
 
-__all__ = ["Base", "SessionLocal", "engine", "get_db", "init_db"]
+__all__ = [
+    "Base",
+    "SessionLocal",
+    "engine",
+    "get_db",
+    "init_db",
+    "rebind_database_for_testing",
+]

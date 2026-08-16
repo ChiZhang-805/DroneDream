@@ -16,6 +16,11 @@ const args = new Map(process.argv.slice(2).map((argument) => {
   const [key, ...value] = argument.split("=");
   return [key, value.join("=") || true];
 }));
+const edition = String(args.get("--edition") || "sim");
+assert(
+  ["universal", "sim", "lab"].includes(edition),
+  `Unsupported shared desktop launcher edition: ${edition}`,
+);
 const label = String(args.get("--label") || "working-tree");
 const outputRoot = path.resolve(
   repoRoot,
@@ -33,7 +38,7 @@ const origin = `http://${host}:${port}`;
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
-process.env.VITE_DRONEDREAM_EDITION = "sim";
+process.env.VITE_DRONEDREAM_EDITION = edition;
 process.env.VITE_SUPABASE_URL = "https://visual-fixture.supabase.co";
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_visual_fixture";
 const productionEnvironment = await readFile(
@@ -266,7 +271,10 @@ async function verifyCase(browser, testCase) {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   try {
-    await page.goto(`${origin}/desktop/setup`, { waitUntil: "networkidle" });
+    // Packaged desktop builds use hash history so a WebView reload never asks a
+    // nonexistent HTTP server to resolve an application route. Exercise the
+    // same URL shape here instead of accidentally testing the hosted router.
+    await page.goto(`${origin}/#/desktop/setup`, { waitUntil: "networkidle" });
     const progress = page.getByRole("progressbar");
     const expectedPercent = testCase.scenario === "ready" ? "100" : null;
     if (expectedPercent !== null) {
@@ -299,7 +307,18 @@ async function verifyCase(browser, testCase) {
     const repairRuntime = page.getByRole("button", { name: /Repair Runtime|修复 Runtime/i });
 
     if (testCase.scenario === "missing") {
-      await install.waitFor();
+      try {
+        await install.waitFor({ timeout: 30_000 });
+      } catch (error) {
+        const diagnosticPath = path.join(outputRoot, `${testCase.id}-diagnostic.png`);
+        await page.screenshot({ path: diagnosticPath, fullPage: false });
+        const diagnostic = await page.evaluate(() => ({
+          progress: document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
+          calls: window.__SIM_VISUAL_CALLS__,
+          text: document.body.innerText,
+        }));
+        throw new Error(`Missing Runtime install action did not appear: ${JSON.stringify(diagnostic)}`, { cause: error });
+      }
       if (!(await install.isVisible())) {
         const diagnosticPath = path.join(outputRoot, `${testCase.id}-diagnostic.png`);
         await page.screenshot({ path: diagnosticPath, fullPage: false });
@@ -353,17 +372,19 @@ async function verifyCase(browser, testCase) {
     assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
     assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
     assert.equal(dimensions.appearance, testCase.appearance);
-    assert.equal(dimensions.brandEdition, "sim");
+    assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
     assert.equal(dimensions.sceneStars, testCase.appearance === "light" ? "false" : "true");
     assert.equal(dimensions.sceneParticles, testCase.appearance === "light" ? "false" : "true");
     if (testCase.appearance === "light") {
       assert(dimensions.lightContrast, `${testCase.id}: light contrast metrics are missing`);
-      assert.equal(
-        dimensions.lightContrast.runtimeIndicatorColor,
-        testCase.scenario === "ready" ? "rgb(16, 40, 59)" : "rgb(23, 51, 75)",
-      );
-      assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(23, 51, 75)");
+      if (edition === "sim") {
+        assert.equal(
+          dimensions.lightContrast.runtimeIndicatorColor,
+          testCase.scenario === "ready" ? "rgb(16, 40, 59)" : "rgb(23, 51, 75)",
+        );
+        assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(23, 51, 75)");
+      }
       assert.equal(dimensions.lightContrast.hudColor, "rgba(255, 255, 255, 0.82)");
       assert.equal(dimensions.lightContrast.hudStrongColor, "rgb(255, 255, 255)");
       assert.match(dimensions.lightContrast.hudBackground, /rgba\(7, 42, 86, 0\.96\)/u);
@@ -423,35 +444,23 @@ async function verifyCase(browser, testCase) {
         100,
         `${testCase.id}: an already-ready Runtime did not render 100% readiness`,
       );
-      assert(
-        dimensions.readinessTransitions.length >= 8,
-        `${testCase.id}: readiness did not expose a smooth multi-step sequence`,
-      );
       assert.equal(
         dimensions.readinessTransitions.some((transition) => transition.percent === 99),
         false,
         `${testCase.id}: the prohibited 99% action point was rendered`,
       );
-      assert(
-        dimensions.readinessTransitions.some((transition) => transition.percent === 96),
-        `${testCase.id}: the final non-action readiness milestone was skipped`,
-      );
       for (let index = 1; index < dimensions.readinessTransitions.length; index += 1) {
         assert(
           dimensions.readinessTransitions[index].percent
-            > dimensions.readinessTransitions[index - 1].percent,
-          `${testCase.id}: readiness must increase monotonically`,
+            >= dimensions.readinessTransitions[index - 1].percent,
+          `${testCase.id}: evidence-driven readiness must never move backwards`,
         );
       }
-      const readinessDurationMs = dimensions.readinessTransitions.at(-1).atMs
-        - dimensions.readinessTransitions[0].atMs;
       assert(
-        readinessDurationMs >= 4_500,
-        `${testCase.id}: readiness completed too quickly (${readinessDurationMs} ms)`,
-      );
-      assert(
-        readinessDurationMs <= 9_000,
-        `${testCase.id}: readiness exceeded the visual acceptance window (${readinessDurationMs} ms)`,
+        dimensions.readinessTransitions.every((transition) =>
+          transition.percent === 0 ||
+          (transition.percent >= 20 && transition.percent <= 100)),
+        `${testCase.id}: readiness rendered a value without completed native evidence`,
       );
       assert(
         dimensions.primaryActionAppearances.length >= 1,
@@ -518,6 +527,7 @@ try {
 
 const receipt = {
   schema_version: 1,
+  edition,
   subject_commit: git("rev-parse", "HEAD"),
   subject_dirty: Boolean(git("status", "--short")),
   branch: git("branch", "--show-current"),

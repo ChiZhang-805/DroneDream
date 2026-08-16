@@ -7,6 +7,10 @@ LangString DD_RuntimePendingUpdate ${LANG_ENGLISH} "Runtime setup is waiting to 
 LangString DD_RuntimePendingUpdate ${LANG_SIMPCHINESE} "Runtime 安装正在等待续传。请先打开 DroneDream 完成或取消安装，再进行升级。"
 LangString DD_RuntimeIsolationFailed ${LANG_ENGLISH} "Unable to establish safe Runtime update isolation. Setup has stopped."
 LangString DD_RuntimeIsolationFailed ${LANG_SIMPCHINESE} "无法建立安全的 Runtime 升级隔离，安装已停止。"
+LangString DD_DowngradeBlocked ${LANG_ENGLISH} "A newer DroneDream version is already installed. This older installer will close without changing the installed application."
+LangString DD_DowngradeBlocked ${LANG_SIMPCHINESE} "电脑上已安装更新版本的 DroneDream。这个旧安装程序将直接关闭，不会更改当前安装。"
+LangString DD_ShortcutConflict ${LANG_ENGLISH} "The requested shortcut name is already owned by another DroneDream installation. Setup preserved the existing shortcut and did not replace it."
+LangString DD_ShortcutConflict ${LANG_SIMPCHINESE} "所需的快捷方式名称已属于另一个 DroneDream 安装。安装程序已保留现有快捷方式，未进行覆盖。"
 
 LangString DD_ModeHeader ${LANG_ENGLISH} "Choose what to install"
 LangString DD_ModeHeader ${LANG_SIMPCHINESE} "选择安装内容"

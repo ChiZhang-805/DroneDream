@@ -13,14 +13,14 @@ const MODE_SET = new Set<string>(UNIVERSAL_WORKSPACE_IDS);
 export function parseUniversalMode(value: unknown): UniversalWorkspaceId {
   return typeof value === "string" && MODE_SET.has(value)
     ? value as UniversalWorkspaceId
-    : "sim";
+    : "universal";
 }
 
 export function loadUniversalMode(storage: Pick<Storage, "getItem"> = window.localStorage) {
   try {
     return parseUniversalMode(storage.getItem(UNIVERSAL_MODE_STORAGE_KEY));
   } catch {
-    return "sim" as const;
+    return "universal" as const;
   }
 }
 

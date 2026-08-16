@@ -24,6 +24,14 @@ ExperimentalOptimizerStrategy = Literal[
     "bipop_cma_es",
     "optimizer_portfolio",
 ]
+OptimizerObservationRole = Literal[
+    "objective",
+    "constraint_only",
+    "pending_reservation",
+]
+OPTIMIZER_LEARNING_OBSERVATION_ROLES = frozenset(
+    {"objective", "constraint_only"}
+)
 
 EXPERIMENTAL_OPTIMIZER_STRATEGIES: tuple[ExperimentalOptimizerStrategy, ...] = (
     "constrained_mobo",
@@ -34,6 +42,36 @@ EXPERIMENTAL_OPTIMIZER_STRATEGIES: tuple[ExperimentalOptimizerStrategy, ...] = (
     "bipop_cma_es",
     "optimizer_portfolio",
 )
+OPTIMIZER_SEED_FLOAT_SIGNIFICANT_DIGITS = 12
+
+
+def canonical_optimizer_seed_value(value: Any) -> Any:
+    """Return stable JSON state for deterministic optimizer seed derivation.
+
+    Supported Python runtimes can differ by one binary ULP when aggregating
+    the same finite metrics. Hashing the raw float spelling would turn that
+    harmless representation noise into an unrelated optimizer random stream.
+    """
+
+    if value is None or isinstance(value, str | bool | int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("optimizer seed state must contain only finite numbers")
+        normalized = float(
+            format(value, f".{OPTIMIZER_SEED_FLOAT_SIGNIFICANT_DIGITS}g")
+        )
+        return 0.0 if normalized == 0.0 else normalized
+    if isinstance(value, Mapping):
+        return {
+            str(key): canonical_optimizer_seed_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list | tuple):
+        return [canonical_optimizer_seed_value(item) for item in value]
+    raise ValueError(
+        f"optimizer seed state contains unsupported {type(value).__name__}"
+    )
 
 
 class _FrozenDict(dict[str, Any]):
@@ -147,11 +185,13 @@ def _validate_json_compatible(name: str, value: object) -> None:
 
 @dataclass(frozen=True)
 class OptimizerObservation:
-    """One completed or failed candidate visible to an optimizer.
+    """One trusted learning outcome or pending reservation.
 
-    ``loss`` is always minimized.  A failed candidate may have ``loss=None``;
-    it still contributes to the feasibility model instead of being discarded
-    or receiving an arbitrary giant objective value.
+    ``objective`` observations may train objective and feasibility models.
+    Trusted physical failures use ``constraint_only`` and never receive a
+    fabricated loss. ``pending_reservation`` points only prevent duplicate
+    dispatch. Infrastructure, cancellation, invalid, and unknown-only terminal
+    outcomes are quarantined before this contract is constructed.
     """
 
     candidate_id: str
@@ -176,6 +216,10 @@ class OptimizerObservation:
     # the portfolio uses eligibility fields to exclude fallback proposals.
     optimizer_metadata: dict[str, Any] = field(default_factory=dict)
     completed: bool = True
+    # Added after ``completed`` so historical positional constructors and
+    # persisted payloads remain readable. Historical ``completed=False`` rows
+    # are normalized to pending reservations below.
+    role: OptimizerObservationRole = "objective"
 
     def __post_init__(self) -> None:
         if not isinstance(self.candidate_id, str) or not self.candidate_id:
@@ -240,6 +284,26 @@ class OptimizerObservation:
             raise ValueError("optimizer_strategy must be a non-empty string when provided")
         if not isinstance(self.completed, bool):
             raise ValueError("completed must be a boolean")
+        role = self.role
+        if role not in {
+            "objective",
+            "constraint_only",
+            "pending_reservation",
+        }:
+            raise ValueError("unsupported optimizer observation role")
+        if not self.completed and role == "objective":
+            role = "pending_reservation"
+        if self.completed == (role == "pending_reservation"):
+            raise ValueError(
+                "pending reservations must be incomplete and learning observations "
+                "must be completed"
+            )
+        if role == "constraint_only" and (
+            self.loss is not None or self.objectives
+        ):
+            raise ValueError(
+                "constraint-only observations cannot contain objective values"
+            )
         _validate_json_compatible("optimizer_metadata", self.optimizer_metadata)
         object.__setattr__(self, "parameters", _freeze_json(self.parameters))
         object.__setattr__(self, "unit_vector", vector)
@@ -247,6 +311,7 @@ class OptimizerObservation:
         object.__setattr__(self, "objective_directions", _freeze_json(self.objective_directions))
         object.__setattr__(self, "constraints", _freeze_json(self.constraints))
         object.__setattr__(self, "optimizer_metadata", _freeze_json(self.optimizer_metadata))
+        object.__setattr__(self, "role", role)
 
 
 @dataclass(frozen=True)
@@ -278,6 +343,10 @@ class OptimizerRequest:
     batch_size: int
     random_seed: int
     observations: tuple[OptimizerObservation, ...]
+    # Frozen Job preference inputs. Bayesian vector acquisitions use these
+    # instead of adapting objective scales or weights from observed extrema.
+    objective_weights: tuple[tuple[str, float], ...] = ()
+    objective_normalizations: tuple[tuple[str, float], ...] = ()
     # Pairs are (requested level, effective training-matrix coverage). The
     # orchestration layer derives them from the concrete scenario/seed matrix.
     fidelity_mapping: tuple[tuple[float, float], ...] = ()
@@ -307,6 +376,35 @@ class OptimizerRequest:
         observations = tuple(self.observations)
         if not all(isinstance(item, OptimizerObservation) for item in observations):
             raise ValueError("observations must contain OptimizerObservation values")
+        for field_name, pairs in (
+            ("objective_weights", self.objective_weights),
+            ("objective_normalizations", self.objective_normalizations),
+        ):
+            names = [name for name, _value in pairs]
+            if (
+                any(not isinstance(name, str) or not name for name in names)
+                or len(set(names)) != len(names)
+                or any(
+                    isinstance(value, bool)
+                    or not isinstance(value, int | float)
+                    or not math.isfinite(float(value))
+                    or float(value) <= 0.0
+                    for _name, value in pairs
+                )
+            ):
+                raise ValueError(
+                    f"{field_name} must contain unique metric names and "
+                    "finite positive values"
+                )
+        weight_names = {name for name, _value in self.objective_weights}
+        normalization_names = {
+            name for name, _value in self.objective_normalizations
+        }
+        if weight_names != normalization_names:
+            raise ValueError(
+                "objective_weights and objective_normalizations must declare "
+                "the same metric names"
+            )
         if any(
             isinstance(value, bool) or not isinstance(value, int | float)
             for pair in self.fidelity_mapping
@@ -347,13 +445,31 @@ class OptimizerRequest:
         ):
             raise ValueError("required_fidelity must be finite and inside (0, 1]")
         object.__setattr__(self, "observations", observations)
+        object.__setattr__(
+            self,
+            "objective_weights",
+            tuple(
+                (name, float(value))
+                for name, value in self.objective_weights
+            ),
+        )
+        object.__setattr__(
+            self,
+            "objective_normalizations",
+            tuple(
+                (name, float(value))
+                for name, value in self.objective_normalizations
+            ),
+        )
         object.__setattr__(self, "fidelity_mapping", ordered_mapping)
 
 
 __all__ = [
     "EXPERIMENTAL_OPTIMIZER_STRATEGIES",
+    "OPTIMIZER_LEARNING_OBSERVATION_ROLES",
     "ExperimentalOptimizerStrategy",
     "ExperimentalProposal",
     "OptimizerObservation",
+    "OptimizerObservationRole",
     "OptimizerRequest",
 ]

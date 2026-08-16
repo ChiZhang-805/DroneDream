@@ -11,7 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
 from app import models
+from app.optimization.outcome_evidence import (
+    require_authoritative_candidate_report_projection,
+)
 from app.orchestration.acceptance import criteria_for_job, evaluate_candidate
+from app.orchestration.winner_freeze import require_winner_freeze_receipt
+from app.time_utils import canonical_utc_iso
 
 _SECRET_TOKENS = (
     "secret",
@@ -31,7 +36,7 @@ def _worst_max_error(aggregate: dict[str, Any]) -> Any:
 
 
 def _fmt_dt(value: datetime | None) -> str:
-    return value.isoformat() if value is not None else "—"
+    return canonical_utc_iso(value) or "—"
 
 
 def _fmt_num(value: Any, *, digits: int = 3) -> str:
@@ -111,27 +116,51 @@ def _pct_change(old: Any, new: Any) -> str:
     return f"{((new - old) / old) * 100.0:+.1f}%"
 
 
+def _parameter_changes(
+    parent: models.CandidateParameterSet | None,
+    candidate: models.CandidateParameterSet,
+) -> list[str]:
+    """Describe only parameter changes that are explicitly bound to a parent."""
+
+    if parent is None:
+        return []
+    parent_values = dict(_safe_pairs(parent.parameter_json))
+    candidate_values = dict(_safe_pairs(candidate.parameter_json))
+    changes: list[str] = []
+    for key in sorted(set(parent_values) | set(candidate_values)):
+        old = parent_values.get(key, "—")
+        new = candidate_values.get(key, "—")
+        if old == new:
+            continue
+        changes.append(f"{key}: {old} -> {new}")
+    return changes
+
+
 def _collect_artifacts(job: models.Job) -> tuple[list[models.Artifact], list[models.Artifact]]:
     session = object_session(job)
     if session is None:
         return [], []
     job_artifacts = list(
         session.scalars(
-        select(models.Artifact)
-        .where(models.Artifact.owner_type == "job")
-        .where(models.Artifact.owner_id == job.id)
-        .order_by(models.Artifact.created_at.asc())
-    ).all()
+            select(models.Artifact)
+            .where(models.Artifact.owner_type == "job")
+            .where(models.Artifact.owner_id == job.id)
+            # A report cannot include its own byte size without making the
+            # report recursively self-dependent and non-deterministic.
+            .where(models.Artifact.artifact_type != "pdf_report")
+            .order_by(models.Artifact.artifact_type.asc(), models.Artifact.id.asc())
+        ).all()
     )
     trial_ids = [t.id for t in job.trials]
     if not trial_ids:
         return job_artifacts, []
     trial_artifacts = list(
         session.scalars(
-        select(models.Artifact)
-        .where(models.Artifact.owner_type == "trial")
-        .where(models.Artifact.owner_id.in_(trial_ids))
-    ).all()
+            select(models.Artifact)
+            .where(models.Artifact.owner_type == "trial")
+            .where(models.Artifact.owner_id.in_(trial_ids))
+            .order_by(models.Artifact.artifact_type.asc(), models.Artifact.id.asc())
+        ).all()
     )
     return job_artifacts, trial_artifacts
 
@@ -140,8 +169,7 @@ def _paginate_lines(wrapped_lines: list[str], lines_per_page: int = 52) -> list[
     if not wrapped_lines:
         return [[]]
     return [
-        wrapped_lines[i : i + lines_per_page]
-        for i in range(0, len(wrapped_lines), lines_per_page)
+        wrapped_lines[i : i + lines_per_page] for i in range(0, len(wrapped_lines), lines_per_page)
     ]
 
 
@@ -157,7 +185,71 @@ def _pdf_text_operand(text: str) -> bytes:
     return f"<{text.encode('utf-16-be').hex().upper()}> Tj".encode("ascii")
 
 
-def _build_page_stream(page_lines: list[str], page_number: int, page_count: int) -> bytes:
+def _free_report_watermark_stream() -> list[bytes]:
+    """Draw a non-official, semi-transparent DroneDream brand seal.
+
+    The purple/magenta rings and stylized bat deliberately avoid the red,
+    star-shaped, organization-name, and registration-number conventions of a
+    government or legal seal. The mark overlaps the lower-right body region at
+    low opacity so it remains visible without obscuring the report.
+    """
+
+    return [
+        b"% DD-FREE-REPORT-WATERMARK-V1",
+        b"q",
+        b"/GSW gs",
+        b"2.4 w",
+        b"0.45 0.16 0.88 RG",
+        # Outer circle, centered at (492, 118), radius 64.
+        b"492 182 m",
+        b"527.35 182 556 153.35 556 118 c",
+        b"556 82.65 527.35 54 492 54 c",
+        b"456.65 54 428 82.65 428 118 c",
+        b"428 153.35 456.65 182 492 182 c S",
+        b"1.3 w",
+        b"0.92 0.17 0.57 RG",
+        # Inner circle.
+        b"492 174 m",
+        b"522.93 174 548 148.93 548 118 c",
+        b"548 87.07 522.93 62 492 62 c",
+        b"461.07 62 436 87.07 436 118 c",
+        b"436 148.93 461.07 174 492 174 c S",
+        # Minimal bat silhouette: two wings, a compact body, and pointed ears.
+        b"0.48 0.18 0.90 rg",
+        b"492 129 m",
+        b"480 143 463 148 447 143 c",
+        b"455 134 458 123 455 111 c",
+        b"469 116 479 111 486 101 c",
+        b"489 96 490 91 492 84 c",
+        b"494 91 495 96 498 101 c",
+        b"505 111 515 116 529 111 c",
+        b"526 123 529 134 537 143 c",
+        b"521 148 504 143 492 129 c f",
+        # Ears and head.
+        b"486 132 m 487 142 l 492 137 l 497 142 l 498 132 l h f",
+        b"BT",
+        b"/F1 7 Tf",
+        b"0.45 0.16 0.88 rg",
+        b"455 159 Td",
+        _pdf_text_operand("DRONE DREAM"),
+        b"ET",
+        b"BT",
+        b"/F1 7 Tf",
+        b"0.92 0.17 0.57 rg",
+        b"458 71 Td",
+        _pdf_text_operand("FREE EXPORT"),
+        b"ET",
+        b"Q",
+    ]
+
+
+def _build_page_stream(
+    page_lines: list[str],
+    page_number: int,
+    page_count: int,
+    *,
+    free_tier_watermark: bool,
+) -> bytes:
     stream_lines = [b"BT", b"/F1 10 Tf", b"50 800 Td", b"14 TL"]
     for line in page_lines:
         stream_lines.append(_pdf_text_operand(line))
@@ -172,15 +264,13 @@ def _build_page_stream(page_lines: list[str], page_number: int, page_count: int)
             b"ET",
         ]
     )
+    if free_tier_watermark:
+        stream_lines.extend(_free_report_watermark_stream())
     stream = b"\n".join(stream_lines)
-    return (
-        f"<< /Length {len(stream)} >>\nstream\n".encode()
-        + stream
-        + b"\nendstream"
-    )
+    return f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream"
 
 
-def _build_pdf(lines: list[str]) -> bytes:
+def _build_pdf(lines: list[str], *, free_tier_watermark: bool = False) -> bytes:
     out = bytearray()
     out.extend(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
 
@@ -190,7 +280,7 @@ def _build_pdf(lines: list[str]) -> bytes:
 
     objects: list[bytes] = []
     objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
-    page_kids = " ".join(f"{6 + i * 2} 0 R" for i in range(page_count))
+    page_kids = " ".join(f"{7 + i * 2} 0 R" for i in range(page_count))
     objects.append(f"<< /Type /Pages /Kids [{page_kids}] /Count {page_count} >>".encode())
     objects.append(
         b"<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light "
@@ -200,19 +290,22 @@ def _build_pdf(lines: list[str]) -> bytes:
         b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light "
         b"/CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> >>"
     )
+    objects.append(b"<< /Type /ExtGState /CA 0.18 /ca 0.18 >>")
 
     for idx, page_lines in enumerate(pages):
         stream_obj = _build_page_stream(
             page_lines,
             page_number=idx + 1,
             page_count=page_count,
+            free_tier_watermark=free_tier_watermark,
         )
         objects.append(stream_obj)
         page_obj = (
             "<< /Type /Page /Parent 2 0 R "
             "/MediaBox [0 0 595 842] "
-            "/Resources << /Font << /F1 3 0 R >> >> "
-            f"/Contents {5 + idx * 2} 0 R >>"
+            "/Resources << /Font << /F1 3 0 R >> "
+            "/ExtGState << /GSW 5 0 R >> >> "
+            f"/Contents {6 + idx * 2} 0 R >>"
         ).encode()
         objects.append(page_obj)
 
@@ -230,8 +323,7 @@ def _build_pdf(lines: list[str]) -> bytes:
         out.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
 
     trailer = (
-        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
-        f"startxref\n{xref_start}\n%%EOF\n"
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_start}\n%%EOF\n"
     )
     out.extend(trailer.encode("ascii"))
     return bytes(out)
@@ -259,19 +351,43 @@ def build_job_report_lines(job: models.Job) -> list[str]:
 
     baseline = next((c for c in job.candidates if c.id == job.baseline_candidate_id), None)
     baseline_agg = {}
-    if baseline is not None and baseline.aggregated_metric_json is not None:
-        baseline_agg = baseline.aggregated_metric_json
+    if baseline is not None:
+        baseline_agg = require_authoritative_candidate_report_projection(baseline)
     best = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
-    best_agg = (best.aggregated_metric_json or {}) if best is not None else {}
+    best_agg = require_authoritative_candidate_report_projection(best) if best is not None else {}
 
     add("")
     add("2) Executive summary")
     add(f"- Job status: {job.status}")
     add(f"- Optimization outcome: {job.optimization_outcome or '—'}")
-    add(
-        "- Best candidate: "
-        f"{(best.label if best else '—')} / {(best.id if best else '—')}"
+    add(f"- Best candidate: {(best.label if best else '—')} / {(best.id if best else '—')}")
+    verified_winner = (
+        require_winner_freeze_receipt(
+            report.winner_freeze_receipt,
+            job=job,
+            evidence=report.winner_evidence_json,
+        )
+        if report is not None and report.winner_freeze_receipt is not None
+        else None
     )
+    winner_evidence = (
+        verified_winner.model_dump(mode="json")
+        if verified_winner is not None
+        else (
+            report.winner_evidence_json
+            if report is not None and isinstance(report.winner_evidence_json, dict)
+            else {}
+        )
+    )
+    add(
+        f"- Winner selection evidence: {winner_evidence.get('evidence_id', 'legacy / unavailable')}"
+    )
+    winner_freeze_receipt_id = (
+        report.winner_freeze_receipt_id
+        if report is not None and report.winner_freeze_receipt_id
+        else "legacy / unavailable"
+    )
+    add(f"- Winner freeze receipt: {winner_freeze_receipt_id}")
     add(
         "- Baseline vs best RMSE change: "
         f"{_pct_change(baseline_agg.get('rmse'), best_agg.get('rmse'))}"
@@ -339,9 +455,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- target_rmse: {_fmt_num(job.target_rmse, digits=3)}")
     add(f"- target_max_error: {_fmt_num(job.target_max_error, digits=3)}")
     add(f"- min_pass_rate: {_fmt_num(job.min_pass_rate, digits=3)}")
-    acceptance = (
-        evaluate_candidate(best, criteria_for_job(job)) if best is not None else None
-    )
+    acceptance = evaluate_candidate(best, criteria_for_job(job)) if best is not None else None
     add(
         "- Best candidate meets acceptance: "
         f"{'yes' if acceptance is not None and acceptance.passed else 'no'}"
@@ -365,6 +479,46 @@ def build_job_report_lines(job: models.Job) -> list[str]:
             f"pass_rate={_fmt_num(holdout.get('pass_rate'), digits=3)}, "
             f"failure_rate={_fmt_num(holdout.get('failure_rate'), digits=3)}"
         )
+        generalization = holdout.get("generalization_evidence")
+        if isinstance(generalization, dict):
+            shift_axes = generalization.get("shift_axes")
+            axes_text = (
+                ", ".join(str(item) for item in shift_axes)
+                if isinstance(shift_axes, list)
+                else "unknown"
+            )
+            relative_gap = generalization.get("scalar_loss_relative_degradation")
+            relative_gap_text = (
+                f"{_fmt_num(float(relative_gap) * 100.0, digits=2)}%"
+                if isinstance(relative_gap, int | float) and not isinstance(relative_gap, bool)
+                else "—"
+            )
+            add(
+                "- Generalization evidence: "
+                f"assessment={generalization.get('assessment', 'unknown')}, "
+                f"scope={generalization.get('claim_scope', 'unknown')}, "
+                f"shift={generalization.get('observed_shift', 'not_assessable')}, "
+                f"axes={axes_text}, "
+                f"scalar_loss_degradation={relative_gap_text}"
+            )
+            objective_gaps = generalization.get("objective_gaps")
+            if isinstance(objective_gaps, list):
+                for item in objective_gaps:
+                    if not isinstance(item, dict):
+                        continue
+                    relative = item.get("relative_degradation")
+                    relative_text = (
+                        f"{_fmt_num(float(relative) * 100.0, digits=2)}%"
+                        if isinstance(relative, int | float) and not isinstance(relative, bool)
+                        else "—"
+                    )
+                    add(
+                        "  - "
+                        f"{item.get('metric', 'unknown')}: "
+                        f"training={_fmt_num(item.get('training_value'), digits=4)}, "
+                        f"validation={_fmt_num(item.get('validation_value'), digits=4)}, "
+                        f"directional_degradation={relative_text}"
+                    )
 
     add("")
     add("5) Baseline metrics")
@@ -392,14 +546,18 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     add(f"- Trial count: {done}/{total}")
 
     add("")
-    add("6) Candidate summary")
+    add("6) Iteration-by-iteration optimization trace")
     sorted_candidates = sorted(
         job.candidates,
-        key=lambda item: (item.generation_index, item.created_at),
+        key=lambda item: (
+            item.generation_index,
+            canonical_utc_iso(item.created_at) or "",
+            item.id,
+        ),
     )
+    candidate_by_id = {candidate.id: candidate for candidate in sorted_candidates}
     for candidate in sorted_candidates:
-        agg = candidate.aggregated_metric_json or {}
-        params = candidate.parameter_json or {}
+        agg = require_authoritative_candidate_report_projection(candidate)
         is_base = "yes" if candidate.is_baseline else "no"
         header = (
             f"- {candidate.id} | label={candidate.label or '—'} | "
@@ -407,36 +565,65 @@ def build_job_report_lines(job: models.Job) -> list[str]:
             f"baseline={is_base} | best={'yes' if candidate.is_best else 'no'}"
         )
         add(header)
-        focus_params = {
-            "kp_xy": params.get("kp_xy"),
-            "kd_xy": params.get("kd_xy"),
-            "ki_xy": params.get("ki_xy"),
-            "vel_limit": params.get("vel_limit"),
-            "accel_limit": params.get("accel_limit"),
-            "disturbance_rejection": params.get("disturbance_rejection"),
-        }
-        add(f"  params {_truncate(json.dumps(focus_params, ensure_ascii=False), limit=220)}")
+        if candidate.is_baseline:
+            add("  declared parent: baseline has no parent")
+            changes: list[str] = []
+        else:
+            parent = (
+                candidate_by_id.get(candidate.parent_candidate_id)
+                if candidate.parent_candidate_id
+                else None
+            )
+            if parent is None:
+                add(
+                    "  declared parent: unavailable; this report does not infer a causal "
+                    "parameter lineage"
+                )
+                changes = []
+            else:
+                add(
+                    f"  declared parent: {parent.id} / {parent.label or '—'} "
+                    f"(generation {parent.generation_index})"
+                )
+                changes = _parameter_changes(parent, candidate)
+        if changes:
+            add(f"  recorded parameter changes ({len(changes)}):")
+            for change in changes:
+                add(f"    - {_truncate(change, limit=220)}")
+        elif candidate.is_baseline:
+            add("  recorded parameter changes: baseline snapshot")
+        else:
+            add("  recorded parameter changes: none attributable from stored parent evidence")
+        parameter_snapshot = dict(_safe_pairs(candidate.parameter_json))
+        add(
+            "  resulting parameter snapshot: "
+            f"{_truncate(json.dumps(parameter_snapshot, ensure_ascii=False), limit=260)}"
+        )
         aggregate_score = agg.get("aggregated_score")
         if aggregate_score is None:
             aggregate_score = candidate.aggregated_score
-        metrics_text = (
-            f"  metrics rmse={_fmt_num(agg.get('rmse'), digits=3)} "
+        add(
+            "  observed simulation feedback: "
+            f"rmse={_fmt_num(agg.get('rmse'), digits=3)} "
             f"worst_max_error={_fmt_num(_worst_max_error(agg), digits=3)} "
             f"completion={_fmt_num(agg.get('completion_time'), digits=2)}s "
-            f"score={_fmt_num(aggregate_score, digits=4)}"
+            f"score={_fmt_num(aggregate_score, digits=4)} "
+            f"completed={candidate.completed_trial_count}/{candidate.trial_count} "
+            f"failed={candidate.failed_trial_count}"
         )
-        add(metrics_text)
         rationale = _truncate(candidate.proposal_reason, limit=200)
-        add(
-            "  trials "
-            f"{candidate.completed_trial_count}/{candidate.trial_count} "
-            f"rationale={rationale or '—'}"
-        )
+        add(f"  recorded proposal rationale (not inferred by the report): {rationale or '—'}")
 
     add("")
     add("7) Trial summary")
     trial_to_label = {c.id: c.label or c.id for c in job.candidates}
-    for trial in sorted(job.trials, key=lambda item: item.created_at):
+    for trial in sorted(
+        job.trials,
+        key=lambda item: (
+            canonical_utc_iso(item.created_at) or "",
+            item.id,
+        ),
+    ):
         metric = trial.metric
         candidate_label = trial_to_label.get(trial.candidate_id, "—")
         header = (
@@ -497,7 +684,13 @@ def build_job_report_lines(job: models.Job) -> list[str]:
 
     add("")
     add("10) Failure appendix")
-    failed_trials = [t for t in job.trials if t.status == "FAILED"]
+    failed_trials = sorted(
+        (trial for trial in job.trials if trial.status == "FAILED"),
+        key=lambda trial: (
+            canonical_utc_iso(trial.created_at) or "",
+            trial.id,
+        ),
+    )
     if job.status == "FAILED":
         add(
             "- Job failure: "
@@ -525,10 +718,7 @@ def build_job_report_lines(job: models.Job) -> list[str]:
     if repro_artifact is None:
         add("- Reproducibility manifest artifact: —")
     else:
-        add(
-            "- Reproducibility manifest artifact available: "
-            f"{repro_artifact.display_name or '—'}"
-        )
+        add(f"- Reproducibility manifest artifact available: {repro_artifact.display_name or '—'}")
         add("- Download from artifact list; PDF omits full manifest payload by design.")
 
     fallback = (
@@ -548,9 +738,25 @@ def generate_job_pdf_report(*, db: Session, job: models.Job, output_dir: Path) -
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = (output_dir / f"{job.id} report.pdf").resolve()
-    lines = build_job_report_lines(job)
-    output_path.write_bytes(_build_pdf(lines))
+    output_path.write_bytes(render_job_pdf_report(job))
     return output_path
 
 
-__all__ = ["build_job_report_lines", "generate_job_pdf_report"]
+def render_job_pdf_report(
+    job: models.Job,
+    *,
+    free_tier_watermark: bool = False,
+) -> bytes:
+    """Render deterministic PDF bytes without mutating artifact storage."""
+
+    return _build_pdf(
+        build_job_report_lines(job),
+        free_tier_watermark=free_tier_watermark,
+    )
+
+
+__all__ = [
+    "build_job_report_lines",
+    "generate_job_pdf_report",
+    "render_job_pdf_report",
+]

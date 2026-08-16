@@ -7,13 +7,17 @@ type AppUpdaterState = ReturnType<typeof useAppUpdater>;
 const FALLBACK: AppUpdaterState = {
   status: "current",
   availableVersion: null,
+  updateRequired: false,
   progress: null,
   error: null,
   enginePack: null,
+  componentUpdates: null,
   desktopRuntime: false,
   checkForUpdates: async () => undefined,
   installAvailableUpdate: async () => undefined,
+  installComponentUpdates: async () => undefined,
   reconcileEnginePack: async () => undefined,
+  reconcileComponentPacks: async () => undefined,
 };
 
 const AppUpdaterContext = createContext<AppUpdaterState>(FALLBACK);

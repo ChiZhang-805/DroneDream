@@ -30,6 +30,9 @@ if (!licenseText.startsWith("MIT License\n") && !licenseText.startsWith("MIT Lic
 const codeSigningPolicy = readText("CODE_SIGNING_POLICY.md");
 const privacyPolicy = readText("PRIVACY.md");
 const readme = readText("README.md");
+const llvmBuildScript = readText("desktop/scripts/build-windows-llvm.ps1");
+const msvcBuildScript = readText("desktop/scripts/build-windows-msvc.ps1");
+const updaterSignerScript = readText("desktop/scripts/invoke-tauri-updater-signer.ps1");
 for (const requiredText of [
   "Free code signing provided by [SignPath.io]",
   "certificate by [SignPath Foundation]",
@@ -39,6 +42,42 @@ for (const requiredText of [
 ]) {
   if (!codeSigningPolicy.includes(requiredText)) {
     fail(`CODE_SIGNING_POLICY.md is missing: ${requiredText}`);
+  }
+}
+if ([llvmBuildScript, msvcBuildScript, updaterSignerScript].some((script) =>
+  /--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(script)
+)) {
+  fail("the updater key password must not be interpolated into a process argument");
+}
+for (const [name, script] of [["MSVC", msvcBuildScript], ["LLVM fallback", llvmBuildScript]]) {
+  if (!script.includes("invoke-tauri-updater-signer.ps1")) {
+    fail(`the ${name} build must use the tested updater signer helper`);
+  }
+  const updaterSigningPreflightIndex = script.indexOf(
+    "verify-updater-signing-contract.ps1",
+  );
+  const desktopBuildInvocationIndex = script.indexOf(
+    "Invoke-CheckedNativeCommand `",
+  );
+  if (
+    updaterSigningPreflightIndex < 0
+    || desktopBuildInvocationIndex < 0
+    || updaterSigningPreflightIndex >= desktopBuildInvocationIndex
+  ) {
+    fail(`the updater signing contract must run before the ${name} desktop and NSIS build`);
+  }
+  if (script.includes("@updaterPasswordArguments")) {
+    fail(`the ${name} build contains the scalar updater-password splat regression`);
+  }
+}
+for (const requiredText of [
+  '[string[]]$signerArguments = @(',
+  '$signerArguments += "--password="',
+  '$signerArguments += "--"',
+  "& $NodeExecutable @signerArguments",
+]) {
+  if (!updaterSignerScript.includes(requiredText)) {
+    fail(`the updater signer helper is missing: ${requiredText}`);
   }
 }
 for (const requiredText of [
@@ -120,6 +159,43 @@ if (missingRustLicenses.length > 0) {
 }
 
 const tauriConfig = JSON.parse(readText("desktop/src-tauri/tauri.conf.json"));
+const mainWindow = tauriConfig.app?.windows?.find((window) => window.label === "main");
+if (!mainWindow) {
+  fail("canonical Tauri config is missing the main application window");
+}
+if (mainWindow.transparent !== false) {
+  fail("main application window must remain opaque to prevent native window-edge bleed");
+}
+if (mainWindow.backgroundColor !== "#ffffff") {
+  fail("main application window must define the white first-paint background");
+}
+const desktopCapability = JSON.parse(
+  readText("desktop/src-tauri/capabilities/default.json"),
+);
+for (const requiredPermission of [
+  "core:window:allow-destroy",
+  "updater:default",
+  "process:allow-restart",
+]) {
+  if (!desktopCapability.permissions?.includes(requiredPermission)) {
+    fail(`desktop capability is missing: ${requiredPermission}`);
+  }
+}
+const openerPermission = desktopCapability.permissions?.find(
+  (permission) => permission && typeof permission === "object" &&
+    permission.identifier === "opener:allow-open-url",
+);
+if (!openerPermission || !Array.isArray(openerPermission.allow)) {
+  fail("desktop capability is missing its explicit external URL allowlist");
+}
+for (const requiredUrl of [
+  "https://getdronedream.com/pricing/",
+  "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+]) {
+  if (!openerPermission.allow.some((entry) => entry?.url === requiredUrl)) {
+    fail(`desktop external URL allowlist is missing: ${requiredUrl}`);
+  }
+}
 const inventory = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),

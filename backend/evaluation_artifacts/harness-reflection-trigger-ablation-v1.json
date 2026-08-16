@@ -1,0 +1,606 @@
+{
+  "artifact_sha256": "cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38",
+  "case_rows": [
+    {
+      "case_id": "high_cost_no_improvement",
+      "rationale": "A high-cost stagnant search is governed by trusted aggregate search history even when the latest reflection is removed.",
+      "result_status": "no_observed_contract_difference",
+      "steps": [
+        {
+          "arms": [
+            {
+              "arm": "full_reflection",
+              "batch_policy": "broad",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 1,
+              "plan_phase": "diversification",
+              "reason_codes": [
+                "stagnation_detected"
+              ],
+              "removed_reflection_count": 0,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "bipop_cma_es",
+              "snapshot_sha256": "788d8a23ef1883fb95a33826e27cf37664a12d39435b1f9930359567daf67daa",
+              "verified_reflection_count": 1
+            },
+            {
+              "arm": "no_observed_outcome_reflection",
+              "batch_policy": "broad",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 0,
+              "plan_phase": "diversification",
+              "reason_codes": [
+                "stagnation_detected"
+              ],
+              "removed_reflection_count": 1,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "bipop_cma_es",
+              "snapshot_sha256": "e4e3d05e5f4c3f397f4a9e703b82f44d1267be5ff9906f8c129ba19b0442496c",
+              "verified_reflection_count": 0
+            }
+          ],
+          "differences": {
+            "batch_policy": false,
+            "plan_phase": false,
+            "selectable_tools": false,
+            "selected_tool": false
+          },
+          "intervention_activated": true,
+          "result_status": "no_observed_contract_difference",
+          "step_id": "stagnant_high_cost_state"
+        }
+      ],
+      "trigger": "high_cost_no_improvement"
+    },
+    {
+      "case_id": "failure_concentration",
+      "rationale": "A verified cohort with at least 35% domain failures causes recovery when aggregate search failure remains below its independent recovery threshold.",
+      "result_status": "causal_contract_difference",
+      "steps": [
+        {
+          "arms": [
+            {
+              "arm": "full_reflection",
+              "batch_policy": "conservative",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 1,
+              "plan_phase": "recovery",
+              "reason_codes": [
+                "high_domain_failure_rate"
+              ],
+              "removed_reflection_count": 0,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "bipop_cma_es",
+              "snapshot_sha256": "d460f19881edd2924a8fcaddd9c55e8661625809b7d7179559dd3161164dad2b",
+              "verified_reflection_count": 1
+            },
+            {
+              "arm": "no_observed_outcome_reflection",
+              "batch_policy": "balanced",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 0,
+              "plan_phase": "balanced",
+              "reason_codes": [
+                "stable_progress"
+              ],
+              "removed_reflection_count": 1,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "optimizer_portfolio",
+              "snapshot_sha256": "683b45f7c26170888be530f9caf3ae39da35359be9263f07460f7cd2b7ffcea9",
+              "verified_reflection_count": 0
+            }
+          ],
+          "differences": {
+            "batch_policy": true,
+            "plan_phase": true,
+            "selectable_tools": true,
+            "selected_tool": true
+          },
+          "intervention_activated": true,
+          "result_status": "causal_contract_difference",
+          "step_id": "verified_failure_concentration"
+        }
+      ],
+      "trigger": "failure_concentration"
+    },
+    {
+      "case_id": "search_space_exhaustion",
+      "rationale": "A non-dispatched exhausted receipt has no observational cohort; exploration is driven by trusted search insufficiency.",
+      "result_status": "inconclusive_intervention_not_activated",
+      "steps": [
+        {
+          "arms": [
+            {
+              "arm": "full_reflection",
+              "batch_policy": "broad",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 0,
+              "plan_phase": "exploration",
+              "reason_codes": [
+                "insufficient_scored_history",
+                "no_feasible_candidate"
+              ],
+              "removed_reflection_count": 0,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "constrained_mobo",
+              "snapshot_sha256": "3c138d1bd183c48318d7e342fe818b9c93ee909f7b1b1915c47779024f93604e",
+              "verified_reflection_count": 0
+            },
+            {
+              "arm": "no_observed_outcome_reflection",
+              "batch_policy": "broad",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 0,
+              "plan_phase": "exploration",
+              "reason_codes": [
+                "insufficient_scored_history",
+                "no_feasible_candidate"
+              ],
+              "removed_reflection_count": 0,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "constrained_mobo",
+              "snapshot_sha256": "3c138d1bd183c48318d7e342fe818b9c93ee909f7b1b1915c47779024f93604e",
+              "verified_reflection_count": 0
+            }
+          ],
+          "differences": {
+            "batch_policy": false,
+            "plan_phase": false,
+            "selectable_tools": false,
+            "selected_tool": false
+          },
+          "intervention_activated": false,
+          "result_status": "inconclusive_intervention_not_activated",
+          "step_id": "exhausted_without_cohort"
+        }
+      ],
+      "trigger": "search_space_exhaustion"
+    },
+    {
+      "case_id": "verified_improvement_phase_transition",
+      "rationale": "A verified positive incumbent improvement transitions a stable search from balanced planning into refinement.",
+      "result_status": "causal_contract_difference",
+      "steps": [
+        {
+          "arms": [
+            {
+              "arm": "full_reflection",
+              "batch_policy": "balanced",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 1,
+              "plan_phase": "refinement",
+              "reason_codes": [
+                "recent_verified_improvement"
+              ],
+              "removed_reflection_count": 0,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "turbo",
+                "surrogate_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "turbo",
+              "snapshot_sha256": "8c9e8dc21dff655b889da1aca7f90f121b770cc39fe906c541880b766cdb20d7",
+              "verified_reflection_count": 1
+            },
+            {
+              "arm": "no_observed_outcome_reflection",
+              "batch_policy": "balanced",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 0,
+              "plan_phase": "balanced",
+              "reason_codes": [
+                "stable_progress"
+              ],
+              "removed_reflection_count": 1,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "optimizer_portfolio",
+              "snapshot_sha256": "230bb1be23db1b276670baf9a0de05f33c94d56f0256e282a517b27bdc854350",
+              "verified_reflection_count": 0
+            }
+          ],
+          "differences": {
+            "batch_policy": false,
+            "plan_phase": true,
+            "selectable_tools": true,
+            "selected_tool": true
+          },
+          "intervention_activated": true,
+          "result_status": "causal_contract_difference",
+          "step_id": "verified_recent_improvement"
+        }
+      ],
+      "trigger": "phase_transition"
+    },
+    {
+      "case_id": "recovery_then_reexplore",
+      "rationale": "The full arm first enters recovery from verified failures and then returns to exploration when the next trusted search state has insufficient scored and feasible history.",
+      "result_status": "causal_contract_difference",
+      "steps": [
+        {
+          "arms": [
+            {
+              "arm": "full_reflection",
+              "batch_policy": "conservative",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 1,
+              "plan_phase": "recovery",
+              "reason_codes": [
+                "high_domain_failure_rate"
+              ],
+              "removed_reflection_count": 0,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "bipop_cma_es",
+              "snapshot_sha256": "d460f19881edd2924a8fcaddd9c55e8661625809b7d7179559dd3161164dad2b",
+              "verified_reflection_count": 1
+            },
+            {
+              "arm": "no_observed_outcome_reflection",
+              "batch_policy": "balanced",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 0,
+              "plan_phase": "balanced",
+              "reason_codes": [
+                "stable_progress"
+              ],
+              "removed_reflection_count": 1,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "optimizer_portfolio",
+              "snapshot_sha256": "683b45f7c26170888be530f9caf3ae39da35359be9263f07460f7cd2b7ffcea9",
+              "verified_reflection_count": 0
+            }
+          ],
+          "differences": {
+            "batch_policy": true,
+            "plan_phase": true,
+            "selectable_tools": true,
+            "selected_tool": true
+          },
+          "intervention_activated": true,
+          "result_status": "causal_contract_difference",
+          "step_id": "enter_recovery"
+        },
+        {
+          "arms": [
+            {
+              "arm": "full_reflection",
+              "batch_policy": "broad",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 1,
+              "plan_phase": "exploration",
+              "reason_codes": [
+                "insufficient_scored_history",
+                "no_feasible_candidate"
+              ],
+              "removed_reflection_count": 0,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "constrained_mobo",
+              "snapshot_sha256": "cf8a2fe9e8d791e9f7707f284ec8345f945a83d70cbc61959761d6c40d10c772",
+              "verified_reflection_count": 1
+            },
+            {
+              "arm": "no_observed_outcome_reflection",
+              "batch_policy": "broad",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 0,
+              "plan_phase": "exploration",
+              "reason_codes": [
+                "insufficient_scored_history",
+                "no_feasible_candidate"
+              ],
+              "removed_reflection_count": 1,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "constrained_mobo",
+              "snapshot_sha256": "2dc5d248bb27e9ece6fc46c7e531c8ae8f3fe32cab691d43a7b70e7716b7d6b8",
+              "verified_reflection_count": 0
+            }
+          ],
+          "differences": {
+            "batch_policy": false,
+            "plan_phase": false,
+            "selectable_tools": false,
+            "selected_tool": false
+          },
+          "intervention_activated": true,
+          "result_status": "no_observed_contract_difference",
+          "step_id": "reexplore_after_recovery"
+        }
+      ],
+      "trigger": "recovery_then_reexplore"
+    },
+    {
+      "case_id": "phase_scoped_tool_eligibility_change",
+      "rationale": "All eight registered tools satisfy capability preconditions, but verified failure reflection narrows the selectable surface to recovery-compatible roles.",
+      "result_status": "causal_contract_difference",
+      "steps": [
+        {
+          "arms": [
+            {
+              "arm": "full_reflection",
+              "batch_policy": "conservative",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 1,
+              "plan_phase": "recovery",
+              "reason_codes": [
+                "high_domain_failure_rate"
+              ],
+              "removed_reflection_count": 0,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "bipop_cma_es",
+              "snapshot_sha256": "d460f19881edd2924a8fcaddd9c55e8661625809b7d7179559dd3161164dad2b",
+              "verified_reflection_count": 1
+            },
+            {
+              "arm": "no_observed_outcome_reflection",
+              "batch_policy": "balanced",
+              "decision_memory_count": 1,
+              "eligible_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "observed_outcome_count": 0,
+              "plan_phase": "balanced",
+              "reason_codes": [
+                "stable_progress"
+              ],
+              "removed_reflection_count": 1,
+              "selectable_tools": [
+                "cma_es",
+                "constrained_mobo",
+                "multi_fidelity_mobo",
+                "turbo",
+                "saasbo",
+                "surrogate_cma_es",
+                "bipop_cma_es",
+                "optimizer_portfolio"
+              ],
+              "selected_tool": "optimizer_portfolio",
+              "snapshot_sha256": "683b45f7c26170888be530f9caf3ae39da35359be9263f07460f7cd2b7ffcea9",
+              "verified_reflection_count": 0
+            }
+          ],
+          "differences": {
+            "batch_policy": true,
+            "plan_phase": true,
+            "selectable_tools": true,
+            "selected_tool": true
+          },
+          "intervention_activated": true,
+          "result_status": "causal_contract_difference",
+          "step_id": "all_capabilities_recovery_gate"
+        }
+      ],
+      "trigger": "tool_eligibility_change"
+    }
+  ],
+  "claim_boundary": "Matched deterministic intervention over synthetic evidence snapshots using the production plan compiler and tool gates. A difference identifies a causal software-contract dependency within these frozen fixtures only. It does not establish optimizer-quality benefit, LLM superiority, PX4/Gazebo performance, physical fidelity, transfer to real aircraft, or flight safety.",
+  "claim_label": "SYNTHETIC_CONTRACT",
+  "evidence_class": "deterministic_reflection_trigger_contract_ablation",
+  "general_causal_benefit_claim_permitted": false,
+  "manifest_sha256": "cae24d1c3773a13d4d2558284a97821420726384cbd3287148fd7b2732f62936",
+  "network_calls": 0,
+  "optimizer_quality_claim_permitted": false,
+  "physical_fidelity": false,
+  "provider_calls": 0,
+  "real_credentials_used": false,
+  "schema_version": "dronedream.harness-reflection-trigger-ablation/v1",
+  "simulator_runs": 0,
+  "summary": {
+    "all_six_required_triggers_covered": true,
+    "case_count": 6,
+    "case_status_counts": {
+      "causal_contract_difference": 4,
+      "inconclusive_intervention_not_activated": 1,
+      "no_observed_contract_difference": 1
+    },
+    "phase_difference_step_count": 4,
+    "selected_tool_difference_step_count": 4,
+    "step_count": 7,
+    "step_status_counts": {
+      "causal_contract_difference": 4,
+      "inconclusive_intervention_not_activated": 1,
+      "no_observed_contract_difference": 2
+    },
+    "tool_surface_difference_step_count": 4,
+    "trigger_count": 6
+  }
+}

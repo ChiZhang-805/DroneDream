@@ -24,13 +24,23 @@ const updaterState = vi.hoisted(() => ({
       | "available"
       | "downloading"
       | "installing"
+      | "componentAvailable"
+      | "installingComponents"
+      | "componentUpdateDeferred"
+      | "componentError"
       | "error",
     availableVersion: null as string | null,
+    updateRequired: false,
     progress: null as number | null,
     error: null as string | null,
+    enginePack: null,
+    componentUpdates: null,
     desktopRuntime: true,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    installComponentUpdates: vi.fn(async () => undefined),
+    reconcileEnginePack: vi.fn(async () => undefined),
+    reconcileComponentPacks: vi.fn(async () => undefined),
   },
 }));
 const browserAuthMocks = vi.hoisted(() => ({
@@ -45,7 +55,6 @@ const validBrowserSession = {
   editionId: "universal",
   authClientId: "dronedream-desktop-universal",
   accessToken: "header.payload.signature",
-  refreshToken: "refresh-token-value",
   attemptIdHash: "a".repeat(64),
   stateHash: "b".repeat(64),
   subjectHash: "c".repeat(64),
@@ -478,11 +487,17 @@ afterEach(() => {
   updaterState.current = {
     status: "current",
     availableVersion: null,
+    updateRequired: false,
     progress: null,
     error: null,
+    enginePack: null,
+    componentUpdates: null,
     desktopRuntime: true,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    installComponentUpdates: vi.fn(async () => undefined),
+    reconcileEnginePack: vi.fn(async () => undefined),
+    reconcileComponentPacks: vi.fn(async () => undefined),
   };
   browserAuthMocks.configuration = {
     supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
@@ -878,6 +893,7 @@ describe("DesktopSetup", () => {
       ...updaterState.current,
       status: "available",
       availableVersion: "1.0.1",
+      updateRequired: true,
       installAvailableUpdate,
     };
     window.__TAURI__ = {
@@ -901,6 +917,40 @@ describe("DesktopSetup", () => {
       .toHaveAttribute("aria-valuenow", "0");
     await userEvent.click(update);
     expect(installAvailableUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not block first-run sign-in for a recommended application update", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    updaterState.current = {
+      ...updaterState.current,
+      status: "available",
+      availableVersion: "1.0.1",
+      updateRequired: false,
+    };
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+
+    expect(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    })).toBeEnabled();
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "100");
+    expect(screen.queryByRole("button", {
+      name: "Version 1.0.1 is available. Click to update.",
+    })).not.toBeInTheDocument();
   });
 
   it("keeps checking through a transient system-probe timeout instead of showing an error", async () => {

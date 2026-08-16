@@ -34,6 +34,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        protected_namespaces=("model_validate", "model_dump", "settings_"),
     )
 
     app_env: str = Field(default="development")
@@ -91,22 +92,41 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=1, ge=0, le=5)
     llm_max_response_bytes: int = Field(default=1_000_000, ge=1024, le=10_000_000)
     llm_max_prompt_bytes: int = Field(default=262_144, ge=32_768, le=2_000_000)
+    model_gateway_base_url: str = Field(default="")
+    model_gateway_managed_model_alias: str = Field(
+        default="DroneDream Managed",
+        min_length=1,
+        max_length=128,
+    )
     # User-supplied LLM credentials are deliberately short-lived even if a job
     # remains queued because no worker is available.  Terminal jobs purge them
     # earlier through the normal lifecycle hooks.
     job_secret_ttl_seconds: int = Field(default=86400, ge=300, le=604800)
     job_secret_cleanup_interval_seconds: int = Field(default=60, ge=10, le=3600)
     finalization_lease_seconds: int = Field(default=900, ge=60, le=7200)
+    finalization_lease_heartbeat_seconds: float = Field(
+        default=30.0,
+        gt=0,
+    )
     sqlite_busy_timeout_seconds: int = Field(default=30, ge=1, le=300)
     auth_mode: Literal["disabled", "demo_token", "oidc_jwt"] = Field(default="disabled")
     demo_auth_tokens: str = Field(default="")
     oidc_issuer: str | None = Field(default=None)
     oidc_audience: str | None = Field(default=None)
     oidc_jwks_url: str | None = Field(default=None)
+    oidc_jwks_timeout_seconds: int = Field(default=5, ge=1, le=30)
+    oidc_jwks_max_bytes: int = Field(
+        default=1024 * 1024,
+        ge=4096,
+        le=16 * 1024 * 1024,
+    )
     oidc_algorithms: str = Field(default="RS256,ES256")
     oidc_email_claim: str = Field(default="email")
     oidc_name_claim: str = Field(default="name")
     oidc_clock_skew_seconds: int = Field(default=30, ge=0, le=300)
+    desktop_bridge_required: bool = Field(default=False)
+    desktop_bridge_clock_skew_seconds: int = Field(default=30, ge=5, le=300)
+    desktop_bridge_nonce_retention_seconds: int = Field(default=600, ge=60, le=86400)
 
     @field_validator("dronedream_runtime_id", mode="before")
     @classmethod
@@ -129,10 +149,22 @@ class Settings(BaseSettings):
     def validate_production_safety(self) -> Settings:
         """Reject the development-only anonymous identity in production."""
 
-        is_production = self.app_env.strip().lower() in {"prod", "production"}
+        protected_environment = self.app_env.strip().lower() in {
+            "desktop",
+            "prod",
+            "production",
+        }
         if self.worker_lease_heartbeat_seconds >= self.worker_lease_seconds:
             raise ValueError(
                 "WORKER_LEASE_HEARTBEAT_SECONDS must be less than WORKER_LEASE_SECONDS"
+            )
+        if (
+            self.finalization_lease_heartbeat_seconds
+            >= self.finalization_lease_seconds
+        ):
+            raise ValueError(
+                "FINALIZATION_LEASE_HEARTBEAT_SECONDS must be less than "
+                "FINALIZATION_LEASE_SECONDS"
             )
         if self.worker_presence_interval_seconds >= self.worker_presence_ttl_seconds:
             raise ValueError(
@@ -168,6 +200,19 @@ class Settings(BaseSettings):
                 "CORS_ORIGINS must list exact trusted origins; wildcard origins "
                 "are incompatible with credentialed CORS"
             )
+        if self.model_gateway_base_url.strip():
+            gateway_url = urlsplit(self.model_gateway_base_url.strip().rstrip("/"))
+            if (
+                gateway_url.scheme != "https"
+                or not gateway_url.hostname
+                or gateway_url.username
+                or gateway_url.password
+                or gateway_url.query
+                or gateway_url.fragment
+            ):
+                raise ValueError(
+                    "MODEL_GATEWAY_BASE_URL must be a credential-free absolute HTTPS URL"
+                )
         for origin in self.cors_origin_list:
             parsed_origin = urlsplit(origin)
             try:
@@ -188,7 +233,7 @@ class Settings(BaseSettings):
                     f"CORS_ORIGINS contains an invalid origin (scheme/host/port only): {origin!r}"
                 )
             if (
-                is_production
+                protected_environment
                 and parsed_origin.scheme == "http"
                 and parsed_origin.hostname not in {"localhost", "127.0.0.1", "::1"}
                 and not parsed_origin.hostname.endswith(".localhost")
@@ -209,7 +254,7 @@ class Settings(BaseSettings):
                     or any(ord(char) < 32 for char in email + token)
                 ):
                     raise ValueError("DEMO_AUTH_TOKENS contains an invalid email:token entry")
-                if is_production and (
+                if protected_environment and (
                     len(token.encode("utf-8")) < 32
                     or len(set(token)) < 8
                     or _is_obvious_placeholder(token)
@@ -249,8 +294,10 @@ class Settings(BaseSettings):
                 or parsed_jwks.fragment
             ):
                 raise ValueError("OIDC_JWKS_URL must be an absolute HTTP(S) URL")
-            if is_production and parsed_jwks.scheme != "https":
-                raise ValueError("OIDC_JWKS_URL must use HTTPS in production")
+            if protected_environment and parsed_jwks.scheme != "https":
+                raise ValueError(
+                    "OIDC_JWKS_URL must use HTTPS in desktop and production environments"
+                )
             allowed_algorithms = {"RS256", "RS384", "RS512", "ES256", "ES384", "EdDSA"}
             if not self.oidc_algorithm_list or not set(self.oidc_algorithm_list).issubset(
                 allowed_algorithms
@@ -259,16 +306,33 @@ class Settings(BaseSettings):
                     "OIDC_ALGORITHMS must contain only asymmetric algorithms: "
                     + ", ".join(sorted(allowed_algorithms))
                 )
-        if is_production:
+        if protected_environment:
             if self.auth_mode == "disabled":
                 raise ValueError(
-                    "AUTH_MODE=disabled is forbidden when APP_ENV=production; "
+                    "AUTH_MODE=disabled is forbidden when APP_ENV is desktop or production; "
                     "configure an authenticated mode before starting the service"
                 )
             if self.auth_mode == "demo_token" and not self.demo_auth_token_map:
                 raise ValueError(
                     "DEMO_AUTH_TOKENS must contain at least one email:token pair "
-                    "when AUTH_MODE=demo_token in production"
+                    "when AUTH_MODE=demo_token in desktop or production"
+                )
+        if self.app_env.strip().lower() == "desktop" and not self.desktop_bridge_required:
+            raise ValueError(
+                "DESKTOP_BRIDGE_REQUIRED=true is mandatory when APP_ENV=desktop"
+            )
+        if self.app_env.strip().lower() == "desktop" and self.auth_mode != "oidc_jwt":
+            raise ValueError(
+                "Packaged APP_ENV=desktop requires AUTH_MODE=oidc_jwt"
+            )
+        if self.desktop_bridge_required:
+            if self.app_env.strip().lower() != "desktop":
+                raise ValueError(
+                    "DESKTOP_BRIDGE_REQUIRED may be enabled only when APP_ENV=desktop"
+                )
+            if self.dronedream_runtime_id is None:
+                raise ValueError(
+                    "DESKTOP_BRIDGE_REQUIRED requires DRONEDREAM_RUNTIME_ID"
                 )
         return self
 

@@ -21,6 +21,9 @@ ARG PYULOG_VERSION=1.2.3
 ARG PX4_BUILD_JOBS=2
 ARG DRONEDREAM_UID=2000
 ARG DRONEDREAM_GID=2000
+ARG OIDC_ISSUER
+ARG OIDC_JWKS_URL
+ARG MODEL_GATEWAY_BASE_URL
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -70,7 +73,9 @@ RUN git clone --filter=blob:none "${VALKEY_GIT_URL}" /tmp/valkey && \
 
 COPY . /opt/dronedream/source
 ARG DRONEDREAM_SOURCE_COMMIT
+ARG DRONEDREAM_SOURCE_DATE_EPOCH
 RUN test -n "${DRONEDREAM_SOURCE_COMMIT}" && \
+    test -n "${DRONEDREAM_SOURCE_DATE_EPOCH}" && \
     python3 -m venv /opt/dronedream/venv && \
     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir \
       -r /opt/dronedream/source/runtime/locks/python-requirements.lock && \
@@ -109,26 +114,60 @@ COPY runtime/scripts/runtime-init.sh /usr/lib/dronedream/runtime-init.sh
 COPY runtime/scripts/runtime-check.sh /usr/lib/dronedream/runtime-check.sh
 COPY runtime/scripts/px4-gazebo-smoke.py /usr/lib/dronedream/px4-gazebo-smoke.py
 COPY runtime/scripts/px4-log-cleanup.py /usr/lib/dronedream/px4-log-cleanup.py
+COPY runtime/scripts/engine-pack-manager.py /usr/lib/dronedream/engine-pack-manager.py
+COPY runtime/scripts/component-pack-manager.py /usr/lib/dronedream/component-pack-manager.py
+COPY engine-pack/tools/engine_pack.py /usr/lib/dronedream/engine_pack.py
 COPY runtime/systemd/*.service /etc/systemd/system/
 COPY runtime/systemd/*.timer /etc/systemd/system/
 
-RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh \
+RUN test -n "${OIDC_ISSUER}" && test -n "${OIDC_JWKS_URL}" && \
+    test -n "${MODEL_GATEWAY_BASE_URL}" && \
+    case "${OIDC_ISSUER}" in https://*) ;; *) exit 2 ;; esac && \
+    case "${OIDC_JWKS_URL}" in https://*) ;; *) exit 2 ;; esac && \
+    case "${MODEL_GATEWAY_BASE_URL}" in https://*) ;; *) exit 2 ;; esac && \
+    sed -i \
+      -e "s|__OIDC_ISSUER__|${OIDC_ISSUER}|g" \
+      -e "s|__OIDC_JWKS_URL__|${OIDC_JWKS_URL}|g" \
+      -e "s|__MODEL_GATEWAY_BASE_URL__|${MODEL_GATEWAY_BASE_URL}|g" \
+      /usr/lib/dronedream/runtime.env.default && \
+    ! grep -q '__[A-Z0-9_]*__' /usr/lib/dronedream/runtime.env.default && \
+    chmod 0755 /usr/lib/dronedream/runtime-init.sh \
       /usr/lib/dronedream/runtime-check.sh /usr/lib/dronedream/px4-gazebo-smoke.py \
-      /usr/lib/dronedream/px4-log-cleanup.py && \
+      /usr/lib/dronedream/px4-log-cleanup.py /usr/lib/dronedream/engine-pack-manager.py \
+      /usr/lib/dronedream/component-pack-manager.py && \
+    chmod 0644 /usr/lib/dronedream/engine_pack.py && \
     install -d -m 0750 -o root -g dronedream /etc/dronedream && \
     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/artifacts && \
     install -d -m 0750 -o dronedream -g dronedream /var/lib/dronedream/runtime-smoke && \
+    install -d -m 0750 -o root -g dronedream /var/lib/dronedream && \
     install -d -m 0750 -o valkey -g valkey /var/lib/valkey && \
     install -d -m 0750 -o dronedream -g dronedream \
       /opt/PX4-Autopilot/build/px4_sitl_default/rootfs/log && \
     install -d -m 2755 -o root -g systemd-journal /var/log/journal && \
     chown -R root:root /opt/dronedream && \
+    SOURCE_DATE_EPOCH="${DRONEDREAM_SOURCE_DATE_EPOCH}" \
+      /opt/dronedream/venv/bin/python /opt/dronedream/source/engine-pack/tools/engine_pack.py \
+      build --repository-root /opt/dronedream/source \
+      --output-directory /tmp/dronedream-bootstrap-engine-pack \
+      --source-commit "${DRONEDREAM_SOURCE_COMMIT}" && \
+    /usr/lib/dronedream/engine-pack-manager.py \
+      --descriptor /tmp/dronedream-bootstrap-engine-pack/engine-pack-bundle.json \
+      --archive /tmp/dronedream-bootstrap-engine-pack/DroneDreamEnginePack.tar.gz \
+      --no-services && \
+    test -L /opt/dronedream/engine/current && \
+    test -s /opt/dronedream/engine/current/engine-pack-manifest.json && \
+    test -d /opt/dronedream/engine/current/backend/app && \
+    test -d /opt/dronedream/engine/current/worker/drone_dream_worker && \
+    rm -rf /tmp/dronedream-bootstrap-engine-pack && \
     test -x /usr/lib/dronedream/runtime-init.sh && \
     test -x /usr/local/bin/valkey-server && \
     test -x /opt/dronedream/venv/bin/alembic && \
     test -x /opt/dronedream/venv/bin/uvicorn && \
     test -x /opt/dronedream/venv/bin/drone-dream-worker && \
     test -x /usr/lib/dronedream/px4-log-cleanup.py && \
+    test -x /usr/lib/dronedream/engine-pack-manager.py && \
+    test -x /usr/lib/dronedream/component-pack-manager.py && \
+    test -s /usr/lib/dronedream/engine_pack.py && \
     test -x /usr/bin/curl && \
     test -x /usr/bin/timeout && \
     test -x /usr/bin/head && \

@@ -22,6 +22,8 @@ worker uses to dispatch and finalize jobs.
     compatibility filters, guided presets, and server-side search-space validation.
   - `capabilities` — advisory worker/simulator/optimizer readiness used by the
     experiment wizard before dispatch (job creation remains authoritative).
+  - `session` — authenticated identity probe used by the packaged desktop
+    startup gate before it can report 100% ready.
 - `app/schemas.py` — Pydantic v2 request/response models + enum literals.
 - `app/models.py` — SQLAlchemy ORM models including `User`, `BatchJob`, `Job`,
   `JobSecret`, `CandidateParameterSet`, `Trial`, `TrialMetric`, `JobReport`,
@@ -103,8 +105,11 @@ python3 -m venv .venv
 - Worker lease / reclaim:
   - `WORKER_LEASE_SECONDS` (default `900`)
   - `WORKER_STALE_RUNNING_RECLAIM_ENABLED` (default `true`)
-  - `FINALIZATION_LEASE_SECONDS` (must cover the configured LLM timeout and
-    retry window; default `900`)
+  - `FINALIZATION_LEASE_SECONDS` (renewable finalizer claim lifetime; default
+    `900`)
+  - `FINALIZATION_LEASE_HEARTBEAT_SECONDS` (independent renewal cadence; default
+    `30`, must be shorter than the finalization lease, and is runtime-clamped
+    to no more than one third of the lease)
 - Real simulator execution:
   - `SIMULATOR_BACKEND=real_cli`
   - `REAL_SIMULATOR_COMMAND` (PX4/Gazebo runner executable plus arguments)
@@ -133,11 +138,32 @@ python3 -m venv .venv
     whenever `DRONEDREAM_RUNTIME_ID` is configured
 - Authentication:
   - `AUTH_MODE=disabled|demo_token|oidc_jwt` (default `disabled`; production
-    refuses disabled mode)
+    and packaged `APP_ENV=desktop` runtimes refuse disabled mode)
   - `DEMO_AUTH_TOKENS` format:
     `user1@example.com:token1,user2@example.com:token2`
   - OIDC mode requires `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL`, and
-    asymmetric `OIDC_ALGORITHMS`
+    asymmetric `OIDC_ALGORITHMS`; `OIDC_JWKS_TIMEOUT_SECONDS` (default `5`) and
+    `OIDC_JWKS_MAX_BYTES` (default `1048576`) bound identity-provider stalls and
+    malformed or unexpectedly large key sets
+  - packaged desktop also requires `DESKTOP_BRIDGE_REQUIRED=true` and
+    `DRONEDREAM_RUNTIME_ID`; each `/api/v1` request must carry the native
+    Runtime/session/body/token/idempotency-bound Bridge v2 proof, and its nonce
+    is durably one-use
+  - Job/Batch create, update, rerun, cancel, and delete actions require a
+    canonical UUID `Idempotency-Key` in packaged desktop mode. The key hash,
+    request hash, domain change, and exact safe response commit atomically;
+    exact retries replay and changed reuse returns `409`
+  - every Job and Batch response includes a positive `control_version`.
+    User-authored Job update/cancel/delete and Batch cancel requests send the
+    version from the view as `?control_version=<n>`. Packaged desktop and
+    production reject a missing version with `428 CONTROL_VERSION_REQUIRED`;
+    a stale command returns `409 CONTROL_VERSION_CONFLICT`. A successful
+    command increments the version. Exact idempotent retries replay before
+    this fence, so a lost success response remains recoverable without
+    allowing a different stale command to overwrite newer state
+  - `DESKTOP_BRIDGE_CLOCK_SKEW_SECONDS` bounds proof age (packaged default
+    `30`); `DESKTOP_BRIDGE_NONCE_RETENTION_SECONDS` bounds replay-receipt
+    retention (packaged default `600`)
 - LLM safety and cleanup:
   - `JOB_SECRET_TTL_SECONDS`, `JOB_SECRET_CLEANUP_INTERVAL_SECONDS`
   - `LLM_REQUEST_TIMEOUT_SECONDS`, `LLM_MAX_RETRIES`,

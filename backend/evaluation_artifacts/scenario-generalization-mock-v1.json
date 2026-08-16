@@ -1,0 +1,286 @@
+{
+  "baseline": {
+    "parameters": {
+      "accel_limit": 4.0,
+      "disturbance_rejection": 0.5,
+      "kd_xy": 0.2,
+      "ki_xy": 0.05,
+      "kp_xy": 1.0,
+      "vel_limit": 5.0
+    },
+    "training_all_pass": true,
+    "training_by_case": {
+      "training-noise": 1.1297,
+      "training-nominal": 0.8255,
+      "training-payload": 1.1465,
+      "training-turbulence": 1.6216,
+      "training-wind": 1.3892
+    },
+    "training_loss": 1.2225,
+    "validation_all_pass": false,
+    "validation_by_case": {
+      "validation-actuator-delay-novel": 1.6068,
+      "validation-battery-novel": 1.1066,
+      "validation-combined-novel": 1.7214,
+      "validation-custom-novel": 1.0834,
+      "validation-gps-dropout-novel": 1.5058,
+      "validation-noise-heavy": 1.1734,
+      "validation-nominal-obstacles": 0.969,
+      "validation-payload-heavy": 1.2044,
+      "validation-turbulence-high": 1.8141,
+      "validation-wind-gust": 1.5693
+    },
+    "validation_loss": 1.37542
+  },
+  "baseline_to_selected_training_improvement_rate": 0.285562372188,
+  "baseline_to_selected_validation_improvement_rate": 0.250723415393,
+  "batch_size": 6,
+  "campaign_spec_sha256": "26e625838a4383ed8ee397bd00db11b67a7d2c49762bd867284316f5f927b92d",
+  "candidate_budget": 61,
+  "configuration_shift_case_ids": [
+    "validation-nominal-obstacles",
+    "validation-noise-heavy",
+    "validation-wind-gust",
+    "validation-turbulence-high",
+    "validation-payload-heavy"
+  ],
+  "evaluated_candidate_count": 61,
+  "exhaustive_training_oracle_candidate_count": 2430,
+  "exhaustive_validation_oracle_candidate_count": 2430,
+  "failed_requirements": [],
+  "generalization_evidence": {
+    "assessment": "qualified_with_degradation",
+    "claim_scope": "mixed_shift_robustness",
+    "configuration_shift_case_count": 5,
+    "degraded_objective_count": 1,
+    "disjoint_seed_case_count": 0,
+    "evidence_complete": true,
+    "evidence_id": "c1474dbf639d746ecc5a6b448117b92b79d594eb424504a4e36157d00e85ff90",
+    "improved_objective_count": 0,
+    "novel_scenario_type_case_count": 5,
+    "objective_gaps": [
+      {
+        "degraded": true,
+        "direction": "minimize",
+        "improved": false,
+        "metric": "score",
+        "relative_degradation": 0.17995191206778113,
+        "signed_degradation": 0.15717000000000003,
+        "training_value": 0.8734,
+        "validation_value": 1.03057
+      }
+    ],
+    "observed_shift": "degraded",
+    "outcome_contract_id": null,
+    "qualified": true,
+    "role": "validation_report_only_no_adaptive_feedback",
+    "scalar_loss_degradation": 0.15717000000000003,
+    "scalar_loss_relative_degradation": 0.17995191206778113,
+    "scenario_suite_sha256": "5f7f6d025bfb79a540ddb983b054b09fd4737322dbc02e5a8ebbec333b4e8372",
+    "schema_id": "dronedream.validation-generalization-evidence/v1",
+    "shift_axes": [
+      "configuration_shift",
+      "scenario_type_shift"
+    ],
+    "training_case_count": 5,
+    "training_scalar_loss": 0.8734,
+    "training_validation_seed_overlap_count": 0,
+    "validation_case_count": 10,
+    "validation_completed_trial_count": 10,
+    "validation_replicate_count": 10,
+    "validation_scalar_loss": 1.03057,
+    "validation_status": "passed",
+    "validation_trial_count": 10
+  },
+  "generation_count": 8,
+  "initial_design_size": 13,
+  "mock_landscape_schema": "dronedream.mock.synthetic.v2",
+  "novel_scenario_type_case_ids": [
+    "validation-combined-novel",
+    "validation-gps-dropout-novel",
+    "validation-battery-novel",
+    "validation-actuator-delay-novel",
+    "validation-custom-novel"
+  ],
+  "optimizer_seed": 27071,
+  "optimizer_strategy": "optimizer_portfolio",
+  "optimizer_transcript_sha256": "4eecd9774edf933c3f7a97ee4dda8f5aef75982ebea30f8911f56c1eea50d9a0",
+  "physical_fidelity": false,
+  "qualified": true,
+  "schema_version": "dronedream.scenario-generalization-campaign.v1",
+  "selected": {
+    "parameters": {
+      "accel_limit": 4.5,
+      "disturbance_rejection": 1.0,
+      "kd_xy": 0.3,
+      "ki_xy": 0.05,
+      "kp_xy": 1.2,
+      "vel_limit": 6.0
+    },
+    "training_all_pass": true,
+    "training_by_case": {
+      "training-noise": 0.8406,
+      "training-nominal": 0.6031,
+      "training-payload": 0.8148,
+      "training-turbulence": 1.1269,
+      "training-wind": 0.9816
+    },
+    "training_loss": 0.8734,
+    "validation_all_pass": true,
+    "validation_by_case": {
+      "validation-actuator-delay-novel": 1.2891,
+      "validation-battery-novel": 0.857,
+      "validation-combined-novel": 1.1933,
+      "validation-custom-novel": 0.8276,
+      "validation-gps-dropout-novel": 1.154,
+      "validation-noise-heavy": 0.8843,
+      "validation-nominal-obstacles": 0.7467,
+      "validation-payload-heavy": 0.8727,
+      "validation-turbulence-high": 1.3194,
+      "validation-wind-gust": 1.1616
+    },
+    "validation_loss": 1.03057
+  },
+  "simulator_backend": "mock",
+  "training_case_ids": [
+    "training-nominal",
+    "training-noise",
+    "training-wind",
+    "training-turbulence",
+    "training-payload"
+  ],
+  "training_oracle": {
+    "parameters": {
+      "accel_limit": 4.5,
+      "disturbance_rejection": 1.0,
+      "kd_xy": 0.3,
+      "ki_xy": 0.05,
+      "kp_xy": 1.2,
+      "vel_limit": 6.0
+    },
+    "training_all_pass": true,
+    "training_by_case": {
+      "training-noise": 0.8406,
+      "training-nominal": 0.6031,
+      "training-payload": 0.8148,
+      "training-turbulence": 1.1269,
+      "training-wind": 0.9816
+    },
+    "training_loss": 0.8734,
+    "validation_all_pass": true,
+    "validation_by_case": {
+      "validation-actuator-delay-novel": 1.2891,
+      "validation-battery-novel": 0.857,
+      "validation-combined-novel": 1.1933,
+      "validation-custom-novel": 0.8276,
+      "validation-gps-dropout-novel": 1.154,
+      "validation-noise-heavy": 0.8843,
+      "validation-nominal-obstacles": 0.7467,
+      "validation-payload-heavy": 0.8727,
+      "validation-turbulence-high": 1.3194,
+      "validation-wind-gust": 1.1616
+    },
+    "validation_loss": 1.03057
+  },
+  "training_oracle_regret": 0.0,
+  "training_oracle_tie_count": 2,
+  "training_scenario_types": [
+    "nominal",
+    "noise_perturbed",
+    "wind_perturbed",
+    "turbulence",
+    "payload_changed"
+  ],
+  "training_seeds": {
+    "training-noise": 112,
+    "training-nominal": 111,
+    "training-payload": 115,
+    "training-turbulence": 114,
+    "training-wind": 113
+  },
+  "validation_case_ids": [
+    "validation-nominal-obstacles",
+    "validation-noise-heavy",
+    "validation-wind-gust",
+    "validation-turbulence-high",
+    "validation-payload-heavy",
+    "validation-combined-novel",
+    "validation-gps-dropout-novel",
+    "validation-battery-novel",
+    "validation-actuator-delay-novel",
+    "validation-custom-novel"
+  ],
+  "validation_change_by_case": {
+    "validation-actuator-delay-novel": -0.3177,
+    "validation-battery-novel": -0.2496,
+    "validation-combined-novel": -0.5281,
+    "validation-custom-novel": -0.2558,
+    "validation-gps-dropout-novel": -0.3518,
+    "validation-noise-heavy": -0.2891,
+    "validation-nominal-obstacles": -0.2223,
+    "validation-payload-heavy": -0.3317,
+    "validation-turbulence-high": -0.4947,
+    "validation-wind-gust": -0.4077
+  },
+  "validation_oracle": {
+    "parameters": {
+      "accel_limit": 4.5,
+      "disturbance_rejection": 1.0,
+      "kd_xy": 0.3,
+      "ki_xy": 0.05,
+      "kp_xy": 1.2,
+      "vel_limit": 6.0
+    },
+    "training_all_pass": true,
+    "training_by_case": {
+      "training-noise": 0.8406,
+      "training-nominal": 0.6031,
+      "training-payload": 0.8148,
+      "training-turbulence": 1.1269,
+      "training-wind": 0.9816
+    },
+    "training_loss": 0.8734,
+    "validation_all_pass": true,
+    "validation_by_case": {
+      "validation-actuator-delay-novel": 1.2891,
+      "validation-battery-novel": 0.857,
+      "validation-combined-novel": 1.1933,
+      "validation-custom-novel": 0.8276,
+      "validation-gps-dropout-novel": 1.154,
+      "validation-noise-heavy": 0.8843,
+      "validation-nominal-obstacles": 0.7467,
+      "validation-payload-heavy": 0.8727,
+      "validation-turbulence-high": 1.3194,
+      "validation-wind-gust": 1.1616
+    },
+    "validation_loss": 1.03057
+  },
+  "validation_oracle_regret": 0.0,
+  "validation_oracle_tie_count": 2,
+  "validation_outcomes_used_for_selection": false,
+  "validation_role": "report_only_no_adaptive_feedback",
+  "validation_scenario_types": [
+    "nominal",
+    "noise_perturbed",
+    "wind_perturbed",
+    "turbulence",
+    "payload_changed",
+    "combined_perturbed",
+    "gps_dropout",
+    "battery_degraded",
+    "actuator_delay",
+    "custom"
+  ],
+  "validation_seeds": {
+    "validation-actuator-delay-novel": 919,
+    "validation-battery-novel": 918,
+    "validation-combined-novel": 916,
+    "validation-custom-novel": 920,
+    "validation-gps-dropout-novel": 917,
+    "validation-noise-heavy": 912,
+    "validation-nominal-obstacles": 911,
+    "validation-payload-heavy": 915,
+    "validation-turbulence-high": 914,
+    "validation-wind-gust": 913
+  }
+}

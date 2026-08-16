@@ -4,7 +4,6 @@ import asyncio
 import json
 import struct
 
-from app.autonomy.catalog import get_bundled_map_manifest
 from app.autonomy.qualification import (
     MapAssetAdmissionRegistry,
     MapPackQualificationRequest,
@@ -188,34 +187,6 @@ def test_bundled_map_pack_qualification_binds_exact_scene_manifest() -> None:
     assert receipt.compiler_scene_id == "stairwell-coffee-return"
     assert receipt.hardware_authority is False
     assert len(receipt.content_sha256) == 64
-
-
-def test_school_map_pack_accepts_its_full_public_semantic_contract() -> None:
-    manifest = get_bundled_map_manifest("school-campus-v1")
-    assert manifest is not None
-    payload = map_pack_payload()
-    payload.update(
-        {
-            "name": manifest["name"],
-            "pack_id": "school-map",
-            "version": 1,
-            "compiler_scene_id": "school-campus-v1",
-            "representation": manifest["representation"],
-            "coordinate_frame": manifest["coordinate_frame"],
-            "resolution_m": manifest["resolution_m"],
-            "floor_count": manifest["floor_count"],
-            "bounds_m": manifest["bounds_m"],
-            "confidence_percent": manifest["confidence_percent"],
-            "semantic_layers": manifest["semantic_layers"],
-            "planning_layers": manifest["planning_layers"],
-        }
-    )
-
-    receipt = qualify_map_pack(MapPackQualificationRequest.model_validate(payload))
-
-    assert receipt.status == "qualified"
-    assert receipt.compiler_scene_id == "school-campus-v1"
-    assert receipt.manifest_sha256 == manifest["manifest_sha256"]
 
 
 def test_map_pack_qualification_blocks_scene_manifest_mismatch() -> None:

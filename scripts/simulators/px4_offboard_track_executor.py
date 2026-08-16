@@ -10,26 +10,54 @@ Coordinate mapping assumption (first implementation):
 - PX4 offboard local frame uses NED north/east/down.
 - Mapping: north=x, east=y, down=-z.
 
-Controller parameters are applied by this executor's scheduling logic
-(vel/accel-limited interpolation and progression), not PX4 internal parameters.
+The executor applies only ``vel_limit`` and ``accel_limit`` to its setpoint
+schedule. Selected PX4 parameters are applied and verified separately by the
+launch wrapper; the remaining legacy controller fields are compatibility
+metadata and must not be represented as physical flight controls.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
+import hashlib
 import json
 import math
 import os
+import re
+import shutil
+import stat
+import subprocess
 import sys
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 MAX_REFERENCE_TRACK_POINTS = 10_000
 MAX_SETPOINT_RATE_HZ = 100.0
+MAX_TAKEOFF_CLIMB_RATE_M_S = 5.0
 MAX_SETPOINTS = 1_000_000
+MAX_INPUT_JSON_BYTES = 16 * 1024 * 1024
+DEFAULT_HOVER_DURATION_SECONDS = 10.0
+MIN_HOVER_DURATION_SECONDS = 1.0
+MAX_HOVER_DURATION_SECONDS = 300.0
+BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS = 15.0
+RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
+
+_T = TypeVar("_T")
+
+
+def _require_runtime_details(
+    value: dict[str, Any] | None,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    if value is None:
+        raise RuntimeError(f"runtime scenario invariant violated: missing {label}")
+    return value
 
 
 @dataclass(frozen=True)
@@ -37,6 +65,13 @@ class TrackPoint:
     x: float
     y: float
     z: float
+
+
+@dataclass(frozen=True)
+class ReferenceTrackPlan:
+    points: list[TrackPoint]
+    track_type: str | None
+    hover_duration_seconds: float | None
 
 
 @dataclass(frozen=True)
@@ -64,10 +99,32 @@ class SetpointSchedulePlan:
     track_end_index: int
 
 
+@dataclass(frozen=True)
+class TelemetryHealth:
+    connected: bool
+    global_position_ok: bool
+    home_position_ok: bool
+    local_position_ok: bool
+    armable: bool
+
+
+@dataclass(frozen=True)
+class PositionVelocityNed:
+    north_m: float
+    east_m: float
+    down_m: float
+    north_m_s: float
+    east_m_s: float
+    down_m_s: float
+
+
 class OffboardClientProtocol(Protocol):
     async def connect(self, connection_url: str) -> None: ...
 
-    async def wait_until_ready(self, timeout_seconds: float) -> None: ...
+    async def wait_until_ready(
+        self,
+        timeout_seconds: float,
+    ) -> TelemetryHealth: ...
 
     async def arm(self) -> None: ...
 
@@ -79,12 +136,39 @@ class OffboardClientProtocol(Protocol):
 
     async def land(self) -> None: ...
 
+    async def wait_until_landed(
+        self,
+        timeout_seconds: float,
+    ) -> dict[str, Any]: ...
+
+    async def get_param_int(self, name: str) -> int: ...
+
+    async def set_param_int(self, name: str, value: int) -> None: ...
+
+    async def get_param_float(self, name: str) -> float: ...
+
+    async def set_param_float(self, name: str, value: float) -> None: ...
+
+    async def sample_battery(self, timeout_seconds: float) -> dict[str, float]: ...
+
+    async def sample_gps_info(self, timeout_seconds: float) -> dict[str, int | str]: ...
+
+    async def sample_position_velocity_ned(
+        self,
+        timeout_seconds: float,
+    ) -> PositionVelocityNed: ...
+
+    async def close(self) -> None: ...
+
 
 class MavsdkOffboardClient:
     def __init__(self) -> None:
         try:
             from mavsdk import System
-            from mavsdk.offboard import OffboardError, PositionNedYaw
+            from mavsdk.offboard import (
+                OffboardError,
+                PositionNedYaw,
+            )
         except ModuleNotFoundError as exc:
             raise RuntimeError("mavsdk is required for PX4 offboard execution") from exc
 
@@ -102,8 +186,12 @@ class MavsdkOffboardClient:
             raise RuntimeError("PX4 offboard client is not connected")
         return self._system
 
-    async def wait_until_ready(self, timeout_seconds: float) -> None:
+    async def wait_until_ready(
+        self,
+        timeout_seconds: float,
+    ) -> TelemetryHealth:
         system = self._require_system()
+        last_health: TelemetryHealth | None = None
         try:
             async with asyncio.timeout(timeout_seconds):
                 connected = False
@@ -115,13 +203,27 @@ class MavsdkOffboardClient:
                     raise RuntimeError("PX4 connection state stream ended before connecting")
 
                 async for health in system.telemetry.health():
-                    if bool(getattr(health, "is_global_position_ok", True)) and bool(
-                        getattr(health, "is_home_position_ok", True)
-                    ):
-                        return
+                    sample = TelemetryHealth(
+                        connected=True,
+                        global_position_ok=bool(getattr(health, "is_global_position_ok", False)),
+                        home_position_ok=bool(getattr(health, "is_home_position_ok", False)),
+                        local_position_ok=bool(getattr(health, "is_local_position_ok", False)),
+                        armable=bool(getattr(health, "is_armable", False)),
+                    )
+                    last_health = sample
+                    # Every reference track is local NED, so global position is
+                    # advisory. PX4 armability is still a required preflight
+                    # signal: numeric local coordinates alone are not proof that
+                    # the estimator considers them stable enough for flight.
+                    if sample.home_position_ok and sample.local_position_ok and sample.armable:
+                        return sample
                 raise RuntimeError("PX4 health stream ended before the vehicle became ready")
         except TimeoutError:
-            raise TimeoutError(f"PX4 readiness timeout after {timeout_seconds}s") from None
+            observed = _health_payload(last_health)
+            details = ", ".join(f"{name}={str(value).lower()}" for name, value in observed.items())
+            raise TimeoutError(
+                f"PX4 readiness timeout after {timeout_seconds}s; last_health: {details}"
+            ) from None
 
     async def arm(self) -> None:
         await self._require_system().action.arm()
@@ -149,6 +251,120 @@ class MavsdkOffboardClient:
     async def land(self) -> None:
         await self._require_system().action.land()
 
+    async def wait_until_landed(self, timeout_seconds: float) -> dict[str, Any]:
+        async def _wait() -> dict[str, Any]:
+            async for landed_state in self._require_system().telemetry.landed_state():
+                raw_name = getattr(landed_state, "name", None)
+                state_name = (
+                    raw_name
+                    if isinstance(raw_name, str) and raw_name
+                    else str(landed_state).rsplit(".", 1)[-1]
+                ).upper()
+                if state_name == "ON_GROUND":
+                    return {
+                        "state": state_name,
+                        "confirmed": True,
+                    }
+            raise RuntimeError("PX4 landed-state stream ended before ON_GROUND")
+
+        try:
+            return await asyncio.wait_for(_wait(), timeout=timeout_seconds)
+        except TimeoutError:
+            raise TimeoutError(
+                f"PX4 landing confirmation timeout after {timeout_seconds:g}s"
+            ) from None
+
+    async def get_param_float(self, name: str) -> float:
+        return float(await self._require_system().param.get_param_float(name))
+
+    async def set_param_float(self, name: str, value: float) -> None:
+        await self._require_system().param.set_param_float(name, value)
+
+    async def get_param_int(self, name: str) -> int:
+        return int(await self._require_system().param.get_param_int(name))
+
+    async def set_param_int(self, name: str, value: int) -> None:
+        await self._require_system().param.set_param_int(name, value)
+
+    async def sample_battery(self, timeout_seconds: float) -> dict[str, float]:
+        async def _sample() -> dict[str, float]:
+            async for battery in self._require_system().telemetry.battery():
+                return _validated_battery_telemetry(
+                    {
+                        "remaining_percent": battery.remaining_percent,
+                        "voltage_v": battery.voltage_v,
+                    },
+                    label="PX4 battery telemetry",
+                )
+            raise RuntimeError("PX4 battery telemetry stream ended without a sample")
+
+        try:
+            return await asyncio.wait_for(_sample(), timeout=timeout_seconds)
+        except TimeoutError:
+            raise TimeoutError(
+                f"PX4 battery telemetry timeout after {timeout_seconds:g}s"
+            ) from None
+
+    async def sample_gps_info(self, timeout_seconds: float) -> dict[str, int | str]:
+        async def _sample() -> dict[str, int | str]:
+            async for gps_info in self._require_system().telemetry.gps_info():
+                fix_type = gps_info.fix_type
+                fix_value = getattr(fix_type, "value", fix_type)
+                fix_name = str(getattr(fix_type, "name", fix_type))
+                return _validated_gps_telemetry(
+                    {
+                        "num_satellites": gps_info.num_satellites,
+                        "fix_type": fix_value,
+                        "fix_type_name": fix_name,
+                    },
+                    label="PX4 GPS telemetry",
+                )
+            raise RuntimeError("PX4 GPS info telemetry stream ended without a sample")
+
+        try:
+            return await asyncio.wait_for(_sample(), timeout=timeout_seconds)
+        except TimeoutError:
+            raise TimeoutError(
+                f"PX4 GPS info telemetry timeout after {timeout_seconds:g}s"
+            ) from None
+
+    async def sample_position_velocity_ned(
+        self,
+        timeout_seconds: float,
+    ) -> PositionVelocityNed:
+        async def _sample() -> PositionVelocityNed:
+            async for telemetry in self._require_system().telemetry.position_velocity_ned():
+                position = telemetry.position
+                velocity = telemetry.velocity
+                sample = PositionVelocityNed(
+                    north_m=float(position.north_m),
+                    east_m=float(position.east_m),
+                    down_m=float(position.down_m),
+                    north_m_s=float(velocity.north_m_s),
+                    east_m_s=float(velocity.east_m_s),
+                    down_m_s=float(velocity.down_m_s),
+                )
+                if not all(math.isfinite(value) for value in sample.__dict__.values()):
+                    raise RuntimeError("PX4 position/velocity telemetry contains non-finite values")
+                return sample
+            raise RuntimeError("PX4 position/velocity telemetry stream ended without a sample")
+
+        try:
+            return await asyncio.wait_for(_sample(), timeout=timeout_seconds)
+        except TimeoutError:
+            raise TimeoutError(
+                f"PX4 position/velocity telemetry timeout after {timeout_seconds:g}s"
+            ) from None
+
+    async def close(self) -> None:
+        system = self._system
+        self._system = None
+        if system is None:
+            return
+        stop_server = getattr(system, "_stop_mavsdk_server", None)
+        if callable(stop_server):
+            stop_server()
+
 
 class FakeOffboardClient:
     def __init__(self) -> None:
@@ -157,13 +373,38 @@ class FakeOffboardClient:
         self.offboard_started = False
         self.setpoints: list[Setpoint] = []
         self.landed = False
+        self.closed = False
+        self.int_params: dict[str, int] = {
+            "SIM_GPS_USED": 10,
+        }
+        self.float_params: dict[str, float] = {
+            "SIM_BAT_DRAIN": 60.0,
+            "SIM_BAT_MIN_PCT": 50.0,
+        }
+        self.battery_samples: list[dict[str, float]] = [
+            {"remaining_percent": 100.0, "voltage_v": 16.8}
+        ]
+        self.gps_info_samples: list[dict[str, int | str]] = [
+            {"num_satellites": 10, "fix_type": 3, "fix_type_name": "FIX_3D"}
+        ]
+        self.position_velocity_samples: list[PositionVelocityNed] = []
 
     async def connect(self, connection_url: str) -> None:
         _ = connection_url
         self.connected = True
 
-    async def wait_until_ready(self, timeout_seconds: float) -> None:
+    async def wait_until_ready(
+        self,
+        timeout_seconds: float,
+    ) -> TelemetryHealth:
         _ = timeout_seconds
+        return TelemetryHealth(
+            connected=True,
+            global_position_ok=True,
+            home_position_ok=True,
+            local_position_ok=True,
+            armable=True,
+        )
 
     async def arm(self) -> None:
         self.armed = True
@@ -180,6 +421,61 @@ class FakeOffboardClient:
     async def land(self) -> None:
         self.landed = True
 
+    async def wait_until_landed(self, timeout_seconds: float) -> dict[str, Any]:
+        _ = timeout_seconds
+        if not self.landed:
+            raise RuntimeError("fake PX4 has not received a land command")
+        return {"state": "ON_GROUND", "confirmed": True}
+
+    async def get_param_float(self, name: str) -> float:
+        return self.float_params[name]
+
+    async def set_param_float(self, name: str, value: float) -> None:
+        self.float_params[name] = float(value)
+
+    async def get_param_int(self, name: str) -> int:
+        return self.int_params[name]
+
+    async def set_param_int(self, name: str, value: int) -> None:
+        self.int_params[name] = int(value)
+
+    async def sample_battery(self, timeout_seconds: float) -> dict[str, float]:
+        _ = timeout_seconds
+        if len(self.battery_samples) > 1:
+            return dict(self.battery_samples.pop(0))
+        return dict(self.battery_samples[0])
+
+    async def sample_gps_info(self, timeout_seconds: float) -> dict[str, int | str]:
+        _ = timeout_seconds
+        target_used = self.int_params["SIM_GPS_USED"]
+        return {
+            "num_satellites": target_used,
+            "fix_type": 3 if target_used >= 4 else 0,
+            "fix_type_name": "FIX_3D" if target_used >= 4 else "NO_GPS",
+        }
+
+    async def sample_position_velocity_ned(
+        self,
+        timeout_seconds: float,
+    ) -> PositionVelocityNed:
+        _ = timeout_seconds
+        if self.position_velocity_samples:
+            if len(self.position_velocity_samples) > 1:
+                return self.position_velocity_samples.pop(0)
+            return self.position_velocity_samples[0]
+        target = self.setpoints[-1] if self.setpoints else Setpoint(0.0, 0.0, 0.0, 0.0)
+        return PositionVelocityNed(
+            north_m=target.north_m,
+            east_m=target.east_m,
+            down_m=target.down_m,
+            north_m_s=0.0,
+            east_m_s=0.0,
+            down_m_s=0.0,
+        )
+
+    async def close(self) -> None:
+        self.closed = True
+
 
 def _parse_bool(raw: str | None, *, default: bool) -> bool:
     if raw is None:
@@ -195,7 +491,7 @@ def _parse_bool(raw: str | None, *, default: bool) -> bool:
 def _parse_float(raw: str | None, *, default: float) -> float:
     if raw is None or not raw.strip():
         return default
-    return float(raw)
+    return _finite_float(raw, "environment float")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -220,9 +516,65 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=_parse_float(os.environ.get("PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS"), default=30.0),
     )
     parser.add_argument(
+        "--takeoff-climb-rate-m-s",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_CLIMB_RATE_M_S"),
+            default=1.0,
+        ),
+    )
+    parser.add_argument(
         "--track-timeout-seconds",
         type=float,
         default=_parse_float(os.environ.get("PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS"), default=120.0),
+    )
+    parser.add_argument(
+        "--landing-timeout-seconds",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_LANDING_TIMEOUT_SECONDS"),
+            default=60.0,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-horizontal-tolerance-m",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_HORIZONTAL_TOLERANCE_M"),
+            default=0.35,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-vertical-tolerance-m",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_VERTICAL_TOLERANCE_M"),
+            default=0.25,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-horizontal-speed-tolerance-m-s",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_HORIZONTAL_SPEED_TOLERANCE_M_S"),
+            default=0.35,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-vertical-speed-tolerance-m-s",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_VERTICAL_SPEED_TOLERANCE_M_S"),
+            default=0.25,
+        ),
+    )
+    parser.add_argument(
+        "--takeoff-stable-window-seconds",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_STABLE_WINDOW_SECONDS"),
+            default=1.5,
+        ),
     )
     parser.add_argument("--log", required=True, type=Path)
     return parser.parse_args(argv)
@@ -235,12 +587,394 @@ def _log(path: Path, message: str) -> None:
 
 
 def _write_offboard_timing(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    _write_json_atomic(path, payload)
 
 
 def _reject_nonfinite_json(value: str) -> None:
     raise ValueError(f"non-standard JSON numeric constant is forbidden: {value}")
+
+
+def _load_scenario_effect_engine() -> Any:
+    try:
+        from app.simulator import scenario_effects as engine
+    except ModuleNotFoundError:
+        backend_root = Path(__file__).resolve().parents[2] / "backend"
+        if not backend_root.is_dir():
+            raise RuntimeError(
+                "DroneDream backend package is required for flight-timed scenario effects"
+            ) from None
+        if str(backend_root) not in sys.path:
+            sys.path.insert(0, str(backend_root))
+        from app.simulator import scenario_effects as engine
+    return engine
+
+
+def _load_runtime_effect_request() -> tuple[Any, dict[str, Any] | None, dict[str, Any] | None]:
+    engine = _load_scenario_effect_engine()
+    raw_path = os.environ.get("PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH", "").strip()
+    if not raw_path:
+        return engine, None, None
+    request = engine.load_scenario_effect_request(Path(raw_path))
+    return engine, request, engine.compile_bundled_runtime_profile(request)
+
+
+def _canonical_sha256(value: object) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _parse_gazebo_wind_info(response_text: str) -> dict[str, Any]:
+    block = re.search(r"linear_velocity\s*\{(?P<body>.*?)\}", response_text, re.DOTALL)
+    if block is None:
+        raise RuntimeError("Gazebo wind_info response omitted linear_velocity")
+    vector: dict[str, float] = {}
+    for axis in ("x", "y", "z"):
+        match = re.search(
+            rf"\b{axis}\s*:\s*([-+0-9.eE]+)",
+            block.group("body"),
+        )
+        # ``gz service`` renders protobuf text format. Proto3 omits scalar
+        # fields whose value is the default zero, so a north-only wind can be
+        # returned as ``linear_velocity { y: 3 }``. Treat only an omitted axis
+        # as the protobuf-defined 0.0; present values remain strictly parsed
+        # and compared against the requested vector below.
+        value = 0.0 if match is None else float(match.group(1))
+        if not math.isfinite(value):
+            raise RuntimeError(f"Gazebo wind_info returned non-finite {axis}")
+        vector[axis] = round(value, 12)
+    enabled = re.search(r"\benable_wind\s*:\s*(true|false)", response_text)
+    if enabled is None:
+        raise RuntimeError("Gazebo wind_info response omitted enable_wind")
+    return {
+        "linear_velocity_mps": vector,
+        "enable_wind": enabled.group(1) == "true",
+    }
+
+
+def _validated_gazebo_wind_activation(
+    world: str,
+    profile: dict[str, Any],
+) -> tuple[dict[str, float], str, str, str]:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", world):
+        raise RuntimeError("Gazebo world name is invalid for post-hover wind activation")
+    vector = profile.get("linear_velocity_mps")
+    if not isinstance(vector, dict) or set(vector) != {"x", "y", "z"}:
+        raise RuntimeError("compiled wind activation vector is invalid")
+    requested = {
+        axis: _finite_float(vector[axis], f"wind_activation.{axis}") for axis in ("x", "y", "z")
+    }
+    gz_cli = shutil.which("gz")
+    if not gz_cli:
+        raise RuntimeError("Gazebo gz CLI is unavailable for post-hover wind activation")
+    return requested, f"/world/{world}/wind", f"/world/{world}/wind_info", gz_cli
+
+
+def _gazebo_wind_message_text(requested: dict[str, float]) -> str:
+    return (
+        "linear_velocity { "
+        f"x: {requested['x']:.17g} y: {requested['y']:.17g} z: {requested['z']:.17g} "
+        "} enable_wind: true"
+    )
+
+
+def _activate_gazebo_wind_profile(
+    *,
+    world: str,
+    profile: dict[str, Any],
+    activation_t_s: float,
+) -> dict[str, Any]:
+    requested, topic, service, gz_cli = _validated_gazebo_wind_activation(world, profile)
+    # Use the Runtime-owned Gazebo CLI for publication. The Python binding can
+    # advertise the correct endpoint while never completing delivery to the
+    # WindEffects subscriber under WSL; the official CLI shares the exact
+    # transport implementation used by the simulator. Publication is still
+    # not trusted on exit status alone: /wind_info exact read-back below is the
+    # sole authority that permits flight to enter the track.
+    try:
+        attempts = int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "100"))
+    except ValueError:
+        attempts = 100
+    attempts = min(100, max(1, attempts))
+    try:
+        publish_duration_seconds = float(
+            os.environ.get("PX4_GAZEBO_WIND_PUBLISH_DURATION_SECONDS", "0.5")
+        )
+    except ValueError:
+        publish_duration_seconds = 0.5
+    publish_duration_seconds = min(2.0, max(0.1, publish_duration_seconds))
+    last_error = "no wind_info response"
+    readback: dict[str, Any] | None = None
+    publish_attempts = 0
+    message_text = _gazebo_wind_message_text(requested)
+    for _attempt in range(attempts):
+        publish_attempts += 1
+        publish = subprocess.run(  # noqa: S603
+            [
+                gz_cli,
+                "topic",
+                "-t",
+                topic,
+                "-m",
+                "gz.msgs.Wind",
+                "-p",
+                message_text,
+                "-d",
+                f"{publish_duration_seconds:g}",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=publish_duration_seconds + 5.0,
+        )
+        if publish.returncode != 0:
+            last_error = (
+                f"wind publish exit={publish.returncode}, response="
+                f"{(publish.stdout + publish.stderr).strip()[:400]}"
+            )
+            continue
+        response = subprocess.run(  # noqa: S603
+            [
+                gz_cli,
+                "service",
+                "-s",
+                service,
+                "--reqtype",
+                "gz.msgs.Empty",
+                "--reptype",
+                "gz.msgs.Wind",
+                "--timeout",
+                "5000",
+                "--req",
+                "",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=8.0,
+        )
+        try:
+            if response.returncode != 0:
+                raise RuntimeError(
+                    f"exit={response.returncode}, response="
+                    f"{(response.stdout + response.stderr).strip()[:400]}"
+                )
+            candidate = _parse_gazebo_wind_info(response.stdout + response.stderr)
+            matches = candidate["enable_wind"] is True and all(
+                math.isclose(
+                    candidate["linear_velocity_mps"][axis],
+                    requested[axis],
+                    rel_tol=1e-9,
+                    abs_tol=1e-9,
+                )
+                for axis in ("x", "y", "z")
+            )
+            if matches:
+                readback = candidate
+                break
+            last_error = f"mismatched readback {candidate}"
+        except (RuntimeError, ValueError) as exc:
+            last_error = str(exc)
+    if readback is None:
+        raise RuntimeError(
+            "Gazebo post-hover wind activation was not verified after "
+            f"{publish_attempts} bounded CLI publishes: {last_error}"
+        )
+    return {
+        "readback": {
+            "source": service,
+            "kind": "readback",
+            "value": readback,
+            "sha256": _canonical_sha256(readback),
+        },
+        "activation": {
+            "source": topic,
+            "kind": "acknowledgement",
+            "value": {
+                "phase": "after_stable_hover_before_track_entry",
+                "activation_t_s": round(activation_t_s, 12),
+                "readback_service": service,
+                "delivery_verification": "wind_info_exact_readback",
+                "publisher": "gazebo_cli_topic",
+                "publish_duration_seconds": publish_duration_seconds,
+                "publish_attempts": publish_attempts,
+                "publisher_connections_observed": None,
+                "transport_prepared_before_takeoff": False,
+            },
+        },
+    }
+
+
+def compile_fixed_duty_schedule(
+    *,
+    requested_rate: float,
+    tick_count: int,
+    execution_identity_sha256: str,
+) -> list[bool]:
+    engine = _load_scenario_effect_engine()
+    try:
+        raw_schedule: object = engine.compile_bundled_gps_dropout_schedule(
+            requested_rate=requested_rate,
+            tick_count=tick_count,
+            execution_identity_sha256=execution_identity_sha256,
+        )
+    except engine.ScenarioEffectContractError as exc:
+        raise ValueError(str(exc)) from exc
+    if not isinstance(raw_schedule, list) or any(
+        not isinstance(item, bool) for item in raw_schedule
+    ):
+        raise RuntimeError("scenario engine returned an invalid GPS dropout schedule")
+    return [item for item in raw_schedule if isinstance(item, bool)]
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    serialized = (
+        json.dumps(
+            payload,
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+        + "\n"
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
+    try:
+        with temp.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temp.replace(path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            temp.unlink()
+
+
+def _runtime_effect_records(
+    engine: Any,
+    request: dict[str, Any],
+    profile: dict[str, Any],
+    *,
+    observations: dict[str, dict[str, Any]],
+    attempted_sections: set[str],
+    status: str,
+    error: str | None,
+) -> list[dict[str, Any]]:
+    requested_by_id = {effect["effect_id"]: effect for effect in request["effects"]}
+    records: list[dict[str, Any]] = []
+    for effect_id in profile["requested_effect_ids"]:
+        effect = requested_by_id[effect_id]
+        if effect_id in profile.get("wind_activation", {}).get("effect_ids", []):
+            section = "wind_activation"
+        elif effect_id in profile.get("gps_dropout", {}).get("effect_ids", []):
+            section = "gps_dropout"
+        else:
+            section = "battery"
+        observation = observations.get(section)
+        if status != "complete" and observation is None:
+            reason = error or "flight-timed scenario effect did not complete"
+            attempted = section in attempted_sections
+            records.append(
+                {
+                    "effect_id": effect_id,
+                    "mechanism": effect["mechanism"],
+                    "status": "failed" if attempted else "skipped",
+                    "capability": {
+                        "status": "available",
+                        "reason": (
+                            reason
+                            if attempted
+                            else "flight terminated before this available effect was activated"
+                        ),
+                    },
+                    "reason": (
+                        reason
+                        if attempted
+                        else f"flight terminated before {section} activation: {reason}"
+                    ),
+                }
+            )
+            continue
+        if observation is None:
+            raise RuntimeError(f"runtime effect evidence omitted {section}")
+        verification_observations = (
+            [observation["readback"], observation["activation"]]
+            if section == "wind_activation"
+            else [observation]
+        )
+        if section == "wind_activation":
+            capability_reason = (
+                "Gazebo wind was enabled only after the stable-hover gate and exact readback"
+            )
+            method = "gazebo_wind_topic_after_stable_hover_and_exact_readback"
+        elif section == "gps_dropout":
+            capability_reason = "PX4 GPS availability parameter and telemetry verified the schedule"
+            method = "mavsdk_sim_gps_used_plus_gps_info_telemetry_and_reset"
+        else:
+            capability_reason = "PX4 parameter readback and battery telemetry verified the profile"
+            method = "mavsdk_parameter_readback_and_battery_telemetry"
+        records.append(
+            {
+                "effect_id": effect_id,
+                "mechanism": effect["mechanism"],
+                "status": "applied",
+                "capability": {
+                    "status": "available",
+                    "reason": capability_reason,
+                },
+                "evidence": {
+                    "requested_value_sha256": engine.scenario_effect_value_sha256(
+                        effect["requested_value"]
+                    ),
+                    "compiled_runtime_profile": profile,
+                    "verification": {
+                        "status": "verified",
+                        "method": method,
+                        "observations": verification_observations,
+                    },
+                },
+            }
+        )
+    return records
+
+
+def _write_runtime_effect_artifact(
+    engine: Any,
+    request: dict[str, Any],
+    profile: dict[str, Any],
+    path: Path,
+    *,
+    observations: dict[str, dict[str, Any]],
+    attempted_sections: set[str],
+    status: str,
+    error: str | None = None,
+) -> None:
+    records = _runtime_effect_records(
+        engine,
+        request,
+        profile,
+        observations=observations,
+        attempted_sections=attempted_sections,
+        status=status,
+        error=error,
+    )
+    payload = {
+        "schema_version": RUNTIME_EFFECT_SCHEMA_VERSION,
+        "request_sha256": request["request_sha256"],
+        "compiled_runtime_profile": profile,
+        "attempted_sections": sorted(attempted_sections),
+        "status": status,
+        "error": error,
+        "records": records,
+    }
+    _write_json_atomic(path, payload)
 
 
 def _finite_float(value: Any, label: str) -> float:
@@ -255,11 +989,79 @@ def _finite_float(value: Any, label: str) -> float:
     return parsed
 
 
-def load_reference_track(path: Path) -> list[TrackPoint]:
-    payload = json.loads(
-        path.read_text(encoding="utf-8"),
-        parse_constant=_reject_nonfinite_json,
+def _finite_integer(value: Any, label: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be an integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        return int(value)
+    raise ValueError(f"{label} must be an integer")
+
+
+def _validated_battery_telemetry(value: Any, *, label: str) -> dict[str, float]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be an object")
+    remaining_percent = _finite_float(
+        value.get("remaining_percent"),
+        f"{label} remaining_percent",
     )
+    voltage_v = _finite_float(value.get("voltage_v"), f"{label} voltage_v")
+    if not 0.0 <= remaining_percent <= 100.0:
+        raise ValueError(f"{label} remaining_percent must be between 0 and 100")
+    if voltage_v < 0.0:
+        raise ValueError(f"{label} voltage_v must be non-negative")
+    return {"remaining_percent": remaining_percent, "voltage_v": voltage_v}
+
+
+def _validated_gps_telemetry(value: Any, *, label: str) -> dict[str, int | str]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be an object")
+    num_satellites = _finite_integer(
+        value.get("num_satellites"),
+        f"{label} num_satellites",
+    )
+    fix_type = _finite_integer(value.get("fix_type"), f"{label} fix_type")
+    if num_satellites < 0:
+        raise ValueError(f"{label} num_satellites must be non-negative")
+    if fix_type < 0:
+        raise ValueError(f"{label} fix_type must be non-negative")
+    fix_type_name = value.get("fix_type_name", str(fix_type))
+    if not isinstance(fix_type_name, str) or not fix_type_name.strip():
+        raise ValueError(f"{label} fix_type_name must be a non-empty string")
+    return {
+        "num_satellites": num_satellites,
+        "fix_type": fix_type,
+        "fix_type_name": fix_type_name,
+    }
+
+
+def _load_bounded_json(path: Path, *, label: str) -> Any:
+    try:
+        status = path.lstat()
+    except OSError as exc:
+        raise ValueError(f"{label} cannot be inspected: {exc}") from exc
+    if stat.S_ISLNK(status.st_mode):
+        raise ValueError(f"{label} must not be a symbolic link")
+    if not stat.S_ISREG(status.st_mode):
+        raise ValueError(f"{label} must be a regular file")
+    if status.st_size > MAX_INPUT_JSON_BYTES:
+        raise ValueError(f"{label} exceeds the {MAX_INPUT_JSON_BYTES} byte limit")
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"{label} cannot be read: {exc}") from exc
+    if len(raw) > MAX_INPUT_JSON_BYTES:
+        raise ValueError(f"{label} exceeds the {MAX_INPUT_JSON_BYTES} byte limit")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{label} must be UTF-8 JSON") from exc
+    return json.loads(text, parse_constant=_reject_nonfinite_json)
+
+
+def load_reference_track_plan(path: Path) -> ReferenceTrackPlan:
+    payload = _load_bounded_json(path, label="reference_track.json")
     if not isinstance(payload, dict) or not isinstance(payload.get("points"), list):
         raise ValueError("reference_track.json must be an object with points[]")
     if len(payload["points"]) > MAX_REFERENCE_TRACK_POINTS:
@@ -279,14 +1081,34 @@ def load_reference_track(path: Path) -> list[TrackPoint]:
         )
     if not points:
         raise ValueError("reference_track.json points[] cannot be empty")
-    return points
+    track_type_raw = payload.get("track_type")
+    track_type = None if track_type_raw is None else str(track_type_raw).strip()
+    if track_type not in {None, "hover", "circle", "u_turn", "lemniscate", "custom"}:
+        raise ValueError("reference_track.json track_type is unsupported")
+    hover_duration_seconds: float | None = None
+    if track_type == "hover":
+        hover_duration_seconds = _finite_float(
+            payload.get("hover_duration_s", DEFAULT_HOVER_DURATION_SECONDS),
+            "hover_duration_s",
+        )
+        if not MIN_HOVER_DURATION_SECONDS <= hover_duration_seconds <= MAX_HOVER_DURATION_SECONDS:
+            raise ValueError(
+                "hover_duration_s must be between "
+                f"{MIN_HOVER_DURATION_SECONDS:g} and {MAX_HOVER_DURATION_SECONDS:g} seconds"
+            )
+    return ReferenceTrackPlan(
+        points=points,
+        track_type=track_type,
+        hover_duration_seconds=hover_duration_seconds,
+    )
+
+
+def load_reference_track(path: Path) -> list[TrackPoint]:
+    return load_reference_track_plan(path).points
 
 
 def load_controller_params(path: Path) -> ControllerParams:
-    payload = json.loads(
-        path.read_text(encoding="utf-8"),
-        parse_constant=_reject_nonfinite_json,
-    )
+    payload = _load_bounded_json(path, label="controller_params.json")
     if not isinstance(payload, dict):
         raise ValueError("controller_params.json must be an object")
     params = ControllerParams(
@@ -321,15 +1143,85 @@ def enu_point_to_ned_setpoint(point: TrackPoint, yaw_deg: float) -> Setpoint:
     return Setpoint(north_m=point.x, east_m=point.y, down_m=-point.z, yaw_deg=yaw_deg)
 
 
-def _interpolate_points(start: TrackPoint, end: TrackPoint, parts: int) -> list[TrackPoint]:
-    result: list[TrackPoint] = []
-    for i in range(1, parts + 1):
-        ratio = i / parts
+def _build_motion_setpoints(
+    start: TrackPoint,
+    waypoints: list[TrackPoint],
+    params: ControllerParams,
+    rate_hz: float,
+    *,
+    max_samples: int,
+) -> list[Setpoint]:
+    """Time-parameterize a polyline with bounded scalar speed/acceleration."""
+
+    segments: list[tuple[TrackPoint, TrackPoint, float, float, float]] = []
+    cumulative_distance = 0.0
+    previous = start
+    for waypoint in waypoints:
+        distance = math.dist(
+            (previous.x, previous.y, previous.z),
+            (waypoint.x, waypoint.y, waypoint.z),
+        )
+        if distance > 1e-12:
+            segments.append(
+                (
+                    previous,
+                    waypoint,
+                    distance,
+                    cumulative_distance,
+                    cumulative_distance + distance,
+                )
+            )
+            cumulative_distance += distance
+        previous = waypoint
+    if not segments:
+        return []
+
+    acceleration_seconds = params.vel_limit / params.accel_limit
+    acceleration_distance = 0.5 * params.accel_limit * acceleration_seconds**2
+    if 2.0 * acceleration_distance >= cumulative_distance:
+        acceleration_seconds = math.sqrt(cumulative_distance / params.accel_limit)
+        peak_speed = params.accel_limit * acceleration_seconds
+        acceleration_distance = 0.5 * params.accel_limit * acceleration_seconds**2
+        cruise_seconds = 0.0
+    else:
+        peak_speed = params.vel_limit
+        cruise_seconds = (cumulative_distance - 2.0 * acceleration_distance) / peak_speed
+    total_seconds = 2.0 * acceleration_seconds + cruise_seconds
+    sample_count = max(1, int(math.ceil(total_seconds * rate_hz)))
+    if sample_count > max_samples:
+        raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
+
+    cruise_distance = peak_speed * cruise_seconds
+    segment_index = 0
+    result: list[Setpoint] = []
+    for sample_index in range(1, sample_count + 1):
+        sample_time = min(sample_index / rate_hz, total_seconds)
+        if sample_time <= acceleration_seconds:
+            progress = 0.5 * params.accel_limit * sample_time**2
+        elif sample_time <= acceleration_seconds + cruise_seconds:
+            progress = acceleration_distance + peak_speed * (sample_time - acceleration_seconds)
+        else:
+            deceleration_time = sample_time - acceleration_seconds - cruise_seconds
+            progress = (
+                acceleration_distance
+                + cruise_distance
+                + peak_speed * deceleration_time
+                - 0.5 * params.accel_limit * deceleration_time**2
+            )
+        progress = min(cumulative_distance, max(0.0, progress))
+        while segment_index < len(segments) - 1 and progress >= segments[segment_index][4] - 1e-12:
+            segment_index += 1
+        segment_start, segment_end, segment_length, segment_offset, _ = segments[segment_index]
+        ratio = min(1.0, max(0.0, (progress - segment_offset) / segment_length))
+        point = TrackPoint(
+            x=segment_start.x + (segment_end.x - segment_start.x) * ratio,
+            y=segment_start.y + (segment_end.y - segment_start.y) * ratio,
+            z=segment_start.z + (segment_end.z - segment_start.z) * ratio,
+        )
         result.append(
-            TrackPoint(
-                x=start.x + (end.x - start.x) * ratio,
-                y=start.y + (end.y - start.y) * ratio,
-                z=start.z + (end.z - start.z) * ratio,
+            enu_point_to_ned_setpoint(
+                point,
+                yaw_deg=compute_yaw_from_segment(segment_start, segment_end),
             )
         )
     return result
@@ -342,15 +1234,17 @@ def build_setpoint_schedule(
 
 
 def build_setpoint_schedule_plan(
-    points: list[TrackPoint], params: ControllerParams, rate_hz: float
+    points: list[TrackPoint],
+    params: ControllerParams,
+    rate_hz: float,
+    *,
+    hover_duration_seconds: float | None = None,
 ) -> SetpointSchedulePlan:
     if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
         raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
     if not points:
         raise ValueError("points cannot be empty")
 
-    dt = 1.0 / rate_hz
-    max_step = max(0.05, params.vel_limit * dt)
     takeoff = TrackPoint(0.0, 0.0, max(0.5, points[0].z))
     schedule: list[Setpoint] = []
 
@@ -360,38 +1254,577 @@ def build_setpoint_schedule_plan(
     for _ in range(takeoff_hold_samples):
         schedule.append(enu_point_to_ned_setpoint(takeoff, yaw_deg=0.0))
 
-    prev = takeoff
-    smoothed_speed = 0.0
-    for idx, point in enumerate(points):
-        seg_dx = point.x - prev.x
-        seg_dy = point.y - prev.y
-        seg_dz = point.z - prev.z
-        seg_dist = math.sqrt(seg_dx * seg_dx + seg_dy * seg_dy + seg_dz * seg_dz)
-        speed_target = min(params.vel_limit, smoothed_speed + params.accel_limit * dt)
-        smoothed_speed = speed_target
-        step_limit = max(0.05, speed_target * dt)
-        effective_step = min(max_step, step_limit)
-        parts = max(1, int(math.ceil(seg_dist / effective_step)))
-        if parts > MAX_SETPOINTS - len(schedule):
+    if hover_duration_seconds is not None:
+        if (
+            not math.isfinite(hover_duration_seconds)
+            or not MIN_HOVER_DURATION_SECONDS
+            <= hover_duration_seconds
+            <= MAX_HOVER_DURATION_SECONDS
+        ):
+            raise ValueError(
+                "hover_duration_seconds must be between "
+                f"{MIN_HOVER_DURATION_SECONDS:g} and {MAX_HOVER_DURATION_SECONDS:g}"
+            )
+        anchor = points[0]
+        if any(
+            math.dist(
+                (point.x, point.y, point.z),
+                (anchor.x, anchor.y, anchor.z),
+            )
+            > 1e-9
+            for point in points
+        ):
+            raise ValueError("hover reference track must contain one stationary anchor")
+        if abs(anchor.x) > 1e-9 or abs(anchor.y) > 1e-9:
+            raise ValueError("hover anchor must remain at local origin x=0, y=0")
+        hover_samples = max(2, int(math.ceil(rate_hz * hover_duration_seconds)) + 1)
+        if hover_samples > MAX_SETPOINTS - len(schedule):
             raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
-        yaw_deg = compute_yaw_from_segment(prev, point) if seg_dist > 1e-9 else 0.0
-        for interp in _interpolate_points(prev, point, parts):
-            schedule.append(enu_point_to_ned_setpoint(interp, yaw_deg=yaw_deg))
-        prev = point
-        if idx == len(points) - 1:
-            final_hold_samples = max(2, int(rate_hz * 0.5))
-            if final_hold_samples > MAX_SETPOINTS - len(schedule):
-                raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
-            for _ in range(final_hold_samples):
-                schedule.append(enu_point_to_ned_setpoint(point, yaw_deg=yaw_deg))
+        hover_setpoint = enu_point_to_ned_setpoint(anchor, yaw_deg=0.0)
+        track_start_index = len(schedule)
+        schedule.extend(hover_setpoint for _ in range(hover_samples))
+        return SetpointSchedulePlan(
+            schedule=schedule,
+            track_start_index=track_start_index,
+            track_end_index=len(schedule) - 1,
+        )
 
-    track_start_index = takeoff_hold_samples
-    track_end_index = max(track_start_index, len(schedule) - 1)
+    ingress = _build_motion_setpoints(
+        takeoff,
+        [points[0]],
+        params,
+        rate_hz,
+        max_samples=MAX_SETPOINTS - len(schedule),
+    )
+    schedule.extend(ingress)
+    track_start_index = len(schedule) - 1
+
+    track_motion = _build_motion_setpoints(
+        points[0],
+        points[1:],
+        params,
+        rate_hz,
+        max_samples=MAX_SETPOINTS - len(schedule),
+    )
+    schedule.extend(track_motion)
+
+    final_hold_samples = max(2, int(rate_hz * 0.5))
+    if final_hold_samples > MAX_SETPOINTS - len(schedule):
+        raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
+    final_yaw = (
+        track_motion[-1].yaw_deg if track_motion else ingress[-1].yaw_deg if ingress else 0.0
+    )
+    final_setpoint = enu_point_to_ned_setpoint(points[-1], yaw_deg=final_yaw)
+    schedule.extend(final_setpoint for _ in range(final_hold_samples))
+
+    track_end_index = len(schedule) - 1
     return SetpointSchedulePlan(
         schedule=schedule,
         track_start_index=track_start_index,
         track_end_index=track_end_index,
     )
+
+
+def _validate_takeoff_gate_limit(value: float, label: str, *, allow_zero: bool = False) -> None:
+    if not math.isfinite(value) or value < 0 or (value == 0 and not allow_zero):
+        comparator = "non-negative" if allow_zero else "greater than zero"
+        raise ValueError(f"{label} must be finite and {comparator}")
+
+
+def _health_payload(health: TelemetryHealth | None) -> dict[str, bool]:
+    if health is None:
+        return {
+            "connected": False,
+            "global_position_ok": False,
+            "home_position_ok": False,
+            "local_position_ok": False,
+            "armable": False,
+        }
+    return {
+        "connected": health.connected,
+        "global_position_ok": health.global_position_ok,
+        "home_position_ok": health.home_position_ok,
+        "local_position_ok": health.local_position_ok,
+        "armable": health.armable,
+    }
+
+
+def _position_velocity_payload(
+    sample: PositionVelocityNed,
+    target: Setpoint,
+) -> dict[str, float | bool]:
+    horizontal_error_m = math.hypot(
+        sample.north_m - target.north_m,
+        sample.east_m - target.east_m,
+    )
+    vertical_error_m = abs(sample.down_m - target.down_m)
+    horizontal_speed_m_s = math.hypot(sample.north_m_s, sample.east_m_s)
+    vertical_speed_m_s = abs(sample.down_m_s)
+    return {
+        "north_m": sample.north_m,
+        "east_m": sample.east_m,
+        "down_m": sample.down_m,
+        "north_m_s": sample.north_m_s,
+        "east_m_s": sample.east_m_s,
+        "down_m_s": sample.down_m_s,
+        "horizontal_error_m": horizontal_error_m,
+        "vertical_error_m": vertical_error_m,
+        "horizontal_speed_m_s": horizontal_speed_m_s,
+        "vertical_speed_m_s": vertical_speed_m_s,
+    }
+
+
+async def _await_with_setpoint_keepalive(
+    client: OffboardClientProtocol,
+    operation: Awaitable[_T],
+    *,
+    hold_setpoint: Setpoint,
+    rate_hz: float,
+) -> _T:
+    """Await a bounded control operation without starving PX4 Offboard input."""
+
+    if not math.isfinite(rate_hz) or rate_hz <= 0.0:
+        raise ValueError("Offboard keepalive rate must be finite and greater than zero")
+    operation_task = asyncio.ensure_future(operation)
+    try:
+        while not operation_task.done():
+            await client.set_position_ned(hold_setpoint)
+            if operation_task.done():
+                break
+            await asyncio.wait({operation_task}, timeout=1.0 / rate_hz)
+        return operation_task.result()
+    finally:
+        if not operation_task.done():
+            operation_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await operation_task
+
+
+async def _wait_for_takeoff_stability(
+    client: OffboardClientProtocol,
+    target: Setpoint,
+    *,
+    takeoff_origin: PositionVelocityNed | None = None,
+    climb_rate_m_s: float = 1.0,
+    timeout_seconds: float,
+    sample_rate_hz: float,
+    stable_window_seconds: float,
+    horizontal_tolerance_m: float,
+    vertical_tolerance_m: float,
+    horizontal_speed_tolerance_m_s: float,
+    vertical_speed_tolerance_m_s: float,
+    evidence: dict[str, Any],
+) -> None:
+    for label, value, allow_zero in (
+        ("timeout_seconds", timeout_seconds, False),
+        ("sample_rate_hz", sample_rate_hz, False),
+        ("climb_rate_m_s", climb_rate_m_s, False),
+        ("stable_window_seconds", stable_window_seconds, True),
+        ("horizontal_tolerance_m", horizontal_tolerance_m, False),
+        ("vertical_tolerance_m", vertical_tolerance_m, False),
+        (
+            "horizontal_speed_tolerance_m_s",
+            horizontal_speed_tolerance_m_s,
+            False,
+        ),
+        ("vertical_speed_tolerance_m_s", vertical_speed_tolerance_m_s, False),
+    ):
+        _validate_takeoff_gate_limit(value, label, allow_zero=allow_zero)
+    if climb_rate_m_s > MAX_TAKEOFF_CLIMB_RATE_M_S:
+        raise ValueError(f"climb_rate_m_s must be no greater than {MAX_TAKEOFF_CLIMB_RATE_M_S:g}")
+
+    sample_interval_seconds = max(0.01, 1.0 / sample_rate_hz)
+    telemetry_timeout_seconds = min(1.0, timeout_seconds)
+    deadline = time.monotonic() + timeout_seconds
+    ramp_started_at = time.monotonic()
+    stable_since: float | None = None
+    origin_down_m = target.down_m if takeoff_origin is None else takeoff_origin.down_m
+    vertical_distance_m = target.down_m - origin_down_m
+    evidence.update(
+        {
+            "schema_version": "dronedream.takeoff_gate.v2",
+            "status": "waiting",
+            "target_ned": {
+                "north_m": target.north_m,
+                "east_m": target.east_m,
+                "down_m": target.down_m,
+            },
+            "tolerances": {
+                "horizontal_position_m": horizontal_tolerance_m,
+                "vertical_position_m": vertical_tolerance_m,
+                "horizontal_speed_m_s": horizontal_speed_tolerance_m_s,
+                "vertical_speed_m_s": vertical_speed_tolerance_m_s,
+            },
+            "required_stable_window_s": stable_window_seconds,
+            "takeoff_profile": {
+                "mode": (
+                    "direct_target"
+                    if takeoff_origin is None
+                    else "telemetry_anchored_bounded_vertical_ramp"
+                ),
+                "climb_rate_limit_m_s": climb_rate_m_s,
+                "origin_ned": (
+                    None
+                    if takeoff_origin is None
+                    else {
+                        "north_m": takeoff_origin.north_m,
+                        "east_m": takeoff_origin.east_m,
+                        "down_m": takeoff_origin.down_m,
+                    }
+                ),
+                "vertical_distance_m": abs(vertical_distance_m),
+            },
+            "sample_count": 0,
+            "stable_sample_count": 0,
+            "reset_count": 0,
+            "observations": [],
+        }
+    )
+
+    while True:
+        now = time.monotonic()
+        remaining = deadline - now
+        if remaining <= 0:
+            latest = evidence.get("latest_observation")
+            evidence["status"] = "failed"
+            evidence["failure_reason"] = "takeoff_stability_timeout"
+            raise TimeoutError(
+                "takeoff did not reach a continuously stable hover within "
+                f"{timeout_seconds:g}s; latest={latest}"
+            )
+
+        ramp_elapsed_seconds = max(0.0, now - ramp_started_at)
+        maximum_vertical_delta_m = climb_rate_m_s * ramp_elapsed_seconds
+        if abs(vertical_distance_m) <= maximum_vertical_delta_m:
+            commanded_down_m = target.down_m
+            ramp_fraction = 1.0
+        else:
+            commanded_down_m = origin_down_m + math.copysign(
+                maximum_vertical_delta_m,
+                vertical_distance_m,
+            )
+            ramp_fraction = (
+                1.0
+                if abs(vertical_distance_m) <= 1e-12
+                else maximum_vertical_delta_m / abs(vertical_distance_m)
+            )
+        commanded = Setpoint(
+            north_m=target.north_m,
+            east_m=target.east_m,
+            down_m=commanded_down_m,
+            yaw_deg=target.yaw_deg,
+        )
+        try:
+            sample = await _await_with_setpoint_keepalive(
+                client,
+                client.sample_position_velocity_ned(min(telemetry_timeout_seconds, remaining)),
+                hold_setpoint=commanded,
+                rate_hz=sample_rate_hz,
+            )
+        except BaseException as exc:
+            if evidence["sample_count"] > 0 and time.monotonic() >= deadline:
+                latest = evidence.get("latest_observation")
+                evidence["status"] = "failed"
+                evidence["failure_reason"] = "takeoff_stability_timeout"
+                evidence["terminal_telemetry_error"] = f"{type(exc).__name__}: {exc}"
+                raise TimeoutError(
+                    "takeoff did not reach a continuously stable hover within "
+                    f"{timeout_seconds:g}s; latest={latest}"
+                ) from exc
+            evidence["status"] = "failed"
+            evidence["failure_reason"] = "position_velocity_telemetry_unavailable"
+            evidence["telemetry_error"] = f"{type(exc).__name__}: {exc}"
+            raise
+
+        observed_at = time.monotonic()
+        payload: dict[str, Any] = _position_velocity_payload(sample, target)
+        payload["commanded_setpoint_ned"] = {
+            "north_m": commanded.north_m,
+            "east_m": commanded.east_m,
+            "down_m": commanded.down_m,
+            "yaw_deg": commanded.yaw_deg,
+        }
+        payload["takeoff_ramp_fraction"] = min(1.0, max(0.0, ramp_fraction))
+        payload["takeoff_ramp_elapsed_s"] = ramp_elapsed_seconds
+        if ramp_fraction >= 1.0 and "ramp_completed_after_s" not in evidence["takeoff_profile"]:
+            evidence["takeoff_profile"]["ramp_completed_after_s"] = ramp_elapsed_seconds
+        within_limits = bool(
+            float(payload["horizontal_error_m"]) <= horizontal_tolerance_m
+            and float(payload["vertical_error_m"]) <= vertical_tolerance_m
+            and float(payload["horizontal_speed_m_s"]) <= horizontal_speed_tolerance_m_s
+            and float(payload["vertical_speed_m_s"]) <= vertical_speed_tolerance_m_s
+        )
+        payload["within_all_limits"] = within_limits
+        evidence["sample_count"] = int(evidence["sample_count"]) + 1
+        if within_limits:
+            evidence["stable_sample_count"] = int(evidence["stable_sample_count"]) + 1
+            if stable_since is None:
+                stable_since = observed_at
+        else:
+            if stable_since is not None:
+                evidence["reset_count"] = int(evidence["reset_count"]) + 1
+            stable_since = None
+
+        stable_duration = 0.0 if stable_since is None else observed_at - stable_since
+        payload["stable_duration_s"] = stable_duration
+        evidence["latest_observation"] = payload
+        observations = evidence["observations"]
+        if isinstance(observations, list):
+            observations.append(payload)
+
+        if within_limits and stable_duration >= stable_window_seconds:
+            evidence["status"] = "achieved"
+            evidence["achieved_stable_window_s"] = stable_duration
+            return
+
+        await asyncio.sleep(min(sample_interval_seconds, max(0.0, deadline - time.monotonic())))
+
+
+async def _set_float_parameter_verified(
+    client: OffboardClientProtocol,
+    name: str,
+    value: float,
+) -> dict[str, float]:
+    before = await client.get_param_float(name)
+    await client.set_param_float(name, value)
+    applied = await client.get_param_float(name)
+    if not math.isclose(applied, value, rel_tol=1e-6, abs_tol=1e-6):
+        raise RuntimeError(
+            f"PX4 parameter {name} readback mismatch: requested={value:g}, applied={applied:g}"
+        )
+    return {"before": before, "requested": value, "applied": applied}
+
+
+async def _set_float_parameters_verified(
+    client: OffboardClientProtocol,
+    values: dict[str, float],
+) -> dict[str, dict[str, float]]:
+    applied: dict[str, dict[str, float]] = {}
+    for name, value in values.items():
+        applied[name] = await _set_float_parameter_verified(client, name, value)
+    return applied
+
+
+async def _set_int_parameter_verified(
+    client: OffboardClientProtocol,
+    name: str,
+    value: int,
+) -> dict[str, int]:
+    before = await client.get_param_int(name)
+    await client.set_param_int(name, value)
+    applied = await client.get_param_int(name)
+    if applied != value:
+        raise RuntimeError(
+            f"PX4 parameter {name} readback mismatch: requested={value}, applied={applied}"
+        )
+    return {"before": before, "requested": value, "applied": applied}
+
+
+async def _set_gps_availability_verified(
+    client: OffboardClientProtocol,
+    *,
+    satellites_used: int,
+    unavailable: bool,
+) -> dict[str, Any]:
+    parameter = await _set_int_parameter_verified(
+        client,
+        "SIM_GPS_USED",
+        satellites_used,
+    )
+    samples: list[dict[str, int | str]] = []
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        sample = _validated_gps_telemetry(
+            await client.sample_gps_info(min(1.0, max(0.01, deadline - time.monotonic()))),
+            label="PX4 GPS availability telemetry",
+        )
+        samples.append(sample)
+        num_satellites = sample["num_satellites"]
+        fix_type = sample["fix_type"]
+        if isinstance(num_satellites, bool) or not isinstance(num_satellites, int):
+            raise ValueError("PX4 GPS availability num_satellites must remain an integer")
+        if isinstance(fix_type, bool) or not isinstance(fix_type, int):
+            raise ValueError("PX4 GPS availability fix_type must remain an integer")
+        observed = (
+            num_satellites < 4 and fix_type <= 1
+            if unavailable
+            else num_satellites >= 4 and fix_type >= 2
+        )
+        if observed:
+            return {
+                "parameter_name": "SIM_GPS_USED",
+                "parameter": parameter,
+                "expected_availability": "unavailable" if unavailable else "available",
+                "telemetry_samples": samples,
+                "physical_effect_verified": True,
+            }
+        await asyncio.sleep(0.1)
+    expected = "unavailable" if unavailable else "available"
+    raise RuntimeError(
+        f"PX4 GPS telemetry did not become {expected} after SIM_GPS_USED="
+        f"{satellites_used}; samples={samples!r}"
+    )
+
+
+async def _prepare_battery_profile(
+    client: OffboardClientProtocol,
+    profile: dict[str, Any],
+    *,
+    takeoff_hold_seconds: float,
+) -> dict[str, Any]:
+    target = float(profile["target_track_start_percent"])
+    if target >= 100.0 - 1e-12:
+        pretrack_drain_seconds = 86400.0
+    else:
+        pretrack_drain_seconds = max(
+            1.0,
+            min(86400.0, takeoff_hold_seconds / max(1e-9, 1.0 - target / 100.0)),
+        )
+    parameters = {
+        "SIM_BAT_MIN_PCT": await _set_float_parameter_verified(
+            client,
+            "SIM_BAT_MIN_PCT",
+            target,
+        ),
+        "SIM_BAT_DRAIN": await _set_float_parameter_verified(
+            client,
+            "SIM_BAT_DRAIN",
+            pretrack_drain_seconds,
+        ),
+    }
+    return {
+        "target_track_start_percent": target,
+        "takeoff_hold_seconds": takeoff_hold_seconds,
+        "pretrack_drain_seconds": pretrack_drain_seconds,
+        "pretrack_parameters": parameters,
+    }
+
+
+async def _hold_battery_during_takeoff_gate(
+    client: OffboardClientProtocol,
+) -> dict[str, dict[str, float]]:
+    return {
+        "SIM_BAT_MIN_PCT": await _set_float_parameter_verified(
+            client,
+            "SIM_BAT_MIN_PCT",
+            100.0,
+        ),
+        "SIM_BAT_DRAIN": await _set_float_parameter_verified(
+            client,
+            "SIM_BAT_DRAIN",
+            86400.0,
+        ),
+    }
+
+
+async def _sample_battery_while_holding(
+    client: OffboardClientProtocol,
+    *,
+    hold_setpoint: Setpoint,
+    rate_hz: float,
+    deadline: float,
+) -> dict[str, float] | None:
+    """Keep the Offboard heartbeat alive while awaiting one battery sample."""
+
+    remaining = deadline - time.monotonic()
+    if remaining <= 0.0:
+        return None
+    return await _await_with_setpoint_keepalive(
+        client,
+        client.sample_battery(min(5.0, remaining)),
+        hold_setpoint=hold_setpoint,
+        rate_hz=rate_hz,
+    )
+
+
+async def _transition_battery_at_track_start(
+    client: OffboardClientProtocol,
+    profile: dict[str, Any],
+    prepared: dict[str, Any],
+    *,
+    hold_setpoint: Setpoint,
+    rate_hz: float,
+    settle_timeout_seconds: float = BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    target = float(profile["target_track_start_percent"])
+    drain_seconds = float(prepared["pretrack_drain_seconds"])
+    quantization_tolerance = 100.0 * 0.1 / max(1.0, drain_seconds)
+    tolerance = max(5.0, quantization_tolerance + 2.0)
+    if not math.isfinite(rate_hz) or rate_hz <= 0.0:
+        raise ValueError("battery conditioning setpoint rate must be finite and greater than zero")
+    if not math.isfinite(settle_timeout_seconds) or settle_timeout_seconds <= 0.0:
+        raise ValueError("battery settle timeout must be finite and greater than zero")
+    deadline = time.monotonic() + settle_timeout_seconds
+    conditioning_samples: list[dict[str, float]] = []
+    conditioning_sample_timeout_count = 0
+    track_start_sample: dict[str, float] | None = None
+    while True:
+        try:
+            sample = await _sample_battery_while_holding(
+                client,
+                hold_setpoint=hold_setpoint,
+                rate_hz=rate_hz,
+                deadline=deadline,
+            )
+        except TimeoutError:
+            conditioning_sample_timeout_count += 1
+            if time.monotonic() >= deadline:
+                break
+            continue
+        if sample is None:
+            break
+        sample = _validated_battery_telemetry(
+            sample,
+            label="PX4 battery conditioning telemetry",
+        )
+        conditioning_samples.append(sample)
+        sample_percent = sample["remaining_percent"]
+        if abs(sample_percent - target) <= tolerance:
+            track_start_sample = sample
+            break
+        if sample_percent < target - tolerance:
+            raise RuntimeError(
+                "PX4 battery overshot the requested track-start state: "
+                f"target={target:g}%, observed={sample_percent:g}%, tolerance={tolerance:g}%"
+            )
+        await asyncio.sleep(min(1.0 / rate_hz, max(0.0, deadline - time.monotonic())))
+    if track_start_sample is None:
+        observed = (
+            float(conditioning_samples[-1]["remaining_percent"])
+            if conditioning_samples
+            else math.nan
+        )
+        raise RuntimeError(
+            "PX4 battery did not reach the requested track-start state before timeout: "
+            f"target={target:g}%, observed={observed:g}%, tolerance={tolerance:g}%, "
+            f"samples={len(conditioning_samples)}, timeout={settle_timeout_seconds:g}s"
+        )
+    if bool(profile["voltage_sag"]):
+        transition_values = {
+            "SIM_BAT_MIN_PCT": 0.0,
+            "SIM_BAT_DRAIN": float(profile["sag_drain_seconds"]),
+        }
+    else:
+        transition_values = {
+            "SIM_BAT_MIN_PCT": target,
+            "SIM_BAT_DRAIN": float(profile["no_sag_hold_drain_seconds"]),
+        }
+    transition_parameters = await _await_with_setpoint_keepalive(
+        client,
+        _set_float_parameters_verified(client, transition_values),
+        hold_setpoint=hold_setpoint,
+        rate_hz=rate_hz,
+    )
+    return {
+        **prepared,
+        "conditioning_sample_count": len(conditioning_samples),
+        "conditioning_sample_timeout_count": conditioning_sample_timeout_count,
+        "conditioning_samples": conditioning_samples,
+        "conditioning_timeout_seconds": settle_timeout_seconds,
+        "track_start_sample": track_start_sample,
+        "track_start_tolerance_percent": tolerance,
+        "track_parameters": transition_parameters,
+    }
 
 
 async def run_executor(
@@ -400,92 +1833,589 @@ async def run_executor(
     *,
     connection: str,
     takeoff_timeout_seconds: float,
+    takeoff_climb_rate_m_s: float = 1.0,
     track_timeout_seconds: float,
+    landing_timeout_seconds: float = 60.0,
     rate_hz: float,
     land_after: bool,
     log_path: Path,
     track_start_index: int = 0,
     track_end_index: int | None = None,
     timing_path: Path | None = None,
+    scenario_engine: Any | None = None,
+    scenario_request: dict[str, Any] | None = None,
+    runtime_profile: dict[str, Any] | None = None,
+    runtime_evidence_path: Path | None = None,
+    takeoff_stable_window_seconds: float = 0.0,
+    takeoff_horizontal_tolerance_m: float = 0.35,
+    takeoff_vertical_tolerance_m: float = 0.25,
+    takeoff_horizontal_speed_tolerance_m_s: float = 0.35,
+    takeoff_vertical_speed_tolerance_m_s: float = 0.25,
+    world: str = "default",
+    wind_activator: Callable[..., dict[str, Any]] = _activate_gazebo_wind_profile,
 ) -> None:
     if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
         raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
     for label, value in (
         ("takeoff_timeout_seconds", takeoff_timeout_seconds),
+        ("takeoff_climb_rate_m_s", takeoff_climb_rate_m_s),
         ("track_timeout_seconds", track_timeout_seconds),
+        ("landing_timeout_seconds", landing_timeout_seconds),
     ):
         if not math.isfinite(value) or value <= 0:
             raise ValueError(f"{label} must be finite and greater than zero")
+    if takeoff_climb_rate_m_s > MAX_TAKEOFF_CLIMB_RATE_M_S:
+        raise ValueError(
+            f"takeoff_climb_rate_m_s must be no greater than {MAX_TAKEOFF_CLIMB_RATE_M_S:g}"
+        )
     if not schedule:
         raise ValueError("setpoint schedule is empty")
+    for index, setpoint in enumerate(schedule):
+        for field_name in ("north_m", "east_m", "down_m", "yaw_deg"):
+            _finite_float(
+                getattr(setpoint, field_name),
+                f"setpoint schedule index {index}.{field_name}",
+            )
+    if isinstance(track_start_index, bool) or not isinstance(track_start_index, int):
+        raise ValueError("track start index must be an integer")
+    if track_start_index < 0 or track_start_index >= len(schedule):
+        raise ValueError("track start index is outside the setpoint schedule")
+    if track_end_index is not None:
+        if isinstance(track_end_index, bool) or not isinstance(track_end_index, int):
+            raise ValueError("track end index must be an integer")
+        if track_end_index < 0 or track_end_index >= len(schedule):
+            raise ValueError("track end index is outside the setpoint schedule")
+        if track_end_index < track_start_index:
+            raise ValueError("track end index must not precede the track start index")
     exec_start = time.monotonic()
     timing: dict[str, Any] = {
         "time_base": "executor_relative_seconds",
         "setpoint_count": len(schedule),
         "rate_hz": rate_hz,
+        "takeoff_gate": {
+            "status": "not_started",
+        },
+        "cleanup": {
+            "stop_offboard": "not_needed",
+            "land": "not_requested" if not land_after else "not_needed",
+            "close": "pending",
+        },
     }
-    track_end = (
-        len(schedule) - 1
-        if track_end_index is None
-        else min(max(0, track_end_index), len(schedule) - 1)
-    )
-    track_start = min(max(0, track_start_index), track_end) if schedule else 0
+    takeoff_gate = timing["takeoff_gate"]
+    cleanup = timing["cleanup"]
+    track_end = len(schedule) - 1 if track_end_index is None else track_end_index
+    track_start = track_start_index
     armed = False
     offboard_started = False
     offboard_stopped = False
+    last_commanded_setpoint: Setpoint | None = None
     land_command_sent = False
+    landing_confirmation_attempted = False
+    runtime_failure: str | None = None
+    runtime_observations: dict[str, dict[str, Any]] = {}
+    attempted_effect_sections: set[str] = set()
+    gps_transitions: list[dict[str, Any]] = []
+    gps_reset_verified = False
+    gps_value: dict[str, Any] | None = None
+    gps_control_details: dict[str, Any] | None = None
+    battery_details: dict[str, Any] | None = None
+    gps_profile = runtime_profile.get("gps_dropout") if runtime_profile else None
+    battery_profile = runtime_profile.get("battery") if runtime_profile else None
+    wind_profile = runtime_profile.get("wind_activation") if runtime_profile else None
+    gps_schedule: list[bool] = []
+    gps_last_tick = -1
+    gps_off = False
+    battery_takeoff_gate_parameters: dict[str, dict[str, float]] | None = None
+    if isinstance(gps_profile, dict):
+        runtime_profile_details = _require_runtime_details(
+            runtime_profile,
+            label="compiled runtime profile",
+        )
+        track_sample_count = track_end - track_start + 1
+        tick_period_s = float(gps_profile["tick_period_s"])
+        tick_count = max(
+            1,
+            int(math.ceil(track_sample_count / rate_hz / tick_period_s)),
+        )
+        gps_schedule = compile_fixed_duty_schedule(
+            requested_rate=float(gps_profile["requested_rate"]),
+            tick_count=tick_count,
+            execution_identity_sha256=str(runtime_profile_details["execution_identity_sha256"]),
+        )
     try:
         await client.connect(connection)
         _log(log_path, f"connected via {connection}")
-        await client.wait_until_ready(takeoff_timeout_seconds)
+        health = await client.wait_until_ready(takeoff_timeout_seconds)
+        takeoff_gate["readiness"] = _health_payload(health)
+        takeoff_gate["readiness_policy"] = "local_ned_with_px4_preflight_authority"
+        takeoff_gate["required_readiness"] = {
+            name: takeoff_gate["readiness"][name]
+            for name in ("connected", "home_position_ok", "local_position_ok", "armable")
+        }
+        takeoff_gate["advisory_readiness"] = {
+            name: takeoff_gate["readiness"][name] for name in ("global_position_ok",)
+        }
+        takeoff_gate["readiness_observed"] = all(takeoff_gate["required_readiness"].values())
+        if not health.armable:
+            raise RuntimeError(
+                "PX4 returned non-armable readiness; sensor degradation must never "
+                "bypass the preflight safety gate"
+            )
+        if isinstance(gps_profile, dict):
+            baseline_satellites = await client.get_param_int("SIM_GPS_USED")
+            if baseline_satellites < 4:
+                raise RuntimeError(
+                    "PX4 SIM_GPS_USED baseline must be at least 4 satellites for "
+                    f"deterministic GPS recovery, got {baseline_satellites}"
+                )
+            gps_control_details = {
+                "parameter_name": "SIM_GPS_USED",
+                "before": baseline_satellites,
+                "dropout_value": 0,
+                "recovery_value": baseline_satellites,
+            }
+            _log(
+                log_path,
+                f"SIM_GPS_USED baseline recorded as {baseline_satellites}",
+            )
+        if isinstance(battery_profile, dict):
+            battery_takeoff_gate_parameters = await _hold_battery_during_takeoff_gate(client)
+        try:
+            takeoff_origin = await client.sample_position_velocity_ned(
+                min(2.0, takeoff_timeout_seconds)
+            )
+        except BaseException as exc:
+            takeoff_gate["status"] = "failed"
+            takeoff_gate["failure_reason"] = "initial_position_velocity_telemetry_unavailable"
+            takeoff_gate["telemetry_error"] = f"{type(exc).__name__}: {exc}"
+            raise
+        takeoff_gate["initial_position_velocity_ned"] = {
+            "north_m": takeoff_origin.north_m,
+            "east_m": takeoff_origin.east_m,
+            "down_m": takeoff_origin.down_m,
+            "north_m_s": takeoff_origin.north_m_s,
+            "east_m_s": takeoff_origin.east_m_s,
+            "down_m_s": takeoff_origin.down_m_s,
+        }
+        initial_hold = Setpoint(
+            north_m=schedule[0].north_m,
+            east_m=schedule[0].east_m,
+            down_m=takeoff_origin.down_m,
+            yaw_deg=schedule[0].yaw_deg,
+        )
+        await client.set_position_ned(initial_hold)
+        last_commanded_setpoint = initial_hold
+        takeoff_gate["initial_setpoint_ned"] = {
+            "north_m": initial_hold.north_m,
+            "east_m": initial_hold.east_m,
+            "down_m": initial_hold.down_m,
+            "yaw_deg": initial_hold.yaw_deg,
+        }
         await client.arm()
         armed = True
+        takeoff_gate["px4_arm_command"] = "accepted"
         _log(log_path, "armed")
 
         timing["takeoff_start_t"] = time.monotonic() - exec_start
-        await client.set_position_ned(schedule[0])
         await client.start_offboard()
         offboard_started = True
         timing["offboard_start_t"] = time.monotonic() - exec_start
         _log(log_path, "offboard started")
 
-        dt = 1.0 / rate_hz
-        start = time.monotonic()
-        for idx, setpoint in enumerate(schedule):
-            if (time.monotonic() - start) > track_timeout_seconds:
-                raise TimeoutError(f"track timeout after {track_timeout_seconds}s")
-            await client.set_position_ned(setpoint)
-            now_t = time.monotonic() - exec_start
-            if idx == track_start:
-                timing["track_start_t"] = now_t
-            if idx == track_end:
-                timing["track_end_t"] = now_t
-            await asyncio.sleep(dt)
+        await _wait_for_takeoff_stability(
+            client,
+            schedule[0],
+            takeoff_origin=takeoff_origin,
+            climb_rate_m_s=takeoff_climb_rate_m_s,
+            timeout_seconds=takeoff_timeout_seconds,
+            sample_rate_hz=rate_hz,
+            stable_window_seconds=takeoff_stable_window_seconds,
+            horizontal_tolerance_m=takeoff_horizontal_tolerance_m,
+            vertical_tolerance_m=takeoff_vertical_tolerance_m,
+            horizontal_speed_tolerance_m_s=takeoff_horizontal_speed_tolerance_m_s,
+            vertical_speed_tolerance_m_s=takeoff_vertical_speed_tolerance_m_s,
+            evidence=takeoff_gate,
+        )
+        last_commanded_setpoint = schedule[0]
+        timing["takeoff_stable_t"] = time.monotonic() - exec_start
+        _log(log_path, "takeoff telemetry gate achieved stable hover")
 
+        if isinstance(wind_profile, dict):
+            activation_t_s = time.monotonic() - exec_start
+            attempted_effect_sections.add("wind_activation")
+            wind_observation = await _await_with_setpoint_keepalive(
+                client,
+                asyncio.to_thread(
+                    wind_activator,
+                    world=world,
+                    profile=wind_profile,
+                    activation_t_s=activation_t_s,
+                ),
+                hold_setpoint=schedule[0],
+                rate_hz=rate_hz,
+            )
+            if not isinstance(wind_observation, dict):
+                raise RuntimeError("post-hover wind activator returned invalid evidence")
+            runtime_observations["wind_activation"] = wind_observation
+            timing["wind_activation"] = {
+                "status": "verified",
+                "phase": "after_stable_hover_before_track_entry",
+                # Preserve the monotonic timestamp for ordering checks. The
+                # request-bound evidence may round its display value, but the
+                # timing trace must never appear to place activation before
+                # the stable-hover sample because of decimal rounding.
+                "activation_t_s": activation_t_s,
+            }
+            _log(log_path, "post-hover Gazebo wind activation readback verified")
+
+        if isinstance(battery_profile, dict):
+            attempted_effect_sections.add("battery")
+            battery_details = await _await_with_setpoint_keepalive(
+                client,
+                _prepare_battery_profile(
+                    client,
+                    battery_profile,
+                    takeoff_hold_seconds=max(1.0 / rate_hz, track_start / rate_hz),
+                ),
+                hold_setpoint=schedule[0],
+                rate_hz=rate_hz,
+            )
+            battery_details["takeoff_gate_parameters"] = _require_runtime_details(
+                battery_takeoff_gate_parameters,
+                label="battery takeoff-gate control details",
+            )
+
+        dt = 1.0 / rate_hz
+        event_loop = asyncio.get_running_loop()
+        start = event_loop.time()
+        track_deadline = start + track_timeout_seconds
+        for idx, setpoint in enumerate(schedule):
+            if idx == track_start and isinstance(battery_profile, dict):
+                conditioning_started = event_loop.time()
+                battery_details = await _transition_battery_at_track_start(
+                    client,
+                    battery_profile,
+                    _require_runtime_details(
+                        battery_details,
+                        label="battery control details",
+                    ),
+                    hold_setpoint=schedule[max(0, track_start - 1)],
+                    rate_hz=rate_hz,
+                )
+                # Battery conditioning is a bounded pre-track safety gate, not
+                # part of the trajectory execution timeout budget.
+                conditioning_elapsed = event_loop.time() - conditioning_started
+                start += conditioning_elapsed
+                track_deadline += conditioning_elapsed
+            if event_loop.time() >= track_deadline:
+                raise TimeoutError(f"track timeout after {track_timeout_seconds:g}s")
+            timeout_scope = asyncio.timeout_at(track_deadline)
+            try:
+                async with timeout_scope:
+                    if idx >= track_start and isinstance(gps_profile, dict):
+                        elapsed_track_seconds = (idx - track_start) / rate_hz
+                        tick_index = min(
+                            len(gps_schedule) - 1,
+                            int(elapsed_track_seconds / float(gps_profile["tick_period_s"])),
+                        )
+                        if tick_index != gps_last_tick:
+                            gps_last_tick = tick_index
+                            desired_off = gps_schedule[tick_index]
+                            if desired_off != gps_off:
+                                attempted_effect_sections.add("gps_dropout")
+                                gps_control = _require_runtime_details(
+                                    gps_control_details,
+                                    label="GPS control details",
+                                )
+                                failure_type = "off" if desired_off else "ok"
+                                target_satellites = (
+                                    int(gps_control["dropout_value"])
+                                    if desired_off
+                                    else int(gps_control["recovery_value"])
+                                )
+                                verification = await _await_with_setpoint_keepalive(
+                                    client,
+                                    _set_gps_availability_verified(
+                                        client,
+                                        satellites_used=target_satellites,
+                                        unavailable=desired_off,
+                                    ),
+                                    hold_setpoint=last_commanded_setpoint or schedule[0],
+                                    rate_hz=rate_hz,
+                                )
+                                gps_off = desired_off
+                                gps_transitions.append(
+                                    {
+                                        "tick_index": tick_index,
+                                        "track_time_s": elapsed_track_seconds,
+                                        "failure_type": failure_type,
+                                        "physical_effect_verified": True,
+                                        "verification": verification,
+                                    }
+                                )
+                    await client.set_position_ned(setpoint)
+                    last_commanded_setpoint = setpoint
+                    now_t = time.monotonic() - exec_start
+                    if idx == track_start:
+                        timing["track_start_t"] = now_t
+                    if idx == track_end:
+                        timing["track_end_t"] = now_t
+                        if isinstance(battery_profile, dict):
+                            current_battery_details = _require_runtime_details(
+                                battery_details,
+                                label="battery control details",
+                            )
+                            track_end_sample = _validated_battery_telemetry(
+                                await _await_with_setpoint_keepalive(
+                                    client,
+                                    client.sample_battery(5.0),
+                                    hold_setpoint=setpoint,
+                                    rate_hz=rate_hz,
+                                ),
+                                label="PX4 track-end battery telemetry",
+                            )
+                            start_percent = _finite_float(
+                                current_battery_details["track_start_sample"]["remaining_percent"],
+                                "PX4 track-start battery remaining_percent",
+                            )
+                            end_percent = track_end_sample["remaining_percent"]
+                            if (
+                                bool(battery_profile["voltage_sag"])
+                                and end_percent > start_percent + 0.5
+                            ):
+                                raise RuntimeError(
+                                    "PX4 battery telemetry increased during requested voltage "
+                                    f"sag: start={start_percent:g}%, end={end_percent:g}%"
+                                )
+                            current_battery_details["track_end_sample"] = track_end_sample
+                            current_battery_details["observed_nonincrease"] = (
+                                end_percent <= start_percent + 0.5
+                            )
+                    next_tick_at = start + (idx + 1) * dt
+                    await asyncio.sleep(max(0.0, next_tick_at - event_loop.time()))
+            except TimeoutError:
+                if timeout_scope.expired():
+                    raise TimeoutError(f"track timeout after {track_timeout_seconds:g}s") from None
+                raise
+
+        if isinstance(gps_profile, dict):
+            gps_control = _require_runtime_details(
+                gps_control_details,
+                label="GPS control details",
+            )
+            verification = await _await_with_setpoint_keepalive(
+                client,
+                _set_gps_availability_verified(
+                    client,
+                    satellites_used=int(gps_control["recovery_value"]),
+                    unavailable=False,
+                ),
+                hold_setpoint=last_commanded_setpoint or schedule[0],
+                rate_hz=rate_hz,
+            )
+            gps_control["restore"] = verification
+            gps_control["restore_verified"] = True
+            gps_off = False
+            gps_reset_verified = True
+            gps_transitions.append(
+                {
+                    "tick_index": len(gps_schedule),
+                    "track_time_s": max(0.0, (track_end - track_start + 1) / rate_hz),
+                    "failure_type": "ok",
+                    "physical_effect_verified": True,
+                    "verification": verification,
+                    "final_reset": True,
+                }
+            )
+            gps_value = {
+                "schedule_algorithm": gps_profile["schedule_algorithm"],
+                "tick_period_s": gps_profile["tick_period_s"],
+                "schedule": gps_schedule,
+                "tick_count": len(gps_schedule),
+                "off_tick_count": sum(gps_schedule),
+                "realized_rate": sum(gps_schedule) / len(gps_schedule),
+                "transitions": gps_transitions,
+                "reset_verified": gps_reset_verified,
+                "control_parameter": gps_control,
+            }
+        if isinstance(battery_profile, dict):
+            current_battery_details = _require_runtime_details(
+                battery_details,
+                label="battery control details",
+            )
+            runtime_observations["battery"] = {
+                "source": "mavsdk.param+telemetry/battery",
+                "kind": "readback",
+                "value": current_battery_details,
+                "sha256": _canonical_sha256(current_battery_details),
+            }
         await client.stop_offboard()
         offboard_stopped = True
+        cleanup["stop_offboard"] = "completed"
         _log(log_path, "offboard stopped")
         if land_after:
             timing["land_start_t"] = time.monotonic() - exec_start
             await client.land()
             land_command_sent = True
+            cleanup["land"] = "command_sent"
             _log(log_path, "land command sent")
+            landing_confirmation_attempted = True
+            try:
+                landing_observation = await client.wait_until_landed(landing_timeout_seconds)
+            except Exception as exc:
+                cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
+                raise
+            cleanup["land"] = "confirmed_on_ground"
+            cleanup["landing_observation"] = landing_observation
+            timing["land_confirmed_t"] = time.monotonic() - exec_start
+            _log(log_path, "landing confirmed ON_GROUND by PX4 telemetry")
+    except BaseException as exc:
+        runtime_failure = f"{type(exc).__name__}: {exc}"
+        if takeoff_gate.get("status") not in {"achieved", "failed"}:
+            takeoff_gate["status"] = "failed"
+            takeoff_gate["failure_reason"] = "readiness_or_preflight_failure"
+            takeoff_gate["preflight_error"] = runtime_failure
+        timing["status"] = "failed"
+        timing["failure"] = runtime_failure
+        raise
     finally:
+        reset_error: Exception | None = None
+        deferred_cleanup_error: RuntimeError | None = None
+        if (
+            isinstance(gps_profile, dict)
+            and gps_control_details is not None
+            and not gps_reset_verified
+        ):
+            try:
+                restore_operation = _set_gps_availability_verified(
+                    client,
+                    satellites_used=int(gps_control_details["recovery_value"]),
+                    unavailable=False,
+                )
+                if offboard_started and not offboard_stopped:
+                    restore = await _await_with_setpoint_keepalive(
+                        client,
+                        restore_operation,
+                        hold_setpoint=last_commanded_setpoint or schedule[0],
+                        rate_hz=rate_hz,
+                    )
+                else:
+                    restore = await restore_operation
+                gps_control_details["restore"] = restore
+                gps_control_details["restore_verified"] = True
+                gps_off = False
+                gps_reset_verified = True
+                _log(log_path, "SIM_GPS_USED restored during GPS cleanup")
+            except Exception as exc:
+                reset_error = exc
+                gps_control_details["restore_verified"] = False
+                gps_control_details["restore_error"] = f"{type(exc).__name__}: {exc}"
+                _log(log_path, f"GPS availability cleanup reset failed: {exc}")
+                if runtime_failure is None:
+                    runtime_failure = f"{type(exc).__name__}: {exc}"
+                    timing["status"] = "failed"
+                    timing["failure"] = runtime_failure
+        if (
+            gps_value is not None
+            and gps_control_details is not None
+            and gps_control_details.get("restore_verified") is True
+        ):
+            runtime_observations["gps_dropout"] = {
+                "source": "mavsdk.param+telemetry/gps_info",
+                "kind": "readback",
+                "value": gps_value,
+                "sha256": _canonical_sha256(gps_value),
+            }
         if offboard_started and not offboard_stopped:
             try:
                 await client.stop_offboard()
+                offboard_stopped = True
+                cleanup["stop_offboard"] = "completed_during_failure_cleanup"
                 _log(log_path, "offboard stopped during failure cleanup")
             except Exception as exc:
+                cleanup["stop_offboard"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not stop offboard: {exc}")
-        if armed and land_after and not land_command_sent:
+        if armed and land_after and not landing_confirmation_attempted:
             try:
                 timing.setdefault("land_start_t", time.monotonic() - exec_start)
-                await client.land()
-                _log(log_path, "land command sent during failure cleanup")
+                if not land_command_sent:
+                    await client.land()
+                    land_command_sent = True
+                    cleanup["land"] = "command_sent_during_failure_cleanup"
+                    _log(log_path, "land command sent during failure cleanup")
+                landing_confirmation_attempted = True
+                landing_observation = await client.wait_until_landed(landing_timeout_seconds)
+                cleanup["land"] = "confirmed_on_ground_during_failure_cleanup"
+                cleanup["landing_observation"] = landing_observation
+                timing["land_confirmed_t"] = time.monotonic() - exec_start
+                _log(
+                    log_path,
+                    "landing confirmed ON_GROUND during failure cleanup",
+                )
             except Exception as exc:
+                cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not land: {exc}")
+        if (
+            runtime_profile is not None
+            and scenario_engine is not None
+            and scenario_request is not None
+            and runtime_evidence_path is not None
+        ):
+            try:
+                _write_runtime_effect_artifact(
+                    scenario_engine,
+                    scenario_request,
+                    runtime_profile,
+                    runtime_evidence_path,
+                    observations=runtime_observations,
+                    attempted_sections=attempted_effect_sections,
+                    status="complete" if runtime_failure is None else "failed",
+                    error=runtime_failure,
+                )
+            except Exception as exc:
+                evidence_error = f"{type(exc).__name__}: {exc}"
+                timing["runtime_evidence_write_error"] = evidence_error
+                _log(log_path, f"runtime effect evidence write failed: {exc}")
+                if runtime_failure is None:
+                    runtime_failure = evidence_error
+                    timing["status"] = "failed"
+                    timing["failure"] = evidence_error
+                    deferred_cleanup_error = RuntimeError(
+                        f"runtime effect evidence write failed: {exc}"
+                    )
+        if runtime_failure is None:
+            timing["status"] = "complete"
+        try:
+            await client.close()
+            cleanup["close"] = "completed"
+            _log(log_path, "offboard client closed")
+        except Exception as exc:
+            cleanup_error = f"{type(exc).__name__}: {exc}"
+            cleanup["close"] = f"failed: {cleanup_error}"
+            _log(log_path, f"offboard client cleanup failed: {exc}")
+            if runtime_failure is None:
+                runtime_failure = cleanup_error
+                timing["status"] = "failed"
+                timing["failure"] = cleanup_error
+                deferred_cleanup_error = RuntimeError(f"offboard client cleanup failed: {exc}")
         if timing_path is not None:
-            _write_offboard_timing(timing_path, timing)
+            try:
+                _write_offboard_timing(timing_path, timing)
+            except Exception as exc:
+                _log(log_path, f"offboard timing evidence write failed: {exc}")
+                if runtime_failure is None:
+                    deferred_cleanup_error = RuntimeError(
+                        f"offboard timing evidence write failed: {exc}"
+                    )
+        reset_failure_text = (
+            f"{type(reset_error).__name__}: {reset_error}" if reset_error is not None else None
+        )
+        if reset_error is not None and runtime_failure == reset_failure_text:
+            raise RuntimeError(
+                f"GPS availability cleanup reset failed: {reset_error}"
+            ) from reset_error
+        if deferred_cleanup_error is not None:
+            raise deferred_cleanup_error
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -494,9 +2424,21 @@ def main(argv: list[str] | None = None) -> int:
     land_after = _parse_bool(os.environ.get("PX4_OFFBOARD_LAND_AFTER"), default=True)
 
     try:
-        points = load_reference_track(args.track)
+        scenario_engine, scenario_request, runtime_profile = _load_runtime_effect_request()
+        runtime_evidence_path = (
+            args.run_dir / scenario_engine.RUNTIME_EVIDENCE_ARTIFACT_NAME
+            if runtime_profile is not None
+            else None
+        )
+        reference_plan = load_reference_track_plan(args.track)
+        points = reference_plan.points
         params = load_controller_params(args.params)
-        plan = build_setpoint_schedule_plan(points, params, args.setpoint_rate_hz)
+        plan = build_setpoint_schedule_plan(
+            points,
+            params,
+            args.setpoint_rate_hz,
+            hover_duration_seconds=reference_plan.hover_duration_seconds,
+        )
         _log(
             args.log,
             f"vehicle={args.vehicle} world={args.world} points={len(points)} "
@@ -504,7 +2446,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         _log(
             args.log,
-            "controller_params are applied by the offboard executor, not PX4 internal parameters",
+            "offboard schedule applies vel_limit and accel_limit only; selected PX4 parameters "
+            "are applied and verified by the launch wrapper; legacy gain fields are "
+            "compatibility metadata",
         )
 
         if dry_run:
@@ -520,9 +2464,21 @@ def main(argv: list[str] | None = None) -> int:
                 "offboard_start_t": 0.0,
                 "track_start_t": plan.track_start_index / max(1e-6, args.setpoint_rate_hz),
                 "track_end_t": plan.track_end_index / max(1e-6, args.setpoint_rate_hz),
+                "takeoff_gate": {
+                    "status": "dry_run_not_observed",
+                    "reason": "dry-run does not emit PX4 position/velocity telemetry",
+                },
             }
             _write_offboard_timing(args.run_dir / "offboard_timing.json", dry_timing)
             return 0
+
+        wind_profile = runtime_profile.get("wind_activation") if runtime_profile else None
+        if isinstance(wind_profile, dict):
+            _validated_gazebo_wind_activation(args.world, wind_profile)
+            _log(
+                args.log,
+                "Gazebo CLI wind publisher validated; activation remains gated until stable hover",
+            )
 
         client = MavsdkOffboardClient()
         asyncio.run(
@@ -531,13 +2487,28 @@ def main(argv: list[str] | None = None) -> int:
                 plan.schedule,
                 connection=args.connection,
                 takeoff_timeout_seconds=args.takeoff_timeout_seconds,
+                takeoff_climb_rate_m_s=args.takeoff_climb_rate_m_s,
                 track_timeout_seconds=args.track_timeout_seconds,
+                landing_timeout_seconds=args.landing_timeout_seconds,
                 rate_hz=args.setpoint_rate_hz,
                 land_after=land_after,
                 log_path=args.log,
                 track_start_index=plan.track_start_index,
                 track_end_index=plan.track_end_index,
                 timing_path=args.run_dir / "offboard_timing.json",
+                scenario_engine=scenario_engine,
+                scenario_request=scenario_request,
+                runtime_profile=runtime_profile,
+                runtime_evidence_path=runtime_evidence_path,
+                takeoff_stable_window_seconds=args.takeoff_stable_window_seconds,
+                takeoff_horizontal_tolerance_m=args.takeoff_horizontal_tolerance_m,
+                takeoff_vertical_tolerance_m=args.takeoff_vertical_tolerance_m,
+                takeoff_horizontal_speed_tolerance_m_s=(
+                    args.takeoff_horizontal_speed_tolerance_m_s
+                ),
+                takeoff_vertical_speed_tolerance_m_s=(args.takeoff_vertical_speed_tolerance_m_s),
+                world=args.world,
+                wind_activator=_activate_gazebo_wind_profile,
             )
         )
         _log(args.log, "executor completed successfully")

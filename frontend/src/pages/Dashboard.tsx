@@ -139,12 +139,20 @@ export function Dashboard() {
       </header>
 
       {!runtimeAccess.canUseRuntime ? (
-        <RuntimeAccessNotice page="dashboard" />
+        <div className="dashboard-runtime-fallback">
+          <RuntimeAccessNotice page="dashboard" showAction={false} />
+          <DashboardBody
+            recentJobs={[]}
+            totalJobs={0}
+            counts={{}}
+            dataAvailable={false}
+          />
+        </div>
       ) : jobsQuery.isLoading ? (
         <Loading label={t("dashboard.loading")} />
       ) : runtimeNetworkUnavailable ? (
         <div className="dashboard-runtime-fallback">
-          <RuntimeAccessNotice page="dashboard" />
+          <RuntimeAccessNotice page="dashboard" showAction={false} />
           <DashboardBody recentJobs={[]} totalJobs={0} counts={{}} />
         </div>
       ) : jobsQuery.isError ? (
@@ -179,13 +187,16 @@ function DashboardBody({
   recentJobs,
   totalJobs,
   counts,
+  dataAvailable = true,
 }: {
   recentJobs: Job[];
   totalJobs: number;
   counts: Partial<Record<JobStatus, number>>;
+  dataAvailable?: boolean;
 }) {
   const { t } = useI18n();
   const columns = buildJobColumns(t);
+  const unavailableValue = "—";
 
   return (
     <div className="dashboard-body">
@@ -193,32 +204,32 @@ function DashboardBody({
         <div className="metric-grid">
           <MetricCard
             label={t("dashboard.totalJobs")}
-            value={totalJobs}
+            value={dataAvailable ? totalJobs : unavailableValue}
           />
           <MetricCard
             label={t("dashboard.active")}
-            value={
+            value={dataAvailable ? (
               (counts.RUNNING ?? 0) +
               (counts.QUEUED ?? 0) +
               (counts.AGGREGATING ?? 0) +
               (counts.FINALIZING ?? 0) +
               (counts.CREATED ?? 0)
-            }
+            ) : unavailableValue}
             tone="muted"
           />
           <MetricCard
             label={t("dashboard.completed")}
-            value={counts.COMPLETED ?? 0}
+            value={dataAvailable ? (counts.COMPLETED ?? 0) : unavailableValue}
             tone="positive"
           />
           <MetricCard
             label={t("dashboard.failed")}
-            value={counts.FAILED ?? 0}
+            value={dataAvailable ? (counts.FAILED ?? 0) : unavailableValue}
             tone={(counts.FAILED ?? 0) > 0 ? "negative" : "muted"}
           />
           <MetricCard
             label={t("dashboard.cancelled")}
-            value={counts.CANCELLED ?? 0}
+            value={dataAvailable ? (counts.CANCELLED ?? 0) : unavailableValue}
             tone="muted"
           />
         </div>

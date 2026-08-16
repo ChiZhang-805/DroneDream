@@ -23,7 +23,20 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert data["features"]["llm_tool_harness"] == {
         "available": True,
         "decision_schema_version": "1.0",
+        "evidence_schema_version": "2.9",
+        "tool_registry_version": "2.1",
+        "prompt_template_version": "1.7",
+        "trace_schema_version": "1.4",
         "tool_registry": "closed",
+        "cross_job_memory": {
+            "available": True,
+            "schema_version": "1.0",
+            "retrieval_policy_version": "1.0",
+            "scope": "same_authenticated_user",
+            "task_family_policy": "exact_structural_match",
+            "retention_days": 90,
+            "revocable": True,
+        },
     }
     assert data["simulators"]["authoritative"] is False
     assert data["optimizers"]["authoritative"] is False
@@ -58,6 +71,7 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
             "payload_changed",
             "battery_degraded",
             "actuator_delay",
+            "actuator_failure",
             "custom",
         ],
     }
@@ -68,15 +82,37 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert real_cli["status"] == "not_configured"
     assert real_cli["max_concurrency_per_host_without_instance_allocator"] == 1
     assert real_cli["instance_allocation"] == "operator_managed"
-    assert real_cli["bundled_runner_advanced_effects"] == ["obstacles"]
-    scenario_effects = real_cli["scenario_effect_contract"]
-    assert scenario_effects["physically_applied"] == ["obstacles"]
-    assert scenario_effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
-    assert "probabilistic GPS dropout" in scenario_effects[
-        "requires_runtime_extension"
+    assert real_cli["bundled_runner_advanced_effects"] == [
+        "actuator_first_order_delay",
+        "actuator_hard_failure",
+        "battery_initial_state_and_voltage_sag",
+        "deterministic_seeded_gps_dropout",
+        "gust_and_turbulence",
+        "obstacles",
+        "payload_mass_and_inertia",
+        "sensor_noise",
+        "steady_wind",
     ]
+    scenario_effects = real_cli["scenario_effect_contract"]
+    assert scenario_effects["physically_applied"] == real_cli["bundled_runner_advanced_effects"]
+    assert scenario_effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
+    assert scenario_effects["steady_wind"]["mechanism"] == "gazebo_wind_effects"
+    assert scenario_effects["trial_local_sdf_profiles"]["mechanisms"] == [
+        "gazebo_wind_effects",
+        "sdformat_sensor_noise",
+        "sdformat_model_inertial",
+        "sdformat_actuator_dynamics",
+        "sdformat_actuator_hard_stop",
+        "gazebo_joint_state_publisher",
+    ]
+    assert scenario_effects["flight_timed_runtime_profiles"]["mechanisms"] == [
+        "mavsdk_sim_gps_used_plus_gps_info_telemetry",
+        "px4_battery_simulation",
+    ]
+    assert scenario_effects["requires_runtime_extension"] == []
     assert real_cli["unverified_effect_passthrough_opt_in"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
+    assert data["optimizers"]["items"]["gpt"]["prompt_schema_version"] == "2.3"
     assert data["optimizers"]["items"]["llm_harness"] == {
         "ready": False,
         "status": "server_secret_not_configured",
@@ -84,9 +120,7 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
         "requires_user_api_key": True,
         "tool_registry": "closed",
         "fallback_strategy": "optimizer_portfolio",
-        "reason": (
-            "The API secret store is not configured for model-guided Harness jobs."
-        ),
+        "reason": ("The API secret store is not configured for model-guided Harness jobs."),
         "custom_base_url_allowlist_configured": False,
     }
     serialized = response.text
@@ -94,19 +128,14 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert "APP_SECRET_KEY" not in serialized
 
 
-def test_capabilities_treats_blank_secret_key_as_unconfigured(
-    client, monkeypatch
-) -> None:
+def test_capabilities_treats_blank_secret_key_as_unconfigured(client, monkeypatch) -> None:
     monkeypatch.setenv("APP_SECRET_KEY", "   ")
     monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
 
     data = client.get("/api/v1/capabilities").json()["data"]
 
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
-    assert (
-        data["optimizers"]["items"]["gpt"]["status"]
-        == "server_secret_not_configured"
-    )
+    assert data["optimizers"]["items"]["gpt"]["status"] == "server_secret_not_configured"
 
 
 def test_capabilities_honors_global_override_and_configuration(

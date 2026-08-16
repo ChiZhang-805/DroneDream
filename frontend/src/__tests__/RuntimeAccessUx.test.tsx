@@ -181,7 +181,7 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Runtime data is not available yet"))
+    expect(await screen.findByText("Runtime disconnected"))
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Experiment" }))
       .not.toHaveClass("runtime-locked");
@@ -221,7 +221,7 @@ afterEach(() => {
       await router.navigate("/history");
     });
     await waitFor(() => {
-      expect(screen.getByText("Runtime data is not available yet")).toBeInTheDocument();
+      expect(screen.getByText("Runtime disconnected")).toBeInTheDocument();
     });
     expect(listJobs).not.toHaveBeenCalled();
 
@@ -269,7 +269,7 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Runtime data is not available yet")).toBeInTheDocument();
+    expect(await screen.findByText("Runtime disconnected")).toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
@@ -329,7 +329,7 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Runtime data is not available yet"))
+    expect(await screen.findByText("Runtime disconnected"))
       .toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);

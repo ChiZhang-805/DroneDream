@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-runtime-contract-registry",
+  "contractPaths": [
+    "distribution/schemas/capability-policy.schema.json",
+    "distribution/schemas/edition-manifest.schema.json",
+    "distribution/schemas/engine-pack-profile.schema.json",
+    "distribution/schemas/upstream-source-inventory.schema.json",
+    "distribution/schemas/vehicle-pack-manifest.schema.json",
+    "distribution/schemas/vehicle-pack-profile-registry.schema.json",
+    "distribution/tools/distribution_contract.py",
+    "distribution/tools/engine_pack_profile_contract.py"
+  ]
+}

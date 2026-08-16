@@ -32,7 +32,7 @@ describe("Dashboard availability", () => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Runtime data is not available yet"))
+    expect(await screen.findByText("Runtime disconnected"))
       .toBeVisible();
     expect(screen.getByText("Status summary")).toBeVisible();
     expect(screen.getByText("Recent jobs")).toBeVisible();

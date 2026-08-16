@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "kind": "dronedream-universal-integrated-workspaces",
+  "contractId": "dronedream-universal-integrated-workspaces/v2",
+  "productEdition": "universal",
+  "workspaceModes": ["sim", "lab", "field"],
+  "workspaceSwitchMeaning": "presentation-and-module-selection-only",
+  "createsCrossEditionHarnessOrchestrator": false,
+  "presentationOnly": true,
+  "grantsHardwareAuthority": false,
+  "validatedVehiclePackCount": 0,
+  "hardwareActionDecision": "deny",
+  "universalExclusiveCapability": {
+    "id": "vehicle-studio",
+    "route": "/vehicle-studio",
+    "theme": "universal",
+    "shareTargets": ["sim", "lab", "field"],
+    "automaticReceiverInstallation": false,
+    "startsModelHarnessOnExchange": false,
+    "grantsHardwareAuthority": false
+  },
+  "donors": {
+    "lab": {
+      "productSource": "b3c5f90948f206472e3e12504d8205cb563ac9dc",
+      "tree": "272125dace28293f206f223865df6ac42ef0bdb2",
+      "evidenceHead": "4b94b635d2b1c26623556306bf5921a947fec8db",
+      "evidenceHeadIsProductSource": false
+    },
+    "field": {
+      "productSource": "7d3d0c34d0e385d88312db34601667a384ecc9c5",
+      "upstreamExact": true,
+      "evidenceHeadIsProductSource": true
+    }
+  },
+  "sourceFiles": [
+    {
+      "path": "frontend/scripts/verify-lab-ui.mjs",
+      "sha256": "1037a4b204b875963520a2db0c617ccc8de2f0352dce24f11b47265ceefaa142",
+      "donorEdition": "lab",
+      "donorBlob": "125386b98af709fbe559cb1dff6013dd52eee3ed",
+      "integration": "semantic-universal-profile-and-final-field-adaptation"
+    },
+    {
+      "path": "frontend/src/__tests__/FieldAssistantWorkspace.test.tsx",
+      "sha256": "d328f46b9e0aed5ed282cf341083675bafdf88063bc3bbc0630f0a2fb461414e",
+      "donorEdition": "field",
+      "donorBlob": "1311d713f1b5909e8731d99946706e069b83f93c",
+      "integration": "semantic-universal-auth-and-workflow-adaptation"
+    },
+    {
+      "path": "frontend/src/field/FieldAssistantWorkspace.tsx",
+      "sha256": "2641036493026ef85823ffb0f325434784c43b3e2c8b83cd596eb42a910cd5d8",
+      "donorEdition": "field",
+      "donorBlob": "17aef3e57559c652b080b1c37e675816d24de118",
+      "integration": "semantic-universal-auth-and-workflow-adaptation"
+    },
+    {
+      "path": "frontend/src/field/field.css",
+      "sha256": "e54167739a20c13dff313c018d5d1567abfa01c5b329d930414fec8373669000",
+      "donorEdition": "field",
+      "donorBlob": "49d715fd854354277352be5f77dfd2db5d06b51a",
+      "integration": "semantic-field-settings-and-responsive-chrome"
+    },
+    {
+      "path": "frontend/src/lab/LabSetup.tsx",
+      "sha256": "f70672fac9d546a6bb4964cc35fedf9f71c71e141532a7e166bb7dcbc2818b02",
+      "donorEdition": "lab",
+      "donorBlob": "b4a3a2198e8ce3b25cf766fe425b922f516bd546",
+      "integration": "semantic-universal-auth-and-runtime-adaptation"
+    },
+    {
+      "path": "frontend/src/lab/__tests__/LabSetup.test.tsx",
+      "sha256": "a9c07e6813acdde603bcc69dde711c30338671ab8116d36c4377476d48749d6c",
+      "donorEdition": "lab",
+      "donorBlob": "afee9e33fb49e1eb79084e459782de80fc656b42",
+      "integration": "byte-exact"
+    },
+    {
+      "path": "frontend/src/lab/lab-hardware.css",
+      "sha256": "a1f0f717beb9430352c0e5c38c1935d4e20b407db66676f77115c397d1e6c38e",
+      "donorEdition": "lab",
+      "donorBlob": "905ca7b5f783e9a72c3e063e578a2b071aa8e2b5",
+      "integration": "semantic-universal-container-height-boundary"
+    },
+    {
+      "path": "frontend/src/lab/lab.css",
+      "sha256": "5904d9a2649e886414ca25f7464e3a04aed3da74d127495f2985eed01698fc58",
+      "donorEdition": "lab",
+      "donorBlob": "5968461d1f67e16551c88888a93fee137a481e68",
+      "integration": "semantic-universal-layout-and-theme-adaptation"
+    },
+    {
+      "path": "frontend/src/pages/ExperimentAssistant.tsx",
+      "sha256": "44ac3ed63351942003b44d7315ff81017ff9811f0b2262db22c28ee112140534",
+      "donorEdition": "lab",
+      "donorBlob": "c0bcfc6042582014a35e28ce2ff1f01bde3f44ad",
+      "integration": "semantic-active-universal-workspace-theme"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "sha256": "ab1c0f59ec47730716384b3b6c2629ad1dd76289642b018ab003a0e5f7d94953",
+      "donorEdition": "lab",
+      "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
+      "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
+    },
+    {
+      "path": "frontend/src/field/FieldApp.tsx",
+      "sha256": "63bfacac56584424962a2579270d7a4ea718e822f6f80ddd861eb7169eb6a6b6",
+      "donorEdition": "field",
+      "donorBlob": "5c4e3f01f16d831cdf0d995904c5b8b0a9b11c0d",
+      "integration": "semantic-universal-shared-locale-adapter"
+    },
+    {
+      "path": "frontend/src/router.tsx",
+      "sha256": "04bc165f1175f55c1854592426165946bff31273b7001ee103279c73df088dc2",
+      "donorEdition": "universal",
+      "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
+      "integration": "semantic-universal-workspace-routing-and-shared-locale"
+    }
+  ],
+  "verificationRequirements": {
+    "locales": ["en", "zh-CN"],
+    "viewports": ["1440x1000", "760x900", "390x844"],
+    "assistantSingleScreen": true,
+    "hardwareWorkspaceSingleScreen": true,
+    "mobileChatPlanAriaTabs": true,
+    "presentationAuthorityInvariant": true,
+    "fieldSimulationCapabilityAllowed": false
+  }
+}

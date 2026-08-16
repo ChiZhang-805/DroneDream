@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-adapter-package",
+  "adapterId": "tello-state-v2",
+  "version": "1.0.0",
+  "editionId": "field",
+  "protocol": {
+    "family": "Tello SDK State",
+    "dialect": "Tello SDK 2.0",
+    "versions": [2],
+    "engine": "native-read-only-tello-state-inspector",
+    "transportPolicy": "offline-captured-state-only"
+  },
+  "capabilities": {
+    "deviceDiscovery": "unavailable",
+    "telemetryRead": "read-only",
+    "parameterRead": "unavailable",
+    "parameterWrite": "unavailable",
+    "arm": "unavailable",
+    "flight": "unavailable",
+    "autonomousTuning": "unavailable"
+  },
+  "safety": {
+    "executableCode": false,
+    "installationGrantsAuthority": false,
+    "discoveryGrantsAuthority": false,
+    "zeroValidatedPackDecision": "deny"
+  },
+  "license": {
+    "protocolSpecification": "Ryze Tello SDK 2.0 User Guide",
+    "packageContent": "DroneDream-1.0"
+  }
+}

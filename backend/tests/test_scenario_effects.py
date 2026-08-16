@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 
 import pytest
 
@@ -10,6 +11,10 @@ from app.simulator.scenario_effects import (
     ScenarioEffectContractError,
     build_scenario_effect_evidence,
     build_scenario_effect_request,
+    compile_bundled_runtime_profile,
+    compile_bundled_sdf_profile,
+    compile_bundled_steady_wind,
+    scenario_effect_value_sha256,
     validate_scenario_effect_evidence,
     validate_scenario_effect_request,
 )
@@ -43,6 +48,152 @@ def _request(*, advanced: dict[str, object], wind: bool = False):
     )
 
 
+def _wind_only_request(
+    *,
+    seed: int = 42,
+    cardinal: dict[str, float] | None = None,
+    wind_mps: float | None = 3.0,
+) -> dict[str, object]:
+    scenario_config = {} if wind_mps is None else {"wind_mps": wind_mps}
+    return build_scenario_effect_request(
+        execution_identity={**_identity(), "seed": seed},
+        scenario_type="nominal",
+        scenario_config=scenario_config,
+        job_config={
+            "wind": cardinal or {"north": 1.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+
+def _wind_evidence_records(request: dict[str, object]) -> list[dict[str, object]]:
+    compiled = compile_bundled_steady_wind(request)
+    assert compiled is not None
+    readback = {
+        "linear_velocity_mps": dict(compiled["linear_velocity_mps"]),
+        "enable_wind": True,
+    }
+    runtime_sdf = {
+        "source_vehicle_model": "x500_base",
+        "vehicle_model": "x500_0",
+        "link_name": "base_link",
+        "enable_wind": True,
+        "sdf_path": "/tmp/generated_world.sdf",
+        "sdf_sha256": "a" * 64,
+    }
+    observations = [
+        {
+            "source": "/world/default/wind_info",
+            "kind": "readback",
+            "value": readback,
+            "sha256": scenario_effect_value_sha256(readback),
+        },
+        {
+            "source": "/world/default/generate_world_sdf",
+            "kind": "artifact",
+            "value": runtime_sdf,
+            "sha256": scenario_effect_value_sha256(runtime_sdf),
+        },
+    ]
+    return [
+        {
+            "effect_id": effect["effect_id"],
+            "mechanism": effect["mechanism"],
+            "status": "applied",
+            "capability": {"status": "available", "reason": "bundled steady wind"},
+            "evidence": {
+                "requested_value_sha256": scenario_effect_value_sha256(effect["requested_value"]),
+                "compiled_wind": compiled,
+                "verification": {
+                    "status": "verified",
+                    "method": "gazebo_wind_info_and_generated_world_sdf",
+                    "observations": copy.deepcopy(observations),
+                },
+            },
+        }
+        for effect in request["effects"]
+    ]
+
+
+def _combined_wind_gust_request() -> dict[str, object]:
+    return build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 2.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 8.0,
+            }
+        },
+    )
+
+
+def _combined_wind_gust_evidence_records(
+    request: dict[str, object],
+) -> list[dict[str, object]]:
+    compiled_wind = compile_bundled_steady_wind(request)
+    compiled_sdf = compile_bundled_sdf_profile(request)
+    runtime_profile = compile_bundled_runtime_profile(request)
+    assert compiled_wind is not None
+    assert compiled_sdf is not None
+    assert runtime_profile is not None
+    activation_vector = runtime_profile["wind_activation"]["linear_velocity_mps"]
+    readback = {
+        "linear_velocity_mps": dict(activation_vector),
+        "enable_wind": True,
+    }
+    runtime_sdf = {
+        "source_vehicle_model": "x500_base",
+        "vehicle_model": "x500_0",
+        "link_name": "base_link",
+        "enable_wind": True,
+        "verified_profile_sections": ["wind_gust"],
+        "sdf_path": "/tmp/generated_world.sdf",
+        "sdf_sha256": "a" * 64,
+    }
+    observations = [
+        {
+            "source": "/world/default/wind_info",
+            "kind": "readback",
+            "value": readback,
+            "sha256": scenario_effect_value_sha256(readback),
+        },
+        {
+            "source": "/world/default/generate_world_sdf",
+            "kind": "artifact",
+            "value": runtime_sdf,
+            "sha256": scenario_effect_value_sha256(runtime_sdf),
+        },
+    ]
+    return [
+        {
+            "effect_id": effect["effect_id"],
+            "mechanism": effect["mechanism"],
+            "status": "applied",
+            "capability": {"status": "available", "reason": "bundled composed wind"},
+            "evidence": {
+                "requested_value_sha256": scenario_effect_value_sha256(effect["requested_value"]),
+                "compiled_wind": compiled_wind,
+                "compiled_sdf_profile": compiled_sdf,
+                "verification": {
+                    "status": "verified",
+                    "method": "gazebo_composed_wind_and_generated_world_sdf",
+                    "observations": copy.deepcopy(observations),
+                },
+            },
+        }
+        for effect in request["effects"]
+    ]
+
+
 def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
     request = _request(
         wind=True,
@@ -50,7 +201,9 @@ def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
             "wind_gusts": {
                 "enabled": True,
                 "magnitude_mps": 4.0,
-                "direction_deg": 135.0,
+                # The test also requests a seeded 3 m/s wind plus 1 m/s north.
+                # This bearing is their exact combined direction.
+                "direction_deg": 332.966948831704,
                 "period_s": 8.0,
             },
             "obstacles": [
@@ -94,22 +247,342 @@ def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
     }
     assert effects["obstacles"]["capability"]["status"] == "available"
     assert effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
+    assert effects["job_config.wind"]["capability"]["status"] == "available"
+    assert effects["scenario_config.wind_mps"]["capability"]["status"] == "available"
+    assert effects["wind_gusts"]["capability"]["status"] == "available"
     assert effects["wind_gusts"]["requested_value"] == {
         "enabled": True,
         "magnitude_mps": 4.0,
-        "direction_deg": 135.0,
+        "direction_deg": 332.966948831704,
         "period_s": 8.0,
     }
     assert "WindEffects" in effects["wind_gusts"]["capability"]["reason"]
-    assert (
-        "not a probabilistic dropout rate"
-        in effects["sensor_degradation.dropout_rate"]["capability"]["reason"]
-    )
+    assert effects["sensor_degradation.dropout_rate"]["capability"]["status"] == "available"
+    assert "trial-seed-bound" in effects["sensor_degradation.dropout_rate"]["capability"]["reason"]
+    assert effects["battery.initial_percent"]["capability"]["status"] == "available"
+    assert "battery telemetry" in effects["battery.initial_percent"]["capability"]["reason"]
     assert "inertial" in effects["battery.mass_payload_kg"]["capability"]["reason"]
     assert all(
         item["launcher_input"]["request_path_env"] == "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH"
         for item in effects.values()
     )
+
+
+def test_compile_bundled_sdf_profile_binds_explicit_physics() -> None:
+    request = _request(
+        advanced={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 8.0,
+            },
+            "sensor_degradation": {
+                "gps_noise_m": 2.0,
+                "baro_noise_m": 0.5,
+                "imu_noise_scale": 1.5,
+            },
+            "battery": {"mass_payload_kg": 1.2},
+        }
+    )
+
+    profile = compile_bundled_sdf_profile(request)
+
+    assert profile is not None
+    assert profile["wind_gust"] == {
+        "peak_magnitude_mps": 4.0,
+        "mean_magnitude_mps": 2.0,
+        "direction_deg_clockwise_from_north": 90.0,
+        "period_s": 8.0,
+        "time_for_rise_s": 1.0,
+        "mean_linear_velocity_mps": {"x": 2.0, "y": 0.0, "z": 0.0},
+        "horizontal_magnitude_sine_amplitude_percent": 1.0,
+        "range_mps": [0.0, 4.0],
+        "effect_ids": ["wind_gusts"],
+    }
+    assert profile["sensor_noise"]["gps_position_stddev_m"] == 2.0
+    assert profile["sensor_noise"]["gazebo_navsat_white_stddev_m"] == 0.02
+    assert profile["sensor_noise"]["gazebo_navsat_dynamic_bias_stddev_m"] == pytest.approx(
+        math.sqrt(4.0 - 0.0004)
+    )
+    assert profile["sensor_noise"]["gazebo_navsat_dynamic_bias_correlation_time_s"] == 60.0
+    assert profile["sensor_noise"]["gazebo_navsat_noise_composition_policy"] == (
+        "requested-total-stddev-as-slow-bias-with-one-percent-white-noise-v1"
+    )
+    assert profile["sensor_noise"]["gazebo_navsat_unit_policy"] == (
+        "sdformat-1.11-horizontal-metres-vertical-metres-v2"
+    )
+    assert profile["sensor_noise"]["barometer_altitude_stddev_m"] == 0.5
+    assert profile["sensor_noise"]["barometer_pressure_stddev_pa"] == 6.0
+    assert profile["sensor_noise"]["imu_noise_scale"] == 1.5
+    assert profile["payload"]["mass_kg"] == 1.2
+    assert profile["payload"]["assumption"] == "centered_uniform_cuboid"
+    assert profile["payload"]["inertia_increment_kg_m2"] == {
+        "ixx": pytest.approx(0.005),
+        "iyy": pytest.approx(0.005),
+        "izz": pytest.approx(0.008),
+    }
+
+
+def test_collinear_steady_wind_and_gust_compile_to_exact_superposition() -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="wind_perturbed",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 2.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 12.0,
+            }
+        },
+    )
+
+    sdf_profile = compile_bundled_sdf_profile(request)
+    runtime_profile = compile_bundled_runtime_profile(request)
+
+    assert sdf_profile is not None
+    gust = sdf_profile["wind_gust"]
+    assert gust["composition_policy"] == "collinear-vector-superposition-v1"
+    assert gust["steady_component_magnitude_mps"] == 2.0
+    assert gust["gust_component_peak_magnitude_mps"] == 4.0
+    assert gust["gust_component_mean_magnitude_mps"] == 2.0
+    assert gust["mean_magnitude_mps"] == 4.0
+    assert gust["mean_linear_velocity_mps"] == {"x": 4.0, "y": 0.0, "z": 0.0}
+    assert gust["horizontal_magnitude_sine_amplitude_percent"] == 0.5
+    assert gust["range_mps"] == [2.0, 6.0]
+    assert runtime_profile is not None
+    assert runtime_profile["wind_activation"]["linear_velocity_mps"] == {
+        "x": 4.0,
+        "y": 0.0,
+        "z": 0.0,
+    }
+
+
+def test_non_collinear_steady_wind_and_gust_fail_before_launch() -> None:
+    with pytest.raises(
+        ScenarioEffectContractError,
+        match="share the same horizontal direction",
+    ):
+        build_scenario_effect_request(
+            execution_identity=_identity(),
+            scenario_type="wind_perturbed",
+            scenario_config={},
+            job_config={
+                "wind": {"north": 2.0, "east": 0.0, "south": 0.0, "west": 0.0},
+                "sensor_noise_level": "medium",
+            },
+            advanced_config={
+                "wind_gusts": {
+                    "enabled": True,
+                    "magnitude_mps": 4.0,
+                    "direction_deg": 90.0,
+                    "period_s": 12.0,
+                }
+            },
+        )
+
+
+def test_compile_bundled_runtime_profile_binds_dropout_and_battery() -> None:
+    request = _request(
+        advanced={
+            "sensor_degradation": {"dropout_rate": 0.2},
+            "battery": {"initial_percent": 60.0, "voltage_sag": True},
+        }
+    )
+
+    profile = compile_bundled_runtime_profile(request)
+
+    assert profile is not None
+    assert profile["requested_effect_ids"] == [
+        "battery.initial_percent",
+        "battery.voltage_sag",
+        "sensor_degradation.dropout_rate",
+    ]
+    assert len(profile["execution_identity_sha256"]) == 64
+    assert profile["gps_dropout"] == {
+        "requested_rate": 0.2,
+        "tick_period_s": 1.0,
+        "schedule_algorithm": "sha256-ranked-fixed-duty-v1",
+        "parameter_name": "SIM_GPS_USED",
+        "dropout_value": 0,
+        "availability_source": "mavsdk.telemetry.gps_info",
+        "effect_ids": ["sensor_degradation.dropout_rate"],
+    }
+    assert profile["battery"] == {
+        "target_track_start_percent": 60.0,
+        "voltage_sag": True,
+        "sag_drain_seconds": 300.0,
+        "no_sag_hold_drain_seconds": 86400.0,
+        "parameter_names": ["SIM_BAT_DRAIN", "SIM_BAT_MIN_PCT"],
+        "effect_ids": ["battery.initial_percent", "battery.voltage_sag"],
+    }
+
+
+def test_compile_bundled_runtime_profile_stages_wind_after_stable_hover() -> None:
+    request = _request(advanced={}, wind=True)
+
+    profile = compile_bundled_runtime_profile(request)
+
+    assert profile is not None
+    assert profile["wind_activation"] == {
+        "linear_velocity_mps": {
+            "x": pytest.approx(-1.752621512767),
+            "y": pytest.approx(3.43481371628),
+            "z": 0.0,
+        },
+        "activation_phase": "after_stable_hover_before_track_entry",
+        "topic_suffix": "/wind",
+        "readback_service_suffix": "/wind_info",
+        "effect_ids": ["job_config.wind", "scenario_config.wind_mps"],
+    }
+    assert profile["requested_effect_ids"] == [
+        "job_config.wind",
+        "scenario_config.wind_mps",
+    ]
+
+
+def test_runtime_profile_rejects_conflicting_dropout_sources() -> None:
+    with pytest.raises(ScenarioEffectContractError, match="conflicting dropout rates"):
+        build_scenario_effect_request(
+            execution_identity=_identity(),
+            scenario_type="gps_dropout",
+            scenario_config={"dropout_rate": 0.4},
+            job_config={
+                "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+                "sensor_noise_level": "medium",
+            },
+            advanced_config={"sensor_degradation": {"dropout_rate": 0.2}},
+        )
+
+
+@pytest.mark.parametrize(
+    ("scenario_type", "config", "section", "expected"),
+    [
+        (
+            "noise_perturbed",
+            {},
+            "sensor_noise",
+            {"gps_position_stddev_m": 0.0, "imu_noise_scale": 2.0},
+        ),
+        (
+            "turbulence",
+            {"intensity": 0.8},
+            "wind_gust",
+            {"peak_magnitude_mps": 4.0, "period_s": 5.0},
+        ),
+        (
+            "payload_changed",
+            {"mass_payload_kg": 1.5},
+            "payload",
+            {"mass_kg": 1.5},
+        ),
+        (
+            "actuator_delay",
+            {"delay_ms": 80.0},
+            "actuator_dynamics",
+            {"time_constant_up_s": 0.08, "time_constant_down_s": 0.08},
+        ),
+        (
+            "actuator_failure",
+            {
+                "motor_number": 2,
+                "failure_mode": "stuck_stopped_at_launch",
+            },
+            "actuator_failure",
+            {
+                "target_motor_number": 2,
+                "max_rot_velocity_rad_s": 0.0,
+            },
+        ),
+    ],
+)
+def test_scenario_markers_compile_to_concrete_sdf_profiles(
+    scenario_type: str,
+    config: dict[str, object],
+    section: str,
+    expected: dict[str, object],
+) -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type=scenario_type,
+        scenario_config=config,
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+    profile = compile_bundled_sdf_profile(request)
+
+    assert profile is not None
+    for key, value in expected.items():
+        assert profile[section][key] == value
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ({"motor_number": True}, "motor_number must be an integer"),
+        ({"motor_number": -1}, "motor_number must be an integer"),
+        ({"motor_number": 4}, "motor_number must be an integer"),
+        (
+            {"failure_mode": "intermittent"},
+            "failure_mode must be 'stuck_stopped_at_launch'",
+        ),
+    ],
+)
+def test_actuator_failure_profile_rejects_unverifiable_modes(
+    config: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ScenarioEffectContractError, match=message):
+        build_scenario_effect_request(
+            execution_identity=_identity(),
+            scenario_type="actuator_failure",
+            scenario_config=config,
+            job_config={
+                "wind": {
+                    "north": 0.0,
+                    "east": 0.0,
+                    "south": 0.0,
+                    "west": 0.0,
+                },
+                "sensor_noise_level": "medium",
+            },
+            advanced_config={},
+        )
+
+
+def test_actuator_failure_default_motor_is_seed_deterministic() -> None:
+    def compile_for(seed: int) -> dict[str, object]:
+        request = build_scenario_effect_request(
+            execution_identity={**_identity(), "seed": seed},
+            scenario_type="actuator_failure",
+            scenario_config={},
+            job_config={
+                "wind": {
+                    "north": 0.0,
+                    "east": 0.0,
+                    "south": 0.0,
+                    "west": 0.0,
+                },
+                "sensor_noise_level": "medium",
+            },
+            advanced_config={},
+        )
+        profile = compile_bundled_sdf_profile(request)
+        assert profile is not None
+        return profile["actuator_failure"]
+
+    assert compile_for(42) == compile_for(42)
+    assert 0 <= int(compile_for(42)["target_motor_number"]) <= 3
 
 
 def test_request_hash_rejects_tampering() -> None:
@@ -197,8 +670,17 @@ def test_launcher_cannot_claim_unimplemented_wind_as_applied_without_readback() 
         validate_scenario_effect_evidence(request, payload)
 
 
-def test_extended_launcher_can_prove_an_applied_effect_with_bound_readback() -> None:
-    request = _request(advanced={}, wind=True)
+def test_extended_launcher_can_prove_site_specific_effect_with_bound_readback() -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="custom",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
     records = []
     for item in request["effects"]:
         value_hash = hashlib.sha256(
@@ -249,6 +731,132 @@ def test_extended_launcher_can_prove_an_applied_effect_with_bound_readback() -> 
     rejected["effects"][0]["evidence"]["verification"]["observations"][0]["sha256"] = "0" * 64
     with pytest.raises(ScenarioEffectContractError, match="hash does not match"):
         validate_scenario_effect_evidence(request, rejected)
+
+
+def test_bundled_steady_wind_compiles_cardinal_components_into_gazebo_enu() -> None:
+    request = _wind_only_request(
+        cardinal={"north": 3.0, "east": 4.0, "south": 1.0, "west": 0.5},
+        wind_mps=None,
+    )
+
+    compiled = compile_bundled_steady_wind(request)
+
+    assert compiled is not None
+    assert compiled["coordinate_frame"] == "GAZEBO_WORLD_ENU"
+    assert compiled["linear_velocity_mps"] == {"x": 3.5, "y": 2.0, "z": 0.0}
+    assert compiled["speed_mps"] == pytest.approx(math.hypot(3.5, 2.0))
+
+
+def test_scalar_steady_wind_direction_is_seeded_and_repeatable() -> None:
+    first = compile_bundled_steady_wind(
+        _wind_only_request(
+            seed=42,
+            cardinal={"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+        )
+    )
+    repeated = compile_bundled_steady_wind(
+        _wind_only_request(
+            seed=42,
+            cardinal={"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+        )
+    )
+    different = compile_bundled_steady_wind(
+        _wind_only_request(
+            seed=43,
+            cardinal={"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+        )
+    )
+
+    assert first == repeated
+    assert first is not None and different is not None
+    assert first["speed_mps"] == pytest.approx(3.0)
+    assert first["linear_velocity_mps"] != different["linear_velocity_mps"]
+
+
+def test_combined_steady_wind_limit_is_fail_closed() -> None:
+    with pytest.raises(ScenarioEffectContractError, match="combined steady wind"):
+        _wind_only_request(
+            cardinal={"north": 29.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            wind_mps=3.0,
+        )
+
+
+def test_bundled_steady_wind_requires_exact_readback_and_runtime_wind_mode() -> None:
+    request = _wind_only_request()
+    records = _wind_evidence_records(request)
+    payload = build_scenario_effect_evidence(
+        request,
+        launcher="bundled-test-launcher",
+        world="default",
+        effects=records,
+    )
+
+    normalized = validate_scenario_effect_evidence(request, payload)
+
+    assert normalized["verification_status"] == "verified_applied"
+    assert normalized["applied_effects"] == [
+        "job_config.wind",
+        "scenario_config.wind_mps",
+    ]
+
+    mismatched = copy.deepcopy(payload)
+    mismatched["effects"][0]["evidence"]["verification"]["observations"][0]["value"][
+        "linear_velocity_mps"
+    ]["x"] += 0.5
+    mismatched["effects"][0]["evidence"]["verification"]["observations"][0]["sha256"] = (
+        scenario_effect_value_sha256(
+            mismatched["effects"][0]["evidence"]["verification"]["observations"][0]["value"]
+        )
+    )
+    with pytest.raises(ScenarioEffectContractError, match="exact Gazebo wind_info"):
+        validate_scenario_effect_evidence(request, mismatched)
+
+    no_wind_mode = copy.deepcopy(payload)
+    no_wind_mode["effects"][0]["evidence"]["verification"]["observations"][1]["value"][
+        "enable_wind"
+    ] = False
+    no_wind_mode["effects"][0]["evidence"]["verification"]["observations"][1]["sha256"] = (
+        scenario_effect_value_sha256(
+            no_wind_mode["effects"][0]["evidence"]["verification"]["observations"][1]["value"]
+        )
+    )
+    with pytest.raises(ScenarioEffectContractError, match="WindMode"):
+        validate_scenario_effect_evidence(request, no_wind_mode)
+
+
+def test_combined_wind_evidence_requires_the_exact_runtime_activation_vector() -> None:
+    request = _combined_wind_gust_request()
+    records = _combined_wind_gust_evidence_records(request)
+    payload = build_scenario_effect_evidence(
+        request,
+        launcher="bundled-test-launcher",
+        world="default",
+        effects=records,
+    )
+
+    normalized = validate_scenario_effect_evidence(request, payload)
+
+    assert normalized["verification_status"] == "verified_applied"
+    assert normalized["applied_effects"] == ["job_config.wind", "wind_gusts"]
+    steady = compile_bundled_steady_wind(request)
+    runtime_profile = compile_bundled_runtime_profile(request)
+    assert steady is not None
+    assert runtime_profile is not None
+    assert steady["linear_velocity_mps"] == {"x": 2.0, "y": 0.0, "z": 0.0}
+    assert runtime_profile["wind_activation"]["linear_velocity_mps"] == {
+        "x": 4.0,
+        "y": 0.0,
+        "z": 0.0,
+    }
+
+    stale_steady_only_readback = copy.deepcopy(payload)
+    observation = stale_steady_only_readback["effects"][0]["evidence"]["verification"][
+        "observations"
+    ][0]
+    observation["value"]["linear_velocity_mps"] = dict(steady["linear_velocity_mps"])
+    observation["sha256"] = scenario_effect_value_sha256(observation["value"])
+    with pytest.raises(ScenarioEffectContractError, match="exact Gazebo wind_info"):
+        validate_scenario_effect_evidence(request, stale_steady_only_readback)
 
 
 def test_extended_evidence_rejects_requested_value_hash_mismatch() -> None:
@@ -322,7 +930,7 @@ def test_combined_scenario_uses_explicit_effects_without_unappliable_label() -> 
     assert "scenario_type.combined_perturbed" not in effect_ids
 
 
-def test_combined_scenario_without_explicit_effects_keeps_guard_marker() -> None:
+def test_combined_scenario_without_explicit_effects_gets_two_physical_defaults() -> None:
     request = build_scenario_effect_request(
         execution_identity=_identity(),
         scenario_type="combined_perturbed",
@@ -334,9 +942,32 @@ def test_combined_scenario_without_explicit_effects_keeps_guard_marker() -> None
         advanced_config={},
     )
 
-    assert [item["effect_id"] for item in request["effects"]] == [
-        "scenario_type.combined_perturbed"
-    ]
+    assert {item["effect_id"] for item in request["effects"]} == {
+        "scenario_type.wind_perturbed",
+        "scenario_type.noise_perturbed",
+    }
+    assert compile_bundled_steady_wind(request) is not None
+    sdf_profile = compile_bundled_sdf_profile(request)
+    assert sdf_profile is not None
+    assert sdf_profile["sensor_noise"]["preset"] == "high"
+
+
+def test_combined_scenario_with_only_one_effect_adds_a_second_effect_family() -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="combined_perturbed",
+        scenario_config={"wind_mps": 4.0},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+    assert {item["effect_id"] for item in request["effects"]} == {
+        "scenario_config.wind_mps",
+        "scenario_type.noise_perturbed",
+    }
 
 
 def test_request_builder_rejects_pathologically_deep_custom_config() -> None:

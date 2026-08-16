@@ -1,0 +1,235 @@
+param(
+    [Parameter(Mandatory = $true)][string]$OutputReceipt,
+    [ValidateRange(5, 120)][int]$TimeoutSeconds = 90,
+    [switch]$Execute
+)
+
+$ErrorActionPreference = "Stop"
+$receiptPath = [IO.Path]::GetFullPath($OutputReceipt)
+
+function Write-AtomicJson([string]$Path, $Value) {
+    $directory = Split-Path -Parent $Path
+    New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    $temporary = "$Path.tmp-$PID"
+    try {
+        [IO.File]::WriteAllText(
+            $temporary,
+            (($Value | ConvertTo-Json -Depth 12) + "`n"),
+            [Text.UTF8Encoding]::new($false)
+        )
+        Move-Item -LiteralPath $temporary -Destination $Path -Force
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporary) { [IO.File]::Delete($temporary) }
+    }
+}
+
+$receipt = [ordered]@{
+    schemaVersion = 1
+    kind = "dronedream-universal-browser-consent-receipt"
+    executionAuthorized = [bool]$Execute
+    attempted = $false
+    clicked = $false
+    credentialsRead = $false
+    screenshotPersisted = $false
+    latestTabActivated = $false
+    exactWindowTitle = "DroneDream - Google Chrome"
+    exactWindowClass = "Chrome_WidgetWin_1"
+}
+
+if (-not $Execute) {
+    $receipt.kind = "dronedream-universal-browser-consent-plan"
+    Write-AtomicJson $receiptPath $receipt
+    Write-Host "Universal browser-consent plan frozen; no window or pointer action ran."
+    exit 0
+}
+
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName System.Drawing
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class DroneDreamConsentNative {
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+  [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+}
+"@
+
+function Get-ExactChromeWindow([switch]$AllowRelatedDroneDreamTitle) {
+    $desktop = [System.Windows.Automation.AutomationElement]::RootElement
+    $windows = $desktop.FindAll(
+        [System.Windows.Automation.TreeScope]::Children,
+        [System.Windows.Automation.Condition]::TrueCondition
+    )
+    $matches = if ($AllowRelatedDroneDreamTitle) {
+        @($windows | Where-Object {
+            $_.Current.Name -match 'DroneDream - Google Chrome$' -and
+            $_.Current.ClassName -ceq $receipt.exactWindowClass
+        })
+    }
+    else {
+        @($windows | Where-Object {
+            $_.Current.Name -ceq $receipt.exactWindowTitle -and
+            $_.Current.ClassName -ceq $receipt.exactWindowClass
+        })
+    }
+    if ($matches.Count -ne 1) { return $null }
+    $window = $matches[0]
+    $process = Get-Process -Id $window.Current.ProcessId -ErrorAction Stop
+    try {
+        if (-not $process.Path -or [IO.Path]::GetFileName($process.Path) -cne "chrome.exe") { return $null }
+        $signature = Get-AuthenticodeSignature -FilePath $process.Path
+        if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) { return $null }
+        return $window
+    }
+    finally { $process.Dispose() }
+}
+
+function Find-ConsentTarget {
+    $window = Get-ExactChromeWindow
+    if ($null -eq $window) { return $null }
+    $process = Get-Process -Id $window.Current.ProcessId -ErrorAction Stop
+    if (-not $process.Path -or [IO.Path]::GetFileName($process.Path) -cne "chrome.exe") { return $null }
+    $signature = Get-AuthenticodeSignature -FilePath $process.Path
+    if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) { return $null }
+
+    $rect = New-Object DroneDreamConsentNative+RECT
+    if (-not [DroneDreamConsentNative]::GetWindowRect([IntPtr]$window.Current.NativeWindowHandle, [ref]$rect)) {
+        return $null
+    }
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+    if ($width -lt 1000 -or $height -lt 650) { return $null }
+
+    $bitmap = [Drawing.Bitmap]::new($width, $height)
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, [Drawing.Size]::new($width, $height))
+        $rows = @()
+        $xStart = [int]($width * 0.25); $xEnd = [int]($width * 0.75)
+        $yStart = [int]($height * 0.40); $yEnd = [int]($height * 0.78)
+        for ($y = $yStart; $y -lt $yEnd; $y += 2) {
+            $rowMinX = $width; $rowMaxX = -1; $rowCount = 0
+            for ($x = $xStart; $x -lt $xEnd; $x += 2) {
+                $pixel = $bitmap.GetPixel($x, $y)
+                $maximum = [Math]::Max($pixel.R, [Math]::Max($pixel.G, $pixel.B))
+                $minimum = [Math]::Min($pixel.R, [Math]::Min($pixel.G, $pixel.B))
+                $isBrandGradientPixel =
+                    $pixel.B -ge 135 -and
+                    ($maximum - $minimum) -ge 50 -and
+                    (($pixel.B - $pixel.G) -ge 20 -or ($pixel.R - $pixel.G) -ge 30)
+                if ($isBrandGradientPixel) {
+                    $rowCount++
+                    if ($x -lt $rowMinX) { $rowMinX = $x }
+                    if ($x -gt $rowMaxX) { $rowMaxX = $x }
+                }
+            }
+            if ($rowCount -ge 100 -and ($rowMaxX - $rowMinX) -ge 280) {
+                $rows += [ordered]@{ y = $y; minX = $rowMinX; maxX = $rowMaxX; count = $rowCount }
+            }
+        }
+
+        $bands = @(); $band = $null
+        foreach ($row in $rows) {
+            if ($null -eq $band -or $row.y -gt ($band.maxY + 2)) {
+                if ($null -ne $band) { $bands += $band }
+                $band = [ordered]@{
+                    minX = $row.minX; maxX = $row.maxX; minY = $row.y; maxY = $row.y
+                    sampledPixels = $row.count
+                }
+            }
+            else {
+                if ($row.minX -lt $band.minX) { $band.minX = $row.minX }
+                if ($row.maxX -gt $band.maxX) { $band.maxX = $row.maxX }
+                $band.maxY = $row.y
+                $band.sampledPixels += $row.count
+            }
+        }
+        if ($null -ne $band) { $bands += $band }
+        $candidate = @($bands | Sort-Object sampledPixels -Descending | Select-Object -First 1)
+        if ($candidate.Count -ne 1 -or $candidate[0].sampledPixels -lt 1200) { return $null }
+        $minX = $candidate[0].minX; $maxX = $candidate[0].maxX
+        $minY = $candidate[0].minY; $maxY = $candidate[0].maxY
+        $count = $candidate[0].sampledPixels
+        $buttonWidth = $maxX - $minX
+        $buttonHeight = $maxY - $minY + 2
+        $buttonCenterX = ($minX + $maxX) / 2
+        if ($buttonWidth -lt 280 -or $buttonWidth -gt 760 -or
+            $buttonHeight -lt 35 -or $buttonHeight -gt 100 -or
+            $buttonCenterX -lt ($width * 0.35) -or $buttonCenterX -gt ($width * 0.65)) { return $null }
+        return [ordered]@{
+            handle = [IntPtr]$window.Current.NativeWindowHandle
+            processId = [int]$window.Current.ProcessId
+            window = [ordered]@{ left = $rect.Left; top = $rect.Top; width = $width; height = $height }
+            target = [ordered]@{
+                x = $rect.Left + [int](($minX + $maxX) / 2)
+                y = $rect.Top + [int](($minY + $maxY) / 2)
+                detectedWidth = $buttonWidth
+                detectedHeight = $buttonHeight
+                sampledPixels = $count
+            }
+        }
+    }
+    finally {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+        $process.Dispose()
+    }
+}
+
+$deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+$target = $null
+$latestTabWindow = $null
+while ([DateTime]::UtcNow -lt $deadline -and $null -eq $latestTabWindow) {
+    $latestTabWindow = Get-ExactChromeWindow -AllowRelatedDroneDreamTitle
+    if ($null -eq $latestTabWindow) { Start-Sleep -Milliseconds 250 }
+}
+if ($null -eq $latestTabWindow) { throw "The exact signed Chrome window is unavailable." }
+$latestTabHandle = [IntPtr]$latestTabWindow.Current.NativeWindowHandle
+if (-not [DroneDreamConsentNative]::SetForegroundWindow($latestTabHandle)) { throw "Unable to focus the exact consent window." }
+Start-Sleep -Milliseconds 300
+if ([DroneDreamConsentNative]::GetForegroundWindow() -ne $latestTabHandle) { throw "The exact consent window did not retain focus." }
+[DroneDreamConsentNative]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
+[DroneDreamConsentNative]::keybd_event(0x39, 0, 0, [UIntPtr]::Zero)
+[DroneDreamConsentNative]::keybd_event(0x39, 0, 2, [UIntPtr]::Zero)
+[DroneDreamConsentNative]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
+$receipt.latestTabActivated = $true
+Write-AtomicJson $receiptPath $receipt
+Start-Sleep -Milliseconds 700
+while ([DateTime]::UtcNow -lt $deadline -and $null -eq $target) {
+    $target = Find-ConsentTarget
+    if ($null -eq $target) { Start-Sleep -Milliseconds 500 }
+}
+if ($null -eq $target) { throw "The exact signed Chrome consent surface was not detected within the bounded window." }
+
+$receipt.attempted = $true
+$receipt.processId = $target.processId
+$receipt.window = $target.window
+$receipt.target = $target.target
+Write-AtomicJson $receiptPath $receipt
+
+$original = New-Object DroneDreamConsentNative+POINT
+if (-not [DroneDreamConsentNative]::GetCursorPos([ref]$original)) { throw "Unable to preserve the pointer position." }
+try {
+    if (-not [DroneDreamConsentNative]::SetForegroundWindow($target.handle)) { throw "Unable to focus the exact consent window." }
+    Start-Sleep -Milliseconds 300
+    if ([DroneDreamConsentNative]::GetForegroundWindow() -ne $target.handle) { throw "The exact consent window did not retain focus." }
+    if (-not [DroneDreamConsentNative]::SetCursorPos($target.target.x, $target.target.y)) { throw "Unable to position the pointer over the verified consent target." }
+    [DroneDreamConsentNative]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 80
+    [DroneDreamConsentNative]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+    $receipt.clicked = $true
+    Write-AtomicJson $receiptPath $receipt
+}
+finally {
+    [DroneDreamConsentNative]::SetCursorPos($original.X, $original.Y) | Out-Null
+}
+
+Write-Host "Clicked one verified non-credential Universal consent action and restored the pointer."

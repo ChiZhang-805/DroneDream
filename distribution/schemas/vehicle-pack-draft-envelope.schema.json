@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/vehicle-pack-draft-envelope.v1.json",
+  "title": "DroneDream Universal Vehicle Pack draft envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["payload", "integrity"],
+  "properties": {
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "kind", "transportVersion", "sourceEdition", "packId",
+        "packVersion", "model", "targetEditions", "artifacts", "compatibility", "authority"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-vehicle-pack-draft-envelope"},
+        "transportVersion": {"const": "1.0.0"},
+        "sourceEdition": {"const": "universal"},
+        "packId": {"type": "string", "pattern": "^custom-[a-z0-9]+(?:-[a-z0-9]+)*-[0-9a-f]{8}$"},
+        "packVersion": {"type": "string", "pattern": "^0\\.1\\.[0-9]+$"},
+        "model": {"$ref": "#/$defs/model"},
+        "targetEditions": {
+          "type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true,
+          "items": {"enum": ["sim", "lab", "field"]}
+        },
+        "artifacts": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "items": {"$ref": "#/$defs/artifact"}
+        },
+        "compatibility": {
+          "type": "object", "additionalProperties": false,
+          "required": ["autopilotFamily", "controllerModel", "firmwareVersion", "simulationGeometryGenerated", "simulationExecutionReady", "hardwareAdapterValidated"],
+          "properties": {
+            "autopilotFamily": {"enum": ["px4", "ardupilot", "crazyflie"]},
+            "controllerModel": {"type": "string", "minLength": 1, "maxLength": 96},
+            "firmwareVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+            "simulationGeometryGenerated": {"const": true},
+            "simulationExecutionReady": {"const": false},
+            "hardwareAdapterValidated": {"const": false}
+          }
+        },
+        "authority": {
+          "type": "object", "additionalProperties": false,
+          "required": ["draftOnly", "signed", "validated", "frontendIsAuthority", "grantsSimulationExecution", "grantsHardwareAuthority"],
+          "properties": {
+            "draftOnly": {"const": true},
+            "signed": {"const": false},
+            "validated": {"const": false},
+            "frontendIsAuthority": {"const": false},
+            "grantsSimulationExecution": {"const": false},
+            "grantsHardwareAuthority": {"const": false}
+          }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["canonicalization", "payloadSha256"],
+      "properties": {
+        "canonicalization": {"const": "dronedream-sorted-json-v1"},
+        "payloadSha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "positive": {"type": "number", "exclusiveMinimum": 0},
+    "model": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "draftId", "revision", "name", "manufacturer", "vehicleClass", "body", "propulsion", "sensors", "autopilot", "controlTarget", "targetEditions", "notes", "createdAt", "updatedAt"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "draftId": {"type": "string", "format": "uuid", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"},
+        "revision": {"type": "integer", "minimum": 1},
+        "name": {"type": "string", "minLength": 1, "maxLength": 96},
+        "manufacturer": {"type": "string", "minLength": 1, "maxLength": 96},
+        "vehicleClass": {"enum": ["multicopter-small", "multicopter-medium", "multicopter-research"]},
+        "body": {
+          "type": "object", "additionalProperties": false,
+          "required": ["shape", "massKg", "lengthM", "widthM", "heightM"],
+          "properties": {
+            "shape": {"enum": ["box", "cylinder"]},
+            "massKg": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000},
+            "lengthM": {"type": "number", "exclusiveMinimum": 0, "maximum": 50},
+            "widthM": {"type": "number", "exclusiveMinimum": 0, "maximum": 50},
+            "heightM": {"type": "number", "exclusiveMinimum": 0, "maximum": 50}
+          }
+        },
+        "propulsion": {
+          "type": "object", "additionalProperties": false,
+          "required": ["motorCount", "armLengthM", "propellerDiameterM", "maximumThrustPerMotorN", "batteryCells", "batteryCapacityMah"],
+          "properties": {
+            "motorCount": {"enum": [4, 6, 8]},
+            "armLengthM": {"type": "number", "exclusiveMinimum": 0, "maximum": 25},
+            "propellerDiameterM": {"type": "number", "exclusiveMinimum": 0, "maximum": 10},
+            "maximumThrustPerMotorN": {"type": "number", "exclusiveMinimum": 0, "maximum": 100000},
+            "batteryCells": {"type": "integer", "minimum": 1, "maximum": 16},
+            "batteryCapacityMah": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000000}
+          }
+        },
+        "sensors": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/sensor"}},
+        "autopilot": {
+          "type": "object", "additionalProperties": false,
+          "required": ["family", "controllerModel", "firmwareVersion"],
+          "properties": {
+            "family": {"enum": ["px4", "ardupilot", "crazyflie"]},
+            "controllerModel": {"type": "string", "minLength": 1, "maxLength": 96},
+            "firmwareVersion": {"type": "string", "minLength": 1, "maxLength": 64}
+          }
+        },
+        "controlTarget": {
+          "type": "object", "additionalProperties": false,
+          "required": ["primary", "parameterFamilies"],
+          "properties": {
+            "primary": {"enum": ["position", "velocity", "attitude"]},
+            "parameterFamilies": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 64}}
+          }
+        },
+        "targetEditions": {
+          "type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true,
+          "items": {"enum": ["sim", "lab", "field"]}
+        },
+        "notes": {"type": "string", "maxLength": 4096},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "updatedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "sensor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "type", "model", "enabled"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "type": {"enum": ["imu", "gps", "barometer", "magnetometer", "camera", "lidar"]},
+        "model": {"type": "string", "minLength": 1, "maxLength": 96},
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "mediaType", "encoding", "content", "sha256"],
+      "properties": {
+        "path": {"enum": ["model/vehicle-model.json", "model/model.sdf"]},
+        "mediaType": {"enum": ["application/json", "model/sdf+xml"]},
+        "encoding": {"const": "utf-8"},
+        "content": {"type": "string", "minLength": 1, "maxLength": 1048576},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

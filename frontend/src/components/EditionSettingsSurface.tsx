@@ -21,6 +21,7 @@ export type SettingsSurfaceTabId = "general" | "memory" | "model" | "course" | "
 export type SettingsSurfaceTab = Readonly<{
   id: SettingsSurfaceTabId;
   label: string;
+  disabled?: boolean;
 }>;
 
 const TAB_ICONS: Readonly<Record<SettingsSurfaceTabId, LucideIcon>> = {
@@ -52,25 +53,35 @@ export function EditionSettingsSurface({
   tabs: readonly SettingsSurfaceTab[];
   title: string;
   children: ReactNode;
-  consumerProfile?: "shared" | "universal" | "sim" | "lab" | "field-lightweight";
+  consumerProfile?: "shared" | BrandEditionId;
 }) {
   const tabRefs = useRef(new Map<SettingsSurfaceTabId, HTMLButtonElement>());
   const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+    let direction = 0;
     let nextIndex: number;
     if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = (currentIndex + 1) % tabs.length;
+      direction = 1;
+      nextIndex = currentIndex;
     } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      direction = -1;
+      nextIndex = currentIndex;
     } else if (event.key === "Home") {
-      nextIndex = 0;
+      nextIndex = tabs.findIndex((tab) => !tab.disabled);
     } else if (event.key === "End") {
       nextIndex = tabs.length - 1;
+      while (nextIndex >= 0 && tabs[nextIndex]?.disabled) nextIndex -= 1;
     } else {
       return;
     }
     event.preventDefault();
+    if (direction !== 0) {
+      for (let attempts = 0; attempts < tabs.length; attempts += 1) {
+        nextIndex = (nextIndex + direction + tabs.length) % tabs.length;
+        if (!tabs[nextIndex]?.disabled) break;
+      }
+    }
     const next = tabs[nextIndex];
-    if (!next) return;
+    if (!next || next.disabled) return;
     onTabChange(next.id);
     tabRefs.current.get(next.id)?.focus();
   };
@@ -117,7 +128,9 @@ export function EditionSettingsSurface({
               id={`settings-tab-${tab.id}`}
               aria-controls={`settings-panel-${tab.id}`}
               aria-selected={selected}
-              tabIndex={selected ? 0 : -1}
+              aria-disabled={tab.disabled || undefined}
+              disabled={tab.disabled}
+              tabIndex={!tab.disabled && selected ? 0 : -1}
               title={tab.label}
               onClick={() => onTabChange(tab.id)}
               onKeyDown={(event) => moveFocus(event, index)}
