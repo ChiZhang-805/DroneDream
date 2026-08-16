@@ -134,7 +134,9 @@ try {
   if (contextGeometry.headersFit.some((fits) => !fits) || contextGeometry.rowsFit.some((fits) => !fits)) throw new Error(`Mission Context headings wrapped: ${JSON.stringify(contextGeometry)}.`);
   if (await contextPopover.getByText("5 environment", { exact: true }).count() !== 0) throw new Error("The retired 5 environment map is still visible.");
   if (await contextPopover.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Mission Context must expose exactly one School Map entry.");
-  if (await contextPopover.locator('input[name="autonomy-map"]:checked').getAttribute("value") !== "map-school") throw new Error("School Map was not selected after legacy migration.");
+  if (await contextPopover.locator('input[name="autonomy-map"]:checked').count() !== 0) throw new Error("Opening Mission Context must not silently replace a custom map binding.");
+  await contextPopover.locator('input[name="autonomy-map"][value="map-school"]').check();
+  if (await contextPopover.locator('input[name="autonomy-map"]:checked').getAttribute("value") !== "map-school") throw new Error("School Map was not selected after an explicit user choice.");
   const reboundMapId = await page.evaluate(() => {
     const stored = window.localStorage.getItem("dronedream:autonomy-workspace:v2:local:universal");
     return stored ? JSON.parse(stored).mapPack?.id : null;
