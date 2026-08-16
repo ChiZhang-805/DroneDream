@@ -26,6 +26,7 @@ import {
   installComponentUpdate,
   startRuntime,
   startRuntimeInstall,
+  startRuntimeUpgrade,
   stopRuntimeForExit,
   validateDistributionPlan,
 } from "../desktop/bridge";
@@ -745,6 +746,9 @@ describe("desktop bridge", () => {
       targetRoot: "e:\\DroneDream\\",
       releaseManifestUrl: "https://example.com/releases/runtime.json",
     });
+    await startRuntimeUpgrade({
+      releaseManifestUrl: "https://example.com/releases/runtime-v2.json",
+    });
     await getRuntimeInstallProgress();
     await cancelRuntimeInstall();
     await startRuntime();
@@ -756,10 +760,15 @@ describe("desktop bridge", () => {
         releaseManifestUrl: "https://example.com/releases/runtime.json",
       },
     });
-    expect(invoke).toHaveBeenNthCalledWith(2, "get_runtime_install_progress", undefined);
-    expect(invoke).toHaveBeenNthCalledWith(3, "cancel_runtime_install", undefined);
-    expect(invoke).toHaveBeenNthCalledWith(4, "start_runtime", undefined);
-    expect(invoke).toHaveBeenNthCalledWith(5, "repair_runtime", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(2, "start_runtime_upgrade", {
+      request: {
+        releaseManifestUrl: "https://example.com/releases/runtime-v2.json",
+      },
+    });
+    expect(invoke).toHaveBeenNthCalledWith(3, "get_runtime_install_progress", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(4, "cancel_runtime_install", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(5, "start_runtime", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(6, "repair_runtime", undefined);
   });
 
   it("strictly validates and routes the atomic installer handoff", async () => {
@@ -924,7 +933,18 @@ describe("desktop bridge", () => {
       targetRoot: "E:\\DroneDream",
       releaseManifestUrl: "http://example.com/runtime.json",
     })).toThrow(/absolute HTTPS URL/i);
+    expect(() => startRuntimeUpgrade({
+      releaseManifestUrl: "http://example.com/runtime-v2.json",
+    })).toThrow(/absolute HTTPS URL/i);
     expect(invoke).not.toHaveBeenCalled();
+
+    for (const phase of ["backingUp", "restoring"] as const) {
+      invoke.mockResolvedValueOnce({
+        ...installSnapshot,
+        phase,
+      });
+      await expect(getRuntimeInstallProgress()).resolves.toMatchObject({ phase });
+    }
 
     invoke.mockResolvedValueOnce({
       ...installSnapshot,

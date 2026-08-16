@@ -73,6 +73,11 @@ const CACHED_MANIFEST_TEMP_FILE: &str = "signed-release-manifest.json.tmp";
 const CACHED_SIGNATURE_TEMP_FILE: &str = "signed-release-manifest.json.sig.tmp";
 const IMPORT_PENDING_FILE: &str = "import-pending.json";
 const IMPORT_PENDING_TEMP_FILE: &str = "import-pending.json.tmp";
+const UPGRADE_JOURNAL_FILE: &str = "runtime-upgrade.json";
+const UPGRADE_JOURNAL_TEMP_FILE: &str = "runtime-upgrade.json.tmp";
+const UPGRADE_BACKUP_PREFIX: &str = "runtime-upgrade-backup-";
+const UPGRADE_POINTER_FILE: &str = "runtime-upgrade-pointer.json";
+const UPGRADE_POINTER_TEMP_FILE: &str = "runtime-upgrade-pointer.json.tmp";
 
 #[cfg(target_os = "windows")]
 const DIAGNOSTIC_SCRIPT: &str = r#"
@@ -156,6 +161,13 @@ pub struct RuntimeInstallRequest {
     pub(crate) release_manifest_url: Option<String>,
 }
 
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeUpgradeRequest {
+    #[serde(default)]
+    pub(crate) release_manifest_url: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RuntimeInstallPhase {
@@ -164,9 +176,11 @@ pub enum RuntimeInstallPhase {
     VerifyingManifest,
     Downloading,
     VerifyingArchive,
+    BackingUp,
     Importing,
     Starting,
     HealthChecking,
+    Restoring,
     WaitingForRestart,
     Completed,
     Failed,
@@ -181,9 +195,11 @@ impl RuntimeInstallPhase {
                 | Self::VerifyingManifest
                 | Self::Downloading
                 | Self::VerifyingArchive
+                | Self::BackingUp
                 | Self::Importing
                 | Self::Starting
                 | Self::HealthChecking
+                | Self::Restoring
         )
     }
 }
@@ -591,6 +607,109 @@ impl RuntimeInstaller {
         Ok(queued_snapshot)
     }
 
+    pub(crate) fn begin_upgrade(
+        &self,
+        request: RuntimeUpgradeRequest,
+    ) -> Result<RuntimeInstallSnapshot, String> {
+        let operation = self.prepare_operation()?;
+        let manifest_url = request
+            .release_manifest_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or(DEFAULT_RELEASE_MANIFEST_URL)
+            .to_string();
+        validate_release_url(&manifest_url, false).map_err(|error| error.message)?;
+        let operation_id = format!(
+            "upgrade-{}-{}",
+            std::process::id(),
+            OPERATION_COUNTER.fetch_add(1, Ordering::Relaxed)
+        );
+        let cancel = Arc::new(AtomicBool::new(false));
+        *self
+            .shared
+            .cancel
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(cancel.clone());
+        let queued_snapshot = RuntimeInstallSnapshot {
+            operation_id: Some(operation_id),
+            phase: RuntimeInstallPhase::Queued,
+            message: Some("Waiting for the signed Runtime Base upgrader.".to_string()),
+            updated_at: Some(chrono::Utc::now().to_rfc3339()),
+            ..RuntimeInstallSnapshot::default()
+        };
+        {
+            let mut snapshot = self
+                .shared
+                .snapshot
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            *snapshot = queued_snapshot.clone();
+        }
+
+        let installer = self.clone();
+        let spawn_result = std::thread::Builder::new()
+            .name("dronedream-runtime-upgrade".to_string())
+            .spawn(move || {
+                let _operation = operation;
+                match run_production_upgrade(&installer, manifest_url, cancel.clone()) {
+                    Ok(success) => installer.update(|snapshot| {
+                        snapshot.phase = RuntimeInstallPhase::Completed;
+                        snapshot.installed_version = Some(success.version);
+                        snapshot.message = Some(success.cleanup_warning.unwrap_or_else(|| {
+                            "DroneDreamRuntime was upgraded and is ready.".to_string()
+                        }));
+                        snapshot.error = None;
+                        snapshot.resumable = false;
+                    }),
+                    Err(error) if error.cancelled => installer.update(|snapshot| {
+                        snapshot.phase = RuntimeInstallPhase::Cancelled;
+                        snapshot.message = Some(
+                            "Runtime Base upgrade was cancelled; the previous Runtime remains ready."
+                                .to_string(),
+                        );
+                        snapshot.error = None;
+                        snapshot.resumable = error.retryable;
+                    }),
+                    Err(error) => installer.update(|snapshot| {
+                        snapshot.phase = RuntimeInstallPhase::Failed;
+                        snapshot.message = None;
+                        snapshot.resumable = error.retryable;
+                        snapshot.error = Some(RuntimeInstallError {
+                            code: error.code,
+                            message: error.message,
+                            retryable: error.retryable,
+                            diagnostics_path: error.diagnostics_path,
+                        });
+                    }),
+                }
+                *installer
+                    .shared
+                    .cancel
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+            });
+        if let Err(error) = spawn_result {
+            let message = format!("Unable to start the Runtime Base upgrader: {error}");
+            *self
+                .shared
+                .cancel
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+            self.update(|snapshot| {
+                snapshot.phase = RuntimeInstallPhase::Failed;
+                snapshot.error = Some(RuntimeInstallError {
+                    code: "upgrader_thread_failed".to_string(),
+                    message: message.clone(),
+                    retryable: true,
+                    diagnostics_path: None,
+                });
+            });
+            return Err(message);
+        }
+        Ok(queued_snapshot)
+    }
+
     fn cancel_install(&self) -> RuntimeInstallSnapshot {
         if let Some(cancel) = self
             .shared
@@ -848,6 +967,14 @@ pub async fn start_runtime_install(
 }
 
 #[tauri::command]
+pub async fn start_runtime_upgrade(
+    installer: tauri::State<'_, RuntimeInstaller>,
+    request: RuntimeUpgradeRequest,
+) -> Result<RuntimeInstallSnapshot, String> {
+    installer.begin_upgrade(request)
+}
+
+#[tauri::command]
 pub fn get_runtime_install_progress(
     installer: tauri::State<'_, RuntimeInstaller>,
 ) -> RuntimeInstallSnapshot {
@@ -898,6 +1025,63 @@ async fn run_runtime_maintenance(
                 crate::runtime::RUNTIME_REGISTRY_PROBE_BUDGET,
                 "runtime registration probe",
             )?;
+            let registered_before_recovery = executor
+                .is_registered()
+                .map_err(runtime_maintenance_error_for_ipc)?;
+            let registered_target = if registered_before_recovery {
+                crate::runtime::registered_runtime_target()?
+            } else {
+                None
+            };
+            let recovery_pointer =
+                load_upgrade_pointer().map_err(runtime_maintenance_error_for_ipc)?;
+            let recovery_target = match recovery_pointer.as_ref() {
+                Some(pointer) => {
+                    let target = crate::runtime::normalize_windows_target(&pointer.target_root)?;
+                    if registered_target.as_ref().is_some_and(|registered| {
+                        !registered.eq_ignore_ascii_case(&target)
+                    }) {
+                        return Err(
+                            "Runtime upgrade recovery points to another target; the registered Runtime and recovery data were both preserved."
+                                .to_string(),
+                        );
+                    }
+                    Some(target)
+                }
+                None => registered_target.clone(),
+            };
+            if let Some(target) = recovery_target.as_deref() {
+                let has_upgrade = pending_upgrade_journal_exists(Path::new(target))
+                    .map_err(runtime_maintenance_error_for_ipc)?;
+                if let Some(pointer) = recovery_pointer.as_ref().filter(|_| !has_upgrade) {
+                    finalize_orphaned_upgrade_cleanup(Path::new(target), pointer)
+                        .map_err(runtime_maintenance_error_for_ipc)?;
+                    installer.update(|snapshot| {
+                        snapshot.message = Some(
+                            "Finished cleanup from a previously qualified Runtime Base upgrade."
+                                .to_string(),
+                        );
+                    });
+                }
+                if has_upgrade {
+                    let cancel = AtomicBool::new(false);
+                    let recovered = recover_pending_upgrade(
+                        &installer,
+                        Path::new(target),
+                        &executor,
+                        &cancel,
+                        TRUSTED_KEYRING,
+                    )
+                    .map_err(runtime_maintenance_error_for_ipc)?;
+                    installer.update(|snapshot| {
+                        snapshot.phase = RuntimeInstallPhase::Completed;
+                        snapshot.installed_version = Some(recovered.version);
+                        snapshot.message = Some(recovered.cleanup_warning.unwrap_or_else(|| {
+                            "Interrupted Runtime Base upgrade recovered successfully.".to_string()
+                        }));
+                    });
+                }
+            }
             if !executor
                 .is_registered()
                 .map_err(runtime_maintenance_error_for_ipc)?
@@ -1825,6 +2009,8 @@ trait WslExecutor: Send + Sync {
     fn prepare_environment(&self, cancel: &AtomicBool) -> Result<WslPreparation, InstallFailure>;
     fn is_registered(&self) -> Result<bool, InstallFailure>;
     fn registration_matches_target(&self, target: &Path) -> Result<bool, InstallFailure>;
+    fn installed_identity(&self) -> Result<(String, String), InstallFailure>;
+    fn export(&self, backup: &Path) -> Result<(), InstallFailure>;
     fn import(
         &self,
         target: &Path,
@@ -1835,6 +2021,12 @@ trait WslExecutor: Send + Sync {
     fn start(&self, cancel: &AtomicBool) -> Result<(), InstallFailure>;
     fn terminate(&self) -> Result<(), InstallFailure>;
     fn unregister(&self) -> Result<(), InstallFailure>;
+    fn clear_receipt(
+        &self,
+        target: &Path,
+        build_id: &str,
+        version: &str,
+    ) -> Result<(), InstallFailure>;
     fn wait_healthy(
         &self,
         build_id: &str,
@@ -2079,6 +2271,27 @@ impl WslExecutor for ProductionWslExecutor {
             .map_err(|error| fail("wsl_probe_failed", error, true))
     }
 
+    fn installed_identity(&self) -> Result<(String, String), InstallFailure> {
+        crate::runtime::validate_installed_runtime_ownership()
+            .map_err(|error| fail("runtime_ownership", error, false))
+    }
+
+    fn export(&self, backup: &Path) -> Result<(), InstallFailure> {
+        let backup = backup.to_str().ok_or_else(|| {
+            fail(
+                "invalid_cache",
+                "Runtime backup path is not valid UTF-8.",
+                false,
+            )
+        })?;
+        self.run_exact(
+            "DroneDreamRuntime backup",
+            &["--export", RUNTIME_NAME, backup],
+            None,
+            IMPORT_TIMEOUT,
+        )
+    }
+
     fn import(
         &self,
         target: &Path,
@@ -2149,6 +2362,23 @@ impl WslExecutor for ProductionWslExecutor {
             None,
             COMMAND_TIMEOUT,
         )
+    }
+
+    fn clear_receipt(
+        &self,
+        target: &Path,
+        build_id: &str,
+        version: &str,
+    ) -> Result<(), InstallFailure> {
+        let target = target.to_str().ok_or_else(|| {
+            fail(
+                "invalid_target",
+                "Runtime target is not valid UTF-8.",
+                false,
+            )
+        })?;
+        crate::runtime::remove_runtime_root_receipt_if_matches(target, build_id, version)
+            .map_err(|error| fail("runtime_receipt", error, false))
     }
 
     fn wait_healthy(
@@ -2612,6 +2842,20 @@ impl WslExecutor for ProductionWslExecutor {
             false,
         ))
     }
+    fn installed_identity(&self) -> Result<(String, String), InstallFailure> {
+        Err(fail(
+            "unsupported_platform",
+            "The runtime installer supports Windows only.",
+            false,
+        ))
+    }
+    fn export(&self, _: &Path) -> Result<(), InstallFailure> {
+        Err(fail(
+            "unsupported_platform",
+            "The runtime installer supports Windows only.",
+            false,
+        ))
+    }
     fn import(&self, _: &Path, _: &Path, _: &AtomicBool) -> Result<(), InstallFailure> {
         Err(fail(
             "unsupported_platform",
@@ -2641,6 +2885,13 @@ impl WslExecutor for ProductionWslExecutor {
         ))
     }
     fn unregister(&self) -> Result<(), InstallFailure> {
+        Err(fail(
+            "unsupported_platform",
+            "The runtime installer supports Windows only.",
+            false,
+        ))
+    }
+    fn clear_receipt(&self, _: &Path, _: &str, _: &str) -> Result<(), InstallFailure> {
         Err(fail(
             "unsupported_platform",
             "The runtime installer supports Windows only.",
@@ -2692,6 +2943,57 @@ struct ImportPendingRecord {
     archive_verified: bool,
     #[serde(default)]
     target_created_by_installer: bool,
+    created_at: String,
+}
+
+#[derive(Clone, Debug)]
+enum RuntimeInstallMode {
+    Fresh,
+    Upgrade {
+        old_build_id: String,
+        old_version: String,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum RuntimeUpgradePhase {
+    BackupVerified,
+    OldUnregistered,
+    NewImported,
+    NewReady,
+    Restoring,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RuntimeUpgradeJournal {
+    schema_version: u32,
+    owner: String,
+    runtime_name: String,
+    operation_id: String,
+    target_root: String,
+    old_build_id: String,
+    old_version: String,
+    new_build_id: String,
+    new_version: String,
+    manifest_sha256: String,
+    backup_filename: String,
+    backup_size: u64,
+    backup_sha256: String,
+    phase: RuntimeUpgradePhase,
+    created_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RuntimeUpgradePointer {
+    schema_version: u32,
+    owner: String,
+    runtime_name: String,
+    operation_id: String,
+    target_root: String,
+    manifest_sha256: String,
     created_at: String,
 }
 
@@ -2778,6 +3080,133 @@ fn run_production_install(
         &executor,
         &cancel,
     )
+}
+
+fn run_production_upgrade(
+    installer: &RuntimeInstaller,
+    manifest_url: String,
+    cancel: Arc<AtomicBool>,
+) -> Result<InstallSuccess, InstallFailure> {
+    installer.update(|snapshot| {
+        snapshot.phase = RuntimeInstallPhase::VerifyingManifest;
+        snapshot.message =
+            Some("Checking the installed Runtime Base and signed upgrade manifest...".to_string());
+    });
+    check_cancel(&cancel)?;
+    let executor = ProductionWslExecutor;
+    if load_upgrade_pointer()?.is_some() {
+        return Err(fail(
+            "upgrade_recovery_required",
+            "A previous Runtime Base upgrade has durable recovery data. Run Runtime repair before starting another upgrade.",
+            false,
+        ));
+    }
+    if !executor.is_registered()? {
+        return Err(fail(
+            "runtime_not_installed",
+            "DroneDreamRuntime is not installed; use the first-run Runtime installer instead.",
+            false,
+        ));
+    }
+    let raw_target = crate::runtime::registered_runtime_target()
+        .map_err(|error| fail("wsl_probe_failed", error, true))?
+        .ok_or_else(|| {
+            fail(
+                "runtime_target_missing",
+                "DroneDreamRuntime has no registered target path.",
+                false,
+            )
+        })?;
+    let target = crate::runtime::normalize_windows_target(&raw_target)
+        .map_err(|error| fail("invalid_target", error, false))?;
+    if !executor.registration_matches_target(Path::new(&target))? {
+        return Err(fail(
+            "foreign_runtime_registration",
+            "The exact-name Runtime registration is not the owned DroneDream target and was left untouched.",
+            false,
+        ));
+    }
+    let (old_build_id, old_version) = executor.installed_identity()?;
+    installer.update(|snapshot| {
+        snapshot.target_root = Some(target.clone());
+        snapshot.installed_version = Some(old_version.clone());
+    });
+
+    let transport = HttpReleaseTransport::new()?;
+    let raw_manifest =
+        fetch_manifest_after_wsl_preparation(&executor, &transport, &manifest_url, &cancel)?;
+    let signature_url = detached_signature_url(&manifest_url)?;
+    let raw_signature = transport.fetch(&signature_url, MAX_SIGNATURE_BYTES, &cancel)?;
+    let manifest = parse_and_verify_manifest(&raw_manifest, &raw_signature, TRUSTED_KEYRING)?;
+    validate_upgrade_version(&old_build_id, &old_version, &manifest)?;
+
+    let cache_root = initialize_runtime_download_cache(Path::new(&target))
+        .map_err(|error| fail("unsafe_cache", error, false))?;
+    let artifact_root = cache_root.join("artifacts");
+    persist_signed_release_metadata(&artifact_root, &raw_manifest, &raw_signature)?;
+    let manifest_sha256 = hex::encode(Sha256::digest(&raw_manifest));
+    let archive_path = artifact_root.join(format!("{}.staging", manifest.artifact.filename));
+    load_or_initialize_resume(&artifact_root, &archive_path, &manifest, &manifest_sha256)?;
+    let storage_credit = resumable_storage_credit(Path::new(&target), &manifest, &manifest_sha256)?;
+    let upgrade_required = manifest
+        .requirements
+        .minimum_free_bytes
+        .saturating_add(manifest.artifact.size_bytes);
+    crate::runtime::validate_runtime_install_target_free_bytes(
+        &target,
+        upgrade_required,
+        storage_credit,
+    )
+    .map_err(|error| fail("insufficient_upgrade_storage", error, false))?;
+    let smoke_report =
+        transport.fetch(&manifest.smoke.report_url, MAX_SMOKE_REPORT_BYTES, &cancel)?;
+    verify_bytes_sha256(&smoke_report, &manifest.smoke.report_sha256, "smoke report")?;
+
+    run_install_core_with_mode(
+        installer,
+        Path::new(&target),
+        &manifest,
+        &raw_manifest,
+        &transport,
+        &executor,
+        &cancel,
+        RuntimeInstallMode::Upgrade {
+            old_build_id,
+            old_version,
+        },
+    )
+}
+
+fn validate_upgrade_version(
+    old_build_id: &str,
+    old_version: &str,
+    manifest: &ReleaseManifest,
+) -> Result<(), InstallFailure> {
+    let current = semver::Version::parse(old_version).map_err(|_| {
+        fail(
+            "invalid_installed_version",
+            "The installed Runtime Base version is not valid semantic version data.",
+            false,
+        )
+    })?;
+    let candidate = semver::Version::parse(&manifest.runtime.version).map_err(|_| {
+        fail(
+            "invalid_upgrade_version",
+            "The signed Runtime Base upgrade version is not valid semantic version data.",
+            false,
+        )
+    })?;
+    if candidate <= current || manifest.runtime.build_id == old_build_id {
+        return Err(fail(
+            "runtime_upgrade_not_newer",
+            format!(
+                "Runtime Base {} is installed; the signed candidate {} is not a newer build.",
+                old_version, manifest.runtime.version
+            ),
+            false,
+        ));
+    }
+    Ok(())
 }
 
 fn recover_pending_install(
@@ -2900,6 +3329,218 @@ fn recover_pending_install(
         version: manifest.runtime.version.clone(),
         cleanup_warning,
     })
+}
+
+fn pending_upgrade_journal_exists(target: &Path) -> Result<bool, InstallFailure> {
+    let target_text = target.to_str().ok_or_else(|| {
+        fail(
+            "invalid_target",
+            "Runtime recovery target is not valid UTF-8.",
+            false,
+        )
+    })?;
+    let cache_root = crate::runtime_cache::runtime_download_cache_root(target_text);
+    if !cache_root.exists() {
+        return Ok(false);
+    }
+    let cache_root = crate::runtime_cache::validate_managed_cache(target)
+        .map_err(|error| fail("unsafe_cache", error, false))?;
+    let journal = cache_root.join("artifacts").join(UPGRADE_JOURNAL_FILE);
+    ensure_safe_cache_file(&journal)?;
+    Ok(journal.exists())
+}
+
+fn import_pending_exists(target: &Path) -> Result<bool, InstallFailure> {
+    let cache_root = crate::runtime_cache::validate_managed_cache(target)
+        .map_err(|error| fail("unsafe_cache", error, false))?;
+    let pending = cache_root.join("artifacts").join(IMPORT_PENDING_FILE);
+    ensure_safe_cache_file(&pending)?;
+    Ok(pending.exists())
+}
+
+fn recover_pending_upgrade(
+    installer: &RuntimeInstaller,
+    target: &Path,
+    executor: &dyn WslExecutor,
+    cancel: &AtomicBool,
+    keyring: &str,
+) -> Result<InstallSuccess, InstallFailure> {
+    let (mut journal, manifest) = load_upgrade_journal(target, keyring, cancel)?;
+    if let Some(pointer) = load_upgrade_pointer()? {
+        if pointer.operation_id != journal.operation_id
+            || !pointer
+                .target_root
+                .eq_ignore_ascii_case(&journal.target_root)
+            || pointer.manifest_sha256 != journal.manifest_sha256
+        {
+            return Err(fail(
+                "upgrade_pointer",
+                "Runtime recovery pointer and signed upgrade journal disagree; both were preserved.",
+                false,
+            ));
+        }
+    }
+    let cache_root = crate::runtime_cache::validate_managed_cache(target)
+        .map_err(|error| fail("unsafe_cache", error, false))?;
+    let artifact_root = cache_root.join("artifacts");
+    let archive_path = artifact_root.join(format!("{}.staging", manifest.artifact.filename));
+    let manifest_sha256 = journal.manifest_sha256.clone();
+    let pending_exists = import_pending_exists(target)?;
+
+    if !executor.is_registered()? {
+        let pending_written = if pending_exists {
+            validate_import_pending(target, &manifest, &manifest_sha256)?;
+            true
+        } else {
+            false
+        };
+        restore_previous_runtime(
+            installer,
+            target,
+            &manifest,
+            &manifest_sha256,
+            executor,
+            cancel,
+            &mut journal,
+            pending_written,
+        )?;
+        return Ok(InstallSuccess {
+            version: journal.old_version.clone(),
+            cleanup_warning: None,
+        });
+    }
+    if !executor.registration_matches_target(target)? {
+        return Err(fail(
+            "foreign_runtime_registration",
+            "A foreign exact-name Runtime registration appeared during upgrade recovery and was left untouched.",
+            false,
+        ));
+    }
+
+    let identity = executor.installed_identity();
+    if identity
+        .as_ref()
+        .is_ok_and(|value| value.0 == journal.old_build_id && value.1 == journal.old_version)
+    {
+        installer.update(|snapshot| {
+            snapshot.phase = RuntimeInstallPhase::Starting;
+            snapshot.message = Some(
+                "The previous Runtime remained installed; verifying it before clearing upgrade recovery data."
+                    .to_string(),
+            );
+            snapshot.installed_version = Some(journal.old_version.clone());
+        });
+        executor.start(cancel)?;
+        executor.wait_healthy(&journal.old_build_id, &journal.old_version, cancel)?;
+        executor.write_receipt(target, &journal.old_build_id, &journal.old_version)?;
+        if pending_exists {
+            validate_import_pending(target, &manifest, &manifest_sha256)?;
+            clear_import_pending(target)?;
+        }
+        let candidate_cleanup = cleanup_successful_install(target, &manifest, &archive_path);
+        let upgrade_cleanup = cleanup_upgrade_state(&artifact_root, &journal).err();
+        let cleanup_warning = match (candidate_cleanup, upgrade_cleanup) {
+            (Some(left), Some(right)) => Some(format!("{left}; {right}")),
+            (Some(value), None) | (None, Some(value)) => Some(value),
+            (None, None) => None,
+        };
+        return Ok(InstallSuccess {
+            version: journal.old_version.clone(),
+            cleanup_warning,
+        });
+    }
+
+    let registered_new = identity
+        .as_ref()
+        .is_ok_and(|value| value.0 == journal.new_build_id && value.1 == journal.new_version);
+    let pending_new = if pending_exists {
+        validate_import_pending(target, &manifest, &manifest_sha256)?;
+        true
+    } else {
+        false
+    };
+    if registered_new || pending_new {
+        let completion = (|| {
+            installer.update(|snapshot| {
+                snapshot.phase = RuntimeInstallPhase::Starting;
+                snapshot.message = Some(
+                    "Completing verification of the interrupted Runtime Base upgrade..."
+                        .to_string(),
+                );
+                snapshot.installed_version = Some(journal.new_version.clone());
+            });
+            executor.bootstrap_imported_runtime()?;
+            executor.start(cancel)?;
+            installer.update(|snapshot| {
+                snapshot.phase = RuntimeInstallPhase::HealthChecking;
+                snapshot.message = Some(
+                    "Verifying the recovered PX4, Gazebo, worker, and local API contract..."
+                        .to_string(),
+                );
+            });
+            executor.wait_healthy(&journal.new_build_id, &journal.new_version, cancel)?;
+            executor.write_receipt(target, &journal.new_build_id, &journal.new_version)?;
+            journal.phase = RuntimeUpgradePhase::NewReady;
+            persist_upgrade_journal(&artifact_root, &journal)
+        })();
+        if let Err(mut original) = completion {
+            original = attach_runtime_failure_diagnostics(executor, target, original);
+            restore_previous_runtime(
+                installer,
+                target,
+                &manifest,
+                &manifest_sha256,
+                executor,
+                cancel,
+                &mut journal,
+                pending_new,
+            )
+            .map_err(|rollback| {
+                fail(
+                    "rollback_failed",
+                    format!(
+                        "{} Automatic restoration of Runtime Base {} also failed: {}",
+                        original.message, journal.old_version, rollback.message
+                    ),
+                    false,
+                )
+                .inherit_diagnostics(&original)
+            })?;
+            return Err(original);
+        }
+        let pending_warning = if pending_new {
+            clear_import_pending(target).err().map(|error| {
+                format!(
+                    "Runtime is ready, but import authorization cleanup failed: {}",
+                    error.message
+                )
+            })
+        } else {
+            None
+        };
+        let upgrade_cleanup = cleanup_upgrade_state(&artifact_root, &journal).err();
+        let install_cleanup = upgrade_cleanup
+            .is_none()
+            .then(|| cleanup_successful_install(target, &manifest, &archive_path))
+            .flatten();
+        let cleanup_warning =
+            join_cleanup_warnings([pending_warning, install_cleanup, upgrade_cleanup]);
+        return Ok(InstallSuccess {
+            version: journal.new_version.clone(),
+            cleanup_warning,
+        });
+    }
+
+    Err(fail(
+        "upgrade_runtime_changed",
+        format!(
+            "Runtime upgrade recovery found an unexpected installed identity: {}",
+            identity
+                .map(|(build, version)| format!("{build} ({version})"))
+                .unwrap_or_else(|error| error.message)
+        ),
+        false,
+    ))
 }
 
 fn persist_signed_release_metadata(
@@ -3652,13 +4293,57 @@ fn run_install_core(
     executor: &dyn WslExecutor,
     cancel: &AtomicBool,
 ) -> Result<InstallSuccess, InstallFailure> {
+    run_install_core_with_mode(
+        installer,
+        target,
+        manifest,
+        raw_manifest,
+        transport,
+        executor,
+        cancel,
+        RuntimeInstallMode::Fresh,
+    )
+}
+
+fn run_install_core_with_mode(
+    installer: &RuntimeInstaller,
+    target: &Path,
+    manifest: &ReleaseManifest,
+    raw_manifest: &[u8],
+    transport: &dyn ReleaseTransport,
+    executor: &dyn WslExecutor,
+    cancel: &AtomicBool,
+    mode: RuntimeInstallMode,
+) -> Result<InstallSuccess, InstallFailure> {
     check_cancel(cancel)?;
-    if executor.is_registered()? {
-        return Err(fail(
-            "runtime_already_registered",
-            "DroneDreamRuntime is already registered. The installer will not replace or unregister it.",
-            false,
-        ));
+    match &mode {
+        RuntimeInstallMode::Fresh if executor.is_registered()? => {
+            return Err(fail(
+                "runtime_already_registered",
+                "DroneDreamRuntime is already registered. The installer will not replace or unregister it.",
+                false,
+            ));
+        }
+        RuntimeInstallMode::Upgrade {
+            old_build_id,
+            old_version,
+        } => {
+            if !executor.is_registered()? || !executor.registration_matches_target(target)? {
+                return Err(fail(
+                    "upgrade_runtime_changed",
+                    "The owned DroneDreamRuntime registration changed before upgrade; it was left untouched.",
+                    false,
+                ));
+            }
+            if executor.installed_identity()? != (old_build_id.clone(), old_version.clone()) {
+                return Err(fail(
+                    "upgrade_runtime_changed",
+                    "The Runtime Base identity changed before upgrade; it was left untouched.",
+                    false,
+                ));
+            }
+        }
+        RuntimeInstallMode::Fresh => {}
     }
     let cache_root = initialize_runtime_download_cache(target)
         .map_err(|error| fail("unsafe_cache", error, false))?;
@@ -3862,6 +4547,24 @@ fn run_install_core(
         }
     }
 
+    if let RuntimeInstallMode::Upgrade {
+        old_build_id,
+        old_version,
+    } = &mode
+    {
+        return run_upgrade_replace(
+            installer,
+            target,
+            manifest,
+            &manifest_sha256,
+            &archive_path,
+            executor,
+            cancel,
+            old_build_id,
+            old_version,
+        );
+    }
+
     check_cancel(cancel)?;
     if executor.is_registered()? {
         return Err(fail(
@@ -3999,6 +4702,754 @@ fn run_install_core(
         version: manifest.runtime.version.clone(),
         cleanup_warning,
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_upgrade_replace(
+    installer: &RuntimeInstaller,
+    target: &Path,
+    manifest: &ReleaseManifest,
+    manifest_sha256: &str,
+    archive_path: &Path,
+    executor: &dyn WslExecutor,
+    cancel: &AtomicBool,
+    old_build_id: &str,
+    old_version: &str,
+) -> Result<InstallSuccess, InstallFailure> {
+    check_cancel(cancel)?;
+    if !executor.is_registered()?
+        || !executor.registration_matches_target(target)?
+        || executor.installed_identity()? != (old_build_id.to_string(), old_version.to_string())
+    {
+        return Err(fail(
+            "upgrade_runtime_changed",
+            "The owned Runtime Base changed after download; no replacement was attempted.",
+            false,
+        ));
+    }
+    let cache_root = crate::runtime_cache::validate_managed_cache(target)
+        .map_err(|error| fail("unsafe_cache", error, false))?;
+    let artifact_root = cache_root.join("artifacts");
+    let operation_id = installer.snapshot().operation_id.unwrap_or_else(|| {
+        format!(
+            "upgrade-{}-{}",
+            std::process::id(),
+            OPERATION_COUNTER.fetch_add(1, Ordering::Relaxed)
+        )
+    });
+    let backup_filename = format!("{UPGRADE_BACKUP_PREFIX}{operation_id}.tar");
+    let backup_path = artifact_root.join(&backup_filename);
+    ensure_safe_cache_file(&backup_path)?;
+    if backup_path.exists() || artifact_root.join(UPGRADE_JOURNAL_FILE).exists() {
+        return Err(fail(
+            "upgrade_recovery_required",
+            "A previous Runtime Base upgrade has durable recovery data. Run Runtime repair before starting another upgrade.",
+            false,
+        ));
+    }
+
+    installer.update(|snapshot| {
+        snapshot.phase = RuntimeInstallPhase::BackingUp;
+        snapshot.message = Some(
+            "Creating and verifying a rollback image of the current Runtime Base...".to_string(),
+        );
+        snapshot.resumable = true;
+    });
+    executor.terminate()?;
+    executor.export(&backup_path)?;
+    let backup_size = fs::metadata(&backup_path)
+        .map_err(|error| fail("upgrade_backup", error.to_string(), false))?
+        .len();
+    if backup_size == 0 {
+        return Err(fail(
+            "upgrade_backup",
+            "The Runtime Base rollback image is empty; the installed Runtime was left untouched.",
+            false,
+        ));
+    }
+    let backup_sha256 = compute_file_sha256(&backup_path, cancel)?;
+    let mut journal = RuntimeUpgradeJournal {
+        schema_version: 1,
+        owner: "DroneDreamDesktop".to_string(),
+        runtime_name: RUNTIME_NAME.to_string(),
+        operation_id,
+        target_root: target
+            .to_str()
+            .ok_or_else(|| fail("invalid_target", "Runtime target is invalid.", false))?
+            .to_string(),
+        old_build_id: old_build_id.to_string(),
+        old_version: old_version.to_string(),
+        new_build_id: manifest.runtime.build_id.clone(),
+        new_version: manifest.runtime.version.clone(),
+        manifest_sha256: manifest_sha256.to_string(),
+        backup_filename,
+        backup_size,
+        backup_sha256,
+        phase: RuntimeUpgradePhase::BackupVerified,
+        created_at: chrono::Utc::now().to_rfc3339(),
+    };
+    persist_upgrade_journal(&artifact_root, &journal)?;
+    // This same-user host pointer survives the interval in which the old WSL
+    // registration has been removed, so a process crash cannot orphan the
+    // verified rollback image on a non-default drive.
+    persist_upgrade_pointer(&journal)?;
+    verify_upgrade_backup(&artifact_root, &journal, cancel)?;
+    check_cancel(cancel)?;
+    if !executor.is_registered()?
+        || !executor.registration_matches_target(target)?
+        || executor.installed_identity()? != (old_build_id.to_string(), old_version.to_string())
+    {
+        return Err(fail(
+            "upgrade_runtime_changed",
+            "The Runtime Base identity changed after backup; the verified backup was preserved for repair.",
+            false,
+        ));
+    }
+
+    executor.unregister()?;
+    journal.phase = RuntimeUpgradePhase::OldUnregistered;
+    persist_upgrade_journal(&artifact_root, &journal)?;
+    let mut new_pending_written = false;
+    let replacement = (|| {
+        executor.clear_receipt(target, old_build_id, old_version)?;
+        prepare_import_target_and_write_pending(
+            &artifact_root,
+            target,
+            manifest,
+            manifest_sha256,
+            &journal.operation_id,
+        )?;
+        new_pending_written = true;
+        installer.update(|snapshot| {
+            snapshot.phase = RuntimeInstallPhase::Importing;
+            snapshot.message =
+                Some("Installing the signed Runtime Base replacement...".to_string());
+        });
+        executor.import(target, archive_path, cancel)?;
+        journal.phase = RuntimeUpgradePhase::NewImported;
+        persist_upgrade_journal(&artifact_root, &journal)?;
+        check_cancel(cancel)?;
+        installer.update(|snapshot| {
+            snapshot.phase = RuntimeInstallPhase::Starting;
+            snapshot.message = Some("Starting the upgraded Runtime Base...".to_string());
+        });
+        executor.bootstrap_imported_runtime()?;
+        executor.start(cancel)?;
+        installer.update(|snapshot| {
+            snapshot.phase = RuntimeInstallPhase::HealthChecking;
+            snapshot.message =
+                Some("Verifying PX4, Gazebo, worker, and local API compatibility...".to_string());
+        });
+        executor.wait_healthy(
+            &manifest.runtime.build_id,
+            &manifest.runtime.version,
+            cancel,
+        )?;
+        executor.write_receipt(
+            target,
+            &manifest.runtime.build_id,
+            &manifest.runtime.version,
+        )?;
+        journal.phase = RuntimeUpgradePhase::NewReady;
+        persist_upgrade_journal(&artifact_root, &journal)
+    })();
+
+    if let Err(mut original) = replacement {
+        original = attach_runtime_failure_diagnostics(executor, target, original);
+        restore_previous_runtime(
+            installer,
+            target,
+            manifest,
+            manifest_sha256,
+            executor,
+            cancel,
+            &mut journal,
+            new_pending_written,
+        )
+        .map_err(|rollback| {
+            fail(
+                "rollback_failed",
+                format!(
+                    "{} Automatic restoration of Runtime Base {} also failed: {}",
+                    original.message, old_version, rollback.message
+                ),
+                false,
+            )
+            .inherit_diagnostics(&original)
+        })?;
+        return Err(original);
+    }
+
+    let pending_warning = clear_import_pending(target).err().map(|error| {
+        format!(
+            "Runtime is ready, but import authorization cleanup failed: {}",
+            error.message
+        )
+    });
+    let upgrade_cleanup = cleanup_upgrade_state(&artifact_root, &journal).err();
+    let install_cleanup = upgrade_cleanup
+        .is_none()
+        .then(|| cleanup_successful_install(target, manifest, archive_path))
+        .flatten();
+    let cleanup_warning =
+        join_cleanup_warnings([pending_warning, install_cleanup, upgrade_cleanup]);
+    Ok(InstallSuccess {
+        version: manifest.runtime.version.clone(),
+        cleanup_warning,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn restore_previous_runtime(
+    installer: &RuntimeInstaller,
+    target: &Path,
+    new_manifest: &ReleaseManifest,
+    manifest_sha256: &str,
+    executor: &dyn WslExecutor,
+    _cancel: &AtomicBool,
+    journal: &mut RuntimeUpgradeJournal,
+    new_pending_written: bool,
+) -> Result<(), InstallFailure> {
+    installer.update(|snapshot| {
+        snapshot.phase = RuntimeInstallPhase::Restoring;
+        snapshot.message = Some(
+            "The new Runtime did not qualify; restoring the verified previous Runtime..."
+                .to_string(),
+        );
+    });
+    let cache_root = crate::runtime_cache::validate_managed_cache(target)
+        .map_err(|error| fail("unsafe_cache", error, false))?;
+    let artifact_root = cache_root.join("artifacts");
+    journal.phase = RuntimeUpgradePhase::Restoring;
+    persist_upgrade_journal(&artifact_root, journal)?;
+    verify_upgrade_backup(&artifact_root, journal, &AtomicBool::new(false))?;
+
+    if executor.is_registered()? {
+        if !executor.registration_matches_target(target)? {
+            return Err(fail(
+                "rollback_state_unknown",
+                "A foreign Runtime registration appeared during rollback and was left untouched.",
+                false,
+            ));
+        }
+        if new_pending_written {
+            validate_import_pending(target, new_manifest, manifest_sha256)?;
+        }
+        executor.unregister()?;
+        executor.clear_receipt(
+            target,
+            &new_manifest.runtime.build_id,
+            &new_manifest.runtime.version,
+        )?;
+    }
+    if new_pending_written {
+        let pending = validate_import_pending(target, new_manifest, manifest_sha256)?;
+        reconcile_failed_unregistered_import_target(target, &pending)?;
+        clear_import_pending(target)?;
+    }
+    prepare_import_target(target)?;
+    let backup_path = artifact_root.join(&journal.backup_filename);
+    executor.import(target, &backup_path, &AtomicBool::new(false))?;
+    executor.start(&AtomicBool::new(false))?;
+    executor.wait_healthy(
+        &journal.old_build_id,
+        &journal.old_version,
+        &AtomicBool::new(false),
+    )?;
+    executor.write_receipt(target, &journal.old_build_id, &journal.old_version)?;
+    cleanup_upgrade_state(&artifact_root, journal).map_err(|message| {
+        fail(
+            "upgrade_cleanup",
+            format!("Previous Runtime was restored, but recovery cleanup failed: {message}"),
+            true,
+        )
+    })?;
+    Ok(())
+}
+
+fn compute_file_sha256(path: &Path, cancel: &AtomicBool) -> Result<String, InstallFailure> {
+    ensure_safe_cache_file(path)?;
+    let mut file = File::open(path).map_err(|error| {
+        fail(
+            "cache_read",
+            format!("Unable to read backup: {error}"),
+            true,
+        )
+    })?;
+    let mut digest = Sha256::new();
+    let mut buffer = vec![0_u8; 1024 * 1024];
+    loop {
+        check_cancel(cancel)?;
+        let count = file.read(&mut buffer).map_err(|error| {
+            fail(
+                "cache_read",
+                format!("Unable to hash backup: {error}"),
+                true,
+            )
+        })?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
+    }
+    Ok(hex::encode(digest.finalize()))
+}
+
+fn persist_upgrade_journal(
+    artifact_root: &Path,
+    journal: &RuntimeUpgradeJournal,
+) -> Result<(), InstallFailure> {
+    let encoded = serde_json::to_vec(journal).map_err(|error| {
+        fail(
+            "upgrade_journal",
+            format!("Unable to encode Runtime upgrade journal: {error}"),
+            false,
+        )
+    })?;
+    persist_cache_metadata_file(
+        &artifact_root.join(UPGRADE_JOURNAL_FILE),
+        &artifact_root.join(UPGRADE_JOURNAL_TEMP_FILE),
+        &encoded,
+    )
+}
+
+fn runtime_upgrade_pointer_root() -> Result<PathBuf, InstallFailure> {
+    let local = std::env::var_os("LOCALAPPDATA")
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            fail(
+                "upgrade_pointer",
+                "LOCALAPPDATA is unavailable for Runtime upgrade recovery.",
+                false,
+            )
+        })?;
+    let root = PathBuf::from(local).join(RUNTIME_BASE_MANAGER_NAMESPACE);
+    fs::create_dir_all(&root).map_err(|error| {
+        fail(
+            "upgrade_pointer",
+            format!("Unable to create Runtime recovery directory: {error}"),
+            true,
+        )
+    })?;
+    let metadata = fs::symlink_metadata(&root).map_err(|error| {
+        fail(
+            "upgrade_pointer",
+            format!("Unable to inspect Runtime recovery directory: {error}"),
+            false,
+        )
+    })?;
+    if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
+        return Err(fail(
+            "upgrade_pointer",
+            "Runtime recovery directory is not a safe ordinary directory.",
+            false,
+        ));
+    }
+    Ok(root)
+}
+
+fn persist_upgrade_pointer(journal: &RuntimeUpgradeJournal) -> Result<(), InstallFailure> {
+    let root = runtime_upgrade_pointer_root()?;
+    let pointer = RuntimeUpgradePointer {
+        schema_version: 1,
+        owner: journal.owner.clone(),
+        runtime_name: journal.runtime_name.clone(),
+        operation_id: journal.operation_id.clone(),
+        target_root: journal.target_root.clone(),
+        manifest_sha256: journal.manifest_sha256.clone(),
+        created_at: journal.created_at.clone(),
+    };
+    let encoded = serde_json::to_vec(&pointer).map_err(|error| {
+        fail(
+            "upgrade_pointer",
+            format!("Unable to encode Runtime recovery pointer: {error}"),
+            false,
+        )
+    })?;
+    persist_cache_metadata_file(
+        &root.join(UPGRADE_POINTER_FILE),
+        &root.join(UPGRADE_POINTER_TEMP_FILE),
+        &encoded,
+    )
+}
+
+fn load_upgrade_pointer() -> Result<Option<RuntimeUpgradePointer>, InstallFailure> {
+    let root = runtime_upgrade_pointer_root()?;
+    let path = root.join(UPGRADE_POINTER_FILE);
+    ensure_safe_cache_file(&path)?;
+    let metadata = match fs::metadata(&path) {
+        Ok(value) => value,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(fail(
+                "upgrade_pointer",
+                format!("Unable to inspect Runtime recovery pointer: {error}"),
+                false,
+            ))
+        }
+    };
+    if metadata.len() > 64 * 1024 {
+        return Err(fail(
+            "upgrade_pointer",
+            "Runtime recovery pointer is oversized.",
+            false,
+        ));
+    }
+    let pointer: RuntimeUpgradePointer =
+        serde_json::from_slice(&fs::read(&path).map_err(|error| {
+            fail(
+                "upgrade_pointer",
+                format!("Unable to read Runtime recovery pointer: {error}"),
+                false,
+            )
+        })?)
+        .map_err(|error| {
+            fail(
+                "upgrade_pointer",
+                format!("Runtime recovery pointer is invalid: {error}"),
+                false,
+            )
+        })?;
+    validate_upgrade_record_identity(
+        pointer.schema_version,
+        &pointer.owner,
+        &pointer.runtime_name,
+        &pointer.operation_id,
+        &pointer.created_at,
+    )?;
+    if pointer.target_root.is_empty()
+        || pointer.target_root.len() > 1024
+        || pointer.manifest_sha256.len() != 64
+        || !pointer
+            .manifest_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(fail(
+            "upgrade_pointer",
+            "Runtime recovery pointer does not contain a valid target and manifest digest.",
+            false,
+        ));
+    }
+    Ok(Some(pointer))
+}
+
+fn clear_upgrade_pointer(journal: &RuntimeUpgradeJournal) -> Result<(), String> {
+    clear_upgrade_pointer_for(
+        &journal.operation_id,
+        &journal.target_root,
+        &journal.manifest_sha256,
+    )
+}
+
+fn clear_upgrade_pointer_for(
+    operation_id: &str,
+    target_root: &str,
+    manifest_sha256: &str,
+) -> Result<(), String> {
+    let Some(pointer) = load_upgrade_pointer().map_err(|error| error.message)? else {
+        return Ok(());
+    };
+    if pointer.operation_id != operation_id
+        || !pointer.target_root.eq_ignore_ascii_case(target_root)
+        || pointer.manifest_sha256 != manifest_sha256
+    {
+        return Err(
+            "Runtime recovery pointer belongs to another operation and was preserved.".to_string(),
+        );
+    }
+    let root = runtime_upgrade_pointer_root().map_err(|error| error.message)?;
+    for path in [
+        root.join(UPGRADE_POINTER_FILE),
+        root.join(UPGRADE_POINTER_TEMP_FILE),
+    ] {
+        ensure_safe_cache_file(&path).map_err(|error| error.message)?;
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("Unable to remove {}: {error}", path.display())),
+        }
+    }
+    Ok(())
+}
+
+fn finalize_orphaned_upgrade_cleanup(
+    target: &Path,
+    pointer: &RuntimeUpgradePointer,
+) -> Result<(), InstallFailure> {
+    let target_text = target.to_str().ok_or_else(|| {
+        fail(
+            "invalid_target",
+            "Runtime cleanup target is not valid UTF-8.",
+            false,
+        )
+    })?;
+    if !pointer.target_root.eq_ignore_ascii_case(target_text) {
+        return Err(fail(
+            "upgrade_pointer",
+            "Runtime cleanup pointer does not match the registered target.",
+            false,
+        ));
+    }
+    let registered = crate::runtime::registered_runtime_target()
+        .map_err(|error| fail("upgrade_cleanup", error, false))?
+        .ok_or_else(|| {
+            fail(
+                "upgrade_cleanup",
+                "Runtime cleanup cannot continue because DroneDreamRuntime is not registered.",
+                false,
+            )
+        })?;
+    if !registered.eq_ignore_ascii_case(target_text) {
+        return Err(fail(
+            "upgrade_cleanup",
+            "Runtime cleanup found another registered target and preserved all recovery data.",
+            false,
+        ));
+    }
+    crate::runtime::validate_installed_runtime_ownership().map_err(|error| {
+        fail(
+            "upgrade_cleanup",
+            format!("Runtime cleanup requires a valid installed ownership receipt: {error}"),
+            false,
+        )
+    })?;
+
+    let cache_candidate = crate::runtime_cache::runtime_download_cache_root(target_text);
+    if cache_candidate.exists() {
+        let cache_root = crate::runtime_cache::validate_managed_cache(target)
+            .map_err(|error| fail("unsafe_cache", error, false))?;
+        let artifact_root = cache_root.join("artifacts");
+        let journal_path = artifact_root.join(UPGRADE_JOURNAL_FILE);
+        ensure_safe_cache_file(&journal_path)?;
+        if journal_path.exists() {
+            return Err(fail(
+                "upgrade_cleanup",
+                "Runtime cleanup found a durable upgrade journal and preserved it for normal recovery.",
+                false,
+            ));
+        }
+        let backup = artifact_root.join(format!(
+            "{UPGRADE_BACKUP_PREFIX}{}.tar",
+            pointer.operation_id
+        ));
+        for path in [backup, artifact_root.join(UPGRADE_JOURNAL_TEMP_FILE)] {
+            ensure_safe_cache_file(&path)?;
+            match fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(fail(
+                        "upgrade_cleanup",
+                        format!(
+                            "Unable to finish Runtime cleanup at {}: {error}",
+                            path.display()
+                        ),
+                        true,
+                    ))
+                }
+            }
+        }
+    }
+    clear_upgrade_pointer_for(
+        &pointer.operation_id,
+        &pointer.target_root,
+        &pointer.manifest_sha256,
+    )
+    .map_err(|error| fail("upgrade_cleanup", error, true))
+}
+
+fn validate_upgrade_record_identity(
+    schema_version: u32,
+    owner: &str,
+    runtime_name: &str,
+    operation_id: &str,
+    created_at: &str,
+) -> Result<(), InstallFailure> {
+    let created = chrono::DateTime::parse_from_rfc3339(created_at)
+        .map_err(|_| {
+            fail(
+                "upgrade_journal",
+                "Runtime upgrade recovery timestamp is invalid.",
+                false,
+            )
+        })?
+        .with_timezone(&chrono::Utc);
+    let age = chrono::Utc::now().signed_duration_since(created);
+    if schema_version != 1
+        || owner != "DroneDreamDesktop"
+        || runtime_name != RUNTIME_NAME
+        || operation_id.is_empty()
+        || operation_id.len() > 128
+        || !operation_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        || age < chrono::Duration::minutes(-5)
+        || age > chrono::Duration::hours(48)
+    {
+        return Err(fail(
+            "upgrade_journal",
+            "Runtime upgrade recovery record is stale or does not belong to DroneDream.",
+            false,
+        ));
+    }
+    Ok(())
+}
+
+fn load_upgrade_journal(
+    target: &Path,
+    keyring: &str,
+    cancel: &AtomicBool,
+) -> Result<(RuntimeUpgradeJournal, ReleaseManifest), InstallFailure> {
+    let cache_root = crate::runtime_cache::validate_managed_cache(target)
+        .map_err(|error| fail("unsafe_cache", error, false))?;
+    let artifact_root = cache_root.join("artifacts");
+    let journal_path = artifact_root.join(UPGRADE_JOURNAL_FILE);
+    ensure_safe_cache_file(&journal_path)?;
+    let metadata = fs::metadata(&journal_path).map_err(|_| {
+        fail(
+            "upgrade_journal_missing",
+            "Runtime upgrade recovery journal is missing.",
+            false,
+        )
+    })?;
+    if metadata.len() > 64 * 1024 {
+        return Err(fail(
+            "upgrade_journal",
+            "Runtime upgrade recovery journal is oversized.",
+            false,
+        ));
+    }
+    let journal: RuntimeUpgradeJournal =
+        serde_json::from_slice(&fs::read(&journal_path).map_err(|error| {
+            fail(
+                "upgrade_journal",
+                format!("Unable to read Runtime upgrade recovery journal: {error}"),
+                false,
+            )
+        })?)
+        .map_err(|error| {
+            fail(
+                "upgrade_journal",
+                format!("Runtime upgrade recovery journal is invalid: {error}"),
+                false,
+            )
+        })?;
+    validate_upgrade_record_identity(
+        journal.schema_version,
+        &journal.owner,
+        &journal.runtime_name,
+        &journal.operation_id,
+        &journal.created_at,
+    )?;
+    let target_text = target.to_str().ok_or_else(|| {
+        fail(
+            "invalid_target",
+            "Runtime recovery target is not valid UTF-8.",
+            false,
+        )
+    })?;
+    if !journal.target_root.eq_ignore_ascii_case(target_text)
+        || journal.old_build_id.is_empty()
+        || journal.old_build_id.len() > 128
+        || journal.new_build_id.is_empty()
+        || journal.new_build_id.len() > 128
+        || journal.manifest_sha256.len() != 64
+        || !journal
+            .manifest_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(fail(
+            "upgrade_journal",
+            "Runtime upgrade recovery journal does not match this target.",
+            false,
+        ));
+    }
+    let (manifest, raw_manifest) = load_cached_signed_release(target, keyring)?;
+    let manifest_sha256 = hex::encode(Sha256::digest(&raw_manifest));
+    if manifest_sha256 != journal.manifest_sha256
+        || manifest.runtime.build_id != journal.new_build_id
+        || manifest.runtime.version != journal.new_version
+    {
+        return Err(fail(
+            "upgrade_journal",
+            "Runtime upgrade journal does not match the trusted signed release metadata.",
+            false,
+        ));
+    }
+    validate_upgrade_version(&journal.old_build_id, &journal.old_version, &manifest)?;
+    verify_upgrade_backup(&artifact_root, &journal, cancel)?;
+    Ok((journal, manifest))
+}
+
+fn verify_upgrade_backup(
+    artifact_root: &Path,
+    journal: &RuntimeUpgradeJournal,
+    cancel: &AtomicBool,
+) -> Result<(), InstallFailure> {
+    if !journal.backup_filename.starts_with(UPGRADE_BACKUP_PREFIX)
+        || !journal.backup_filename.ends_with(".tar")
+        || journal.backup_filename.contains(['/', '\\'])
+    {
+        return Err(fail(
+            "upgrade_journal",
+            "Runtime upgrade backup name is invalid.",
+            false,
+        ));
+    }
+    let backup = artifact_root.join(&journal.backup_filename);
+    let size = fs::metadata(&backup)
+        .map_err(|error| fail("upgrade_backup", error.to_string(), false))?
+        .len();
+    if size == 0 || size != journal.backup_size {
+        return Err(fail(
+            "upgrade_backup",
+            "Runtime rollback image size no longer matches the durable journal.",
+            false,
+        ));
+    }
+    let observed = compute_file_sha256(&backup, cancel)?;
+    if observed != journal.backup_sha256 {
+        return Err(fail(
+            "upgrade_backup",
+            "Runtime rollback image failed SHA-256 verification.",
+            false,
+        ));
+    }
+    Ok(())
+}
+
+fn cleanup_upgrade_state(
+    artifact_root: &Path,
+    journal: &RuntimeUpgradeJournal,
+) -> Result<(), String> {
+    let backup = artifact_root.join(&journal.backup_filename);
+    for path in [
+        artifact_root.join(UPGRADE_JOURNAL_FILE),
+        artifact_root.join(UPGRADE_JOURNAL_TEMP_FILE),
+        backup,
+    ] {
+        ensure_safe_cache_file(&path).map_err(|error| error.message)?;
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("Unable to remove {}: {error}", path.display())),
+        }
+    }
+    // The host pointer is the final transaction record removed. If the process
+    // stops after the journal is gone, maintenance can prove the installed
+    // owned Runtime and finish removing the exact operation backup.
+    clear_upgrade_pointer(journal)
+}
+
+fn join_cleanup_warnings<const N: usize>(warnings: [Option<String>; N]) -> Option<String> {
+    let joined = warnings
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join("; ");
+    (!joined.is_empty()).then_some(joined)
 }
 
 fn cleanup_successful_install(
@@ -4598,6 +6049,73 @@ mod tests {
         )
     }
 
+    #[test]
+    fn runtime_upgrade_accepts_only_a_strictly_newer_distinct_signed_build() {
+        let manifest = fixture_manifest(b"runtime");
+        assert!(validate_upgrade_version(
+            "123e4567-e89b-12d3-a456-426614174099",
+            "1.2.2",
+            &manifest,
+        )
+        .is_ok());
+
+        let same_version =
+            validate_upgrade_version("123e4567-e89b-12d3-a456-426614174099", "1.2.3", &manifest)
+                .expect_err("equal semantic versions must not replace the Runtime Base");
+        assert_eq!(same_version.code, "runtime_upgrade_not_newer");
+
+        let same_build = validate_upgrade_version(&manifest.runtime.build_id, "1.2.2", &manifest)
+            .expect_err("a reused build identity must not be accepted as an upgrade");
+        assert_eq!(same_build.code, "runtime_upgrade_not_newer");
+    }
+
+    #[test]
+    fn runtime_upgrade_recovery_records_are_owner_bound_and_time_bounded() {
+        let now = chrono::Utc::now().to_rfc3339();
+        assert!(validate_upgrade_record_identity(
+            1,
+            "DroneDreamDesktop",
+            RUNTIME_NAME,
+            "upgrade-42-7",
+            &now,
+        )
+        .is_ok());
+
+        let foreign = validate_upgrade_record_identity(
+            1,
+            "AnotherApplication",
+            RUNTIME_NAME,
+            "upgrade-42-7",
+            &now,
+        )
+        .expect_err("foreign recovery ownership must fail closed");
+        assert_eq!(foreign.code, "upgrade_journal");
+
+        let stale = (chrono::Utc::now() - chrono::Duration::hours(49)).to_rfc3339();
+        let expired = validate_upgrade_record_identity(
+            1,
+            "DroneDreamDesktop",
+            RUNTIME_NAME,
+            "upgrade-42-7",
+            &stale,
+        )
+        .expect_err("stale recovery capabilities must not remain actionable");
+        assert_eq!(expired.code, "upgrade_journal");
+    }
+
+    #[test]
+    fn runtime_upgrade_cleanup_preserves_every_warning_without_blank_separators() {
+        assert_eq!(
+            join_cleanup_warnings([
+                Some("pending".to_string()),
+                None,
+                Some("journal".to_string()),
+            ]),
+            Some("pending; journal".to_string())
+        );
+        assert_eq!(join_cleanup_warnings([None::<String>, None]), None);
+    }
+
     #[derive(Clone, Copy)]
     enum TransportMode {
         Valid,
@@ -4666,6 +6184,8 @@ mod tests {
     struct FakeWslState {
         registered: bool,
         registration_owned_by_attempt: bool,
+        installed_build_id: Option<String>,
+        installed_version: Option<String>,
         unrelated_registered: bool,
         fail_import_after_registration: bool,
         fail_import_without_registration: bool,
@@ -4675,6 +6195,7 @@ mod tests {
         cancel_during_import: bool,
         preparation_requires_restart: bool,
         imports: usize,
+        exports: usize,
         bootstraps: usize,
         starts: usize,
         unregisters: usize,
@@ -4682,6 +6203,7 @@ mod tests {
         diagnostics: usize,
         fail_diagnostics: bool,
         health_failure_code: Option<String>,
+        health_failures_remaining: usize,
         events: Vec<String>,
         lifecycle_events: Vec<String>,
     }
@@ -4707,6 +6229,29 @@ mod tests {
         fn registration_matches_target(&self, _: &Path) -> Result<bool, InstallFailure> {
             let state = self.state.lock().unwrap();
             Ok(state.registered && state.registration_owned_by_attempt)
+        }
+
+        fn installed_identity(&self) -> Result<(String, String), InstallFailure> {
+            let state = self.state.lock().unwrap();
+            match (
+                state.installed_build_id.as_ref(),
+                state.installed_version.as_ref(),
+            ) {
+                (Some(build_id), Some(version)) => Ok((build_id.clone(), version.clone())),
+                _ => Err(fail(
+                    "runtime_ownership",
+                    "fake runtime has no installed identity",
+                    false,
+                )),
+            }
+        }
+
+        fn export(&self, backup: &Path) -> Result<(), InstallFailure> {
+            let mut state = self.state.lock().unwrap();
+            state.exports += 1;
+            state.lifecycle_events.push("export".to_string());
+            fs::write(backup, b"owned-runtime-backup")
+                .map_err(|error| fail("fake_export", error.to_string(), true))
         }
 
         fn import(
@@ -4784,6 +6329,35 @@ mod tests {
             Ok(())
         }
 
+        fn clear_receipt(
+            &self,
+            _: &Path,
+            build_id: &str,
+            version: &str,
+        ) -> Result<(), InstallFailure> {
+            let mut state = self.state.lock().unwrap();
+            if state.installed_build_id.is_none() && state.installed_version.is_none() {
+                state
+                    .lifecycle_events
+                    .push("clear-receipt-missing".to_string());
+                return Ok(());
+            }
+            if state.installed_build_id.as_deref() == Some(build_id)
+                && state.installed_version.as_deref() == Some(version)
+            {
+                state.installed_build_id = None;
+                state.installed_version = None;
+                state.lifecycle_events.push("clear-receipt".to_string());
+                Ok(())
+            } else {
+                Err(fail(
+                    "runtime_receipt",
+                    "fake runtime receipt changed",
+                    false,
+                ))
+            }
+        }
+
         fn wait_healthy(
             &self,
             _: &str,
@@ -4793,6 +6367,14 @@ mod tests {
             check_cancel(cancel)?;
             let mut state = self.state.lock().unwrap();
             state.lifecycle_events.push("health".to_string());
+            if state.health_failures_remaining > 0 {
+                state.health_failures_remaining -= 1;
+                return Err(fail(
+                    "runtime_service_unhealthy",
+                    "injected one-shot runtime health failure",
+                    true,
+                ));
+            }
             if let Some(code) = state.health_failure_code.as_deref() {
                 Err(fail(code, "injected runtime health failure", true))
             } else {
@@ -4825,9 +6407,16 @@ mod tests {
             Ok(path)
         }
 
-        fn write_receipt(&self, _: &Path, _: &str, _: &str) -> Result<(), InstallFailure> {
+        fn write_receipt(
+            &self,
+            _: &Path,
+            build_id: &str,
+            version: &str,
+        ) -> Result<(), InstallFailure> {
             let mut state = self.state.lock().unwrap();
             state.receipts += 1;
+            state.installed_build_id = Some(build_id.to_string());
+            state.installed_version = Some(version.to_string());
             state.lifecycle_events.push("receipt".to_string());
             Ok(())
         }

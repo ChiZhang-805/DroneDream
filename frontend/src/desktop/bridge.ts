@@ -752,9 +752,11 @@ export type RuntimeInstallPhase =
   | "verifyingManifest"
   | "downloading"
   | "verifyingArchive"
+  | "backingUp"
   | "importing"
   | "starting"
   | "healthChecking"
+  | "restoring"
   | "waitingForRestart"
   | "completed"
   | "failed"
@@ -785,6 +787,10 @@ export interface RuntimeInstallSnapshot {
 
 export interface RuntimeInstallRequest {
   targetRoot: string;
+  releaseManifestUrl?: string | null;
+}
+
+export interface RuntimeUpgradeRequest {
   releaseManifestUrl?: string | null;
 }
 
@@ -883,9 +889,11 @@ const INSTALL_PHASES = new Set<RuntimeInstallPhase>([
   "verifyingManifest",
   "downloading",
   "verifyingArchive",
+  "backingUp",
   "importing",
   "starting",
   "healthChecking",
+  "restoring",
   "waitingForRestart",
   "completed",
   "failed",
@@ -1448,6 +1456,19 @@ export function startRuntimeInstall(
     "start_runtime_install",
     parseRuntimeInstallSnapshot,
     { request: normalizedRequest },
+  );
+}
+
+export function startRuntimeUpgrade(
+  request: RuntimeUpgradeRequest = {},
+): Promise<RuntimeInstallSnapshot> {
+  const releaseManifestUrl = request.releaseManifestUrl == null
+    ? null
+    : normalizeReleaseManifestUrl(request.releaseManifestUrl);
+  return invokeDesktop(
+    "start_runtime_upgrade",
+    parseRuntimeInstallSnapshot,
+    { request: { releaseManifestUrl } },
   );
 }
 

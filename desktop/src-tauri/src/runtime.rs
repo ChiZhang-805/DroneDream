@@ -1066,6 +1066,97 @@ pub(crate) fn write_runtime_root_receipt(
         .map_err(|error| format!("Unable to commit runtime ownership receipt: {error}"))
 }
 
+#[cfg(target_os = "windows")]
+pub(crate) fn remove_runtime_root_receipt_if_matches(
+    target_root: &str,
+    build_id: &str,
+    version: &str,
+) -> Result<(), String> {
+    use std::io::ErrorKind;
+    use std::os::windows::fs::MetadataExt;
+    use std::path::Path;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    const MAX_MARKER_BYTES: u64 = 16 * 1024;
+    let normalized = normalize_windows_target(target_root)?;
+    let root = Path::new(&normalized);
+    let root_metadata = std::fs::symlink_metadata(root)
+        .map_err(|error| format!("Unable to inspect runtime root before replacement: {error}"))?;
+    if !root_metadata.is_dir()
+        || root_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    {
+        return Err("Runtime root is not a real local directory.".to_string());
+    }
+
+    let destination = root.join(RUNTIME_ROOT_MARKER);
+    let marker_metadata = match std::fs::symlink_metadata(&destination) {
+        Ok(value) => value,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "Unable to inspect runtime ownership receipt before replacement: {error}"
+            ))
+        }
+    };
+    if !marker_metadata.is_file()
+        || marker_metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || marker_metadata.len() > MAX_MARKER_BYTES
+    {
+        return Err("Runtime ownership receipt is not a safe ordinary file.".to_string());
+    }
+    let marker: RuntimeRootMarker = serde_json::from_slice(
+        &std::fs::read(&destination)
+            .map_err(|error| format!("Unable to read runtime ownership receipt: {error}"))?,
+    )
+    .map_err(|error| format!("Runtime ownership receipt is invalid: {error}"))?;
+    if marker.schema_version != 1
+        || marker.owner != RUNTIME_ROOT_MARKER_OWNER
+        || marker.runtime_name != RUNTIME_NAME
+        || marker.build_id.as_deref() != Some(build_id)
+        || marker.version.as_deref() != Some(version)
+    {
+        return Err(
+            "Runtime ownership receipt changed after upgrade authorization; it was preserved."
+                .to_string(),
+        );
+    }
+    std::fs::remove_file(&destination)
+        .map_err(|error| format!("Unable to remove the replaced runtime receipt: {error}"))?;
+
+    let temporary = root.join(".dronedream-runtime-root.json.tmp");
+    match std::fs::symlink_metadata(&temporary) {
+        Ok(metadata)
+            if metadata.is_file()
+                && metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0
+                && metadata.len() <= MAX_MARKER_BYTES =>
+        {
+            std::fs::remove_file(&temporary).map_err(|error| {
+                format!("Unable to remove the temporary runtime receipt: {error}")
+            })?;
+        }
+        Ok(_) => return Err(
+            "Temporary runtime ownership receipt is not a safe ordinary file; it was preserved."
+                .to_string(),
+        ),
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(format!(
+                "Unable to inspect the temporary runtime receipt: {error}"
+            ))
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn remove_runtime_root_receipt_if_matches(
+    _: &str,
+    _: &str,
+    _: &str,
+) -> Result<(), String> {
+    Err("The runtime installer supports Windows only.".to_string())
+}
+
 #[cfg(not(target_os = "windows"))]
 pub(crate) fn write_runtime_root_receipt(_: &str, _: &str, _: &str) -> Result<(), String> {
     Err("The runtime installer supports Windows only.".to_string())
