@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AutonomyCompileRequest } from "../../types/api";
 import { loadAutonomyAssetLibrary } from "./assetLibraryStore";
 import { createLocalAutonomyPreview } from "./missionAutonomy";
+import { SCHOOL_MAP_CONTRACT, SCHOOL_MAP_ROAD_NETWORK } from "./schoolMapScene";
 import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "./workspaceStore";
 import {
   autonomyHarnessRequest,
@@ -69,7 +70,55 @@ describe("autonomy mission harness", () => {
 
     expect(normalized.mapPack.id).toBe("map-user-import");
     expect(normalized.mapPack.name).toBe("5 environment");
+    expect(normalized.mapPack.version).toBe(1);
     expect(normalized.mapPack.sourceFiles).toHaveLength(1);
+  });
+
+  it("keeps one replace-in-place map identity instead of creating visible revisions", () => {
+    const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    workspace.mapPack.version = 9;
+    workspace.mapPack.status = "qualified";
+    workspace.mapPack.contentHash = "a".repeat(64);
+    workspace.mapPack.qualificationReceiptId = "old-map-receipt";
+
+    const normalized = normalizeAutonomyWorkspace(workspace);
+
+    expect(normalized.mapPack.id).toBe("map-school");
+    expect(normalized.mapPack.name).toBe("School Map");
+    expect(normalized.mapPack.version).toBe(1);
+    expect(normalized.mapPack.status).toBe("draft");
+    expect(normalized.mapPack.qualificationReceiptId).toBeNull();
+  });
+
+  it("connects every School Map facility to one shared meter-scale road graph", () => {
+    const key = ([x, z]: [number, number]) => `${x},${z}`;
+    const graph = new Map<string, Set<string>>();
+    for (const segment of SCHOOL_MAP_ROAD_NETWORK.segments) {
+      expect(segment.widthM).toBeGreaterThanOrEqual(SCHOOL_MAP_CONTRACT.simulation.minimumRoadWidthM);
+      for (let index = 0; index < segment.points.length - 1; index += 1) {
+        const from = key(segment.points[index]);
+        const to = key(segment.points[index + 1]);
+        if (!graph.has(from)) graph.set(from, new Set());
+        if (!graph.has(to)) graph.set(to, new Set());
+        graph.get(from)!.add(to);
+        graph.get(to)!.add(from);
+      }
+    }
+    const start = key(SCHOOL_MAP_ROAD_NETWORK.facilityAnchors["campus-gate"]);
+    const visited = new Set([start]);
+    const queue = [start];
+    while (queue.length) {
+      for (const neighbor of graph.get(queue.shift()!) ?? []) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+    for (const anchor of Object.values(SCHOOL_MAP_ROAD_NETWORK.facilityAnchors)) {
+      expect(visited.has(key(anchor))).toBe(true);
+    }
+    expect(SCHOOL_MAP_CONTRACT.simulation.minimumOpenDoorClearanceM)
+      .toBeGreaterThan(SCHOOL_MAP_CONTRACT.simulation.vehicleCollisionDiameterM * 2);
   });
 
   it("restores public assets when the persisted asset library is malformed", () => {

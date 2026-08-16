@@ -1686,7 +1686,7 @@ export function AutonomyMaps() {
     event.preventDefault();
     const next = {
       ...form,
-      version: saved ? form.version : Math.max(workspace.mapPack.version + 1, form.version),
+      version: 1,
       status: ready
         ? "qualified" as const
         : form.sourceFiles.length && form.sourceFiles.every((file) => file.admission === "admitted")
@@ -1995,7 +1995,7 @@ export function AutonomyEvidence() {
         {workspace.evidence.map((record) => <article key={record.id}>
           <header><FileClock aria-hidden="true" /><strong>{record.contractId}</strong><em>{record.source.toUpperCase()}</em></header>
           <p>{record.missionIntent}</p>
-          <dl><div><dt>{chinese ? "无人机" : "Aircraft"}</dt><dd>{record.aircraftName} · v{record.aircraftVersion}</dd></div><div><dt>Map Pack</dt><dd>{record.mapName} · v{record.mapVersion}</dd></div><div><dt>{chinese ? "观测" : "Observations"}</dt><dd>{record.observationCount}</dd></div><div><dt>{chinese ? "任务图" : "Task graph"}</dt><dd>r{record.taskGraphRevision}</dd></div><div><dt>{chinese ? "决策" : "Decisions"}</dt><dd>{record.decisionCount}</dd></div><div><dt>{chinese ? "跟踪实体" : "Tracked entities"}</dt><dd>{record.trackedEntityCount}</dd></div><div><dt>{chinese ? "证据链" : "Evidence chain"}</dt><dd>{record.evidenceChainHead.slice(0, 18)}</dd></div></dl>
+          <dl><div><dt>{chinese ? "无人机" : "Aircraft"}</dt><dd>{record.aircraftName} · v{record.aircraftVersion}</dd></div><div><dt>Map Pack</dt><dd>{record.mapName}</dd></div><div><dt>{chinese ? "观测" : "Observations"}</dt><dd>{record.observationCount}</dd></div><div><dt>{chinese ? "任务图" : "Task graph"}</dt><dd>r{record.taskGraphRevision}</dd></div><div><dt>{chinese ? "决策" : "Decisions"}</dt><dd>{record.decisionCount}</dd></div><div><dt>{chinese ? "跟踪实体" : "Tracked entities"}</dt><dd>{record.trackedEntityCount}</dd></div><div><dt>{chinese ? "证据链" : "Evidence chain"}</dt><dd>{record.evidenceChainHead.slice(0, 18)}</dd></div></dl>
           <time>{formatTime(record.completedAt)}</time>
         </article>)}
       </div> : <div className="autonomy-evidence-empty">

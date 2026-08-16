@@ -21,6 +21,14 @@ export const SCHOOL_MAP_CONTRACT = {
   resolutionM: 0.05,
   floorCount: 3,
   boundsM: { x: 120, y: 90, z: 12.6 },
+  simulation: {
+    units: "m",
+    worldFrame: "ENU",
+    vehicleCollisionDiameterM: 0.76,
+    minimumRoadWidthM: 4.8,
+    minimumOpenDoorClearanceM: 3.8,
+    minimumIndoorClearWidthM: 1.6,
+  },
   stair: {
     type: "switchback",
     risersPerFlight: 12,
@@ -208,6 +216,41 @@ function addDoor(
   parent.add(group);
 }
 
+function addEntranceDoorLeaf(
+  parent: THREE.Object3D,
+  hinge: [number, number, number],
+  id: string,
+  direction: -1 | 1,
+  open: boolean,
+  width = 2.05,
+  height = 2.7,
+) {
+  const group = tag(new THREE.Group(), "door", id, {
+    traversable: open,
+    state: open ? "open" : "closed",
+    clearanceM: open ? width * 2 : 0,
+  });
+  group.position.set(...hinge);
+  group.rotation.y = open ? direction * THREE.MathUtils.degToRad(78) : 0;
+  box(group, [width, height, 0.095], [direction * width / 2, 0, 0], 0x8c674f, {
+    id: `${id}-panel`,
+    kind: "door-leaf",
+    roughness: 0.55,
+  });
+  box(group, [width * 0.72, height * 0.48, 0.105], [direction * width / 2, 0.35, -0.01], COLORS.glass, {
+    id: `${id}-vision-panel`,
+    kind: "door-glazing",
+    opacity: 0.46,
+    roughness: 0.16,
+    castShadow: false,
+  });
+  cylinder(group, 0.045, 0.085, [direction * width * 0.82, -0.05, -0.09], 0xe5c46e, {
+    radialSegments: 10,
+    metalness: 0.58,
+  }).rotation.x = Math.PI / 2;
+  parent.add(group);
+}
+
 function addDeskChair(
   parent: THREE.Object3D,
   x: number,
@@ -392,7 +435,12 @@ function addSwitchbackStair(
 }
 
 function addEntrance(parent: THREE.Object3D) {
-  const group = tag(new THREE.Group(), "entrance", "teaching-building-main-entrance", { accessible: true });
+  const group = tag(new THREE.Group(), "entrance", "teaching-building-main-entrance", {
+    accessible: true,
+    doorLeafCount: 4,
+    openDoorLeafCount: 2,
+    openClearanceM: SCHOOL_MAP_CONTRACT.simulation.minimumOpenDoorClearanceM,
+  });
   parent.add(group);
   const x = -25;
   const z = -0.35;
@@ -401,8 +449,23 @@ function addEntrance(parent: THREE.Object3D) {
   }
   const ramp = box(group, [2.0, 0.12, 7.2], [x - 5.5, 0.34, z + 2.4], COLORS.path, { id: "main-entrance-accessible-ramp", kind: "accessible-ramp" });
   ramp.rotation.x = -Math.atan2(0.55, 7.2);
-  addDoor(group, [x - 1.5, 1.72, 2.0], 0, "teaching-main-door-west", 2.15, 2.7, true);
-  addDoor(group, [x + 1.5, 1.72, 2.0], 0, "teaching-main-door-east", 2.15, 2.7, true);
+  const doorY = 1.72;
+  const doorZ = 1.92;
+  // The stair core sits at the east end of the teaching building. Keep the two
+  // western leaves open so the active flight entrance is the pair furthest
+  // from the stair traffic, while retaining all four modeled door leaves.
+  addEntranceDoorLeaf(group, [x - 4.15, doorY, doorZ], "teaching-main-door-1-west-open", 1, true);
+  addEntranceDoorLeaf(group, [x, doorY, doorZ], "teaching-main-door-2-west-open", -1, true);
+  addEntranceDoorLeaf(group, [x, doorY, doorZ], "teaching-main-door-3-east-closed", 1, false);
+  addEntranceDoorLeaf(group, [x + 4.15, doorY, doorZ], "teaching-main-door-4-east-closed", -1, false);
+  [x - 4.25, x, x + 4.25].forEach((postX, index) => box(
+    group,
+    [0.16, 2.92, 0.18],
+    [postX, 1.55, doorZ],
+    COLORS.trim,
+    { id: `teaching-main-door-frame-${index + 1}`, kind: "door-frame", metalness: 0.2 },
+  ));
+  box(group, [8.65, 0.18, 0.18], [x, 3.08, doorZ], COLORS.trim, { id: "teaching-main-door-lintel", kind: "door-frame", metalness: 0.2 });
   box(group, [8.2, 0.28, 2.5], [x, 3.25, 1.6], COLORS.trim, { id: "main-door-canopy", kind: "canopy", metalness: 0.2 });
 }
 
@@ -432,7 +495,13 @@ function addTeachingBuilding(root: THREE.Group, options: SchoolMapSceneOptions) 
     box(floorGroup, [56, 3.35, 0.22], [-25, floorY + 1.8, 24], COLORS.wall, { id: `teaching-north-shell-${floorNumber}`, kind: "exterior-wall", opacity: shellOpacity });
     box(floorGroup, [0.22, 3.35, 22], [-53, floorY + 1.8, 13], COLORS.wall, { id: `teaching-west-shell-${floorNumber}`, kind: "exterior-wall", opacity: shellOpacity });
     box(floorGroup, [0.22, 3.35, 22], [3, floorY + 1.8, 13], COLORS.wall, { id: `teaching-east-shell-${floorNumber}`, kind: "exterior-wall", opacity: shellOpacity });
-    if (floorNumber > 1) box(floorGroup, [56, 3.35, 0.22], [-25, floorY + 1.8, 2], COLORS.wall, { id: `teaching-south-shell-${floorNumber}`, kind: "exterior-wall", opacity: shellOpacity });
+    if (floorNumber === 1) {
+      box(floorGroup, [23.7, 3.35, 0.22], [-41.15, floorY + 1.8, 2], COLORS.wall, { id: "teaching-south-shell-1-west", kind: "exterior-wall", opacity: shellOpacity });
+      box(floorGroup, [23.7, 3.35, 0.22], [-8.85, floorY + 1.8, 2], COLORS.wall, { id: "teaching-south-shell-1-east", kind: "exterior-wall", opacity: shellOpacity });
+      box(floorGroup, [8.6, 0.47, 0.22], [-25, floorY + 3.11, 2], COLORS.wall, { id: "teaching-south-shell-1-entrance-header", kind: "exterior-wall", opacity: shellOpacity });
+    } else {
+      box(floorGroup, [56, 3.35, 0.22], [-25, floorY + 1.8, 2], COLORS.wall, { id: `teaching-south-shell-${floorNumber}`, kind: "exterior-wall", opacity: shellOpacity });
+    }
     [-45.25, -31.75, -18.25, -4.75].forEach((roomCenter, roomIndex) => {
       [-4.05, -1.35, 1.35, 4.05].forEach((offset, windowIndex) => addWindow(
         floorGroup,
@@ -489,7 +558,13 @@ function addCafeteria(root: THREE.Group, options: SchoolMapSceneOptions) {
     box(floorGroup, [34, 3.35, 0.22], [30, y + 1.8, 32.5], COLORS.cafeteria, { id: `cafeteria-north-${floor}`, kind: "exterior-wall", opacity: shellOpacity });
     box(floorGroup, [0.22, 3.35, 25], [13, y + 1.8, 20], COLORS.cafeteria, { id: `cafeteria-west-${floor}`, kind: "exterior-wall", opacity: shellOpacity });
     box(floorGroup, [0.22, 3.35, 25], [47, y + 1.8, 20], COLORS.cafeteria, { id: `cafeteria-east-${floor}`, kind: "exterior-wall", opacity: shellOpacity });
-    if (floor === 2) box(floorGroup, [34, 3.35, 0.22], [30, y + 1.8, 7.5], COLORS.cafeteria, { id: "cafeteria-south-2", kind: "exterior-wall", opacity: shellOpacity });
+    if (floor === 1) {
+      box(floorGroup, [13.25, 3.35, 0.22], [19.625, y + 1.8, 7.5], COLORS.cafeteria, { id: "cafeteria-south-1-west", kind: "exterior-wall", opacity: shellOpacity });
+      box(floorGroup, [13.25, 3.35, 0.22], [40.375, y + 1.8, 7.5], COLORS.cafeteria, { id: "cafeteria-south-1-east", kind: "exterior-wall", opacity: shellOpacity });
+      box(floorGroup, [7.5, 0.58, 0.22], [30, y + 3.06, 7.5], COLORS.cafeteria, { id: "cafeteria-south-1-entry-header", kind: "exterior-wall", opacity: shellOpacity });
+    } else {
+      box(floorGroup, [34, 3.35, 0.22], [30, y + 1.8, 7.5], COLORS.cafeteria, { id: "cafeteria-south-2", kind: "exterior-wall", opacity: shellOpacity });
+    }
     for (let row = 0; row < 3; row += 1) {
       for (let column = 0; column < 4; column += 1) {
         addCafeteriaTable(floorGroup, 18 + column * 7.4, y, 13 + row * 6.2, `cafeteria-${floor}-table-${row + 1}-${column + 1}`);
@@ -520,7 +595,12 @@ function addRoadRibbon(parent: THREE.Object3D, points: Array<[number, number]>, 
   const vertices: number[] = [];
   const indices: number[] = [];
   points.forEach((_, index) => vertices.push(left[index].x, left[index].y, left[index].z, right[index].x, right[index].y, right[index].z));
-  for (let index = 0; index < points.length - 1; index += 1) indices.push(index * 2, index * 2 + 1, index * 2 + 2, index * 2 + 1, index * 2 + 3, index * 2 + 2);
+  for (let index = 0; index < points.length - 1; index += 1) {
+    // Counter-clockwise from above (+Y) so the road surface is visible with
+    // normal front-face culling in both the browser and an SDF mesh export.
+    indices.push(index * 2, index * 2 + 2, index * 2 + 1);
+    indices.push(index * 2 + 1, index * 2 + 2, index * 2 + 3);
+  }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setIndex(indices);
@@ -537,6 +617,72 @@ function addRoadRibbon(parent: THREE.Object3D, points: Array<[number, number]>, 
   centerLine.computeLineDistances();
   tag(centerLine, "lane-center", `${id}-centerline`);
   parent.add(centerLine);
+}
+
+export interface SchoolMapRoadSegment {
+  id: string;
+  widthM: number;
+  points: Array<[number, number]>;
+  connects: string[];
+}
+
+export const SCHOOL_MAP_ROAD_NETWORK: {
+  segments: SchoolMapRoadSegment[];
+  junctions: Array<{ id: string; x: number; z: number; diameterM: number }>;
+  facilityAnchors: Record<string, [number, number]>;
+} = {
+  facilityAnchors: {
+    "campus-gate": [0, -43],
+    "teaching-building": [-25, -0.85],
+    cafeteria: [30, 7.15],
+    "takeout-pickup": [48.5, 1.5],
+    "bicycle-shelter": [-42, 35.4],
+    "tree-corridor": [0, -18],
+  },
+  segments: [
+    { id: "campus-gate-spine", widthM: 6.4, points: [[0, -43], [0, -31], [0, -18]], connects: ["campus-gate", "tree-corridor"] },
+    { id: "campus-east-west-road", widthM: 6.2, points: [[-51, -18], [-25, -18], [0, -18], [8, -18], [30, -18], [52, -18]], connects: ["tree-corridor"] },
+    { id: "teaching-entrance-road", widthM: 5.4, points: [[-25, -18], [-25, -9], [-25, -0.85]], connects: ["tree-corridor", "teaching-building"] },
+    { id: "cafeteria-entrance-road", widthM: 5.4, points: [[30, -18], [30, -6], [30, 1], [30, 7.15]], connects: ["tree-corridor", "cafeteria"] },
+    { id: "takeout-pickup-road", widthM: 5.2, points: [[30, -18], [39, -12], [46, -5], [48.5, 1.5]], connects: ["tree-corridor", "takeout-pickup"] },
+    { id: "west-bicycle-service-road", widthM: 4.8, points: [[-51, -18], [-55, -8], [-55, 24], [-51, 34], [-42, 35.4]], connects: ["tree-corridor", "bicycle-shelter"] },
+    { id: "campus-courtyard-road", widthM: 4.8, points: [[8, -18], [8, -5], [8, 10], [8, 27], [8, 35.4], [-15, 35.4], [-42, 35.4]], connects: ["tree-corridor", "bicycle-shelter"] },
+    { id: "north-cafeteria-service-road", widthM: 4.8, points: [[8, 35.4], [30, 35.4], [45, 35.4], [52, 28], [52, -18]], connects: ["bicycle-shelter", "cafeteria", "tree-corridor"] },
+  ],
+  junctions: [
+    { id: "south-gate-crossroads", x: 0, z: -18, diameterM: 7.2 },
+    { id: "teaching-road-junction", x: -25, z: -18, diameterM: 6.6 },
+    { id: "cafeteria-road-junction", x: 30, z: -18, diameterM: 6.8 },
+    { id: "courtyard-road-junction", x: 8, z: -18, diameterM: 6.2 },
+    { id: "north-loop-junction", x: 8, z: 35.4, diameterM: 5.5 },
+    { id: "bicycle-shelter-junction", x: -42, z: 35.4, diameterM: 5.4 },
+  ],
+};
+
+function addRoadJunction(parent: THREE.Object3D, x: number, z: number, diameterM: number, id: string) {
+  const junction = new THREE.Mesh(
+    new THREE.CylinderGeometry(diameterM / 2, diameterM / 2, 0.075, 36),
+    mat(COLORS.road, 0.94),
+  );
+  junction.position.set(x, 0.07, z);
+  junction.receiveShadow = true;
+  tag(junction, "road-junction", id, { connected: true, diameterM });
+  parent.add(junction);
+}
+
+function addCrosswalk(parent: THREE.Object3D, x: number, z: number, axis: "x" | "z", id: string) {
+  const group = tag(new THREE.Group(), "crosswalk", id, { traversable: true });
+  for (let index = -3; index <= 3; index += 1) {
+    const along = index * 0.62;
+    box(
+      group,
+      axis === "x" ? [0.34, 0.025, 3.8] : [3.8, 0.025, 0.34],
+      axis === "x" ? [x + along, 0.115, z] : [x, 0.115, z + along],
+      0xf0eee9,
+      { castShadow: false },
+    );
+  }
+  parent.add(group);
 }
 
 function addTree(parent: THREE.Object3D, x: number, z: number, id: string, height = 5.6) {
@@ -566,10 +712,11 @@ function addStreetLight(parent: THREE.Object3D, x: number, z: number, id: string
 }
 
 function addCampusInfrastructure(root: THREE.Group) {
-  addRoadRibbon(root, [[0, -43], [0, -31], [-2, -18], [-12, -7], [-22, -3], [-23, 4]], 6.4, "campus-main-curved-road");
-  addRoadRibbon(root, [[-51, -18], [-25, -18], [0, -18], [27, -18], [52, -18]], 6.2, "campus-east-west-road");
-  addRoadRibbon(root, [[30, -18], [30, -5], [30, 7], [30, 20]], 5.6, "cafeteria-approach-road");
-  addRoadRibbon(root, [[-48, 34], [-30, 34], [-12, 34], [3, 32], [17, 28]], 4.8, "north-service-road");
+  SCHOOL_MAP_ROAD_NETWORK.segments.forEach((segment) => addRoadRibbon(root, segment.points, segment.widthM, segment.id));
+  SCHOOL_MAP_ROAD_NETWORK.junctions.forEach((junction) => addRoadJunction(root, junction.x, junction.z, junction.diameterM, junction.id));
+  addCrosswalk(root, -25, -4.6, "x", "teaching-entry-crosswalk");
+  addCrosswalk(root, 30, 3.0, "x", "cafeteria-entry-crosswalk");
+  addCrosswalk(root, 0, -24.5, "z", "main-gate-crosswalk");
   box(root, [60, 0.09, 2.2], [-25, 0.08, -5.2], COLORS.path, { id: "teaching-south-pedestrian-path", kind: "pedestrian-path", castShadow: false });
   box(root, [3.1, 0.09, 39], [8.2, 0.08, 12.5], COLORS.path, { id: "teaching-cafeteria-path", kind: "pedestrian-path", castShadow: false });
   box(root, [39, 0.09, 2.4], [29.5, 0.08, 3.4], COLORS.path, { id: "cafeteria-south-path", kind: "pedestrian-path", castShadow: false });
@@ -603,16 +750,17 @@ function addCampusInfrastructure(root: THREE.Group) {
   cylinder(root, 0.22, 7.2, [7.6, 3.6, -43], 0x70586f, { id: "campus-main-gate-east", kind: "gate-post" });
   labelSprite(root, "DRONEDREAM SCHOOL", [0, 5.4, -42.8]);
   const roadsideTrees: Array<[number, number]> = [];
-  [-48, -40, -32, -24, -16, -8, 8, 16, 24, 32, 40, 48].forEach((x) => roadsideTrees.push([x, -12.8], [x, -23.2]));
+  [-48, -40, -32, -16, -8, 16, 24, 40, 48].forEach((x) => roadsideTrees.push([x, -12.8], [x, -23.2]));
   [-34, -26, -8, 0, 8, 16, 24].forEach((z) => roadsideTrees.push([-53.5, z]));
-  [28, 36, 44].forEach((x) => roadsideTrees.push([x, 37.5]));
-  roadsideTrees.push([-44, 38], [-34, 38], [43, 28], [51, 28]);
+  [20, 28, 36, 44].forEach((x) => roadsideTrees.push([x, 40.2]));
+  roadsideTrees.push([-44, 40], [-34, 40], [43, 28], [56, 20], [56, 8], [44, -30], [20, -32], [-12, -32], [-36, -32]);
   roadsideTrees.slice(0, SCHOOL_MAP_CONTRACT.semanticEntityCounts.trees).forEach(([x, z], index) => addTree(root, x, z, `campus-tree-${index + 1}`, 4.8 + (index % 4) * 0.45));
-  for (let index = 0; index < 11; index += 1) {
-    const x = -50 + index * 10;
+  const eastWestLightXs = [-50, -40, -30, -15, -5, 15, 25, 40, 50];
+  eastWestLightXs.forEach((x, index) => {
     addStreetLight(root, x, -14.4, `street-light-south-${index + 1}`);
     addStreetLight(root, x, -21.6, `street-light-north-${index + 1}`, Math.PI);
-  }
+  });
+  [[4.8, -4], [11.2, 8], [4.8, 21], [11.2, 31]].forEach(([x, z], index) => addStreetLight(root, x, z, `street-light-courtyard-${index + 1}`, index % 2 ? Math.PI : 0));
 }
 
 function addBikeShelter(root: THREE.Group) {
@@ -725,22 +873,22 @@ export const SCHOOL_MAP_ROUTES: Record<SchoolMapMissionId, THREE.Vector3[]> = {
     [-49.0, 8.15, 15.3], [-46.0, 8.35, 9.4], [-35.0, 8.25, 5.0], [-14.0, 8.15, 5.0], [-2.3, 8.05, 6.9],
     [-1.9, 7.45, 8.7], [-1.9, 6.65, 10.7], [1.7, 5.65, 12.3], [1.7, 4.45, 10.0], [1.7, 3.75, 7.0],
     [-1.9, 3.15, 8.7], [-1.9, 2.35, 10.7], [1.7, 1.35, 12.3], [1.7, 1.15, 8.8], [-8.0, 1.25, 5.0],
-    [-24.8, 1.35, 3.0], [-24.8, 1.55, -4.0], [-20.0, 1.65, -10.0], [-12.0, 1.7, -16.0], [3.0, 1.8, -18.0],
-    [18.0, 1.8, -18.0], [30.0, 1.7, -10.0], [38.0, 1.6, -3.0], [48.5, 1.15, 0.4],
-    [42.0, 1.7, -3.5], [30.0, 1.8, -10.0], [16.0, 1.85, -18.0], [0, 1.8, -18.0], [-16, 1.75, -12.0],
-    [-24.8, 1.5, -4.0], [-24.8, 1.35, 3.0], [-8.0, 1.25, 5.0], [1.7, 1.15, 8.8], [1.7, 1.35, 12.3],
+    [-24.8, 1.35, 2.7], [-25.0, 1.45, -0.85], [-25.0, 1.55, -9.0], [-25.0, 1.65, -18.0], [0, 1.8, -18.0],
+    [30.0, 1.8, -18.0], [39.0, 1.7, -12.0], [46.0, 1.55, -5.0], [48.5, 1.15, 1.5],
+    [46.0, 1.55, -5.0], [39.0, 1.7, -12.0], [30.0, 1.8, -18.0], [0, 1.8, -18.0], [-25.0, 1.65, -18.0],
+    [-25.0, 1.55, -9.0], [-25.0, 1.45, -0.85], [-24.8, 1.35, 2.7], [-8.0, 1.25, 5.0], [1.7, 1.15, 8.8], [1.7, 1.35, 12.3],
     [-1.9, 2.35, 10.7], [-1.9, 3.15, 8.7], [1.7, 3.75, 7.0], [1.7, 4.45, 10.0], [1.7, 5.65, 12.3],
     [-1.9, 6.65, 10.7], [-1.9, 7.45, 8.7], [-2.3, 8.05, 6.9], [-14.0, 8.15, 5.0], [-35.0, 8.25, 5.0],
     [-46.0, 8.35, 9.4], [-49.0, 8.15, 15.3],
   ]),
   gates: route([
-    [-24.8, 1.4, -4], [-20, 1.8, -10], [-13, 2.2, -17], [-5, 2.4, -18], [5, 2.2, -18],
+    [-24.8, 1.4, -0.85], [-25, 1.7, -9], [-25, 1.9, -18], [-13, 2.2, -18], [-5, 2.4, -18], [5, 2.2, -18],
     [15, 2.5, -18], [25, 2.2, -18], [35, 1.9, -18], [48, 1.3, -18],
   ]),
   narrow: route([
     [-49, 8.15, 15.3], [-46, 8.3, 9.4], [-35, 8.1, 5.0], [-23, 8.0, 5.0], [-12, 8.0, 5.0],
     [-2.4, 7.9, 6.7], [-1.9, 7.2, 9.0], [1.7, 6.0, 12.2], [1.7, 4.6, 9.4], [-1.9, 3.2, 8.7],
-    [1.7, 1.35, 12.3], [1.7, 1.15, 8.8], [-8, 1.2, 5], [-24.8, 1.3, 3],
+    [1.7, 1.35, 12.3], [1.7, 1.15, 8.8], [-8, 1.2, 5], [-24.8, 1.3, 2.7], [-25, 1.4, -0.85],
   ]),
 };
 
@@ -748,7 +896,7 @@ export function buildSchoolMapScene(
   parent: THREE.Group,
   options: SchoolMapSceneOptions,
 ): SchoolMapSceneResult {
-  const campus = tag(new THREE.Group(), "semantic-campus", "school-map-v1", {
+  const campus = tag(new THREE.Group(), "semantic-campus", "school-map", {
     contract: SCHOOL_MAP_CONTRACT,
     planningFrame: "ENU",
     usableForPlanning: true,
