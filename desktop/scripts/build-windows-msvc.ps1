@@ -11,6 +11,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ($PSVersionTable.PSEdition -ceq "Desktop") {
+    $inboxModuleRoot = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\Modules"
+    if (Test-Path -LiteralPath $inboxModuleRoot -PathType Container) {
+        $modulePaths = @($inboxModuleRoot) + @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -and $_ -cne $inboxModuleRoot }
+        )
+        $env:PSModulePath = $modulePaths -join [IO.Path]::PathSeparator
+    }
+}
+
 Import-Module (Join-Path $PSScriptRoot "release-build-driver.psm1") -Force
 
 & (Join-Path $PSScriptRoot "verify-updater-signing-contract.ps1")

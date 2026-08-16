@@ -13,6 +13,17 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+if ($PSVersionTable.PSEdition -ceq "Desktop") {
+    $inboxModuleRoot = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\Modules"
+    if (Test-Path -LiteralPath $inboxModuleRoot -PathType Container) {
+        $modulePaths = @($inboxModuleRoot) + @(
+            $env:PSModulePath -split [IO.Path]::PathSeparator |
+                Where-Object { $_ -and $_ -cne $inboxModuleRoot }
+        )
+        $env:PSModulePath = $modulePaths -join [IO.Path]::PathSeparator
+    }
+}
+
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $outputBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-builds"))
 $cargoBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache"))

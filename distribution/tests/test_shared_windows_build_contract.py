@@ -56,6 +56,7 @@ def test_four_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
         '[ValidateSet("msvc", "gnullvm")]',
         'targetTriple = "x86_64-pc-windows-msvc"',
         'compilerFamily = "msvc"',
+        'System32\\WindowsPowerShell\\v1.0\\Modules',
     ):
         assert fragment in script
     assert 'Join-Path $editionOutput "$($contract.product)-${version}.exe"' not in script
@@ -77,6 +78,7 @@ def test_shared_msvc_build_is_pinned_native_and_fail_closed() -> None:
         'Refusing to prune installer artifacts outside the MSVC NSIS bundle directory.',
         'Resolve-EditionGeneratedFrontendContract',
         'Test-PostBuildSourceStatus',
+        'System32\\WindowsPowerShell\\v1.0\\Modules',
     ):
         assert fragment in script
     assert 'tauri.llvm.conf.json' not in script
@@ -234,6 +236,7 @@ def test_shared_llvm_build_exposes_edition_safe_inputs_without_changing_defaults
         "Detached release sources require an exact attested Node dependency manifest.",
         "verify-detached-node-dependencies.ps1",
         '$env:npm_config_offline = "true"',
+        'System32\\WindowsPowerShell\\v1.0\\Modules',
     ):
         assert fragment in script
 
