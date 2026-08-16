@@ -529,12 +529,80 @@ export interface ExperimentAssistantTurnRequest {
   message_id: string;
   message: string;
   locale: "en" | "zh-CN";
+  edition?: "universal" | "sim" | "lab" | "field";
+  requested_task_type?: TaskWorkflowRequestedTaskType;
   conversation_summary: string;
   current_values: Record<string, ExperimentAssistantFieldValue>;
   explicit_field_ids: string[];
   current_parameters: ExperimentAssistantCurrentParameter[];
   document_context?: ExperimentAssistantDocumentContext | null;
-  llm: LLMProviderConfig;
+  llm?: LLMProviderConfig | null;
+}
+
+export type TaskWorkflowTaskType =
+  | "control_tuning"
+  | "mission_autonomy"
+  | "vehicle_modeling"
+  | "simulation_experiment"
+  | "cross_edition_workflow"
+  | "hardware_validation"
+  | "calibration"
+  | "sim_to_real"
+  | "real_to_sim"
+  | "field_task";
+
+export type TaskWorkflowRequestedTaskType = TaskWorkflowTaskType | "auto_detect";
+
+export interface TaskWorkflowContextItem {
+  key: string;
+  value: string;
+  source: "user" | "workspace" | "asset_receipt" | "prior_summary";
+}
+
+export interface TaskWorkflowCompileRequest {
+  request_id: string;
+  edition: "universal" | "sim" | "lab" | "field";
+  requested_task_type: TaskWorkflowRequestedTaskType;
+  message: string;
+  locale: "en" | "zh-CN";
+  conversation_summary?: string;
+  context?: TaskWorkflowContextItem[];
+  requested_tool_ids?: string[];
+}
+
+export interface TaskWorkflowStep {
+  step_id: string;
+  phase: "understand" | "bind" | "plan" | "validate" | "approve" | "execute" | "evidence";
+  title: string;
+  executor: "model" | "deterministic_service" | "operator" | "runtime_adapter";
+  risk: "low" | "medium" | "high" | "critical";
+  tool_ids: string[];
+  preconditions: string[];
+  completion_evidence: string[];
+  fallback: "ask" | "hold" | "replan" | "rollback" | "return" | "land" | "abort";
+}
+
+export interface TaskWorkflowContract {
+  schema_version: "dronedream.task-workflow.v1";
+  contract_id: string;
+  owner_binding_sha256: string;
+  request_id: string;
+  edition: "universal" | "sim" | "lab" | "field";
+  task_type: TaskWorkflowTaskType;
+  routing_source: "explicit" | "auto_detect";
+  status: "draft" | "blocked";
+  system_prompt_registry_version: "dronedream.workflow-prompts.v1";
+  system_prompt_version: string;
+  tool_registry_version: "dronedream.workflow-tools.v1";
+  context_sha256: string;
+  context_bytes: number;
+  eligible_tool_ids: string[];
+  denied_tool_ids: string[];
+  steps: TaskWorkflowStep[];
+  blockers: string[];
+  artifact_kind: string;
+  product_path: string;
+  contract_sha256: string;
 }
 
 export interface ExperimentAssistantTurnResponse {

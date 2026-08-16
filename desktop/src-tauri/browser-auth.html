@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="__DOCUMENT_LANGUAGE__">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>DroneDream</title>
+    <style nonce="__CSP_NONCE__">
+      :root {
+        color: #171225;
+        background: #fff;
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 50% 42%, rgba(106, 76, 255, 0.08), transparent 35%),
+          #fff;
+      }
+
+      main {
+        width: min(600px, calc(100vw - 40px));
+        padding: 48px 0;
+        text-align: center;
+      }
+
+      .brand {
+        width: min(100%, 520px);
+        max-height: 110px;
+        object-fit: contain;
+        margin-bottom: 46px;
+      }
+
+      .result-mark {
+        width: 58px;
+        height: 58px;
+        margin: 0 auto 18px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 30px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #ff5574, #6a4cff 52%, #e657d1);
+        box-shadow: 0 14px 34px rgba(106, 76, 255, 0.22);
+      }
+
+      .result-mark[data-success="false"] {
+        background: #c33c60;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(26px, 5vw, 36px);
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+      }
+
+      p {
+        margin: 14px auto 0;
+        max-width: 440px;
+        color: #665f72;
+        font-size: 16px;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 480px) {
+        main {
+          width: min(100% - 28px, 600px);
+          padding: 32px 0;
+        }
+
+        .brand {
+          margin-bottom: 36px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main aria-labelledby="result-title">
+      <img class="brand" src="__BRAND_LOCKUP_DATA_URL__" alt="" />
+      <div id="result-mark" class="result-mark" aria-hidden="true"></div>
+      <h1 id="result-title"></h1>
+      <p id="result-message"></p>
+    </main>
+    <script nonce="__CSP_NONCE__">
+      const locale = __LOCALE_JSON__;
+      const success = __SUCCESS_JSON__;
+      const displayName = __DISPLAY_NAME_JSON__;
+      const homeUrl = __HOME_URL_JSON__;
+      const copy = locale === "zh-CN"
+        ? {
+            successTitle: "登录成功",
+            successMessage: `${displayName} 已获得本次独立授权，正在返回 DroneDream 首页。`,
+            failureTitle: "登录未完成",
+            failureMessage: `请返回 ${displayName}，重新点击“登录并进入调优平台”。`,
+          }
+        : {
+            successTitle: "Sign-in complete",
+            successMessage: `${displayName} received this independent authorization. Returning to the DroneDream homepage.`,
+            failureTitle: "Sign-in not completed",
+            failureMessage: `Return to ${displayName} and select “Sign in and enter tuning workspace” again.`,
+          };
+      const mark = document.querySelector("#result-mark");
+      mark.dataset.success = String(success);
+      mark.textContent = success ? "✓" : "!";
+      document.querySelector("#result-title").textContent = success
+        ? copy.successTitle
+        : copy.failureTitle;
+      document.querySelector("#result-message").textContent = success
+        ? copy.successMessage
+        : copy.failureMessage;
+      document.title = `${success ? copy.successTitle : copy.failureTitle} · ${displayName}`;
+      if (success) {
+        window.setTimeout(() => window.location.replace(homeUrl), 1200);
+      }
+    </script>
+  </body>
+</html>

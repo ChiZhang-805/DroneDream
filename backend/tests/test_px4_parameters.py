@@ -301,6 +301,86 @@ def test_environment_transport_readback_does_not_set_again(tmp_path: Path) -> No
     assert _read(tmp_path / BEFORE_EVIDENCE_NAME)["kind"] == "before_environment_override"
 
 
+def test_environment_transport_reconciles_live_airframe_override(tmp_path: Path) -> None:
+    client = FakeParameterClient({"MPC_THR_HOVER": 0.6})
+    result = asyncio.run(
+        verify_environment_parameters(
+            {"MPC_THR_HOVER": 0.5},
+            client,
+            tmp_path,
+            previous_environment={"PX4_PARAM_MPC_THR_HOVER": "0.5"},
+            reconcile_live_mismatches=True,
+        )
+    )
+
+    assert result.verified is True
+    assert result.applied == {"MPC_THR_HOVER": pytest.approx(0.5)}
+    assert client.set_calls == [("MPC_THR_HOVER", 0.5, "float")]
+    verification = _read(tmp_path / APPLIED_EVIDENCE_NAME)["verification"]
+    assert verification["initial_readback"] == {"MPC_THR_HOVER": 0.6}
+    mismatch = verification["initial_mismatches"]["MPC_THR_HOVER"]
+    assert mismatch["requested"] == 0.5
+    assert mismatch["applied"] == 0.6
+    assert mismatch["absolute_tolerance"] == pytest.approx(0.001)
+    assert verification["reconciliation_transport"] == "mavsdk"
+    assert verification["reconciled_parameters"] == ["MPC_THR_HOVER"]
+
+
+def test_environment_transport_never_reconciles_reboot_parameter_live(tmp_path: Path) -> None:
+    client = FakeParameterClient({"IMU_GYRO_CUTOFF": 40.0})
+
+    with pytest.raises(ParameterReadbackError, match="IMU_GYRO_CUTOFF"):
+        asyncio.run(
+            verify_environment_parameters(
+                {"IMU_GYRO_CUTOFF": 45.0},
+                client,
+                tmp_path,
+                reconcile_live_mismatches=True,
+            )
+        )
+
+    assert client.set_calls == []
+    applied = _read(tmp_path / APPLIED_EVIDENCE_NAME)
+    assert applied["status"] == "mismatch"
+    assert applied["verification"]["reconciled_parameters"] == []
+
+
+@pytest.mark.parametrize(
+    ("name", "requested", "unsafe_readback"),
+    (
+        ("MPC_XY_P", 1.0, float("nan")),
+        ("MPC_XY_P", 1.0, True),
+        ("MC_AIRMODE", 1, 1.5),
+    ),
+)
+def test_environment_transport_rejects_invalid_px4_readback_values(
+    tmp_path: Path,
+    name: str,
+    requested: int | float,
+    unsafe_readback: object,
+) -> None:
+    class UnsafeReadbackClient(FakeParameterClient):
+        async def get_parameter(self, name: str, value_type: str) -> int | float:
+            del name, value_type
+            return unsafe_readback  # type: ignore[return-value]
+
+    client = UnsafeReadbackClient({name: requested})
+
+    with pytest.raises(ParameterApplicationError, match="invalid PX4 parameter readback"):
+        asyncio.run(
+            verify_environment_parameters(
+                {name: requested},
+                client,
+                tmp_path,
+            )
+        )
+
+    applied = _read(tmp_path / APPLIED_EVIDENCE_NAME)
+    assert applied["status"] == "error"
+    assert applied["values"] == {}
+    assert applied["verification"]["verified"] is False
+
+
 def test_reboot_parameter_is_verified_after_startup_environment_injection(
     tmp_path: Path,
 ) -> None:

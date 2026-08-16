@@ -13,22 +13,28 @@ crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+serde_json = "1"
 
 [dependencies]
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+dronecan = { version = "=0.1.0", default-features = false, features = ["std"] }
 ed25519-dalek = "2"
 hex = "0.4"
+mavlink = { version = "=0.18.0", default-features = false, features = ["std", "dialect-common", "dialect-ardupilotmega"] }
+multiwii_serial_protocol = { version = "=0.1.1", default-features = false, features = ["std"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_jcs = "0.1"
 sha2 = "0.10"
+serialport = { version = "=4.9.0", default-features = false }
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
+tauri-plugin-opener = "2"
 uuid = { version = "1", features = ["v4"] }
 wait-timeout = "0.2"
 
@@ -39,11 +45,18 @@ windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Globalization",
   "Win32_Security",
+  "Win32_Security_Credentials",
   "Win32_Security_Cryptography",
   "Win32_Storage_FileSystem",
   "Win32_System_JobObjects",
   "Win32_System_Com",
   "Win32_System_Memory",
+  "Win32_System_Registry",
   "Win32_System_Threading",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+[patch.crates-io]
+# mavlink-bindgen 0.18.0 was published with quick-xml 0.39.x. Pin the
+# upstream security fix until the next crate release carries quick-xml 0.41+.
+mavlink-bindgen = { git = "https://github.com/mavlink/rust-mavlink.git", rev = "ac3491fd415b15f0f89cf8523d38c2bf42399c50" }

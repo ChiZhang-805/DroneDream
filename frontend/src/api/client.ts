@@ -50,6 +50,8 @@ import type {
   JobStatus,
   PaginatedJobs,
   ParameterCatalogApiResponse,
+  TaskWorkflowCompileRequest,
+  TaskWorkflowContract,
   OptimizationHistory,
   Trial,
   TrialSummary,
@@ -403,6 +405,15 @@ export const apiClient = {
     req: AutonomyCompileRequest,
   ): Promise<AutonomyCompileResponse> {
     return request<AutonomyCompileResponse>("/autonomy/compile", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  },
+
+  async compileTaskWorkflow(
+    req: TaskWorkflowCompileRequest,
+  ): Promise<TaskWorkflowContract> {
+    return request<TaskWorkflowContract>("/task-workflows/compile", {
       method: "POST",
       body: JSON.stringify(req),
     });

@@ -1,0 +1,4476 @@
+{
+  "arms": [
+    {
+      "arm_id": "deterministic_default_policy",
+      "freeze_requirement": "implementation and tool versions bound before run",
+      "label": "Deterministic default optimizer policy",
+      "provider_access": false
+    },
+    {
+      "arm_id": "fixed_cma_es",
+      "freeze_requirement": "cma_es configuration bound before run",
+      "label": "Fixed cma_es",
+      "provider_access": false
+    },
+    {
+      "arm_id": "preselected_specialized_optimizer",
+      "development_only_pool": [
+        "constrained_mobo",
+        "multi_fidelity_mobo",
+        "turbo",
+        "saasbo",
+        "surrogate_cma_es",
+        "bipop_cma_es"
+      ],
+      "freeze_requirement": "select exactly one optimizer from the declared development-only pool using baseline-blind calibration, then freeze it before any locked outcome",
+      "label": "Best single specialized optimizer selected before locked run",
+      "provider_access": false
+    },
+    {
+      "arm_id": "deterministic_portfolio_no_model",
+      "freeze_requirement": "portfolio membership and deterministic routing bound before run",
+      "label": "Deterministic optimizer portfolio without model routing",
+      "provider_access": false
+    },
+    {
+      "arm_id": "harness_without_reflection_recovery_memory",
+      "freeze_requirement": "same model snapshot and prompts; declared component intervention only",
+      "label": "Harness routing without reflection/recovery memory",
+      "provider_access": true
+    },
+    {
+      "arm_id": "full_harness",
+      "freeze_requirement": "same model snapshot, prompts, tools, and adaptive-turn policy",
+      "label": "Full Harness",
+      "provider_access": true
+    }
+  ],
+  "budget": {
+    "baseline_scenario_runs": 4,
+    "candidate_slots_per_generation": 2,
+    "completion_policy": "first_qualified_stop",
+    "continue_exploration_default": false,
+    "generation_cap": 8,
+    "provider_retry_cap": 0,
+    "provider_turn_cap_per_job": 32,
+    "scenario_runs_per_candidate": 4,
+    "simulation_trial_cap": 68,
+    "wall_time_cap_s": 3600
+  },
+  "calibration_audit_log": [
+    {
+      "after": 0.0,
+      "before": 0.25,
+      "comparative_outcome_used": false,
+      "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+      "problem_id": "representative-hover-sensor-noise",
+      "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+    },
+    {
+      "after": 0.0,
+      "before": 0.35,
+      "comparative_outcome_used": false,
+      "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+      "problem_id": "representative-lemniscate-sensor-noise",
+      "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+    },
+    {
+      "after": 0.0,
+      "before": 0.2,
+      "comparative_outcome_used": false,
+      "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+      "problem_id": "representative-circle-wind-noise",
+      "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+    },
+    {
+      "after": 0.0,
+      "before": 0.4,
+      "comparative_outcome_used": false,
+      "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+      "problem_id": "hard-lemniscate-gust-noise",
+      "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+    },
+    {
+      "after": 0.0,
+      "before": 0.45,
+      "comparative_outcome_used": false,
+      "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+      "problem_id": "hard-hover-wind-dropout",
+      "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+    }
+  ],
+  "calibration_protocol": {
+    "calibration_manifest": {
+      "engine_pack_id": "sha256:28347545e0160d459513e432bfa83af3c36a8497a800933bfe0982bc68095674",
+      "execution_source": "9db5df212ef14927e0ba47a30304b026d3c0bc4c",
+      "path": "artifacts/test-runs/prefinal-physical-calibration-9db5df2-smoke3/campaign-manifest.json",
+      "provider_calls_attempted": 0,
+      "provider_calls_succeeded": 0,
+      "repository_evidence_head": "9c4004961b2079cef2a7f84e1fb39d23f33ff460"
+    },
+    "fixed_baseline_controller_only": true,
+    "purpose": "freeze feasible thresholds and verify runtime execution before lock",
+    "status": "partial_3_of_18",
+    "successor_required": "locked-realistic-px4-gazebo-v3-after-full-calibration",
+    "uses_comparative_arm_outcomes": false,
+    "uses_optimizer": false,
+    "uses_provider": false
+  },
+  "claim_boundary": "Baseline-only calibration revision. It makes no provider calls, compares no optimizer arms, selects no comparative winner, and supports no superiority, real-aircraft safety, or global-optimum claim.",
+  "deterministic_tie_break": [
+    "all_hard_gates_and_holdout_pass",
+    "fewer_consumed_simulation_trials",
+    "earlier_generation_and_dispatch_ordinal",
+    "pre_registered_objective_order"
+  ],
+  "difficulty_distribution": {
+    "easy": 2,
+    "hard": 3,
+    "representative": 13
+  },
+  "fairness_contract": {
+    "arrival_order_and_candidate_uuid_not_semantic_tie_breakers": true,
+    "extra_provider_turns_do_not_grant_extra_simulations": true,
+    "provider_turns_may_differ_but_are_counted": true,
+    "same_baseline_parameters": true,
+    "same_hard_safety_and_acceptance_gates": true,
+    "same_parameter_space": true,
+    "same_scenario_and_seed_matrix": true,
+    "same_simulation_trial_cap": true
+  },
+  "holdout_policy": {
+    "common_random_numbers_across_arms": true,
+    "continue_exploration_requires_independent_successor_holdout": true,
+    "holdout_hidden_during_candidate_selection": true,
+    "holdout_revealed_only_after_candidate_freeze": true,
+    "same_scenario_contract_across_arms": true,
+    "training_and_holdout_seeds_disjoint": true
+  },
+  "holdout_seed_count": 36,
+  "parameter_space": [
+    {
+      "baseline": 0.95,
+      "maximum": 1.3,
+      "minimum": 0.6,
+      "name": "MPC_XY_P",
+      "step": 0.1
+    },
+    {
+      "baseline": 1.8,
+      "maximum": 2.8,
+      "minimum": 1.2,
+      "name": "MPC_XY_VEL_P_ACC",
+      "step": 0.1
+    },
+    {
+      "baseline": 0.4,
+      "maximum": 1.0,
+      "minimum": 0.1,
+      "name": "MPC_XY_VEL_I_ACC",
+      "step": 0.02
+    },
+    {
+      "baseline": 0.2,
+      "maximum": 0.5,
+      "minimum": 0.1,
+      "name": "MPC_XY_VEL_D_ACC",
+      "step": 0.02
+    },
+    {
+      "baseline": 3.0,
+      "maximum": 5.0,
+      "minimum": 2.0,
+      "name": "MPC_ACC_HOR",
+      "step": 1.0
+    },
+    {
+      "baseline": 5.0,
+      "maximum": 10.0,
+      "minimum": 5.0,
+      "name": "MPC_ACC_HOR_MAX",
+      "step": 1.0
+    }
+  ],
+  "primary_product_objective": {
+    "name": "time_to_first_qualified_candidate",
+    "no_validated_winner_when_none_qualify": true,
+    "secondary": [
+      "simulations_to_first_qualified_candidate",
+      "provider_calls_to_first_qualified_candidate",
+      "qualification_rate",
+      "holdout_pass_rate",
+      "unsafe_or_invalid_proposal_rate",
+      "wall_time_and_cost"
+    ],
+    "stop_when_first_qualified": true
+  },
+  "problem_count": 18,
+  "problems": [
+    {
+      "baseline_calibration_observation": {
+        "job_id": "job_ce55e4c02f7a",
+        "outcome": "qualified_4_of_4",
+        "receipt_sha256": "c12292447368d32b6c6869f1fca42bf35d12c2a6ee3bbbadd83e1bef60e75b89",
+        "status": "baseline_calibrated_easy_tail"
+      },
+      "difficulty": "easy",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 0.9,
+          "target_rmse": 0.35
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final easy-hover-calm",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "easy-hover-calm-train",
+              "scenario_type": "nominal",
+              "seeds": [
+                10011,
+                10012
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "easy-hover-calm-holdout",
+              "scenario_type": "nominal",
+              "seeds": [
+                20011,
+                20012
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "hover",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "easy-hover-calm-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "c3107e74f69c8e3ab7f482e4eb9c0c24f695d53f8d1dd8469c95e2e855942dcc",
+          "seed": 10011
+        },
+        {
+          "case_id": "easy-hover-calm-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "be6385e8d743c66d3b81eeceb9754931bc8c86c4f9c3bd040443a83a1f6b15f4",
+          "seed": 10012
+        },
+        {
+          "case_id": "easy-hover-calm-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "0bd7805c9546e367c16539fdc29f50c8bdd16c02420c6b0c9f8abdeea9515c25",
+          "seed": 20011
+        },
+        {
+          "case_id": "easy-hover-calm-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "5f41182dc9a300e8d4177782ae240fea5bb650807f7dccb9eb48de81432ec990",
+          "seed": 20012
+        }
+      ],
+      "physical_effect_contracts_sha256": "9f38458114f4e7e64b849d016e2dc624c65edfa4f026fd23b5e84559a02512ed",
+      "problem_id": "easy-hover-calm",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 0.9,
+        "target_rmse": 0.35
+      },
+      "registry_ordinal": 1,
+      "tags": [
+        "onboarding",
+        "hover"
+      ],
+      "task_family": "takeoff_hover",
+      "threshold_status": "baseline_calibrated_easy_tail",
+      "user_relevance": "Basic vertical takeoff and stationary inspection in calm air."
+    },
+    {
+      "difficulty": "easy",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 0.9,
+          "target_rmse": 0.35
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final easy-circle-calm",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "easy-circle-calm-train",
+              "scenario_type": "nominal",
+              "seeds": [
+                10021,
+                10022
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "easy-circle-calm-holdout",
+              "scenario_type": "nominal",
+              "seeds": [
+                20021,
+                20022
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "circle",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "easy-circle-calm-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "a80d34db528991966f393aa9cc6231da0f00cd93915c0a9ad2084366b3ae9881",
+          "seed": 10021
+        },
+        {
+          "case_id": "easy-circle-calm-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "9ab8423e2a2be34a19efa652b640d9197e139b54570b357ec90a8e14d92b8fa0",
+          "seed": 10022
+        },
+        {
+          "case_id": "easy-circle-calm-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "c6521fcb9aedf13b3aa0b154e04d991b0ec76ffff093ead6e9e8549ffb8e4994",
+          "seed": 20021
+        },
+        {
+          "case_id": "easy-circle-calm-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "65a93dfdd7e03076ef7aa97b1a4dce6fc2d0205d3b95a196e692ad3643a519bb",
+          "seed": 20022
+        }
+      ],
+      "physical_effect_contracts_sha256": "e43436bc2c76dec94469138ceaabeac29a51f8084d1bd583f96c87b1a0409a1c",
+      "problem_id": "easy-circle-calm",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 0.9,
+        "target_rmse": 0.35
+      },
+      "registry_ordinal": 2,
+      "tags": [
+        "onboarding",
+        "orbit"
+      ],
+      "task_family": "orbit_inspection",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "A common low-speed orbit around a point of interest."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-u-turn-calm",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-u-turn-calm-train",
+              "scenario_type": "nominal",
+              "seeds": [
+                10031,
+                10032
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-u-turn-calm-holdout",
+              "scenario_type": "nominal",
+              "seeds": [
+                20031,
+                20032
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "u_turn",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-u-turn-calm-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "b2f73072cf6fbd47247c4271fe3dc4e664e983486bfc8cb6294f28b91b47c63a",
+          "seed": 10031
+        },
+        {
+          "case_id": "representative-u-turn-calm-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "0020e0abc7aa3799f1363e308fab9530419fe90748e6fffefe21b4e3b3b23058",
+          "seed": 10032
+        },
+        {
+          "case_id": "representative-u-turn-calm-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "23aba83bb532f6f1cbb37e4dd7ce9e3efe9de12c6678f10ff474f55c70b6d5c3",
+          "seed": 20031
+        },
+        {
+          "case_id": "representative-u-turn-calm-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "065aeab43ed46d57206d2c63a91cb608feb80fb4f1395a0a78f43142bba4cca4",
+          "seed": 20032
+        }
+      ],
+      "physical_effect_contracts_sha256": "c62555f00a288d198401b97afeb90bf8be71398276c881ab6972034238bd37fa",
+      "problem_id": "representative-u-turn-calm",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 3,
+      "tags": [
+        "reversal",
+        "position_tracking"
+      ],
+      "task_family": "direction_reversal",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "A corridor or row-inspection reversal without artificial disturbance."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "altitude_m": 3.5,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-lemniscate-calm",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-lemniscate-calm-train",
+              "scenario_type": "nominal",
+              "seeds": [
+                10041,
+                10042
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-lemniscate-calm-holdout",
+              "scenario_type": "nominal",
+              "seeds": [
+                20041,
+                20042
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "lemniscate",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-lemniscate-calm-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "d6c74b68a95b46209ab8a0997690f265dc55accdb9af9f5363ca3e7b1478466f",
+          "seed": 10041
+        },
+        {
+          "case_id": "representative-lemniscate-calm-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "75adcaa56f86da147bf3635029144a597f4ea40f680ab66bce82fa82a21496fd",
+          "seed": 10042
+        },
+        {
+          "case_id": "representative-lemniscate-calm-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "e6b9281d7a0d8bbfa4b9781a78872ca5bc60659acbc1f9a743e6df7d5f72395a",
+          "seed": 20041
+        },
+        {
+          "case_id": "representative-lemniscate-calm-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "c1c81b7c6e8d9d2a08a39fe49322fdab990d0e1a0bd0574e1285f9beb63f2705",
+          "seed": 20042
+        }
+      ],
+      "physical_effect_contracts_sha256": "73027dd2afc0fe7fe9e7f41e3a64e173b4dba137af99fa64f5a70c8d4bb94a19",
+      "problem_id": "representative-lemniscate-calm",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 4,
+      "tags": [
+        "continuous_turns",
+        "tracking"
+      ],
+      "task_family": "continuous_turning",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "Repeated left/right turns representative of camera and mapping practice."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-hover-crosswind",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-hover-crosswind-train",
+              "scenario_type": "wind_perturbed",
+              "seeds": [
+                10051,
+                10052
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-hover-crosswind-holdout",
+              "scenario_type": "wind_perturbed",
+              "seeds": [
+                20051,
+                20052
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "hover",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 1.5,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-hover-crosswind-train",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": false,
+          "request_sha256": "0c8664d32025eab3938699a9a8ce4751aaa07d7c67f676429dfa82e587ca9a48",
+          "seed": 10051
+        },
+        {
+          "case_id": "representative-hover-crosswind-train",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": false,
+          "request_sha256": "eaa8dcdae26eecfd22d095d97398ce9e7a9cdead4dde0f3354c225a92cd1faa0",
+          "seed": 10052
+        },
+        {
+          "case_id": "representative-hover-crosswind-holdout",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": true,
+          "request_sha256": "c6e81b61bb830185c0e0e0c9ca384022cea626cfd3045542a1ab7b92d6eeeea6",
+          "seed": 20051
+        },
+        {
+          "case_id": "representative-hover-crosswind-holdout",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": true,
+          "request_sha256": "a3be5be77678ea0c965c4b37a7888413b7c20ecc110ad736a5c57ec427859826",
+          "seed": 20052
+        }
+      ],
+      "physical_effect_contracts_sha256": "328c267d949b60d7e3b5977de0604201a7ce2a856093246425bc9ed6efdefbb7",
+      "problem_id": "representative-hover-crosswind",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 5,
+      "tags": [
+        "hover",
+        "steady_wind"
+      ],
+      "task_family": "station_keeping",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "Station keeping under a steady outdoor crosswind."
+    },
+    {
+      "baseline_calibration_observation": {
+        "job_id": "job_8c1175cb474e",
+        "outcome": "completed_4_of_4_baseline_not_qualified",
+        "receipt_sha256": "f1f5c7fab2756d461c0b4be3e4f713227671b23e40ceb14c93ac63565834cc36",
+        "status": "baseline_calibrated_discriminative_candidate"
+      },
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-circle-crosswind",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-circle-crosswind-train",
+              "scenario_type": "wind_perturbed",
+              "seeds": [
+                10061,
+                10062
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-circle-crosswind-holdout",
+              "scenario_type": "wind_perturbed",
+              "seeds": [
+                20061,
+                20062
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "circle",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 2.5,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-circle-crosswind-train",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": false,
+          "request_sha256": "94b79e69ee67e7baa4df3fb1bbbc66cf7e7c59169587a51572eb48e58b3b61e9",
+          "seed": 10061
+        },
+        {
+          "case_id": "representative-circle-crosswind-train",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": false,
+          "request_sha256": "0835c3bb52c4543ad5c7fdd63eddabe9c957cc307d897a631ffc692748a97c38",
+          "seed": 10062
+        },
+        {
+          "case_id": "representative-circle-crosswind-holdout",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": true,
+          "request_sha256": "393db6734c09c8c5c65e67bb2681767a0171af22b54ec4483965897d49788420",
+          "seed": 20061
+        },
+        {
+          "case_id": "representative-circle-crosswind-holdout",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": true,
+          "request_sha256": "7add26c16d266e7a85835024aa55c3436b73fd952413f73cf2a2856687202d7d",
+          "seed": 20062
+        }
+      ],
+      "physical_effect_contracts_sha256": "7154d938eb110433160ca85f9a2b81639574f207f74ce97481fec0f3726e683c",
+      "problem_id": "representative-circle-crosswind",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 6,
+      "tags": [
+        "orbit",
+        "steady_wind"
+      ],
+      "task_family": "orbit_inspection",
+      "threshold_status": "baseline_calibrated_discriminative_candidate",
+      "user_relevance": "Orbit inspection under a moderate, directionally fixed crosswind."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-u-turn-crosswind",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-u-turn-crosswind-train",
+              "scenario_type": "wind_perturbed",
+              "seeds": [
+                10071,
+                10072
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-u-turn-crosswind-holdout",
+              "scenario_type": "wind_perturbed",
+              "seeds": [
+                20071,
+                20072
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "u_turn",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 2.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-u-turn-crosswind-train",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": false,
+          "request_sha256": "050ecc64f2d2ce2cf7d9de5b3f372c24ee8183f7871cd657b989fa4caf44c4ec",
+          "seed": 10071
+        },
+        {
+          "case_id": "representative-u-turn-crosswind-train",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": false,
+          "request_sha256": "bcfdb5f1a41c5dbca6905d6117cff4b7b64cfbb78deccf623e569a850729b39c",
+          "seed": 10072
+        },
+        {
+          "case_id": "representative-u-turn-crosswind-holdout",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": true,
+          "request_sha256": "f709e30ad2541c5295b80c0083c08eada6df1c38fc3bf08fbb99673ac5faea9b",
+          "seed": 20071
+        },
+        {
+          "case_id": "representative-u-turn-crosswind-holdout",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": true,
+          "request_sha256": "d43c15df291732d2beb5d7923ddfcedcf365faddb5cda058fd02313dbe47e2e0",
+          "seed": 20072
+        }
+      ],
+      "physical_effect_contracts_sha256": "f2885d9271cbdc11b9e3ebd601e6d94ec01ba6b9fca5a4660f3523bb084dba68",
+      "problem_id": "representative-u-turn-crosswind",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 7,
+      "tags": [
+        "reversal",
+        "steady_wind"
+      ],
+      "task_family": "direction_reversal",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "A row-end reversal with moderate lateral wind."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 100.0,
+            "voltage_sag": false
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.0,
+            "dropout_rate": 0.0,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.0
+          },
+          "wind_gusts": {
+            "direction_deg": 90.0,
+            "enabled": true,
+            "magnitude_mps": 1.5,
+            "period_s": 8.0
+          }
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-circle-gust",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-circle-gust-train",
+              "scenario_type": "turbulence",
+              "seeds": [
+                10081,
+                10082
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-circle-gust-holdout",
+              "scenario_type": "turbulence",
+              "seeds": [
+                20081,
+                20082
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "circle",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-circle-gust-train",
+          "effect_ids": [
+            "wind_gusts"
+          ],
+          "holdout": false,
+          "request_sha256": "b71b4ec270bdd6059eb5c5bc5165f14d5c0bb0187b9c6214651103fdb86a932e",
+          "seed": 10081
+        },
+        {
+          "case_id": "representative-circle-gust-train",
+          "effect_ids": [
+            "wind_gusts"
+          ],
+          "holdout": false,
+          "request_sha256": "4e43c66c215004505aead83ad78c7d128e2201bd7411e7dc0dad46069ccc2b48",
+          "seed": 10082
+        },
+        {
+          "case_id": "representative-circle-gust-holdout",
+          "effect_ids": [
+            "wind_gusts"
+          ],
+          "holdout": true,
+          "request_sha256": "7c286cf1696756a449a580ef065284c1071de0bf840bd16b473699a740b2190f",
+          "seed": 20081
+        },
+        {
+          "case_id": "representative-circle-gust-holdout",
+          "effect_ids": [
+            "wind_gusts"
+          ],
+          "holdout": true,
+          "request_sha256": "3c77fd1b07abfd425cbbbef79a1582b114db9f006e1faf8847512bec7044dbf3",
+          "seed": 20082
+        }
+      ],
+      "physical_effect_contracts_sha256": "41e467014d710542e5d93b837bc8a204049860e0e69301887e757b6c913ef293",
+      "problem_id": "representative-circle-gust",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 8,
+      "tags": [
+        "orbit",
+        "gust"
+      ],
+      "task_family": "orbit_inspection",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "An orbit with periodic but non-extreme gusts."
+    },
+    {
+      "calibration_adjustments": [
+        {
+          "after": 0.0,
+          "before": 0.25,
+          "comparative_outcome_used": false,
+          "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+          "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+        }
+      ],
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 100.0,
+            "voltage_sag": false
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.1,
+            "dropout_rate": 0.0,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.1
+          },
+          "wind_gusts": {
+            "direction_deg": 0.0,
+            "enabled": false,
+            "magnitude_mps": 0.0,
+            "period_s": 10.0
+          }
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-hover-sensor-noise",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-hover-sensor-noise-train",
+              "scenario_type": "noise_perturbed",
+              "seeds": [
+                10091,
+                10092
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-hover-sensor-noise-holdout",
+              "scenario_type": "noise_perturbed",
+              "seeds": [
+                20091,
+                20092
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "high",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "hover",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-hover-sensor-noise-train",
+          "effect_ids": [
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": false,
+          "request_sha256": "22e2ddf49cce6e3dc26407f0a90d0bdf2ff19b566ebc0efafaa2e1de2b5c96ca",
+          "seed": 10091
+        },
+        {
+          "case_id": "representative-hover-sensor-noise-train",
+          "effect_ids": [
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": false,
+          "request_sha256": "c55f09681ffcb610341c59214d865d6592aa040816ae6123369f4e3519321aa5",
+          "seed": 10092
+        },
+        {
+          "case_id": "representative-hover-sensor-noise-holdout",
+          "effect_ids": [
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": true,
+          "request_sha256": "b50742f16a0c5e3fd3445c83657393ed51568d3122d9ac70244a2194d4d45796",
+          "seed": 20091
+        },
+        {
+          "case_id": "representative-hover-sensor-noise-holdout",
+          "effect_ids": [
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": true,
+          "request_sha256": "35fb1972f732e23d336bde2384c3d251ba30628095a99d6ddbbbd0fa3b31b400",
+          "seed": 20092
+        }
+      ],
+      "physical_effect_contracts_sha256": "50be667a7143a600a50dcda2d5a5abc72250afeef40736de2c889aaefc8bcd37",
+      "problem_id": "representative-hover-sensor-noise",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 9,
+      "tags": [
+        "hover",
+        "sensor_noise"
+      ],
+      "task_family": "station_keeping",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "Indoor or urban station keeping with modest navigation noise."
+    },
+    {
+      "calibration_adjustments": [
+        {
+          "after": 0.0,
+          "before": 0.35,
+          "comparative_outcome_used": false,
+          "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+          "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+        }
+      ],
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 100.0,
+            "voltage_sag": false
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.15,
+            "dropout_rate": 0.0,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.15
+          },
+          "wind_gusts": {
+            "direction_deg": 0.0,
+            "enabled": false,
+            "magnitude_mps": 0.0,
+            "period_s": 10.0
+          }
+        },
+        "altitude_m": 3.5,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-lemniscate-sensor-noise",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-lemniscate-sensor-noise-train",
+              "scenario_type": "noise_perturbed",
+              "seeds": [
+                10101,
+                10102
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-lemniscate-sensor-noise-holdout",
+              "scenario_type": "noise_perturbed",
+              "seeds": [
+                20101,
+                20102
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "high",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "lemniscate",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-lemniscate-sensor-noise-train",
+          "effect_ids": [
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": false,
+          "request_sha256": "17dd5b1fa439b8fff11c2ab40efba1dd5b403b3a2958191f415daba24757a9a1",
+          "seed": 10101
+        },
+        {
+          "case_id": "representative-lemniscate-sensor-noise-train",
+          "effect_ids": [
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": false,
+          "request_sha256": "4074f6e98d1474328d9f4dc925aa5f45037f3a968caabe60fc7f0ac3c3fc1747",
+          "seed": 10102
+        },
+        {
+          "case_id": "representative-lemniscate-sensor-noise-holdout",
+          "effect_ids": [
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": true,
+          "request_sha256": "b52c0cc9b6af2fc7f2b50bbb7629f86beb57b2d6a88c6f9cfae6fb96d6f2cbf0",
+          "seed": 20101
+        },
+        {
+          "case_id": "representative-lemniscate-sensor-noise-holdout",
+          "effect_ids": [
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": true,
+          "request_sha256": "a868667681454b4cff16683a7bfadcadf81c1d4e68954c8c9fa95a19d259bf1a",
+          "seed": 20102
+        }
+      ],
+      "physical_effect_contracts_sha256": "8fa13fbf5252339259db1d1b56959c4f4c18b0b6aef6f463be13793607562b90",
+      "problem_id": "representative-lemniscate-sensor-noise",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 10,
+      "tags": [
+        "continuous_turns",
+        "sensor_noise"
+      ],
+      "task_family": "continuous_turning",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "Continuous turning with realistic moderate localization noise."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 100.0,
+            "mass_payload_kg": 0.35,
+            "voltage_sag": false
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.0,
+            "dropout_rate": 0.0,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.0
+          },
+          "wind_gusts": {
+            "direction_deg": 0.0,
+            "enabled": false,
+            "magnitude_mps": 0.0,
+            "period_s": 10.0
+          }
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-hover-payload",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-hover-payload-train",
+              "scenario_type": "payload_changed",
+              "seeds": [
+                10111,
+                10112
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-hover-payload-holdout",
+              "scenario_type": "payload_changed",
+              "seeds": [
+                20111,
+                20112
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "hover",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-hover-payload-train",
+          "effect_ids": [
+            "battery.mass_payload_kg"
+          ],
+          "holdout": false,
+          "request_sha256": "e2fc781c57fcbc632773a3ffa3953beaf012b9b770d0c36605d97fa96e4ea0b0",
+          "seed": 10111
+        },
+        {
+          "case_id": "representative-hover-payload-train",
+          "effect_ids": [
+            "battery.mass_payload_kg"
+          ],
+          "holdout": false,
+          "request_sha256": "d4e923aa6bfd4145e5f3629daa67a8788ea050d78f404cf9c0fdcf8499c83f07",
+          "seed": 10112
+        },
+        {
+          "case_id": "representative-hover-payload-holdout",
+          "effect_ids": [
+            "battery.mass_payload_kg"
+          ],
+          "holdout": true,
+          "request_sha256": "356e5326c7c07c707c612a8f60149e75e30f32a44449cfdb9853f709384bcb91",
+          "seed": 20111
+        },
+        {
+          "case_id": "representative-hover-payload-holdout",
+          "effect_ids": [
+            "battery.mass_payload_kg"
+          ],
+          "holdout": true,
+          "request_sha256": "4024c558f9f00276d23b0ad8851db5387fd0797acb1842a1bfe154d51d2e9f91",
+          "seed": 20112
+        }
+      ],
+      "physical_effect_contracts_sha256": "526e34c496ac385a21f2ee3c4967303493b464f2dc854a0778ee6474459f1afa",
+      "problem_id": "representative-hover-payload",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 11,
+      "tags": [
+        "hover",
+        "payload"
+      ],
+      "task_family": "payload_station_keeping",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "Station keeping after attaching a small camera or sensor payload."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 70.0,
+            "voltage_sag": true
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.0,
+            "dropout_rate": 0.0,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.0
+          },
+          "wind_gusts": {
+            "direction_deg": 0.0,
+            "enabled": false,
+            "magnitude_mps": 0.0,
+            "period_s": 10.0
+          }
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-circle-battery-sag",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-circle-battery-sag-train",
+              "scenario_type": "battery_degraded",
+              "seeds": [
+                10121,
+                10122
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-circle-battery-sag-holdout",
+              "scenario_type": "battery_degraded",
+              "seeds": [
+                20121,
+                20122
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "circle",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-circle-battery-sag-train",
+          "effect_ids": [
+            "battery.initial_percent",
+            "battery.voltage_sag"
+          ],
+          "holdout": false,
+          "request_sha256": "f0b15f3094015bb22e121a52ab03f4b28c6497292aa84faac24d4dd875fc133b",
+          "seed": 10121
+        },
+        {
+          "case_id": "representative-circle-battery-sag-train",
+          "effect_ids": [
+            "battery.initial_percent",
+            "battery.voltage_sag"
+          ],
+          "holdout": false,
+          "request_sha256": "abd5551c7cd9593b745792941060cad9bb8721dcb3265786cf7cfcec14de2382",
+          "seed": 10122
+        },
+        {
+          "case_id": "representative-circle-battery-sag-holdout",
+          "effect_ids": [
+            "battery.initial_percent",
+            "battery.voltage_sag"
+          ],
+          "holdout": true,
+          "request_sha256": "c946a5307549dae4213d44fba9a16b2fb99659541d0ef03f5cb648427144f793",
+          "seed": 20121
+        },
+        {
+          "case_id": "representative-circle-battery-sag-holdout",
+          "effect_ids": [
+            "battery.initial_percent",
+            "battery.voltage_sag"
+          ],
+          "holdout": true,
+          "request_sha256": "e80c030485f777ae14850b3ccddb2ff1d7e8fc57cf32df98e587238d76213e70",
+          "seed": 20122
+        }
+      ],
+      "physical_effect_contracts_sha256": "eca54846e64655b0d2baa327d1e28b542cd155082dbe3e63281a5e08ced652de",
+      "problem_id": "representative-circle-battery-sag",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 12,
+      "tags": [
+        "orbit",
+        "battery"
+      ],
+      "task_family": "orbit_inspection",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "Orbit inspection later in a battery cycle with voltage sag enabled."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-rectangle-inspection",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "reference_track": [
+          {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 3.0
+          },
+          {
+            "x": 6.0,
+            "y": 0.0,
+            "z": 3.0
+          },
+          {
+            "x": 6.0,
+            "y": 4.0,
+            "z": 3.0
+          },
+          {
+            "x": 0.0,
+            "y": 4.0,
+            "z": 3.0
+          },
+          {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 3.0
+          }
+        ],
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-rectangle-inspection-train",
+              "scenario_type": "nominal",
+              "seeds": [
+                10131,
+                10132
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-rectangle-inspection-holdout",
+              "scenario_type": "nominal",
+              "seeds": [
+                20131,
+                20132
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "custom",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-rectangle-inspection-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "6db24f1897be10ddc6faf04861cd621a8a7aaee4ee40835bc35616f8a4239e8d",
+          "seed": 10131
+        },
+        {
+          "case_id": "representative-rectangle-inspection-train",
+          "effect_ids": [],
+          "holdout": false,
+          "request_sha256": "2a77240cc12c284c87061fe9513f98033ed072748f9f0f6e24a5ff40eca33280",
+          "seed": 10132
+        },
+        {
+          "case_id": "representative-rectangle-inspection-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "8e5c69e269f67b10ac6bcb4d95422d413f6eab1b7557e07bd9b5e412f4367fa4",
+          "seed": 20131
+        },
+        {
+          "case_id": "representative-rectangle-inspection-holdout",
+          "effect_ids": [],
+          "holdout": true,
+          "request_sha256": "3b4fb09f8b3323a79d73de58d81c5146b77fd589336a9baf187e597a9adc749c",
+          "seed": 20132
+        }
+      ],
+      "physical_effect_contracts_sha256": "2a9650f77d6ba0d6869b1a74698fd157c8fee62bf695ebc837aa5ad1fce33856",
+      "problem_id": "representative-rectangle-inspection",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 13,
+      "tags": [
+        "custom_track",
+        "perimeter"
+      ],
+      "task_family": "perimeter_inspection",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "A rectangular building or fenced-area perimeter inspection."
+    },
+    {
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-aisle-crosswind",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "reference_track": [
+          {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 3.0
+          },
+          {
+            "x": 8.0,
+            "y": 0.0,
+            "z": 3.0
+          },
+          {
+            "x": 8.0,
+            "y": 2.5,
+            "z": 3.0
+          },
+          {
+            "x": 1.0,
+            "y": 2.5,
+            "z": 3.0
+          }
+        ],
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-aisle-crosswind-train",
+              "scenario_type": "wind_perturbed",
+              "seeds": [
+                10141,
+                10142
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-aisle-crosswind-holdout",
+              "scenario_type": "wind_perturbed",
+              "seeds": [
+                20141,
+                20142
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "custom",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 1.8,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-aisle-crosswind-train",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": false,
+          "request_sha256": "fba3b474ae8af8686ca50bd7e62da3085f320a99589316a5cbcfdb8c9ca6ba79",
+          "seed": 10141
+        },
+        {
+          "case_id": "representative-aisle-crosswind-train",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": false,
+          "request_sha256": "9f7e5a9d58e2f08e8a1fb99af5e66bbaa992a6f8ca90b76860cc6128989c36aa",
+          "seed": 10142
+        },
+        {
+          "case_id": "representative-aisle-crosswind-holdout",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": true,
+          "request_sha256": "92e0d593c6ab296108c97263a7ac9755cec3b1ec8a1e84223a1239653244c32e",
+          "seed": 20141
+        },
+        {
+          "case_id": "representative-aisle-crosswind-holdout",
+          "effect_ids": [
+            "job_config.wind"
+          ],
+          "holdout": true,
+          "request_sha256": "436857159b8c41d49fabc6e4982037d05256b68b5b3d3699982d64cb835100e7",
+          "seed": 20142
+        }
+      ],
+      "physical_effect_contracts_sha256": "1f383098d32b8ec207dda31fe80dd61775a992fc2908786becef358b4d25f86e",
+      "problem_id": "representative-aisle-crosswind",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 14,
+      "tags": [
+        "custom_track",
+        "steady_wind"
+      ],
+      "task_family": "aisle_inspection",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "A long out-and-return inspection aisle under moderate crosswind."
+    },
+    {
+      "calibration_adjustments": [
+        {
+          "after": 0.0,
+          "before": 0.2,
+          "comparative_outcome_used": false,
+          "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+          "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+        }
+      ],
+      "difficulty": "representative",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.35,
+          "target_rmse": 0.55
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 100.0,
+            "voltage_sag": false
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.1,
+            "dropout_rate": 0.0,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.1
+          },
+          "wind_gusts": {
+            "direction_deg": 0.0,
+            "enabled": false,
+            "magnitude_mps": 0.0,
+            "period_s": 10.0
+          }
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final representative-circle-wind-noise",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "representative-circle-wind-noise-train",
+              "scenario_type": "combined_perturbed",
+              "seeds": [
+                10151,
+                10152
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "representative-circle-wind-noise-holdout",
+              "scenario_type": "combined_perturbed",
+              "seeds": [
+                20151,
+                20152
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "high",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "circle",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 2.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "representative-circle-wind-noise-train",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": false,
+          "request_sha256": "13e89693bf6da73b17eccfe29544a6d7f683b0d2d5faa9f66759ba348a12c497",
+          "seed": 10151
+        },
+        {
+          "case_id": "representative-circle-wind-noise-train",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": false,
+          "request_sha256": "943fd84e75c61585ff6be1a2470bc53de34e0f8b3232c02c8e581f20ecd0bb52",
+          "seed": 10152
+        },
+        {
+          "case_id": "representative-circle-wind-noise-holdout",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": true,
+          "request_sha256": "173b932705327fda0a537153470bf61c31c53bb8a3190ffe55a3686920ffb580",
+          "seed": 20151
+        },
+        {
+          "case_id": "representative-circle-wind-noise-holdout",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale"
+          ],
+          "holdout": true,
+          "request_sha256": "6254eaf531f08092aea320e06acc196ebd13c39881dcd1980d94f62674ae027d",
+          "seed": 20152
+        }
+      ],
+      "physical_effect_contracts_sha256": "77ec067a7ee52d8707792e86fce8ff405066bad63016a4efa902742a573d9f3a",
+      "problem_id": "representative-circle-wind-noise",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.35,
+        "target_rmse": 0.55
+      },
+      "registry_ordinal": 15,
+      "tags": [
+        "orbit",
+        "combined"
+      ],
+      "task_family": "orbit_inspection",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "A realistic combined orbit with moderate wind and navigation noise."
+    },
+    {
+      "calibration_adjustments": [
+        {
+          "after": 0.0,
+          "before": 0.4,
+          "comparative_outcome_used": false,
+          "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+          "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+        }
+      ],
+      "difficulty": "hard",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.8,
+          "target_rmse": 0.8
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 100.0,
+            "voltage_sag": false
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.2,
+            "dropout_rate": 0.02,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.2
+          },
+          "wind_gusts": {
+            "direction_deg": 0.0,
+            "enabled": true,
+            "magnitude_mps": 2.0,
+            "period_s": 7.0
+          }
+        },
+        "altitude_m": 4.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final hard-lemniscate-gust-noise",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "hard-lemniscate-gust-noise-train",
+              "scenario_type": "combined_perturbed",
+              "seeds": [
+                10161,
+                10162
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "hard-lemniscate-gust-noise-holdout",
+              "scenario_type": "combined_perturbed",
+              "seeds": [
+                20161,
+                20162
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "high",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "lemniscate",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 4.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "hard-lemniscate-gust-noise-train",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "wind_gusts",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "sensor_degradation.dropout_rate"
+          ],
+          "holdout": false,
+          "request_sha256": "be73265830e03d1159a0f0875fa4052e5fd51dd71c2661d789193bcaf860dd74",
+          "seed": 10161
+        },
+        {
+          "case_id": "hard-lemniscate-gust-noise-train",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "wind_gusts",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "sensor_degradation.dropout_rate"
+          ],
+          "holdout": false,
+          "request_sha256": "456196fc989b6903990059ee05f420c36f262961e7fb3f27390d82da19fc9378",
+          "seed": 10162
+        },
+        {
+          "case_id": "hard-lemniscate-gust-noise-holdout",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "wind_gusts",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "sensor_degradation.dropout_rate"
+          ],
+          "holdout": true,
+          "request_sha256": "deab71bfd2b0819264fbe76cf80762f2869ca738ed624ee8aeee423beecf6eb8",
+          "seed": 20161
+        },
+        {
+          "case_id": "hard-lemniscate-gust-noise-holdout",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "wind_gusts",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "sensor_degradation.dropout_rate"
+          ],
+          "holdout": true,
+          "request_sha256": "5b8210c2f92e1f00b8ee6c158fca9c03efea345ae4421bdb8a7fcc95c4766d8e",
+          "seed": 20162
+        }
+      ],
+      "physical_effect_contracts_sha256": "f9251be39af52849f889f6b47f475464425f27c5c5f907ff48bc2100422c9c71",
+      "problem_id": "hard-lemniscate-gust-noise",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.8,
+        "target_rmse": 0.8
+      },
+      "registry_ordinal": 16,
+      "tags": [
+        "continuous_turns",
+        "combined",
+        "strong_wind"
+      ],
+      "task_family": "continuous_turning",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "A demanding but plausible mapping path in strong wind, gusts, and noise."
+    },
+    {
+      "difficulty": "hard",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.8,
+          "target_rmse": 0.8
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 65.0,
+            "mass_payload_kg": 0.75,
+            "voltage_sag": true
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.0,
+            "dropout_rate": 0.0,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.0
+          },
+          "wind_gusts": {
+            "direction_deg": 0.0,
+            "enabled": false,
+            "magnitude_mps": 0.0,
+            "period_s": 10.0
+          }
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final hard-rectangle-wind-payload",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "reference_track": [
+          {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 3.0
+          },
+          {
+            "x": 6.0,
+            "y": 0.0,
+            "z": 3.0
+          },
+          {
+            "x": 6.0,
+            "y": 4.0,
+            "z": 3.0
+          },
+          {
+            "x": 0.0,
+            "y": 4.0,
+            "z": 3.0
+          },
+          {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 3.0
+          }
+        ],
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "hard-rectangle-wind-payload-train",
+              "scenario_type": "combined_perturbed",
+              "seeds": [
+                10171,
+                10172
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "hard-rectangle-wind-payload-holdout",
+              "scenario_type": "combined_perturbed",
+              "seeds": [
+                20171,
+                20172
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "medium",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "custom",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 4.0,
+          "north": 0.0,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "hard-rectangle-wind-payload-train",
+          "effect_ids": [
+            "job_config.wind",
+            "battery.initial_percent",
+            "battery.voltage_sag",
+            "battery.mass_payload_kg"
+          ],
+          "holdout": false,
+          "request_sha256": "6ef7c6790700d7487f7b09d2eda8de64ddcaedd241cb073644abf9100343ed63",
+          "seed": 10171
+        },
+        {
+          "case_id": "hard-rectangle-wind-payload-train",
+          "effect_ids": [
+            "job_config.wind",
+            "battery.initial_percent",
+            "battery.voltage_sag",
+            "battery.mass_payload_kg"
+          ],
+          "holdout": false,
+          "request_sha256": "2870043195e57d6a3ec4530fef1d49deed8e68f393c9906c44617fe9f7982b2a",
+          "seed": 10172
+        },
+        {
+          "case_id": "hard-rectangle-wind-payload-holdout",
+          "effect_ids": [
+            "job_config.wind",
+            "battery.initial_percent",
+            "battery.voltage_sag",
+            "battery.mass_payload_kg"
+          ],
+          "holdout": true,
+          "request_sha256": "3870b6fc5c7b89115ff66d6b0f0dec3fe3dc3494e979fc2b28c6fbac98cff4d8",
+          "seed": 20171
+        },
+        {
+          "case_id": "hard-rectangle-wind-payload-holdout",
+          "effect_ids": [
+            "job_config.wind",
+            "battery.initial_percent",
+            "battery.voltage_sag",
+            "battery.mass_payload_kg"
+          ],
+          "holdout": true,
+          "request_sha256": "35f4c342f5bf7b0deb7bb810c6c345a96e88237d8a01424614c15f451f9ba305",
+          "seed": 20172
+        }
+      ],
+      "physical_effect_contracts_sha256": "6dc0611feebff10fd15986332d92aea3f9536a82479022644b39f07b6401fb59",
+      "problem_id": "hard-rectangle-wind-payload",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.8,
+        "target_rmse": 0.8
+      },
+      "registry_ordinal": 17,
+      "tags": [
+        "custom_track",
+        "payload",
+        "strong_wind"
+      ],
+      "task_family": "perimeter_inspection",
+      "threshold_status": "baseline_calibration_required",
+      "user_relevance": "A payload-carrying perimeter inspection under strong but usable wind."
+    },
+    {
+      "baseline_calibration_observation": {
+        "job_id": "job_52b4e29f4dc5",
+        "outcome": "failed_4_of_4_before_flight_global_position_unhealthy",
+        "receipt_sha256": "d631e8173b6a9104d98e4e678e490237d36dc36de9d227e7f49f3ee47312d9e5",
+        "status": "v1_prearm_invalid_revised_recalibration_required"
+      },
+      "calibration_adjustments": [
+        {
+          "after": 0.0,
+          "before": 0.45,
+          "comparative_outcome_used": false,
+          "field": "advanced_scenario_config.sensor_degradation.gps_noise_m",
+          "reason": "Continuous Gazebo NavSat noise is active before arming and can make PX4 global_position_ok=false before any optimizer candidate flies. Keep GNSS healthy for prearm; retain high barometer/IMU noise and any post-takeoff deterministic dropout, wind, gust, payload, or battery stress."
+        }
+      ],
+      "difficulty": "hard",
+      "job_template": {
+        "acceptance_criteria": {
+          "min_pass_rate": 1.0,
+          "target_max_error": 1.8,
+          "target_rmse": 0.8
+        },
+        "advanced_scenario_config": {
+          "battery": {
+            "initial_percent": 100.0,
+            "voltage_sag": false
+          },
+          "obstacles": [],
+          "sensor_degradation": {
+            "baro_noise_m": 0.2,
+            "dropout_rate": 0.04,
+            "gps_noise_m": 0.0,
+            "imu_noise_scale": 1.2
+          },
+          "wind_gusts": {
+            "direction_deg": 0.0,
+            "enabled": false,
+            "magnitude_mps": 0.0,
+            "period_s": 10.0
+          }
+        },
+        "altitude_m": 3.0,
+        "baseline_parameters": {
+          "accel_limit": 4.0,
+          "disturbance_rejection": 0.5,
+          "kd_xy": 0.2,
+          "ki_xy": 0.05,
+          "kp_xy": 1.0,
+          "vel_limit": 5.0
+        },
+        "completion_policy": "first_qualified_stop",
+        "continue_exploration_after_qualified": false,
+        "display_name": "Pre-final hard-hover-wind-dropout",
+        "max_iterations": 8,
+        "max_total_trials": 68,
+        "objective_config": {
+          "constraints": [],
+          "cvar_alpha": 0.2,
+          "objectives": [
+            {
+              "direction": "minimize",
+              "metric": "rmse",
+              "normalization": 1.0,
+              "weight": 1.0
+            }
+          ],
+          "percentile": 95.0,
+          "robust_aggregation": "mean"
+        },
+        "objective_profile": "robust",
+        "optimizer_strategy": "none",
+        "parameter_catalog_version": "builtin-v1",
+        "parameter_space": [
+          {
+            "baseline": 0.95,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.3,
+            "minimum": 0.6,
+            "name": "MPC_XY_P",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 1.8,
+            "enabled": true,
+            "locked": false,
+            "maximum": 2.8,
+            "minimum": 1.2,
+            "name": "MPC_XY_VEL_P_ACC",
+            "scale": "linear",
+            "step": 0.1,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.4,
+            "enabled": true,
+            "locked": false,
+            "maximum": 1.0,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_I_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 0.2,
+            "enabled": true,
+            "locked": false,
+            "maximum": 0.5,
+            "minimum": 0.1,
+            "name": "MPC_XY_VEL_D_ACC",
+            "scale": "linear",
+            "step": 0.02,
+            "value_type": "float"
+          },
+          {
+            "baseline": 3.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 5.0,
+            "minimum": 2.0,
+            "name": "MPC_ACC_HOR",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          },
+          {
+            "baseline": 5.0,
+            "enabled": true,
+            "locked": false,
+            "maximum": 10.0,
+            "minimum": 5.0,
+            "name": "MPC_ACC_HOR_MAX",
+            "scale": "linear",
+            "step": 1.0,
+            "value_type": "float"
+          }
+        ],
+        "provider_turn_cap": 0,
+        "scenario_suite": {
+          "cases": [
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": false,
+              "id": "hard-hover-wind-dropout-train",
+              "scenario_type": "combined_perturbed",
+              "seeds": [
+                10181,
+                10182
+              ],
+              "weight": 1.0
+            },
+            {
+              "config": {},
+              "enabled": true,
+              "holdout": true,
+              "id": "hard-hover-wind-dropout-holdout",
+              "scenario_type": "combined_perturbed",
+              "seeds": [
+                20181,
+                20182
+              ],
+              "weight": 1.0
+            }
+          ],
+          "common_random_numbers": true
+        },
+        "sensor_noise_level": "high",
+        "simulator_backend": "real_cli",
+        "start_point": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "track_type": "hover",
+        "trials_per_candidate": 4,
+        "vehicle_profile": {
+          "airframe": "x500",
+          "headless": true,
+          "instance_id": 0,
+          "px4_version": "main",
+          "simulation_speed_factor": 1.0,
+          "simulator_model": "gz_x500",
+          "vehicle_type": "multicopter",
+          "world": "default"
+        },
+        "wind": {
+          "east": 0.0,
+          "north": 3.5,
+          "south": 0.0,
+          "west": 0.0
+        }
+      },
+      "physical_effect_contracts": [
+        {
+          "case_id": "hard-hover-wind-dropout-train",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "sensor_degradation.dropout_rate"
+          ],
+          "holdout": false,
+          "request_sha256": "63805aeb3322efc7861bad3f5bab3efef020084a9f8eb4a9dcceb7592bde0488",
+          "seed": 10181
+        },
+        {
+          "case_id": "hard-hover-wind-dropout-train",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "sensor_degradation.dropout_rate"
+          ],
+          "holdout": false,
+          "request_sha256": "66ef3a6ec288afe477e25294bfc5d732997793263f233aeee81d38f058feb274",
+          "seed": 10182
+        },
+        {
+          "case_id": "hard-hover-wind-dropout-holdout",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "sensor_degradation.dropout_rate"
+          ],
+          "holdout": true,
+          "request_sha256": "269144d4313da44ae8bffeb18865c85ffcbefbf94cbd41e851cb38db059ec54b",
+          "seed": 20181
+        },
+        {
+          "case_id": "hard-hover-wind-dropout-holdout",
+          "effect_ids": [
+            "job_config.wind",
+            "job_config.sensor_noise_level",
+            "sensor_degradation.baro_noise_m",
+            "sensor_degradation.imu_noise_scale",
+            "sensor_degradation.dropout_rate"
+          ],
+          "holdout": true,
+          "request_sha256": "3d92542c964788fe9ee326ff02dff378d1a65c749fedc0f9802f710bf2fef8d4",
+          "seed": 20182
+        }
+      ],
+      "physical_effect_contracts_sha256": "2880b9f337fa95c29dd5677b3076c9a9c37f1bf0052ee58f3ad55f3fff086665",
+      "problem_id": "hard-hover-wind-dropout",
+      "provisional_acceptance_criteria": {
+        "min_pass_rate": 1.0,
+        "target_max_error": 1.8,
+        "target_rmse": 0.8
+      },
+      "registry_ordinal": 18,
+      "tags": [
+        "hover",
+        "dropout",
+        "strong_wind"
+      ],
+      "task_family": "station_keeping",
+      "threshold_status": "v1_prearm_invalid_revised_recalibration_required",
+      "user_relevance": "Emergency or degraded-link station keeping with strong wind and sparse dropout."
+    }
+  ],
+  "registry_sha256": "ef102cbf312abf7fa987a635c7ed8506e716b06bf8666f3db810ef4ccceab612",
+  "registry_version": "prefinal-realistic-px4-gazebo-v2",
+  "report_eligible": false,
+  "schema_version": "dronedream.prefinal-scenario-registry/v2",
+  "selection_policy": {
+    "all_registered_problems_retained": true,
+    "comparative_outcome_based_pruning_forbidden": true,
+    "failures_and_competitor_wins_retained": true,
+    "replacement_allowed_only_before_lock": true,
+    "replacement_reasons": [
+      "nonphysical_or_unavailable_runtime_effect",
+      "invalid_or_unexecutable_track_contract",
+      "baseline_only_calibration_proves_trivially_impossible_or_trivially_saturated"
+    ],
+    "replacement_requires_new_registry_version_and_audit_log": true
+  },
+  "status": "baseline_calibration_in_progress",
+  "supersedes_registry": {
+    "preserved_as_immutable_input": true,
+    "registry_sha256": "00ea1a11319df1b3f2f7a2cf909698f7e6bd056c23f7cd3b22e89aac6b39c080",
+    "registry_version": "prefinal-realistic-px4-gazebo-v1"
+  },
+  "training_seed_count": 36
+}

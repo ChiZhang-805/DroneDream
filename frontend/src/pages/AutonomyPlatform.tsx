@@ -804,7 +804,61 @@ export function AutonomyOverview() {
       let planningBrief = "";
       let planningRunId: string | null = assistantWorkspaceId;
       let modelReasoningUnavailable = false;
+      if (!publicDemoConsole) {
+        try {
+          const workflow = await apiClient.compileTaskWorkflow({
+            request_id: `autonomy:${assistantWorkspaceId}:${turnId}`,
+            edition,
+            requested_task_type: "mission_autonomy",
+            message: intent,
+            locale: chinese ? "zh-CN" : "en",
+            conversation_summary: missionWorkspace.mission.planningBrief.slice(0, 4_000),
+            context: [
+              {
+                key: "autonomy.harness",
+                value: JSON.stringify(
+                  autonomyModelContext(harnessRequest, harnessInspection),
+                ).slice(0, 4_000),
+                source: "asset_receipt",
+              },
+              {
+                key: "planning.model",
+                value: `${selectedPlanningModel.accessMode}:${selectedPlanningModel.provider}:${selectedPlanningModel.model}`,
+                source: "workspace",
+              },
+            ],
+            requested_tool_ids: [],
+          });
+          planningRunId = workflow.contract_id;
+          if (workflow.status === "blocked") {
+            harnessInspection = {
+              ...harnessInspection,
+              status: "blocked",
+              planning_ready: false,
+              blockers: [...new Set([
+                ...harnessInspection.blockers,
+                ...workflow.blockers,
+              ])],
+            };
+            planningBrief = autonomyAssetBlockerMessage(harnessInspection, chinese);
+          }
+        } catch {
+          harnessInspection = {
+            ...harnessInspection,
+            status: "blocked",
+            planning_ready: false,
+            blockers: [...new Set([
+              ...harnessInspection.blockers,
+              "The deterministic task workflow could not be compiled.",
+            ])],
+          };
+          planningBrief = autonomyAssetBlockerMessage(harnessInspection, chinese);
+        }
+      }
       try {
+        if (!harnessInspection.planning_ready) {
+          throw new Error("The deterministic workflow gate blocked model planning.");
+        }
         if (selectedPlanningModel.accessMode !== "platform") {
           throw new Error("The dedicated BYOK autonomy planner adapter is not yet bound.");
         }
@@ -839,10 +893,10 @@ export function AutonomyOverview() {
             ])],
           };
         }
-        planningRunId = response.orchestration?.run_id ?? assistantWorkspaceId;
+        planningRunId = response.orchestration?.run_id ?? planningRunId;
       } catch {
         modelReasoningUnavailable = true;
-        planningBrief = autonomyAssetBlockerMessage(harnessInspection, chinese);
+        planningBrief = planningBrief || autonomyAssetBlockerMessage(harnessInspection, chinese);
       }
       if (!harnessInspection.planning_ready) {
         const updatedAt = new Date().toISOString();

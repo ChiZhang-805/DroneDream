@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from collections.abc import Iterator
 
 import pytest
@@ -15,16 +14,13 @@ def gpt_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     from app import config as config_module
 
     config_module.get_settings.cache_clear()
-    for name in list(sys.modules):
-        if name == "app" or name.startswith("app."):
-            del sys.modules[name]
-
     import app.db as db_module
     import app.models as models_module
     import app.orchestration.aggregation as aggregation
     import app.orchestration.runner as runner
     import app.services.jobs as jobs_service
 
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
     yield {
         "db_module": db_module,

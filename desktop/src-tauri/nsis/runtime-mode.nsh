@@ -20,6 +20,22 @@ Var DroneDreamDiagnosticLog
 Var DroneDreamDiagnosticHandle
 Var DroneDreamValidatePathOnly
 
+!macro DRONEDREAM_BLOCK_DOWNGRADE COMPARISON
+  ; The upstream page disables only the in-place downgrade option and still
+  ; offers to uninstall the newer copy first. DroneDream instead fails closed.
+  ${If} ${COMPARISON} = -1
+    IfSilent dronedream_downgrade_blocked_silent dronedream_downgrade_blocked_interactive
+    dronedream_downgrade_blocked_interactive:
+      MessageBox MB_ICONSTOP|MB_OK "$(DD_DowngradeBlocked)"
+      SetErrorLevel 74
+      Quit
+    dronedream_downgrade_blocked_silent:
+      DetailPrint "$(DD_DowngradeBlocked)"
+      SetErrorLevel 74
+      Quit
+  ${EndIf}
+!macroend
+
 !macro DRONEDREAM_ONINIT
   ; MUI_LANGDLL_DISPLAY has already returned at this anchor. Preserve that
   ; exact choice for every later custom page and message.
@@ -56,23 +72,25 @@ Var DroneDreamValidatePathOnly
     ReadRegStr $0 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive"
     StrCpy $DroneDreamRuntimeDrive $0
   ${EndIf}
-  ReadRegDWORD $DroneDreamRuntimeProtocol SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
-  ${If} $DroneDreamRuntimeProtocol >= 2
-    IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_oninit_no_quiesce
-      Call DroneDreamAcquireRuntimeQuiesce
-      Pop $0
-      ${If} $0 == "busy"
-        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimeBusy)"
-        Abort
-      ${ElseIf} $0 == "pending"
-        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimePendingUpdate)"
-        Abort
-      ${ElseIf} $0 != "ok"
-        MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimeIsolationFailed)"
-        Abort
-      ${EndIf}
-    dronedream_oninit_no_quiesce:
-  ${EndIf}
+  !if "${DRONEDREAM_EDITION_ID}" != "field"
+    ReadRegDWORD $DroneDreamRuntimeProtocol SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
+    ${If} $DroneDreamRuntimeProtocol >= 2
+      IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_oninit_no_quiesce
+        Call DroneDreamAcquireRuntimeQuiesce
+        Pop $0
+        ${If} $0 == "busy"
+          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimeBusy)"
+          Abort
+        ${ElseIf} $0 == "pending"
+          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimePendingUpdate)"
+          Abort
+        ${ElseIf} $0 != "ok"
+          MessageBox MB_ICONEXCLAMATION|MB_OK "$(DD_RuntimeIsolationFailed)"
+          Abort
+        ${EndIf}
+      dronedream_oninit_no_quiesce:
+    ${EndIf}
+  !endif
 !macroend
 
 !macro DRONEDREAM_RUNTIME_MODE_PAGE
@@ -96,7 +114,12 @@ Var DroneDreamValidatePathOnly
   Var DroneDreamModePageVisited
   Var DroneDreamRuntimeProtocol
 
-  Page custom DroneDreamRuntimeModePageCreate DroneDreamRuntimeModePageLeave
+  ; FIELD is a standalone real-device application and never offers or seals a
+  ; DroneDreamRuntime install. Keep the shared functions available to the
+  ; other editions, but omit this page from the compiled FIELD page sequence.
+  !if "${DRONEDREAM_EDITION_ID}" != "field"
+    Page custom DroneDreamRuntimeModePageCreate DroneDreamRuntimeModePageLeave
+  !endif
 
   Function DroneDreamAppendInstallerDiagnostic
     Exch $0
@@ -191,8 +214,14 @@ Var DroneDreamValidatePathOnly
         Push "error"
         Return
       ${EndIf}
+      Push "ok"
+      Return
     dronedream_revalidate_without_binary:
-    Push "ok"
+    ; The preinstall hook calls this only after observing the old binary. If it
+    ; disappears before or during revalidation, the durable quiesce can no
+    ; longer be authenticated; fail closed instead of treating the race as a
+    ; verified update window.
+    Push "error"
   FunctionEnd
 
   Function DroneDreamEndRuntimeQuiesce

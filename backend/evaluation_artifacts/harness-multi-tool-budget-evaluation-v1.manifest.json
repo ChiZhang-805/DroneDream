@@ -1,0 +1,32 @@
+{
+  "arms": [
+    "direct_portfolio",
+    "scripted_multi_tool"
+  ],
+  "artifact_schema_version": "dronedream.harness-multi-tool-budget-evaluation/v1",
+  "artifact_sha256": "e5c27308a9be35a276ce845e872e186e613f5421c459bcddec726a461e480ef3",
+  "claim_boundary": "Equal configured Trial and generation ceilings on MockSimulatorAdapter. The scripted local planner exercises production closed schemas, multi-tool execution, revision, provenance, and cost accounting with zero provider and network calls. Results do not establish LLM quality, optimizer superiority, physical fidelity, real-flight performance, or causal Harness benefit.",
+  "configured_budget": {
+    "max_iterations": 2,
+    "max_total_trials": 40
+  },
+  "contracts": {
+    "evidence_schema_version": "2.9",
+    "tool_registry_version": "2.1"
+  },
+  "generated_at": "2026-07-28T17:53:02Z",
+  "manifest_sha256": "3c49e2b96b3fffdd92383d6b978d4679f16e012e2a4a43e1c50b8b8a402aca72",
+  "runtime": {
+    "network_calls": 0,
+    "real_credentials_used": false,
+    "real_provider_calls": 0,
+    "simulator_backend": "mock"
+  },
+  "schema_version": "dronedream.harness-multi-tool-budget-evaluation-manifest/v1",
+  "seed_blocks": [
+    7100,
+    8200,
+    9300
+  ],
+  "source_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f"
+}

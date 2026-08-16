@@ -11,6 +11,15 @@ import math
 from dataclasses import dataclass
 
 from app import models
+from app.optimization.candidate_evidence_ledger import (
+    candidate_evidence_chain_matches_current,
+    candidate_evidence_receipt_required,
+)
+from app.optimization.outcome_evidence import (
+    authoritative_candidate_trial_outcome_projection,
+    candidate_outcome_evidence_required,
+    candidate_training_trial_evidence_rows,
+)
 
 
 @dataclass(frozen=True)
@@ -59,9 +68,9 @@ def _safe_float(value: object) -> float | None:
 
 def _safe_rate(value: object) -> float | None:
     parsed = _safe_float(value)
-    if parsed is None:
+    if parsed is None or not 0.0 <= parsed <= 1.0:
         return None
-    return min(1.0, max(0.0, parsed))
+    return parsed
 
 
 def _safe_nonnegative_int(value: object) -> int:
@@ -95,7 +104,24 @@ def evaluate_candidate(
     trial counts.
     """
 
-    agg = candidate.aggregated_metric_json or {}
+    raw_aggregate = candidate.aggregated_metric_json
+    ledger_required = candidate_evidence_receipt_required(candidate)
+    evidence_required = (
+        candidate_outcome_evidence_required(raw_aggregate)
+        or ledger_required
+    )
+    if ledger_required and not candidate_evidence_chain_matches_current(
+        candidate,
+        raw_aggregate,
+    ):
+        raw_aggregate = {}
+    agg = authoritative_candidate_trial_outcome_projection(
+        candidate_id=candidate.id,
+        generation_index=candidate.generation_index,
+        parameter_snapshot=candidate.parameter_json,
+        trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
+        aggregate=raw_aggregate,
+    )
     trial_count = _safe_nonnegative_int(
         agg.get("training_trial_count", candidate.trial_count or 0)
     )
@@ -108,23 +134,40 @@ def evaluate_candidate(
             )
         ),
     )
-    stored_completion_rate = _safe_rate(agg.get("training_completion_rate"))
+    raw_completion_rate = agg.get(
+        "acceptance_completion_rate",
+        agg.get("training_completion_rate"),
+    )
+    stored_completion_rate = _safe_rate(raw_completion_rate)
+    invalid_completion_rate = (
+        raw_completion_rate is not None and stored_completion_rate is None
+    )
     if (
         stored_completion_rate is None
+        and not invalid_completion_rate
         and agg.get("rate_aggregation") == "scenario_case_weighted_v1"
     ):
-        stored_completion_rate = _safe_rate(agg.get("completion_rate"))
+        raw_completion_rate = agg.get("completion_rate")
+        stored_completion_rate = _safe_rate(raw_completion_rate)
+        invalid_completion_rate = (
+            raw_completion_rate is not None and stored_completion_rate is None
+        )
     completion_rate = (
         stored_completion_rate
         if stored_completion_rate is not None
         else completed / trial_count if trial_count > 0 else 0.0
     )
 
-    rmse = _safe_float(agg.get("rmse"))
+    rmse = _safe_float(agg.get("acceptance_rmse", agg.get("rmse")))
     # ``max_error`` historically contains the completed-trial mean. New
     # aggregates retain it for compatibility while acceptance uses the worst
     # observed trial excursion.
-    max_error = _safe_float(agg.get("max_error_worst", agg.get("max_error")))
+    max_error = _safe_float(
+        agg.get(
+            "acceptance_max_error",
+            agg.get("max_error_worst", agg.get("max_error")),
+        )
+    )
     passing = min(
         trial_count,
         _safe_nonnegative_int(
@@ -134,12 +177,20 @@ def evaluate_candidate(
             )
         ),
     )
-    stored_pass_rate = _safe_rate(agg.get("training_pass_rate"))
+    raw_pass_rate = agg.get(
+        "acceptance_pass_rate",
+        agg.get("training_pass_rate"),
+    )
+    stored_pass_rate = _safe_rate(raw_pass_rate)
+    invalid_pass_rate = raw_pass_rate is not None and stored_pass_rate is None
     if (
         stored_pass_rate is None
+        and not invalid_pass_rate
         and agg.get("rate_aggregation") == "scenario_case_weighted_v1"
     ):
-        stored_pass_rate = _safe_rate(agg.get("pass_rate"))
+        raw_pass_rate = agg.get("pass_rate")
+        stored_pass_rate = _safe_rate(raw_pass_rate)
+        invalid_pass_rate = raw_pass_rate is not None and stored_pass_rate is None
     pass_rate = (
         stored_pass_rate
         if stored_pass_rate is not None
@@ -149,6 +200,24 @@ def evaluate_candidate(
     if not _criteria_are_valid(criteria):
         return AcceptanceResult(
             False, "invalid_criteria", pass_rate, completion_rate, rmse, max_error
+        )
+    if evidence_required and not agg:
+        return AcceptanceResult(
+            False,
+            "invalid_outcome_evidence",
+            pass_rate,
+            completion_rate,
+            rmse,
+            max_error,
+        )
+    if invalid_completion_rate or invalid_pass_rate:
+        return AcceptanceResult(
+            False,
+            "invalid_rate_evidence",
+            pass_rate,
+            completion_rate,
+            rmse,
+            max_error,
         )
     if candidate.aggregated_metric_json is None or trial_count == 0:
         return AcceptanceResult(

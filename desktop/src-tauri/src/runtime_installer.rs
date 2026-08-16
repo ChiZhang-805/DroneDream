@@ -26,6 +26,9 @@ use crate::runtime_cache::{
 };
 
 const RUNTIME_NAME: &str = "DroneDreamRuntime";
+const RUNTIME_BASE_MANAGER_NAMESPACE: &str = "io.dronedream.runtime-base-manager";
+const COMPILED_DESKTOP_EDITION_ID: &str = env!("DRONEDREAM_DESKTOP_EDITION_ID");
+const COMPILED_EDITION_PROFILE: &str = env!("DRONEDREAM_EDITION_PROFILE");
 const DEFAULT_RELEASE_MANIFEST_URL: &str =
     env!("DRONEDREAM_PRODUCTION_RUNTIME_RELEASE_MANIFEST_URL");
 const TRUSTED_KEYRING: &str = include_str!("../../../runtime/release-public-keys.json");
@@ -54,6 +57,14 @@ const MAX_JCS_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 const IMPORT_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(60);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(3 * 60);
+// The installed-app observer owns a 300 second action window. Native startup
+// uses at most 270 seconds and reserves the final 30 seconds for IPC delivery,
+// durable evidence, app shutdown, and the verifier's owned rollback.
+const RUNTIME_MAINTENANCE_OBSERVER_WINDOW_SECS: u64 = 300;
+const RUNTIME_MAINTENANCE_SETTLEMENT_MARGIN_SECS: u64 = 30;
+const RUNTIME_MAINTENANCE_TIMEOUT: Duration = Duration::from_secs(
+    RUNTIME_MAINTENANCE_OBSERVER_WINDOW_SECS - RUNTIME_MAINTENANCE_SETTLEMENT_MARGIN_SECS,
+);
 const RESUME_STATE_FILE: &str = "install-state.json";
 const RESUME_STATE_TEMP_FILE: &str = "install-state.json.tmp";
 const CACHED_MANIFEST_FILE: &str = "signed-release-manifest.json";
@@ -636,12 +647,19 @@ pub(crate) struct PreparedRuntimeOperation {
 }
 
 #[cfg(target_os = "windows")]
-struct CrossProcessOperationLease(windows_sys::Win32::Foundation::HANDLE);
+struct CrossProcessOperationLease(Vec<windows_sys::Win32::Foundation::HANDLE>);
 
 #[cfg(target_os = "windows")]
 impl CrossProcessOperationLease {
     fn acquire() -> Result<Self, String> {
-        Self::acquire_at(&runtime_operation_lease_path()?)
+        let [legacy_path, global_path] = runtime_operation_lease_paths()?;
+        // Acquire in one fixed order. All new editions therefore serialize
+        // with one another through the global lease and with an installed
+        // pre-edition desktop through its legacy lease.
+        let mut lease = Self::acquire_at(&legacy_path)?;
+        let mut global_lease = Self::acquire_at(&global_path)?;
+        lease.0.append(&mut global_lease.0);
+        Ok(lease)
     }
 
     fn acquire_at(path: &Path) -> Result<Self, String> {
@@ -712,7 +730,7 @@ impl CrossProcessOperationLease {
             unsafe { CloseHandle(handle) };
             return Err("Runtime operation lease is not a safe ordinary file.".to_string());
         }
-        Ok(Self(handle))
+        Ok(Self(vec![handle]))
     }
 }
 
@@ -725,21 +743,40 @@ unsafe impl Send for CrossProcessOperationLease {}
 impl Drop for CrossProcessOperationLease {
     fn drop(&mut self) {
         use windows_sys::Win32::Foundation::CloseHandle;
-        // SAFETY: this wrapper uniquely owns the valid CreateFileW handle.
-        unsafe {
-            CloseHandle(self.0);
+        for handle in self.0.drain(..) {
+            // SAFETY: this wrapper uniquely owns every valid CreateFileW
+            // handle in the vector.
+            unsafe {
+                CloseHandle(handle);
+            }
         }
     }
 }
 
 #[cfg(target_os = "windows")]
-fn runtime_operation_lease_path() -> Result<PathBuf, String> {
+fn runtime_operation_lease_paths() -> Result<[PathBuf; 2], String> {
     let local = std::env::var_os("LOCALAPPDATA")
         .filter(|value| !value.is_empty())
         .ok_or_else(|| "LOCALAPPDATA is unavailable.".to_string())?;
-    Ok(PathBuf::from(local)
+    let local = PathBuf::from(local);
+    Ok([
+        legacy_runtime_operation_lease_path_at(&local),
+        runtime_operation_lease_path_at(&local),
+    ])
+}
+
+#[cfg(target_os = "windows")]
+fn runtime_operation_lease_path_at(local_app_data: &Path) -> PathBuf {
+    local_app_data
+        .join(RUNTIME_BASE_MANAGER_NAMESPACE)
+        .join("runtime-operation-v1.lock")
+}
+
+#[cfg(target_os = "windows")]
+fn legacy_runtime_operation_lease_path_at(local_app_data: &Path) -> PathBuf {
+    local_app_data
         .join("io.dronedream.desktop")
-        .join("runtime-operation-v1.lock"))
+        .join("runtime-operation-v1.lock")
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -849,13 +886,32 @@ async fn run_runtime_maintenance(
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
         let executor = ProductionWslExecutor;
+        let maintenance_deadline = Instant::now()
+            .checked_add(RUNTIME_MAINTENANCE_TIMEOUT)
+            .ok_or_else(|| "Runtime maintenance deadline overflowed.".to_string())?;
+        let health_deadline = maintenance_deadline
+            .checked_sub(crate::runtime::RUNTIME_STATUS_PROBE_BUDGET)
+            .ok_or_else(|| "Runtime maintenance probe budget is invalid.".to_string())?;
         let result = (|| {
-            if !executor.is_registered().map_err(|error| error.message)? {
+            require_runtime_maintenance_budget(
+                maintenance_deadline,
+                crate::runtime::RUNTIME_REGISTRY_PROBE_BUDGET,
+                "runtime registration probe",
+            )?;
+            if !executor
+                .is_registered()
+                .map_err(runtime_maintenance_error_for_ipc)?
+            {
                 return Err(
                     "DroneDreamRuntime is not installed; no other WSL distribution was changed."
                         .to_string(),
                 );
             }
+            require_runtime_maintenance_budget(
+                maintenance_deadline,
+                crate::runtime::RUNTIME_REGISTRY_PROBE_BUDGET,
+                "runtime ownership probe",
+            )?;
             let (build_id, version) = match crate::runtime::validate_installed_runtime_ownership() {
                 Ok(identity) => identity,
                 Err(_) => {
@@ -870,7 +926,7 @@ async fn run_runtime_maintenance(
                         &cancel,
                         TRUSTED_KEYRING,
                     )
-                    .map_err(|error| error.message)?;
+                    .map_err(runtime_maintenance_error_for_ipc)?;
                     installer.update(|snapshot| {
                         snapshot.phase = RuntimeInstallPhase::Completed;
                         snapshot.installed_version = Some(recovered.version);
@@ -884,14 +940,23 @@ async fn run_runtime_maintenance(
             };
             if repair {
                 keepalive.release()?;
-                executor.terminate().map_err(|error| error.message)?;
+                executor
+                    .terminate()
+                    .map_err(runtime_maintenance_error_for_ipc)?;
             }
             keepalive.ensure_running()?;
             let cancel = AtomicBool::new(false);
-            executor.start(&cancel).map_err(|error| error.message)?;
             executor
-                .wait_healthy(&build_id, &version, &cancel)
-                .map_err(|error| error.message)?;
+                .start_until(&cancel, health_deadline)
+                .map_err(runtime_maintenance_error_for_ipc)?;
+            executor
+                .wait_healthy_until(&build_id, &version, &cancel, health_deadline)
+                .map_err(runtime_maintenance_error_for_ipc)?;
+            require_runtime_maintenance_budget(
+                maintenance_deadline,
+                crate::runtime::RUNTIME_STATUS_PROBE_BUDGET,
+                "final runtime status probe",
+            )?;
             let report = crate::runtime::probe_runtime()?;
             if !report.is_ready() {
                 return Err(
@@ -908,6 +973,23 @@ async fn run_runtime_maintenance(
     })
     .await
     .map_err(|error| format!("Runtime maintenance task failed: {error}"))?
+}
+
+fn require_runtime_maintenance_budget(
+    deadline: Instant,
+    required: Duration,
+    stage: &str,
+) -> Result<(), String> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining < required {
+        Err(format!(
+            "runtime_maintenance_deadline_exceeded: {stage} requires at most {} seconds but only {} milliseconds remain.",
+            required.as_secs(),
+            remaining.as_millis()
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -953,6 +1035,17 @@ impl InstallFailure {
 
 fn fail(code: &str, message: impl Into<String>, retryable: bool) -> InstallFailure {
     InstallFailure::new(code, message, retryable)
+}
+
+fn runtime_maintenance_error_for_ipc(error: InstallFailure) -> String {
+    let mut error = RuntimeInstallError {
+        code: error.code,
+        message: error.message,
+        retryable: error.retryable,
+        diagnostics_path: error.diagnostics_path,
+    };
+    error.sanitize_for_ipc();
+    format!("{}: {}", error.code, error.message)
 }
 
 fn is_runtime_health_failure(error: &InstallFailure) -> bool {
@@ -1804,6 +1897,111 @@ impl ProductionWslExecutor {
         }
         Ok(())
     }
+
+    fn start_until(&self, cancel: &AtomicBool, deadline: Instant) -> Result<(), InstallFailure> {
+        let timeout = remaining_runtime_timeout(deadline, COMMAND_TIMEOUT, "Runtime start")?;
+        let args = crate::runtime::runtime_wsl_exec_args("/bin/true", &[]);
+        self.run_exact("DroneDreamRuntime start", &args, Some(cancel), timeout)
+    }
+
+    fn wait_healthy_until(
+        &self,
+        build_id: &str,
+        version: &str,
+        cancel: &AtomicBool,
+        operation_deadline: Instant,
+    ) -> Result<(), InstallFailure> {
+        let local_deadline = Instant::now()
+            .checked_add(HEALTH_TIMEOUT)
+            .map(|deadline| deadline.min(operation_deadline))
+            .unwrap_or(operation_deadline);
+        let mut last_health = crate::runtime::RuntimeReleaseHealth::NotReady(
+            "runtime health check has not completed".to_string(),
+        );
+        loop {
+            check_cancel(cancel)?;
+            if local_deadline
+                .saturating_duration_since(Instant::now())
+                .is_zero()
+            {
+                break;
+            }
+            let observed = crate::runtime::probe_runtime_release_health_until(
+                build_id,
+                version,
+                local_deadline,
+            );
+            if matches!(observed, crate::runtime::RuntimeReleaseHealth::Ready) {
+                return Ok(());
+            }
+            last_health = retain_specific_runtime_health(last_health, observed);
+            let remaining = local_deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            std::thread::sleep(remaining.min(Duration::from_secs(2)));
+        }
+        Err(runtime_health_failure(last_health))
+    }
+}
+
+fn remaining_runtime_timeout(
+    deadline: Instant,
+    cap: Duration,
+    stage: &str,
+) -> Result<Duration, InstallFailure> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    let timeout = bounded_runtime_timeout(remaining, cap).ok_or_else(|| {
+        fail(
+            "runtime_maintenance_deadline_exceeded",
+            format!("{stage} did not start because the shared deadline was exhausted."),
+            true,
+        )
+    })?;
+    Ok(timeout)
+}
+
+fn bounded_runtime_timeout(remaining: Duration, cap: Duration) -> Option<Duration> {
+    if remaining.is_zero() || cap.is_zero() {
+        None
+    } else {
+        Some(remaining.min(cap))
+    }
+}
+
+fn runtime_health_failure(last_health: crate::runtime::RuntimeReleaseHealth) -> InstallFailure {
+    let (code, detail) = match last_health {
+        crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(error) => {
+            ("runtime_service_unhealthy", error)
+        }
+        crate::runtime::RuntimeReleaseHealth::HostConnectivity(error) => {
+            ("runtime_host_connectivity", error)
+        }
+        crate::runtime::RuntimeReleaseHealth::Unknown(error)
+        | crate::runtime::RuntimeReleaseHealth::NotReady(error) => {
+            ("runtime_health_unknown", error)
+        }
+        crate::runtime::RuntimeReleaseHealth::Ready => unreachable!("ready returned above"),
+    };
+    fail(
+        code,
+        format!("DroneDreamRuntime did not become healthy: {detail}"),
+        true,
+    )
+}
+
+fn retain_specific_runtime_health(
+    previous: crate::runtime::RuntimeReleaseHealth,
+    observed: crate::runtime::RuntimeReleaseHealth,
+) -> crate::runtime::RuntimeReleaseHealth {
+    match (&previous, &observed) {
+        (
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(_)
+            | crate::runtime::RuntimeReleaseHealth::HostConnectivity(_),
+            crate::runtime::RuntimeReleaseHealth::Unknown(error),
+        ) if error.contains("shared deadline was exhausted") => previous,
+        _ => observed,
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -1925,13 +2123,14 @@ impl WslExecutor for ProductionWslExecutor {
     }
 
     fn start(&self, cancel: &AtomicBool) -> Result<(), InstallFailure> {
-        let args = crate::runtime::runtime_wsl_exec_args("/bin/true", &[]);
-        self.run_exact(
-            "DroneDreamRuntime start",
-            &args,
-            Some(cancel),
-            COMMAND_TIMEOUT,
-        )
+        let deadline = Instant::now().checked_add(COMMAND_TIMEOUT).ok_or_else(|| {
+            fail(
+                "wsl_command_failed",
+                "Runtime start deadline overflowed.",
+                true,
+            )
+        })?;
+        self.start_until(cancel, deadline)
     }
 
     fn terminate(&self) -> Result<(), InstallFailure> {
@@ -1958,36 +2157,14 @@ impl WslExecutor for ProductionWslExecutor {
         version: &str,
         cancel: &AtomicBool,
     ) -> Result<(), InstallFailure> {
-        let started = Instant::now();
-        let mut last_health = crate::runtime::RuntimeReleaseHealth::NotReady(
-            "runtime health check has not completed".to_string(),
-        );
-        while started.elapsed() < HEALTH_TIMEOUT {
-            check_cancel(cancel)?;
-            last_health = crate::runtime::probe_runtime_release_health(build_id, version);
-            if matches!(last_health, crate::runtime::RuntimeReleaseHealth::Ready) {
-                return Ok(());
-            }
-            std::thread::sleep(Duration::from_secs(2));
-        }
-        let (code, detail) = match last_health {
-            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(error) => {
-                ("runtime_service_unhealthy", error)
-            }
-            crate::runtime::RuntimeReleaseHealth::HostConnectivity(error) => {
-                ("runtime_host_connectivity", error)
-            }
-            crate::runtime::RuntimeReleaseHealth::Unknown(error)
-            | crate::runtime::RuntimeReleaseHealth::NotReady(error) => {
-                ("runtime_health_unknown", error)
-            }
-            crate::runtime::RuntimeReleaseHealth::Ready => unreachable!("ready returned above"),
-        };
-        Err(fail(
-            code,
-            format!("DroneDreamRuntime did not become healthy: {detail}"),
-            true,
-        ))
+        let deadline = Instant::now().checked_add(HEALTH_TIMEOUT).ok_or_else(|| {
+            fail(
+                "runtime_health_unknown",
+                "Health deadline overflowed.",
+                true,
+            )
+        })?;
+        self.wait_healthy_until(build_id, version, cancel, deadline)
     }
 
     fn collect_diagnostics(
@@ -2036,7 +2213,7 @@ fn collect_production_runtime_diagnostics(
     failure_message: &str,
 ) -> Result<PathBuf, String> {
     let cache_root = crate::runtime_cache::validate_managed_cache(runtime_target)?;
-    let diagnostics_root = prepare_diagnostics_directory(&cache_root)?;
+    let diagnostics_root = prepare_diagnostics_directory(&cache_root, COMPILED_DESKTOP_EDITION_ID)?;
     let mut command = windows_command("wsl.exe");
     let bounded_script = bounded_diagnostic_script(DIAGNOSTIC_SCRIPT);
     command.args(diagnostic_wsl_command_args(bounded_script.as_str()));
@@ -2117,7 +2294,9 @@ fn diagnostic_report_header(
     failure_message: &str,
 ) -> String {
     format!(
-        "DroneDreamRuntime failure diagnostics\ncollectedAt={}\ncollectorLimitBytes={}\nfailureCode={}\nfailureMessage={}\n\n",
+        "DroneDreamRuntime failure diagnostics\ndesktopEditionId={}\neditionProfileId={}\ncollectedAt={}\ncollectorLimitBytes={}\nfailureCode={}\nfailureMessage={}\n\n",
+        COMPILED_DESKTOP_EDITION_ID,
+        COMPILED_EDITION_PROFILE,
         collected_at,
         MAX_DIAGNOSTIC_BYTES,
         failure_code,
@@ -2181,42 +2360,49 @@ fn decode_diagnostic_output(bytes: &[u8]) -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn prepare_diagnostics_directory(cache_root: &Path) -> Result<PathBuf, String> {
-    let canonical_cache = fs::canonicalize(cache_root)
-        .map_err(|error| format!("Unable to resolve the managed runtime cache: {error}"))?;
-    let diagnostics_root = cache_root.join("diagnostics");
-    match fs::symlink_metadata(&diagnostics_root) {
+fn prepare_real_child_directory(
+    parent: &Path,
+    child_name: &str,
+    label: &str,
+) -> Result<PathBuf, String> {
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|error| format!("Unable to resolve the {label} parent directory: {error}"))?;
+    let child = parent.join(child_name);
+    match fs::symlink_metadata(&child) {
         Ok(metadata) => {
             if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
-                return Err(
-                    "Runtime diagnostics path is not a real managed-cache directory.".to_string(),
-                );
+                return Err(format!("{label} path is not a real directory."));
             }
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            fs::create_dir(&diagnostics_root).map_err(|error| {
-                format!("Unable to create the runtime diagnostics directory: {error}")
-            })?;
+            fs::create_dir(&child)
+                .map_err(|error| format!("Unable to create the {label} directory: {error}"))?;
         }
-        Err(error) => {
-            return Err(format!(
-                "Unable to inspect the runtime diagnostics directory: {error}"
-            ))
-        }
+        Err(error) => return Err(format!("Unable to inspect the {label} directory: {error}")),
     }
-    let metadata = fs::symlink_metadata(&diagnostics_root)
-        .map_err(|error| format!("Unable to verify the runtime diagnostics directory: {error}"))?;
+    let metadata = fs::symlink_metadata(&child)
+        .map_err(|error| format!("Unable to verify the {label} directory: {error}"))?;
     if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
-        return Err("Runtime diagnostics directory failed its safety check.".to_string());
+        return Err(format!("{label} directory failed its safety check."));
     }
-    let canonical_diagnostics = fs::canonicalize(&diagnostics_root)
-        .map_err(|error| format!("Unable to resolve the runtime diagnostics directory: {error}"))?;
-    if canonical_diagnostics.parent() != Some(canonical_cache.as_path()) {
-        return Err(
-            "Runtime diagnostics directory resolved outside the managed runtime cache.".to_string(),
-        );
+    let canonical_child = fs::canonicalize(&child)
+        .map_err(|error| format!("Unable to resolve the {label} directory: {error}"))?;
+    if canonical_child.parent() != Some(canonical_parent.as_path()) {
+        return Err(format!(
+            "{label} directory resolved outside its managed parent."
+        ));
     }
-    Ok(diagnostics_root)
+    Ok(child)
+}
+
+#[cfg(target_os = "windows")]
+fn prepare_diagnostics_directory(cache_root: &Path, edition_id: &str) -> Result<PathBuf, String> {
+    if !matches!(edition_id, "universal" | "sim" | "lab" | "field") {
+        return Err("Desktop edition is not allowed to own runtime diagnostics.".to_string());
+    }
+    let diagnostics_root =
+        prepare_real_child_directory(cache_root, "diagnostics", "runtime diagnostics root")?;
+    prepare_real_child_directory(&diagnostics_root, edition_id, "edition runtime diagnostics")
 }
 
 #[cfg(target_os = "windows")]
@@ -2383,6 +2569,16 @@ fn diagnostic_line_is_sensitive(line: &str) -> bool {
         "api_key",
         "apikey",
         "access_key",
+        "anon_key",
+        "service_role",
+        "private_key",
+        "private key",
+        "database_url",
+        "redis_url",
+        "connection_string",
+        "set-cookie",
+        "cookie:",
+        "dsn=",
     ]
     .iter()
     .any(|needle| lowercase.contains(needle))
@@ -4187,6 +4383,112 @@ fn verify_file_sha256(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_maintenance_ipc_error_preserves_bounded_machine_code() {
+        let value = runtime_maintenance_error_for_ipc(InstallFailure {
+            code: "runtime_service_unhealthy\nignored".to_string(),
+            message: "backend did not become ready\r\nsecond line".to_string(),
+            retryable: true,
+            cancelled: false,
+            diagnostics_path: None,
+        });
+
+        assert_eq!(
+            value,
+            "runtime_service_unhealthy ignored: backend did not become ready second line"
+        );
+        assert!(!value.contains(['\r', '\n']));
+    }
+
+    #[test]
+    fn runtime_maintenance_budget_leaves_observer_settlement_margin() {
+        assert_eq!(
+            RUNTIME_MAINTENANCE_TIMEOUT
+                + Duration::from_secs(RUNTIME_MAINTENANCE_SETTLEMENT_MARGIN_SECS),
+            Duration::from_secs(RUNTIME_MAINTENANCE_OBSERVER_WINDOW_SECS)
+        );
+        assert!(crate::runtime::RUNTIME_STATUS_PROBE_BUDGET < RUNTIME_MAINTENANCE_TIMEOUT);
+        assert_eq!(
+            bounded_runtime_timeout(Duration::from_secs(75), COMMAND_TIMEOUT),
+            Some(COMMAND_TIMEOUT)
+        );
+        assert_eq!(
+            bounded_runtime_timeout(Duration::from_millis(250), COMMAND_TIMEOUT),
+            Some(Duration::from_millis(250))
+        );
+        assert_eq!(
+            bounded_runtime_timeout(Duration::ZERO, COMMAND_TIMEOUT),
+            None
+        );
+    }
+
+    #[test]
+    fn runtime_deadline_preserves_observed_failure_classification() {
+        let service = runtime_health_failure(
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy("backend failed".to_string()),
+        );
+        assert_eq!(service.code, "runtime_service_unhealthy");
+
+        let host = runtime_health_failure(crate::runtime::RuntimeReleaseHealth::HostConnectivity(
+            "host path failed".to_string(),
+        ));
+        assert_eq!(host.code, "runtime_host_connectivity");
+
+        let unknown = runtime_health_failure(crate::runtime::RuntimeReleaseHealth::Unknown(
+            "shared deadline exhausted".to_string(),
+        ));
+        assert_eq!(unknown.code, "runtime_health_unknown");
+        assert!(unknown.message.contains("shared deadline exhausted"));
+
+        let retained = retain_specific_runtime_health(
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(
+                "backend refused connections".to_string(),
+            ),
+            crate::runtime::RuntimeReleaseHealth::Unknown(
+                "host backend readiness probe did not start because the shared deadline was exhausted."
+                    .to_string(),
+            ),
+        );
+        assert_eq!(
+            retained,
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(
+                "backend refused connections".to_string()
+            )
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "requires an installed, owned DroneDreamRuntime"]
+    fn live_runtime_maintenance_reaches_ready_before_the_observer_deadline() {
+        let keepalive = crate::runtime_keepalive::RuntimeKeepalive::default();
+        let release_handle = keepalive.clone();
+        let started = Instant::now();
+        let result = tauri::async_runtime::block_on(run_runtime_maintenance(
+            RuntimeInstaller::default(),
+            keepalive,
+            false,
+        ));
+        let elapsed = started.elapsed();
+        let session_contract = if result.as_ref().is_ok_and(|report| report.is_ready()) {
+            crate::desktop_api_bridge::verify_live_anonymous_session_contract_for_test()
+        } else {
+            Ok(())
+        };
+        let _ = release_handle.release();
+
+        let report = result.unwrap_or_else(|error| {
+            panic!("live Runtime maintenance failed after {elapsed:?}: {error}")
+        });
+        assert!(report.is_ready(), "maintenance returned a non-ready report");
+        session_contract
+            .unwrap_or_else(|error| panic!("live signed session contract failed: {error}"));
+        assert!(
+            elapsed < RUNTIME_MAINTENANCE_TIMEOUT,
+            "maintenance exceeded its native deadline: {elapsed:?}"
+        );
+    }
     use ed25519_dalek::{Signer, SigningKey};
     use std::sync::atomic::AtomicUsize;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -4515,7 +4817,8 @@ mod tests {
                 .parent()
                 .expect("test runtime target has a parent")
                 .join("DroneDream.download-cache")
-                .join("diagnostics");
+                .join("diagnostics")
+                .join(COMPILED_DESKTOP_EDITION_ID);
             fs::create_dir_all(&root).map_err(|error| error.to_string())?;
             let path = root.join("fake-runtime-health.log");
             fs::write(&path, b"fake diagnostics\n").map_err(|error| error.to_string())?;
@@ -4844,7 +5147,8 @@ mod tests {
     fn handoff_cleanup_failure_preserves_exported_health_diagnostics_in_snapshot() {
         let installer = RuntimeInstaller::default();
         let diagnostics_path =
-            r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log".to_string();
+            r"E:\DroneDream.download-cache\diagnostics\universal\runtime-health-test.log"
+                .to_string();
 
         set_receipt_cleanup_failure(
             &installer,
@@ -5319,14 +5623,15 @@ mod tests {
             message: "service did not become ready".to_string(),
             retryable: true,
             diagnostics_path: Some(
-                r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log".to_string(),
+                r"E:\DroneDream.download-cache\diagnostics\universal\runtime-health-test.log"
+                    .to_string(),
             ),
         })
         .unwrap();
         assert_eq!(value["code"], "runtime_service_unhealthy");
         assert_eq!(
             value["diagnosticsPath"],
-            r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log"
+            r"E:\DroneDream.download-cache\diagnostics\universal\runtime-health-test.log"
         );
     }
 
@@ -5370,6 +5675,9 @@ mod tests {
         let header =
             diagnostic_report_header("2026-07-14T00:00:00Z", "runtime_service_unhealthy", detail);
         assert!(header.contains(detail));
+        assert!(header.contains(&format!(
+            "desktopEditionId={COMPILED_DESKTOP_EDITION_ID}\neditionProfileId={COMPILED_EDITION_PROFILE}\n"
+        )));
 
         let persisted = String::from_utf8(sanitize_and_bound_diagnostics(&header)).unwrap();
         assert!(persisted.contains(
@@ -5377,10 +5685,61 @@ mod tests {
         ));
     }
 
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn runtime_operation_lock_has_one_global_runtime_base_owner() {
+        let sandbox = Sandbox::new();
+        assert_eq!(
+            runtime_operation_lease_path_at(&sandbox.0),
+            sandbox
+                .0
+                .join("io.dronedream.runtime-base-manager")
+                .join("runtime-operation-v1.lock")
+        );
+        assert_eq!(
+            legacy_runtime_operation_lease_path_at(&sandbox.0),
+            sandbox
+                .0
+                .join("io.dronedream.desktop")
+                .join("runtime-operation-v1.lock")
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn runtime_diagnostics_are_isolated_by_validated_desktop_edition() {
+        let sandbox = Sandbox::new();
+        let cache = sandbox.0.join("DroneDream.download-cache");
+        fs::create_dir(&cache).unwrap();
+
+        let mut paths = BTreeSet::new();
+        for edition_id in ["universal", "sim", "lab", "field"] {
+            let path = prepare_diagnostics_directory(&cache, edition_id).unwrap();
+            assert_eq!(path, cache.join("diagnostics").join(edition_id));
+            assert!(path.is_dir());
+            paths.insert(path);
+        }
+        assert_eq!(paths.len(), 4);
+
+        let error = prepare_diagnostics_directory(&cache, "unknown").unwrap_err();
+        assert!(error.contains("not allowed"));
+        assert!(!cache.join("diagnostics").join("unknown").exists());
+    }
+
     #[test]
     fn diagnostic_sanitizer_redacts_secrets_controls_and_caps_output() {
         let raw = format!(
-            "safe line\nAuthorization: Bearer abc\nurl=https://user:pass@example.test/path\ncontrol=\u{0}\n{}",
+            concat!(
+                "safe line\n",
+                "Authorization: Bearer abc\n",
+                "url=https://user:pass@example.test/path\n",
+                "SUPABASE_ANON_KEY=public-looking-but-sensitive\n",
+                "DATABASE_URL=postgresql://database.example.test/name\n",
+                "Set-Cookie: session=private\n",
+                "-----BEGIN PRIVATE KEY-----\n",
+                "control=\u{0}\n",
+                "{}"
+            ),
             "x".repeat(MAX_DIAGNOSTIC_BYTES * 2)
         );
         let sanitized = sanitize_and_bound_diagnostics(&raw);
@@ -5388,6 +5747,10 @@ mod tests {
         assert!(sanitized.len() <= MAX_DIAGNOSTIC_BYTES);
         assert!(!text.contains("Bearer abc"));
         assert!(!text.contains("user:pass"));
+        assert!(!text.contains("public-looking-but-sensitive"));
+        assert!(!text.contains("postgresql://database.example.test"));
+        assert!(!text.contains("session=private"));
+        assert!(!text.contains("BEGIN PRIVATE KEY"));
         assert!(!text.contains('\0'));
         assert!(text.contains("[REDACTED sensitive diagnostic line]"));
         assert!(text.contains("diagnostic output truncated"));

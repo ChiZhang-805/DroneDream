@@ -20,4 +20,4 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-declare const __DRONEDREAM_BUILD_EDITION__: "universal" | "sim" | "lab";
+declare const __DRONEDREAM_BUILD_EDITION__: "universal" | "sim" | "lab" | "field";

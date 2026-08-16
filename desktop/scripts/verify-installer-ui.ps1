@@ -3,10 +3,19 @@ param(
     [string]$Installer,
     [ValidateSet("English", "SimpChinese")]
     [string]$Language = "English",
+    [ValidatePattern("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
+    [string]$InstallerProductName = "DroneDream",
+    [ValidateScript({
+        -not [string]::IsNullOrWhiteSpace($_) -and
+        $_.Length -le 128 -and
+        $_ -notmatch "[\r\n]"
+    })]
+    [string]$ExpectedDisplayName = "DroneDream",
     [string]$ExpectedTarget = "E:\DroneDream",
     [string]$ExpectedApplication = (Join-Path $env:LOCALAPPDATA "DroneDream"),
     [string]$RecoveryControlExecutable = "",
     [switch]$SimulateFreshInstall,
+    [switch]$StopAfterLocationPage,
     [switch]$ValidatePathGuard
 )
 
@@ -96,11 +105,11 @@ $CB_SETCURSEL = 0x014E
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
 $process = $null
 $registryBackups = @()
-$installerLanguageRegistryPath = "HKCU:\Software\DroneDream\DroneDream"
+$installerLanguageRegistryPath = "HKCU:\Software\DroneDream\$InstallerProductName"
 $installerLanguageValueName = "Installer Language"
 $installerLanguageWasPresent = $false
 $originalInstallerLanguage = $null
-$zhWelcome = (-join ([char[]](27426, 36814, 20351, 29992))) + " DroneDream"
+$zhWelcome = (-join ([char[]](27426, 36814, 20351, 29992))) + " $ExpectedDisplayName"
 $zhInstallationComplete = -join ([char[]](23433, 35013, 23436, 25104))
 $zhInstallLocation = -join ([char[]](36873, 25321, 23433, 35013, 20301, 32622))
 $zhInstallContent = -join ([char[]](36873, 25321, 23433, 35013, 20869, 23481))
@@ -109,6 +118,10 @@ $zhAlreadyInstalled = -join ([char[]](24050, 23433, 35013))
 $zhAddOrReinstall = -join ([char[]](28155, 21152, 25110, 37325, 26032, 23433, 35013, 32452, 20214))
 $zhDontUninstall = -join ([char[]](19981, 21368, 36733))
 $zhRuntimeDeferred = -join ([char[]](36816, 34892, 29615, 22659, 23558, 22312, 26700, 38754, 31243, 24207, 20013, 32487, 32493, 35774, 32622, 12290))
+
+if ($StopAfterLocationPage -and $ValidatePathGuard) {
+    throw "StopAfterLocationPage and ValidatePathGuard are mutually exclusive."
+}
 
 function Wait-InstallerWindow {
     param(
@@ -223,14 +236,24 @@ function Advance-InstallerPage {
 
 function Suspend-DroneDreamRegistration {
     $keys = @(
-        "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\DroneDream",
-        "HKCU\Software\DroneDream\DroneDream"
+        @{
+            Key = "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerProductName"
+            ProviderPath = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerProductName"
+        },
+        @{
+            Key = "HKCU\Software\DroneDream\$InstallerProductName"
+            ProviderPath = "Registry::HKEY_CURRENT_USER\Software\DroneDream\$InstallerProductName"
+        }
     )
-    foreach ($key in $keys) {
-        & reg.exe query $key *> $null
-        if ($LASTEXITCODE -ne 0) {
+    foreach ($entry in $keys) {
+        # An absent registration is the expected fresh-install state. Use the
+        # Registry provider for this check so reg.exe's normal "not found"
+        # stderr cannot become a terminating NativeCommandError under Stop.
+        # Export/delete still use reg.exe and remain fail-closed below.
+        if (-not (Test-Path -LiteralPath $entry.ProviderPath)) {
             continue
         }
+        $key = $entry.Key
         $backup = Join-Path $env:TEMP ("dronedream-installer-ui-{0}.reg" -f [Guid]::NewGuid().ToString("N"))
         & reg.exe export $key $backup /y *> $null
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $backup)) {
@@ -264,7 +287,7 @@ try {
         Write-Host "UI verify: temporarily suspending DroneDream registration"
         Suspend-DroneDreamRegistration
     }
-    $welcomeNeedle = if ($Language -eq "English") { "Welcome to DroneDream Setup" } else { $zhWelcome }
+    $welcomeNeedle = if ($Language -eq "English") { "Welcome to $ExpectedDisplayName Setup" } else { $zhWelcome }
     $locationNeedle = if ($Language -eq "English") { "Choose Install Location" } else { $zhInstallLocation }
     $languageId = if ($Language -eq "English") { 1033 } else { 2052 }
     if (-not $SimulateFreshInstall -and (Test-Path -LiteralPath $installerLanguageRegistryPath)) {
@@ -353,6 +376,10 @@ try {
     }
     if (-not $locationPage.Body.Contains($ExpectedApplication)) {
         throw "The application page did not preserve the expected destination $ExpectedApplication. Controls='$($locationPage.Body)'"
+    }
+    if ($StopAfterLocationPage) {
+        Write-Host "Interactive installer application page verified: language=$Language app=$ExpectedApplication"
+        return
     }
     Advance-InstallerPage -Process $process -CurrentPageNeedle $locationNeedle `
         -AllowProcessExit:$ValidatePathGuard

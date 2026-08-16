@@ -1,0 +1,16 @@
+block_id,seed_block,arm,provider_calls,network_calls,terminal_status,optimization_outcome,candidate_count,trial_count,configured_max_total_trials,dispatched_trials,completed_trials,winner_candidate_key,holdout_loss,failure_count,evidence_completeness_rate,outcome_sha256,exact_match_to_deterministic_baseline
+1,1100,deterministic_no_provider_baseline,0,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g02-c06,0.8966,0,1.0,0109e445352b20315f334a496b31d622cf778d0f612ae69aa588e9ad9cfaee57,True
+1,1100,provider_error_fallback,4,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g02-c06,0.8966,0,1.0,0109e445352b20315f334a496b31d622cf778d0f612ae69aa588e9ad9cfaee57,True
+1,1100,invalid_response_fallback,4,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g02-c06,0.8966,0,1.0,0109e445352b20315f334a496b31d622cf778d0f612ae69aa588e9ad9cfaee57,True
+2,2200,deterministic_no_provider_baseline,0,0,COMPLETED,max_iterations_reached,8,31,40,31,31,g02-c05,0.9656,0,1.0,ce44843fa58de5480a8badaca7afb0cc97682f07561c66aaa996d7d3e992d00e,True
+2,2200,provider_error_fallback,4,0,COMPLETED,max_iterations_reached,8,31,40,31,31,g02-c05,0.9656,0,1.0,ce44843fa58de5480a8badaca7afb0cc97682f07561c66aaa996d7d3e992d00e,True
+2,2200,invalid_response_fallback,4,0,COMPLETED,max_iterations_reached,8,31,40,31,31,g02-c05,0.9656,0,1.0,ce44843fa58de5480a8badaca7afb0cc97682f07561c66aaa996d7d3e992d00e,True
+3,3300,deterministic_no_provider_baseline,0,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g00-c00,1.0052,0,1.0,06b85da3c491a59eb336576649bfc9a71fc97d3c94387fc31e92418e10f30936,True
+3,3300,provider_error_fallback,4,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g00-c00,1.0052,0,1.0,06b85da3c491a59eb336576649bfc9a71fc97d3c94387fc31e92418e10f30936,True
+3,3300,invalid_response_fallback,4,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g00-c00,1.0052,0,1.0,06b85da3c491a59eb336576649bfc9a71fc97d3c94387fc31e92418e10f30936,True
+4,4400,deterministic_no_provider_baseline,0,0,COMPLETED,max_iterations_reached,8,31,40,31,31,g02-c05,0.9401,0,1.0,5165191f8fe261b9ca0ad1ea8f6cb637a9420efa020fac9bcf0927be00b06412,True
+4,4400,provider_error_fallback,4,0,COMPLETED,max_iterations_reached,8,31,40,31,31,g02-c05,0.9401,0,1.0,5165191f8fe261b9ca0ad1ea8f6cb637a9420efa020fac9bcf0927be00b06412,True
+4,4400,invalid_response_fallback,4,0,COMPLETED,max_iterations_reached,8,31,40,31,31,g02-c05,0.9401,0,1.0,5165191f8fe261b9ca0ad1ea8f6cb637a9420efa020fac9bcf0927be00b06412,True
+5,5500,deterministic_no_provider_baseline,0,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g00-c00,0.9683,0,1.0,0ed2f7b5c5d59da2c73bb5f39efd566d7fc1d89c652a79857e1f2efd4e106d0b,True
+5,5500,provider_error_fallback,4,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g00-c00,0.9683,0,1.0,0ed2f7b5c5d59da2c73bb5f39efd566d7fc1d89c652a79857e1f2efd4e106d0b,True
+5,5500,invalid_response_fallback,4,0,COMPLETED,max_iterations_reached,8,32,40,32,32,g00-c00,0.9683,0,1.0,0ed2f7b5c5d59da2c73bb5f39efd566d7fc1d89c652a79857e1f2efd4e106d0b,True

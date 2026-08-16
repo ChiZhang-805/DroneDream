@@ -23,6 +23,7 @@ Environment variables:
 from __future__ import annotations
 
 import ctypes
+import hashlib
 import json
 import logging
 import math
@@ -36,21 +37,24 @@ from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 from typing import Any
 
 from app.config import get_settings
 from app.parameters import get_parameter
 from app.simulator.artifact_schema import (
     infer_mime_type,
+    validate_log_capture_receipt_payload,
     validate_reference_track_payload,
     validate_telemetry_payload,
 )
 from app.simulator.base import (
     FAILURE_ADAPTER_UNAVAILABLE,
     FAILURE_CANCELLED,
-    FAILURE_SIMULATION,
-    FAILURE_TIMEOUT,
+    FAILURE_EXECUTION_TIMEOUT,
+    FAILURE_INVALID_RESULT,
+    FAILURE_SIM_ERROR,
+    FAILURE_UNVERIFIED_REPORT,
     ArtifactMetadata,
     SimulatorAdapter,
     TrialContext,
@@ -58,7 +62,31 @@ from app.simulator.base import (
     TrialMetricsPayload,
     TrialResult,
 )
+from app.simulator.bounded_log_capture import (
+    DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+    StreamingBoundedLogCapture,
+)
+from app.simulator.px4_actuator_link_evidence import (
+    DIAGNOSTIC_FAILURE_CODE as FAILURE_ACTUATOR_LINK_STALLED,
+)
+from app.simulator.px4_actuator_link_evidence import (
+    actuator_link_evidence_eligibility,
+    compile_actuator_link_health_evidence,
+    validate_actuator_link_health_evidence,
+)
+from app.simulator.px4_metric_evidence import (
+    compile_px4_core_metric_evidence,
+    compile_px4_evaluation_window_evidence,
+    compile_px4_outcome_evidence,
+    px4_evaluation_policy_from_environment,
+    require_px4_core_metric_binding,
+    require_px4_evaluation_window_binding,
+    require_px4_outcome_binding,
+)
 from app.simulator.scenario_effects import build_scenario_effect_request
+from app.simulator.telemetry_evidence import (
+    verify_telemetry_semantic_contract,
+)
 
 logger = logging.getLogger("drone_dream.simulator.real_cli")
 
@@ -66,6 +94,7 @@ _DEFAULT_TIMEOUT = 300
 _DEFAULT_ARTIFACT_ROOT = "./artifacts"
 _MAX_RESULT_BYTES = 10 * 1024 * 1024
 _MAX_KNOWN_JSON_ARTIFACT_BYTES = 16 * 1024 * 1024
+_MAX_PX4_ULOG_BYTES = 1024 * 1024 * 1024
 _MAX_RESULT_ARTIFACTS = 256
 _MAX_RAW_METRIC_DEPTH = 20
 _MAX_RAW_METRIC_NODES = 10_000
@@ -73,6 +102,15 @@ _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER = 10.0
 _MAX_EFFECTIVE_TIMEOUT_SECONDS = 86_400.0
 _PROCESS_POLL_SECONDS = 0.2
 _TERMINATE_GRACE_SECONDS = 2.0
+_LEGACY_RUNTIME_SOURCE_ROOT = "/opt/dronedream/source"
+_ACTIVE_ENGINE_PACK_ROOT = "/opt/dronedream/engine/current"
+_ENGINE_PACK_PATH_ENVIRONMENT_NAMES = frozenset(
+    {
+        "PX4_GAZEBO_LAUNCH_COMMAND",
+        "PX4_GAZEBO_WORKDIR",
+        "PX4_OFFBOARD_EXECUTOR_COMMAND",
+    }
+)
 
 _CHILD_ENV_EXACT_ALLOWLIST = frozenset(
     {
@@ -317,6 +355,34 @@ def _truncate(text: str, limit: int = 4000) -> str:
     return text[:limit] + f"\n... [truncated, original length {len(text)}]"
 
 
+def _diagnostic_failure_code(value: object) -> str:
+    """Return a bounded, display-only producer claim.
+
+    External result producers are not part of the optimizer's outcome-taxonomy
+    trust boundary. Their code is retained only as a printable diagnostic and
+    must never become the canonical persisted ``Trial.failure_code``.
+    """
+
+    if not isinstance(value, str):
+        return "UNSPECIFIED"
+    normalized = "".join(
+        char if char.isascii() and (char.isalnum() or char in {"-", "_", "."}) else "_"
+        for char in value.strip()
+    )
+    normalized = normalized.strip("_")[:64]
+    return normalized or "UNSPECIFIED"
+
+
+def _diagnostic_failure_reason(value: object) -> str:
+    """Return a bounded, single-line producer failure explanation."""
+
+    if not isinstance(value, str):
+        return "Simulator reported failure without a reason."
+    normalized = "".join(char if char.isprintable() else " " for char in value)
+    normalized = " ".join(normalized.split())
+    return normalized[:1000] or "Simulator reported failure without a reason."
+
+
 def _split_command(command: str) -> list[str]:
     tokens = shlex.split(command, posix=os.name != "nt")
     if os.name != "nt":
@@ -336,7 +402,9 @@ def _build_command(command_template: str, input_path: Path, output_path: Path) -
     has_input = any("{input}" in token for token in tokens)
     has_output = any("{output}" in token for token in tokens)
     rendered = [
-        token.replace("{input}", str(input_path)).replace("{output}", str(output_path))
+        _active_engine_pack_path(
+            token.replace("{input}", str(input_path)).replace("{output}", str(output_path))
+        )
         for token in tokens
     ]
     if not has_input:
@@ -344,6 +412,28 @@ def _build_command(command_template: str, input_path: Path, output_path: Path) -
     if not has_output:
         rendered.extend(["--output", str(output_path)])
     return rendered
+
+
+def _active_engine_pack_path(value: str) -> str:
+    """Retarget legacy mutable-code paths to the activated Engine Pack.
+
+    Runtime Base beta.2 installations created before Engine Pack support keep
+    their original ``runtime.env`` file across upgrades. Those files point the
+    simulator command chain at ``/opt/dronedream/source`` even though the API
+    and worker correctly run from ``/opt/dronedream/engine/current``. Leaving
+    that split in place makes new backend schemas reach an old simulator (for
+    example, ``hover`` is accepted by the API but rejected by the runner).
+
+    Only known pack-owned command/work-directory values use this helper. PX4,
+    Gazebo, user data and the immutable Runtime Base remain untouched.
+    """
+
+    if value == _LEGACY_RUNTIME_SOURCE_ROOT:
+        return _ACTIVE_ENGINE_PACK_ROOT
+    return value.replace(
+        f"{_LEGACY_RUNTIME_SOURCE_ROOT}/",
+        f"{_ACTIVE_ENGINE_PACK_ROOT}/",
+    )
 
 
 def _effective_timeout_seconds(baseline_seconds: float, simulation_speed_factor: object) -> float:
@@ -405,7 +495,11 @@ def _build_simulator_environment(source: Mapping[str, str]) -> dict[str, str]:
             or normalized.startswith(_CHILD_ENV_PREFIX_ALLOWLIST)
             or normalized.startswith("DRONEDREAM_RUNTIME_")
         ):
-            child[name] = value
+            child[name] = (
+                _active_engine_pack_path(value)
+                if normalized in _ENGINE_PACK_PATH_ENVIRONMENT_NAMES
+                else value
+            )
     return child
 
 
@@ -430,7 +524,23 @@ def _run_directory(artifact_root: Path, ctx: TrialContext) -> Path:
     trial_id = _safe_path_segment(ctx.trial_id, field_name="trial_id")
     if isinstance(ctx.attempt_count, bool) or ctx.attempt_count < 1:
         raise ValueError("attempt_count must be a positive integer")
-    base = (root / "jobs" / job_id / "trials" / trial_id).resolve()
+    jobs_root = root / "jobs"
+    # A Runtime Base can intentionally expose one operator-managed artifact
+    # volume for both transient simulator runs and durable Trial evidence.
+    # Durable evidence is persisted below ``<ARTIFACT_ROOT>/jobs/<job>`` before
+    # ``finalize_trial`` removes the successful run directory.  Keep the
+    # transient hierarchy disjoint when both configured roots resolve to the
+    # same directory so cleanup can never delete the byte-sealed evidence it
+    # has just produced.
+    configured_durable_root = os.environ.get("ARTIFACT_ROOT", "").strip()
+    durable_root = (
+        Path(configured_durable_root).expanduser().resolve()
+        if configured_durable_root
+        else get_settings().default_artifact_root_path.resolve()
+    )
+    if root == durable_root:
+        jobs_root = jobs_root / "_simulator_runs"
+    base = (jobs_root / job_id / "trials" / trial_id).resolve()
     if not base.is_relative_to(root):  # pragma: no cover - guarded by safe segments.
         raise ValueError("trial run directory escaped REAL_SIMULATOR_ARTIFACT_ROOT")
     if ctx.attempt_count == 1:
@@ -468,6 +578,29 @@ def _read_log_tail(path: Path, *, limit: int = 2000) -> str:
     return f"... [tail of {size} bytes]\n{text[-limit:]}"
 
 
+def _terminate_posix_process_group(process_group_id: int) -> None:
+    """Reap every process in a POSIX simulator session, including orphans."""
+
+    kill_process_group = getattr(os, "killpg", None)
+    if kill_process_group is None or process_group_id <= 0:
+        return
+    try:
+        kill_process_group(process_group_id, signal.SIGTERM)
+    except OSError:
+        return
+
+    deadline = time.monotonic() + _TERMINATE_GRACE_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            kill_process_group(process_group_id, 0)
+        except OSError:
+            return
+        time.sleep(_PROCESS_POLL_SECONDS)
+
+    with suppress(OSError):
+        kill_process_group(process_group_id, getattr(signal, "SIGKILL", 9))
+
+
 def _terminate_process_tree(proc: subprocess.Popen[bytes]) -> None:
     """Terminate the simulator and descendants after timeout/cancellation."""
 
@@ -487,16 +620,7 @@ def _terminate_process_tree(proc: subprocess.Popen[bytes]) -> None:
                 timeout=10,
             )
     else:
-        kill_process_group = getattr(os, "killpg", None)
-        with suppress(OSError):
-            if kill_process_group is not None:
-                kill_process_group(proc.pid, signal.SIGTERM)
-        try:
-            proc.wait(timeout=_TERMINATE_GRACE_SECONDS)
-        except subprocess.TimeoutExpired:
-            with suppress(OSError):
-                if kill_process_group is not None:
-                    kill_process_group(proc.pid, getattr(signal, "SIGKILL", 9))
+        _terminate_posix_process_group(proc.pid)
     if proc.poll() is None:
         with suppress(OSError):
             proc.kill()
@@ -514,53 +638,104 @@ def _execute_command(
     stdout_path: Path,
     stderr_path: Path,
 ) -> _ProcessOutcome:
+    if cancellation_event is not None and cancellation_event.is_set():
+        raise _SimulatorCancelled
     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
     windows_job = _WindowsKillOnCloseJob.create()
+    proc: subprocess.Popen[bytes] | None = None
+    stdout_capture = StreamingBoundedLogCapture(
+        stdout_path,
+        cap_bytes=DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+        stream_name="real_cli_adapter_stdout",
+    )
     try:
-        with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
-            proc = subprocess.Popen(  # noqa: S603 - trusted operator command, no shell.
-                argv,
-                cwd=cwd,
-                env=env,
-                stdin=subprocess.DEVNULL,
-                stdout=stdout_file,
-                stderr=stderr_file,
-                start_new_session=os.name != "nt",
-                creationflags=creationflags,
-            )
-            if windows_job is not None and not windows_job.assign(proc):
-                windows_job.close()
-                windows_job = None
-            deadline = time.monotonic() + timeout_seconds
-            while True:
-                if cancellation_event is not None and cancellation_event.is_set():
-                    # Close the kernel-tracked job before invoking taskkill.
-                    # Besides eliminating the process-tree snapshot race, this
-                    # ensures a slow taskkill invocation cannot give a child
-                    # time to perform work after cancellation was observed.
-                    if windows_job is not None:
-                        windows_job.close()
-                        windows_job = None
-                    _terminate_process_tree(proc)
-                    raise _SimulatorCancelled
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    if windows_job is not None:
-                        windows_job.close()
-                        windows_job = None
-                    _terminate_process_tree(proc)
-                    raise subprocess.TimeoutExpired(argv, timeout_seconds)
-                try:
-                    returncode = proc.wait(timeout=min(_PROCESS_POLL_SECONDS, remaining))
-                    break
-                except subprocess.TimeoutExpired:
-                    continue
+        stderr_capture = StreamingBoundedLogCapture(
+            stderr_path,
+            cap_bytes=DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+            stream_name="real_cli_adapter_stderr",
+        )
+    except Exception:
+        stdout_capture.close(write_receipt=False)
+        raise
+    threads: tuple[Thread, Thread] | None = None
+    try:
+        proc = subprocess.Popen(  # noqa: S603 - trusted operator command, no shell.
+            argv,
+            cwd=cwd,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=os.name != "nt",
+            creationflags=creationflags,
+        )
+        if proc.stdout is None or proc.stderr is None:  # pragma: no cover - PIPE contract.
+            raise OSError("simulator process pipes were not created")
+        threads = (
+            Thread(
+                target=stdout_capture.copy_from,
+                args=(proc.stdout,),
+                name="real-cli-stdout-capture",
+                daemon=True,
+            ),
+            Thread(
+                target=stderr_capture.copy_from,
+                args=(proc.stderr,),
+                name="real-cli-stderr-capture",
+                daemon=True,
+            ),
+        )
+        for thread in threads:
+            thread.start()
+        if windows_job is not None and not windows_job.assign(proc):
+            windows_job.close()
+            windows_job = None
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            if cancellation_event is not None and cancellation_event.is_set():
+                # Close the kernel-tracked job before invoking taskkill.
+                # Besides eliminating the process-tree snapshot race, this
+                # ensures a slow taskkill invocation cannot give a child
+                # time to perform work after cancellation was observed.
+                if windows_job is not None:
+                    windows_job.close()
+                    windows_job = None
+                _terminate_process_tree(proc)
+                raise _SimulatorCancelled
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                if windows_job is not None:
+                    windows_job.close()
+                    windows_job = None
+                _terminate_process_tree(proc)
+                raise subprocess.TimeoutExpired(argv, timeout_seconds)
+            try:
+                returncode = proc.wait(timeout=min(_PROCESS_POLL_SECONDS, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                continue
     finally:
         # Closing a configured Job Object is also important after a nominal
         # parent exit: a buggy CLI must not detach a long-lived descendant from
         # the worker simply by returning before its own children.
         if windows_job is not None:
             windows_job.close()
+        elif os.name != "nt" and proc is not None:
+            _terminate_posix_process_group(proc.pid)
+        if threads is not None:
+            for thread, capture, pipe in (
+                (threads[0], stdout_capture, proc.stdout if proc is not None else None),
+                (threads[1], stderr_capture, proc.stderr if proc is not None else None),
+            ):
+                thread.join(timeout=5.0)
+                if thread.is_alive():
+                    capture.mark_observation_incomplete("capture_thread_did_not_finish")
+                    if pipe is not None:
+                        with suppress(OSError):
+                            pipe.close()
+                    thread.join(timeout=1.0)
+        stdout_capture.close()
+        stderr_capture.close()
     return _ProcessOutcome(
         returncode=returncode,
         stdout=_read_log_tail(stdout_path),
@@ -845,7 +1020,11 @@ def _normalize_artifact_path(storage_path: str, run_dir: Path) -> Path:
 
 
 def _validate_known_artifact_payload(artifact: ArtifactMetadata) -> None:
-    if artifact.artifact_type not in {"telemetry_json", "reference_track_json"}:
+    if artifact.artifact_type not in {
+        "telemetry_json",
+        "reference_track_json",
+        "log_capture_receipt_json",
+    }:
         return
     if artifact.mime_type != "application/json":
         raise ValueError(f"{artifact.artifact_type} must declare mime_type=application/json")
@@ -866,11 +1045,12 @@ def _validate_known_artifact_payload(artifact: ArtifactMetadata) -> None:
             f"the {_MAX_KNOWN_JSON_ARTIFACT_BYTES} byte validation limit"
         )
     payload = json.loads(encoded.decode("utf-8"))
-    errors = (
-        validate_telemetry_payload(payload)
-        if artifact.artifact_type == "telemetry_json"
-        else validate_reference_track_payload(payload)
-    )
+    if artifact.artifact_type == "telemetry_json":
+        errors = validate_telemetry_payload(payload)
+    elif artifact.artifact_type == "reference_track_json":
+        errors = validate_reference_track_payload(payload)
+    else:
+        errors = validate_log_capture_receipt_payload(payload)
     if errors:
         raise ValueError("; ".join(errors))
 
@@ -879,8 +1059,17 @@ def _sanitize_artifacts_for_trial(
     artifacts: list[ArtifactMetadata], *, run_dir: Path, trial_id: str
 ) -> list[ArtifactMetadata]:
     sanitized: list[ArtifactMetadata] = []
+    resolved_run_dir = run_dir.resolve()
     for artifact in artifacts:
         normalized_path = _normalize_artifact_path(artifact.storage_path, run_dir)
+        if not normalized_path.is_relative_to(resolved_run_dir):
+            logger.warning(
+                "real_cli trial=%s dropped artifact outside its run directory type=%s path=%s",
+                trial_id,
+                artifact.artifact_type,
+                artifact.storage_path,
+            )
+            continue
         if not _is_under_allowed_root(normalized_path):
             logger.warning(
                 "real_cli trial=%s dropped artifact outside allowed roots type=%s path=%s",
@@ -913,6 +1102,316 @@ def _sanitize_artifacts_for_trial(
             continue
         sanitized.append(artifact)
     return sanitized
+
+
+def _load_bounded_json_artifact(
+    artifact: ArtifactMetadata,
+) -> object:
+    path = Path(artifact.storage_path)
+    with path.open("rb") as stream:
+        encoded = stream.read(_MAX_KNOWN_JSON_ARTIFACT_BYTES + 1)
+    if len(encoded) > _MAX_KNOWN_JSON_ARTIFACT_BYTES:
+        raise ValueError(f"{artifact.artifact_type} exceeds the JSON evidence limit")
+    try:
+        return json.loads(
+            encoded.decode("utf-8"),
+            parse_constant=_reject_nonfinite_json_constant,
+        )
+    except RecursionError as exc:
+        raise ValueError(f"{artifact.artifact_type} exceeds the JSON nesting limit") from exc
+
+
+def _hash_bounded_artifact(
+    artifact: ArtifactMetadata,
+    *,
+    max_bytes: int,
+) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    byte_count = 0
+    path = Path(artifact.storage_path)
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            byte_count += len(chunk)
+            if byte_count > max_bytes:
+                raise ValueError(f"{artifact.artifact_type} exceeds the retained-byte limit")
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest(), byte_count
+
+
+def _has_verified_actuator_link_stall(
+    *,
+    claimed_code: str,
+    artifacts: list[ArtifactMetadata],
+    ctx: TrialContext,
+) -> bool:
+    """Admit one narrow infrastructure failure from sealed PX4 evidence."""
+
+    if claimed_code != FAILURE_ACTUATOR_LINK_STALLED:
+        return False
+    health = [
+        artifact for artifact in artifacts if artifact.artifact_type == "actuator_link_health_json"
+    ]
+    ulogs = [artifact for artifact in artifacts if artifact.artifact_type == "px4_ulog"]
+    transient_health = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "sim_transient_health_json"
+    ]
+    transient_ulogs = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "sim_transient_px4_ulog"
+    ]
+    retry_receipts = [
+        artifact for artifact in artifacts if artifact.artifact_type == "sim_transient_retry_json"
+    ]
+    if (
+        len(health) != 1
+        or len(ulogs) != 1
+        or len(transient_health) != 1
+        or len(transient_ulogs) != 1
+        or len(retry_receipts) != 1
+    ):
+        return False
+    try:
+        retry = _load_bounded_json_artifact(retry_receipts[0])
+        if not isinstance(retry, dict):
+            return False
+        expected_identity = {
+            "trial_id": ctx.trial_id,
+            "job_id": ctx.job_id,
+            "candidate_id": ctx.candidate_id,
+            "seed": ctx.seed,
+            "attempt_count": ctx.attempt_count,
+        }
+        if (
+            retry.get("schema_id") != "dronedream.simulator-transient-retry/v1"
+            or retry.get("execution_identity") != expected_identity
+            or retry.get("diagnostic_failure_code") != FAILURE_ACTUATOR_LINK_STALLED
+            or retry.get("maximum_launcher_attempts") != 2
+            or retry.get("retry_index") != 1
+        ):
+            return False
+        current_ulog_sha, _ = _hash_bounded_artifact(
+            ulogs[0],
+            max_bytes=_MAX_PX4_ULOG_BYTES,
+        )
+        first_ulog_sha, first_ulog_bytes = _hash_bounded_artifact(
+            transient_ulogs[0],
+            max_bytes=_MAX_PX4_ULOG_BYTES,
+        )
+        first_health_sha, first_health_bytes = _hash_bounded_artifact(
+            transient_health[0],
+            max_bytes=_MAX_KNOWN_JSON_ARTIFACT_BYTES,
+        )
+        current_ulog_sha = current_ulog_sha.removeprefix("sha256:")
+        first_ulog_sha = first_ulog_sha.removeprefix("sha256:")
+        first_health_sha = first_health_sha.removeprefix("sha256:")
+        preserved_files = retry.get("preserved_files")
+        if not isinstance(preserved_files, list):
+            return False
+        required_preserved = {
+            "actuator_link_transient_attempt_1.ulg": (
+                transient_ulogs[0],
+                first_ulog_sha,
+                first_ulog_bytes,
+            ),
+            "actuator_link_transient_attempt_1.health.json": (
+                transient_health[0],
+                first_health_sha,
+                first_health_bytes,
+            ),
+        }
+        for expected_path, (artifact, expected_sha, expected_bytes) in required_preserved.items():
+            matches = [
+                item
+                for item in preserved_files
+                if isinstance(item, dict) and item.get("path") == expected_path
+            ]
+            if (
+                len(matches) != 1
+                or Path(artifact.storage_path).name != expected_path
+                or matches[0].get("sha256") != expected_sha
+                or matches[0].get("bytes") != expected_bytes
+            ):
+                return False
+        if retry.get("first_attempt_health_ulog_sha256") != first_ulog_sha:
+            return False
+        trusted_input = _trial_input_payload(ctx, Path("unused-trial-result.json"))
+        vehicle_profile = trusted_input.get("vehicle_profile")
+        vehicle = (
+            vehicle_profile.get("simulator_model")
+            if isinstance(vehicle_profile, dict)
+            else None
+        ) or os.environ.get("PX4_VEHICLE", "x500")
+        eligibility = actuator_link_evidence_eligibility(
+            vehicle=vehicle,
+            selected_parameters=trusted_input.get("px4_parameters", {}),
+            scenario_effect_request=trusted_input.get("scenario_effect_request"),
+        )
+        first_health_payload = _load_bounded_json_artifact(transient_health[0])
+        current_health_payload = _load_bounded_json_artifact(health[0])
+        validate_actuator_link_health_evidence(
+            first_health_payload,
+            expected_identity=expected_identity,
+            expected_ulog_sha256=first_ulog_sha,
+        )
+        validate_actuator_link_health_evidence(
+            current_health_payload,
+            expected_identity=expected_identity,
+            expected_ulog_sha256=current_ulog_sha,
+        )
+        if first_health_payload != compile_actuator_link_health_evidence(
+            ulog_path=Path(transient_ulogs[0].storage_path),
+            execution_identity=expected_identity,
+            eligibility=eligibility,
+        ):
+            return False
+        if current_health_payload != compile_actuator_link_health_evidence(
+            ulog_path=Path(ulogs[0].storage_path),
+            execution_identity=expected_identity,
+            eligibility=eligibility,
+        ):
+            return False
+    except (OSError, TypeError, ValueError):
+        return False
+    return True
+
+
+def _require_px4_metric_evidence(
+    raw: Mapping[str, Any],
+    *,
+    metrics: TrialMetricsPayload,
+    artifacts: list[ArtifactMetadata],
+    expected_scenario_effect_request: object,
+) -> None:
+    if raw.get("backend") != "px4_gazebo":
+        return
+    if raw.get("schema_version") != "dronedream.trial_result.v2":
+        raise ValueError("PX4/Gazebo metric evidence requires trial_result.v2")
+    telemetry_artifacts = [
+        artifact for artifact in artifacts if artifact.artifact_type == "telemetry_json"
+    ]
+    reference_artifacts = [
+        artifact for artifact in artifacts if artifact.artifact_type == "reference_track_json"
+    ]
+    if len(telemetry_artifacts) != 1 or len(reference_artifacts) != 1:
+        raise ValueError(
+            "PX4/Gazebo success requires exactly one telemetry and reference-track artifact"
+        )
+    telemetry = _load_bounded_json_artifact(telemetry_artifacts[0])
+    reference_track = _load_bounded_json_artifact(reference_artifacts[0])
+    timing_artifacts = [
+        artifact for artifact in artifacts if artifact.artifact_type == "offboard_timing_json"
+    ]
+    if len(timing_artifacts) > 1:
+        raise ValueError("PX4/Gazebo success cannot contain duplicate offboard timing artifacts")
+    offboard_timing: object | None = None
+    if timing_artifacts:
+        try:
+            loaded_timing = _load_bounded_json_artifact(timing_artifacts[0])
+        except (
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+            ValueError,
+        ):
+            loaded_timing = None
+        if isinstance(loaded_timing, dict):
+            offboard_timing = loaded_timing
+    effect_request_artifacts = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "scenario_effect_request_json"
+    ]
+    if len(effect_request_artifacts) != 1:
+        raise ValueError("PX4/Gazebo success requires exactly one scenario-effect request artifact")
+    scenario_effect_request = _load_bounded_json_artifact(effect_request_artifacts[0])
+    if scenario_effect_request != expected_scenario_effect_request:
+        raise ValueError(
+            "PX4/Gazebo scenario-effect request does not match the trusted Trial input"
+        )
+    effect_evidence_artifacts = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "scenario_effect_evidence_json"
+    ]
+    if len(effect_evidence_artifacts) > 1:
+        raise ValueError(
+            "PX4/Gazebo success cannot contain duplicate scenario-effect evidence artifacts"
+        )
+    scenario_effect_evidence: object | None = None
+    if effect_evidence_artifacts:
+        scenario_effect_evidence = _load_bounded_json_artifact(effect_evidence_artifacts[0])
+    contract = verify_telemetry_semantic_contract(telemetry)
+    if contract is None:
+        raise ValueError("PX4/Gazebo telemetry semantic contract is invalid")
+    ulog_artifacts = [artifact for artifact in artifacts if artifact.artifact_type == "px4_ulog"]
+    if contract.source_kind == "px4_ulog":
+        if len(ulog_artifacts) != 1:
+            raise ValueError("PX4 ULog telemetry requires exactly one retained origin artifact")
+        ulog_artifact = ulog_artifacts[0]
+        if ulog_artifact.mime_type != "application/octet-stream":
+            raise ValueError("retained PX4 ULog must declare application/octet-stream")
+        ulog_sha256, ulog_byte_count = _hash_bounded_artifact(
+            ulog_artifact,
+            max_bytes=_MAX_PX4_ULOG_BYTES,
+        )
+        if (
+            ulog_sha256 != contract.origin_source_sha256
+            or ulog_byte_count != contract.origin_source_byte_count
+        ):
+            raise ValueError("retained PX4 ULog bytes do not match telemetry origin provenance")
+    elif ulog_artifacts:
+        raise ValueError("non-ULog telemetry cannot attach a retained PX4 ULog artifact")
+    raw_metric = metrics.raw_metric_json
+    if (
+        raw_metric.get("rmse_integration") != "time_weighted_trapezoidal"
+        or raw_metric.get("telemetry_semantic_contract_id") != contract.contract_id
+        or raw_metric.get("telemetry_verifier_revision") != contract.verifier_revision
+        or raw_metric.get("telemetry_source_sha256") != contract.source_sha256
+        or raw_metric.get("telemetry_coordinate_frame") != contract.coordinate_frame
+        or raw_metric.get("telemetry_position_unit") != contract.position_unit
+        or raw_metric.get("telemetry_time_unit") != contract.time_unit
+        or raw_metric.get("telemetry_sampling") != contract.sampling.model_dump(mode="json")
+    ):
+        raise ValueError("PX4/Gazebo metrics do not bind the verified telemetry contract")
+    evaluation_policy = px4_evaluation_policy_from_environment(os.environ)
+    evaluation_window_evidence = compile_px4_evaluation_window_evidence(
+        telemetry_payload=telemetry,
+        reference_track_payload=reference_track,
+        offboard_timing_payload=offboard_timing,
+        policy=evaluation_policy,
+    )
+    require_px4_evaluation_window_binding(
+        raw_metric,
+        policy=evaluation_policy,
+        evidence=evaluation_window_evidence,
+    )
+    core_metric_evidence = compile_px4_core_metric_evidence(
+        telemetry_payload=telemetry,
+        reference_track_payload=reference_track,
+        evaluation_start_index=(evaluation_window_evidence.start_index),
+        evaluation_end_index=(evaluation_window_evidence.end_index),
+    )
+    require_px4_core_metric_binding(
+        metrics.as_dict(),
+        core_metric_evidence,
+    )
+    outcome_policy, outcome_evidence = compile_px4_outcome_evidence(
+        telemetry_payload=telemetry,
+        reference_track_payload=reference_track,
+        evaluation_policy=evaluation_policy,
+        evaluation_window_evidence=(evaluation_window_evidence),
+        core_metric_evidence=core_metric_evidence,
+        scenario_effect_request_payload=(scenario_effect_request),
+        scenario_effect_evidence_payload=(scenario_effect_evidence),
+    )
+    require_px4_outcome_binding(
+        metrics.as_dict(),
+        policy=outcome_policy,
+        evidence=outcome_evidence,
+    )
 
 
 def _reject_nonfinite_json_constant(value: str) -> None:
@@ -1155,7 +1654,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_TIMEOUT,
+                    code=FAILURE_EXECUTION_TIMEOUT,
                     reason=(
                         f"Real simulator exceeded timeout of {timeout:g}s for trial {ctx.trial_id}."
                     ),
@@ -1183,7 +1682,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=(
                         "Simulator exited without producing trial_result.json "
                         f"(exit={proc.returncode})."
@@ -1199,7 +1698,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=f"trial_result.json was malformed: {exc}",
                 ),
                 log_excerpt=combined_log,
@@ -1210,7 +1709,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason="trial_result.json must be a JSON object.",
                 ),
                 log_excerpt=combined_log,
@@ -1223,7 +1722,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=f"Simulator result identity was invalid: {exc}",
                 ),
                 log_excerpt=combined_log,
@@ -1240,7 +1739,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason="trial_result.json field 'success' must be a boolean.",
                 ),
                 log_excerpt=combined_log,
@@ -1250,25 +1749,15 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
             failure_raw = raw.get("failure") if isinstance(raw.get("failure"), dict) else {}
             if not isinstance(failure_raw, dict):
                 failure_raw = {}
-            code_value = failure_raw.get("code")
-            code: str = (
-                code_value.strip()[:64]
-                if isinstance(code_value, str)
-                and code_value.strip()
-                and not any(ord(char) < 32 for char in code_value)
-                else FAILURE_SIMULATION
+            claimed_code = _diagnostic_failure_code(failure_raw.get("code"))
+            claimed_reason = _diagnostic_failure_reason(failure_raw.get("reason"))
+            reason = _truncate(
+                (
+                    "External simulator reported an unverified failure "
+                    f"(claimed_code={claimed_code}): {claimed_reason}"
+                ),
+                1200,
             )
-            reason_value = failure_raw.get("reason")
-            reason: str = (
-                _truncate(
-                    reason_value.replace("\x00", " ").replace("\r", " ").strip(),
-                    1000,
-                )
-                if isinstance(reason_value, str) and reason_value.strip()
-                else "Simulator reported failure without a reason."
-            )
-            if not reason:
-                reason = "Simulator reported failure without a reason."
             try:
                 failure_artifacts = _sanitize_artifacts_for_trial(
                     _parse_artifacts(raw),
@@ -1277,10 +1766,29 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 )
             except ValueError:
                 failure_artifacts = []
+            if _has_verified_actuator_link_stall(
+                claimed_code=claimed_code,
+                artifacts=failure_artifacts,
+                ctx=ctx,
+            ):
+                return TrialResult(
+                    success=False,
+                    backend=self.backend_name,
+                    failure=TrialFailure(
+                        code=FAILURE_SIM_ERROR,
+                        reason=(
+                            "PX4-to-Gazebo actuator-link stall remained after the one "
+                            "allowed fresh launcher retry; ULog proves sustained actuation "
+                            "with a stationary Gazebo ground-truth vehicle."
+                        ),
+                    ),
+                    artifacts=failure_artifacts,
+                    log_excerpt=log_text,
+                )
             return TrialResult(
                 success=False,
                 backend=self.backend_name,
-                failure=TrialFailure(code=code, reason=reason),
+                failure=TrialFailure(code=FAILURE_UNVERIFIED_REPORT, reason=reason),
                 artifacts=failure_artifacts,
                 log_excerpt=log_text,
             )
@@ -1290,7 +1798,7 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=(
                         "Simulator reported success but its process exited non-zero "
                         f"(exit={proc.returncode}); result was rejected."
@@ -1306,12 +1814,18 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 run_dir=run_dir,
                 trial_id=ctx.trial_id,
             )
-        except (ValueError, TypeError) as exc:
+            _require_px4_metric_evidence(
+                raw,
+                metrics=metrics,
+                artifacts=artifacts,
+                expected_scenario_effect_request=payload.get("scenario_effect_request"),
+            )
+        except (OSError, ValueError, TypeError) as exc:
             return TrialResult(
                 success=False,
                 backend=self.backend_name,
                 failure=TrialFailure(
-                    code=FAILURE_SIMULATION,
+                    code=FAILURE_INVALID_RESULT,
                     reason=f"Malformed simulator output: {exc}",
                 ),
                 log_excerpt=combined_log,

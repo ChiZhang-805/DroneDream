@@ -7,8 +7,6 @@ adapter rather than hardcoding simulator logic.
 
 from __future__ import annotations
 
-import importlib
-import sys
 from collections.abc import Iterator
 from types import SimpleNamespace
 
@@ -105,9 +103,13 @@ def _metrics(**overrides: object) -> TrialMetricsPayload:
         ({"max_error": float("inf")}, ValueError),
         ({"completion_time": -0.1}, ValueError),
         ({"final_error": -0.1}, ValueError),
+        ({"score": -0.1}, ValueError),
         ({"overshoot_count": True}, ValueError),
         ({"score": True}, TypeError),
         ({"crash_flag": 1}, TypeError),
+        ({"crash_flag": True}, ValueError),
+        ({"timeout_flag": True}, ValueError),
+        ({"instability_flag": True}, ValueError),
         ({"raw_metric_json": {"nested": float("inf")}}, ValueError),
     ],
 )
@@ -159,14 +161,47 @@ def test_mock_adapter_catalog_parameters_have_explicit_synthetic_effect():
 
     assert low.metrics is not None and high.metrics is not None
     assert low.metrics.rmse != high.metrics.rmse
-    assert low.metrics.raw_metric_json["mock_landscape_schema"] == (
-        "dronedream.mock.synthetic.v1"
-    )
+    assert low.metrics.raw_metric_json["mock_landscape_schema"] == ("dronedream.mock.synthetic.v2")
     assert low.metrics.raw_metric_json["physical_fidelity"] is False
     assert low.metrics.raw_metric_json["catalog_parameter_count"] == 1
     # The score contract is consistent across adapters: lower error => lower score.
     better, worse = sorted((low.metrics, high.metrics), key=lambda metric: metric.rmse)
     assert better.score < worse.score
+
+
+def test_mock_scenario_changes_controller_response_not_only_constant_difficulty() -> None:
+    adapter = MockSimulatorAdapter()
+    weak = {
+        "kp_xy": 1.2,
+        "kd_xy": 0.3,
+        "ki_xy": 0.05,
+        "vel_limit": 6.0,
+        "accel_limit": 4.5,
+        "disturbance_rejection": 0.0,
+    }
+    robust = {**weak, "disturbance_rejection": 1.0}
+
+    nominal_weak = adapter.run_trial(_make_ctx(scenario="nominal", seed=101, parameters=weak))
+    nominal_robust = adapter.run_trial(_make_ctx(scenario="nominal", seed=101, parameters=robust))
+    wind_weak = adapter.run_trial(_make_ctx(scenario="wind_perturbed", seed=101, parameters=weak))
+    wind_robust = adapter.run_trial(
+        _make_ctx(scenario="wind_perturbed", seed=101, parameters=robust)
+    )
+    assert all(
+        result.metrics is not None
+        for result in (nominal_weak, nominal_robust, wind_weak, wind_robust)
+    )
+    assert nominal_weak.metrics is not None
+    assert nominal_robust.metrics is not None
+    assert wind_weak.metrics is not None
+    assert wind_robust.metrics is not None
+    nominal_gain = nominal_weak.metrics.rmse - nominal_robust.metrics.rmse
+    wind_gain = wind_weak.metrics.rmse - wind_robust.metrics.rmse
+
+    assert nominal_gain > 0.0
+    assert wind_gain > nominal_gain
+    assert wind_weak.metrics.raw_metric_json["scenario_control_penalty"] > 0.0
+    assert wind_robust.metrics.raw_metric_json["scenario_control_penalty"] == 0.0
 
 
 @pytest.mark.parametrize(
@@ -177,6 +212,7 @@ def test_mock_adapter_catalog_parameters_have_explicit_synthetic_effect():
         "payload_changed",
         "battery_degraded",
         "actuator_delay",
+        "actuator_failure",
         "custom",
     ],
 )
@@ -416,33 +452,13 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
-    models_was_loaded = "app.models" in sys.modules
-
     import app.db as db_module
-
-    importlib.reload(db_module)
-
-    if models_was_loaded:
-        models_module = importlib.reload(sys.modules["app.models"])
-    else:
-        models_module = importlib.import_module("app.models")
-
+    import app.models as models_module
+    import app.orchestration.job_manager as job_manager_module
+    import app.orchestration.trial_executor as trial_executor_module
     import app.services.jobs as jobs_service_module
 
-    importlib.reload(jobs_service_module)
-
-    import app.orchestration.aggregation as aggregation_module
-    import app.orchestration.events as events_module
-    import app.orchestration.job_manager as job_manager_module
-    import app.orchestration.runner as runner_module
-    import app.orchestration.trial_executor as trial_executor_module
-
-    importlib.reload(events_module)
-    importlib.reload(job_manager_module)
-    importlib.reload(trial_executor_module)
-    importlib.reload(aggregation_module)
-    importlib.reload(runner_module)
-
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
 
     yield {
@@ -485,7 +501,15 @@ class _RecordingAdapter(SimulatorAdapter):
     def run_trial(self, ctx: TrialContext) -> TrialResult:
         self.calls.append("run_trial")
         self.contexts.append(ctx)
-        return self.delegate.run_trial(ctx)
+        result = self.delegate.run_trial(ctx)
+        return TrialResult(
+            success=result.success,
+            backend=self.backend_name,
+            metrics=result.metrics,
+            artifacts=result.artifacts,
+            failure=result.failure,
+            log_excerpt=result.log_excerpt,
+        )
 
     def cleanup(self, ctx: TrialContext) -> None:
         self.calls.append("cleanup")
@@ -612,12 +636,7 @@ def test_resolve_backend_override_env_wins(monkeypatch):
 
     from app.orchestration.trial_executor import _resolve_backend_override
 
-    assert (
-        _resolve_backend_override(
-            env_backend="mock", job_backend_requested="real_cli"
-        )
-        == "mock"
-    )
+    assert _resolve_backend_override(env_backend="mock", job_backend_requested="real_cli") == "mock"
 
 
 def test_resolve_backend_override_falls_back_to_job_column():
@@ -626,10 +645,7 @@ def test_resolve_backend_override_falls_back_to_job_column():
     from app.orchestration.trial_executor import _resolve_backend_override
 
     assert (
-        _resolve_backend_override(
-            env_backend=None, job_backend_requested="real_cli"
-        )
-        == "real_cli"
+        _resolve_backend_override(env_backend=None, job_backend_requested="real_cli") == "real_cli"
     )
 
 
@@ -638,10 +654,7 @@ def test_resolve_backend_override_returns_none_when_neither_set():
 
     from app.orchestration.trial_executor import _resolve_backend_override
 
-    assert (
-        _resolve_backend_override(env_backend=None, job_backend_requested=None)
-        is None
-    )
+    assert _resolve_backend_override(env_backend=None, job_backend_requested=None) is None
 
 
 def test_env_simulator_backend_treats_blank_as_unset(monkeypatch):

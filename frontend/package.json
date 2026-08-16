@@ -31,6 +31,7 @@
     "test:autonomy-mission-entry": "node scripts/verify-autonomy-mission-entry.mjs",
     "test:school-map-and-drone": "node scripts/verify-school-map-and-drone.mjs",
     "test:fixed-scenarios-layout": "node scripts/verify-fixed-scenarios-layout.mjs",
+    "test:four-edition-desktop-parity": "node scripts/verify-four-edition-desktop-parity.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

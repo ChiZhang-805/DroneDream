@@ -48,7 +48,7 @@ def test_worker_presence_rejects_invalid_or_future_timestamps(
     )
     client = SimpleNamespace(
         ping=lambda: True,
-        get=lambda _key: json.dumps(
+        getrange=lambda _key, _start, _end: json.dumps(
             {"worker_id": "worker", "observed_at_epoch": observed_epoch}
         ),
     )
@@ -61,10 +61,61 @@ def test_worker_presence_rejects_invalid_or_future_timestamps(
     assert health["status"] == "invalid"
 
 
+def test_worker_presence_rejects_oversized_heartbeat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = SimpleNamespace(
+        redis_url="redis://example.invalid/0",
+        worker_presence_key="workers:test",
+        worker_presence_ttl_seconds=60,
+        require_worker_heartbeat=True,
+    )
+    client = SimpleNamespace(
+        ping=lambda: True,
+        getrange=lambda _key, _start, _end: "x" * 4097,
+    )
+    monkeypatch.setattr(worker_presence, "_settings", lambda: settings)
+    monkeypatch.setattr(worker_presence, "_client", lambda: client)
+
+    health = worker_presence.worker_presence_health()
+
+    assert health == {
+        "ok": False,
+        "status": "invalid",
+        "detail": "worker signal exceeds the supported size",
+    }
+
+
 @pytest.mark.parametrize("worker_id", ("", "   ", "bad\nworker", "x" * 129))
 def test_worker_presence_rejects_invalid_worker_ids(worker_id: str) -> None:
     with pytest.raises(ValueError, match="worker_id"):
         worker_presence.WorkerPresenceHeartbeat(worker_id)
+
+
+def test_worker_presence_health_never_exposes_backend_exception_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = SimpleNamespace(
+        redis_url="redis://example.invalid/0",
+        require_worker_heartbeat=True,
+    )
+    monkeypatch.setattr(worker_presence, "_settings", lambda: settings)
+    monkeypatch.setattr(
+        worker_presence,
+        "_client",
+        lambda: (_ for _ in ()).throw(
+            RuntimeError("redis://operator:do-not-expose@example.invalid/0")
+        ),
+    )
+
+    health = worker_presence.worker_presence_health()
+
+    assert health == {
+        "ok": False,
+        "status": "unavailable",
+        "detail": "RuntimeError",
+    }
+    assert "do-not-expose" not in json.dumps(health)
 
 
 def test_event_writer_rejects_nonfinite_json_payload() -> None:

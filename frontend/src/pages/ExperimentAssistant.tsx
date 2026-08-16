@@ -1101,12 +1101,20 @@ export function ExperimentAssistant() {
       setError(copy.messageTooLong);
       return;
     }
-    if (modelAccess.accessMode === "byok" && !modelAccess.apiKey.trim()) {
+    const requiresModelProvider = selectedTaskType === null
+      || selectedTaskType === "control_tuning";
+    if (
+      requiresModelProvider
+      && modelAccess.accessMode === "byok"
+      && !modelAccess.apiKey.trim()
+    ) {
       setError(copy.modelRequired);
       openAppSettings();
       return;
     }
     if (
+      requiresModelProvider
+      &&
       modelAccess.accessMode === "platform"
       && (!managedModelsReady || !selectedManagedModel)
     ) {
@@ -1120,7 +1128,9 @@ export function ExperimentAssistant() {
     setError(null);
     try {
       const targetWorkspaceId = workspaceId ?? createExperimentWorkspaceId();
-      const platformAccess = modelAccess.accessMode === "platform" && !publicDemoConsole
+      const platformAccess = requiresModelProvider
+        && modelAccess.accessMode === "platform"
+        && !publicDemoConsole
         ? await issueManagedModelGrant(
             "assistant",
             targetWorkspaceId,
@@ -1155,12 +1165,16 @@ export function ExperimentAssistant() {
         message_id: id,
         message: visibleMessage,
         locale,
+        edition: editionTheme.id,
+        requested_task_type: selectedTaskType ?? "auto_detect",
         conversation_summary: draft.conversation.summary,
         current_values: assistantCurrentValues(draft.form),
         explicit_field_ids: explicitAssistantFields(draft.conversation),
         current_parameters: assistantCurrentParameters(draft.selections),
         document_context: documentContext,
-        llm: modelAccess.accessMode === "platform"
+        llm: !requiresModelProvider
+          ? null
+          : modelAccess.accessMode === "platform"
           ? {
               access_mode: "platform",
               provider: "dronedream",

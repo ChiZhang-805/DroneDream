@@ -7,26 +7,27 @@ the `/api/v1/jobs/{job_id}/report` endpoint's failure-path behaviour.
 
 from __future__ import annotations
 
-import importlib
 import json
-import sys
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
+from sqlalchemy.exc import DatabaseError
 
 
 def _clear_settings_cache() -> None:
-    """Clear the currently loaded config module, not a stale pre-reload alias."""
+    """Clear the process-wide settings cache."""
 
-    config_module = importlib.import_module("app.config")
+    from app import config as config_module
+
     config_module.get_settings.cache_clear()
 
 
 @pytest.fixture()
 def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
-    """Reload the backend against an isolated SQLite DB."""
+    """Bind the backend to an isolated SQLite DB."""
 
     db_path = tmp_path / "report.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
@@ -36,40 +37,17 @@ def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
-    models_was_loaded = "app.models" in sys.modules
-
     import app.db as db_module
-
-    importlib.reload(db_module)
-
-    if models_was_loaded:
-        models_module = importlib.reload(sys.modules["app.models"])
-    else:
-        models_module = importlib.import_module("app.models")
-
-    import app.services.jobs as jobs_service_module
-
-    importlib.reload(jobs_service_module)
-
+    import app.models as models_module
     import app.orchestration.aggregation as aggregation_module
-    import app.orchestration.constants as constants_module
-    import app.orchestration.events as events_module
     import app.orchestration.job_manager as job_manager_module
     import app.orchestration.metrics as metrics_module  # noqa: F401
-    import app.orchestration.optimizer as optimizer_module
     import app.orchestration.report_generator as report_generator_module
     import app.orchestration.runner as runner_module
     import app.orchestration.trial_executor as trial_executor_module
+    import app.services.jobs as jobs_service_module
 
-    importlib.reload(constants_module)
-    importlib.reload(optimizer_module)
-    importlib.reload(events_module)
-    importlib.reload(job_manager_module)
-    importlib.reload(trial_executor_module)
-    importlib.reload(report_generator_module)
-    importlib.reload(aggregation_module)
-    importlib.reload(runner_module)
-
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
 
     yield {
@@ -87,7 +65,11 @@ def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     config_module.get_settings.cache_clear()
 
 
-def _run_job_to_completion(ctx: dict[str, object]) -> str:
+def _run_job_to_completion(
+    ctx: dict[str, object],
+    *,
+    optimizer_strategy: str = "heuristic",
+) -> str:
     """Create a job and drain every trial until the runner finalises it."""
 
     schemas = ctx["schemas"]
@@ -96,9 +78,27 @@ def _run_job_to_completion(ctx: dict[str, object]) -> str:
     models = ctx["models"]
     runner = ctx["runner"]
 
+    request_kwargs: dict[str, object] = {}
+    if optimizer_strategy != "heuristic":
+        request_kwargs.update(
+            {
+                "max_iterations": 2,
+                "trials_per_candidate": 1,
+                "max_total_trials": 17,
+            }
+        )
     req = schemas.JobCreateRequest(
-        optimizer_strategy="heuristic",
+        optimizer_strategy=optimizer_strategy,
         simulator_backend="mock",
+        # These tests exercise multi-candidate report and tamper-rejection
+        # paths.  Keep the baseline below the preregistered qualification bar
+        # so the product's default first-qualified policy does not correctly
+        # stop before an optimizer candidate is generated.
+        acceptance_criteria=schemas.AcceptanceCriteria(
+            target_rmse=0.01,
+            min_pass_rate=1.0,
+        ),
+        **request_kwargs,
     )
     with db_module.SessionLocal() as db:
         job_id = jobs_service.create_job(db, req).id
@@ -131,14 +131,222 @@ def test_summary_text_covers_baseline_and_optimized(ctx):
     # winner fallback. The "No failure or instability flags" branch is what
     # we expect for a fully successful mock run.
     assert "Baseline achieved aggregated score" in text
-    assert (
-        "Optimizer candidate" in text
-        or "No optimizer candidate beat the baseline" in text
+    assert "Optimizer candidate" in text or "No optimizer candidate beat the baseline" in text
+    assert "No failure or instability flags" in text or "Watch-outs" in text
+
+
+def test_summary_text_handles_incomplete_diagnostic_metrics(ctx):
+    models = ctx["models"]
+    report_generator = ctx["report_generator"]
+    baseline = models.CandidateParameterSet(
+        id="cand_partial_baseline",
+        job_id="job_partial",
+        generation_index=0,
+        source_type="baseline",
+        label="baseline",
+        parameter_json={},
+        is_baseline=True,
     )
-    assert (
-        "No failure or instability flags" in text
-        or "Watch-outs" in text
+    partial_aggregate = {
+        "aggregated_score": 1.25,
+        "rmse": None,
+        "completion_time": None,
+    }
+
+    text = report_generator.generate_summary_text(
+        best=baseline,
+        baseline_agg=partial_aggregate,
+        best_agg=partial_aggregate,
+        baseline_trials=[],
+        best_trials=[],
     )
+
+    assert "aggregated score 1.2500" in text
+    assert "RMSE unavailable" in text
+    assert "completion unavailable" in text
+    assert "no best-candidate trial rows were available" in text
+
+
+def test_summary_text_does_not_recommend_a_diagnostic_baseline(ctx):
+    models = ctx["models"]
+    report_generator = ctx["report_generator"]
+    baseline = models.CandidateParameterSet(
+        id="cand_unqualified_baseline",
+        job_id="job_unqualified",
+        generation_index=0,
+        source_type="baseline",
+        label="baseline",
+        parameter_json={},
+        is_baseline=True,
+        is_best=False,
+    )
+    aggregate = {
+        "aggregated_score": 3.4332,
+        "rmse": 8.4936,
+        "completion_time": 38.808,
+    }
+
+    text = report_generator.generate_summary_text(
+        best=baseline,
+        baseline_agg=aggregate,
+        best_agg=aggregate,
+        baseline_trials=[],
+        best_trials=[],
+    )
+
+    assert "No candidate satisfied the publication and evidence gates" in text
+    assert "diagnostic comparison fallback" in text
+    assert "not a validated recommendation" in text
+
+
+def test_bound_report_projection_seals_compatibility_and_evidence_fields(
+    ctx,
+):
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    rg = ctx["report_generator"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        best = next(
+            candidate for candidate in job.candidates if candidate.id == job.best_candidate_id
+        )
+        aggregate = json.loads(json.dumps(best.aggregated_metric_json))
+        aggregate["rmse"] = 999.0
+        with pytest.raises(rg.ReportEvidenceError):
+            rg._authoritative_report_aggregate(best, aggregate)  # noqa: SLF001
+
+        aggregate = json.loads(json.dumps(best.aggregated_metric_json))
+        aggregate["candidate_report_evidence"]["projection"]["rmse"] = 999.0
+        with pytest.raises(rg.ReportEvidenceError):
+            rg._authoritative_report_aggregate(best, aggregate)  # noqa: SLF001
+
+        baseline = next(
+            candidate for candidate in job.candidates if candidate.id == job.baseline_candidate_id
+        )
+        nonwinner = next(
+            candidate
+            for candidate in job.candidates
+            if candidate.id not in {baseline.id, best.id}
+            and "candidate_report_evidence" in (candidate.aggregated_metric_json or {})
+        )
+        nonwinner_aggregate = json.loads(json.dumps(nonwinner.aggregated_metric_json))
+        nonwinner_aggregate["candidate_report_evidence"]["projection"]["rmse"] = 999.0
+        nonwinner.aggregated_metric_json = nonwinner_aggregate
+        with pytest.raises(rg.ReportEvidenceError):
+            rg.generate_and_persist_report(
+                db,
+                job=job,
+                best=best,
+                baseline_agg=baseline.aggregated_metric_json,
+                best_agg=best.aggregated_metric_json,
+            )
+
+
+def test_report_refuses_winner_that_diverges_from_selection_evidence(ctx):
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    rg = ctx["report_generator"]
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.report is not None
+        original_best = next(
+            candidate for candidate in job.candidates if candidate.id == job.best_candidate_id
+        )
+        alternate = next(
+            candidate
+            for candidate in job.candidates
+            if candidate.id != original_best.id and candidate.aggregated_metric_json is not None
+        )
+        baseline = next(
+            candidate for candidate in job.candidates if candidate.id == job.baseline_candidate_id
+        )
+
+        job.best_candidate_id = alternate.id
+        original_best.is_best = False
+        alternate.is_best = True
+        with pytest.raises(
+            rg.ReportEvidenceError,
+            match="winner-selection evidence",
+        ):
+            rg.generate_and_persist_report(
+                db,
+                job=job,
+                best=alternate,
+                baseline_agg=baseline.aggregated_metric_json,
+                best_agg=alternate.aggregated_metric_json,
+                winner_evidence=job.report.winner_evidence_json,
+            )
+
+
+def test_winner_freeze_is_idempotent_but_rejects_mutation_and_late_rebuild(
+    ctx,
+):
+    from app.orchestration.winner_freeze import (
+        WinnerFreezeError,
+        freeze_winner_selection,
+    )
+
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.report is not None
+        assert job.winner_freeze is not None
+        receipt_id = job.winner_freeze.id
+        evidence = job.report.winner_evidence_json
+
+        same = freeze_winner_selection(
+            db,
+            job=job,
+            evidence=evidence,
+        )
+        assert same.id == receipt_id
+
+        job.winner_freeze.winner_candidate_id = "cand_tampered"
+        with pytest.raises(
+            DatabaseError,
+            match="append-only",
+        ):
+            db.flush()
+        db.rollback()
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.winner_freeze is not None
+        db.delete(job.winner_freeze)
+        with pytest.raises(
+            DatabaseError,
+            match="append-only",
+        ):
+            db.flush()
+        db.rollback()
+
+    with ctx["db_module"].SessionLocal() as db:
+        db.execute(text("DROP TRIGGER IF EXISTS trg_winner_freeze_receipts_no_delete"))
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.winner_freeze is not None
+        db.delete(job.winner_freeze)
+        db.flush()
+        with pytest.raises(
+            WinnerFreezeError,
+            match="only during FINALIZING",
+        ):
+            freeze_winner_selection(
+                db,
+                job=job,
+                evidence=job.report.winner_evidence_json,
+            )
 
 
 def test_summary_text_reports_tradeoff_when_optimized_slower(ctx):
@@ -321,11 +529,7 @@ def test_ensure_job_artifacts_is_idempotent(ctx):
         assert len(first) == 4
         assert second == []
 
-        rows = (
-            db.query(models.Artifact)
-            .filter(models.Artifact.owner_id == job.id)
-            .all()
-        )
+        rows = db.query(models.Artifact).filter(models.Artifact.owner_id == job.id).all()
         assert len(rows) == 4
 
 
@@ -408,6 +612,182 @@ def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, mon
         assert isinstance(trial_summary, list)
         assert "has_telemetry_json" in trial_summary[0]
         assert "has_reference_track_json" in trial_summary[0]
+
+
+def test_real_cli_artifact_regeneration_mismatch_preserves_verified_bytes(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from app.storage.integrity import ArtifactIntegrityError
+
+    rg = ctx["report_generator"]
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+        )
+        db.add(job)
+        db.flush()
+        best = models.CandidateParameterSet(
+            job_id=job.id,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0},
+            is_baseline=True,
+            is_best=True,
+        )
+        db.add(best)
+        db.flush()
+        report_body = {
+            "summary_text": "sealed summary",
+            "baseline_metric_json": {"rmse": 1.0},
+            "optimized_metric_json": {"rmse": 0.9},
+            "comparison_metric_json": [],
+            "best_parameter_json": {"kp_xy": 1.0},
+        }
+        rg.ensure_job_artifacts(
+            db,
+            job=job,
+            report_body=report_body,
+            best=best,
+        )
+        db.commit()
+
+        report_path = tmp_path / "jobs" / job.id / "job_artifacts" / "report.json"
+        sealed_bytes = report_path.read_bytes()
+        report_row = (
+            db.query(models.Artifact)
+            .filter(models.Artifact.owner_id == job.id)
+            .filter(models.Artifact.artifact_type == "report_json")
+            .one()
+        )
+        assert report_row.digest_receipt is not None
+        sealed_evidence_id = report_row.digest_receipt.evidence_id
+        report_artifact_id = report_row.id
+
+        changed_body = dict(report_body)
+        changed_body["summary_text"] = "attempted replacement"
+        with pytest.raises(
+            ArtifactIntegrityError,
+            match="not an exact match",
+        ):
+            rg.ensure_job_artifacts(
+                db,
+                job=job,
+                report_body=changed_body,
+                best=best,
+            )
+        db.rollback()
+
+        assert report_path.read_bytes() == sealed_bytes
+        db.expire_all()
+        report_row = db.get(models.Artifact, report_artifact_id)
+        assert report_row is not None
+        assert report_row.digest_receipt is not None
+        assert report_row.digest_receipt.evidence_id == sealed_evidence_id
+
+
+def test_unregistered_immutable_artifact_mismatch_is_not_overwritten(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from app.storage.integrity import ArtifactIntegrityError
+
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    original = b"unregistered bytes from an interrupted transaction"
+    destination.write_bytes(original)
+
+    with pytest.raises(
+        ArtifactIntegrityError,
+        match="unregistered immutable artifact bytes differ",
+    ):
+        rg._publish_immutable_artifact(destination, b'{"new":"content"}\n')
+
+    assert destination.read_bytes() == original
+
+
+def test_unregistered_exact_immutable_artifact_is_recovered_without_rewrite(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    content = b'{"recover":"exact bytes"}\n'
+    destination.write_bytes(content)
+    original_mtime = destination.stat().st_mtime_ns
+
+    rg._publish_immutable_artifact(destination, content)
+
+    assert destination.read_bytes() == content
+    assert destination.stat().st_mtime_ns == original_mtime
+
+
+def test_failed_immutable_artifact_write_removes_only_its_partial_file(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+
+    def fail_fsync(descriptor: int) -> None:
+        del descriptor
+        raise OSError("injected fsync failure")
+
+    monkeypatch.setattr(rg.os, "fsync", fail_fsync)
+    with pytest.raises(OSError, match="injected fsync failure"):
+        rg._publish_immutable_artifact(destination, b"partial bytes")
+
+    assert not destination.exists()
+
+
+def test_immutable_artifact_rejects_symlink_destination(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from app.storage.integrity import ArtifactIntegrityError
+
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"outside bytes")
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    try:
+        destination.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
+
+    with pytest.raises(
+        ArtifactIntegrityError,
+        match="not a regular file",
+    ):
+        rg._publish_immutable_artifact(destination, b"replacement")
+
+    assert outside.read_bytes() == b"outside bytes"
 
 
 def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
@@ -502,6 +882,114 @@ def test_pdf_renderer_uses_unicode_cid_font_for_chinese_text() -> None:
     pdf = _build_pdf(["蝶 梦 水 云 乡"])
     assert b"/Encoding /UniGB-UCS2-H" in pdf
     assert "蝶 梦 水 云 乡".encode("utf-16-be").hex().upper().encode("ascii") in pdf
+
+
+def test_free_pdf_renderer_draws_brand_watermark_on_every_page() -> None:
+    from app.services.pdf_report import _build_pdf
+
+    pdf = _build_pdf(
+        [f"report evidence line {index}" for index in range(120)],
+        free_tier_watermark=True,
+    )
+
+    assert b"/Count 3" in pdf
+    assert pdf.count(b"% DD-FREE-REPORT-WATERMARK-V1") == 3
+    assert b"/CA 0.18 /ca 0.18" in pdf
+    assert b"0.45 0.16 0.88 RG" in pdf
+    assert b"0.92 0.17 0.57 RG" in pdf
+
+    paid_pdf = _build_pdf(
+        [f"report evidence line {index}" for index in range(120)],
+        free_tier_watermark=False,
+    )
+    assert b"/Count 3" in paid_pdf
+    assert b"DD-FREE-REPORT-WATERMARK" not in paid_pdf
+
+
+def test_job_report_records_parameter_lineage_feedback_and_rationale(ctx):
+    models = ctx["models"]
+    db_module = ctx["db_module"]
+    pdf_service = __import__("app.services.pdf_report", fromlist=["*"])
+
+    with db_module.SessionLocal() as db:
+        job = models.Job(
+            track_type="circle",
+            altitude_m=3.0,
+            sensor_noise_level="medium",
+            objective_profile="robust",
+            status="COMPLETED",
+            simulator_backend_requested="real_cli",
+        )
+        db.add(job)
+        db.flush()
+        baseline = models.CandidateParameterSet(
+            id="cand_trace_baseline",
+            job_id=job.id,
+            generation_index=0,
+            source_type="baseline",
+            label="baseline",
+            parameter_json={"kp_xy": 1.0, "kd_xy": 0.2},
+            aggregated_score=1.4,
+            aggregated_metric_json={
+                "rmse": 1.2,
+                "max_error": 1.7,
+                "completion_time": 9.5,
+                "aggregated_score": 1.4,
+                "trial_count": 1,
+                "completed_trial_count": 1,
+            },
+            trial_count=1,
+            completed_trial_count=1,
+            is_baseline=True,
+        )
+        improved = models.CandidateParameterSet(
+            id="cand_trace_improved",
+            job_id=job.id,
+            generation_index=1,
+            source_type="llm_optimizer",
+            label="feedback-step",
+            parent_candidate_id=baseline.id,
+            parameter_json={"kp_xy": 1.25, "kd_xy": 0.2},
+            aggregated_score=0.9,
+            aggregated_metric_json={
+                "rmse": 0.7,
+                "max_error": 1.0,
+                "completion_time": 8.5,
+                "aggregated_score": 0.9,
+                "trial_count": 1,
+                "completed_trial_count": 1,
+            },
+            proposal_reason=(
+                "Increase lateral proportional gain after the recorded tracking error."
+            ),
+            trial_count=1,
+            completed_trial_count=1,
+            is_best=True,
+        )
+        db.add_all([baseline, improved])
+        db.flush()
+        job.baseline_candidate_id = baseline.id
+        job.best_candidate_id = improved.id
+        db.add(
+            models.JobReport(
+                job_id=job.id,
+                best_candidate_id=improved.id,
+                report_status="READY",
+                summary_text="Traceable optimization completed.",
+            )
+        )
+        db.commit()
+        db.refresh(job)
+
+        report_text = "\n".join(pdf_service.build_job_report_lines(job))
+
+    assert "6) Iteration-by-iteration optimization trace" in report_text
+    assert "declared parent: cand_trace_baseline / baseline (generation 0)" in report_text
+    assert "kp_xy: 1.0000 -> 1.2500" in report_text
+    assert "observed simulation feedback: rmse=0.700" in report_text
+    assert "completed=1/1 failed=0" in report_text
+    assert "recorded proposal rationale (not inferred by the report)" in report_text
+    assert "Increase lateral proportional gain after the recorded tracking error." in report_text
 
 
 def test_generate_job_pdf_report_creates_expected_file(ctx, tmp_path):
@@ -632,9 +1120,7 @@ def test_generate_job_pdf_report_paginates_and_includes_all_candidates_trials(ct
                 completed_trial_count=3,
                 is_baseline=is_baseline,
                 is_best=idx == 20,
-                proposal_reason=(
-                    "Candidate rationale " * 15 if not is_baseline else "Baseline"
-                ),
+                proposal_reason=("Candidate rationale " * 15 if not is_baseline else "Baseline"),
                 created_at=base_time + timedelta(seconds=idx),
                 updated_at=base_time + timedelta(seconds=idx),
             )
@@ -701,6 +1187,7 @@ def test_generate_job_pdf_report_paginates_and_includes_all_candidates_trials(ct
         assert path.exists()
         assert path.name == f"{job.id} report.pdf"
         assert body.startswith(b"%PDF")
+
         def pdf_text(value: str) -> bytes:
             return value.encode("utf-16-be").hex().upper().encode("ascii")
 
@@ -794,7 +1281,10 @@ def test_generate_job_pdf_report_excludes_secret_values(ctx, tmp_path):
 
 
 def test_repro_manifest_generated_for_mock_job(ctx):
-    job_id = _run_job_to_completion(ctx)
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         assert job is not None
@@ -811,6 +1301,14 @@ def test_repro_manifest_generated_for_mock_job(ctx):
         payload = json.loads(Path(artifact.storage_path).read_text(encoding="utf-8"))
         assert payload["job"]["job_id"] == job_id
         assert payload["optimizer"]["best_candidate_id"] == job.best_candidate_id
+        winner_evidence = payload["optimizer"]["winner_selection_evidence"]
+        assert isinstance(winner_evidence, dict)
+        assert winner_evidence["winner_candidate_id"] == job.best_candidate_id
+        assert winner_evidence["evidence_id"] == job.report.winner_evidence_json["evidence_id"]
+        winner_freeze = payload["optimizer"]["winner_freeze_receipt"]
+        assert isinstance(winner_freeze, dict)
+        assert winner_freeze["receipt_id"] == job.winner_freeze.id
+        assert winner_freeze["evidence_id"] == winner_evidence["evidence_id"]
         assert isinstance(payload["trials"], list)
         assert payload["trials"]
         assert "track_type" in payload["job"]
@@ -819,6 +1317,7 @@ def test_repro_manifest_generated_for_mock_job(ctx):
         candidate_summary = payload["optimizer"]["candidate_summaries"][0]
         assert "parameters" in candidate_summary
         assert "aggregated_feedback" in candidate_summary
+        assert "candidate_report_evidence_id" in candidate_summary["aggregated_feedback"]
 
 
 def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
@@ -859,12 +1358,8 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
                     "maximum": 1.3,
                 }
             ],
-            objective_config_json={
-                "objectives": [{"metric": "rmse", "direction": "minimize"}]
-            },
-            scenario_suite_json={
-                "cases": [{"scenario_type": "wind", "seeds": [101]}]
-            },
+            objective_config_json={"objectives": [{"metric": "rmse", "direction": "minimize"}]},
+            scenario_suite_json={"cases": [{"scenario_type": "wind", "seeds": [101]}]},
             advanced_scenario_config_json={
                 "wind_gusts": {"enabled": True},
                 "service_token": "should-not-appear",
@@ -948,6 +1443,10 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
                 "wind_gusts": {"enabled": True},
                 "service_token": "should-not-appear",
                 "nested": {"db_password": "do-not-leak"},
+                "credential": "credential-do-not-leak",
+                "authorization": "Bearer authorization-do-not-leak",
+                "cookie": "session=cookie-do-not-leak",
+                "bearer": "bearer-do-not-leak",
             },
         )
         db.add(job)
@@ -980,8 +1479,31 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
         assert "db-secret" not in text
         assert "should-not-appear" not in text
         assert "do-not-leak" not in text
+        assert "credential-do-not-leak" not in text
+        assert "authorization-do-not-leak" not in text
+        assert "cookie-do-not-leak" not in text
+        assert "bearer-do-not-leak" not in text
         assert "encrypted_api_key" not in text
         assert "APP_SECRET_KEY" not in text
+
+
+def test_repro_payload_sanitizer_rejects_common_credential_fields() -> None:
+    repro_manifest = __import__(
+        "app.orchestration.repro_manifest",
+        fromlist=["sanitize_payload"],
+    )
+
+    sanitized = repro_manifest.sanitize_payload(
+        {
+            "credential": "credential-value",
+            "authorization": "Bearer authorization-value",
+            "cookie": "session=cookie-value",
+            "bearer": "bearer-value",
+            "authoritative_evidence": "retain-normal-field",
+        }
+    )
+
+    assert sanitized == {"authoritative_evidence": "retain-normal-field"}
 
 
 def test_build_job_report_lines_includes_new_sections(ctx):
@@ -1033,6 +1555,14 @@ def test_build_job_report_lines_includes_new_sections(ctx):
                     "trial_count": 2,
                     "pass_rate": 0.5,
                     "failure_rate": 0.5,
+                    "generalization_evidence": {
+                        "assessment": "not_assessable",
+                        "claim_scope": "seed_robustness",
+                        "observed_shift": None,
+                        "shift_axes": ["seed_shift"],
+                        "scalar_loss_relative_degradation": None,
+                        "objective_gaps": [],
+                    },
                 },
             },
             is_best=True,
@@ -1088,24 +1618,67 @@ def test_build_job_report_lines_includes_new_sections(ctx):
         assert "evaluator=max_error_above_target" in text
         assert "worst_max_error=4.000" in text
         assert "Holdout validation: status=incomplete" in text
+        assert ("Generalization evidence: assessment=not_assessable, scope=seed_robustness") in text
         assert "never-print" not in text
 
 
 # --- API error paths ------------------------------------------------------
 
 
+def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
+    from fastapi.testclient import TestClient
+
+    import app.main as main_module
+
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.report is not None
+        expected_evidence_id = job.report.winner_evidence_json["evidence_id"]
+        expected_receipt_id = job.winner_freeze.id
+
+    with TestClient(main_module.create_app()) as client:
+        response = client.get(f"/api/v1/jobs/{job_id}/report")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["winner_evidence_id"] == expected_evidence_id
+    assert response.json()["data"]["winner_freeze_receipt_id"] == expected_receipt_id
+
+
+def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
+    from fastapi.testclient import TestClient
+
+    import app.main as main_module
+
+    job_id = _run_job_to_completion(
+        ctx,
+        optimizer_strategy="constrained_mobo",
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.winner_freeze is not None
+        db.execute(text("DROP TRIGGER IF EXISTS trg_winner_freeze_receipts_no_update"))
+        job.winner_freeze.winner_candidate_id = "cand_tampered"
+        db.commit()
+
+    with TestClient(main_module.create_app()) as client:
+        response = client.get(f"/api/v1/jobs/{job_id}/report")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "REPORT_EVIDENCE_INVALID"
+
+
 def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
     """A FAILED job returns a structured JOB_FAILED error with context."""
 
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
@@ -1127,7 +1700,7 @@ def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
         job_ref.latest_error_message = "All baseline trials failed; cannot produce a report."
         db.commit()
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         resp = client.get(f"/api/v1/jobs/{job_id}/report")
         assert resp.status_code == 409
         body = resp.json()
@@ -1139,15 +1712,9 @@ def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
 
 
 def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
@@ -1164,7 +1731,7 @@ def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
         job_id = job.id
         jobs_service.cancel_job(db, job_id)
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         resp = client.get(f"/api/v1/jobs/{job_id}/report")
         assert resp.status_code == 409
         body = resp.json()
@@ -1175,18 +1742,12 @@ def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
 
 
 def test_job_detail_includes_recent_events(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
 
+    import app.main as main_module
+
     job_id = _run_job_to_completion(ctx)
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         body = client.get(f"/api/v1/jobs/{job_id}").json()["data"]
 
     events = body.get("recent_events")
@@ -1203,19 +1764,13 @@ def test_job_detail_includes_recent_events(ctx):
 
 
 def test_artifacts_endpoint_exposes_job_artifacts(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     job_id = _run_job_to_completion(ctx)
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         body = client.get(f"/api/v1/jobs/{job_id}/artifacts").json()["data"]
 
     assert isinstance(body, list)

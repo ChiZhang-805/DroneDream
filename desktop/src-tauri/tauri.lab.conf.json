@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream-Lab",
+  "identifier": "io.dronedream.desktop.lab",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream · LAB",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "publisher": "DroneDream",
+    "shortDescription": "Bidirectional Sim-to-Real calibration workspace",
+    "longDescription": "DroneDream · LAB joins simulation and recorded real-device evidence for bounded calibration and qualification. Hardware actions remain denied until every native, backend, Runtime and Vehicle Pack gate authorizes them.",
+    "icon": [
+      "../../brand/generated/lab/windows/32x32.png",
+      "../../brand/generated/lab/windows/128x128.png",
+      "../../brand/generated/lab/windows/128x128@2x.png",
+      "../../brand/generated/lab/windows/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "../../brand/generated/lab/windows/icon.ico",
+        "uninstallerIcon": "../../brand/generated/lab/windows/icon.ico"
+      }
+    },
+    "resources": {
+      "../../distribution/editions/lab.v1.json": "distribution/editions/lab.v1.json",
+      "../../distribution/editions/lab/model-harness-closed-loop.v1.json": "distribution/editions/lab/model-harness-closed-loop.v1.json",
+      "../../distribution/editions/lab/sim-field-integration.v1.json": "distribution/editions/lab/sim-field-integration.v1.json",
+      "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",
+      "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",
+      "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json",
+      "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",
+      "../../distribution/desktop/edition-browser-auth.v1.json": "distribution/desktop/edition-browser-auth.v1.json",
+      "../../distribution/desktop/edition-runtime-update-families.v1.json": "distribution/desktop/edition-runtime-update-families.v1.json",
+      "../../brand/brand-editions.v1.json": "brand/brand-editions.v1.json",
+      "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json"
+      ],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.config import Settings, get_settings
+from app.storage.integrity import authorize_artifact_integrity_deletion
 
 
 @dataclass(frozen=True, slots=True)
@@ -517,6 +518,11 @@ def cleanup_local_artifacts(
     # are established; otherwise an autoflush from the locking query could
     # expose deletion before serialization.
     for artifact in selected_row_objects.values():
+        authorize_artifact_integrity_deletion(
+            db,
+            artifact=artifact,
+            reason="retention_cleanup",
+        )
         db.delete(artifact)
 
     for job_id in audit_job_ids:

@@ -1,0 +1,565 @@
+{
+  "artifact_sha256": "e5c27308a9be35a276ce845e872e186e613f5421c459bcddec726a461e480ef3",
+  "block_rows": [
+    {
+      "arms": [
+        {
+          "arm": "direct_portfolio",
+          "configured_max_iterations": 2,
+          "configured_max_total_trials": 40,
+          "evidence_completeness": {
+            "accepted_trial_outcome_count": 38,
+            "candidate_count": 10,
+            "complete_candidate_chain_count": 10,
+            "complete_evidence_units": 50,
+            "completeness_rate": 1.0,
+            "expected_evidence_units": 50,
+            "report_ready": true,
+            "terminal_trial_count": 38,
+            "winner_freeze_present": true
+          },
+          "failure_count": 0,
+          "holdout_loss": 0.8576,
+          "network_calls": 0,
+          "optimization_outcome": "max_iterations_reached",
+          "outcome_sha256": "d0308861eb98ea5c36d9031fd52f9970acb003030d053a45bb0f2e11fe042bcf",
+          "plan_trace": {
+            "accounting": {
+              "actual_tool_cpu_ms": 0.0,
+              "dispatched_candidates": 0,
+              "dispatched_trials": 0,
+              "plan_decision_wall_ms": 0.0,
+              "planned_candidates": 0,
+              "provider_call_count": 0,
+              "revision_wall_ms": 0.0,
+              "tool_execution_wall_ms": 0.0
+            },
+            "multi_tool_generation_count": 0,
+            "provider_visible_history": [],
+            "verified_generation_count": 0
+          },
+          "real_credentials_used": false,
+          "real_provider_calls": 0,
+          "realized_candidate_count": 10,
+          "realized_completed_trials": 38,
+          "realized_dispatched_trials": 38,
+          "scripted_decision_calls": 0,
+          "scripted_plan_calls": 0,
+          "scripted_revision_calls": 0,
+          "terminal_status": "COMPLETED"
+        },
+        {
+          "arm": "scripted_multi_tool",
+          "configured_max_iterations": 2,
+          "configured_max_total_trials": 40,
+          "evidence_completeness": {
+            "accepted_trial_outcome_count": 32,
+            "candidate_count": 8,
+            "complete_candidate_chain_count": 8,
+            "complete_evidence_units": 42,
+            "completeness_rate": 1.0,
+            "expected_evidence_units": 42,
+            "report_ready": true,
+            "terminal_trial_count": 32,
+            "winner_freeze_present": true
+          },
+          "failure_count": 0,
+          "holdout_loss": 0.9415,
+          "network_calls": 0,
+          "optimization_outcome": "max_iterations_reached",
+          "outcome_sha256": "00d91c704fb0e357c2bbc2e97ab13c9c9c2cfe8e68910868caab9d3de1ea8538",
+          "plan_trace": {
+            "accounting": {
+              "actual_tool_cpu_ms": 15.625,
+              "dispatched_candidates": 7,
+              "dispatched_trials": 28,
+              "plan_decision_wall_ms": 43.896,
+              "planned_candidates": 7,
+              "provider_call_count": 4,
+              "revision_wall_ms": 0.394,
+              "tool_execution_wall_ms": 23.677
+            },
+            "multi_tool_generation_count": 1,
+            "provider_visible_history": [
+              {
+                "actual_tool_cpu_ms": 0.0,
+                "decision_source": "model",
+                "dispatched_candidates": 3,
+                "dispatched_trials": 12,
+                "generation": 1,
+                "plan_decision_wall_ms": 11.86,
+                "planned_candidates": 3,
+                "projected_cpu_budget_ms": 10500,
+                "projected_critical_path_latency_budget_ms": 10500,
+                "projected_trial_upper_bound": 12,
+                "provider_call_count": 2,
+                "revision_source": "model",
+                "revision_wall_ms": 0.199,
+                "schema_id": "dronedream.harness-generation-plan-memory/v1",
+                "status": "dispatched",
+                "tool_calls": [
+                  {
+                    "allocation": 3,
+                    "cpu_budget_ms": 10500,
+                    "cpu_ms": 0.0,
+                    "elapsed_ms": 5.806,
+                    "latency_budget_ms": 10500,
+                    "parallel_safe": false,
+                    "proposal_count": 3,
+                    "status": "completed",
+                    "tool_id": "optimizer_portfolio"
+                  }
+                ],
+                "tool_execution_wall_ms": 5.82,
+                "usable_proposal_count": 3
+              },
+              {
+                "actual_tool_cpu_ms": 15.625,
+                "decision_source": "model",
+                "dispatched_candidates": 4,
+                "dispatched_trials": 16,
+                "generation": 2,
+                "plan_decision_wall_ms": 32.036,
+                "planned_candidates": 4,
+                "projected_cpu_budget_ms": 12200,
+                "projected_critical_path_latency_budget_ms": 12200,
+                "projected_trial_upper_bound": 16,
+                "provider_call_count": 2,
+                "revision_source": "model",
+                "revision_wall_ms": 0.195,
+                "schema_id": "dronedream.harness-generation-plan-memory/v1",
+                "status": "dispatched",
+                "tool_calls": [
+                  {
+                    "allocation": 2,
+                    "cpu_budget_ms": 3200,
+                    "cpu_ms": 0.0,
+                    "elapsed_ms": 2.187,
+                    "latency_budget_ms": 3200,
+                    "parallel_safe": true,
+                    "proposal_count": 2,
+                    "status": "completed",
+                    "tool_id": "turbo"
+                  },
+                  {
+                    "allocation": 2,
+                    "cpu_budget_ms": 9000,
+                    "cpu_ms": 15.625,
+                    "elapsed_ms": 15.23,
+                    "latency_budget_ms": 9000,
+                    "parallel_safe": false,
+                    "proposal_count": 2,
+                    "status": "completed",
+                    "tool_id": "optimizer_portfolio"
+                  }
+                ],
+                "tool_execution_wall_ms": 17.857,
+                "usable_proposal_count": 4
+              }
+            ],
+            "verified_generation_count": 2
+          },
+          "real_credentials_used": false,
+          "real_provider_calls": 0,
+          "realized_candidate_count": 8,
+          "realized_completed_trials": 32,
+          "realized_dispatched_trials": 32,
+          "scripted_decision_calls": 4,
+          "scripted_plan_calls": 2,
+          "scripted_revision_calls": 2,
+          "terminal_status": "COMPLETED"
+        }
+      ],
+      "block_id": 1,
+      "configured_budget_equal": true,
+      "realized_trial_delta_scripted_minus_direct": -6,
+      "seed_block": 7100
+    },
+    {
+      "arms": [
+        {
+          "arm": "direct_portfolio",
+          "configured_max_iterations": 2,
+          "configured_max_total_trials": 40,
+          "evidence_completeness": {
+            "accepted_trial_outcome_count": 38,
+            "candidate_count": 10,
+            "complete_candidate_chain_count": 10,
+            "complete_evidence_units": 50,
+            "completeness_rate": 1.0,
+            "expected_evidence_units": 50,
+            "report_ready": true,
+            "terminal_trial_count": 38,
+            "winner_freeze_present": true
+          },
+          "failure_count": 0,
+          "holdout_loss": 0.9776,
+          "network_calls": 0,
+          "optimization_outcome": "max_iterations_reached",
+          "outcome_sha256": "dcd934e9efd1a00aef7cd40cb1792c9e48ea4a29eac9cf8cd46ff72e5327a4ec",
+          "plan_trace": {
+            "accounting": {
+              "actual_tool_cpu_ms": 0.0,
+              "dispatched_candidates": 0,
+              "dispatched_trials": 0,
+              "plan_decision_wall_ms": 0.0,
+              "planned_candidates": 0,
+              "provider_call_count": 0,
+              "revision_wall_ms": 0.0,
+              "tool_execution_wall_ms": 0.0
+            },
+            "multi_tool_generation_count": 0,
+            "provider_visible_history": [],
+            "verified_generation_count": 0
+          },
+          "real_credentials_used": false,
+          "real_provider_calls": 0,
+          "realized_candidate_count": 10,
+          "realized_completed_trials": 38,
+          "realized_dispatched_trials": 38,
+          "scripted_decision_calls": 0,
+          "scripted_plan_calls": 0,
+          "scripted_revision_calls": 0,
+          "terminal_status": "COMPLETED"
+        },
+        {
+          "arm": "scripted_multi_tool",
+          "configured_max_iterations": 2,
+          "configured_max_total_trials": 40,
+          "evidence_completeness": {
+            "accepted_trial_outcome_count": 32,
+            "candidate_count": 8,
+            "complete_candidate_chain_count": 8,
+            "complete_evidence_units": 42,
+            "completeness_rate": 1.0,
+            "expected_evidence_units": 42,
+            "report_ready": true,
+            "terminal_trial_count": 32,
+            "winner_freeze_present": true
+          },
+          "failure_count": 0,
+          "holdout_loss": 0.8284,
+          "network_calls": 0,
+          "optimization_outcome": "max_iterations_reached",
+          "outcome_sha256": "d2c1625a031768515161cfd79662af7e059ceb367699d3e85a23b441102b60a3",
+          "plan_trace": {
+            "accounting": {
+              "actual_tool_cpu_ms": 0.0,
+              "dispatched_candidates": 7,
+              "dispatched_trials": 28,
+              "plan_decision_wall_ms": 45.717,
+              "planned_candidates": 7,
+              "provider_call_count": 4,
+              "revision_wall_ms": 0.343,
+              "tool_execution_wall_ms": 12.231
+            },
+            "multi_tool_generation_count": 1,
+            "provider_visible_history": [
+              {
+                "actual_tool_cpu_ms": 0.0,
+                "decision_source": "model",
+                "dispatched_candidates": 3,
+                "dispatched_trials": 12,
+                "generation": 1,
+                "plan_decision_wall_ms": 16.108,
+                "planned_candidates": 3,
+                "projected_cpu_budget_ms": 10500,
+                "projected_critical_path_latency_budget_ms": 10500,
+                "projected_trial_upper_bound": 12,
+                "provider_call_count": 2,
+                "revision_source": "model",
+                "revision_wall_ms": 0.193,
+                "schema_id": "dronedream.harness-generation-plan-memory/v1",
+                "status": "dispatched",
+                "tool_calls": [
+                  {
+                    "allocation": 3,
+                    "cpu_budget_ms": 10500,
+                    "cpu_ms": 0.0,
+                    "elapsed_ms": 5.871,
+                    "latency_budget_ms": 10500,
+                    "parallel_safe": false,
+                    "proposal_count": 3,
+                    "status": "completed",
+                    "tool_id": "optimizer_portfolio"
+                  }
+                ],
+                "tool_execution_wall_ms": 5.885,
+                "usable_proposal_count": 3
+              },
+              {
+                "actual_tool_cpu_ms": 0.0,
+                "decision_source": "model",
+                "dispatched_candidates": 4,
+                "dispatched_trials": 16,
+                "generation": 2,
+                "plan_decision_wall_ms": 29.609,
+                "planned_candidates": 4,
+                "projected_cpu_budget_ms": 12200,
+                "projected_critical_path_latency_budget_ms": 12200,
+                "projected_trial_upper_bound": 16,
+                "provider_call_count": 2,
+                "revision_source": "model",
+                "revision_wall_ms": 0.15,
+                "schema_id": "dronedream.harness-generation-plan-memory/v1",
+                "status": "dispatched",
+                "tool_calls": [
+                  {
+                    "allocation": 2,
+                    "cpu_budget_ms": 3200,
+                    "cpu_ms": 0.0,
+                    "elapsed_ms": 1.823,
+                    "latency_budget_ms": 3200,
+                    "parallel_safe": true,
+                    "proposal_count": 2,
+                    "status": "completed",
+                    "tool_id": "turbo"
+                  },
+                  {
+                    "allocation": 2,
+                    "cpu_budget_ms": 9000,
+                    "cpu_ms": 0.0,
+                    "elapsed_ms": 3.978,
+                    "latency_budget_ms": 9000,
+                    "parallel_safe": false,
+                    "proposal_count": 2,
+                    "status": "completed",
+                    "tool_id": "optimizer_portfolio"
+                  }
+                ],
+                "tool_execution_wall_ms": 6.346,
+                "usable_proposal_count": 4
+              }
+            ],
+            "verified_generation_count": 2
+          },
+          "real_credentials_used": false,
+          "real_provider_calls": 0,
+          "realized_candidate_count": 8,
+          "realized_completed_trials": 32,
+          "realized_dispatched_trials": 32,
+          "scripted_decision_calls": 4,
+          "scripted_plan_calls": 2,
+          "scripted_revision_calls": 2,
+          "terminal_status": "COMPLETED"
+        }
+      ],
+      "block_id": 2,
+      "configured_budget_equal": true,
+      "realized_trial_delta_scripted_minus_direct": -6,
+      "seed_block": 8200
+    },
+    {
+      "arms": [
+        {
+          "arm": "direct_portfolio",
+          "configured_max_iterations": 2,
+          "configured_max_total_trials": 40,
+          "evidence_completeness": {
+            "accepted_trial_outcome_count": 39,
+            "candidate_count": 10,
+            "complete_candidate_chain_count": 10,
+            "complete_evidence_units": 51,
+            "completeness_rate": 1.0,
+            "expected_evidence_units": 51,
+            "report_ready": true,
+            "terminal_trial_count": 39,
+            "winner_freeze_present": true
+          },
+          "failure_count": 0,
+          "holdout_loss": 0.8823,
+          "network_calls": 0,
+          "optimization_outcome": "max_iterations_reached",
+          "outcome_sha256": "f8c8248b5ae2a28cdcdcfa32e336f78135e023541e37eb9d7511bfa7423a0a2f",
+          "plan_trace": {
+            "accounting": {
+              "actual_tool_cpu_ms": 0.0,
+              "dispatched_candidates": 0,
+              "dispatched_trials": 0,
+              "plan_decision_wall_ms": 0.0,
+              "planned_candidates": 0,
+              "provider_call_count": 0,
+              "revision_wall_ms": 0.0,
+              "tool_execution_wall_ms": 0.0
+            },
+            "multi_tool_generation_count": 0,
+            "provider_visible_history": [],
+            "verified_generation_count": 0
+          },
+          "real_credentials_used": false,
+          "real_provider_calls": 0,
+          "realized_candidate_count": 10,
+          "realized_completed_trials": 39,
+          "realized_dispatched_trials": 39,
+          "scripted_decision_calls": 0,
+          "scripted_plan_calls": 0,
+          "scripted_revision_calls": 0,
+          "terminal_status": "COMPLETED"
+        },
+        {
+          "arm": "scripted_multi_tool",
+          "configured_max_iterations": 2,
+          "configured_max_total_trials": 40,
+          "evidence_completeness": {
+            "accepted_trial_outcome_count": 32,
+            "candidate_count": 8,
+            "complete_candidate_chain_count": 8,
+            "complete_evidence_units": 42,
+            "completeness_rate": 1.0,
+            "expected_evidence_units": 42,
+            "report_ready": true,
+            "terminal_trial_count": 32,
+            "winner_freeze_present": true
+          },
+          "failure_count": 0,
+          "holdout_loss": 0.9532,
+          "network_calls": 0,
+          "optimization_outcome": "max_iterations_reached",
+          "outcome_sha256": "caa82366bd187058244d485f297dd31d5cb0f654d845ad3017b14cbecb0d96c4",
+          "plan_trace": {
+            "accounting": {
+              "actual_tool_cpu_ms": 0.0,
+              "dispatched_candidates": 7,
+              "dispatched_trials": 28,
+              "plan_decision_wall_ms": 42.488,
+              "planned_candidates": 7,
+              "provider_call_count": 4,
+              "revision_wall_ms": 0.327,
+              "tool_execution_wall_ms": 13.04
+            },
+            "multi_tool_generation_count": 1,
+            "provider_visible_history": [
+              {
+                "actual_tool_cpu_ms": 0.0,
+                "decision_source": "model",
+                "dispatched_candidates": 3,
+                "dispatched_trials": 12,
+                "generation": 1,
+                "plan_decision_wall_ms": 10.959,
+                "planned_candidates": 3,
+                "projected_cpu_budget_ms": 10500,
+                "projected_critical_path_latency_budget_ms": 10500,
+                "projected_trial_upper_bound": 12,
+                "provider_call_count": 2,
+                "revision_source": "model",
+                "revision_wall_ms": 0.167,
+                "schema_id": "dronedream.harness-generation-plan-memory/v1",
+                "status": "dispatched",
+                "tool_calls": [
+                  {
+                    "allocation": 3,
+                    "cpu_budget_ms": 10500,
+                    "cpu_ms": 0.0,
+                    "elapsed_ms": 3.069,
+                    "latency_budget_ms": 10500,
+                    "parallel_safe": false,
+                    "proposal_count": 3,
+                    "status": "completed",
+                    "tool_id": "optimizer_portfolio"
+                  }
+                ],
+                "tool_execution_wall_ms": 3.079,
+                "usable_proposal_count": 3
+              },
+              {
+                "actual_tool_cpu_ms": 0.0,
+                "decision_source": "model",
+                "dispatched_candidates": 4,
+                "dispatched_trials": 16,
+                "generation": 2,
+                "plan_decision_wall_ms": 31.529,
+                "planned_candidates": 4,
+                "projected_cpu_budget_ms": 12200,
+                "projected_critical_path_latency_budget_ms": 12200,
+                "projected_trial_upper_bound": 16,
+                "provider_call_count": 2,
+                "revision_source": "model",
+                "revision_wall_ms": 0.16,
+                "schema_id": "dronedream.harness-generation-plan-memory/v1",
+                "status": "dispatched",
+                "tool_calls": [
+                  {
+                    "allocation": 2,
+                    "cpu_budget_ms": 3200,
+                    "cpu_ms": 0.0,
+                    "elapsed_ms": 1.933,
+                    "latency_budget_ms": 3200,
+                    "parallel_safe": true,
+                    "proposal_count": 2,
+                    "status": "completed",
+                    "tool_id": "turbo"
+                  },
+                  {
+                    "allocation": 2,
+                    "cpu_budget_ms": 9000,
+                    "cpu_ms": 0.0,
+                    "elapsed_ms": 7.453,
+                    "latency_budget_ms": 9000,
+                    "parallel_safe": false,
+                    "proposal_count": 2,
+                    "status": "completed",
+                    "tool_id": "optimizer_portfolio"
+                  }
+                ],
+                "tool_execution_wall_ms": 9.961,
+                "usable_proposal_count": 4
+              }
+            ],
+            "verified_generation_count": 2
+          },
+          "real_credentials_used": false,
+          "real_provider_calls": 0,
+          "realized_candidate_count": 8,
+          "realized_completed_trials": 32,
+          "realized_dispatched_trials": 32,
+          "scripted_decision_calls": 4,
+          "scripted_plan_calls": 2,
+          "scripted_revision_calls": 2,
+          "terminal_status": "COMPLETED"
+        }
+      ],
+      "block_id": 3,
+      "configured_budget_equal": true,
+      "realized_trial_delta_scripted_minus_direct": -7,
+      "seed_block": 9300
+    }
+  ],
+  "causal_harness_benefit_claim_permitted": false,
+  "claim_boundary": "Equal configured Trial and generation ceilings on MockSimulatorAdapter. The scripted local planner exercises production closed schemas, multi-tool execution, revision, provenance, and cost accounting with zero provider and network calls. Results do not establish LLM quality, optimizer superiority, physical fidelity, real-flight performance, or causal Harness benefit.",
+  "configured_budget": {
+    "max_iterations": 2,
+    "max_total_trials": 40
+  },
+  "contracts": {
+    "evidence_schema_version": "2.9",
+    "tool_registry_version": "2.1"
+  },
+  "evidence_class": "synthetic_mock_equal_budget_dispatcher_evaluation",
+  "generated_at": "2026-07-28T17:53:02Z",
+  "llm_quality_claim_permitted": false,
+  "network_calls": 0,
+  "optimizer_superiority_claim_permitted": false,
+  "physical_fidelity": false,
+  "real_credentials_used": false,
+  "real_provider_calls": 0,
+  "schema_version": "dronedream.harness-multi-tool-budget-evaluation/v1",
+  "seed_blocks": [
+    7100,
+    8200,
+    9300
+  ],
+  "source_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+  "summary": {
+    "arm_run_count": 6,
+    "block_count": 3,
+    "configured_budget_parity_count": 3,
+    "scripted_accounted_provider_call_count": 12,
+    "scripted_actual_tool_cpu_ms": 15.625,
+    "scripted_decision_call_count": 12,
+    "scripted_multi_tool_generation_count": 3,
+    "scripted_plan_decision_wall_ms": 132.101,
+    "scripted_revision_wall_ms": 1.064,
+    "scripted_tool_execution_wall_ms": 48.948,
+    "scripted_verified_generation_count": 6
+  }
+}

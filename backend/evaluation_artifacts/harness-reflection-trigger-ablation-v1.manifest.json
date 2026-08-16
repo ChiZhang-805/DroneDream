@@ -1,0 +1,506 @@
+{
+  "arms": [
+    "full_reflection",
+    "no_observed_outcome_reflection"
+  ],
+  "cases": [
+    {
+      "case_id": "high_cost_no_improvement",
+      "expected_full_phases": [
+        "diversification"
+      ],
+      "expected_no_reflection_phases": [
+        "diversification"
+      ],
+      "rationale": "A high-cost stagnant search is governed by trusted aggregate search history even when the latest reflection is removed.",
+      "steps": [
+        {
+          "step_id": "stagnant_high_cost_state",
+          "stimulus": {
+            "baseline_score": 1.0,
+            "best_score": 1.0,
+            "constraint_count": 2,
+            "current_generation": 5,
+            "environment": {
+              "advanced_config_present": false,
+              "baro_noise_m": 0.0,
+              "battery_initial_percent": 100.0,
+              "gps_noise_m": 0.0,
+              "imu_noise_scale": 1.0,
+              "obstacle_count": 0,
+              "sensor_dropout_rate": 0.0,
+              "sensor_noise_level": "medium",
+              "steady_wind_component_l1_mps": 0.0,
+              "voltage_sag": false
+            },
+            "feasible_candidate_count": 6,
+            "last_execution": {
+              "batch_policy": "balanced",
+              "decision_source": "model",
+              "dispatched_candidates": 2,
+              "generation": 3,
+              "observed_outcome": {
+                "accepted_attempt_count": 8,
+                "cohort_best_score": 1.0,
+                "cohort_candidate_count": 2,
+                "completed_candidate_rate": 1.0,
+                "domain_failure_trial_count": 0,
+                "feasible_candidate_count": 1,
+                "incumbent_score_after": 1.0,
+                "incumbent_score_before": 1.0,
+                "optimizer_learning_trial_count": 8,
+                "schema_id": "dronedream.harness-decision-observed-outcome/v1"
+              },
+              "plan_phase": "balanced",
+              "planned_candidates": 2,
+              "reflection_status": "verified_complete",
+              "status": "dispatched",
+              "tool_id": "optimizer_portfolio"
+            },
+            "max_iterations": 8,
+            "objective_count": 2,
+            "observed_failure_rate": 0.1,
+            "parameter_count": 16,
+            "remaining_trials": 24,
+            "scored_candidate_count": 12,
+            "tool_history": [],
+            "trailing_stagnant_generations": 3,
+            "training_case_count": 4,
+            "training_cases": [],
+            "training_replicate_count": 8,
+            "trials_per_candidate": 8
+          }
+        }
+      ],
+      "trigger": "high_cost_no_improvement"
+    },
+    {
+      "case_id": "failure_concentration",
+      "expected_full_phases": [
+        "recovery"
+      ],
+      "expected_no_reflection_phases": [
+        "balanced"
+      ],
+      "rationale": "A verified cohort with at least 35% domain failures causes recovery when aggregate search failure remains below its independent recovery threshold.",
+      "steps": [
+        {
+          "step_id": "verified_failure_concentration",
+          "stimulus": {
+            "baseline_score": 1.0,
+            "best_score": 1.0,
+            "constraint_count": 2,
+            "current_generation": 3,
+            "environment": {
+              "advanced_config_present": false,
+              "baro_noise_m": 0.0,
+              "battery_initial_percent": 100.0,
+              "gps_noise_m": 0.0,
+              "imu_noise_scale": 1.0,
+              "obstacle_count": 0,
+              "sensor_dropout_rate": 0.0,
+              "sensor_noise_level": "medium",
+              "steady_wind_component_l1_mps": 0.0,
+              "voltage_sag": false
+            },
+            "feasible_candidate_count": 6,
+            "last_execution": {
+              "batch_policy": "balanced",
+              "decision_source": "model",
+              "dispatched_candidates": 2,
+              "generation": 3,
+              "observed_outcome": {
+                "accepted_attempt_count": 8,
+                "cohort_best_score": 1.0,
+                "cohort_candidate_count": 2,
+                "completed_candidate_rate": 1.0,
+                "domain_failure_trial_count": 4,
+                "feasible_candidate_count": 1,
+                "incumbent_score_after": 1.0,
+                "incumbent_score_before": 1.0,
+                "optimizer_learning_trial_count": 8,
+                "schema_id": "dronedream.harness-decision-observed-outcome/v1"
+              },
+              "plan_phase": "balanced",
+              "planned_candidates": 2,
+              "reflection_status": "verified_complete",
+              "status": "dispatched",
+              "tool_id": "optimizer_portfolio"
+            },
+            "max_iterations": 8,
+            "objective_count": 2,
+            "observed_failure_rate": 0.1,
+            "parameter_count": 16,
+            "remaining_trials": 64,
+            "scored_candidate_count": 12,
+            "tool_history": [],
+            "trailing_stagnant_generations": 0,
+            "training_case_count": 4,
+            "training_cases": [],
+            "training_replicate_count": 8,
+            "trials_per_candidate": 8
+          }
+        }
+      ],
+      "trigger": "failure_concentration"
+    },
+    {
+      "case_id": "search_space_exhaustion",
+      "expected_full_phases": [
+        "exploration"
+      ],
+      "expected_no_reflection_phases": [
+        "exploration"
+      ],
+      "rationale": "A non-dispatched exhausted receipt has no observational cohort; exploration is driven by trusted search insufficiency.",
+      "steps": [
+        {
+          "step_id": "exhausted_without_cohort",
+          "stimulus": {
+            "baseline_score": 1.0,
+            "best_score": 1.0,
+            "constraint_count": 2,
+            "current_generation": 2,
+            "environment": {
+              "advanced_config_present": false,
+              "baro_noise_m": 0.0,
+              "battery_initial_percent": 100.0,
+              "gps_noise_m": 0.0,
+              "imu_noise_scale": 1.0,
+              "obstacle_count": 0,
+              "sensor_dropout_rate": 0.0,
+              "sensor_noise_level": "medium",
+              "steady_wind_component_l1_mps": 0.0,
+              "voltage_sag": false
+            },
+            "feasible_candidate_count": 0,
+            "last_execution": {
+              "batch_policy": "broad",
+              "decision_source": "model",
+              "dispatched_candidates": 0,
+              "generation": 2,
+              "plan_phase": "exploration",
+              "planned_candidates": 4,
+              "reflection_status": "not_applicable",
+              "status": "search_space_exhausted",
+              "tool_id": "constrained_mobo"
+            },
+            "max_iterations": 8,
+            "objective_count": 2,
+            "observed_failure_rate": 0.1,
+            "parameter_count": 4,
+            "remaining_trials": 64,
+            "scored_candidate_count": 2,
+            "tool_history": [],
+            "trailing_stagnant_generations": 0,
+            "training_case_count": 4,
+            "training_cases": [],
+            "training_replicate_count": 8,
+            "trials_per_candidate": 8
+          }
+        }
+      ],
+      "trigger": "search_space_exhaustion"
+    },
+    {
+      "case_id": "verified_improvement_phase_transition",
+      "expected_full_phases": [
+        "refinement"
+      ],
+      "expected_no_reflection_phases": [
+        "balanced"
+      ],
+      "rationale": "A verified positive incumbent improvement transitions a stable search from balanced planning into refinement.",
+      "steps": [
+        {
+          "step_id": "verified_recent_improvement",
+          "stimulus": {
+            "baseline_score": 1.0,
+            "best_score": 0.8,
+            "constraint_count": 2,
+            "current_generation": 3,
+            "environment": {
+              "advanced_config_present": false,
+              "baro_noise_m": 0.0,
+              "battery_initial_percent": 100.0,
+              "gps_noise_m": 0.0,
+              "imu_noise_scale": 1.0,
+              "obstacle_count": 0,
+              "sensor_dropout_rate": 0.0,
+              "sensor_noise_level": "medium",
+              "steady_wind_component_l1_mps": 0.0,
+              "voltage_sag": false
+            },
+            "feasible_candidate_count": 6,
+            "last_execution": {
+              "batch_policy": "balanced",
+              "decision_source": "model",
+              "dispatched_candidates": 2,
+              "generation": 3,
+              "observed_outcome": {
+                "accepted_attempt_count": 8,
+                "cohort_best_score": 0.8,
+                "cohort_candidate_count": 2,
+                "completed_candidate_rate": 1.0,
+                "domain_failure_trial_count": 0,
+                "feasible_candidate_count": 1,
+                "incumbent_score_after": 0.8,
+                "incumbent_score_before": 1.0,
+                "observed_absolute_improvement": 0.2,
+                "observed_relative_improvement": 0.2,
+                "optimizer_learning_trial_count": 8,
+                "schema_id": "dronedream.harness-decision-observed-outcome/v1"
+              },
+              "plan_phase": "balanced",
+              "planned_candidates": 2,
+              "reflection_status": "verified_complete",
+              "status": "dispatched",
+              "tool_id": "optimizer_portfolio"
+            },
+            "max_iterations": 8,
+            "objective_count": 2,
+            "observed_failure_rate": 0.1,
+            "parameter_count": 16,
+            "remaining_trials": 64,
+            "scored_candidate_count": 12,
+            "tool_history": [],
+            "trailing_stagnant_generations": 0,
+            "training_case_count": 4,
+            "training_cases": [],
+            "training_replicate_count": 8,
+            "trials_per_candidate": 8
+          }
+        }
+      ],
+      "trigger": "phase_transition"
+    },
+    {
+      "case_id": "recovery_then_reexplore",
+      "expected_full_phases": [
+        "recovery",
+        "exploration"
+      ],
+      "expected_no_reflection_phases": [
+        "balanced",
+        "exploration"
+      ],
+      "rationale": "The full arm first enters recovery from verified failures and then returns to exploration when the next trusted search state has insufficient scored and feasible history.",
+      "steps": [
+        {
+          "step_id": "enter_recovery",
+          "stimulus": {
+            "baseline_score": 1.0,
+            "best_score": 1.0,
+            "constraint_count": 2,
+            "current_generation": 3,
+            "environment": {
+              "advanced_config_present": false,
+              "baro_noise_m": 0.0,
+              "battery_initial_percent": 100.0,
+              "gps_noise_m": 0.0,
+              "imu_noise_scale": 1.0,
+              "obstacle_count": 0,
+              "sensor_dropout_rate": 0.0,
+              "sensor_noise_level": "medium",
+              "steady_wind_component_l1_mps": 0.0,
+              "voltage_sag": false
+            },
+            "feasible_candidate_count": 6,
+            "last_execution": {
+              "batch_policy": "balanced",
+              "decision_source": "model",
+              "dispatched_candidates": 2,
+              "generation": 3,
+              "observed_outcome": {
+                "accepted_attempt_count": 8,
+                "cohort_best_score": 1.0,
+                "cohort_candidate_count": 2,
+                "completed_candidate_rate": 1.0,
+                "domain_failure_trial_count": 4,
+                "feasible_candidate_count": 1,
+                "incumbent_score_after": 1.0,
+                "incumbent_score_before": 1.0,
+                "optimizer_learning_trial_count": 8,
+                "schema_id": "dronedream.harness-decision-observed-outcome/v1"
+              },
+              "plan_phase": "balanced",
+              "planned_candidates": 2,
+              "reflection_status": "verified_complete",
+              "status": "dispatched",
+              "tool_id": "optimizer_portfolio"
+            },
+            "max_iterations": 8,
+            "objective_count": 2,
+            "observed_failure_rate": 0.1,
+            "parameter_count": 16,
+            "remaining_trials": 64,
+            "scored_candidate_count": 12,
+            "tool_history": [],
+            "trailing_stagnant_generations": 0,
+            "training_case_count": 4,
+            "training_cases": [],
+            "training_replicate_count": 8,
+            "trials_per_candidate": 8
+          }
+        },
+        {
+          "step_id": "reexplore_after_recovery",
+          "stimulus": {
+            "baseline_score": 1.0,
+            "best_score": 1.0,
+            "constraint_count": 2,
+            "current_generation": 4,
+            "environment": {
+              "advanced_config_present": false,
+              "baro_noise_m": 0.0,
+              "battery_initial_percent": 100.0,
+              "gps_noise_m": 0.0,
+              "imu_noise_scale": 1.0,
+              "obstacle_count": 0,
+              "sensor_dropout_rate": 0.0,
+              "sensor_noise_level": "medium",
+              "steady_wind_component_l1_mps": 0.0,
+              "voltage_sag": false
+            },
+            "feasible_candidate_count": 0,
+            "last_execution": {
+              "batch_policy": "conservative",
+              "decision_source": "model",
+              "dispatched_candidates": 2,
+              "generation": 4,
+              "observed_outcome": {
+                "accepted_attempt_count": 8,
+                "cohort_best_score": 1.0,
+                "cohort_candidate_count": 2,
+                "completed_candidate_rate": 1.0,
+                "domain_failure_trial_count": 0,
+                "feasible_candidate_count": 1,
+                "incumbent_score_after": 1.0,
+                "incumbent_score_before": 1.0,
+                "optimizer_learning_trial_count": 8,
+                "schema_id": "dronedream.harness-decision-observed-outcome/v1"
+              },
+              "plan_phase": "recovery",
+              "planned_candidates": 2,
+              "reflection_status": "verified_complete",
+              "status": "dispatched",
+              "tool_id": "optimizer_portfolio"
+            },
+            "max_iterations": 8,
+            "objective_count": 2,
+            "observed_failure_rate": 0.0,
+            "parameter_count": 4,
+            "remaining_trials": 64,
+            "scored_candidate_count": 2,
+            "tool_history": [],
+            "trailing_stagnant_generations": 0,
+            "training_case_count": 4,
+            "training_cases": [],
+            "training_replicate_count": 8,
+            "trials_per_candidate": 8
+          }
+        }
+      ],
+      "trigger": "recovery_then_reexplore"
+    },
+    {
+      "case_id": "phase_scoped_tool_eligibility_change",
+      "expected_full_phases": [
+        "recovery"
+      ],
+      "expected_no_reflection_phases": [
+        "balanced"
+      ],
+      "rationale": "All eight registered tools satisfy capability preconditions, but verified failure reflection narrows the selectable surface to recovery-compatible roles.",
+      "steps": [
+        {
+          "step_id": "all_capabilities_recovery_gate",
+          "stimulus": {
+            "baseline_score": 1.0,
+            "best_score": 1.0,
+            "constraint_count": 2,
+            "current_generation": 3,
+            "environment": {
+              "advanced_config_present": false,
+              "baro_noise_m": 0.0,
+              "battery_initial_percent": 100.0,
+              "gps_noise_m": 0.0,
+              "imu_noise_scale": 1.0,
+              "obstacle_count": 0,
+              "sensor_dropout_rate": 0.0,
+              "sensor_noise_level": "medium",
+              "steady_wind_component_l1_mps": 0.0,
+              "voltage_sag": false
+            },
+            "feasible_candidate_count": 6,
+            "last_execution": {
+              "batch_policy": "balanced",
+              "decision_source": "model",
+              "dispatched_candidates": 2,
+              "generation": 3,
+              "observed_outcome": {
+                "accepted_attempt_count": 8,
+                "cohort_best_score": 1.0,
+                "cohort_candidate_count": 2,
+                "completed_candidate_rate": 1.0,
+                "domain_failure_trial_count": 4,
+                "feasible_candidate_count": 1,
+                "incumbent_score_after": 1.0,
+                "incumbent_score_before": 1.0,
+                "optimizer_learning_trial_count": 8,
+                "schema_id": "dronedream.harness-decision-observed-outcome/v1"
+              },
+              "plan_phase": "balanced",
+              "planned_candidates": 2,
+              "reflection_status": "verified_complete",
+              "status": "dispatched",
+              "tool_id": "optimizer_portfolio"
+            },
+            "max_iterations": 8,
+            "objective_count": 2,
+            "observed_failure_rate": 0.1,
+            "parameter_count": 16,
+            "remaining_trials": 64,
+            "scored_candidate_count": 12,
+            "tool_history": [],
+            "trailing_stagnant_generations": 0,
+            "training_case_count": 4,
+            "training_cases": [],
+            "training_replicate_count": 8,
+            "trials_per_candidate": 8
+          }
+        }
+      ],
+      "trigger": "tool_eligibility_change"
+    }
+  ],
+  "claim_boundary": "Matched deterministic intervention over synthetic evidence snapshots using the production plan compiler and tool gates. A difference identifies a causal software-contract dependency within these frozen fixtures only. It does not establish optimizer-quality benefit, LLM superiority, PX4/Gazebo performance, physical fidelity, transfer to real aircraft, or flight safety.",
+  "claim_label": "SYNTHETIC_CONTRACT",
+  "evidence_class": "deterministic_reflection_trigger_contract_ablation",
+  "interpretation_rule": {
+    "causal_contract_difference": "the direct reflection intervention was activated and changed at least one preregistered plan or tool-surface field",
+    "inconclusive_intervention_not_activated": "the receipt had no dispatched observational cohort, so there was no verified reflection to remove",
+    "no_observed_contract_difference": "the intervention was activated but trusted budget/search signals made the resulting contract identical"
+  },
+  "intervention": "retain the verified decision receipt but replace reflection_status with unavailable and remove observed_outcome before recompiling the production plan",
+  "manifest_sha256": "cae24d1c3773a13d4d2558284a97821420726384cbd3287148fd7b2732f62936",
+  "runtime_contract": {
+    "network_calls": 0,
+    "physical_fidelity": false,
+    "production_capability_gate": true,
+    "production_phase_gate": true,
+    "production_plan_compiler": true,
+    "provider_calls": 0,
+    "real_credentials_used": false,
+    "simulator_runs": 0
+  },
+  "schema_version": "dronedream.harness-reflection-trigger-ablation-manifest/v1",
+  "trigger_coverage": [
+    "high_cost_no_improvement",
+    "failure_concentration",
+    "search_space_exhaustion",
+    "phase_transition",
+    "recovery_then_reexplore",
+    "tool_eligibility_change"
+  ]
+}

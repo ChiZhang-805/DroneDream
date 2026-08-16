@@ -1,0 +1,838 @@
+{
+  "artifact_sha256": "d8708040bd1f035a3cc1917213e5091ccfc79fe581f9294fa8d6b1492e65a833",
+  "case_rows": [
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 1,
+          "consumed_simulations": 6,
+          "consumed_trials": 6,
+          "generations_to_first_qualified": 1,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 1,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 1,
+          "simulated_provider_turns_succeeded": 1,
+          "simulations_to_first_qualified": 6,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 43500,
+          "trials_to_first_qualified": 6
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 1,
+          "consumed_simulations": 6,
+          "consumed_trials": 6,
+          "generations_to_first_qualified": 1,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 2,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 2,
+          "simulated_provider_turns_succeeded": 2,
+          "simulations_to_first_qualified": 6,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 45000,
+          "trials_to_first_qualified": 6
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 1,
+          "consumed_simulations": 6,
+          "consumed_trials": 6,
+          "generations_to_first_qualified": 1,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 1,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 1,
+          "simulated_provider_turns_succeeded": 1,
+          "simulations_to_first_qualified": 6,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 43500,
+          "trials_to_first_qualified": 6
+        }
+      ],
+      "case_id": "direct_first_turn_stop",
+      "category": "local_progress",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [],
+        "expected_optional_turn": false,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 0,
+        "optional_turn_triggered": false,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "8e13541438a09546a5537e4bdc3e0f6370b0c348389e298960b32ea03153e70b"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 2,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 2,
+          "simulated_provider_turns_succeeded": 2,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 87000,
+          "trials_to_first_qualified": 12
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 4,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 90000,
+          "trials_to_first_qualified": 12
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 4,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 90000,
+          "trials_to_first_qualified": 12
+        }
+      ],
+      "case_id": "steady_progress_no_extra_reasoning",
+      "category": "local_progress",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [],
+        "expected_optional_turn": false,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 0,
+        "optional_turn_triggered": false,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "db445c0f5afca852037d77f3a277203be0dee15b4c0d986c9de0a0e39defc4a6"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": 4,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 8,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 8,
+          "simulated_provider_turns_succeeded": 8,
+          "simulations_to_first_qualified": 24,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 180000,
+          "trials_to_first_qualified": 24
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 3,
+          "consumed_simulations": 18,
+          "consumed_trials": 18,
+          "generations_to_first_qualified": 3,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 7,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 7,
+          "simulated_provider_turns_succeeded": 7,
+          "simulations_to_first_qualified": 18,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 136500,
+          "trials_to_first_qualified": 18
+        }
+      ],
+      "case_id": "trailing_stagnation_diagnosis",
+      "category": "stagnation",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [
+          "trailing_stagnation"
+        ],
+        "expected_optional_turn": true,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 1,
+        "optional_turn_triggered": true,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "ef5cd9354e66e4e7ccfbda1f665f25e36b9cc03c2f772ccd7cab2001dffd4e47"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": 4,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 4,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": 24,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 174000,
+          "trials_to_first_qualified": 24
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 3,
+          "consumed_simulations": 18,
+          "consumed_trials": 18,
+          "generations_to_first_qualified": 3,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 6,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 6,
+          "simulated_provider_turns_succeeded": 6,
+          "simulations_to_first_qualified": 18,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 135000,
+          "trials_to_first_qualified": 18
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 5,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 5,
+          "simulated_provider_turns_succeeded": 5,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 91500,
+          "trials_to_first_qualified": 12
+        }
+      ],
+      "case_id": "conflicting_tool_directions",
+      "category": "mixed_tool_history",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [
+          "tool_direction_conflict"
+        ],
+        "expected_optional_turn": true,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 1,
+        "optional_turn_triggered": true,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "db445c0f5afca852037d77f3a277203be0dee15b4c0d986c9de0a0e39defc4a6"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": 4,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 8,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 8,
+          "simulated_provider_turns_succeeded": 8,
+          "simulations_to_first_qualified": 24,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 180000,
+          "trials_to_first_qualified": 24
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 3,
+          "consumed_simulations": 18,
+          "consumed_trials": 18,
+          "generations_to_first_qualified": 3,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 7,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 7,
+          "simulated_provider_turns_succeeded": 7,
+          "simulations_to_first_qualified": 18,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 136500,
+          "trials_to_first_qualified": 18
+        }
+      ],
+      "case_id": "prediction_outcome_mismatch",
+      "category": "failure_recovery",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [
+          "prediction_outcome_mismatch"
+        ],
+        "expected_optional_turn": true,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 1,
+        "optional_turn_triggered": true,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "db445c0f5afca852037d77f3a277203be0dee15b4c0d986c9de0a0e39defc4a6"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 3,
+          "consumed_simulations": 18,
+          "consumed_trials": 18,
+          "generations_to_first_qualified": 3,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 6,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 6,
+          "simulated_provider_turns_succeeded": 6,
+          "simulations_to_first_qualified": 18,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 135000,
+          "trials_to_first_qualified": 18
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 5,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 5,
+          "simulated_provider_turns_succeeded": 5,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 91500,
+          "trials_to_first_qualified": 12
+        }
+      ],
+      "case_id": "domain_failure_spike",
+      "category": "failure_recovery",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [
+          "domain_failure_spike"
+        ],
+        "expected_optional_turn": true,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 1,
+        "optional_turn_triggered": true,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "225785f8f734c9e6339215ee7f04e11fd1ed105ced90c86e661cf73608119761"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": 4,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 8,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 8,
+          "simulated_provider_turns_succeeded": 8,
+          "simulations_to_first_qualified": 24,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 180000,
+          "trials_to_first_qualified": 24
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 3,
+          "consumed_simulations": 18,
+          "consumed_trials": 18,
+          "generations_to_first_qualified": 3,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 7,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 7,
+          "simulated_provider_turns_succeeded": 7,
+          "simulations_to_first_qualified": 18,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 136500,
+          "trials_to_first_qualified": 18
+        }
+      ],
+      "case_id": "ood_without_transfer_memory",
+      "category": "cold_start",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [
+          "domain_failure_spike",
+          "ood_no_transfer_memory"
+        ],
+        "expected_optional_turn": true,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 1,
+        "optional_turn_triggered": true,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "b12d60538b42671703c4e0c62b40409386c59615c36191674008e091b84d9727"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 3,
+          "consumed_simulations": 18,
+          "consumed_trials": 18,
+          "generations_to_first_qualified": 3,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 6,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 6,
+          "simulated_provider_turns_succeeded": 6,
+          "simulations_to_first_qualified": 18,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 135000,
+          "trials_to_first_qualified": 18
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 5,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 5,
+          "simulated_provider_turns_succeeded": 5,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 91500,
+          "trials_to_first_qualified": 12
+        }
+      ],
+      "case_id": "hard_boundary_safety_review",
+      "category": "constraint_pressure",
+      "trigger": {
+        "critic_reasons": [
+          "hard_boundary_candidate"
+        ],
+        "diagnosis_reasons": [],
+        "expected_optional_turn": true,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 1,
+        "optional_turn_triggered": true,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "db445c0f5afca852037d77f3a277203be0dee15b4c0d986c9de0a0e39defc4a6"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 3,
+          "consumed_simulations": 18,
+          "consumed_trials": 18,
+          "generations_to_first_qualified": 3,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 3,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 3,
+          "simulated_provider_turns_succeeded": 3,
+          "simulations_to_first_qualified": 18,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 130500,
+          "trials_to_first_qualified": 18
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 4,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 90000,
+          "trials_to_first_qualified": 12
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 4,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 90000,
+          "trials_to_first_qualified": 12
+        }
+      ],
+      "case_id": "cooldown_suppresses_duplicate_stagnation",
+      "category": "stagnation",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [],
+        "expected_optional_turn": false,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 0,
+        "optional_turn_triggered": false,
+        "suppressed_by_cooldown": [
+          "trailing_stagnation"
+        ],
+        "trigger_evidence_sha256": "ef5cd9354e66e4e7ccfbda1f665f25e36b9cc03c2f772ccd7cab2001dffd4e47"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 3,
+          "consumed_simulations": 18,
+          "consumed_trials": 18,
+          "generations_to_first_qualified": 3,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 6,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 6,
+          "simulated_provider_turns_succeeded": 6,
+          "simulations_to_first_qualified": 18,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 135000,
+          "trials_to_first_qualified": 18
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 2,
+          "consumed_simulations": 12,
+          "consumed_trials": 12,
+          "generations_to_first_qualified": 2,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": 5,
+          "qualified": true,
+          "simulated_provider_turns_attempted": 5,
+          "simulated_provider_turns_succeeded": 5,
+          "simulations_to_first_qualified": 12,
+          "terminal_result": "first_qualified",
+          "time_to_first_qualified_ms": 91500,
+          "trials_to_first_qualified": 12
+        }
+      ],
+      "case_id": "severity_escalation_over_cooldown",
+      "category": "constraint_pressure",
+      "trigger": {
+        "critic_reasons": [
+          "hard_boundary_candidate"
+        ],
+        "diagnosis_reasons": [],
+        "expected_optional_turn": true,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 1,
+        "optional_turn_triggered": true,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "db445c0f5afca852037d77f3a277203be0dee15b4c0d986c9de0a0e39defc4a6"
+      }
+    },
+    {
+      "arms": [
+        {
+          "arm": "one_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 4,
+          "simulated_provider_turns_succeeded": 4,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        },
+        {
+          "arm": "fixed_two_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 8,
+          "simulated_provider_turns_succeeded": 8,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        },
+        {
+          "arm": "adaptive_two_to_four_turn",
+          "consumed_generations": 4,
+          "consumed_simulations": 24,
+          "consumed_trials": 24,
+          "generations_to_first_qualified": null,
+          "provider_retries": 0,
+          "provider_turns_to_first_qualified": null,
+          "qualified": false,
+          "simulated_provider_turns_attempted": 8,
+          "simulated_provider_turns_succeeded": 8,
+          "simulations_to_first_qualified": null,
+          "terminal_result": "no_validated_winner",
+          "time_to_first_qualified_ms": null,
+          "trials_to_first_qualified": null
+        }
+      ],
+      "case_id": "no_validated_winner_under_frozen_budget",
+      "category": "tight_budget",
+      "trigger": {
+        "critic_reasons": [],
+        "diagnosis_reasons": [],
+        "expected_optional_turn": false,
+        "holdout_outcomes_visible": false,
+        "optional_turn_count": 0,
+        "optional_turn_triggered": false,
+        "suppressed_by_cooldown": [],
+        "trigger_evidence_sha256": "db445c0f5afca852037d77f3a277203be0dee15b4c0d986c9de0a0e39defc4a6"
+      }
+    }
+  ],
+  "claim_boundary": "Deterministic offline state-machine evidence over frozen scripted outcomes. It exercises the production adaptive trigger and equal maximum simulation, trial, scenario, seed, model-fixture and tool-version budgets across arms. It does not call a provider or simulator and cannot establish optimizer quality, model superiority, PX4/Gazebo performance, physical fidelity, transfer to aircraft, flight safety, or a global optimum.",
+  "claim_label": "SYNTHETIC_FIXED_BUDGET",
+  "general_model_benefit_claim_permitted": false,
+  "manifest_sha256": "aefd8bdb0d52a1b6bea26c250cf1cc8c7e5c201158e3db16792a151f171ac61a",
+  "network_calls": 0,
+  "optimizer_quality_claim_permitted": false,
+  "real_credentials_used": false,
+  "real_provider_calls": 0,
+  "schema_version": "dronedream.cognitive-budget-ablation/v1",
+  "simulator_runs": 0,
+  "summary": {
+    "arm_count": 3,
+    "arm_summaries": [
+      {
+        "arm": "one_turn",
+        "case_count": 11,
+        "median_provider_turns_to_first_qualified": 2.5,
+        "median_simulations_to_first_qualified": 15.0,
+        "median_time_to_first_qualified_ms": 108750.0,
+        "no_validated_winner_count": 7,
+        "qualification_rate": 0.36363636363636365,
+        "qualified_case_count": 4,
+        "total_consumed_simulations": 228,
+        "total_simulated_provider_turns": 38
+      },
+      {
+        "arm": "fixed_two_turn",
+        "case_count": 11,
+        "median_provider_turns_to_first_qualified": 6.0,
+        "median_simulations_to_first_qualified": 18.0,
+        "median_time_to_first_qualified_ms": 135000.0,
+        "no_validated_winner_count": 1,
+        "qualification_rate": 0.9090909090909091,
+        "qualified_case_count": 10,
+        "total_consumed_simulations": 198,
+        "total_simulated_provider_turns": 66
+      },
+      {
+        "arm": "adaptive_two_to_four_turn",
+        "case_count": 11,
+        "median_provider_turns_to_first_qualified": 5.0,
+        "median_simulations_to_first_qualified": 12.0,
+        "median_time_to_first_qualified_ms": 91500.0,
+        "no_validated_winner_count": 1,
+        "qualification_rate": 0.9090909090909091,
+        "qualified_case_count": 10,
+        "total_consumed_simulations": 156,
+        "total_simulated_provider_turns": 58
+      }
+    ],
+    "case_count": 11,
+    "fixed_budget_equal_across_arms": true,
+    "marginal_optional_turn_rows": [
+      {
+        "adaptive_qualified": true,
+        "additional_provider_turns_vs_fixed_two": -1,
+        "case_id": "trailing_stagnation_diagnosis",
+        "fixed_two_qualified": true,
+        "simulations_saved_vs_fixed_two": 6
+      },
+      {
+        "adaptive_qualified": true,
+        "additional_provider_turns_vs_fixed_two": -1,
+        "case_id": "conflicting_tool_directions",
+        "fixed_two_qualified": true,
+        "simulations_saved_vs_fixed_two": 6
+      },
+      {
+        "adaptive_qualified": true,
+        "additional_provider_turns_vs_fixed_two": -1,
+        "case_id": "prediction_outcome_mismatch",
+        "fixed_two_qualified": true,
+        "simulations_saved_vs_fixed_two": 6
+      },
+      {
+        "adaptive_qualified": true,
+        "additional_provider_turns_vs_fixed_two": -1,
+        "case_id": "domain_failure_spike",
+        "fixed_two_qualified": true,
+        "simulations_saved_vs_fixed_two": 6
+      },
+      {
+        "adaptive_qualified": true,
+        "additional_provider_turns_vs_fixed_two": -1,
+        "case_id": "ood_without_transfer_memory",
+        "fixed_two_qualified": true,
+        "simulations_saved_vs_fixed_two": 6
+      },
+      {
+        "adaptive_qualified": true,
+        "additional_provider_turns_vs_fixed_two": -1,
+        "case_id": "hard_boundary_safety_review",
+        "fixed_two_qualified": true,
+        "simulations_saved_vs_fixed_two": 6
+      },
+      {
+        "adaptive_qualified": true,
+        "additional_provider_turns_vs_fixed_two": -1,
+        "case_id": "severity_escalation_over_cooldown",
+        "fixed_two_qualified": true,
+        "simulations_saved_vs_fixed_two": 6
+      }
+    ],
+    "trigger_confusion": {
+      "fn": 0,
+      "fp": 0,
+      "tn": 4,
+      "tp": 7
+    },
+    "trigger_false_positive_rate": 0.0,
+    "trigger_precision": 1.0
+  }
+}

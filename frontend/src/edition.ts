@@ -10,7 +10,8 @@ export const BUILD_HAS_LAB_WORKSPACE =
   __DRONEDREAM_BUILD_EDITION__ === "universal"
   || __DRONEDREAM_BUILD_EDITION__ === "lab";
 export const BUILD_HAS_FIELD_WORKSPACE =
-  __DRONEDREAM_BUILD_EDITION__ === "universal";
+  __DRONEDREAM_BUILD_EDITION__ === "universal"
+  || __DRONEDREAM_BUILD_EDITION__ === "field";
 export const BUILD_HAS_VEHICLE_STUDIO =
   __DRONEDREAM_BUILD_EDITION__ === "universal";
 

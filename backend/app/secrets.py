@@ -24,7 +24,7 @@ from typing import Protocol
 logger = logging.getLogger("drone_dream.secrets")
 
 _DEV_MARKER = "DRONEDREAM_DEV::"
-_PRODUCTION_ENVS = frozenset({"prod", "production"})
+_PROTECTED_ENVS = frozenset({"desktop", "prod", "production"})
 _PLACEHOLDER_MARKERS = (
     "change-me",
     "changeme",
@@ -45,12 +45,17 @@ class _FernetCipher(Protocol):
     def decrypt(self, token: bytes) -> bytes: ...
 
 
-def _is_production() -> bool:
-    return os.environ.get("APP_ENV", "development").strip().lower() in _PRODUCTION_ENVS
+def _is_protected_environment() -> bool:
+    return (
+        os.environ.get("APP_ENV", "development").strip().lower()
+        in _PROTECTED_ENVS
+    )
 
 
-def _validate_production_key(raw: str) -> None:
-    if not _is_production():
+def validate_secret_material(raw: str) -> None:
+    """Reject weak shared secret material in packaged or hosted environments."""
+
+    if not _is_protected_environment():
         return
     normalized = raw.strip()
     marker_value = normalized.lower().replace("_", "-")
@@ -61,7 +66,7 @@ def _validate_production_key(raw: str) -> None:
     ):
         raise SecretStoreError(
             "APP_SECRET_KEY must be a non-placeholder value of at least 32 UTF-8 "
-            "bytes with adequate character diversity in production."
+            "bytes with adequate character diversity in desktop or production."
         )
 
 
@@ -71,13 +76,13 @@ def _load_fernet() -> _FernetCipher | None:
     raw = os.environ.get("APP_SECRET_KEY") or os.environ.get("DRONEDREAM_SECRET_KEY")
     if not raw:
         return None
-    _validate_production_key(raw)
+    validate_secret_material(raw)
     try:
         from cryptography.fernet import Fernet
     except ImportError:  # pragma: no cover — dev convenience only
-        if _is_production():
+        if _is_protected_environment():
             raise SecretStoreError(
-                "cryptography is required for production secret storage."
+                "cryptography is required for desktop or production secret storage."
             ) from None
         logger.warning("cryptography is not installed; falling back to local-dev secret store")
         return None
@@ -125,6 +130,13 @@ def decrypt_secret(token: str) -> str:
     if not token:
         raise SecretStoreError("Cannot decrypt an empty token.")
     if token.startswith(_DEV_MARKER):
+        if _is_protected_environment():
+            # A development database may be copied into a packaged or hosted
+            # environment. Never let its reversible base64 placeholder bypass
+            # the protected environment's Fernet-at-rest requirement.
+            raise SecretStoreError(
+                "Local-development secret tokens are forbidden in desktop or production."
+            )
         try:
             return base64.urlsafe_b64decode(token.removeprefix(_DEV_MARKER).encode("ascii")).decode(
                 "utf-8"
@@ -149,4 +161,5 @@ __all__ = [
     "decrypt_secret",
     "encrypt_secret",
     "is_configured",
+    "validate_secret_material",
 ]

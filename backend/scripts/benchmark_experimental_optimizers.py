@@ -271,6 +271,8 @@ def run_benchmark(
 
     if generations < 1 or batch_size < 1:
         raise ValueError("generations and batch_size must both be positive")
+    if not strategies:
+        raise ValueError("benchmark requires at least one optimizer strategy")
     unknown = set(strategies).difference(EXPERIMENTAL_OPTIMIZER_STRATEGIES)
     if unknown:
         raise ValueError(f"unsupported strategies: {', '.join(sorted(unknown))}")
@@ -317,6 +319,24 @@ def run_benchmark(
     }
 
 
+def write_new_benchmark_result(path: Path, payload: str) -> None:
+    """Publish one benchmark result without replacing an earlier run."""
+
+    path = path.resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    created = False
+    try:
+        with path.open("x", encoding="utf-8", newline="\n") as handle:
+            created = True
+            handle.write(payload)
+    except FileExistsError as exc:
+        raise ValueError(f"benchmark output already exists: {path}") from exc
+    except Exception:
+        if created:
+            path.unlink(missing_ok=True)
+        raise
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--generations", type=int, default=3)
@@ -331,8 +351,7 @@ def main() -> int:
     )
     payload = json.dumps(result, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     if args.output is not None:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(payload, encoding="utf-8")
+        write_new_benchmark_result(args.output, payload)
     else:
         print(payload, end="")
     return 0

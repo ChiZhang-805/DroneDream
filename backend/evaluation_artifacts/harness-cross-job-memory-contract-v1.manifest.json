@@ -1,0 +1,35 @@
+{
+  "cases": [
+    "same_user_exact_task_exact_scenario",
+    "same_user_exact_task_shifted_scenario",
+    "cross_user_isolated",
+    "anonymous_user_isolated",
+    "task_family_mismatch",
+    "parameter_catalog_drift",
+    "revoked_excluded",
+    "expired_excluded",
+    "contract_version_drift_excluded",
+    "source_receipt_drift_excluded"
+  ],
+  "claim_boundary": "This deterministic in-memory SQLite evaluation proves the current software retrieval, isolation, retention, revocation, contract-drift, receipt-binding, provider-projection, and prompt-binding behavior for the enumerated fixtures. It makes no claim of optimizer-quality benefit, LLM superiority, physical fidelity, transfer to other tasks, real-aircraft performance, or flight safety.",
+  "contracts": {
+    "eligibility_policy_version": "1.1",
+    "evidence_schema_version": "2.9",
+    "memory_schema_version": "1.0",
+    "prompt_template_version": "1.7",
+    "retention_days": 90,
+    "retrieval_policy_version": "1.0",
+    "tool_registry_version": "2.1",
+    "trace_schema_version": "1.4"
+  },
+  "generated_at": "2026-07-28T17:28:13Z",
+  "manifest_sha256": "c89855fdccd09697b1d4331ee3d06feac851c83cf3121b27cc84a12ee2ce5d51",
+  "runtime": {
+    "database": "sqlite_in_memory",
+    "network_calls": 0,
+    "provider_calls": 0,
+    "real_credentials_used": false,
+    "simulator_runs": 0
+  },
+  "schema_version": "dronedream.harness-cross-job-memory-evaluation-manifest/v1"
+}
