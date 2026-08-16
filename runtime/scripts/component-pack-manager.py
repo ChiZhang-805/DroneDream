@@ -127,7 +127,10 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         {"runtimeProductId", "minimumRuntimeVersion", "engineApiVersion"},
         "component pack compatibility",
     )
-    if compatibility["runtimeProductId"] != "DroneDreamRuntime" or compatibility["engineApiVersion"] != 1:
+    if (
+        compatibility["runtimeProductId"] != "DroneDreamRuntime"
+        or compatibility["engineApiVersion"] != 1
+    ):
         raise ComponentPackInstallError("component pack Runtime identity is unsupported")
     parse_version(compatibility["minimumRuntimeVersion"])
     profiles = manifest["editionProfiles"]
@@ -158,7 +161,9 @@ def validate_runtime_compatibility(
     compatibility = manifest["runtimeCompatibility"]
     if runtime.get("productId") not in (None, "DroneDreamRuntime"):
         raise ComponentPackInstallError("installed Runtime product is incompatible")
-    if parse_version(runtime.get("version")) < parse_version(compatibility["minimumRuntimeVersion"]):
+    if parse_version(runtime.get("version")) < parse_version(
+        compatibility["minimumRuntimeVersion"]
+    ):
         raise ComponentPackInstallError("component pack requires a newer Base Runtime")
     if profile not in manifest["editionProfiles"]:
         raise ComponentPackInstallError("component pack does not support this Runtime profile")
@@ -213,7 +218,9 @@ def validate_verified_receipt(
         or receipt["catalogSequence"] != expected_catalog_sequence
         or receipt["keyId"] != expected_key_id
     ):
-        raise ComponentPackInstallError("component receipt does not match the native trust decision")
+        raise ComponentPackInstallError(
+            "component receipt does not match the native trust decision"
+        )
 
 
 def safe_extract(archive_path: Path, destination: Path, files: list[dict[str, Any]]) -> None:
@@ -243,15 +250,18 @@ def safe_extract(archive_path: Path, destination: Path, files: list[dict[str, An
                     shutil.copyfileobj(source, output)
                 target.chmod(0o644)
                 record = expected[relative]
-                if target.stat().st_size != record["sizeBytes"] or sha256_file(target) != record["sha256"]:
-                    raise ComponentPackInstallError(f"component file failed verification: {relative}")
+                if (
+                    target.stat().st_size != record["sizeBytes"]
+                    or sha256_file(target) != record["sha256"]
+                ):
+                    raise ComponentPackInstallError(
+                        f"component file failed verification: {relative}"
+                    )
     except (OSError, tarfile.TarError) as error:
         raise ComponentPackInstallError("component archive could not be extracted") from error
 
 
-def verify_release_directory(
-    release: Path, manifest_path: Path, manifest: dict[str, Any]
-) -> None:
+def verify_release_directory(release: Path, manifest_path: Path, manifest: dict[str, Any]) -> None:
     expected_files = {
         "component-pack-manifest.json": {
             "sizeBytes": manifest_path.stat().st_size,
@@ -270,17 +280,25 @@ def verify_release_directory(
             if path.is_symlink() or not path.is_file():
                 raise ComponentPackInstallError(f"component release file is missing: {relative}")
             if path.stat().st_size != record["sizeBytes"] or sha256_file(path) != record["sha256"]:
-                raise ComponentPackInstallError(f"component release file failed verification: {relative}")
+                raise ComponentPackInstallError(
+                    f"component release file failed verification: {relative}"
+                )
         for path in release.rglob("*"):
             relative = path.relative_to(release).as_posix()
             if path.is_symlink():
                 raise ComponentPackInstallError(f"component release contains a symlink: {relative}")
             if path.is_file() and relative not in expected_files:
-                raise ComponentPackInstallError(f"component release contains an unlisted file: {relative}")
+                raise ComponentPackInstallError(
+                    f"component release contains an unlisted file: {relative}"
+                )
             if path.is_dir() and relative not in expected_directories:
-                raise ComponentPackInstallError(f"component release contains an unlisted directory: {relative}")
+                raise ComponentPackInstallError(
+                    f"component release contains an unlisted directory: {relative}"
+                )
             if not path.is_file() and not path.is_dir():
-                raise ComponentPackInstallError(f"component release contains an unsafe path: {relative}")
+                raise ComponentPackInstallError(
+                    f"component release contains an unsafe path: {relative}"
+                )
     except OSError as error:
         raise ComponentPackInstallError("component release directory cannot be verified") from error
 
@@ -379,7 +397,9 @@ def install_pack(
         raise ComponentPackInstallError("component catalog replay or downgrade was rejected")
     previous_state = state["components"].get(pack_type)
     if previous_state is not None:
-        if not isinstance(previous_state, dict) or not isinstance(previous_state.get("releaseSequence"), int):
+        if not isinstance(previous_state, dict) or not isinstance(
+            previous_state.get("releaseSequence"), int
+        ):
             raise ComponentPackInstallError("component pack state entry is invalid")
         if manifest["releaseSequence"] < previous_state["releaseSequence"]:
             raise ComponentPackInstallError("component pack replay or downgrade was rejected")

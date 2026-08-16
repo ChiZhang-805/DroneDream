@@ -26,7 +26,9 @@ def _sha(data: bytes) -> str:
 
 def _contracts(tmp_path: Path, sequence: int = 1) -> tuple[Path, Path, Path, Path]:
     payload = b'{"workflows":["autonomous-mission"]}\n'
-    records = [{"path": "capabilities/index.json", "sizeBytes": len(payload), "sha256": _sha(payload)}]
+    records = [
+        {"path": "capabilities/index.json", "sizeBytes": len(payload), "sha256": _sha(payload)}
+    ]
     manifest = {
         "schemaVersion": 1,
         "kind": "dronedream-component-pack",
@@ -91,7 +93,9 @@ def _install(tmp_path: Path, sequence: int = 1) -> dict[str, object]:
     )
 
 
-def test_installs_verified_pack_into_versioned_release_and_switches_atomically(tmp_path: Path) -> None:
+def test_installs_verified_pack_into_versioned_release_and_switches_atomically(
+    tmp_path: Path,
+) -> None:
     result = _install(tmp_path)
     current = tmp_path / "packs/capability/current"
     assert current.is_symlink()
@@ -180,7 +184,10 @@ def test_existing_release_is_reverified_before_reactivation(tmp_path: Path) -> N
     (current / "capabilities/index.json").write_text("tampered", encoding="utf-8")
     with pytest.raises(tool.ComponentPackInstallError, match="failed verification"):
         _install(tmp_path, 2)
-    assert first["packId"] == json.loads((tmp_path / "state.json").read_text())["components"]["capability"]["packId"]
+    assert (
+        first["packId"]
+        == json.loads((tmp_path / "state.json").read_text())["components"]["capability"]["packId"]
+    )
 
 
 def test_older_verified_catalog_sequence_is_rejected(tmp_path: Path) -> None:
