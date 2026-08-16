@@ -4,6 +4,7 @@ param(
     [string]$OutputRoot = (Join-Path $env:LOCALAPPDATA "DroneDream\codex-builds\core-four-main"),
     [string]$CargoRoot = (Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache\core-four-main-cargo"),
     [switch]$AllowUnsignedUpdater,
+    [switch]$ReuseCargoTarget,
     [switch]$PreserveCargoTarget
 )
 
@@ -136,8 +137,17 @@ Assert-StrictChildPath -Path $cargoRootFull -Parent $cargoBase -Label "CargoRoot
 if (Test-Path -LiteralPath $outputRootFull) {
     throw "OutputRoot must be absent before a four-edition build: $outputRootFull"
 }
-if (Test-Path -LiteralPath $cargoRootFull) {
+if ((Test-Path -LiteralPath $cargoRootFull) -and -not $ReuseCargoTarget) {
     throw "CargoRoot must be absent before a four-edition build: $cargoRootFull"
+}
+if ($ReuseCargoTarget) {
+    if (-not (Test-Path -LiteralPath $cargoRootFull -PathType Container)) {
+        throw "ReuseCargoTarget requires an existing CargoRoot directory: $cargoRootFull"
+    }
+    $cargoRootItem = Get-Item -LiteralPath $cargoRootFull -Force
+    if ($cargoRootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw "ReuseCargoTarget refuses a reparse-point CargoRoot: $cargoRootFull"
+    }
 }
 foreach ($name in @("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")) {
     if (-not [string]::IsNullOrWhiteSpace(
