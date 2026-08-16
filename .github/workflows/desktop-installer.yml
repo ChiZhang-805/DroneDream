@@ -44,6 +44,11 @@ jobs:
     timeout-minutes: 180
     env:
       CARGO_BUILD_JOBS: "4"
+      # These are public browser client identifiers, not service credentials.
+      # Keep them in repository variables so CI exercises the same approved
+      # account endpoint as formal desktop builds.
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
     steps:
       - name: Check out source
@@ -109,6 +114,10 @@ jobs:
         with:
           toolchain: 1.97.0
           components: rustfmt, clippy
+
+      - name: Verify desktop browser-auth public configuration
+        shell: pwsh
+        run: node ./desktop/scripts/verify-browser-auth-config.mjs
 
       - name: Install JavaScript dependencies
         shell: pwsh
