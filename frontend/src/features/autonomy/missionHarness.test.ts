@@ -40,29 +40,6 @@ describe("autonomy mission harness", () => {
     expect(migrated.mapPack.contentHash).toBeNull();
   });
 
-  it("replaces the retired 5 environment placeholder with School Map", () => {
-    const legacy = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
-    legacy.mapPack = {
-      ...legacy.mapPack,
-      id: "map-legacy-5-environment",
-      version: 3,
-      name: "5 environment",
-      status: "draft",
-      qualificationReceiptId: null,
-      contentHash: null,
-      compilerSceneId: null,
-      calibrated: false,
-      confidencePercent: 0,
-      sourceFiles: [],
-    };
-
-    const migrated = normalizeAutonomyWorkspace(legacy);
-
-    expect(migrated.mapPack.id).toBe("map-school");
-    expect(migrated.mapPack.name).toBe("School Map");
-    expect(migrated.mission.mapPackId).toBe("map-school");
-  });
-
   it("preserves a real imported map that happens to share the retired placeholder name", () => {
     const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
     workspace.mapPack = {

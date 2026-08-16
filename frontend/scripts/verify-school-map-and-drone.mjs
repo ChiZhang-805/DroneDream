@@ -80,39 +80,42 @@ try {
   if (await page.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Tuning Chat + must expose exactly one School Map entry.");
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`), fullPage: false });
 
-  await page.evaluate(async (canSeedLegacyState) => {
-    let workspaceKey = Object.keys(window.localStorage).find((key) => key.startsWith("dronedream:autonomy-workspace:v2:"));
-    if (!workspaceKey && canSeedLegacyState) {
-      const store = await import("/console/src/features/autonomy/workspaceStore.ts");
-      store.saveAutonomyWorkspace("local", "universal", store.defaultAutonomyWorkspace());
-      workspaceKey = Object.keys(window.localStorage).find((key) => key.startsWith("dronedream:autonomy-workspace:v2:"));
-    }
-    if (!workspaceKey) return;
-    const workspace = JSON.parse(window.localStorage.getItem(workspaceKey));
-    const schoolMap = workspace.mapPack;
+  await page.evaluate(() => {
+    const updatedAt = new Date().toISOString();
     const legacyMap = {
-      ...schoolMap,
+      schemaVersion: 2,
       id: "map-legacy-5-environment",
       version: 3,
-      name: "5 environment",
       status: "draft",
       qualificationReceiptId: null,
       contentHash: null,
+      name: "5 environment",
+      representation: "hybrid-3d",
+      coordinateFrame: "ENU",
+      resolutionM: 0.1,
+      floorCount: 1,
+      liveUpdates: "depth-fusion",
       calibrated: false,
       compilerSceneId: null,
+      semanticLayers: ["free-space", "people"],
+      planningLayers: ["collision-geometry", "occupancy"],
+      origin: { latitude: null, longitude: null, altitudeM: null },
+      boundsM: { x: 40, y: 30, z: 12 },
       confidencePercent: 0,
       sourceFiles: [],
+      updatedAt,
     };
-    workspace.mapPack = legacyMap;
-    workspace.mission.mapPackId = legacyMap.id;
-    window.localStorage.setItem(workspaceKey, JSON.stringify(workspace));
-    const libraryKey = workspaceKey.replace("dronedream:autonomy-workspace:v2:", "dronedream:autonomy-assets:v1:");
-    window.localStorage.setItem(libraryKey, JSON.stringify({
-      schemaVersion: 1,
-      aircraft: [workspace.aircraft],
-      maps: [legacyMap, schoolMap],
+    window.localStorage.setItem("dronedream:autonomy-workspace:v2:local:universal", JSON.stringify({
+      schemaVersion: 2,
+      mapPack: legacyMap,
+      mission: { schemaVersion: 2, mapPackId: legacyMap.id, updatedAt },
     }));
-  }, !externalOrigin);
+    window.localStorage.setItem("dronedream:autonomy-assets:v1:local:universal", JSON.stringify({
+      schemaVersion: 1,
+      aircraft: [],
+      maps: [legacyMap],
+    }));
+  });
   await page.goto(`${origin}/console/autonomy`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);
   await page.locator(".assistant-add-button").click();
@@ -132,6 +135,11 @@ try {
   if (await contextPopover.getByText("5 environment", { exact: true }).count() !== 0) throw new Error("The retired 5 environment map is still visible.");
   if (await contextPopover.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Mission Context must expose exactly one School Map entry.");
   if (await contextPopover.locator('input[name="autonomy-map"]:checked').getAttribute("value") !== "map-school") throw new Error("School Map was not selected after legacy migration.");
+  const reboundMapId = await page.evaluate(() => {
+    const stored = window.localStorage.getItem("dronedream:autonomy-workspace:v2:local:universal");
+    return stored ? JSON.parse(stored).mapPack?.id : null;
+  });
+  if (reboundMapId !== "map-school") throw new Error(`Mission Context did not persist the School Map binding: ${reboundMapId}.`);
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`), fullPage: false });
 
   process.stdout.write(`${JSON.stringify({
