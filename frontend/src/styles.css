@@ -8648,7 +8648,7 @@ a {
 
 .fixed-scenario-card {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 0.62rem;
   min-width: 0;
   min-height: 0;
