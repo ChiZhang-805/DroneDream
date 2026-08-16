@@ -129,6 +129,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install backend test dependencies
+        # Pull requests are already gated by the repository quality workflow.
+        # Keep the duplicated full backend suite only for immutable release tags,
+        # where this workflow must remain independently reproducible.
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -141,6 +145,7 @@ jobs:
         run: npm --prefix desktop run verify:release-source
 
       - name: Verify backend
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
         shell: pwsh
         working-directory: backend
         env:
@@ -155,6 +160,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify shared frontend
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -169,6 +175,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify desktop Rust
+        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
