@@ -156,6 +156,20 @@ function Get-OAuthClientId {
 
 function Import-FrontendPublicBuildEnvironment {
     $requiredNames = @("VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY")
+    foreach ($name in $requiredNames) {
+        if (-not [string]::IsNullOrWhiteSpace(
+            [Environment]::GetEnvironmentVariable($name, "Process")
+        )) {
+            continue
+        }
+        # These VITE values are public browser application identifiers, not
+        # service-role credentials. A reviewed per-user registration must be
+        # usable by fresh terminals and by the local release wrapper.
+        $userValue = [Environment]::GetEnvironmentVariable($name, "User")
+        if (-not [string]::IsNullOrWhiteSpace($userValue)) {
+            [Environment]::SetEnvironmentVariable($name, $userValue, "Process")
+        }
+    }
     $missingNames = @($requiredNames | Where-Object {
         [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_, "Process"))
     })
