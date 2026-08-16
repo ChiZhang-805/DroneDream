@@ -458,6 +458,20 @@ function legacyKey(ownerId: string, edition: BrandEditionId): string {
   return `${LEGACY_STORAGE_PREFIX}:${encodeURIComponent(ownerId || "local")}:${edition}`;
 }
 
+function isRetiredFiveEnvironmentPlaceholder(mapPack: Partial<AutonomyMapPack>): boolean {
+  return mapPack.schemaVersion === 2
+    && mapPack.version === 3
+    && mapPack.name?.trim().toLocaleLowerCase() === "5 environment"
+    && mapPack.status === "draft"
+    && mapPack.calibrated === false
+    && mapPack.compilerSceneId == null
+    && mapPack.qualificationReceiptId == null
+    && mapPack.contentHash == null
+    && mapPack.confidencePercent === 0
+    && Array.isArray(mapPack.sourceFiles)
+    && mapPack.sourceFiles.length === 0;
+}
+
 export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceState {
   const updatedAt = now.toISOString();
   return {
@@ -572,7 +586,7 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     : storedAircraft;
   const mapPack = (storedMapPack.id === "map-primary"
     && storedMapPack.name === "Unconfigured environment")
-    || storedMapPack.name?.trim().toLocaleLowerCase() === "5 environment"
+    || isRetiredFiveEnvironmentPlaceholder(storedMapPack)
     ? fallback.mapPack
     : storedMapPack;
   const mission = candidate.mission && typeof candidate.mission === "object"

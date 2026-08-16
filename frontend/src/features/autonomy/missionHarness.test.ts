@@ -45,10 +45,15 @@ describe("autonomy mission harness", () => {
     legacy.mapPack = {
       ...legacy.mapPack,
       id: "map-legacy-5-environment",
+      version: 3,
       name: "5 environment",
+      status: "draft",
+      qualificationReceiptId: null,
+      contentHash: null,
       compilerSceneId: null,
       calibrated: false,
       confidencePercent: 0,
+      sourceFiles: [],
     };
 
     const migrated = normalizeAutonomyWorkspace(legacy);
@@ -56,6 +61,37 @@ describe("autonomy mission harness", () => {
     expect(migrated.mapPack.id).toBe("map-school");
     expect(migrated.mapPack.name).toBe("School Map");
     expect(migrated.mission.mapPackId).toBe("map-school");
+  });
+
+  it("preserves a real imported map that happens to share the retired placeholder name", () => {
+    const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    workspace.mapPack = {
+      ...workspace.mapPack,
+      id: "map-user-import",
+      version: 3,
+      name: "5 environment",
+      status: "assets-admitted",
+      compilerSceneId: null,
+      calibrated: false,
+      confidencePercent: 0,
+      sourceFiles: [{
+        name: "campus.glb",
+        bytes: 1024,
+        format: "glb",
+        importedAt: "2026-08-15T00:00:00.000Z",
+        sha256: "a".repeat(64),
+        receiptId: "receipt-user-import",
+        admission: "admitted",
+        parser: "gltf",
+        layers: ["mesh"],
+      }],
+    };
+
+    const normalized = normalizeAutonomyWorkspace(workspace);
+
+    expect(normalized.mapPack.id).toBe("map-user-import");
+    expect(normalized.mapPack.name).toBe("5 environment");
+    expect(normalized.mapPack.sourceFiles).toHaveLength(1);
   });
 
   it("publishes My Drone sensor mounts in the Vehicle Pack body frame", () => {

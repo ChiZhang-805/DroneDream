@@ -93,10 +93,15 @@ try {
     const legacyMap = {
       ...schoolMap,
       id: "map-legacy-5-environment",
+      version: 3,
       name: "5 environment",
+      status: "draft",
+      qualificationReceiptId: null,
+      contentHash: null,
       calibrated: false,
       compilerSceneId: null,
       confidencePercent: 0,
+      sourceFiles: [],
     };
     workspace.mapPack = legacyMap;
     workspace.mission.mapPackId = legacyMap.id;
