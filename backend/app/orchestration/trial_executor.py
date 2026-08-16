@@ -1011,8 +1011,19 @@ def claim_and_run_one_pending_trial(
             return None
         selected_trial = db.execute(
             select(models.Trial.id, models.Trial.job_id, models.Trial.status)
+            .join(
+                models.CandidateParameterSet,
+                models.CandidateParameterSet.id == models.Trial.candidate_id,
+            )
             .where(models.Trial.job_id == selected_job_id, claim_pool)
             .order_by(
+                # Windows' wall-clock resolution can assign the same queued
+                # and created timestamps to an entire dispatch batch.  The
+                # server-issued candidate ordinal is the authoritative order;
+                # UUIDs must never decide whether baseline or optimizer work
+                # reaches the first-qualified gate first.
+                models.CandidateParameterSet.dispatch_ordinal.asc().nullslast(),
+                models.Trial.qualification_ordinal.asc().nullslast(),
                 models.Trial.queued_at.asc().nullsfirst(),
                 models.Trial.created_at.asc(),
                 models.Trial.id.asc(),

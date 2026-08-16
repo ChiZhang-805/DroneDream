@@ -3146,6 +3146,43 @@ def test_runner_default_policy_stops_after_first_qualified_baseline(orchestratio
         assert job.progress_completed_trials == job.progress_total_trials
 
 
+def test_trial_claim_order_uses_candidate_ordinal_when_windows_timestamps_tie(
+    orchestration_ctx,
+):
+    """Coarse Windows clocks must not let random UUIDs outrank the baseline."""
+
+    ctx = orchestration_ctx
+    job_id = _create_queued_job(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        baseline_id = job.baseline_candidate_id
+        assert baseline_id is not None
+        tied_at = datetime(2026, 8, 17, tzinfo=timezone.utc)
+        db.execute(
+            update(ctx["models"].Trial)
+            .where(ctx["models"].Trial.job_id == job_id)
+            .values(queued_at=tied_at, created_at=tied_at)
+        )
+        db.commit()
+
+    claimed_ids = []
+    for _ in range(4):
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "coarse-clock-worker",
+            )
+            assert trial_id is not None
+            claimed_ids.append(trial_id)
+
+    with ctx["db_module"].SessionLocal() as db:
+        trials = [db.get(ctx["models"].Trial, trial_id) for trial_id in claimed_ids]
+        assert all(trial is not None for trial in trials)
+        assert all(trial.candidate_id == baseline_id for trial in trials if trial)
+
+
 def test_api_report_endpoint_returns_ready_after_worker_runs(
     orchestration_ctx, tmp_path, monkeypatch
 ):

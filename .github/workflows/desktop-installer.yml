@@ -41,7 +41,7 @@ jobs:
     runs-on: windows-2022
     # Two SignPath requests require explicit release approval. Keep enough
     # headroom for review without turning a stalled request into an endless job.
-    timeout-minutes: 90
+    timeout-minutes: 180
     env:
       CARGO_BUILD_JOBS: "4"
 
