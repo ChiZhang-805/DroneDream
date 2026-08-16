@@ -65,6 +65,8 @@ def test_shared_msvc_build_is_pinned_native_and_fail_closed() -> None:
     script = _msvc_script()
     for fragment in (
         '1.97.0-x86_64-pc-windows-msvc',
+        'stable-x86_64-pc-windows-msvc',
+        '$requiredRustVersion = "1.97.0"',
         'x86_64-pc-windows-msvc',
         'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
         'VsDevCmd.bat',

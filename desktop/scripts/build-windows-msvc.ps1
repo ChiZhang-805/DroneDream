@@ -84,13 +84,30 @@ if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
     throw "npm was not found. Install Node.js before building DroneDream Desktop."
 }
 
-$toolchain = "1.97.0-x86_64-pc-windows-msvc"
+$requiredRustVersion = "1.97.0"
+$toolchainCandidates = @(
+    "1.97.0-x86_64-pc-windows-msvc",
+    "stable-x86_64-pc-windows-msvc"
+)
 $targetTriple = "x86_64-pc-windows-msvc"
-& rustup.exe run $toolchain rustc --version | Out-Null
-if ($LASTEXITCODE -ne 0) {
+$toolchain = $null
+foreach ($candidate in $toolchainCandidates) {
+    $rustcMetadata = (& rustup.exe run $candidate rustc -Vv 2>$null | Out-String)
+    if ($LASTEXITCODE -ne 0) { continue }
+    $releaseMatch = [regex]::Match($rustcMetadata, '(?m)^release:\s*(\S+)\s*$')
+    $hostMatch = [regex]::Match($rustcMetadata, '(?m)^host:\s*(\S+)\s*$')
+    if ($releaseMatch.Success -and
+        $hostMatch.Success -and
+        $releaseMatch.Groups[1].Value -ceq $requiredRustVersion -and
+        $hostMatch.Groups[1].Value -ceq $targetTriple) {
+        $toolchain = $candidate
+        break
+    }
+}
+if (-not $toolchain) {
     throw @"
-$toolchain was not found. Install it once with:
-  rustup toolchain install $toolchain --profile minimal
+Rust $requiredRustVersion for $targetTriple was not found. Install it once with:
+  rustup toolchain install 1.97.0-x86_64-pc-windows-msvc --profile minimal
 "@
 }
 
