@@ -16516,6 +16516,47 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
   flex: 1 1 auto;
 }
 
+.dashboard-runtime-fallback > .alert,
+.history-page > .alert {
+  display: grid;
+  grid-template-columns: minmax(220px, auto) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 1rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+}
+
+.dashboard-runtime-fallback > .alert .alert-title,
+.history-page > .alert .alert-title {
+  white-space: nowrap;
+}
+
+.dashboard-runtime-fallback > .alert .alert-body,
+.history-page > .alert .alert-body {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-runtime-fallback > .alert .runtime-access-copy,
+.history-page > .alert .runtime-access-copy {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-runtime-fallback > .alert .btn,
+.history-page > .alert .btn {
+  flex: 0 0 auto;
+  min-height: 2.25rem;
+  padding-block: 0.45rem;
+}
+
 .dashboard-body > .section-card {
   display: flex;
   flex-direction: column;
@@ -16642,6 +16683,10 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
   min-width: 0;
   min-height: 0;
   gap: 0.75rem;
+}
+
+.history-page > .alert + .history-body {
+  flex: 1 1 0;
 }
 
 .history-header {
