@@ -92,8 +92,15 @@ $toolchainCandidates = @(
 $targetTriple = "x86_64-pc-windows-msvc"
 $toolchain = $null
 foreach ($candidate in $toolchainCandidates) {
-    $rustcMetadata = (& rustup.exe run $candidate rustc -Vv 2>$null | Out-String)
-    if ($LASTEXITCODE -ne 0) { continue }
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $rustcMetadata = (& rustup.exe run $candidate rustc -Vv 2>$null | Out-String)
+        $rustcExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($rustcExitCode -ne 0) { continue }
     $releaseMatch = [regex]::Match($rustcMetadata, '(?m)^release:\s*(\S+)\s*$')
     $hostMatch = [regex]::Match($rustcMetadata, '(?m)^host:\s*(\S+)\s*$')
     if ($releaseMatch.Success -and
