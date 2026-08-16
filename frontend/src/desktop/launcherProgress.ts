@@ -1,88 +1,75 @@
-import { useEffect, useRef, useState } from "react";
+import type { DesktopRuntimeAccessStatus } from "./access";
+import type { RuntimeStatusReport } from "./bridge";
 
-export const LAUNCHER_MINIMUM_DURATION_MS = 5_000;
+/**
+ * Startup progress is evidence driven. These values are checkpoints, not a
+ * timer: the launcher may advance only after the corresponding native probe
+ * has returned fresh evidence for this app session.
+ */
+export const LAUNCHER_PROGRESS_CHECKPOINTS = {
+  prerequisites: 20,
+  runtimeRegistration: 35,
+  runtimeInstalled: 45,
+  runtimeRunning: 55,
+  runtimeComponents: 85,
+  runtimeAccess: 95,
+  complete: 100,
+} as const;
 
-export const LAUNCHER_PROGRESS_MILESTONES = [
-  { at: 0.02, value: 2 },
-  { at: 0.06, value: 7 },
-  { at: 0.12, value: 14 },
-  { at: 0.2, value: 24 },
-  { at: 0.31, value: 37 },
-  { at: 0.44, value: 52 },
-  { at: 0.58, value: 66 },
-  { at: 0.72, value: 78 },
-  { at: 0.84, value: 87 },
-  { at: 0.92, value: 92 },
-  { at: 0.98, value: 96 },
-] as const;
+export interface LauncherProgressEvidence {
+  enabled: boolean;
+  blocked?: boolean;
+  prerequisitesFresh: boolean;
+  runtimeFresh: boolean;
+  runtime: RuntimeStatusReport | null;
+  runtimeAccessStatus: DesktopRuntimeAccessStatus;
+  complete: boolean;
+}
 
-function effectiveLauncherDuration(): number {
-  // Component tests validate the milestone contract separately and should not
-  // spend five real seconds on every ready-launcher fixture. Production and
-  // headed preview builds always use the full visual duration.
-  const vitestFlag = (import.meta.env as Record<string, string | boolean | undefined>).VITEST;
-  const jsdomHarness = typeof navigator !== "undefined" &&
-    /\bjsdom\b/iu.test(navigator.userAgent);
-  return import.meta.env.MODE === "test" || vitestFlag === true || vitestFlag === "true" || jsdomHarness
-    ? 0
-    : LAUNCHER_MINIMUM_DURATION_MS;
+function componentProgress(runtime: RuntimeStatusReport): number {
+  const required = runtime.components.filter((component) => component.required);
+  if (required.length === 0) return LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRunning;
+  const ready = required.filter((component) => component.status === "ready").length;
+  const span = LAUNCHER_PROGRESS_CHECKPOINTS.runtimeComponents -
+    LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRunning;
+  return LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRunning +
+    Math.floor((ready / required.length) * span);
 }
 
 /**
- * Presents real readiness work as a calm, staged launch sequence.
- *
- * The sequence never grants authority: it may wait at 96%, but it reaches
- * 100% only after `complete` reports that every real environment check passed.
- * Disabling or blocking the sequence returns it to the only setup action
- * point, 0%.
+ * Derive the visible launcher percentage exclusively from completed checks.
+ * A missing Runtime never leaves 0%, and 100% remains reserved for the full
+ * local readiness contract. No elapsed-time milestone can grant progress.
  */
-export function useLauncherProgress({
+export function launcherProgressFromEvidence({
   enabled,
-  complete,
   blocked = false,
-}: {
-  enabled: boolean;
-  complete: boolean;
-  blocked?: boolean;
-}): number {
-  const [progress, setProgress] = useState(0);
-  const startedAt = useRef<number | null>(null);
-  const duration = effectiveLauncherDuration();
+  prerequisitesFresh,
+  runtimeFresh,
+  runtime,
+  runtimeAccessStatus,
+  complete,
+}: LauncherProgressEvidence): number {
+  if (!enabled || blocked) return 0;
+  if (complete) return LAUNCHER_PROGRESS_CHECKPOINTS.complete;
 
-  useEffect(() => {
-    if (!enabled || blocked) {
-      startedAt.current = null;
-      setProgress(0);
-      return;
-    }
+  let progress = 0;
+  if (prerequisitesFresh) {
+    progress = LAUNCHER_PROGRESS_CHECKPOINTS.prerequisites;
+  }
+  if (runtimeFresh) {
+    progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRegistration);
+  }
+  if (runtime?.installed) {
+    progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeInstalled);
+  }
+  if (runtime?.running) {
+    progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRunning);
+    progress = Math.max(progress, componentProgress(runtime));
+  }
+  if (runtimeAccessStatus === "ready") {
+    progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeAccess);
+  }
 
-    const start = performance.now();
-    startedAt.current = start;
-    setProgress(0);
-
-    if (duration === 0) {
-      return;
-    }
-
-    const timers = LAUNCHER_PROGRESS_MILESTONES.map(({ at, value }) =>
-      window.setTimeout(() => setProgress((current) => Math.max(current, value)), at * duration)
-    );
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [blocked, duration, enabled]);
-
-  useEffect(() => {
-    if (!enabled || blocked || !complete || startedAt.current === null) return;
-    if (duration === 0) {
-      setProgress(100);
-      return;
-    }
-    const remaining = Math.max(
-      0,
-      duration - (performance.now() - startedAt.current),
-    );
-    const timer = window.setTimeout(() => setProgress(100), remaining);
-    return () => window.clearTimeout(timer);
-  }, [blocked, complete, duration, enabled]);
-
-  return progress;
+  return Math.min(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeAccess);
 }

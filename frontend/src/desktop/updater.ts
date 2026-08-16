@@ -25,6 +25,7 @@ export type AppUpdateStatus =
 interface AppUpdateState {
   status: AppUpdateStatus;
   availableVersion: string | null;
+  updateRequired: boolean;
   progress: number | null;
   error: string | null;
   enginePack: EnginePackStatus | null;
@@ -33,10 +34,27 @@ interface AppUpdateState {
 const CURRENT_STATE: AppUpdateState = {
   status: "current",
   availableVersion: null,
+  updateRequired: false,
   progress: null,
   error: null,
   enginePack: null,
 };
+
+const UPDATE_POLICY_PATTERN = /^update-policy:\s*(recommended|required)$/gmu;
+
+/**
+ * Update policy is carried inside the signed updater metadata. Unknown or
+ * missing values remain recommended so a routine release never locks users
+ * out of a healthy workspace.
+ */
+export function appUpdateIsRequired(update: Pick<Update, "body" | "rawJson">): boolean {
+  const rawPolicy = update.rawJson.updatePolicy;
+  if (rawPolicy === "required") return true;
+  if (rawPolicy === "recommended") return false;
+
+  const matches = Array.from((update.body ?? "").matchAll(UPDATE_POLICY_PATTERN));
+  return matches.length === 1 && matches[0][1] === "required";
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -72,6 +90,7 @@ export function useAppUpdater() {
         setState({
           status: "runtimeBaseRequired",
           availableVersion: null,
+          updateRequired: true,
           progress: null,
           error: observed.message,
           enginePack: observed,
@@ -128,6 +147,7 @@ export function useAppUpdater() {
       setState({
         status: "available",
         availableVersion: update.version,
+        updateRequired: appUpdateIsRequired(update),
         progress: null,
         error: null,
         enginePack: null,
@@ -137,6 +157,7 @@ export function useAppUpdater() {
       setState({
         status: "error",
         availableVersion: null,
+        updateRequired: false,
         progress: null,
         error: errorMessage(error),
         enginePack: null,

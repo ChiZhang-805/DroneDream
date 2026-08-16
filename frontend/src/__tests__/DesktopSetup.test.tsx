@@ -26,11 +26,14 @@ const updaterState = vi.hoisted(() => ({
       | "installing"
       | "error",
     availableVersion: null as string | null,
+    updateRequired: false,
     progress: null as number | null,
     error: null as string | null,
+    enginePack: null,
     desktopRuntime: true,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    reconcileEnginePack: vi.fn(async () => undefined),
   },
 }));
 const browserAuthMocks = vi.hoisted(() => ({
@@ -478,11 +481,14 @@ afterEach(() => {
   updaterState.current = {
     status: "current",
     availableVersion: null,
+    updateRequired: false,
     progress: null,
     error: null,
+    enginePack: null,
     desktopRuntime: true,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    reconcileEnginePack: vi.fn(async () => undefined),
   };
   browserAuthMocks.configuration = {
     supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
@@ -878,6 +884,7 @@ describe("DesktopSetup", () => {
       ...updaterState.current,
       status: "available",
       availableVersion: "1.0.1",
+      updateRequired: true,
       installAvailableUpdate,
     };
     window.__TAURI__ = {

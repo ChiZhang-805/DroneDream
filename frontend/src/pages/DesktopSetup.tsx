@@ -54,7 +54,7 @@ import {
   isRuntimeFullyReady,
   MINIMUM_MEMORY_BYTES,
 } from "../desktop/readiness";
-import { useLauncherProgress } from "../desktop/launcherProgress";
+import { launcherProgressFromEvidence } from "../desktop/launcherProgress";
 import {
   runtimeSessionContractFailure,
   verifyRuntimeSessionContract,
@@ -391,7 +391,7 @@ export function DesktopSetup() {
     updater.status === "reconcilingEngine";
   const updaterBlocksWorkspace =
     updaterBusy ||
-    updater.status === "available" ||
+    (updater.status === "available" && updater.updateRequired) ||
     updater.status === "engineError" ||
     updater.status === "runtimeBaseRequired";
   const updaterActionRequired =
@@ -432,12 +432,16 @@ export function DesktopSetup() {
         : "launcher.accountVerificationFailed";
   const environmentBlocked =
     localRuntimeReady && !localChecksReady && !environmentChecking;
-  const launcherProgress = useLauncherProgress({
+  const launcherProgress = launcherProgressFromEvidence({
     enabled: Boolean(
       desktopAvailable &&
       state.runtimeFresh &&
       state.runtime?.installed,
     ),
+    prerequisitesFresh: state.prerequisitesFresh,
+    runtimeFresh: state.runtimeFresh,
+    runtime: state.runtime,
+    runtimeAccessStatus: runtimeAccess.status,
     complete: localChecksReady && !updaterBlocksWorkspace,
     blocked: Boolean(
       runtimeSessionFailure ||

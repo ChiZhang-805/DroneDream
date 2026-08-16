@@ -115,6 +115,10 @@ try {
             "Updater metadata omitted the exact build number."
         Assert-Contract ($manifest.notes -cmatch "(?m)^source-commit: $sourceCommit`$") `
             "Updater metadata omitted the exact source commit."
+        Assert-Contract ($manifest.updatePolicy -ceq "recommended") `
+            "Routine updater metadata must default to the non-blocking recommended policy."
+        Assert-Contract ($manifest.notes -cmatch '(?m)^update-policy: recommended$') `
+            "Updater metadata omitted its signed update policy."
         Assert-Contract (
             $manifest.platforms.'windows-x86_64'.url -ceq $expectedUrl
         ) "Updater metadata crossed an edition URL family."

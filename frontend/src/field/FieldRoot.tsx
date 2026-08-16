@@ -2,7 +2,6 @@ import { Settings } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import { DroneLaunchSceneCore } from "../components/DroneLaunchScene";
-import { useLauncherProgress } from "../desktop/launcherProgress";
 import { FieldAuthControl } from "./FieldAuthControl";
 import { FieldBrandLockup } from "./FieldBrandLockup";
 import { useFieldLocale } from "./FieldLocaleProvider";
@@ -182,10 +181,7 @@ export function FieldRoot() {
   const [entered, setEntered] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [fieldWorkspaceLoaded, setFieldWorkspaceLoaded] = useState(false);
-  const progress = useLauncherProgress({
-    enabled: true,
-    complete: fieldWorkspaceLoaded,
-  });
+  const progress = fieldWorkspaceLoaded ? 100 : 0;
   useEffect(() => {
     let active = true;
     const fontsReady = "fonts" in document

@@ -28,7 +28,7 @@ vi.mock("../desktop/bridge", () => ({
   installEmbeddedEnginePack: installEmbeddedEnginePackMock,
 }));
 
-import { useAppUpdater } from "../desktop/updater";
+import { appUpdateIsRequired, useAppUpdater } from "../desktop/updater";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -41,6 +41,8 @@ function deferred<T>() {
 function update(version: string, overrides: Record<string, unknown> = {}) {
   return {
     version,
+    body: "update-policy: recommended",
+    rawJson: {},
     close: vi.fn(async () => undefined),
     downloadAndInstall: vi.fn(async () => undefined),
     ...overrides,
@@ -72,6 +74,22 @@ afterEach(() => {
 });
 
 describe("useAppUpdater", () => {
+  it("treats routine updates as optional and only signed required policy as blocking", () => {
+    expect(appUpdateIsRequired({ body: undefined, rawJson: {} })).toBe(false);
+    expect(appUpdateIsRequired({
+      body: "update-policy: recommended",
+      rawJson: {},
+    })).toBe(false);
+    expect(appUpdateIsRequired({
+      body: "update-policy: required",
+      rawJson: {},
+    })).toBe(true);
+    expect(appUpdateIsRequired({
+      body: "update-policy: recommended",
+      rawJson: { updatePolicy: "required" },
+    })).toBe(true);
+  });
+
   it("discards a stale check that finishes after a newer request", async () => {
     const first = deferred<ReturnType<typeof update>>();
     const second = deferred<ReturnType<typeof update>>();

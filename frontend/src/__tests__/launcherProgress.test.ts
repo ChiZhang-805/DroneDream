@@ -1,22 +1,76 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  LAUNCHER_MINIMUM_DURATION_MS,
-  LAUNCHER_PROGRESS_MILESTONES,
+  LAUNCHER_PROGRESS_CHECKPOINTS,
+  launcherProgressFromEvidence,
 } from "../desktop/launcherProgress";
+import type { RuntimeStatusReport } from "../desktop/bridge";
 
 describe("launcher progress contract", () => {
-  it("uses a five-second production sequence without an intermediate action point", () => {
-    expect(LAUNCHER_MINIMUM_DURATION_MS).toBe(5_000);
+  const runtime = (statuses: Array<"ready" | "stopped">): RuntimeStatusReport => ({
+    runtimeName: "DroneDreamRuntime",
+    installed: true,
+    running: true,
+    ready: statuses.every((status) => status === "ready"),
+    version: "2026.08",
+    dataRoot: "E:\\DroneDream",
+    components: statuses.map((status, index) => ({
+      id: `component-${index}`,
+      label: `Component ${index}`,
+      status,
+      required: true,
+    })),
+    diagnostics: [],
+  });
 
-    const times = LAUNCHER_PROGRESS_MILESTONES.map(({ at }) => at);
-    const values = LAUNCHER_PROGRESS_MILESTONES.map(({ value }) => value);
+  it("keeps missing or blocked Runtime states at zero", () => {
+    expect(launcherProgressFromEvidence({
+      enabled: false,
+      prerequisitesFresh: true,
+      runtimeFresh: true,
+      runtime: null,
+      runtimeAccessStatus: "blocked",
+      complete: false,
+    })).toBe(0);
+    expect(launcherProgressFromEvidence({
+      enabled: true,
+      blocked: true,
+      prerequisitesFresh: true,
+      runtimeFresh: true,
+      runtime: runtime(["ready"]),
+      runtimeAccessStatus: "ready",
+      complete: false,
+    })).toBe(0);
+  });
 
-    expect(times.every((time, index) => index === 0 || time > times[index - 1])).toBe(true);
-    expect(values.every((value, index) => index === 0 || value > values[index - 1])).toBe(true);
-    expect(values[0]).toBeGreaterThan(0);
-    expect(values.at(-1)).toBe(96);
-    expect(values).not.toContain(99);
-    expect(values).not.toContain(100);
+  it("advances only when fresh readiness evidence exists", () => {
+    const partial = runtime(["ready", "stopped"]);
+    expect(launcherProgressFromEvidence({
+      enabled: true,
+      prerequisitesFresh: true,
+      runtimeFresh: true,
+      runtime: partial,
+      runtimeAccessStatus: "checking",
+      complete: false,
+    })).toBeGreaterThan(LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRunning);
+    expect(launcherProgressFromEvidence({
+      enabled: true,
+      prerequisitesFresh: true,
+      runtimeFresh: true,
+      runtime: runtime(["ready", "ready"]),
+      runtimeAccessStatus: "ready",
+      complete: false,
+    })).toBe(LAUNCHER_PROGRESS_CHECKPOINTS.runtimeAccess);
+  });
+
+  it("reserves 100 percent for the complete local readiness contract", () => {
+    expect(launcherProgressFromEvidence({
+      enabled: true,
+      prerequisitesFresh: true,
+      runtimeFresh: true,
+      runtime: runtime(["ready"]),
+      runtimeAccessStatus: "ready",
+      complete: true,
+    })).toBe(100);
   });
 });

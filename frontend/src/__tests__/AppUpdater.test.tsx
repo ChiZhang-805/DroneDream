@@ -11,6 +11,7 @@ const updaterState = vi.hoisted(() => ({
   current: {
     status: "current",
     availableVersion: null as string | null,
+    updateRequired: false,
     progress: null as number | null,
     error: null as string | null,
     enginePack: null,
@@ -106,6 +107,7 @@ afterEach(() => {
     ...updaterState.current,
     status: "current",
     availableVersion: null,
+    updateRequired: false,
     progress: null,
     error: null,
     enginePack: null,

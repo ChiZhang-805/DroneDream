@@ -6,7 +6,9 @@ param(
     [ValidateSet("universal", "sim", "lab", "field")]
     [string]$EditionId,
     [string]$SourceCommit,
-    [UInt64]$BuildNumber
+    [UInt64]$BuildNumber,
+    [ValidateSet("recommended", "required")]
+    [string]$UpdatePolicy = "recommended"
 )
 
 $ErrorActionPreference = "Stop"
@@ -82,11 +84,13 @@ $tag = "${releaseTagPrefix}${BuildNumber}"
 $downloadUrl = "https://github.com/$Repository/releases/download/$tag/$publicArtifactName"
 $manifest = [ordered]@{
     version = $version
+    updatePolicy = $UpdatePolicy
     notes = @(
         "$($family.installerProductName) $version for Windows x64."
         "edition-id: $EditionId"
         "build-number: $BuildNumber"
         "source-commit: $SourceCommit"
+        "update-policy: $UpdatePolicy"
     ) -join "`n"
     pub_date = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
     platforms = [ordered]@{
@@ -107,6 +111,7 @@ $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
 
 $roundTrip = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($roundTrip.version -cne $version -or
+    $roundTrip.updatePolicy -cne $UpdatePolicy -or
     $roundTrip.notes -cne $manifest.notes -or
     $roundTrip.platforms.'windows-x86_64'.url -cne $downloadUrl -or
     $roundTrip.platforms.'windows-x86_64'.signature -cne $signature) {

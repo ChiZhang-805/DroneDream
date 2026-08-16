@@ -7,6 +7,7 @@ type AppUpdaterState = ReturnType<typeof useAppUpdater>;
 const FALLBACK: AppUpdaterState = {
   status: "current",
   availableVersion: null,
+  updateRequired: false,
   progress: null,
   error: null,
   enginePack: null,
