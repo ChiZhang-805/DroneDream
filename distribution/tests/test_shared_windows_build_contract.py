@@ -57,6 +57,11 @@ def test_four_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
         'targetTriple = "x86_64-pc-windows-msvc"',
         'compilerFamily = "msvc"',
         'System32\\WindowsPowerShell\\v1.0\\Modules',
+        'function Get-ProcessEnvironmentSnapshot',
+        'function Restore-ProcessEnvironmentSnapshot',
+        '$editionEnvironment = Get-ProcessEnvironmentSnapshot',
+        'Restore-ProcessEnvironmentSnapshot -Snapshot $editionEnvironment',
+        'VsDevCmd mutates dozens of process-scoped variables.',
     ):
         assert fragment in script
     assert 'Join-Path $editionOutput "$($contract.product)-${version}.exe"' not in script

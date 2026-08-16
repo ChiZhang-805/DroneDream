@@ -104,6 +104,35 @@ function Remove-GeneratedSourceOutputs {
     }
 }
 
+function Get-ProcessEnvironmentSnapshot {
+    $snapshot = @{}
+    foreach ($entry in [Environment]::GetEnvironmentVariables("Process").GetEnumerator()) {
+        $snapshot[[string]$entry.Key] = [string]$entry.Value
+    }
+    return $snapshot
+}
+
+function Restore-ProcessEnvironmentSnapshot {
+    param([Parameter(Mandatory = $true)][hashtable]$Snapshot)
+
+    $currentNames = @(
+        [Environment]::GetEnvironmentVariables("Process").Keys |
+            ForEach-Object { [string]$_ }
+    )
+    foreach ($name in $currentNames) {
+        if (-not $Snapshot.ContainsKey($name)) {
+            [Environment]::SetEnvironmentVariable($name, $null, "Process")
+        }
+    }
+    foreach ($name in $Snapshot.Keys) {
+        [Environment]::SetEnvironmentVariable(
+            [string]$name,
+            [string]$Snapshot[$name],
+            "Process"
+        )
+    }
+}
+
 function Get-OAuthClientId {
     param([Parameter(Mandatory = $true)][string]$EditionId)
     $editionVariable = "DRONEDREAM_OAUTH_CLIENT_ID_$($EditionId.ToUpperInvariant())"
@@ -283,26 +312,36 @@ try {
             throw "$editionId config productName drifted from the build contract."
         }
 
-        $env:DRONEDREAM_DESKTOP_EDITION_ID = $editionId
-        $env:DRONEDREAM_EDITION_PROFILE = $contract.profile
-        $env:DRONEDREAM_OAUTH_CLIENT_ID = Get-OAuthClientId -EditionId $editionId
-        $env:VITE_DRONEDREAM_EDITION = $editionId
-        # The LLVM fallback deliberately sets RUSTFLAGS. Reset its known
-        # process-local output before every edition; the MSVC path also rejects
-        # inherited custom flags so both release chains remain deterministic.
-        Remove-Item Env:\RUSTFLAGS -ErrorAction SilentlyContinue
-        Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
-
         Write-Host "Building $editionId from $sourceCommit"
         $stopwatch = [Diagnostics.Stopwatch]::StartNew()
-        & (Join-Path $repoRoot $toolchainContract.builder) `
-            -AdditionalConfigPath $configPath `
-            -CargoTargetDir $cargoRootFull `
-            -ExpectedProductName $contract.product `
-            -EditionId $editionId `
-            -AllowUnsignedUpdater:$AllowUnsignedUpdater
-        $stopwatch.Stop()
-        if ($LASTEXITCODE -ne 0) {
+        $builderExitCode = 0
+        $editionEnvironment = Get-ProcessEnvironmentSnapshot
+        try {
+            $env:DRONEDREAM_DESKTOP_EDITION_ID = $editionId
+            $env:DRONEDREAM_EDITION_PROFILE = $contract.profile
+            $env:DRONEDREAM_OAUTH_CLIENT_ID = Get-OAuthClientId -EditionId $editionId
+            $env:VITE_DRONEDREAM_EDITION = $editionId
+            # The LLVM fallback deliberately sets RUSTFLAGS. Reset its known
+            # process-local output before every edition; the MSVC path also rejects
+            # inherited custom flags so both release chains remain deterministic.
+            Remove-Item Env:\RUSTFLAGS -ErrorAction SilentlyContinue
+            Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+
+            & (Join-Path $repoRoot $toolchainContract.builder) `
+                -AdditionalConfigPath $configPath `
+                -CargoTargetDir $cargoRootFull `
+                -ExpectedProductName $contract.product `
+                -EditionId $editionId `
+                -AllowUnsignedUpdater:$AllowUnsignedUpdater
+            $builderExitCode = $LASTEXITCODE
+        } finally {
+            $stopwatch.Stop()
+            # VsDevCmd mutates dozens of process-scoped variables. Restore the
+            # exact pre-edition environment so one package can never poison the
+            # next package's Node, Rust, SDK, Python, or linker discovery.
+            Restore-ProcessEnvironmentSnapshot -Snapshot $editionEnvironment
+        }
+        if ($builderExitCode -ne 0) {
             throw "$editionId installer build failed."
         }
 
