@@ -142,8 +142,10 @@ export function useAppUpdater() {
     }
   }, [desktopRuntime]);
 
-  const reconcileEnginePack = useCallback(async (generation?: number) => {
-    if (!desktopRuntime || import.meta.env.MODE === "test") return;
+  const ensureEnginePackCurrent = useCallback(async (
+    generation?: number,
+  ): Promise<EnginePackStatus | null> => {
+    if (!desktopRuntime || import.meta.env.MODE === "test") return null;
     setState((current) => ({
       ...current,
       status: "reconcilingEngine",
@@ -152,7 +154,7 @@ export function useAppUpdater() {
     }));
     try {
       const observed = await getEnginePackStatus();
-      if (generation !== undefined && generation !== checkGenerationRef.current) return;
+      if (generation !== undefined && generation !== checkGenerationRef.current) return null;
       if (!observed.supported) {
         setState({
           status: "runtimeBaseRequired",
@@ -163,17 +165,15 @@ export function useAppUpdater() {
           enginePack: observed,
           componentUpdates: null,
         });
-        return;
+        return null;
       }
-      if (!observed.updateRequired) {
-        await reconcileComponentPacks(generation, observed);
-        return;
-      }
-      const installed = await installEmbeddedEnginePack();
-      if (generation !== undefined && generation !== checkGenerationRef.current) return;
-      await reconcileComponentPacks(generation, installed);
+      const current = observed.updateRequired
+        ? await installEmbeddedEnginePack()
+        : observed;
+      if (generation !== undefined && generation !== checkGenerationRef.current) return null;
+      return current;
     } catch (error) {
-      if (generation !== undefined && generation !== checkGenerationRef.current) return;
+      if (generation !== undefined && generation !== checkGenerationRef.current) return null;
       const message = errorMessage(error);
       setState((current) => ({
         ...current,
@@ -183,8 +183,15 @@ export function useAppUpdater() {
         progress: null,
         error: message,
       }));
+      return null;
     }
-  }, [desktopRuntime, reconcileComponentPacks]);
+  }, [desktopRuntime]);
+
+  const reconcileEnginePack = useCallback(async (generation?: number) => {
+    const current = await ensureEnginePackCurrent(generation);
+    if (!current) return;
+    await reconcileComponentPacks(generation, current);
+  }, [ensureEnginePackCurrent, reconcileComponentPacks]);
 
   const checkForUpdates = useCallback(async () => {
     if (!desktopRuntime || import.meta.env.MODE === "test") {
@@ -195,6 +202,11 @@ export function useAppUpdater() {
     const generation = ++checkGenerationRef.current;
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
     try {
+      // The installed app's embedded Engine Pack is part of its executable
+      // contract. Reconcile it before advertising a newer app so a user who
+      // defers that app update still runs the engine paired with this build.
+      const enginePack = await ensureEnginePackCurrent(generation);
+      if (!enginePack || generation !== checkGenerationRef.current) return;
       const previousUpdate = updateRef.current;
       updateRef.current = null;
       await previousUpdate?.close();
@@ -209,7 +221,7 @@ export function useAppUpdater() {
       }
       updateRef.current = update;
       if (!update) {
-        await reconcileEnginePack(generation);
+        await reconcileComponentPacks(generation, enginePack);
         return;
       }
       setState({
@@ -218,7 +230,7 @@ export function useAppUpdater() {
         updateRequired: appUpdateIsRequired(update),
         progress: null,
         error: null,
-        enginePack: null,
+        enginePack,
         componentUpdates: null,
       });
     } catch (error) {
@@ -233,7 +245,7 @@ export function useAppUpdater() {
         componentUpdates: null,
       });
     }
-  }, [desktopRuntime, reconcileEnginePack]);
+  }, [desktopRuntime, ensureEnginePackCurrent, reconcileComponentPacks]);
 
   const installAvailableUpdate = useCallback(async () => {
     const update = updateRef.current;

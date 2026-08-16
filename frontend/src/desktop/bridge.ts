@@ -631,6 +631,8 @@ export interface DesktopApiRequest {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   body?: string | null;
+  bodyBase64?: string | null;
+  contentType?: "application/json" | "application/octet-stream" | null;
   accessToken?: string | null;
   accept?: "application/json" | "application/octet-stream" | "text/csv";
   idempotencyKey?: string | null;
@@ -662,7 +664,6 @@ export interface BrowserAuthSession {
   editionId: "universal" | "sim" | "lab" | "field";
   authClientId: string;
   accessToken: string;
-  refreshToken: string;
   attemptIdHash: string;
   stateHash: string;
   subjectHash: string;
@@ -1554,7 +1555,6 @@ function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
     "editionId",
     "authClientId",
     "accessToken",
-    "refreshToken",
     "attemptIdHash",
     "stateHash",
     "subjectHash",
@@ -1579,10 +1579,6 @@ function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
     accessToken: expectBrowserAuthToken(
       record.accessToken,
       "response.accessToken",
-    ),
-    refreshToken: expectBrowserAuthToken(
-      record.refreshToken,
-      "response.refreshToken",
     ),
     attemptIdHash: expectLowercaseHex(
       record.attemptIdHash,

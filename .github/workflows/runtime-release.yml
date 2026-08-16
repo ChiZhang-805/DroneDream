@@ -31,6 +31,7 @@ jobs:
     env:
       IMAGE: dronedream/runtime:${{ github.run_id }}-${{ github.run_attempt }}
       RELEASE_TAG: ${{ inputs.release_tag }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -112,6 +113,10 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+          [[ "$VITE_SUPABASE_URL" == https://* ]] || {
+            echo "VITE_SUPABASE_URL repository variable is missing or invalid" >&2
+            exit 2
+          }
           python runtime/tools/runtime_manifest.py validate-config \
             --pins runtime/pins.env \
             --python-lock runtime/locks/python-requirements.lock

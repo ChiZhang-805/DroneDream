@@ -185,6 +185,38 @@ class RuntimeManifestContractTests(unittest.TestCase):
         ):
             self.assertIn(fragment, desktop)
 
+    def test_services_execute_the_atomically_activated_engine_pack(self) -> None:
+        api = (RUNTIME / "systemd" / "dronedream-api.service").read_text(
+            encoding="utf-8"
+        )
+        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(
+            encoding="utf-8"
+        )
+        for service in (api, worker):
+            self.assertIn("/opt/dronedream/engine/current", service)
+            self.assertNotIn("WorkingDirectory=/opt/dronedream/source", service)
+        self.assertIn("engine/current/backend/alembic.ini", api)
+        self.assertIn("ExecStart=/opt/dronedream/venv/bin/drone-dream-worker", worker)
+
+    def test_runtime_auth_template_is_fail_closed_and_injected_at_build(self) -> None:
+        template = (RUNTIME / "config" / "runtime.env.default").read_text(
+            encoding="utf-8"
+        )
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        build = (RUNTIME / "build-rootfs.sh").read_text(encoding="utf-8")
+        self.assertIn("AUTH_MODE=oidc_jwt", template)
+        self.assertIn("DESKTOP_BRIDGE_REQUIRED=true", template)
+        for placeholder in (
+            "__OIDC_ISSUER__",
+            "__OIDC_JWKS_URL__",
+            "__MODEL_GATEWAY_BASE_URL__",
+        ):
+            self.assertIn(placeholder, template)
+            self.assertIn(placeholder, dockerfile)
+        self.assertIn("VITE_SUPABASE_URL", build)
+        self.assertIn("/auth/v1/.well-known/jwks.json", build)
+        self.assertIn("/functions/v1/model-gateway", build)
+
 
 class ThirdPartyNoticeContractTests(unittest.TestCase):
     def test_notice_is_included_in_the_exported_rootfs_source_tree(self) -> None:

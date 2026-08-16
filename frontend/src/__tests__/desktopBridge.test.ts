@@ -72,7 +72,6 @@ const browserAuthSession = {
   editionId: "universal",
   authClientId: "dronedream-desktop-universal",
   accessToken: "header.payload.signature",
-  refreshToken: "refresh-token-value",
   attemptIdHash: "a".repeat(64),
   stateHash: "b".repeat(64),
   subjectHash: "c".repeat(64),
@@ -462,6 +461,28 @@ describe("desktop bridge", () => {
         method: "GET",
         path: "/api/v1/session",
         accessToken: "account-token",
+      },
+    });
+
+    invoke.mockResolvedValueOnce({
+      status: 202,
+      contentType: "application/json",
+      bodyBase64: btoa('{"accepted":true}'),
+    });
+    await expect(desktopApiRequest({
+      method: "POST",
+      path: "/api/v1/maps/ingest",
+      accessToken: "account-token",
+      bodyBase64: btoa("binary-map-body"),
+      contentType: "application/octet-stream",
+    })).resolves.toMatchObject({ status: 202 });
+    expect(invoke).toHaveBeenLastCalledWith("desktop_api_request", {
+      request: {
+        method: "POST",
+        path: "/api/v1/maps/ingest",
+        accessToken: "account-token",
+        bodyBase64: btoa("binary-map-body"),
+        contentType: "application/octet-stream",
       },
     });
 

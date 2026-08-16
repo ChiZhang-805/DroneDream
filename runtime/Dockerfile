@@ -21,6 +21,9 @@ ARG PYULOG_VERSION=1.2.3
 ARG PX4_BUILD_JOBS=2
 ARG DRONEDREAM_UID=2000
 ARG DRONEDREAM_GID=2000
+ARG OIDC_ISSUER
+ARG OIDC_JWKS_URL
+ARG MODEL_GATEWAY_BASE_URL
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -115,7 +118,18 @@ COPY engine-pack/tools/engine_pack.py /usr/lib/dronedream/engine_pack.py
 COPY runtime/systemd/*.service /etc/systemd/system/
 COPY runtime/systemd/*.timer /etc/systemd/system/
 
-RUN chmod 0755 /usr/lib/dronedream/runtime-init.sh \
+RUN test -n "${OIDC_ISSUER}" && test -n "${OIDC_JWKS_URL}" && \
+    test -n "${MODEL_GATEWAY_BASE_URL}" && \
+    case "${OIDC_ISSUER}" in https://*) ;; *) exit 2 ;; esac && \
+    case "${OIDC_JWKS_URL}" in https://*) ;; *) exit 2 ;; esac && \
+    case "${MODEL_GATEWAY_BASE_URL}" in https://*) ;; *) exit 2 ;; esac && \
+    sed -i \
+      -e "s|__OIDC_ISSUER__|${OIDC_ISSUER}|g" \
+      -e "s|__OIDC_JWKS_URL__|${OIDC_JWKS_URL}|g" \
+      -e "s|__MODEL_GATEWAY_BASE_URL__|${MODEL_GATEWAY_BASE_URL}|g" \
+      /usr/lib/dronedream/runtime.env.default && \
+    ! grep -q '__[A-Z0-9_]*__' /usr/lib/dronedream/runtime.env.default && \
+    chmod 0755 /usr/lib/dronedream/runtime-init.sh \
       /usr/lib/dronedream/runtime-check.sh /usr/lib/dronedream/px4-gazebo-smoke.py \
       /usr/lib/dronedream/px4-log-cleanup.py /usr/lib/dronedream/engine-pack-manager.py \
       /usr/lib/dronedream/component-pack-manager.py && \

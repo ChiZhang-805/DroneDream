@@ -8,8 +8,9 @@ Type=simple
 User=dronedream
 Group=dronedream
 EnvironmentFile=/etc/dronedream/runtime.env
-WorkingDirectory=/opt/dronedream/source/backend
-ExecStartPre=/opt/dronedream/venv/bin/alembic -c /opt/dronedream/source/backend/alembic.ini upgrade head
+WorkingDirectory=/opt/dronedream/engine/current/backend
+Environment=PYTHONPATH=/opt/dronedream/engine/current/backend
+ExecStartPre=/opt/dronedream/venv/bin/alembic -c /opt/dronedream/engine/current/backend/alembic.ini upgrade head
 ExecStart=/opt/dronedream/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=3

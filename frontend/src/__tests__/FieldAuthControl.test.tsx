@@ -44,7 +44,6 @@ const FIELD_SESSION = {
   editionId: "field",
   authClientId: "dronedream-desktop-field",
   accessToken: "redacted-access",
-  refreshToken: "redacted-refresh",
   attemptIdHash: "a".repeat(64),
   stateHash: "b".repeat(64),
   subjectHash: "c".repeat(64),

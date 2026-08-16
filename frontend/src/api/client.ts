@@ -2,6 +2,7 @@
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
 import {
+  desktopApiRequest,
   desktopDownloadArtifact,
   isDesktopRuntime,
 } from "../desktop/bridge";
@@ -89,10 +90,7 @@ const DEMO_AUTH_TOKEN: string | undefined =
 const BROWSER_REQUEST_TIMEOUT_MS = 120_000;
 const BROWSER_API_RESPONSE_MAX_BYTES = 64 * 1024 * 1024;
 const BROWSER_ARTIFACT_RESPONSE_MAX_BYTES = 256 * 1024 * 1024;
-// The current backend does not persist idempotency receipts yet. Keep mutation
-// retries disabled until that server contract is deployed end to end.
-const BACKEND_IDEMPOTENCY_RECEIPTS_ENABLED =
-  import.meta.env.VITE_BACKEND_IDEMPOTENCY_RECEIPTS === "enabled";
+const DESKTOP_API_REQUEST_MAX_BYTES = 25 * 1024 * 1024;
 
 function authHeaders(): Record<string, string> {
   const accessToken = currentAccessToken();
@@ -280,7 +278,7 @@ async function request<T>(
   }
 
   const pendingMutation =
-    policy.idempotentMutation && BACKEND_IDEMPOTENCY_RECEIPTS_ENABLED
+    policy.idempotentMutation
     ? await preparePendingMutation(path, init)
     : null;
   const idempotencyKey = pendingMutation?.idempotencyKey ?? null;
@@ -366,6 +364,44 @@ async function transportRequest(
     "application/json",
   idempotencyKey: string | null = null,
 ): Promise<Response> {
+  if (isDesktopRuntime()) {
+    const method = (init?.method ?? "GET").toUpperCase();
+    if (!(method === "GET" || method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE")) {
+      throw new Error("The desktop API method is not supported.");
+    }
+    let body: string | null = null;
+    let bodyBase64: string | null = null;
+    let contentType: "application/json" | "application/octet-stream" | null = null;
+    if (typeof init?.body === "string") {
+      body = init.body;
+      contentType = "application/json";
+    } else if (typeof Blob !== "undefined" && init?.body instanceof Blob) {
+      if (init.body.size > DESKTOP_API_REQUEST_MAX_BYTES) {
+        throw new Error("The desktop API request body exceeds 25 MiB.");
+      }
+      bodyBase64 = bytesToBase64(new Uint8Array(await init.body.arrayBuffer()));
+      contentType = "application/octet-stream";
+    } else if (init?.body != null) {
+      throw new Error("The desktop API request body type is not supported.");
+    }
+    const bridged = await desktopApiRequest({
+      method,
+      path: `/api/v1${path}`,
+      body,
+      bodyBase64,
+      contentType,
+      accessToken: currentAccessToken(),
+      accept,
+      idempotencyKey,
+    });
+    const headers = new Headers();
+    if (bridged.contentType) headers.set("Content-Type", bridged.contentType);
+    const responseBytes = base64ToBytes(bridged.bodyBase64);
+    return new Response(responseBytes.buffer as ArrayBuffer, {
+      status: bridged.status,
+      headers,
+    });
+  }
   const formDataBody = typeof FormData !== "undefined" && init?.body instanceof FormData;
   return fetchWithDeadline(
     `${API_BASE_URL}/api/v1${path}`,
@@ -384,6 +420,24 @@ async function transportRequest(
       ? BROWSER_ARTIFACT_RESPONSE_MAX_BYTES
       : BROWSER_API_RESPONSE_MAX_BYTES,
   );
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
 }
 
 function buildQuery(params: Record<string, string | number | undefined>): string {

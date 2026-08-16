@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.assistant-orchestrator]
 verify_jwt = false
+
+[functions.billing-checkout]
+verify_jwt = false

@@ -15,7 +15,11 @@ import {
   isDesktopRuntime,
 } from "../../desktop/bridge";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
-import { ACTIVATE_DESKTOP_AUTH_EVENT } from "./desktopAuthActivation";
+import {
+  ACTIVATE_DESKTOP_AUTH_EVENT,
+  ADOPT_DESKTOP_AUTH_EVENT,
+} from "./desktopAuthActivation";
+import { clearBrowserAuthSessionRefresh } from "./browserAuth";
 import { setAuthAccessToken } from "./authTokenStore";
 import {
   appleAuthEnabled,
@@ -183,6 +187,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!deferDesktopAuth) return undefined;
+    const adopt = (event: Event) => {
+      const detail = (event as CustomEvent<{ user: User; accessToken: string }>).detail;
+      if (!detail?.user || !detail.accessToken) return;
+      adoptUser(detail.user, detail.accessToken);
+      setLoading(false);
+    };
+    window.addEventListener(ADOPT_DESKTOP_AUTH_EVENT, adopt);
+    return () => window.removeEventListener(ADOPT_DESKTOP_AUTH_EVENT, adopt);
+  }, [adoptUser, deferDesktopAuth]);
+
+  useEffect(() => {
     if (!deferDesktopAuth || authActivated) return undefined;
     const activate = () => {
       setLoading(cloudAuthConfigured && !docsPreview);
@@ -194,6 +210,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (docsPreview || !authActivated) return undefined;
+    if (deferDesktopAuth) {
+      setLoading(false);
+      return undefined;
+    }
     if (!supabaseClient) {
       setLoading(false);
       return undefined;
@@ -335,6 +355,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     let vaultClearFailed = false;
     if (isDesktopRuntime()) {
+      clearBrowserAuthSessionRefresh();
       try {
         await clearBrowserAuthVault();
       } catch {

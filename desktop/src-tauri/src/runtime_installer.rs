@@ -4773,55 +4773,94 @@ fn run_upgrade_replace(
         snapshot.resumable = true;
     });
     executor.terminate()?;
-    executor.export(&backup_path)?;
-    let backup_size = fs::metadata(&backup_path)
-        .map_err(|error| fail("upgrade_backup", error.to_string(), false))?
-        .len();
-    if backup_size == 0 {
-        return Err(fail(
-            "upgrade_backup",
-            "The Runtime Base rollback image is empty; the installed Runtime was left untouched.",
-            false,
-        ));
-    }
-    let backup_sha256 = compute_file_sha256(&backup_path, cancel)?;
-    let mut journal = RuntimeUpgradeJournal {
-        schema_version: 1,
-        owner: "DroneDreamDesktop".to_string(),
-        runtime_name: RUNTIME_NAME.to_string(),
-        operation_id,
-        target_root: target
-            .to_str()
-            .ok_or_else(|| fail("invalid_target", "Runtime target is invalid.", false))?
-            .to_string(),
-        old_build_id: old_build_id.to_string(),
-        old_version: old_version.to_string(),
-        new_build_id: manifest.runtime.build_id.clone(),
-        new_version: manifest.runtime.version.clone(),
-        manifest_sha256: manifest_sha256.to_string(),
-        backup_filename,
-        backup_size,
-        backup_sha256,
-        phase: RuntimeUpgradePhase::BackupVerified,
-        created_at: chrono::Utc::now().to_rfc3339(),
+    let backup_result = (|| {
+        executor.export(&backup_path)?;
+        let backup_size = fs::metadata(&backup_path)
+            .map_err(|error| fail("upgrade_backup", error.to_string(), false))?
+            .len();
+        if backup_size == 0 {
+            return Err(fail(
+                "upgrade_backup",
+                "The Runtime Base rollback image is empty; the installed Runtime was left untouched.",
+                false,
+            ));
+        }
+        let backup_sha256 = compute_file_sha256(&backup_path, cancel)?;
+        let journal = RuntimeUpgradeJournal {
+            schema_version: 1,
+            owner: "DroneDreamDesktop".to_string(),
+            runtime_name: RUNTIME_NAME.to_string(),
+            operation_id,
+            target_root: target
+                .to_str()
+                .ok_or_else(|| fail("invalid_target", "Runtime target is invalid.", false))?
+                .to_string(),
+            old_build_id: old_build_id.to_string(),
+            old_version: old_version.to_string(),
+            new_build_id: manifest.runtime.build_id.clone(),
+            new_version: manifest.runtime.version.clone(),
+            manifest_sha256: manifest_sha256.to_string(),
+            backup_filename,
+            backup_size,
+            backup_sha256,
+            phase: RuntimeUpgradePhase::BackupVerified,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        persist_upgrade_journal(&artifact_root, &journal)?;
+        // This same-user host pointer survives the interval in which the old WSL
+        // registration has been removed, so a process crash cannot orphan the
+        // verified rollback image on a non-default drive.
+        persist_upgrade_pointer(&journal)?;
+        verify_upgrade_backup(&artifact_root, &journal, cancel)?;
+        check_cancel(cancel)?;
+        if !executor.is_registered()?
+            || !executor.registration_matches_target(target)?
+            || executor.installed_identity()? != (old_build_id.to_string(), old_version.to_string())
+        {
+            return Err(fail(
+                "upgrade_runtime_changed",
+                "The Runtime Base identity changed after backup; the verified backup was preserved for repair.",
+                false,
+            ));
+        }
+        Ok(journal)
+    })();
+    let mut journal = match backup_result {
+        Ok(journal) => journal,
+        Err(original) => {
+            // Backup preparation can fail after WSL has been terminated but
+            // before it is unregistered. Recover with a fresh token so a user
+            // cancellation cannot strand the previous Runtime in a stopped state.
+            let recovery_cancel = AtomicBool::new(false);
+            let restart = (|| {
+                if !executor.is_registered()?
+                    || !executor.registration_matches_target(target)?
+                    || executor.installed_identity()?
+                        != (old_build_id.to_string(), old_version.to_string())
+                {
+                    return Err(fail(
+                        "upgrade_runtime_changed",
+                        "The previous Runtime Base could not be safely restarted because its identity changed.",
+                        false,
+                    ));
+                }
+                executor.start(&recovery_cancel)?;
+                executor.wait_healthy(old_build_id, old_version, &recovery_cancel)
+            })();
+            if let Err(restart_error) = restart {
+                return Err(fail(
+                    "rollback_failed",
+                    format!(
+                        "{} Restarting Runtime Base {} also failed: {}",
+                        original.message, old_version, restart_error.message
+                    ),
+                    false,
+                )
+                .inherit_diagnostics(&original));
+            }
+            return Err(original);
+        }
     };
-    persist_upgrade_journal(&artifact_root, &journal)?;
-    // This same-user host pointer survives the interval in which the old WSL
-    // registration has been removed, so a process crash cannot orphan the
-    // verified rollback image on a non-default drive.
-    persist_upgrade_pointer(&journal)?;
-    verify_upgrade_backup(&artifact_root, &journal, cancel)?;
-    check_cancel(cancel)?;
-    if !executor.is_registered()?
-        || !executor.registration_matches_target(target)?
-        || executor.installed_identity()? != (old_build_id.to_string(), old_version.to_string())
-    {
-        return Err(fail(
-            "upgrade_runtime_changed",
-            "The Runtime Base identity changed after backup; the verified backup was preserved for repair.",
-            false,
-        ));
-    }
 
     executor.unregister()?;
     journal.phase = RuntimeUpgradePhase::OldUnregistered;
@@ -6209,6 +6248,7 @@ mod tests {
         unregistered_import_payload: Option<Vec<u8>>,
         leave_unexpected_import_file: bool,
         fail_import_with_foreign_registration: bool,
+        fail_export: bool,
         cancel_during_import: bool,
         preparation_requires_restart: bool,
         imports: usize,
@@ -6267,6 +6307,9 @@ mod tests {
             let mut state = self.state.lock().unwrap();
             state.exports += 1;
             state.lifecycle_events.push("export".to_string());
+            if state.fail_export {
+                return Err(fail("fake_export", "injected export failure", true));
+            }
             fs::write(backup, b"owned-runtime-backup")
                 .map_err(|error| fail("fake_export", error.to_string(), true))
         }
@@ -6334,6 +6377,11 @@ mod tests {
         }
 
         fn terminate(&self) -> Result<(), InstallFailure> {
+            self.state
+                .lock()
+                .unwrap()
+                .lifecycle_events
+                .push("terminate".to_string());
             Ok(())
         }
 
@@ -6866,6 +6914,50 @@ mod tests {
         )
         .is_ok());
         assert_eq!(transport.fetches.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn upgrade_backup_failure_restarts_the_previous_runtime_before_returning() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        let body = b"new-runtime";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let cache = initialize_runtime_download_cache(&target).unwrap();
+        let archive = cache.join("artifacts").join("new-runtime.tar");
+        fs::write(&archive, body).unwrap();
+        let wsl = FakeWsl::default();
+        {
+            let mut state = wsl.state.lock().unwrap();
+            state.registered = true;
+            state.registration_owned_by_attempt = true;
+            state.installed_build_id = Some("old-build".to_string());
+            state.installed_version = Some("1.2.2".to_string());
+            state.fail_export = true;
+        }
+
+        let error = run_upgrade_replace(
+            &RuntimeInstaller::default(),
+            &target,
+            &manifest,
+            &digest(&raw),
+            &archive,
+            &wsl,
+            &AtomicBool::new(false),
+            "old-build",
+            "1.2.2",
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "fake_export");
+        let state = wsl.state.lock().unwrap();
+        assert_eq!(state.unregisters, 0);
+        assert_eq!(state.starts, 1);
+        assert_eq!(
+            state.lifecycle_events,
+            ["terminate", "export", "start", "health"]
+        );
+        assert!(state.registered);
     }
 
     #[test]

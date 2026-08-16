@@ -55,7 +55,6 @@ const validBrowserSession = {
   editionId: "universal",
   authClientId: "dronedream-desktop-universal",
   accessToken: "header.payload.signature",
-  refreshToken: "refresh-token-value",
   attemptIdHash: "a".repeat(64),
   stateHash: "b".repeat(64),
   subjectHash: "c".repeat(64),

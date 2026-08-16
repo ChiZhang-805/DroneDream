@@ -172,7 +172,7 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
-  it("reconciles the embedded Engine Pack after confirming the app is current", async () => {
+  it("reconciles the embedded Engine Pack before checking or advertising an app update", async () => {
     const pendingPack = {
       supported: true,
       updateRequired: true,
@@ -192,7 +192,23 @@ describe("useAppUpdater", () => {
 
     expect(getEnginePackStatusMock).toHaveBeenCalledOnce();
     expect(installEmbeddedEnginePackMock).toHaveBeenCalledOnce();
+    expect(getEnginePackStatusMock.mock.invocationCallOrder[0]).toBeLessThan(
+      checkMock.mock.invocationCallOrder[0],
+    );
     expect(hook.result.current.enginePack).toEqual(installedPack);
+    hook.unmount();
+  });
+
+  it("keeps the reconciled Engine Pack visible while an app update is available", async () => {
+    const availableUpdate = update("1.0.2");
+    checkMock.mockResolvedValue(availableUpdate);
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+
+    expect(hook.result.current.enginePack?.updateRequired).toBe(false);
+    expect(getEnginePackStatusMock).toHaveBeenCalledOnce();
+    expect(checkMock).toHaveBeenCalledOnce();
     hook.unmount();
   });
 

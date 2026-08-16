@@ -1415,7 +1415,7 @@ pub(crate) fn inspect_field_protocol_frame(
 }
 
 #[tauri::command]
-pub(crate) fn probe_field_mavlink_telemetry(
+pub(crate) async fn probe_field_mavlink_telemetry(
     app: AppHandle,
     request: FieldMavlinkTelemetryProbeRequest,
 ) -> Result<FieldMavlinkTelemetryProbeReceipt, String> {
@@ -1426,11 +1426,15 @@ pub(crate) fn probe_field_mavlink_telemetry(
         &request.observation_id,
         &request.port_name,
     )?;
-    let mut port = serialport::new(&request.port_name, request.baud_rate)
-        .timeout(Duration::from_millis(100))
-        .open()
-        .map_err(|error| format!("Unable to open the confirmed Field serial port: {error}"))?;
-    probe_from_reader(&request, port.as_mut())
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut port = serialport::new(&request.port_name, request.baud_rate)
+            .timeout(Duration::from_millis(100))
+            .open()
+            .map_err(|error| format!("Unable to open the confirmed Field serial port: {error}"))?;
+        probe_from_reader(&request, port.as_mut())
+    })
+    .await
+    .map_err(|error| format!("Field serial telemetry probe task failed: {error}"))?
 }
 
 #[cfg(test)]

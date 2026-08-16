@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => ({
-  setSession: vi.fn(),
+  getUser: vi.fn(),
 }));
 
 vi.mock("../features/auth/supabaseClient", () => ({
   supabaseClient: {
     auth: {
-      setSession: authMock.setSession,
+      getUser: authMock.getUser,
     },
   },
 }));
@@ -19,7 +19,6 @@ const validSession = {
   editionId: "universal" as const,
   authClientId: "dronedream-desktop-universal",
   accessToken: "header.payload.signature",
-  refreshToken: "refresh-token-value",
   attemptIdHash: "a".repeat(64),
   stateHash: "b".repeat(64),
   subjectHash: "c".repeat(64),
@@ -29,35 +28,35 @@ const validSession = {
 
 describe("browser auth session adoption", () => {
   beforeEach(() => {
-    authMock.setSession.mockReset();
+    authMock.getUser.mockReset();
   });
 
-  it("adopts the exact access and refresh token pair once", async () => {
-    authMock.setSession.mockResolvedValue({ error: null });
+  it("validates the access token without exposing the native refresh grant", async () => {
+    const user = { id: "user-1", email: "pilot@example.com", user_metadata: {} };
+    authMock.getUser.mockResolvedValue({ data: { user }, error: null });
+    const listener = vi.fn();
+    window.addEventListener("drone-dream:adopt-desktop-auth", listener);
 
     await expect(adoptBrowserAuthSession(validSession)).resolves.toBeUndefined();
 
-    expect(authMock.setSession).toHaveBeenCalledTimes(1);
-    expect(authMock.setSession).toHaveBeenCalledWith({
-      access_token: "header.payload.signature",
-      refresh_token: "refresh-token-value",
-    });
+    expect(authMock.getUser).toHaveBeenCalledWith("header.payload.signature");
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("drone-dream:adopt-desktop-auth", listener);
   });
 
   it("fails closed when Supabase rejects the browser session", async () => {
-    authMock.setSession.mockResolvedValue({
-      error: { message: "Session is no longer valid." },
+    authMock.getUser.mockResolvedValue({
+      data: { user: null }, error: { message: "Session is no longer valid." },
     });
 
     await expect(adoptBrowserAuthSession({
       ...validSession,
       accessToken: "expired-token",
-      refreshToken: "expired-refresh-token",
     })).rejects.toThrow("Session is no longer valid.");
   });
 
   it("rejects a session issued for another desktop edition before adoption", async () => {
-    authMock.setSession.mockResolvedValue({ error: null });
+    authMock.getUser.mockResolvedValue({ data: { user: {} }, error: null });
 
     await expect(adoptBrowserAuthSession({
       ...validSession,
@@ -65,6 +64,6 @@ describe("browser auth session adoption", () => {
       authClientId: "dronedream-desktop-sim",
     })).rejects.toThrow("different DroneDream edition");
 
-    expect(authMock.setSession).not.toHaveBeenCalled();
+    expect(authMock.getUser).not.toHaveBeenCalled();
   });
 });

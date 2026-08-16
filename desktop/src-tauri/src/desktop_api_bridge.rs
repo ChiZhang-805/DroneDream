@@ -23,7 +23,7 @@ use crate::process::{command_output, windows_command};
 
 const BRIDGE_VERSION: &str = "DD-BRIDGE-V2";
 const API_ORIGIN: &str = "http://127.0.0.1:8000";
-const MAX_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
+const MAX_REQUEST_BODY_BYTES: usize = 25 * 1024 * 1024;
 const MAX_RESPONSE_BODY_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_ARTIFACT_DOWNLOAD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
@@ -65,6 +65,10 @@ pub struct DesktopApiRequest {
     path: String,
     #[serde(default)]
     body: Option<String>,
+    #[serde(default)]
+    body_base64: Option<String>,
+    #[serde(default)]
+    content_type: Option<String>,
     #[serde(default)]
     access_token: Option<String>,
     #[serde(default)]
@@ -297,9 +301,26 @@ fn send_signed_request(
 ) -> Result<reqwest::blocking::Response, String> {
     let method = normalize_method(&request.method)?;
     validate_path(&request.path)?;
-    let body = request.body.unwrap_or_default();
+    let content_type = normalize_content_type(request.content_type.as_deref())?;
+    if request.body.is_some() && request.body_base64.is_some() {
+        return Err("The desktop API request cannot contain two body encodings.".to_string());
+    }
+    let body = match (request.body, request.body_base64) {
+        (Some(value), None) => value.into_bytes(),
+        (None, Some(value)) => base64::engine::general_purpose::STANDARD
+            .decode(value)
+            .map_err(|_| "The desktop API binary request body is not valid base64.".to_string())?,
+        (None, None) => Vec::new(),
+        (Some(_), Some(_)) => unreachable!(),
+    };
     if body.len() > MAX_REQUEST_BODY_BYTES {
-        return Err("The desktop API request body exceeds 2 MiB.".to_string());
+        return Err("The desktop API request body exceeds 25 MiB.".to_string());
+    }
+    if body.is_empty() && content_type.is_some() {
+        return Err("An empty desktop API request cannot declare a body type.".to_string());
+    }
+    if !body.is_empty() && content_type.is_none() {
+        return Err("The desktop API request body type is required.".to_string());
     }
     let access_token = request
         .access_token
@@ -317,7 +338,7 @@ fn send_signed_request(
     let idempotency_key = normalize_idempotency_key(request.idempotency_key.as_deref())?;
     let timestamp = chrono::Utc::now().timestamp().to_string();
     let nonce = Uuid::new_v4().to_string();
-    let body_sha256 = sha256_hex(body.as_bytes());
+    let body_sha256 = sha256_hex(&body);
     let authorization_sha256 = sha256_hex(authorization.as_bytes());
     let canonical = canonical_request(&CanonicalRequest {
         runtime_id: &credential.runtime_id,
@@ -356,7 +377,12 @@ fn send_signed_request(
         builder = builder.header(AUTHORIZATION, authorization);
     }
     if !body.is_empty() {
-        builder = builder.header(CONTENT_TYPE, "application/json").body(body);
+        builder = builder
+            .header(
+                CONTENT_TYPE,
+                content_type.expect("validated body content type"),
+            )
+            .body(body);
     }
     builder
         .send()
@@ -421,6 +447,8 @@ fn stream_artifact_download(
         method: "GET".to_string(),
         path: format!("/api/v1/artifacts/{artifact_id}/download"),
         body: None,
+        body_base64: None,
+        content_type: None,
         access_token: request.access_token,
         accept: Some("application/octet-stream".to_string()),
         idempotency_key: None,
@@ -620,6 +648,15 @@ fn normalize_accept(value: Option<&str>) -> Result<&str, String> {
     }
 }
 
+fn normalize_content_type(value: Option<&str>) -> Result<Option<&str>, String> {
+    match value {
+        None => Ok(None),
+        Some("application/json") => Ok(Some("application/json")),
+        Some("application/octet-stream") => Ok(Some("application/octet-stream")),
+        _ => Err("The desktop API request body type is not allowed.".to_string()),
+    }
+}
+
 fn normalize_idempotency_key(value: Option<&str>) -> Result<String, String> {
     let Some(raw) = value else {
         return Ok(String::new());
@@ -687,6 +724,8 @@ pub(crate) fn verify_live_anonymous_session_contract_for_test() -> Result<(), St
             method: "GET".to_string(),
             path: "/api/v1/session".to_string(),
             body: None,
+            body_base64: None,
+            content_type: None,
             access_token: None,
             accept: Some("application/json".to_string()),
             idempotency_key: None,
@@ -723,6 +762,11 @@ mod tests {
         assert!(validate_path("/api/v1/../health").is_err());
         assert_eq!(normalize_method("PUT").unwrap(), "PUT");
         assert!(normalize_method("CONNECT").is_err());
+        assert_eq!(
+            normalize_content_type(Some("application/json")).unwrap(),
+            Some("application/json")
+        );
+        assert!(normalize_content_type(Some("text/plain")).is_err());
         assert!(normalize_idempotency_key(Some("not-a-uuid")).is_err());
         assert_eq!(
             normalize_idempotency_key(Some("123e4567-e89b-12d3-a456-426614174000")).unwrap(),
