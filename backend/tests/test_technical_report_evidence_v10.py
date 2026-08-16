@@ -18,6 +18,21 @@ from app.orchestration.technical_report_evidence_v10 import (
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_COMMIT = "97492448c36bef240e468a0cd53c3ba198cb6aae"
 GENERATED_AT = "2026-07-29T00:00:00Z"
+V10_EVIDENCE_SOURCES_AVAILABLE = all(
+    (REPOSITORY_ROOT / relative).is_file()
+    for relative in (
+        evidence_v10_module.DEFAULT_PATHS.base_bundle,
+        evidence_v10_module.DEFAULT_PATHS.base_manifest,
+        evidence_v10_module.DEFAULT_PATHS.base_checksums,
+        evidence_v10_module.DEFAULT_PATHS.multi_tool_generation_receipt,
+        evidence_v10_module.DEFAULT_PATHS.advanced_physics_test_receipt,
+    )
+)
+
+pytestmark = pytest.mark.skipif(
+    not V10_EVIDENCE_SOURCES_AVAILABLE,
+    reason="requires frozen technical-report v10 source evidence assets",
+)
 
 
 def _paths(tmp_path: Path) -> tuple[Path, Path, Path, Path]:

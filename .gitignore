@@ -14,6 +14,7 @@ dist/
 .vite/
 *.tsbuildinfo
 *.log
+!backend/tests/fixtures/test_run_receipt_v1.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

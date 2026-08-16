@@ -1,27 +1,27 @@
 from pathlib import Path
 
+import pytest
+
 from app.simulator.physical_campaign_evidence import (
     verify_physical_campaign_evidence,
 )
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _EVIDENCE_ROOT = (
-    _REPOSITORY_ROOT
-    / "artifacts"
-    / "technical-report"
-    / "px4-physical-campaign-v1-5f0f62c"
+    _REPOSITORY_ROOT / "artifacts" / "technical-report" / "px4-physical-campaign-v1-5f0f62c"
+)
+
+pytestmark = pytest.mark.skipif(
+    not _EVIDENCE_ROOT.is_dir(),
+    reason="requires frozen technical-report physical-campaign evidence assets",
 )
 
 
 def test_frozen_physical_campaign_bundle_verifies_offline() -> None:
     manifest, receipt = verify_physical_campaign_evidence(_EVIDENCE_ROOT)
 
-    assert manifest["subject_commit"] == (
-        "86273db6d827a790cb0a8b1472256b23e0a629d2"
-    )
-    assert manifest["exporter_commit"] == (
-        "5f0f62c789680e5e2d34c6513727199fabbd50d0"
-    )
+    assert manifest["subject_commit"] == ("86273db6d827a790cb0a8b1472256b23e0a629d2")
+    assert manifest["exporter_commit"] == ("5f0f62c789680e5e2d34c6513727199fabbd50d0")
     assert manifest["manifest_sha256"] == (
         "9440bb24f25dbf07149144c39ea9fc54d373a6c1145d9630a6f53216a9608941"
     )
