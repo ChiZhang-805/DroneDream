@@ -157,6 +157,16 @@ if (missingRustLicenses.length > 0) {
 }
 
 const tauriConfig = JSON.parse(readText("desktop/src-tauri/tauri.conf.json"));
+const mainWindow = tauriConfig.app?.windows?.find((window) => window.label === "main");
+if (!mainWindow) {
+  fail("canonical Tauri config is missing the main application window");
+}
+if (mainWindow.transparent !== false) {
+  fail("main application window must remain opaque to prevent native window-edge bleed");
+}
+if (mainWindow.backgroundColor !== "#ffffff") {
+  fail("main application window must define the white first-paint background");
+}
 const desktopCapability = JSON.parse(
   readText("desktop/src-tauri/capabilities/default.json"),
 );

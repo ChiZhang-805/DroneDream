@@ -20,7 +20,9 @@
         "minWidth": 1100,
         "minHeight": 700,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "transparent": false,
+        "backgroundColor": "#ffffff"
       }
     ],
     "security": {
