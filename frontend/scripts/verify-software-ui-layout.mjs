@@ -39,6 +39,10 @@ process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 const cases = [
   { id: "desktop-en", locale: "en", edition: "universal", viewport: { width: 1440, height: 1000 } },
   { id: "desktop-zh", locale: "zh-CN", edition: "field", viewport: { width: 1440, height: 1000 } },
+  ...(settingsOnly ? [
+    { id: "desktop-sim-en", locale: "en", edition: "sim", viewport: { width: 1440, height: 1000 } },
+    { id: "desktop-lab-en", locale: "en", edition: "lab", viewport: { width: 1440, height: 1000 } },
+  ] : []),
   { id: "tablet-en", locale: "en", edition: "lab", viewport: { width: 760, height: 900 } },
   { id: "tablet-zh", locale: "zh-CN", edition: "sim", viewport: { width: 760, height: 900 } },
   { id: "mobile-en", locale: "en", edition: "universal", viewport: { width: 390, height: 844 } },
