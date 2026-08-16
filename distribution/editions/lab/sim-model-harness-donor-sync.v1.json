@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-sim-model-harness-donor-sync",
+  "editionId": "lab",
+  "sourceBaseCommit": "91d4e02442f679b890a190a15bf4003e00a3569f",
+  "donorBranch": "codex/software-sim",
+  "donorFeatureCommit": "38731d530fdf3bfed6dde43167856f9c6b4a5d67",
+  "donorHeadAudited": "ef70567fe4c34f261fc9f16defb6e98e95f337dc",
+  "syncMode": "path-limited-semantic-forward-sync",
+  "sharedProductPaths": [
+    "backend/app/orchestration/cognitive_budget.py",
+    "backend/app/orchestration/cognitive_review.py",
+    "backend/app/orchestration/decision_harness.py",
+    "backend/app/orchestration/harness_budget_planner.py",
+    "backend/app/orchestration/job_manager.py",
+    "frontend/src/pages/NewJob.tsx"
+  ],
+  "excludedDonorScopes": [
+    "distribution/sim/**",
+    "distribution/editions/sim.v1.json",
+    "frontend/src/editions/sim/**",
+    "SIM brand assets",
+    "SIM artifact and lifecycle evidence"
+  ],
+  "labAdaptation": {
+    "defaultOptimizerStrategy": "llm_harness",
+    "modelAuthority": "proposal-only",
+    "harnessAuthority": "bounded-experiment-and-evidence",
+    "hardwareAuthority": false,
+    "validatedVehiclePackCount": 0
+  },
+  "verification": {
+    "backendTests": {
+      "passed": 87,
+      "failed": 0
+    },
+    "frontendTests": {
+      "passed": 47,
+      "failed": 0
+    },
+    "ruff": "passed",
+    "diffCheck": "passed"
+  }
+}

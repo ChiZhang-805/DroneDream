@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-build-profile",
+  "profileVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "artifactFileName": "DroneDream-Universal-1.0.0.exe",
+  "tauriConfigOverlay": "desktop/src-tauri/tauri.universal.conf.json",
+  "enginePackProfile": "unified-sim-lab",
+  "enginePackProfileMeaning": "backward-compatible Runtime profile identifier for the full Universal payload",
+  "enginePackPayloadContract": {
+    "contractId": "dronedream-universal-engine-payload/v1",
+    "requiredEditionIds": ["sim", "lab", "field"],
+    "requiredVehiclePackRegistry": "distribution/vehicle-packs/registry.v1.json",
+    "requiredSafetyPolicy": "distribution/safety/edition-execution-gate.v1.json",
+    "forbiddenPathPrefixes": [
+      "distribution/build-planning",
+      "distribution/build-plans",
+      "distribution/tests"
+    ],
+    "profileIdIsCompatibilityIdentity": true,
+    "uiModeNeverGrantsCapability": true
+  },
+  "brand": {
+    "editionId": "universal",
+    "displayName": "DroneDream",
+    "manifest": "brand/brand-editions.v1.json",
+    "windowsIcon": "brand/generated/universal/windows/icon.ico",
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "sharedUiContract": {
+    "contractId": "dronedream-shared-edition-ui/v1",
+    "donorCommit": "62ac2345828f50a221c1aaed0ea7273a628c9d5d",
+    "sourceFiles": [
+      {
+        "path": "frontend/src/AppShell.tsx",
+        "sha256": "1ac2da53237e66723c6f847ab4cf47b71c44a52daa586d0c11418d2bffb07afe"
+      },
+      {
+        "path": "frontend/src/components/EditionSettingsSurface.tsx",
+        "sha256": "23f0c359b3c1e40d390b176a26a3e4ff75e54d62a6176c0debab7745848016e1"
+      },
+      {
+        "path": "frontend/src/components/DroneLaunchScene.tsx",
+        "sha256": "36ffce3a6ca3209e6f7cfdb5ef0e62e23d731ef25ee3dcc938a7a927879dc0fe"
+      },
+      {
+        "path": "frontend/src/features/distribution/universalMode.ts",
+        "sha256": "65352f7ee53e95c128e2269ab78f3c14edf9dd0f758a8a7c426a49fa65178410"
+      },
+      {
+        "path": "frontend/src/styles.css",
+        "sha256": "a75feec22077b0ec3240e8f8643e88d9a220de63caa398889a001bba77751122"
+      },
+      {
+        "path": "frontend/src/theme/EditionThemeProvider.tsx",
+        "sha256": "c8c5bb037d8b1635a17a0786e60cf81a2b155c1bfd9650bdfe04baedef8bb112"
+      },
+      {
+        "path": "frontend/src/theme/editionTheme.ts",
+        "sha256": "f380164874cb4bed6d147c08bff914450666d1000950e7714dbb7b9f50c9595e"
+      }
+    ],
+    "visualEvidence": {
+      "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json",
+      "sha256": "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4",
+      "subjectCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+      "caseCount": 6,
+      "locales": ["en", "zh-CN"],
+      "viewportWidths": [390, 760, 1440],
+      "coveredSettingsTabs": ["general", "memory", "model"],
+      "runtimePanelHeadedValidationStatus": "pending-exact-desktop-runtime-red-validation"
+    },
+    "minimumDesktopViewport": {
+      "width": 390,
+      "height": 700,
+      "scalePercent": 100
+    },
+    "settingsDialogVerticalOverflowAllowed": false,
+    "activeSettingsPanelVerticalOverflowAllowed": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "fieldLightweightEntryIntegrationStatus": "integrated-in-universal"
+  },
+  "integratedWorkspaceUiContract": {
+    "contractId": "dronedream-universal-integrated-workspaces/v2",
+    "manifest": "distribution/universal/integrated-workspaces.v2.json",
+    "sha256": "7808809ed585f5c8aebe708d874d148bb8a57f235279d9234d81e2f1ccd43ebf",
+    "sourceFileCount": 12,
+    "workspaceModes": ["sim", "lab", "field"],
+    "createsCrossEditionHarnessOrchestrator": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "workspaceModes": ["sim", "lab", "field"],
+  "universalExclusiveCapabilities": {
+    "vehicleStudio": {
+      "ownerEdition": "universal",
+      "route": "/vehicle-studio",
+      "productSourceCommit": "81550b94270ee4e47eed7d520fb8280bd3a8ee7b",
+      "contract": "distribution/universal/vehicle-studio.v1.json",
+      "schema": "distribution/schemas/vehicle-pack-draft-envelope.schema.json",
+      "shareTargets": ["sim", "lab", "field"],
+      "transport": "file-based-draft-envelope",
+      "automaticReceiverInstallation": false,
+      "modelHarnessStartsOnExchange": false,
+      "grantsSimulationExecution": false,
+      "grantsHardwareAuthority": false,
+      "sourceFiles": [
+        {"path": "frontend/src/pages/VehicleStudio.tsx", "sha256": "72fab0a4abe143089ba3061212a94a21198cb0eec08cfa85034939fd0b2481e7"},
+        {"path": "frontend/src/components/VehicleModelPreview3D.tsx", "sha256": "1111d9ef8f0fb6fde60884e9aa48d2746cbf97132f16a99d9cb3d507ca00c8d3"},
+        {"path": "frontend/src/features/vehicleStudio/model.ts", "sha256": "8bd19421f9dec258fed7d0e1cb705e210af6f0e491b4e1263ff0e83c2cdc977d"},
+        {"path": "frontend/src/features/vehicleStudio/pack.ts", "sha256": "82454a93ec0b8c4382971b6d51d033dca8521e569837aab9c39ba9252770684a"},
+        {"path": "frontend/src/features/vehicleStudio/preview.ts", "sha256": "939d720edb9e03f20a344d98e1abf0ba884fe8e81b2c0a09edb8e2ecba5d9d35"},
+        {"path": "frontend/src/features/vehicleStudio/storage.ts", "sha256": "65fbffacae77e3508b5aca477ccfb2227ac4847a4fa1dda54d1b524c05456559"},
+      {"path": "frontend/src/router.tsx", "sha256": "474330bd706be5d816ba1297717ddcf264dd3ffb6b7eed6329d1ed755a503c30"},
+      {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "9e482996699a9a4fd7bc72c72a84c4b29d779745b4852a764ab31a6f074060f0"},
+        {"path": "distribution/schemas/vehicle-pack-draft-envelope.schema.json", "sha256": "6f4025c7a62eadbc4467d771c610697840f6cd04f276f6a259a5be8fac82f7d9"},
+        {"path": "distribution/universal/vehicle-studio.v1.json", "sha256": "515f8f9a95a6388793d0a1e0a5f8dd82dbec7e5534c2717fd52c800eb33e6e6b"}
+      ]
+    }
+  },
+  "desktopContracts": {
+    "coexistence": "distribution/desktop/edition-coexistence.v1.json",
+    "browserAuth": "distribution/desktop/edition-browser-auth.v1.json",
+    "runtimeAndUpdaterFamilies": "distribution/desktop/edition-runtime-update-families.v1.json",
+    "editionId": "universal",
+    "authClientId": "dronedream-desktop-universal",
+    "bundleIdentifier": "io.dronedream.desktop.universal",
+    "credentialVaultNamespace": "DroneDream/Auth/universal/v1",
+    "updaterMetadataFileName": "latest-universal.json"
+  },
+  "capabilityAuthority": {
+    "frontendCanAuthorize": false,
+    "requiredDecisionLayers": ["native", "backend", "runtime"],
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecision": "deny"
+  },
+  "build": {
+    "sharedScript": "desktop/scripts/build-windows-llvm.ps1",
+    "wrapperScript": "desktop/scripts/build-universal-installer.ps1",
+    "targetTriple": "x86_64-pc-windows-gnullvm",
+    "cargoTargetMustBeOutsideRepository": true,
+    "updaterSignatureRequired": true,
+    "authenticodeRequiredForInternalTest": false,
+    "exactCleanSourceRequired": true,
+    "buildCountPerAuthorization": 1
+  },
+  "websiteHandoff": {
+    "contract": "distribution/universal/release/website-exact-exe-handoff.v1.json",
+    "recipientBranch": "codex/website",
+    "receiverMayRebuild": false,
+    "receiverMayRename": false,
+    "publishedFiles": [
+      "DroneDream-Universal-1.0.0.exe",
+      "DroneDream-Universal-1.0.0.exe.sha256",
+      "DroneDream-Universal-1.0.0.exe.sig",
+      "DroneDream-Universal-1.0.0.exe.receipt.json"
+    ]
+  },
+  "lifecycle": {
+    "freshInstall": "requires isolated RED validation before releaseReady",
+    "upgrade": "requires isolated RED validation without replacing the user's current install",
+    "uninstall": "must preserve separately owned Runtime and user data",
+    "shortcut": "must use the canonical Universal icon",
+    "webView2": "embedded bootstrapper and post-install health check required",
+    "locales": ["en", "zh-CN"]
+  },
+  "releaseGates": {
+    "installerLifecycleReceiptRequired": true,
+    "exactEditionBrowserAuthReceiptRequired": true,
+    "browserAuthMayUseExistingBrowserCookie": true,
+    "crossEditionSessionReuseAllowed": false,
+    "releaseReadyBeforeBothReceipts": false
+  }
+}

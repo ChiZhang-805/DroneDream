@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/capability-policy.v1.json",
+  "title": "DroneDream edition capability policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "policyId",
+    "policyVersion",
+    "defaultDecision",
+    "frontendIsAuthority",
+    "llmControlBoundary",
+    "targetContext",
+    "conditionDefinitions",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-capability-policy"},
+    "policyId": {"const": "core-capabilities"},
+    "policyVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "defaultDecision": {"const": "deny"},
+    "frontendIsAuthority": {"const": false},
+    "llmControlBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generationBoundaryOnly", "highFrequencyController"],
+      "properties": {
+        "generationBoundaryOnly": {"const": true},
+        "highFrequencyController": {"const": "px4-or-vehicle-autopilot"}
+      }
+    },
+    "targetContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "kinds", "authorityLayers", "unknownTargetDecision"],
+      "properties": {
+        "required": {"const": true},
+        "kinds": {
+          "type": "array",
+          "const": ["simulation", "hitl", "real-hardware"]
+        },
+        "authorityLayers": {
+          "type": "array",
+          "const": ["backend", "runtime", "native"]
+        },
+        "unknownTargetDecision": {"const": "deny"}
+      }
+    },
+    "conditionDefinitions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/conditionDefinition"}
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/capability"}
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+    },
+    "conditionDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "enforcedBy"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "description": {"type": "string", "minLength": 1, "maxLength": 512},
+        "enforcedBy": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["backend", "runtime", "native", "operator"]}
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "conditions", "reason"],
+      "properties": {
+        "decision": {"enum": ["allow", "conditioned", "deny"]},
+        "conditions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/identifier"}
+        },
+        "reason": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "risk",
+        "targetKinds",
+        "requiredEnforcementLayers",
+        "decisions"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "risk": {"enum": ["read-only", "controlled", "safety-critical"]},
+        "targetKinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["installation", "simulation", "hitl", "real-hardware"]}
+        },
+        "requiredEnforcementLayers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["backend", "runtime", "native"]}
+        },
+        "decisions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sim", "lab", "field"],
+          "properties": {
+            "sim": {"$ref": "#/$defs/decision"},
+            "lab": {"$ref": "#/$defs/decision"},
+            "field": {"$ref": "#/$defs/decision"}
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-build-request",
+  "requestVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "targetArchitecture": "windows-x86_64",
+  "commonCorePaths": [
+    "backend",
+    "desktop",
+    "engine-pack",
+    "frontend",
+    "runtime",
+    "worker"
+  ],
+  "policyPaths": {
+    "capabilityPolicy": "distribution/capabilities/core-capabilities.v1.json",
+    "upstreamInventory": "distribution/upstream-sources.v1.json",
+    "vehiclePackRegistry": "distribution/vehicle-packs/registry.v1.json",
+    "licenseNotice": "runtime/THIRD_PARTY_NOTICES.md"
+  },
+  "components": [
+    {
+      "componentId": "desktop-core",
+      "version": "1.0.0",
+      "sourcePolicy": "common-source",
+      "sourceCommit": null,
+      "contractPath": "desktop/src-tauri/tauri.conf.json",
+      "artifactState": "planned-not-built",
+      "artifactManifestSha256": null,
+      "artifactSha256": null,
+      "artifactBytes": null,
+      "signatureState": "not-issued",
+      "planningDownloadBytes": 16777216,
+      "planningInstalledBytes": 67108864
+    },
+    {
+      "componentId": "engine-pack",
+      "version": "1.0.0",
+      "sourcePolicy": "common-source",
+      "sourceCommit": null,
+      "contractPath": "engine-pack/manifest.schema.json",
+      "artifactState": "planned-not-built",
+      "artifactManifestSha256": null,
+      "artifactSha256": null,
+      "artifactBytes": null,
+      "signatureState": "not-issued",
+      "planningDownloadBytes": 67108864,
+      "planningInstalledBytes": 201326592
+    },
+    {
+      "componentId": "runtime-base-full-simulation",
+      "version": "0.1.0-beta.2",
+      "sourcePolicy": "pinned-source",
+      "sourceCommit": "755c511539fe561207ca38ff5079f471a4110896",
+      "contractPath": "runtime/release-manifest.schema.json",
+      "artifactState": "verified-existing-reference",
+      "artifactManifestSha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+      "artifactSha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+      "artifactBytes": 6141118464,
+      "signatureState": "verified",
+      "planningDownloadBytes": 6141118464,
+      "planningInstalledBytes": 6141118464
+    },
+    {
+      "componentId": "runtime-base-field-lightweight",
+      "version": "0.1.0",
+      "sourcePolicy": "common-source",
+      "sourceCommit": null,
+      "contractPath": "runtime/manifest.schema.json",
+      "artifactState": "planned-not-built",
+      "artifactManifestSha256": null,
+      "artifactSha256": null,
+      "artifactBytes": null,
+      "signatureState": "not-issued",
+      "planningDownloadBytes": 536870912,
+      "planningInstalledBytes": 2147483648
+    }
+  ],
+  "editions": [
+    {
+      "editionId": "sim",
+      "editionManifestPath": "distribution/editions/sim.v1.json",
+      "componentIds": ["desktop-core", "engine-pack", "runtime-base-full-simulation"],
+      "vehiclePackManifestPath": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+      "controllerModel": null,
+      "region": "global",
+      "vehiclePackDownloadEstimateBytes": 134217728,
+      "vehiclePackInstalledEstimateBytes": 536870912,
+      "artifactFileName": "DroneDream-Sim-1.0.0.exe"
+    },
+    {
+      "editionId": "lab",
+      "editionManifestPath": "distribution/editions/lab.v1.json",
+      "componentIds": ["desktop-core", "engine-pack", "runtime-base-full-simulation"],
+      "vehiclePackManifestPath": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+      "controllerModel": "Pixhawk 6C",
+      "region": "global",
+      "vehiclePackDownloadEstimateBytes": 134217728,
+      "vehiclePackInstalledEstimateBytes": 536870912,
+      "artifactFileName": "DroneDream-Lab-1.0.0.exe"
+    },
+    {
+      "editionId": "field",
+      "editionManifestPath": "distribution/editions/field.v1.json",
+      "componentIds": ["desktop-core", "engine-pack", "runtime-base-field-lightweight"],
+      "vehiclePackManifestPath": "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
+      "controllerModel": "Allspark V6C",
+      "region": "cn",
+      "vehiclePackDownloadEstimateBytes": 33554432,
+      "vehiclePackInstalledEstimateBytes": 134217728,
+      "artifactFileName": "DroneDream-Field-1.0.0.exe"
+    }
+  ],
+  "precombinedBundles": [
+    {
+      "bundleId": "sim-x500-reference",
+      "editionId": "sim",
+      "vehiclePackId": "px4-gazebo-x500-reference",
+      "controllerModel": null,
+      "region": "global",
+      "artifactFileName": "DroneDream-Sim-X500-Reference-1.0.0.exe"
+    },
+    {
+      "bundleId": "lab-s500-pixhawk6c",
+      "editionId": "lab",
+      "vehiclePackId": "holybro-s500-v2-pixhawk6c",
+      "controllerModel": "Pixhawk 6C",
+      "region": "global",
+      "artifactFileName": "DroneDream-Lab-S500-Pixhawk6C-1.0.0.exe"
+    },
+    {
+      "bundleId": "field-p450-allspark-v6c",
+      "editionId": "field",
+      "vehiclePackId": "amovlab-p450-px4",
+      "controllerModel": "Allspark V6C",
+      "region": "cn",
+      "artifactFileName": "DroneDream-Field-P450-AllsparkV6C-1.0.0.exe"
+    }
+  ]
+}

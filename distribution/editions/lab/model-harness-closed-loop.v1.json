@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-model-harness-closed-loop",
+  "editionId": "lab",
+  "productVersion": "1.0.0",
+  "positioning": {
+    "en": "Bidirectional Sim-to-Real and Real-to-Sim autonomous tuning, calibration, qualification, and evidence issuance.",
+    "zh-CN": "面向 Sim-to-Real 与 Real-to-Sim 的双向自主调优、校准、资格判定和证据签发。",
+    "notSimpleFeatureUnion": true
+  },
+  "jobBoundary": {
+    "sameJobRequired": true,
+    "crossEditionHarnessOrchestrator": false,
+    "modelCanAuthorizeExecution": false,
+    "workspaceSwitchInvokesModelOrHarness": false,
+    "workspaceSwitchGrantsHardwareAuthority": false
+  },
+  "roles": {
+    "model": [
+      "propose-next-parameter-candidate",
+      "propose-experiment-strategy",
+      "diagnose-sim-real-gap",
+      "revise-model-calibration"
+    ],
+    "harness": [
+      "enforce-budget-and-constraints",
+      "dispatch-evidence-bound-experiment",
+      "collect-and-classify-observations",
+      "compute-sim-real-gap",
+      "enforce-independent-holdout",
+      "issue-versioned-receipt",
+      "freeze-qualified-candidate",
+      "rollback-to-bound-snapshot"
+    ],
+    "hardwareAuthority": [
+      "native",
+      "backend",
+      "runtime",
+      "validated-vehicle-pack",
+      "operator-confirmation"
+    ]
+  },
+  "phases": [
+    "objective-and-constraints",
+    "simulation-search",
+    "simulation-qualification",
+    "controlled-real-observation",
+    "sim-real-gap-analysis",
+    "real-sim-model-calibration",
+    "resimulation",
+    "independent-holdout",
+    "qualification-and-evidence",
+    "field-handoff"
+  ],
+  "requiredEvidenceBindings": [
+    "jobId",
+    "cycleOrdinal",
+    "commonCoreCommit",
+    "editionManifestSha256",
+    "vehiclePackId",
+    "controllerIdentity",
+    "firmwareIdentity",
+    "parameterCandidateHash",
+    "simulationEvidenceHash",
+    "realObservationEvidenceHash",
+    "objectiveContractHash",
+    "constraintContractHash",
+    "holdoutContractHash",
+    "metricNormalizationReceiptHash"
+  ],
+  "qualification": {
+    "requiresIndependentHoldout": true,
+    "requiresGapWithinTolerance": true,
+    "requiresValidatedVehiclePack": true,
+    "requiresNativeBackendRuntimeQuorum": true,
+    "requiresOperatorConfirmationForHardware": true,
+    "importedEvidenceGrantsAuthority": false,
+    "frontendCanIssueTrustedQualification": false
+  },
+  "currentSafetyState": {
+    "validatedVehiclePackCount": 0,
+    "hardwareExecutionDecision": "deny",
+    "deniedActions": [
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl.execute"
+    ],
+    "allowedOfflineActions": [
+      "calibration.plan.create",
+      "simulation.receipt.preview",
+      "real-observation.receipt.preview",
+      "sim-real.gap.compute",
+      "model-revision.draft",
+      "qualification.receipt.draft",
+      "native-calibration.receipt.draft"
+    ]
+  },
+  "receiptPolicy": {
+    "canonicalJsonRequired": true,
+    "sourceHashesRequired": true,
+    "draftReceiptTrusted": false,
+    "draftReceiptGrantsHardwareAuthority": false,
+    "releaseRequiresSignedQualificationReceipt": true,
+    "releaseRequiresExactSource": true
+  },
+  "presentation": {
+    "themeTokens": ["#A7E84A", "#20C77A", "#087E69"],
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  }
+}

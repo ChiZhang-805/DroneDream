@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/vehicle-pack-profile-registry.v1.json",
+  "title": "DroneDream profile-scoped Vehicle Pack registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "registryId",
+    "registryVersion",
+    "profileId",
+    "sourceRegistry",
+    "policy",
+    "packs"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-vehicle-pack-profile-registry"},
+    "registryId": {"const": "sim-only-x500"},
+    "registryVersion": {"const": "1.0.0"},
+    "profileId": {"const": "sim-only"},
+    "sourceRegistry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "registryId", "registryVersion", "auditDate"],
+      "properties": {
+        "path": {"const": "distribution/vehicle-packs/registry.v1.json"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "registryId": {"const": "initial-vehicle-packs"},
+        "registryVersion": {"const": "1.0.0"},
+        "auditDate": {"type": "string", "format": "date"}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exactPackCount",
+        "allowedPackIds",
+        "hardwareMetadataAllowed",
+        "validatedRequiresSignedReceipt",
+        "stockDoesNotImplyCompatibility",
+        "parameterBoundsAreProvisionalUntilValidated"
+      ],
+      "properties": {
+        "exactPackCount": {"const": 1},
+        "allowedPackIds": {
+          "const": ["px4-gazebo-x500-reference"]
+        },
+        "hardwareMetadataAllowed": {"const": false},
+        "validatedRequiresSignedReceipt": {"const": true},
+        "stockDoesNotImplyCompatibility": {"const": true},
+        "parameterBoundsAreProvisionalUntilValidated": {"const": true}
+      }
+    },
+    "packs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {"$ref": "#/$defs/packEntry"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "packEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packId",
+        "manifestPath",
+        "manifestSha256",
+        "currentValidationStatus",
+        "currentValidationTier",
+        "segments",
+        "goldenCandidate",
+        "productAvailability",
+        "supportRegions",
+        "availabilityEvidence"
+      ],
+      "properties": {
+        "packId": {"const": "px4-gazebo-x500-reference"},
+        "manifestPath": {
+          "const": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json"
+        },
+        "manifestSha256": {"$ref": "#/$defs/sha256"},
+        "currentValidationStatus": {
+          "enum": ["validated", "contract-only", "planned"]
+        },
+        "currentValidationTier": {
+          "enum": ["sim-validated", "contract-only", "planned"]
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["simulation-reference", "student", "teaching", "research", "racing"]
+          }
+        },
+        "goldenCandidate": {"type": "boolean"},
+        "productAvailability": {"const": "simulation-only"},
+        "supportRegions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["cn", "global"]}
+        },
+        "availabilityEvidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["url", "scope", "observedDate"],
+            "properties": {
+              "url": {"type": "string", "format": "uri", "pattern": "^https://"},
+              "scope": {"type": "string", "minLength": 1, "maxLength": 512},
+              "observedDate": {"type": "string", "format": "date"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
