@@ -186,12 +186,8 @@ class RuntimeManifestContractTests(unittest.TestCase):
             self.assertIn(fragment, desktop)
 
     def test_services_execute_the_atomically_activated_engine_pack(self) -> None:
-        api = (RUNTIME / "systemd" / "dronedream-api.service").read_text(
-            encoding="utf-8"
-        )
-        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(
-            encoding="utf-8"
-        )
+        api = (RUNTIME / "systemd" / "dronedream-api.service").read_text(encoding="utf-8")
+        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(encoding="utf-8")
         for service in (api, worker):
             self.assertIn("/opt/dronedream/engine/current", service)
             self.assertNotIn("WorkingDirectory=/opt/dronedream/source", service)
@@ -199,9 +195,7 @@ class RuntimeManifestContractTests(unittest.TestCase):
         self.assertIn("ExecStart=/opt/dronedream/venv/bin/drone-dream-worker", worker)
 
     def test_runtime_auth_template_is_fail_closed_and_injected_at_build(self) -> None:
-        template = (RUNTIME / "config" / "runtime.env.default").read_text(
-            encoding="utf-8"
-        )
+        template = (RUNTIME / "config" / "runtime.env.default").read_text(encoding="utf-8")
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
         build = (RUNTIME / "build-rootfs.sh").read_text(encoding="utf-8")
         self.assertIn("AUTH_MODE=oidc_jwt", template)
