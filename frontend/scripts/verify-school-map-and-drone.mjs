@@ -48,15 +48,27 @@ try {
 
   await page.goto(`${origin}/console/autonomy/live`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);
-  await page.locator('.autonomy-world-3d[data-scene="school-campus-v1"] canvas').waitFor({ state: "visible" });
+  const schoolCanvas = page.locator('.autonomy-world-3d[data-scene="school-campus-v1"] canvas');
+  await schoolCanvas.waitFor({ state: "visible" });
   await page.waitForTimeout(1800);
   const world = page.locator(".autonomy-world-3d");
   if (await world.getAttribute("data-xray") !== "false") throw new Error("School Map must open in solid mode.");
+  if (Number(await world.getAttribute("data-road-segments")) < 8) throw new Error("School Map road graph is incomplete.");
+  if (Number(await world.getAttribute("data-road-junctions")) < 6) throw new Error("School Map intersections are incomplete.");
+  const vehicleDiameter = Number(await world.getAttribute("data-vehicle-collision-diameter-m"));
+  const minimumRoadWidth = Number(await world.getAttribute("data-min-road-width-m"));
+  const openDoorClearance = Number(await world.getAttribute("data-open-door-clearance-m"));
+  if (!(minimumRoadWidth > vehicleDiameter * 4)) throw new Error("School Map roads do not preserve the reviewed My Drone operating envelope.");
+  if (!(openDoorClearance > vehicleDiameter * 2)) throw new Error("School Map teaching entrance does not preserve the reviewed My Drone door clearance.");
   if (await page.getByRole("button", { name: "X-ray" }).count() !== 1) throw new Error("School Map is missing the X-ray control.");
   for (const label of ["ALL", "L1", "L2", "L3"]) {
     if (await page.getByRole("button", { name: label, exact: true }).count() !== 1) throw new Error(`School Map is missing ${label}.`);
   }
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`), fullPage: false });
+  await schoolCanvas.hover();
+  await page.mouse.wheel(0, -900);
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-entrances-1600x1000.png`), fullPage: false });
   await page.getByRole("button", { name: "X-ray" }).click();
   await page.getByRole("button", { name: "L3", exact: true }).click();
   await page.waitForTimeout(1200);
@@ -144,9 +156,26 @@ try {
   if (reboundMapId !== "map-school") throw new Error(`Mission Context did not persist the School Map binding: ${reboundMapId}.`);
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`), fullPage: false });
 
+  await page.goto(`${origin}/console/autonomy/maps`, { waitUntil: "networkidle" });
+  await clearBlockingDialog(page);
+  const savedMapLabels = await page.locator('select[aria-label="Saved maps"] option').allTextContents();
+  if (savedMapLabels.some((label) => /\s·\sv\d+$/iu.test(label))) throw new Error(`Map revision suffix returned: ${savedMapLabels.join(" | ")}`);
+  const mapName = page.getByLabel("Map name", { exact: true });
+  await mapName.fill("School Map ");
+  await mapName.fill("School Map");
+  await page.getByRole("button", { name: "Save Map Pack", exact: true }).click();
+  const persistedMap = await page.evaluate(() => {
+    const stored = window.localStorage.getItem("dronedream:autonomy-workspace:v2:local:universal");
+    return stored ? JSON.parse(stored).mapPack : null;
+  });
+  if (persistedMap?.id !== "map-school" || persistedMap?.name !== "School Map" || persistedMap?.version !== 1) {
+    throw new Error(`Map save did not replace School Map in place: ${JSON.stringify(persistedMap)}`);
+  }
+
   process.stdout.write(`${JSON.stringify({
     screenshots: [
       path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-entrances-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-3-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}my-drone-vehicle-studio-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`),

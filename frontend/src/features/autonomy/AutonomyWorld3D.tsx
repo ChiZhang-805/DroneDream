@@ -6,6 +6,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { createMyDroneModel } from "./myDroneModel";
 import {
   buildSchoolMapScene,
+  SCHOOL_MAP_CONTRACT,
+  SCHOOL_MAP_ROAD_NETWORK,
   type SchoolMapFloor,
   type SchoolMapMissionId,
 } from "./schoolMapScene";
@@ -98,7 +100,7 @@ export function AutonomyWorld3D({
     scene.background = new THREE.Color(perception === "vision" ? 0x121017 : 0xdfe8ef);
     scene.fog = new THREE.Fog(scene.background, perception === "vision" ? 80 : 128, 230);
     const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 360);
-    if (floor === "all") camera.position.set(74, 58, 86);
+    if (floor === "all") camera.position.set(74, 58, -86);
     else camera.position.set(35, 24, 43);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -231,7 +233,18 @@ export function AutonomyWorld3D({
   }, [dynamicEntityActive, floor, missionId, obstacleInjected, perception, planned, xRay]);
 
   return (
-    <div className="autonomy-world-3d autonomy-school-world" data-scene="school-campus-v1" data-mission={missionId} data-perception={perception} data-xray={xRay ? "true" : "false"}>
+    <div
+      className="autonomy-world-3d autonomy-school-world"
+      data-scene="school-campus-v1"
+      data-mission={missionId}
+      data-perception={perception}
+      data-xray={xRay ? "true" : "false"}
+      data-road-segments={SCHOOL_MAP_ROAD_NETWORK.segments.length}
+      data-road-junctions={SCHOOL_MAP_ROAD_NETWORK.junctions.length}
+      data-vehicle-collision-diameter-m={SCHOOL_MAP_CONTRACT.simulation.vehicleCollisionDiameterM}
+      data-min-road-width-m={SCHOOL_MAP_CONTRACT.simulation.minimumRoadWidthM}
+      data-open-door-clearance-m={SCHOOL_MAP_CONTRACT.simulation.minimumOpenDoorClearanceM}
+    >
       <div ref={mountRef} className="autonomy-world-3d-canvas" aria-label={`${mapName} interactive semantic 3D campus`} />
       <div className="autonomy-world-3d-toolbar">
         <span><i />SCHOOL MAP</span>

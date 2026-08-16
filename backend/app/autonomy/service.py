@@ -268,9 +268,10 @@ def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | 
         return None
     if profile == "gates":
         return [
-            RoutePoint(x=-24.8, y=-4.0, z=1.4, phase="launch", speed_limit_mps=0.7),
-            RoutePoint(x=-20.0, y=-10.0, z=1.8, phase="transit", speed_limit_mps=1.0),
-            RoutePoint(x=-13.0, y=-17.0, z=2.2, phase="transit", speed_limit_mps=1.1),
+            RoutePoint(x=-24.8, y=-0.85, z=1.4, phase="launch", speed_limit_mps=0.7),
+            RoutePoint(x=-25.0, y=-9.0, z=1.7, phase="transit", speed_limit_mps=0.9),
+            RoutePoint(x=-25.0, y=-18.0, z=1.9, phase="transit", speed_limit_mps=1.0),
+            RoutePoint(x=-13.0, y=-18.0, z=2.2, phase="transit", speed_limit_mps=1.1),
             RoutePoint(x=-5.0, y=-18.0, z=2.4, phase="gate", speed_limit_mps=0.8),
             RoutePoint(x=5.0, y=-18.0, z=2.2, phase="transit", speed_limit_mps=1.0),
             RoutePoint(x=15.0, y=-18.0, z=2.5, phase="gate", speed_limit_mps=0.8),
@@ -292,7 +293,8 @@ def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | 
         RoutePoint(x=1.7, y=12.3, z=1.35, phase="stairs", speed_limit_mps=0.42),
         RoutePoint(x=1.7, y=8.8, z=1.15, phase="stairs", speed_limit_mps=0.45),
         RoutePoint(x=-8.0, y=5.0, z=1.2, phase="transit", speed_limit_mps=0.65),
-        RoutePoint(x=-24.8, y=3.0, z=1.3, phase="land", speed_limit_mps=0.35),
+        RoutePoint(x=-24.8, y=2.7, z=1.3, phase="transit", speed_limit_mps=0.5),
+        RoutePoint(x=-25.0, y=-0.85, z=1.3, phase="land", speed_limit_mps=0.35),
     ]
 
 

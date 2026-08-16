@@ -723,13 +723,16 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     ? mapPack.qualificationReceiptId.slice(0, 160)
     : null;
   const mapQualificationCredentialValid = mapPack.status === "qualified"
+    && mapPack.version === 1
     && Boolean(normalizedMapContentHash)
     && Boolean(normalizedMapReceiptId);
   const normalizedMap: AutonomyMapPack = {
     ...fallback.mapPack,
     schemaVersion: 2,
     id: boundedText(mapPack.id, fallback.mapPack.id, 80),
-    version: Math.round(boundedNumber(mapPack.version, fallback.mapPack.version, 1, 1_000_000)),
+    // A map is a mutable named workspace asset. Saving replaces that asset;
+    // users never accumulate v2/v3 copies in the map editor.
+    version: 1,
     status: normalizedSourceFiles.length
       ? (normalizedSourceFiles.every((file) => file.admission === "admitted") ? "assets-admitted" : "draft")
       : (mapQualificationCredentialValid
@@ -832,7 +835,7 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
         aircraftName: boundedText(record.aircraftName, normalizedAircraft.name, 120),
         mapName: boundedText(record.mapName, normalizedMap.name, 120),
         aircraftVersion: Math.round(boundedNumber(record.aircraftVersion, normalizedAircraft.version, 1, 1_000_000)),
-        mapVersion: Math.round(boundedNumber(record.mapVersion, normalizedMap.version, 1, 1_000_000)),
+        mapVersion: 1,
         taskGraphRevision: Math.round(boundedNumber(record.taskGraphRevision, 1, 1, 1_000_000)),
         decisionCount: Math.round(boundedNumber(record.decisionCount, 0, 0, 1_000_000)),
         trackedEntityCount: Math.round(boundedNumber(record.trackedEntityCount, 0, 0, 1_000_000)),
