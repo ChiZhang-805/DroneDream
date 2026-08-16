@@ -57,6 +57,10 @@ const authMock = vi.hoisted(() => {
 
 vi.mock("../features/auth/supabaseClient", () => ({
   appleAuthEnabled: false,
+  browserAuthConfiguration: () => ({
+    supabaseUrl: "https://accounts.example.test",
+    publishableKey: "public-browser-key",
+  }),
   cloudAuthConfigured: true,
   googleAuthEnabled: false,
   supabaseClient: {
@@ -157,6 +161,7 @@ describe("AuthContext account profile", () => {
     authMock.signOut.mockResolvedValue({ data: {}, error: null });
     authMock.unsubscribe.mockClear();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     delete window.__TAURI__;
     window.history.replaceState(null, "", "/");
     window.localStorage.clear();
@@ -285,6 +290,41 @@ describe("AuthContext account profile", () => {
     });
     },
   );
+
+  it("updates a desktop username with the native-adopted access token", async () => {
+    const request = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", request);
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    adoptDesktopAccount();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("username")).toHaveTextContent("Flight Pilot");
+    });
+    expect(request).toHaveBeenCalledWith(
+      "https://accounts.example.test/auth/v1/user",
+      expect.objectContaining({
+        method: "PUT",
+        headers: {
+          apikey: "public-browser-key",
+          Authorization: "Bearer session-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ data: { display_name: "Flight Pilot" } }),
+      }),
+    );
+    expect(authMock.updateUser).not.toHaveBeenCalled();
+    expect(authMock.getSession).not.toHaveBeenCalled();
+  });
 
   it("adopts an authenticated account when optional avatar storage is unavailable", async () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem")

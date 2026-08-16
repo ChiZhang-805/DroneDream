@@ -20,9 +20,10 @@ import {
   ADOPT_DESKTOP_AUTH_EVENT,
 } from "./desktopAuthActivation";
 import { clearBrowserAuthSessionRefresh } from "./browserAuth";
-import { setAuthAccessToken } from "./authTokenStore";
+import { getAuthAccessToken, setAuthAccessToken } from "./authTokenStore";
 import {
   appleAuthEnabled,
+  browserAuthConfiguration,
   cloudAuthConfigured,
   googleAuthEnabled,
   supabaseClient,
@@ -312,6 +313,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return code < 32 || code === 127;
     })) {
       throw new Error("Username contains unsupported characters.");
+    }
+
+    if (isDesktopRuntime()) {
+      const configuration = browserAuthConfiguration();
+      const accessToken = getAuthAccessToken();
+      if (!configuration || !accessToken) {
+        throw new Error("Sign in before changing the username.");
+      }
+      const response = await fetch(`${configuration.supabaseUrl}/auth/v1/user`, {
+        method: "PUT",
+        headers: {
+          apikey: configuration.publishableKey,
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ data: { display_name: normalized } }),
+      });
+      if (!response.ok) {
+        throw new Error("The username could not be saved.");
+      }
+      setAccount((current) =>
+        current ? { ...current, displayName: normalized } : current,
+      );
+      return;
     }
 
     const client = requireClient();
