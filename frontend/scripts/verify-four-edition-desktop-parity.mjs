@@ -127,6 +127,11 @@ try {
           const main = document.querySelector(".app-main");
           const lockup = document.querySelector(".app-title img, .universal-mode-switch-trigger img");
           const title = document.querySelector("h1, .assistant-hero-question, .vehicle-studio-title");
+          const adapterScroller = document.querySelector(".field-adapter-center .field-table-scroll");
+          const adapterTable = document.querySelector(".field-adapter-table");
+          const adapterAction = document.querySelector(".field-adapter-table td:last-child button");
+          const adapterScrollerRect = adapterScroller?.getBoundingClientRect();
+          const adapterActionRect = adapterAction?.getBoundingClientRect();
           return {
             edition: root.dataset.brandEdition,
             viewportWidth: window.innerWidth,
@@ -139,6 +144,12 @@ try {
             lockupHeight: lockup?.getBoundingClientRect().height ?? 0,
             title: title?.textContent?.trim() ?? "",
             errorBoundary: Boolean(document.querySelector(".error-page, [data-error-boundary]")),
+            adapterTableFits: !adapterScroller || !adapterTable
+              ? true
+              : adapterTable.scrollWidth <= adapterScroller.clientWidth + 1,
+            adapterActionVisible: !adapterScrollerRect || !adapterActionRect
+              ? true
+              : adapterActionRect.right <= adapterScrollerRect.right + 1,
           };
         });
 
@@ -150,8 +161,11 @@ try {
         assert(metrics.lockupWidth >= 100, `${edition.id}/${surface}: brand lockup is missing or too small`);
         assert(metrics.lockupHeight >= 20, `${edition.id}/${surface}: brand lockup is missing or too short`);
         assert(metrics.documentWidth <= viewport.width + 1, `${edition.id}/${surface}: horizontal overflow ${metrics.documentWidth}px`);
+        assert(metrics.documentHeight <= viewport.height + 1, `${edition.id}/${surface}: page-level vertical overflow ${metrics.documentHeight}px`);
         assert(!metrics.errorBoundary, `${edition.id}/${surface}: error boundary rendered`);
         assert(metrics.title.length > 0, `${edition.id}/${surface}: primary page title is missing`);
+        assert(metrics.adapterTableFits, `${edition.id}/${surface}: adapter table is wider than its visible panel`);
+        assert(metrics.adapterActionVisible, `${edition.id}/${surface}: adapter action column is clipped`);
 
         manifest.push({ edition: edition.id, surface, route, screenshot, metrics });
       }

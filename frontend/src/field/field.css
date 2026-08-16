@@ -2384,10 +2384,29 @@ input:focus-visible {
 }
 
 .field-adapter-table {
-  min-width: 900px;
+  min-width: 0;
+  table-layout: fixed;
   color: var(--field-ink);
   background: var(--field-panel);
 }
+
+.field-adapter-center .field-table-scroll {
+  overflow-x: hidden;
+}
+
+.field-adapter-table th,
+.field-adapter-table td {
+  padding-inline: 9px;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.field-adapter-table th:nth-child(1) { width: 24%; }
+.field-adapter-table th:nth-child(2) { width: 14%; }
+.field-adapter-table th:nth-child(3) { width: 13%; }
+.field-adapter-table th:nth-child(4) { width: 15%; }
+.field-adapter-table th:nth-child(5) { width: 18%; }
+.field-adapter-table th:nth-child(6) { width: 16%; }
 
 .field-adapter-table td,
 .field-adapter-table td strong {
@@ -2395,7 +2414,7 @@ input:focus-visible {
 }
 
 .field-adapter-table td:first-child {
-  min-width: 190px;
+  min-width: 0;
 }
 
 .field-adapter-table td:last-child {
@@ -2417,8 +2436,11 @@ input:focus-visible {
 }
 
 .field-adapter-install {
-  min-width: 94px;
+  width: 100%;
+  min-width: 0;
+  padding-inline: 7px;
   justify-content: center;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -2988,13 +3010,14 @@ body:has(.field-app),
 .field-device-dashboard {
   display: grid;
   min-height: 0;
-  grid-template-columns: minmax(330px, 0.72fr) minmax(480px, 1.28fr);
+  grid-template-columns: minmax(280px, 0.52fr) minmax(0, 1.48fr);
   gap: 14px;
   overflow: hidden;
 }
 
 .field-device-dashboard > .field-page-component {
   padding: 14px;
+  overflow-x: hidden;
   border: 1px solid var(--field-line);
   border-radius: 6px;
   background: #ffffff;
