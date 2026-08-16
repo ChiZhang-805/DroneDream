@@ -43,6 +43,12 @@ describe("fixed scenario library", () => {
     expect(screen.queryByText("Medium")).not.toBeInTheDocument();
     expect(document.querySelectorAll("[data-template-key]")).toHaveLength(2);
     expect(screen.getAllByText("Local track preview")).toHaveLength(2);
+    for (const card of document.querySelectorAll<HTMLElement>("[data-template-key]")) {
+      const preview = card.querySelector(".experience-preview");
+      const useLink = within(card).getByRole("link", { name: /Use this scenario/i });
+      expect(Array.from(card.children).indexOf(preview as Element))
+        .toBeLessThan(Array.from(card.children).indexOf(useLink));
+    }
     expect(screen.getByText(/never creates or starts a job/i)).toBeVisible();
     expect(screen.getByText("1 / 12")).toBeVisible();
     expect(screen.queryByText("PX4 / GAZEBO STUDY")).not.toBeInTheDocument();
