@@ -50,6 +50,20 @@ if ($LASTEXITCODE -ne 0 -or $releaseSourceStatus) {
 }
 $env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $releaseSourceCommit
 $env:DRONEDREAM_RELEASE_BUILD_NUMBER = $releaseBuildNumber
+$desktopVisualQa = [Environment]::GetEnvironmentVariable(
+    "VITE_DESKTOP_VISUAL_QA",
+    "Process"
+) -ceq "true"
+if ($desktopVisualQa -and -not $AllowUnsignedUpdater) {
+    throw "Desktop visual-QA mode is forbidden for signed updater builds."
+}
+$visualQaConfig = if ($desktopVisualQa) {
+    [ordered]@{
+        identifier = "io.dronedream.desktop.$EditionId.visual-qa"
+    } | ConvertTo-Json -Compress
+} else {
+    $null
+}
 
 $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
 if (Test-Path -LiteralPath $cargoBin) {
@@ -248,15 +262,18 @@ $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ($additionalConfig) {
     # Tauri merges repeated --config values in order. Keep the edition overlay
     # first and add the LLVM resource overlay without replacing edition fields.
+    $tauriConfigArguments = @(
+        "--target", "x86_64-pc-windows-gnullvm",
+        "--config", $additionalConfig,
+        "--config", $llvmBundleConfig
+    )
+    if ($visualQaConfig) {
+        $tauriConfigArguments += @("--config", $visualQaConfig)
+    }
     Invoke-CheckedNativeCommand `
         -FilePath "npm.cmd" `
         -DisplayName "Tauri desktop build" `
-        -ArgumentList @(
-            "--prefix", $desktopRoot, "run", "build", "--",
-            "--target", "x86_64-pc-windows-gnullvm",
-            "--config", $additionalConfig,
-            "--config", $llvmBundleConfig
-        )
+        -ArgumentList (@("--prefix", $desktopRoot, "run", "build", "--") + $tauriConfigArguments)
 } else {
     Invoke-CheckedNativeCommand `
         -FilePath "npm.cmd" `
