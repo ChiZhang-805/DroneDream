@@ -185,8 +185,8 @@
   height: 0.95rem;
 }
 
-.autonomy-context-popover {
-  width: min(23rem, calc(100vw - 2rem));
+.assistant-add-popover.autonomy-context-popover {
+  width: min(28rem, calc(100vw - 2rem));
 }
 
 .autonomy-context-popover a > span {
@@ -230,16 +230,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: nowrap;
   gap: 0.7rem;
 }
 
 .autonomy-context-group > header span {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 0.38rem;
   color: #6d6171;
   font-size: 0.64rem;
   font-weight: 850;
+  white-space: nowrap;
 }
 
 .autonomy-context-group > header svg {
@@ -249,10 +252,20 @@
 }
 
 .autonomy-context-group > header a {
+  display: inline-flex;
+  width: max-content;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 0;
   color: var(--dd-brand-middle);
+  background: transparent;
   font-size: 0.62rem;
   font-weight: 800;
   text-decoration: none;
+}
+
+.autonomy-context-group > header a:hover {
+  background: transparent;
 }
 
 .autonomy-context-asset {

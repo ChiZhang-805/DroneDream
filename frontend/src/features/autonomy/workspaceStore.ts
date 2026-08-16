@@ -570,8 +570,9 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     && storedAircraft.name === "Primary research quadrotor"
     ? fallback.aircraft
     : storedAircraft;
-  const mapPack = storedMapPack.id === "map-primary"
-    && storedMapPack.name === "Unconfigured environment"
+  const mapPack = (storedMapPack.id === "map-primary"
+    && storedMapPack.name === "Unconfigured environment")
+    || storedMapPack.name?.trim().toLocaleLowerCase() === "5 environment"
     ? fallback.mapPack
     : storedMapPack;
   const mission = candidate.mission && typeof candidate.mission === "object"

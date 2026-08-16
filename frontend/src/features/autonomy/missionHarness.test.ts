@@ -40,6 +40,24 @@ describe("autonomy mission harness", () => {
     expect(migrated.mapPack.contentHash).toBeNull();
   });
 
+  it("replaces the retired 5 environment placeholder with School Map", () => {
+    const legacy = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    legacy.mapPack = {
+      ...legacy.mapPack,
+      id: "map-legacy-5-environment",
+      name: "5 environment",
+      compilerSceneId: null,
+      calibrated: false,
+      confidencePercent: 0,
+    };
+
+    const migrated = normalizeAutonomyWorkspace(legacy);
+
+    expect(migrated.mapPack.id).toBe("map-school");
+    expect(migrated.mapPack.name).toBe("School Map");
+    expect(migrated.mission.mapPackId).toBe("map-school");
+  });
+
   it("publishes My Drone sensor mounts in the Vehicle Pack body frame", () => {
     const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
     const mounts = Object.fromEntries(workspace.aircraft.sensorMounts.map((mount) => [mount.id, mount]));

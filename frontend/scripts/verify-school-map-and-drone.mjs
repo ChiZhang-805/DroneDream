@@ -80,12 +80,62 @@ try {
   if (await page.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Tuning Chat + must expose exactly one School Map entry.");
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`), fullPage: false });
 
+  await page.evaluate(async (canSeedLegacyState) => {
+    let workspaceKey = Object.keys(window.localStorage).find((key) => key.startsWith("dronedream:autonomy-workspace:v2:"));
+    if (!workspaceKey && canSeedLegacyState) {
+      const store = await import("/console/src/features/autonomy/workspaceStore.ts");
+      store.saveAutonomyWorkspace("local", "universal", store.defaultAutonomyWorkspace());
+      workspaceKey = Object.keys(window.localStorage).find((key) => key.startsWith("dronedream:autonomy-workspace:v2:"));
+    }
+    if (!workspaceKey) return;
+    const workspace = JSON.parse(window.localStorage.getItem(workspaceKey));
+    const schoolMap = workspace.mapPack;
+    const legacyMap = {
+      ...schoolMap,
+      id: "map-legacy-5-environment",
+      name: "5 environment",
+      calibrated: false,
+      compilerSceneId: null,
+      confidencePercent: 0,
+    };
+    workspace.mapPack = legacyMap;
+    workspace.mission.mapPackId = legacyMap.id;
+    window.localStorage.setItem(workspaceKey, JSON.stringify(workspace));
+    const libraryKey = workspaceKey.replace("dronedream:autonomy-workspace:v2:", "dronedream:autonomy-assets:v1:");
+    window.localStorage.setItem(libraryKey, JSON.stringify({
+      schemaVersion: 1,
+      aircraft: [workspace.aircraft],
+      maps: [legacyMap, schoolMap],
+    }));
+  }, !externalOrigin);
+  await page.goto(`${origin}/console/autonomy`, { waitUntil: "networkidle" });
+  await clearBlockingDialog(page);
+  await page.locator(".assistant-add-button").click();
+  const contextPopover = page.locator(".autonomy-context-popover");
+  await contextPopover.waitFor({ state: "visible" });
+  const contextGeometry = await contextPopover.evaluate((element) => {
+    const headers = Array.from(element.querySelectorAll(".autonomy-context-group > header span"));
+    const headerRows = Array.from(element.querySelectorAll(".autonomy-context-group > header"));
+    return {
+      width: element.getBoundingClientRect().width,
+      headersFit: headers.map((header) => getComputedStyle(header).whiteSpace === "nowrap"),
+      rowsFit: headerRows.map((header) => getComputedStyle(header).flexWrap === "nowrap"),
+    };
+  });
+  if (contextGeometry.width < 440) throw new Error(`Mission Context is still too narrow: ${contextGeometry.width}px.`);
+  if (contextGeometry.headersFit.some((fits) => !fits) || contextGeometry.rowsFit.some((fits) => !fits)) throw new Error(`Mission Context headings wrapped: ${JSON.stringify(contextGeometry)}.`);
+  if (await contextPopover.getByText("5 environment", { exact: true }).count() !== 0) throw new Error("The retired 5 environment map is still visible.");
+  if (await contextPopover.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Mission Context must expose exactly one School Map entry.");
+  if (await contextPopover.locator('input[name="autonomy-map"]:checked').getAttribute("value") !== "map-school") throw new Error("School Map was not selected after legacy migration.");
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`), fullPage: false });
+
   process.stdout.write(`${JSON.stringify({
     screenshots: [
       path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-3-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}my-drone-vehicle-studio-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`),
     ],
   }, null, 2)}\n`);
   await context.close();
