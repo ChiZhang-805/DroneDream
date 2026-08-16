@@ -150,8 +150,10 @@ function providerRedirectUrl(): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const docsPreview = import.meta.env.DEV &&
-    new URLSearchParams(window.location.search).has("docsPreview");
+  const desktopVisualQa = isDesktopRuntime()
+    && import.meta.env.VITE_DESKTOP_VISUAL_QA === "true";
+  const docsPreview = desktopVisualQa || (import.meta.env.DEV &&
+    new URLSearchParams(window.location.search).has("docsPreview"));
   const deferDesktopAuth = useRef(shouldDeferDesktopAuth()).current;
   const [authActivated, setAuthActivated] = useState(!deferDesktopAuth);
   const [loading, setLoading] = useState(
@@ -160,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<DroneDreamAccount | null>(
     docsPreview
       ? {
-          id: "docs-preview",
+          id: desktopVisualQa ? "desktop-visual-qa" : "docs-preview",
           email: "pilot@example.com",
           displayName: "DroneDream Pilot",
           avatarUrl: null,

@@ -11,6 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_TURNSTILE_SITE_KEY?: string;
   readonly VITE_AUTH_GOOGLE_ENABLED?: "true" | "false";
   readonly VITE_AUTH_APPLE_ENABLED?: "true" | "false";
+  readonly VITE_DESKTOP_VISUAL_QA?: "true" | "false";
   readonly VITE_PUBLIC_DEMO_CONSOLE?: string;
   readonly VITE_DRONEDREAM_SOURCE_COMMIT?: string;
   readonly VITE_DRONEDREAM_EDITION?: "universal" | "sim" | "lab" | "field";

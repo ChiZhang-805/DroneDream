@@ -173,6 +173,13 @@ foreach ($name in @("VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY")) {
         throw "Set the approved public $name before building."
     }
 }
+$desktopVisualQa = [Environment]::GetEnvironmentVariable(
+    "VITE_DESKTOP_VISUAL_QA",
+    "Process"
+) -ceq "true"
+if ($desktopVisualQa -and -not $AllowUnsignedUpdater) {
+    throw "Desktop visual-QA mode is forbidden for signed updater builds."
+}
 
 $defaultUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
 if (-not $AllowUnsignedUpdater -and
@@ -320,6 +327,7 @@ try {
             version = $version
             sourceCommit = $sourceCommit
             sourceTree = $sourceTree
+            desktopVisualQa = $desktopVisualQa
             installer = [ordered]@{
                 fileName = [IO.Path]::GetFileName($handoffInstaller)
                 bytes = (Get-Item -LiteralPath $handoffInstaller).Length

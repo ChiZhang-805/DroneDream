@@ -31,6 +31,12 @@ closed until the user completes the explicit install, repair, or full re-check
 flow in Settings; the retained `/desktop/setup` route owns that flow without
 replacing the product workspace at every launch.
 
+Native screenshot audits may set `VITE_DESKTOP_VISUAL_QA=true` only for an
+unsigned engineering build. That desktop-only mode supplies a local preview
+account and bypasses the runtime route loader so every shared-console surface
+can be inspected in the real WebView without using customer credentials. The
+four-edition build script rejects the flag for signed updater builds.
+
 ## Source layout
 
 - `src/pages/` — route-level product pages.
