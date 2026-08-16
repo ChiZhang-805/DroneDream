@@ -75,12 +75,17 @@ def _contracts(tmp_path: Path, sequence: int = 1) -> tuple[Path, Path, Path, Pat
 
 def _install(tmp_path: Path, sequence: int = 1) -> dict[str, object]:
     manifest, archive, receipt, runtime = _contracts(tmp_path, sequence)
+    verified = json.loads(receipt.read_text(encoding="utf-8"))
     return tool.install_pack(
         manifest_path=manifest,
         archive_path=archive,
         verified_receipt_path=receipt,
         runtime_manifest_path=runtime,
         runtime_profile="sim-only",
+        expected_manifest_sha256=verified["manifestSha256"],
+        expected_archive_sha256=verified["archiveSha256"],
+        expected_catalog_sequence=verified["catalogSequence"],
+        expected_key_id=verified["keyId"],
         pack_root=tmp_path / "packs",
         state_path=tmp_path / "state.json",
     )
@@ -98,6 +103,7 @@ def test_installs_verified_pack_into_versioned_release_and_switches_atomically(t
 
 def test_modified_archive_after_native_verification_is_rejected(tmp_path: Path) -> None:
     manifest, archive, receipt, runtime = _contracts(tmp_path)
+    verified = json.loads(receipt.read_text(encoding="utf-8"))
     archive.write_bytes(archive.read_bytes() + b"tamper")
     with pytest.raises(tool.ComponentPackInstallError, match="changed after native verification"):
         tool.install_pack(
@@ -106,6 +112,10 @@ def test_modified_archive_after_native_verification_is_rejected(tmp_path: Path) 
             verified_receipt_path=receipt,
             runtime_manifest_path=runtime,
             runtime_profile="sim-only",
+            expected_manifest_sha256=verified["manifestSha256"],
+            expected_archive_sha256=verified["archiveSha256"],
+            expected_catalog_sequence=verified["catalogSequence"],
+            expected_key_id=verified["keyId"],
             pack_root=tmp_path / "packs",
             state_path=tmp_path / "state.json",
         )
@@ -114,6 +124,7 @@ def test_modified_archive_after_native_verification_is_rejected(tmp_path: Path) 
 def test_downgrade_and_equal_sequence_with_different_payload_are_rejected(tmp_path: Path) -> None:
     _install(tmp_path, 2)
     manifest, archive, receipt, runtime = _contracts(tmp_path, 1)
+    verified = json.loads(receipt.read_text(encoding="utf-8"))
     with pytest.raises(tool.ComponentPackInstallError, match="replay or downgrade"):
         tool.install_pack(
             manifest_path=manifest,
@@ -121,6 +132,10 @@ def test_downgrade_and_equal_sequence_with_different_payload_are_rejected(tmp_pa
             verified_receipt_path=receipt,
             runtime_manifest_path=runtime,
             runtime_profile="sim-only",
+            expected_manifest_sha256=verified["manifestSha256"],
+            expected_archive_sha256=verified["archiveSha256"],
+            expected_catalog_sequence=verified["catalogSequence"],
+            expected_key_id=verified["keyId"],
             pack_root=tmp_path / "packs",
             state_path=tmp_path / "state.json",
         )
@@ -142,6 +157,10 @@ def test_profile_and_runtime_version_mismatch_fail_closed(tmp_path: Path) -> Non
             verified_receipt_path=receipt,
             runtime_manifest_path=runtime_path,
             runtime_profile="sim-only",
+            expected_manifest_sha256=verified["manifestSha256"],
+            expected_archive_sha256=verified["archiveSha256"],
+            expected_catalog_sequence=verified["catalogSequence"],
+            expected_key_id=verified["keyId"],
             pack_root=tmp_path / "packs",
             state_path=tmp_path / "state.json",
         )
@@ -177,6 +196,32 @@ def test_older_verified_catalog_sequence_is_rejected(tmp_path: Path) -> None:
             verified_receipt_path=receipt,
             runtime_manifest_path=runtime,
             runtime_profile="sim-only",
+            expected_manifest_sha256=verified["manifestSha256"],
+            expected_archive_sha256=verified["archiveSha256"],
+            expected_catalog_sequence=verified["catalogSequence"],
+            expected_key_id=verified["keyId"],
+            pack_root=tmp_path / "packs",
+            state_path=tmp_path / "state.json",
+        )
+
+
+def test_forged_receipt_cannot_replace_the_native_trust_decision(tmp_path: Path) -> None:
+    manifest, archive, receipt, runtime = _contracts(tmp_path)
+    trusted = json.loads(receipt.read_text(encoding="utf-8"))
+    forged = dict(trusted)
+    forged["catalogSequence"] += 100
+    receipt.write_text(json.dumps(forged), encoding="utf-8")
+    with pytest.raises(tool.ComponentPackInstallError, match="native trust decision"):
+        tool.install_pack(
+            manifest_path=manifest,
+            archive_path=archive,
+            verified_receipt_path=receipt,
+            runtime_manifest_path=runtime,
+            runtime_profile="sim-only",
+            expected_manifest_sha256=trusted["manifestSha256"],
+            expected_archive_sha256=trusted["archiveSha256"],
+            expected_catalog_sequence=trusted["catalogSequence"],
+            expected_key_id=trusted["keyId"],
             pack_root=tmp_path / "packs",
             state_path=tmp_path / "state.json",
         )

@@ -3,6 +3,8 @@ mod browser_auth;
 mod browser_auth_audit;
 mod browser_auth_vault;
 #[cfg(not(dronedream_field))]
+mod component_update;
+#[cfg(not(dronedream_field))]
 mod desktop_api_bridge;
 mod distribution_plan;
 mod edition_safety;
@@ -165,6 +167,8 @@ pub fn run() {
         desktop_api_bridge::desktop_api_request,
         desktop_api_bridge::desktop_download_artifact,
         runtime_keepalive::stop_runtime_for_exit,
+        component_update::check_component_updates,
+        component_update::install_component_update,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
         field_adapters::inspect_field_protocol_frame,
@@ -210,6 +214,8 @@ pub fn run() {
         desktop_api_bridge::desktop_api_request,
         desktop_api_bridge::desktop_download_artifact,
         runtime_keepalive::stop_runtime_for_exit,
+        component_update::check_component_updates,
+        component_update::install_component_update,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
         field_adapters::inspect_field_protocol_frame,
@@ -255,7 +261,9 @@ pub fn run() {
         distribution_plan::validate_distribution_plan,
         desktop_api_bridge::desktop_api_request,
         desktop_api_bridge::desktop_download_artifact,
-        runtime_keepalive::stop_runtime_for_exit
+        runtime_keepalive::stop_runtime_for_exit,
+        component_update::check_component_updates,
+        component_update::install_component_update,
     ]);
 
     builder

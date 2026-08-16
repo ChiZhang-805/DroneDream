@@ -328,5 +328,21 @@ fn main() {
         "the production runtime release manifest URL must be an absolute HTTPS URL"
     );
     println!("cargo:rustc-env=DRONEDREAM_PRODUCTION_RUNTIME_RELEASE_MANIFEST_URL={url}");
+    let component_prefix = "VITE_COMPONENT_UPDATE_CATALOG_URL=";
+    let component_values = raw
+        .lines()
+        .filter_map(|line| line.strip_prefix(component_prefix))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        component_values.len(),
+        1,
+        "frontend/.env.production must define VITE_COMPONENT_UPDATE_CATALOG_URL exactly once"
+    );
+    let component_url = component_values[0].trim();
+    assert!(
+        component_url.starts_with("https://") && !component_url.contains(char::is_whitespace),
+        "the production component catalog URL must be an absolute HTTPS URL"
+    );
+    println!("cargo:rustc-env=DRONEDREAM_PRODUCTION_COMPONENT_CATALOG_URL={component_url}");
     tauri_build::build()
 }

@@ -165,7 +165,14 @@ def validate_runtime_compatibility(
 
 
 def validate_verified_receipt(
-    receipt: dict[str, Any], manifest_path: Path, archive_path: Path
+    receipt: dict[str, Any],
+    manifest_path: Path,
+    archive_path: Path,
+    *,
+    expected_manifest_sha256: str,
+    expected_archive_sha256: str,
+    expected_catalog_sequence: int,
+    expected_key_id: str,
 ) -> None:
     _exact_keys(
         receipt,
@@ -200,6 +207,13 @@ def validate_verified_receipt(
         raise ComponentPackInstallError("component manifest changed after native verification")
     if receipt["archiveSha256"] != sha256_file(archive_path):
         raise ComponentPackInstallError("component archive changed after native verification")
+    if (
+        receipt["manifestSha256"] != expected_manifest_sha256
+        or receipt["archiveSha256"] != expected_archive_sha256
+        or receipt["catalogSequence"] != expected_catalog_sequence
+        or receipt["keyId"] != expected_key_id
+    ):
+        raise ComponentPackInstallError("component receipt does not match the native trust decision")
 
 
 def safe_extract(archive_path: Path, destination: Path, files: list[dict[str, Any]]) -> None:
@@ -307,6 +321,10 @@ def install_pack(
     verified_receipt_path: Path,
     runtime_manifest_path: Path,
     runtime_profile: str,
+    expected_manifest_sha256: str,
+    expected_archive_sha256: str,
+    expected_catalog_sequence: int,
+    expected_key_id: str,
     pack_root: Path = DEFAULT_PACK_ROOT,
     state_path: Path = DEFAULT_STATE_PATH,
 ) -> dict[str, Any]:
@@ -321,7 +339,15 @@ def install_pack(
     manifest = load_json(manifest_path)
     validate_manifest(manifest)
     verified_receipt = load_json(verified_receipt_path)
-    validate_verified_receipt(verified_receipt, manifest_path, archive_path)
+    validate_verified_receipt(
+        verified_receipt,
+        manifest_path,
+        archive_path,
+        expected_manifest_sha256=expected_manifest_sha256,
+        expected_archive_sha256=expected_archive_sha256,
+        expected_catalog_sequence=expected_catalog_sequence,
+        expected_key_id=expected_key_id,
+    )
     validate_runtime_compatibility(manifest, load_json(runtime_manifest_path), runtime_profile)
     pack_type = manifest["packType"]
     component_root = pack_root / pack_type
@@ -408,6 +434,10 @@ def main() -> int:
     parser.add_argument("--verified-receipt", type=Path, required=True)
     parser.add_argument("--runtime-manifest", type=Path, default=DEFAULT_RUNTIME_MANIFEST)
     parser.add_argument("--runtime-profile", choices=PROFILES, required=True)
+    parser.add_argument("--expected-manifest-sha256", required=True)
+    parser.add_argument("--expected-archive-sha256", required=True)
+    parser.add_argument("--expected-catalog-sequence", type=int, required=True)
+    parser.add_argument("--expected-key-id", required=True)
     parser.add_argument("--pack-root", type=Path, default=DEFAULT_PACK_ROOT)
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE_PATH)
     arguments = parser.parse_args()
@@ -418,6 +448,10 @@ def main() -> int:
             verified_receipt_path=arguments.verified_receipt,
             runtime_manifest_path=arguments.runtime_manifest,
             runtime_profile=arguments.runtime_profile,
+            expected_manifest_sha256=arguments.expected_manifest_sha256,
+            expected_archive_sha256=arguments.expected_archive_sha256,
+            expected_catalog_sequence=arguments.expected_catalog_sequence,
+            expected_key_id=arguments.expected_key_id,
             pack_root=arguments.pack_root,
             state_path=arguments.state,
         )
