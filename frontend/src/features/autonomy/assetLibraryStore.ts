@@ -81,7 +81,7 @@ export function loadAutonomyAssetLibrary(
       : [];
     return withCurrentAutonomyAssets({ schemaVersion: 1, aircraft, maps }, workspace);
   } catch {
-    return { schemaVersion: 1, aircraft: [workspace.aircraft], maps: [workspace.mapPack] };
+    return withCurrentAutonomyAssets({ schemaVersion: 1, aircraft: [], maps: [] }, workspace);
   }
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AutonomyCompileRequest } from "../../types/api";
+import { loadAutonomyAssetLibrary } from "./assetLibraryStore";
 import { createLocalAutonomyPreview } from "./missionAutonomy";
 import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "./workspaceStore";
 import {
@@ -69,6 +70,25 @@ describe("autonomy mission harness", () => {
     expect(normalized.mapPack.id).toBe("map-user-import");
     expect(normalized.mapPack.name).toBe("5 environment");
     expect(normalized.mapPack.sourceFiles).toHaveLength(1);
+  });
+
+  it("restores public assets when the persisted asset library is malformed", () => {
+    const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    workspace.aircraft = { ...workspace.aircraft, id: "aircraft-custom", name: "Custom aircraft" };
+    workspace.mapPack = { ...workspace.mapPack, id: "map-custom", name: "Custom map" };
+
+    const library = loadAutonomyAssetLibrary("local", "universal", workspace, {
+      getItem: () => "{malformed-json",
+    });
+
+    expect(library.aircraft.map((aircraft) => aircraft.id)).toEqual([
+      "aircraft-custom",
+      "aircraft-my-drone",
+    ]);
+    expect(library.maps.map((mapPack) => mapPack.id)).toEqual([
+      "map-custom",
+      "map-school",
+    ]);
   });
 
   it("publishes My Drone sensor mounts in the Vehicle Pack body frame", () => {
