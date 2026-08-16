@@ -284,6 +284,23 @@ Write-Host (
     "Building DroneDream Desktop with $toolchain, $pythonExecutable, " +
     "and MSVC from $visualStudioRoot"
 )
+$tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
+    ConvertFrom-Json
+$expectedInstaller = Join-Path $installerBundleRoot (
+    "${ExpectedProductName}_$($tauriConfig.version)_x64-setup.exe"
+)
+$expectedUpdaterSignature = "${expectedInstaller}.sig"
+if ($AllowUnsignedUpdater -and
+    (Test-Path -LiteralPath $expectedUpdaterSignature -PathType Leaf)) {
+    # A reused Cargo target may contain a valid signature from an older build.
+    # Remove only this edition's exact expected signature before compiling so
+    # the post-build empty-slot guard proves this unsigned candidate did not
+    # inherit release authority from prior bytes.
+    [IO.File]::Delete($expectedUpdaterSignature)
+    if (Test-Path -LiteralPath $expectedUpdaterSignature) {
+        throw "Could not clear the stale updater-signature slot: $expectedUpdaterSignature"
+    }
+}
 $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $tauriConfigArguments = @("--target", $targetTriple)
 if ($additionalConfig) {
@@ -377,8 +394,6 @@ if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
     -Application $application `
     -EditionId $EditionId
 
-$tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
-    ConvertFrom-Json
 $bundleDirectory = Join-Path $targetOutputRoot "bundle\nsis"
 $installer = Join-Path $bundleDirectory "${ExpectedProductName}_$($tauriConfig.version)_x64-setup.exe"
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {

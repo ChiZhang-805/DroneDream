@@ -88,8 +88,13 @@ def test_shared_msvc_build_is_pinned_native_and_fail_closed() -> None:
         'System32\\WindowsPowerShell\\v1.0\\Modules',
         'Programs\\Python\\Python311\\python.exe',
         "'^Python 3\\.11\\.[0-9]+$'",
+        "Could not clear the stale updater-signature slot",
+        "Unsigned builds require an empty updater-signature slot",
     ):
         assert fragment in script
+    assert script.index("[IO.File]::Delete($expectedUpdaterSignature)") < script.index(
+        'Invoke-CheckedNativeCommand `'
+    )
     assert 'tauri.llvm.conf.json' not in script
     assert 'WebView2Loader.dll' not in script
 
@@ -274,6 +279,9 @@ def test_shared_llvm_build_keeps_signing_and_source_guards_fail_closed() -> None
         "Test-PostBuildSourceStatus",
     ):
         assert fragment in script
+    assert script.index("[IO.File]::Delete($expectedUpdaterSignature)") < script.index(
+        'Invoke-CheckedNativeCommand `'
+    )
 
 
 def test_release_policies_anchor_the_wrapped_native_build_boundary() -> None:
