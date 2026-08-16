@@ -37,6 +37,9 @@ $updateSource = Get-Content -LiteralPath (
 $llvmBuildScript = Get-Content -LiteralPath (
     Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1"
 ) -Raw -Encoding UTF8
+$msvcBuildScript = Get-Content -LiteralPath (
+    Join-Path $repoRoot "desktop\scripts\build-windows-msvc.ps1"
+) -Raw -Encoding UTF8
 Assert-Contract ($buildScript.Contains('DRONEDREAM_BUILD_NUMBER')) `
     "The desktop build must embed a monotonic updater build number."
 Assert-Contract ($buildScript.Contains('DRONEDREAM_SOURCE_COMMIT')) `
@@ -64,17 +67,22 @@ foreach ($requiredText in @(
     Assert-Contract ($buildScript.Contains($requiredText)) `
         "Repeated builds are missing the safe generated Engine Pack reset contract: $requiredText"
 }
-foreach ($requiredText in @(
-    'status --porcelain=v1 --untracked-files=all',
-    '$env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $releaseSourceCommit',
-    '-SourceCommit $releaseSourceCommit',
-    '-BuildNumber ([UInt64]$releaseBuildNumber)',
-    '-EditionId $EditionId',
-    '[IO.Path]::GetFullPath($updaterSignature)',
-    '(?:\.sha256|\.sig)?$'
+foreach ($releaseBuild in @(
+    [ordered]@{ name = "MSVC"; text = $msvcBuildScript },
+    [ordered]@{ name = "LLVM fallback"; text = $llvmBuildScript }
 )) {
-    Assert-Contract ($llvmBuildScript.Contains($requiredText)) `
-        "The LLVM release build is missing its exact-source contract: $requiredText"
+    foreach ($requiredText in @(
+        'status --porcelain=v1 --untracked-files=all',
+        '$env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $releaseSourceCommit',
+        '-SourceCommit $releaseSourceCommit',
+        '-BuildNumber ([UInt64]$releaseBuildNumber)',
+        '-EditionId $EditionId',
+        '[IO.Path]::GetFullPath($updaterSignature)',
+        '(?:\.sha256|\.sig)?$'
+    )) {
+        Assert-Contract ($releaseBuild.text.Contains($requiredText)) `
+            "$($releaseBuild.name) release build is missing its exact-source contract: $requiredText"
+    }
 }
 
 $temporaryRoot = Join-Path $env:TEMP (

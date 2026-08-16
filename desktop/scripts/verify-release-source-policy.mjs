@@ -31,6 +31,7 @@ const codeSigningPolicy = readText("CODE_SIGNING_POLICY.md");
 const privacyPolicy = readText("PRIVACY.md");
 const readme = readText("README.md");
 const llvmBuildScript = readText("desktop/scripts/build-windows-llvm.ps1");
+const msvcBuildScript = readText("desktop/scripts/build-windows-msvc.ps1");
 const updaterSignerScript = readText("desktop/scripts/invoke-tauri-updater-signer.ps1");
 for (const requiredText of [
   "Free code signing provided by [SignPath.io]",
@@ -43,30 +44,31 @@ for (const requiredText of [
     fail(`CODE_SIGNING_POLICY.md is missing: ${requiredText}`);
   }
 }
-if (
-  /--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(llvmBuildScript)
-  || /--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(updaterSignerScript)
-) {
+if ([llvmBuildScript, msvcBuildScript, updaterSignerScript].some((script) =>
+  /--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(script)
+)) {
   fail("the updater key password must not be interpolated into a process argument");
 }
-if (!llvmBuildScript.includes("invoke-tauri-updater-signer.ps1")) {
-  fail("the LLVM build must use the tested updater signer helper");
-}
-const updaterSigningPreflightIndex = llvmBuildScript.indexOf(
-  "verify-updater-signing-contract.ps1",
-);
-const desktopBuildInvocationIndex = llvmBuildScript.indexOf(
-  "Invoke-CheckedNativeCommand `",
-);
-if (
-  updaterSigningPreflightIndex < 0
-  || desktopBuildInvocationIndex < 0
-  || updaterSigningPreflightIndex >= desktopBuildInvocationIndex
-) {
-  fail("the updater signing contract must run before the desktop and NSIS build");
-}
-if (llvmBuildScript.includes("@updaterPasswordArguments")) {
-  fail("the LLVM build contains the scalar updater-password splat regression");
+for (const [name, script] of [["MSVC", msvcBuildScript], ["LLVM fallback", llvmBuildScript]]) {
+  if (!script.includes("invoke-tauri-updater-signer.ps1")) {
+    fail(`the ${name} build must use the tested updater signer helper`);
+  }
+  const updaterSigningPreflightIndex = script.indexOf(
+    "verify-updater-signing-contract.ps1",
+  );
+  const desktopBuildInvocationIndex = script.indexOf(
+    "Invoke-CheckedNativeCommand `",
+  );
+  if (
+    updaterSigningPreflightIndex < 0
+    || desktopBuildInvocationIndex < 0
+    || updaterSigningPreflightIndex >= desktopBuildInvocationIndex
+  ) {
+    fail(`the updater signing contract must run before the ${name} desktop and NSIS build`);
+  }
+  if (script.includes("@updaterPasswordArguments")) {
+    fail(`the ${name} build contains the scalar updater-password splat regression`);
+  }
 }
 for (const requiredText of [
   '[string[]]$signerArguments = @(',

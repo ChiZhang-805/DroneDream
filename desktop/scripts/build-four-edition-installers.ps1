@@ -1,8 +1,10 @@
 param(
     [ValidateSet("all", "universal", "sim", "lab", "field")]
     [string]$Edition = "all",
-    [string]$OutputRoot = (Join-Path $env:LOCALAPPDATA "DroneDream\codex-builds\core-four-main"),
-    [string]$CargoRoot = (Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache\core-four-main-cargo"),
+    [ValidateSet("msvc", "gnullvm")]
+    [string]$Toolchain = "msvc",
+    [string]$OutputRoot,
+    [string]$CargoRoot,
     [switch]$AllowUnsignedUpdater,
     [switch]$ReuseCargoTarget,
     [switch]$PreserveCargoTarget
@@ -14,6 +16,25 @@ Set-StrictMode -Version Latest
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $outputBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-builds"))
 $cargoBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache"))
+$toolchainContract = if ($Toolchain -ceq "msvc") {
+    [ordered]@{
+        builder = "desktop\scripts\build-windows-msvc.ps1"
+        targetTriple = "x86_64-pc-windows-msvc"
+        compilerFamily = "msvc"
+    }
+} else {
+    [ordered]@{
+        builder = "desktop\scripts\build-windows-llvm.ps1"
+        targetTriple = "x86_64-pc-windows-gnullvm"
+        compilerFamily = "llvm-mingw"
+    }
+}
+if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
+    $OutputRoot = Join-Path $outputBase "core-four-$Toolchain"
+}
+if ([string]::IsNullOrWhiteSpace($CargoRoot)) {
+    $CargoRoot = Join-Path $cargoBase "core-four-$Toolchain-cargo"
+}
 $outputRootFull = [IO.Path]::GetFullPath($OutputRoot)
 $cargoRootFull = [IO.Path]::GetFullPath($CargoRoot)
 
@@ -255,15 +276,15 @@ try {
         $env:DRONEDREAM_EDITION_PROFILE = $contract.profile
         $env:DRONEDREAM_OAUTH_CLIENT_ID = Get-OAuthClientId -EditionId $editionId
         $env:VITE_DRONEDREAM_EDITION = $editionId
-        # The shared lower-level builder deliberately sets RUSTFLAGS for the
-        # pinned gnullvm build. Reset only its known process-local output before
-        # the next edition so the lower-level custom-flag gate remains strict.
+        # The LLVM fallback deliberately sets RUSTFLAGS. Reset its known
+        # process-local output before every edition; the MSVC path also rejects
+        # inherited custom flags so both release chains remain deterministic.
         Remove-Item Env:\RUSTFLAGS -ErrorAction SilentlyContinue
         Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
 
         Write-Host "Building $editionId from $sourceCommit"
         $stopwatch = [Diagnostics.Stopwatch]::StartNew()
-        & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
+        & (Join-Path $repoRoot $toolchainContract.builder) `
             -AdditionalConfigPath $configPath `
             -CargoTargetDir $cargoRootFull `
             -ExpectedProductName $contract.product `
@@ -274,7 +295,7 @@ try {
             throw "$editionId installer build failed."
         }
 
-        $bundleRoot = Join-Path $cargoRootFull "x86_64-pc-windows-gnullvm\release\bundle\nsis"
+        $bundleRoot = Join-Path $cargoRootFull "$($toolchainContract.targetTriple)\release\bundle\nsis"
         $builtInstaller = Join-Path $bundleRoot "$($contract.product)_${version}_x64-setup.exe"
         $builtSignature = "$builtInstaller.sig"
         $builtChecksum = "$builtInstaller.sha256"
@@ -328,6 +349,8 @@ try {
             sourceCommit = $sourceCommit
             sourceTree = $sourceTree
             desktopVisualQa = $desktopVisualQa
+            compilerFamily = $toolchainContract.compilerFamily
+            targetTriple = $toolchainContract.targetTriple
             installer = [ordered]@{
                 fileName = [IO.Path]::GetFileName($handoffInstaller)
                 bytes = (Get-Item -LiteralPath $handoffInstaller).Length

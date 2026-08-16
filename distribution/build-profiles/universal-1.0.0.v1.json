@@ -137,9 +137,11 @@
     "hardwareActionDecision": "deny"
   },
   "build": {
-    "sharedScript": "desktop/scripts/build-windows-llvm.ps1",
+    "sharedScript": "desktop/scripts/build-windows-msvc.ps1",
     "wrapperScript": "desktop/scripts/build-universal-installer.ps1",
-    "targetTriple": "x86_64-pc-windows-gnullvm",
+    "targetTriple": "x86_64-pc-windows-msvc",
+    "fallbackScript": "desktop/scripts/build-windows-llvm.ps1",
+    "fallbackTargetTriple": "x86_64-pc-windows-gnullvm",
     "cargoTargetMustBeOutsideRepository": true,
     "updaterSignatureRequired": true,
     "authenticodeRequiredForInternalTest": false,

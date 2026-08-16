@@ -40,9 +40,17 @@ Assert-Contract (-not (
 )) "a real sequence difference must fail closed"
 
 $helperPath = Join-Path $PSScriptRoot "invoke-tauri-updater-signer.ps1"
-$buildScriptPath = Join-Path $PSScriptRoot "build-windows-llvm.ps1"
 $helperText = Get-Content -LiteralPath $helperPath -Raw
-$buildScriptText = Get-Content -LiteralPath $buildScriptPath -Raw
+$buildScripts = @(
+    [ordered]@{
+        name = "MSVC"
+        path = Join-Path $PSScriptRoot "build-windows-msvc.ps1"
+    },
+    [ordered]@{
+        name = "LLVM fallback"
+        path = Join-Path $PSScriptRoot "build-windows-llvm.ps1"
+    }
+)
 
 $tokens = $null
 $parseErrors = $null
@@ -85,21 +93,26 @@ Assert-Contract (-not [regex]::IsMatch(
     $helperText,
     '(?i)--password[^\r\n]*TAURI_SIGNING_PRIVATE_KEY_PASSWORD'
 )) "the password environment value must not be copied to argv"
-Assert-Contract ($buildScriptText.Contains('invoke-tauri-updater-signer.ps1')) "the LLVM build must use the tested signer helper"
-Assert-Contract (-not $buildScriptText.Contains('@updaterPasswordArguments')) "the scalar-splat regression must stay removed"
-$preflightIndex = $buildScriptText.IndexOf(
-    'verify-updater-signing-contract.ps1',
-    [StringComparison]::Ordinal
-)
-$buildInvocationIndex = $buildScriptText.IndexOf(
-    'Invoke-CheckedNativeCommand `',
-    [StringComparison]::Ordinal
-)
-Assert-Contract (
-    $preflightIndex -ge 0 -and
-    $buildInvocationIndex -ge 0 -and
-    $preflightIndex -lt $buildInvocationIndex
-) "the signer contract must fail before the expensive desktop and NSIS build starts"
+foreach ($buildScript in $buildScripts) {
+    $buildScriptText = Get-Content -LiteralPath $buildScript.path -Raw
+    Assert-Contract ($buildScriptText.Contains('invoke-tauri-updater-signer.ps1')) `
+        "the $($buildScript.name) build must use the tested signer helper"
+    Assert-Contract (-not $buildScriptText.Contains('@updaterPasswordArguments')) `
+        "the scalar-splat regression must stay removed from the $($buildScript.name) build"
+    $preflightIndex = $buildScriptText.IndexOf(
+        'verify-updater-signing-contract.ps1',
+        [StringComparison]::Ordinal
+    )
+    $buildInvocationIndex = $buildScriptText.IndexOf(
+        'Invoke-CheckedNativeCommand `',
+        [StringComparison]::Ordinal
+    )
+    Assert-Contract (
+        $preflightIndex -ge 0 -and
+        $buildInvocationIndex -ge 0 -and
+        $preflightIndex -lt $buildInvocationIndex
+    ) "the signer contract must fail before the $($buildScript.name) desktop and NSIS build starts"
+}
 
 $temporaryBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $temporaryRoot = Join-Path $temporaryBase (

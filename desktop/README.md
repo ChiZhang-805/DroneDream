@@ -215,12 +215,22 @@ npm ci
 npm run check:frontend
 npm run dev
 npm run build
+npm run build:msvc
 npm run build:llvm
+npm run build:four
 ```
 
 `npm run dev` starts the existing frontend dev server automatically. `npm run
 build` first runs the existing frontend build and then compiles the desktop
 executable and `DroneDream_<version>_x64-setup.exe` NSIS installer.
+
+`npm run build:msvc` is the pinned native Windows release build. It loads the
+repository `.vsconfig` toolchain, requires Rust
+`1.97.0-x86_64-pc-windows-msvc`, verifies `cl`, `link`, `rc`, and `dumpbin`, and
+checks the produced PE dependency table before accepting the NSIS installer.
+`npm run build:four` uses this MSVC path to build Universal, SIM, LAB, and FIELD
+from one clean source commit. Use `npm run build:four:llvm` only as the explicit
+portable fallback.
 
 `npm run build:llvm` is the no-administrator fallback for Windows development
 machines without a usable MSVC installation. It expects the official Rust
@@ -232,9 +242,10 @@ aligned with GitHub Actions instead of silently moving with the `stable`
 channel. It statically links the LLVM runtime, stages the locked WebView2 loader
 for NSIS, and inspects both PE import tables so the installer cannot accidentally
 depend on toolchain DLLs from the developer's machine. GitHub Actions and public
-releases continue to use the standard MSVC toolchain. The standard installer is
-written below `src-tauri/target/release/bundle/nsis`; the LLVM fallback uses
-`src-tauri/target/x86_64-pc-windows-gnullvm/release/bundle/nsis`.
+releases continue to use the standard MSVC toolchain. The pinned MSVC installer
+is written below
+`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis`; the LLVM fallback
+uses `src-tauri/target/x86_64-pc-windows-gnullvm/release/bundle/nsis`.
 
 The LLVM fallback also verifies the pinned NSIS template and the generated
 WebView2 health gate, then rewrites the SHA-256 file for the exact configured

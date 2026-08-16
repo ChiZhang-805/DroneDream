@@ -3,6 +3,8 @@ param(
     [string]$ExpectedSourceCommit,
     [string]$OutputRoot,
     [string]$CargoTargetDir,
+    [ValidateSet("msvc", "gnullvm")]
+    [string]$Toolchain = "msvc",
     [string]$LlvmRoot
 )
 
@@ -78,9 +80,29 @@ $runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw -Encoding 
 $sharedUi = $profile.sharedUiContract
 $integratedUi = $profile.integratedWorkspaceUiContract
 $vehicleStudio = $profile.universalExclusiveCapabilities.vehicleStudio
+$toolchainContract = if ($Toolchain -ceq "msvc") {
+    [ordered]@{
+        builder = "desktop\scripts\build-windows-msvc.ps1"
+        targetTriple = "x86_64-pc-windows-msvc"
+        compilerFamily = "msvc"
+    }
+} else {
+    [ordered]@{
+        builder = "desktop\scripts\build-windows-llvm.ps1"
+        targetTriple = "x86_64-pc-windows-gnullvm"
+        compilerFamily = "llvm-mingw"
+    }
+}
+if ($LlvmRoot -and $Toolchain -cne "gnullvm") {
+    throw "LlvmRoot can be used only with -Toolchain gnullvm."
+}
 if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $overlay.productName -cne "DroneDream-Universal" -or
     $profile.enginePackProfile -cne "unified-sim-lab" -or
+    $profile.build.sharedScript -cne "desktop/scripts/build-windows-msvc.ps1" -or
+    $profile.build.targetTriple -cne "x86_64-pc-windows-msvc" -or
+    $profile.build.fallbackScript -cne "desktop/scripts/build-windows-llvm.ps1" -or
+    $profile.build.fallbackTargetTriple -cne "x86_64-pc-windows-gnullvm" -or
     $profile.desktopContracts.coexistence -cne "distribution/desktop/edition-coexistence.v1.json" -or
     $profile.desktopContracts.browserAuth -cne "distribution/desktop/edition-browser-auth.v1.json" -or
     $profile.desktopContracts.runtimeAndUpdaterFamilies -cne "distribution/desktop/edition-runtime-update-families.v1.json" -or
@@ -283,6 +305,8 @@ if (-not $Build) {
         explicitSourcePinRequiredForBuild = $true
         branch = $branch
         artifactFileName = $artifactName
+        compilerFamily = $toolchainContract.compilerFamily
+        targetTriple = $toolchainContract.targetTriple
         profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
         overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
         websiteHandoff = New-RepoFileRef "distribution\universal\release\website-exact-exe-handoff.v1.json"
@@ -366,22 +390,17 @@ $env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"
 $env:DRONEDREAM_DESKTOP_EDITION_ID = "universal"
 $env:VITE_DRONEDREAM_EDITION = "universal"
 
-if ($LlvmRoot) {
-    & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
-        -AdditionalConfigPath $overlayPath `
-        -CargoTargetDir $cargoTargetFull `
-        -LlvmRoot $LlvmRoot `
-        -ExpectedProductName ([string]$overlay.productName) `
-        -EditionId "universal" `
-        -PreserveBundleHistory
-} else {
-    & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
-        -AdditionalConfigPath $overlayPath `
-        -CargoTargetDir $cargoTargetFull `
-        -ExpectedProductName ([string]$overlay.productName) `
-        -EditionId "universal" `
-        -PreserveBundleHistory
+$builderArguments = @{
+    AdditionalConfigPath = $overlayPath
+    CargoTargetDir = $cargoTargetFull
+    ExpectedProductName = [string]$overlay.productName
+    EditionId = "universal"
+    PreserveBundleHistory = $true
 }
+if ($LlvmRoot) {
+    $builderArguments.LlvmRoot = $LlvmRoot
+}
+& (Join-Path $repoRoot $toolchainContract.builder) @builderArguments
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
@@ -392,7 +411,7 @@ if ($postBuildCommit -cne $sourceCommit -or $postBuildStatus) {
     throw "Universal source changed while building."
 }
 
-$bundleDirectory = Join-Path $cargoTargetFull "x86_64-pc-windows-gnullvm\release\bundle\nsis"
+$bundleDirectory = Join-Path $cargoTargetFull "$($toolchainContract.targetTriple)\release\bundle\nsis"
 $candidatePath = Join-Path $bundleDirectory "DroneDream-Universal_1.0.0_x64-setup.exe"
 $candidateSignaturePath = "${candidatePath}.sig"
 $candidateUpdaterMetadataPath = Join-Path $bundleDirectory "latest-universal.json"
@@ -483,6 +502,8 @@ $buildReceipt = [ordered]@{
     branch = $branch
     buildCount = 1
     productDisplayVersion = "1.0.0"
+    compilerFamily = $toolchainContract.compilerFamily
+    targetTriple = $toolchainContract.targetTriple
     artifact = [ordered]@{
         fileName = $artifactName
         absolutePath = $artifactPath

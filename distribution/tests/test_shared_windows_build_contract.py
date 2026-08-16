@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import textwrap
@@ -9,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "desktop" / "scripts" / "build-windows-llvm.ps1"
+MSVC_SCRIPT = ROOT / "desktop" / "scripts" / "build-windows-msvc.ps1"
 FOUR_EDITION_SCRIPT = ROOT / "desktop" / "scripts" / "build-four-edition-installers.ps1"
 PLANNER_VERIFIER = ROOT / "desktop" / "scripts" / "verify-installer-planner.ps1"
 RUNTIME_MODE_HOOK = ROOT / "desktop" / "src-tauri" / "nsis" / "runtime-mode.nsh"
@@ -22,6 +24,10 @@ DETACHED_VERIFIER = ROOT / "desktop" / "scripts" / "verify-detached-node-depende
 
 def _script() -> str:
     return SCRIPT.read_text(encoding="utf-8-sig")
+
+
+def _msvc_script() -> str:
+    return MSVC_SCRIPT.read_text(encoding="utf-8-sig")
 
 
 def _four_edition_script() -> str:
@@ -47,9 +53,54 @@ def test_four_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
         'The source tree changed after the $editionId build.',
         '[IO.Path]::GetFileName($builtInstaller)',
         'build-receipt.json',
+        '[ValidateSet("msvc", "gnullvm")]',
+        'targetTriple = "x86_64-pc-windows-msvc"',
+        'compilerFamily = "msvc"',
     ):
         assert fragment in script
     assert 'Join-Path $editionOutput "$($contract.product)-${version}.exe"' not in script
+
+
+def test_shared_msvc_build_is_pinned_native_and_fail_closed() -> None:
+    script = _msvc_script()
+    for fragment in (
+        '1.97.0-x86_64-pc-windows-msvc',
+        'x86_64-pc-windows-msvc',
+        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+        'VsDevCmd.bat',
+        '"cl.exe", "link.exe", "rc.exe", "dumpbin.exe"',
+        'dumpbin.exe /dependents $application',
+        'The desktop release source must be an exact clean Git commit.',
+        'invoke-tauri-updater-signer.ps1',
+        'Refusing to prune installer artifacts outside the MSVC NSIS bundle directory.',
+        'Resolve-EditionGeneratedFrontendContract',
+        'Test-PostBuildSourceStatus',
+    ):
+        assert fragment in script
+    assert 'tauri.llvm.conf.json' not in script
+    assert 'WebView2Loader.dll' not in script
+
+
+def test_shared_msvc_build_is_valid_windows_powershell() -> None:
+    script_path = str(MSVC_SCRIPT).replace("'", "''")
+    result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $tokens = $null
+            $errors = $null
+            [void][Management.Automation.Language.Parser]::ParseFile(
+              '{script_path}', [ref]$tokens, [ref]$errors)
+            if ($errors.Count -ne 0) {{
+              $errors | ForEach-Object {{ Write-Error $_.Message }}
+              exit 1
+            }}
+            Write-Output 'msvc-ast-ok'
+            """
+        ),
+        cwd=ROOT,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "msvc-ast-ok" in result.stdout
 
 
 def test_four_edition_wrapper_is_valid_windows_powershell() -> None:
@@ -133,9 +184,19 @@ def _run_powershell(script: str, *, cwd: Path) -> subprocess.CompletedProcess[st
         "$OutputEncoding = [Console]::OutputEncoding; "
         + script
     )
+    system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    powershell = system_root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+    env = os.environ.copy()
+    env["PSModulePath"] = os.pathsep.join(
+        (
+            str(Path.home() / "Documents" / "WindowsPowerShell" / "Modules"),
+            str(Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "WindowsPowerShell" / "Modules"),
+            str(system_root / "System32" / "WindowsPowerShell" / "v1.0" / "Modules"),
+        )
+    )
     return subprocess.run(
         [
-            "powershell.exe",
+            str(powershell),
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
@@ -148,6 +209,7 @@ def _run_powershell(script: str, *, cwd: Path) -> subprocess.CompletedProcess[st
         capture_output=True,
         text=True,
         encoding="utf-8",
+        env=env,
     )
 
 
