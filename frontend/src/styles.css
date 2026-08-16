@@ -44,6 +44,28 @@
     #fbfafc;
 }
 
+html:has(.autonomy-platform-page),
+body:has(.autonomy-platform-page),
+#root:has(.autonomy-platform-page),
+.app-shell:has(.autonomy-platform-page),
+.app-shell:has(.autonomy-platform-page) .app-body {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell:has(.autonomy-platform-page) {
+  height: 100dvh;
+}
+
+.app-shell:has(.autonomy-platform-page) .app-main {
+  flex: 1 1 0;
+}
+
+.app-shell:has(.autonomy-platform-page) .app-footer {
+  display: none;
+}
+
 .autonomy-platform-page {
   display: grid;
   width: 100%;
@@ -124,6 +146,11 @@
 }
 
 .autonomy-platform-content:has(.autonomy-lab-page.is-embedded) {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.autonomy-platform-content:has(.autonomy-maps-page) {
   overflow: hidden;
   scrollbar-gutter: auto;
 }
@@ -867,6 +894,60 @@
   gap: 0.8rem;
 }
 
+.autonomy-maps-page {
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.autonomy-maps-page .autonomy-config-main {
+  min-height: 0;
+  align-content: start;
+  gap: 0.55rem;
+}
+
+.autonomy-maps-page .autonomy-config-summary {
+  position: static;
+  height: 100%;
+  max-height: 100%;
+}
+
+.autonomy-maps-page .autonomy-config-card,
+.autonomy-maps-page .autonomy-config-summary {
+  padding: 0.72rem;
+}
+
+.autonomy-maps-page .autonomy-config-card > header {
+  margin-bottom: 0.5rem;
+}
+
+.autonomy-maps-page .autonomy-form-grid {
+  gap: 0.44rem 0.52rem;
+}
+
+.autonomy-maps-page .autonomy-form-grid input,
+.autonomy-maps-page .autonomy-form-grid select,
+.autonomy-maps-page .autonomy-check-control {
+  min-height: 2.08rem;
+}
+
+.autonomy-maps-page .autonomy-map-upload {
+  min-height: 3.85rem;
+  padding: 0.62rem;
+}
+
+.autonomy-maps-page .autonomy-choice-grid {
+  gap: 0.42rem;
+}
+
+.autonomy-maps-page .autonomy-choice-grid button {
+  min-height: 2.28rem;
+}
+
+.autonomy-maps-page .autonomy-planning-layers {
+  margin-top: 0.5rem;
+}
+
 .autonomy-config-main {
   display: grid;
   min-width: 0;
@@ -1606,24 +1687,34 @@
 
 @media (min-width: 1201px) and (max-height: 820px) {
   .autonomy-platform-content:has(.autonomy-lab-page.is-embedded) {
-    overflow-y: auto;
-    scrollbar-gutter: stable;
+    overflow: hidden;
+    scrollbar-gutter: auto;
   }
 
   .autonomy-lab-page.is-embedded,
   .autonomy-lab-page.is-embedded .autonomy-workspace {
-    height: auto;
-    min-height: 46rem;
+    height: 100%;
+    min-height: 0;
   }
 
   .autonomy-lab-page.is-embedded .autonomy-map-panel,
   .autonomy-lab-page.is-embedded .autonomy-brain-panel {
-    min-height: 46rem;
+    min-height: 0;
   }
 
   .autonomy-lab-page.is-embedded .autonomy-brain-panel {
-    overflow: visible;
+    gap: 0.42rem;
+    padding: 0.58rem;
+    overflow: hidden;
   }
+
+  .autonomy-lab-page.is-embedded .autonomy-map-panel { padding: 0.58rem; }
+  .autonomy-lab-page.is-embedded .autonomy-map-heading { margin-bottom: 0.38rem; }
+  .autonomy-lab-page.is-embedded .autonomy-task-graph { max-height: 8.5rem; }
+  .autonomy-lab-page.is-embedded .autonomy-task-graph li { padding: 0.28rem 0.34rem; }
+  .autonomy-lab-page.is-embedded .autonomy-live-perception,
+  .autonomy-lab-page.is-embedded .autonomy-runtime-stack,
+  .autonomy-lab-page.is-embedded .autonomy-telemetry { padding-top: 0.42rem; }
 }
 
 @media (max-width: 820px) {
@@ -4235,6 +4326,10 @@ body:has(.app-shell-public-demo),
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
+}
+
+.app-shell:has(.vehicle-studio-page) .app-footer {
+  display: none;
 }
 
 .vehicle-studio-hero {
