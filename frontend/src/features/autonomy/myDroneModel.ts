@@ -8,7 +8,7 @@ export const MY_DRONE_CONTRACT = {
   wheelbaseM: 0.5,
   propellerDiameterM: 0.254,
   frameBodyM: { x: 0.144, y: 0.062, z: 0.144 },
-  collisionEnvelopeM: { x: 0.72, y: 0.33, z: 0.72 },
+  collisionEnvelopeM: { x: 0.76, y: 0.43, z: 0.76 },
   dryMassKg: 1.86,
   maximumTakeoffMassKg: 2.8,
   maximumPickupPayloadKg: 0.35,

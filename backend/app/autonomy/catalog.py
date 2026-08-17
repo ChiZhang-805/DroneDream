@@ -7,6 +7,7 @@ import json
 from typing import Literal, TypedDict
 
 from app.autonomy.models import RoutePoint, TerrainObject, TerrainScene, Vector3
+from app.autonomy.school_map_artifact import get_school_map_gazebo_artifact
 
 
 def _p(
@@ -32,8 +33,16 @@ SCENES: dict[str, TerrainScene] = {
         floors=3,
         minimum_clearance_m=0.82,
         tags=[
-            "school", "indoor-outdoor", "switchback-stairs", "classrooms",
-            "office", "cafeteria", "roads", "dynamic-people", "payload", "return",
+            "school",
+            "indoor-outdoor",
+            "switchback-stairs",
+            "classrooms",
+            "office",
+            "cafeteria",
+            "roads",
+            "dynamic-people",
+            "payload",
+            "return",
         ],
         objects=[
             TerrainObject(
@@ -156,7 +165,7 @@ SCENES: dict[str, TerrainScene] = {
             _p(-1.9, 10.7, 2.35, "stairs", 0.45),
             _p(1.7, 12.3, 1.35, "stairs", 0.45),
             _p(-24.8, 2.7, 1.35, "transit", 0.7),
-            _p(-25.0, -0.85, 1.45, "transit", 0.7),
+            _p(-25.0, -1.055, 1.45, "transit", 0.7),
             _p(-25.0, -9.0, 1.55, "transit", 0.9),
             _p(-25.0, -18.0, 1.65, "transit", 1.0),
             _p(0.0, -18.0, 1.8, "transit", 1.1),
@@ -170,7 +179,7 @@ SCENES: dict[str, TerrainScene] = {
             _p(0.0, -18.0, 1.8, "return", 1.0),
             _p(-25.0, -18.0, 1.65, "return", 0.9),
             _p(-25.0, -9.0, 1.55, "return", 0.8),
-            _p(-25.0, -0.85, 1.45, "return", 0.7),
+            _p(-25.0, -1.055, 1.45, "return", 0.7),
             _p(-24.8, 2.7, 1.35, "return", 0.7),
             _p(1.7, 12.3, 1.35, "stairs", 0.42),
             _p(-1.9, 10.7, 2.35, "stairs", 0.42),
@@ -409,6 +418,7 @@ class BundledMapManifest(TypedDict):
     confidence_percent: float
     semantic_layers: list[str]
     planning_layers: list[str]
+    gazebo_artifact: dict[str, object] | None
     manifest_sha256: str
 
 
@@ -494,11 +504,15 @@ def get_bundled_map_manifest(scene_id: str) -> BundledMapManifest | None:
     profile = _BUNDLED_MAP_PROFILES.get(scene_id)
     if scene is None or profile is None:
         return None
+    gazebo_artifact = (
+        get_school_map_gazebo_artifact().summary if scene_id == "school-campus-v1" else None
+    )
     canonical = {
         "schema_version": "dronedream.autonomy.bundled-map-manifest.v1",
         "compiler_scene_id": scene.id,
         "scene": scene.model_dump(mode="json"),
         "profile": profile,
+        "gazebo_artifact": gazebo_artifact,
     }
     digest = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -515,6 +529,7 @@ def get_bundled_map_manifest(scene_id: str) -> BundledMapManifest | None:
         "confidence_percent": profile["confidence_percent"],
         "semantic_layers": list(profile["semantic_layers"]),
         "planning_layers": list(profile["planning_layers"]),
+        "gazebo_artifact": gazebo_artifact,
         "manifest_sha256": digest,
     }
 

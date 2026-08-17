@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { AutonomyCompileRequest } from "../../types/api";
 import { loadAutonomyAssetLibrary } from "./assetLibraryStore";
 import { createLocalAutonomyPreview } from "./missionAutonomy";
+import { MY_DRONE_CONTRACT } from "./myDroneModel";
 import { SCHOOL_MAP_CONTRACT, SCHOOL_MAP_ROAD_NETWORK } from "./schoolMapScene";
+import {
+  SCHOOL_MAP_GEOMETRY,
+  schoolMapStairDimensions,
+  validateSchoolMapGeometryContract,
+} from "./schoolMapGeometryContract";
 import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "./workspaceStore";
 import {
   autonomyHarnessRequest,
@@ -119,6 +125,26 @@ describe("autonomy mission harness", () => {
     }
     expect(SCHOOL_MAP_CONTRACT.simulation.minimumOpenDoorClearanceM)
       .toBeGreaterThan(SCHOOL_MAP_CONTRACT.simulation.vehicleCollisionDiameterM * 2);
+  });
+
+  it("holds structural seams, 12+12 stairs, facility joints, and vehicle clearance to declared tolerances", () => {
+    const issues = validateSchoolMapGeometryContract(SCHOOL_MAP_ROAD_NETWORK);
+    const stair = schoolMapStairDimensions();
+
+    expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
+    expect(SCHOOL_MAP_GEOMETRY.tolerance.structuralM).toBe(0.001);
+    expect(SCHOOL_MAP_GEOMETRY.tolerance.routeEndpointM).toBe(0.01);
+    expect(SCHOOL_MAP_GEOMETRY.stair.risersPerFlight * SCHOOL_MAP_GEOMETRY.stair.flightsPerStorey).toBe(24);
+    expect(stair.totalRiseM).toBeCloseTo(SCHOOL_MAP_GEOMETRY.floor.storeyHeightM, 6);
+    expect(stair.opening.maxX - stair.opening.minX).toBeCloseTo(
+      SCHOOL_MAP_GEOMETRY.stair.clearWidthM * 2 + SCHOOL_MAP_GEOMETRY.stair.laneGapM,
+      6,
+    );
+    expect(SCHOOL_MAP_GEOMETRY.vehicle.minimumIndoorClearWidthM)
+      .toBeGreaterThan(SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM);
+    expect(MY_DRONE_CONTRACT.collisionEnvelopeM.x).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM);
+    expect(MY_DRONE_CONTRACT.collisionEnvelopeM.z).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM);
+    expect(MY_DRONE_CONTRACT.collisionEnvelopeM.y).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionHeightM);
   });
 
   it("restores public assets when the persisted asset library is malformed", () => {

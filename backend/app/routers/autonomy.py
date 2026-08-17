@@ -34,6 +34,7 @@ from app.autonomy.qualification import (
     qualify_vehicle_pack,
 )
 from app.autonomy.runtime import AutonomyRuntimeError, runtime_sessions
+from app.autonomy.school_map_artifact import get_school_map_gazebo_artifact
 from app.autonomy.service import AutonomyCompileError, compile_autonomy_mission
 from app.db import get_db
 from app.response import ok
@@ -117,6 +118,35 @@ def read_autonomy_scenes(
                 }
                 for scene in list_scenes()
             ],
+        }
+    )
+
+
+@router.get("/scenes/{scene_id}/gazebo-artifact")
+def read_autonomy_scene_gazebo_artifact(
+    scene_id: str,
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Export a content-addressed static SDF plus its semantic contract."""
+
+    if scene_id != "school-campus-v1":
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "AUTONOMY_GAZEBO_ARTIFACT_NOT_FOUND",
+                "message": "The requested scene has no exported Gazebo artifact.",
+            },
+        )
+    artifact = get_school_map_gazebo_artifact()
+    return ok(
+        {
+            "schema_version": "dronedream.autonomy.gazebo-artifact-export.v1",
+            "compiler_scene_id": scene_id,
+            "summary": artifact.summary,
+            "files": {
+                "model.sdf": artifact.model_sdf,
+                "semantic.json": artifact.semantic_json,
+            },
         }
     )
 

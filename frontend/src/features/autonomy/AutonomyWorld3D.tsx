@@ -110,6 +110,21 @@ export function AutonomyWorld3D({
     controls.maxPolarAngle = Math.PI * 0.495;
     if (floor === "all") controls.target.set(-4, 3.2, 1);
     else controls.target.set(-27, (floor - 1) * 3.6 + 1.8, 5);
+    const cameraPresets = {
+      "teaching-entrance": { position: [-25, 5.8, -12], target: [-25, 1.35, 2] },
+      "teaching-stair": { position: [15, 10, -1], target: [-0.1, 3.6, 10.5] },
+      "cafeteria-entrance": { position: [30, 6.2, -8], target: [30, 1.5, 7.5] },
+      "cafeteria-stair": { position: [54, 8, 8], target: [40, 2.2, 20] },
+    } satisfies Record<string, { position: [number, number, number]; target: [number, number, number] }>;
+    const applyCameraPreset = (event: Event) => {
+      const presetName = (event as CustomEvent<{ preset?: keyof typeof cameraPresets }>).detail?.preset;
+      if (!presetName) return;
+      const preset = cameraPresets[presetName];
+      camera.position.set(...preset.position);
+      controls.target.set(...preset.target);
+      controls.update();
+    };
+    window.addEventListener("dronedream:school-map-camera", applyCameraPreset);
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x6c6974, perception === "vision" ? 1.2 : 1.25));
     const sun = new THREE.DirectionalLight(0xfff9ef, perception === "vision" ? 1.7 : 1.9);
@@ -211,6 +226,7 @@ export function AutonomyWorld3D({
     return () => {
       window.cancelAnimationFrame(animationFrame);
       observer.disconnect();
+      window.removeEventListener("dronedream:school-map-camera", applyCameraPreset);
       controls.dispose();
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();

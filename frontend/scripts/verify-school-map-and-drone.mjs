@@ -65,15 +65,50 @@ try {
     if (await page.getByRole("button", { name: label, exact: true }).count() !== 1) throw new Error(`School Map is missing ${label}.`);
   }
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`), fullPage: false });
-  await schoolCanvas.hover();
-  await page.mouse.wheel(0, -900);
-  await page.waitForTimeout(800);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "teaching-entrance" } })));
+  await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-entrances-1600x1000.png`), fullPage: false });
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "cafeteria-entrance" } })));
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-cafeteria-entrance-1600x1000.png`), fullPage: false });
+  await page.reload({ waitUntil: "networkidle" });
+  await clearBlockingDialog(page);
+  await schoolCanvas.waitFor({ state: "visible" });
+  await page.waitForTimeout(1000);
+  const canvasBounds = await schoolCanvas.boundingBox();
+  if (!canvasBounds) throw new Error("School Map canvas bounds are unavailable for orbit verification.");
+  await page.mouse.move(canvasBounds.x + canvasBounds.width * 0.56, canvasBounds.y + canvasBounds.height * 0.52);
+  await page.mouse.down();
+  await page.mouse.move(canvasBounds.x + canvasBounds.width * 0.76, canvasBounds.y + canvasBounds.height * 0.47, { steps: 14 });
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-west-angle-1600x1000.png`), fullPage: false });
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "teaching-stair" } })));
+  await page.waitForTimeout(500);
   await page.getByRole("button", { name: "X-ray" }).click();
-  await page.getByRole("button", { name: "L3", exact: true }).click();
-  await page.waitForTimeout(1200);
   if (await world.getAttribute("data-xray") !== "true") throw new Error("X-ray state did not reach the rendered world.");
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-3-1600x1000.png`), fullPage: false });
+  for (const floor of ["L1", "L2", "L3"]) {
+    await page.getByRole("button", { name: floor, exact: true }).click();
+    await page.waitForTimeout(700);
+    await page.screenshot({
+      path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-${floor.slice(1)}-1600x1000.png`),
+      fullPage: false,
+    });
+  }
+  await page.getByRole("button", { name: "L1", exact: true }).click();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "cafeteria-stair" } })));
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-cafeteria-stair-1600x1000.png`), fullPage: false });
+  await page.getByRole("button", { name: "Solid" }).click();
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "teaching-stair" } })));
+  for (const floor of ["L1", "L2", "L3"]) {
+    await page.getByRole("button", { name: floor, exact: true }).click();
+    await page.waitForTimeout(500);
+    await page.screenshot({
+      path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-${floor.slice(1)}-1600x1000.png`),
+      fullPage: false,
+    });
+  }
 
   await page.goto(`${origin}/console/vehicle-studio`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);
@@ -176,7 +211,15 @@ try {
     screenshots: [
       path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}school-map-entrances-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-cafeteria-entrance-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-solid-west-angle-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-1-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-2-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-3-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-xray-cafeteria-stair-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-1-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-2-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-3-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}my-drone-vehicle-studio-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`),

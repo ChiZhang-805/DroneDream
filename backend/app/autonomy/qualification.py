@@ -37,6 +37,12 @@ MapSemanticLayer = Literal[
     "gates",
     "people",
     "pickup-zones",
+    "launch-zones",
+    "rooms",
+    "corridors",
+    "roads",
+    "vegetation",
+    "street-furniture",
 ]
 MapPlanningLayer = Literal[
     "collision-geometry",
@@ -516,6 +522,20 @@ def qualify_map_pack(
         for matches, code, message in exact_checks:
             if not matches:
                 issues.append(QualificationIssue(code=code, severity="error", message=message))
+        gazebo_artifact = manifest.get("gazebo_artifact")
+        if gazebo_artifact is not None and not gazebo_artifact.get(
+            "simulation_execution_ready", False
+        ):
+            issues.append(
+                QualificationIssue(
+                    code="map.gazebo-runtime.not-verified",
+                    severity="info",
+                    message=(
+                        "The content-addressed SDF and collision/semantic contract are "
+                        "generated, but real Gazebo/PX4 smoke evidence is not yet bound."
+                    ),
+                )
+            )
     canonical_request = request.model_dump(mode="json")
     canonical_request["semantic_layers"] = sorted(request.semantic_layers)
     canonical_request["planning_layers"] = sorted(request.planning_layers)
