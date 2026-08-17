@@ -72,15 +72,22 @@ def runtime_profile_for(request: AutonomyCompileRequest) -> OnboardRuntimeProfil
         status = "locked"
         authority = False
 
+    localization_role = (
+        "Consumes the qualified School Map and PX4 Gazebo GPS state; no camera or VIO stream "
+        "is attached to the official vehicle."
+        if request.perception_mode == "map"
+        else "Accepts versioned VIO, SLAM, map and vision observations."
+    )
+    localization_rate_hz = 10.0 if request.perception_mode == "map" else 30.0
     component_specs: tuple[tuple[RuntimeComponentId, str, float], ...] = (
         ("mission_executive", "Runs the bounded mission state machine.", 20.0),
-        ("perception_vio_slam", "Accepts versioned VIO, SLAM, map and vision observations.", 30.0),
+        ("perception_vio_slam", localization_role, localization_rate_hz),
         ("world_model", "Maintains obstacle, gate, terrain and payload state.", 20.0),
         ("global_planner", "Builds the route corridor between mission checkpoints.", 2.0),
         ("local_planner", "Repairs the trajectory inside the approved corridor.", 20.0),
-        ("trajectory_tracker", "Converts a qualified trajectory to PX4 setpoint contracts.", 50.0),
-        ("px4_bridge", "Separates simulator, HITL shadow and locked aircraft transports.", 50.0),
-        ("safety_supervisor", "Overrides progress with hold, land or abort decisions.", 50.0),
+        ("trajectory_tracker", "Converts a qualified trajectory to PX4 setpoint contracts.", 20.0),
+        ("px4_bridge", "Separates simulator, HITL shadow and locked aircraft transports.", 20.0),
+        ("safety_supervisor", "Checks live clearance and overrides with abort decisions.", 5.0),
         ("evidence_recorder", "Hash-chains accepted observations and decisions.", 20.0),
     )
     components = [
@@ -625,6 +632,9 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
         adapter = "hardware_contract"
     blockers: list[str] = []
     required: list[str] = []
+    planner_binding = (
+        request.asset_context.planner_binding if request.asset_context is not None else None
+    )
 
     if target != "simulation" and request.edition == "sim":
         blockers.append("edition.sim.forbids-hardware-and-hitl")
@@ -646,8 +656,10 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
             blockers.append(code)
     if not feasible:
         blockers.append("trajectory.not-feasible")
+    if target == "simulation" and planner_binding is None:
+        blockers.append("planner.model-artifact-binding.missing")
 
-    if target == "simulation" and feasible:
+    if target == "simulation" and feasible and planner_binding is not None:
         return ExecutionPolicy(
             readiness="simulation_ready",
             adapter=adapter,
@@ -655,7 +667,8 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
             validated_signed_pack_count=VALIDATED_SIGNED_PACK_COUNT,
             blockers=[],
             required_next_steps=[
-                "Run the PX4/Gazebo qualification job and retain its signed evidence receipt."
+                "Confirm the launch, run the fixed PX4/Gazebo mission, and retain its "
+                "evidence receipt."
             ],
         )
     if blockers:
@@ -819,6 +832,12 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         "steps": [step.model_dump(mode="json") for step in steps],
         "task_graph": task_graph.model_dump(mode="json"),
         "vehicle": request.vehicle.model_dump(mode="json"),
+        "planner_binding": (
+            request.asset_context.planner_binding.model_dump(mode="json")
+            if request.asset_context is not None
+            and request.asset_context.planner_binding is not None
+            else None
+        ),
     }
     digest = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -870,6 +889,24 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         metrics=metrics,
         execution_policy=_policy(request, feasible),
         planner={
+            "binding": (
+                "model-bound"
+                if request.asset_context is not None
+                and request.asset_context.planner_binding is not None
+                else "missing"
+            ),
+            "artifact_sha256": (
+                request.asset_context.planner_binding.artifact_sha256
+                if request.asset_context is not None
+                and request.asset_context.planner_binding is not None
+                else ""
+            ),
+            "run_id": (
+                request.asset_context.planner_binding.run_id
+                if request.asset_context is not None
+                and request.asset_context.planner_binding is not None
+                else ""
+            ),
             "semantic_layer": "bounded-natural-language-contract-v1",
             "global_layer": "prevalidated-corridor-graph-v1",
             "trajectory_layer": "payload-aware-speed-profile-v1",

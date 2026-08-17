@@ -11,6 +11,8 @@ import pytest
 from app.autonomy.catalog import get_bundled_map_manifest, get_scene, list_scenes
 from app.autonomy.qualification import MapPackQualificationRequest, qualify_map_pack
 from app.autonomy.school_map_artifact import (
+    PX4_X500_COLLISION_CENTER_ABOVE_MODEL_ROOT_M,
+    PX4_X500_MODEL_ROOT_TO_CONTACT_M,
     ROAD_NETWORK,
     ROUTE_ENDPOINT_TOLERANCE_M,
     STRUCTURAL_TOLERANCE_M,
@@ -73,8 +75,7 @@ def _boxes_have_positive_volume_overlap(a: BoxPrimitive, b: BoxPrimitive) -> boo
     ):
         return False
     if (
-        min(_bounds(a, "z")[1], _bounds(b, "z")[1])
-        - max(_bounds(a, "z")[0], _bounds(b, "z")[0])
+        min(_bounds(a, "z")[1], _bounds(b, "z")[1]) - max(_bounds(a, "z")[0], _bounds(b, "z")[0])
         <= STRUCTURAL_TOLERANCE_M
     ):
         return False
@@ -159,11 +160,7 @@ def _point_segment_distance(
 def _vehicle_intersects_primitive(
     point: tuple[float, float, float],
     primitive: (
-        BoxPrimitive
-        | CylinderPrimitive
-        | CapsulePrimitive
-        | SpherePrimitive
-        | MeshPrimitive
+        BoxPrimitive | CylinderPrimitive | CapsulePrimitive | SpherePrimitive | MeshPrimitive
     ),
 ) -> bool:
     if isinstance(primitive, BoxPrimitive):
@@ -198,13 +195,11 @@ def _vehicle_intersects_primitive(
             vertical_distance = abs(point[2] - primitive.center_z)
             return (
                 horizontal_distance <= primitive.radius_m + VEHICLE_COLLISION_RADIUS_M
-                and vertical_distance
-                <= primitive.height_m / 2 + VEHICLE_COLLISION_HALF_HEIGHT_M
+                and vertical_distance <= primitive.height_m / 2 + VEHICLE_COLLISION_HALF_HEIGHT_M
             )
         start, end = _cylinder_axis_endpoints(primitive)
         return (
-            _point_segment_distance(point, start, end)
-            <= primitive.radius_m + vehicle_sphere_radius
+            _point_segment_distance(point, start, end) <= primitive.radius_m + vehicle_sphere_radius
         )
     if isinstance(primitive, SpherePrimitive):
         return (
@@ -278,6 +273,23 @@ def test_school_map_exports_parseable_content_addressed_sdf() -> None:
     assert artifact.summary["gazebo_asset_contract_generated"] is True
     assert artifact.summary["gazebo_runtime_verified"] is False
     assert artifact.summary["simulation_execution_ready"] is False
+    physics_root = ElementTree.fromstring(artifact.package_files["model.physics.sdf"])
+    assert len(physics_root.findall("./model/link/collision")) == len(collisions)
+    assert physics_root.findall("./model/link/visual") == []
+
+
+def test_school_map_world_declares_px4_sensor_environment() -> None:
+    artifact = get_school_map_gazebo_artifact()
+    root = ElementTree.fromstring(artifact.package_files["world.sdf"])
+
+    assert root.findtext("./world/gravity") == "0 0 -9.80665"
+    assert root.findtext("./world/magnetic_field") == "6e-06 2.3e-05 -4.2e-05"
+    assert root.find("./world/atmosphere").attrib["type"] == "adiabatic"
+    assert root.find("./world/physics").attrib["type"] == "ode"
+    assert root.findtext("./world/physics/max_step_size") == "0.004"
+    assert root.findtext("./world/physics/real_time_update_rate") == "250"
+    assert len(root.findall("./world/scene")) == 1
+    assert root.findtext("./world/spherical_coordinates/world_frame_orientation") == "ENU"
 
 
 def test_public_scene_catalog_exposes_only_the_canonical_school_map_name() -> None:
@@ -291,11 +303,7 @@ def test_frontend_fallback_manifest_matches_the_backend_geometry_digest() -> Non
     manifest = get_bundled_map_manifest("school-campus-v1")
     assert manifest is not None
     frontend_source = (
-        Path(__file__).resolve().parents[2]
-        / "frontend"
-        / "src"
-        / "pages"
-        / "AutonomyPlatform.tsx"
+        Path(__file__).resolve().parents[2] / "frontend" / "src" / "pages" / "AutonomyPlatform.tsx"
     ).read_text(encoding="utf-8")
 
     assert f'manifest_sha256: "{manifest["manifest_sha256"]}"' in frontend_source
@@ -307,8 +315,10 @@ def test_school_map_export_materializes_digest_bound_files(tmp_path: Path) -> No
 
     assert set(hashes) == {
         "model.sdf",
+        "model.physics.sdf",
         "model.config",
         "world.sdf",
+        "world.physics.sdf",
         "README.md",
         "ros_gz_bridge.yaml",
         "semantic.json",
@@ -559,13 +569,11 @@ def test_visible_tree_trunks_are_exported_as_matching_cylinder_collisions() -> N
         for primitive in trunk_primitives
     )
     collision_names = {
-        collision.attrib["name"]
-        for collision in root.findall("./model/link/collision")
+        collision.attrib["name"] for collision in root.findall("./model/link/collision")
     }
-    assert {
-        f"campus-tree-{index}-trunk-collision"
-        for index in range(1, 39)
-    }.issubset(collision_names)
+    assert {f"campus-tree-{index}-trunk-collision" for index in range(1, 39)}.issubset(
+        collision_names
+    )
     tree_crowns = [
         primitive
         for primitive in school_map_collision_primitives()
@@ -748,12 +756,20 @@ def test_launch_pickup_and_canopy_components_are_grounded_and_supported() -> Non
     ) == pytest.approx((launch_pad.radius_m * 2, launch_pad.radius_m * 2, launch_pad.height_m))
     spawn = semantic["simulation_bindings"]["px4_recommended_spawn"]
     assert spawn["surface"] == launch_pad.name
-    assert spawn["z"] - _bounds(launch_pad, "z")[1] == pytest.approx(
-        VEHICLE_COLLISION_HEIGHT_M / 2
+    assert spawn["pose_reference"] == "px4-x500-model-root"
+    assert spawn["contact_surface_offset_z"] == pytest.approx(PX4_X500_MODEL_ROOT_TO_CONTACT_M)
+    assert spawn["z"] + PX4_X500_MODEL_ROOT_TO_CONTACT_M == pytest.approx(
+        _bounds(launch_pad, "z")[1]
     )
-    assert artifact.package_files["ros_gz_bridge.yaml"].startswith(
-        "- ros_topic_name: /clock\n"
+    assert semantic["simulation_bindings"]["mission_waypoint_reference"] == (
+        "vehicle-collision-envelope-center"
     )
+    assert semantic["simulation_bindings"]["vehicle_collision_center_offset"] == {
+        "x": 0.0,
+        "y": 0.0,
+        "z": PX4_X500_COLLISION_CENTER_ABOVE_MODEL_ROOT_M,
+    }
+    assert artifact.package_files["ros_gz_bridge.yaml"].startswith("- ros_topic_name: /clock\n")
     assert "PX4 mission" in artifact.package_files["README.md"]
 
 
@@ -765,8 +781,7 @@ def test_training_gate_meshes_are_closed_manifolds_and_supported() -> None:
         mesh = artifact.package_files[mesh_name]
         faces = [
             tuple(
-                int(vertex.split("//", maxsplit=1)[0])
-                for vertex in line.removeprefix("f ").split()
+                int(vertex.split("//", maxsplit=1)[0]) for vertex in line.removeprefix("f ").split()
             )
             for line in mesh.splitlines()
             if line.startswith("f ")
@@ -901,9 +916,24 @@ def test_road_markings_and_crosswalk_contract_matches_low_speed_campus_surface()
         "crosswalk_bar_width_m": 0.34,
         "crosswalk_bar_spacing_m": 0.62,
         "crosswalk_length_m": 3.8,
+        "junction_centerline_inset_m": 0.3,
+        "crosswalk_clearance_m": 0.18,
     }
     assert len(semantic["crosswalks"]) == 3
     assert all(crosswalk["axis"] in {"x", "y"} for crosswalk in semantic["crosswalks"])
+    assert {crosswalk["id"]: crosswalk["bar_count"] for crosswalk in semantic["crosswalks"]} == {
+        "teaching-entry-crosswalk": 7,
+        "cafeteria-entry-crosswalk": 7,
+        "main-gate-crosswalk": 9,
+    }
+    assert (
+        next(
+            crosswalk
+            for crosswalk in semantic["crosswalks"]
+            if crosswalk["id"] == "main-gate-crosswalk"
+        )["axis"]
+        == "x"
+    )
     surface = artifact.package_files["materials/textures/campus-surface.ppm"]
     assert surface.startswith("P3\n480 360\n255\n")
     assert "63 66 73" in surface

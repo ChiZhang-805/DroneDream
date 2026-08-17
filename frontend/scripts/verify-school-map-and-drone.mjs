@@ -140,7 +140,10 @@ try {
   const vehicleText = await page.locator("body").innerText();
   const inputValues = await page.locator("input").evaluateAll((elements) => elements.map((element) => element.value));
   if (!vehicleText.includes("My Drone") && !inputValues.includes("My Drone")) throw new Error(`Vehicle Studio did not open My Drone. Inputs: ${inputValues.join(" | ")}`);
-  if (await page.getByText("Jetson Orin NX compute enclosure", { exact: true }).count() < 1) throw new Error("My Drone is missing its onboard compute component.");
+  if (await page.getByText("Jetson Orin NX compute enclosure", { exact: true }).count() !== 0) throw new Error("My Drone still exposes a Jetson module that is absent from the qualified PX4/Gazebo contract.");
+  if (await page.getByText("Front RGB-D perception module", { exact: true }).count() !== 0) throw new Error("My Drone still exposes an RGB-D module that is absent from the qualified PX4/Gazebo contract.");
+  if (await page.getByText("M10 GNSS and compass mast", { exact: true }).count() < 1) throw new Error("My Drone is missing its qualified GNSS component.");
+  if (!vehicleText.includes("2.06 kg")) throw new Error("Vehicle Studio does not display the qualified My Drone dry mass.");
 
   await page.goto(`${origin}/console/assistant`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);

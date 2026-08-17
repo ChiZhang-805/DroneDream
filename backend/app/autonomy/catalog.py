@@ -9,6 +9,8 @@ from typing import Literal, TypedDict
 from app.autonomy.models import RoutePoint, TerrainObject, TerrainScene, Vector3
 from app.autonomy.school_map_artifact import (
     OFFICE_DOOR_CENTER_X,
+    PICKUP_ROUTE_CENTER,
+    PICKUP_ROUTE_ENVELOPE_CENTER_Z_M,
     TEACHING_OPEN_DOOR_PAIR_CENTER_X,
     get_school_map_gazebo_artifact,
     school_map_stair_route_points,
@@ -181,7 +183,13 @@ SCENES: dict[str, TerrainScene] = {
             _p(30.0, -18.0, 1.8, "transit", 1.1),
             _p(39.0, -12.0, 1.7, "transit", 0.9),
             _p(46.0, -5.0, 1.55, "transit", 0.75),
-            _p(48.5, 1.5, 1.15, "pickup", 0.4),
+            _p(
+                PICKUP_ROUTE_CENTER[0],
+                PICKUP_ROUTE_CENTER[1],
+                PICKUP_ROUTE_ENVELOPE_CENTER_Z_M,
+                "pickup",
+                0.4,
+            ),
             _p(46.0, -5.0, 1.55, "return", 0.75),
             _p(39.0, -12.0, 1.7, "return", 0.9),
             _p(30.0, -18.0, 1.8, "return", 1.0),

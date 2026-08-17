@@ -20,6 +20,7 @@ import {
   applyVehicleCatalogEntry,
   applyVehicleMaterialPreset,
 } from "../features/vehicleStudio/catalog";
+import { MY_DRONE_CONTRACT } from "../features/autonomy/myDroneContract";
 
 describe("Vehicle Studio engineering generator", () => {
   it("opens the public My Drone as a validated editable X500-class assembly", () => {
@@ -28,11 +29,13 @@ describe("Vehicle Studio engineering generator", () => {
 
     expect(draft.name).toBe("My Drone");
     expect(draft.propulsion).toMatchObject({ motorCount: 4, armLengthM: .25, propellerDiameterM: .254, batteryCells: 4, batteryCapacityMah: 5000 });
-    expect(draft.components.some((component) => component.name.includes("Jetson Orin NX"))).toBe(true);
-    expect(draft.components.some((component) => component.tags.includes("rgb") && component.tags.includes("depth"))).toBe(true);
-    expect(draft.components.some((component) => component.tags.includes("0.55-kg-capacity"))).toBe(true);
-    expect(diagnostics.totalMassKg).toBeCloseTo(1.86, 8);
-    expect(diagnostics.thrustToWeight).toBeGreaterThan(2.3);
+    expect(draft.components.some((component) => component.name.includes("Jetson"))).toBe(false);
+    expect(draft.components.some((component) => component.tags.includes("rgb") || component.tags.includes("depth") || component.tags.includes("vio"))).toBe(false);
+    expect(draft.components.some((component) => component.tags.includes("0.10-kg-capacity"))).toBe(true);
+    expect(draft.sensors.map((sensor) => sensor.type)).toEqual(["imu", "gps", "barometer"]);
+    expect(diagnostics.totalMassKg).toBeCloseTo(MY_DRONE_CONTRACT.dryMassKg, 12);
+    expect(draft.propulsion.maximumThrustPerMotorN * 4).toBeCloseTo(MY_DRONE_CONTRACT.maximumThrustN, 8);
+    expect(diagnostics.thrustToWeight).toBeGreaterThanOrEqual(MY_DRONE_CONTRACT.minimumQualifiedThrustToWeight);
     expect(validateVehicleModel(draft)).toEqual([]);
   });
 

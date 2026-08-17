@@ -32,7 +32,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol, TypeVar
 
@@ -44,6 +44,8 @@ MAX_INPUT_JSON_BYTES = 16 * 1024 * 1024
 DEFAULT_HOVER_DURATION_SECONDS = 10.0
 MIN_HOVER_DURATION_SECONDS = 1.0
 MAX_HOVER_DURATION_SECONDS = 300.0
+MAX_WAYPOINT_HOLD_SECONDS = 10.0
+MAX_ABORT_REQUEST_BYTES = 4096
 BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS = 15.0
 RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
 
@@ -65,6 +67,7 @@ class TrackPoint:
     x: float
     y: float
     z: float
+    speed_limit_mps: float | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,8 @@ class ReferenceTrackPlan:
     points: list[TrackPoint]
     track_type: str | None
     hover_duration_seconds: float | None
+    stop_at_waypoints: bool
+    waypoint_hold_seconds: float
 
 
 @dataclass(frozen=True)
@@ -501,6 +506,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--params", required=True, type=Path)
     parser.add_argument("--vehicle", required=True)
     parser.add_argument("--world", required=True)
+    parser.add_argument("--abort-file", type=Path)
     parser.add_argument(
         "--connection",
         default=os.environ.get("PX4_OFFBOARD_CONNECTION", "udp://:14540"),
@@ -1077,6 +1083,14 @@ def load_reference_track_plan(path: Path) -> ReferenceTrackPlan:
                 _finite_float(raw.get("x"), f"reference point {idx}.x"),
                 _finite_float(raw.get("y"), f"reference point {idx}.y"),
                 _finite_float(raw.get("z"), f"reference point {idx}.z"),
+                (
+                    _finite_float(
+                        raw.get("speed_limit_mps"),
+                        f"reference point {idx}.speed_limit_mps",
+                    )
+                    if raw.get("speed_limit_mps") is not None
+                    else None
+                ),
             )
         )
     if not points:
@@ -1096,11 +1110,52 @@ def load_reference_track_plan(path: Path) -> ReferenceTrackPlan:
                 "hover_duration_s must be between "
                 f"{MIN_HOVER_DURATION_SECONDS:g} and {MAX_HOVER_DURATION_SECONDS:g} seconds"
             )
+    stop_at_waypoints = payload.get("stop_at_waypoints", False)
+    if not isinstance(stop_at_waypoints, bool):
+        raise ValueError("reference_track.json stop_at_waypoints must be a boolean")
+    waypoint_hold_seconds = _finite_float(
+        payload.get("waypoint_hold_seconds", 0.0),
+        "waypoint_hold_seconds",
+    )
+    if not 0.0 <= waypoint_hold_seconds <= MAX_WAYPOINT_HOLD_SECONDS:
+        raise ValueError(
+            f"waypoint_hold_seconds must be between 0 and {MAX_WAYPOINT_HOLD_SECONDS:g} seconds"
+        )
+    for index, point in enumerate(points):
+        if point.speed_limit_mps is not None and not 0 < point.speed_limit_mps <= 10.0:
+            raise ValueError(f"reference point {index}.speed_limit_mps must be in (0, 10]")
     return ReferenceTrackPlan(
         points=points,
         track_type=track_type,
         hover_duration_seconds=hover_duration_seconds,
+        stop_at_waypoints=stop_at_waypoints,
+        waypoint_hold_seconds=waypoint_hold_seconds,
     )
+
+
+def _read_external_abort_request(path: Path) -> tuple[str, bool]:
+    """Read the bounded runner-to-executor abort contract.
+
+    ``world_paused`` distinguishes a collision monitor stop, where attempting
+    to land cannot make progress, from an operator stop that should retain the
+    normal PX4 landing cleanup path.
+    """
+
+    if path.stat().st_size > MAX_ABORT_REQUEST_BYTES:
+        raise RuntimeError("external safety abort request is oversized")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("external safety abort request is invalid") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("external safety abort request is invalid")
+    reason = payload.get("reason")
+    world_paused = payload.get("world_paused")
+    if not isinstance(reason, str) or not reason.strip() or len(reason) > 240:
+        raise RuntimeError("external safety abort reason is invalid")
+    if not isinstance(world_paused, bool):
+        raise RuntimeError("external safety abort world_paused flag is invalid")
+    return reason.strip(), world_paused
 
 
 def load_reference_track(path: Path) -> list[TrackPoint]:
@@ -1239,11 +1294,22 @@ def build_setpoint_schedule_plan(
     rate_hz: float,
     *,
     hover_duration_seconds: float | None = None,
+    stop_at_waypoints: bool = False,
+    waypoint_hold_seconds: float = 0.0,
 ) -> SetpointSchedulePlan:
     if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
         raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
     if not points:
         raise ValueError("points cannot be empty")
+    if not isinstance(stop_at_waypoints, bool):
+        raise ValueError("stop_at_waypoints must be a boolean")
+    if (
+        not math.isfinite(waypoint_hold_seconds)
+        or not 0.0 <= waypoint_hold_seconds <= MAX_WAYPOINT_HOLD_SECONDS
+    ):
+        raise ValueError(
+            f"waypoint_hold_seconds must be between 0 and {MAX_WAYPOINT_HOLD_SECONDS:g} seconds"
+        )
 
     takeoff = TrackPoint(0.0, 0.0, max(0.5, points[0].z))
     schedule: list[Setpoint] = []
@@ -1299,14 +1365,43 @@ def build_setpoint_schedule_plan(
     schedule.extend(ingress)
     track_start_index = len(schedule) - 1
 
-    track_motion = _build_motion_setpoints(
-        points[0],
-        points[1:],
-        params,
-        rate_hz,
-        max_samples=MAX_SETPOINTS - len(schedule),
-    )
-    schedule.extend(track_motion)
+    track_motion: list[Setpoint] = []
+    if stop_at_waypoints:
+        previous = points[0]
+        previous_yaw = ingress[-1].yaw_deg if ingress else 0.0
+        hold_samples = int(math.ceil(rate_hz * waypoint_hold_seconds))
+        for waypoint in points[1:]:
+            speed_limits = [params.vel_limit]
+            if previous.speed_limit_mps is not None:
+                speed_limits.append(previous.speed_limit_mps)
+            if waypoint.speed_limit_mps is not None:
+                speed_limits.append(waypoint.speed_limit_mps)
+            segment_params = replace(params, vel_limit=min(speed_limits))
+            segment_motion = _build_motion_setpoints(
+                previous,
+                [waypoint],
+                segment_params,
+                rate_hz,
+                max_samples=MAX_SETPOINTS - len(schedule),
+            )
+            schedule.extend(segment_motion)
+            track_motion.extend(segment_motion)
+            if segment_motion:
+                previous_yaw = segment_motion[-1].yaw_deg
+            if hold_samples > MAX_SETPOINTS - len(schedule):
+                raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
+            hold = enu_point_to_ned_setpoint(waypoint, yaw_deg=previous_yaw)
+            schedule.extend(hold for _ in range(hold_samples))
+            previous = waypoint
+    else:
+        track_motion = _build_motion_setpoints(
+            points[0],
+            points[1:],
+            params,
+            rate_hz,
+            max_samples=MAX_SETPOINTS - len(schedule),
+        )
+        schedule.extend(track_motion)
 
     final_hold_samples = max(2, int(rate_hz * 0.5))
     if final_hold_samples > MAX_SETPOINTS - len(schedule):
@@ -1852,6 +1947,7 @@ async def run_executor(
     takeoff_horizontal_speed_tolerance_m_s: float = 0.35,
     takeoff_vertical_speed_tolerance_m_s: float = 0.25,
     world: str = "default",
+    abort_file: Path | None = None,
     wind_activator: Callable[..., dict[str, Any]] = _activate_gazebo_wind_profile,
 ) -> None:
     if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
@@ -1912,6 +2008,7 @@ async def run_executor(
     land_command_sent = False
     landing_confirmation_attempted = False
     runtime_failure: str | None = None
+    external_abort_world_paused = False
     runtime_observations: dict[str, dict[str, Any]] = {}
     attempted_effect_sections: set[str] = set()
     gps_transitions: list[dict[str, Any]] = []
@@ -2090,6 +2187,9 @@ async def run_executor(
         start = event_loop.time()
         track_deadline = start + track_timeout_seconds
         for idx, setpoint in enumerate(schedule):
+            if abort_file is not None and abort_file.is_file():
+                reason, external_abort_world_paused = _read_external_abort_request(abort_file)
+                raise RuntimeError(f"external safety abort requested: {reason}")
             if idx == track_start and isinstance(battery_profile, dict):
                 conditioning_started = event_loop.time()
                 battery_details = await _transition_battery_at_track_start(
@@ -2335,7 +2435,12 @@ async def run_executor(
             except Exception as exc:
                 cleanup["stop_offboard"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not stop offboard: {exc}")
-        if armed and land_after and not landing_confirmation_attempted:
+        if (
+            armed
+            and land_after
+            and not landing_confirmation_attempted
+            and not external_abort_world_paused
+        ):
             try:
                 timing.setdefault("land_start_t", time.monotonic() - exec_start)
                 if not land_command_sent:
@@ -2355,6 +2460,9 @@ async def run_executor(
             except Exception as exc:
                 cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not land: {exc}")
+        elif armed and land_after and external_abort_world_paused:
+            cleanup["land"] = "suppressed_world_paused_external_safety_abort"
+            _log(log_path, "landing suppressed because the external safety monitor paused Gazebo")
         if (
             runtime_profile is not None
             and scenario_engine is not None
@@ -2438,6 +2546,8 @@ def main(argv: list[str] | None = None) -> int:
             params,
             args.setpoint_rate_hz,
             hover_duration_seconds=reference_plan.hover_duration_seconds,
+            stop_at_waypoints=reference_plan.stop_at_waypoints,
+            waypoint_hold_seconds=reference_plan.waypoint_hold_seconds,
         )
         _log(
             args.log,
@@ -2508,6 +2618,7 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 takeoff_vertical_speed_tolerance_m_s=(args.takeoff_vertical_speed_tolerance_m_s),
                 world=args.world,
+                abort_file=args.abort_file,
                 wind_activator=_activate_gazebo_wind_profile,
             )
         )

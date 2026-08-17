@@ -25,6 +25,7 @@ from app.autonomy.models import (
     RuntimeObservation,
     RuntimeOperatorCommand,
     RuntimeSessionCreateRequest,
+    SimulationExecutionStartRequest,
 )
 from app.autonomy.qualification import (
     MapPackQualificationRequest,
@@ -36,6 +37,7 @@ from app.autonomy.qualification import (
 from app.autonomy.runtime import AutonomyRuntimeError, runtime_sessions
 from app.autonomy.school_map_artifact import get_school_map_gazebo_artifact
 from app.autonomy.service import AutonomyCompileError, compile_autonomy_mission
+from app.autonomy.simulation_execution import simulation_executions
 from app.db import get_db
 from app.response import ok
 
@@ -240,6 +242,63 @@ def read_runtime_capabilities(
     """Expose runtime boundaries without probing or connecting to a vehicle."""
 
     return ok(runtime_sessions.capabilities())
+
+
+@router.get("/runtime/simulation-executions/capabilities")
+def read_simulation_execution_capabilities(
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    return ok(simulation_executions.capabilities())
+
+
+@router.post("/runtime/simulation-executions", status_code=201)
+async def start_simulation_execution(
+    request: SimulationExecutionStartRequest,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        result = await asyncio.to_thread(simulation_executions.start, current_user.id, request)
+    except AutonomyRuntimeError as exc:
+        raise _runtime_error(exc) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.get("/runtime/simulation-executions/{execution_id}")
+def read_simulation_execution(
+    execution_id: str,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        result = simulation_executions.get(current_user.id, execution_id)
+    except AutonomyRuntimeError as exc:
+        raise _runtime_error(exc) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.post("/runtime/simulation-executions/{execution_id}/abort")
+async def abort_simulation_execution(
+    execution_id: str,
+    command: RuntimeOperatorCommand,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    if command.action != "abort":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "SIMULATION_ABORT_ACTION_REQUIRED",
+                "message": "This endpoint accepts only an abort operator command.",
+            },
+        )
+    try:
+        result = await asyncio.to_thread(
+            simulation_executions.abort,
+            current_user.id,
+            execution_id,
+            command.reason,
+        )
+    except AutonomyRuntimeError as exc:
+        raise _runtime_error(exc) from exc
+    return ok(result.model_dump(mode="json"))
 
 
 @router.post("/runtime/sessions", status_code=201)

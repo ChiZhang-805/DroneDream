@@ -32,6 +32,33 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
+@pytest.mark.parametrize("world_paused", [False, True])
+def test_external_abort_contract_distinguishes_operator_and_paused_world(
+    tmp_path: Path,
+    world_paused: bool,
+) -> None:
+    abort_path = _write_json(
+        tmp_path / "abort.json",
+        {
+            "schema_version": "dronedream.school-map-live-abort.v1",
+            "reason": "operator_abort" if not world_paused else "live_collision_penetration",
+            "world_paused": world_paused,
+        },
+    )
+
+    reason, observed_world_paused = executor._read_external_abort_request(abort_path)
+
+    assert reason
+    assert observed_world_paused is world_paused
+
+
+def test_external_abort_contract_rejects_missing_world_pause_state(tmp_path: Path) -> None:
+    abort_path = _write_json(tmp_path / "abort.json", {"reason": "operator_abort"})
+
+    with pytest.raises(RuntimeError, match="world_paused flag"):
+        executor._read_external_abort_request(abort_path)
+
+
 def test_load_reference_track_and_controller_params(tmp_path: Path):
     track = _write_json(
         tmp_path / "reference_track.json",
@@ -139,6 +166,68 @@ def test_executor_rejects_unsafe_controller_params(
     params = _write_json(tmp_path / "controller_params.json", payload)
     with pytest.raises(ValueError, match=expected_error):
         executor.load_controller_params(params)
+
+
+def test_reference_track_loads_segment_speed_and_waypoint_stop_contract(tmp_path: Path) -> None:
+    track = _write_json(
+        tmp_path / "reference_track.json",
+        {
+            "track_type": "custom",
+            "stop_at_waypoints": True,
+            "waypoint_hold_seconds": 0.4,
+            "points": [
+                {"x": 0.0, "y": 0.0, "z": 1.0, "speed_limit_mps": 0.42},
+                {"x": 1.0, "y": 0.0, "z": 1.0, "speed_limit_mps": 0.7},
+            ],
+        },
+    )
+
+    plan = executor.load_reference_track_plan(track)
+
+    assert plan.stop_at_waypoints is True
+    assert plan.waypoint_hold_seconds == pytest.approx(0.4)
+    assert [point.speed_limit_mps for point in plan.points] == pytest.approx([0.42, 0.7])
+
+
+def test_waypoint_stop_schedule_decelerates_and_holds_at_a_right_angle() -> None:
+    points = [
+        executor.TrackPoint(0.0, 0.0, 3.0, 0.5),
+        executor.TrackPoint(1.0, 0.0, 3.0, 0.5),
+        executor.TrackPoint(1.0, 1.0, 3.0, 0.5),
+    ]
+    params = executor.ControllerParams(1.0, 0.2, 0.1, 2.0, 0.8, 0.5)
+    rate_hz = 10.0
+
+    plan = executor.build_setpoint_schedule_plan(
+        points,
+        params,
+        rate_hz,
+        stop_at_waypoints=True,
+        waypoint_hold_seconds=0.4,
+    )
+    track = plan.schedule[plan.track_start_index : plan.track_end_index + 1]
+    corner = [
+        index
+        for index, setpoint in enumerate(track)
+        if (
+            setpoint.north_m,
+            setpoint.east_m,
+            setpoint.down_m,
+        )
+        == pytest.approx((1.0, 0.0, -3.0))
+    ]
+
+    assert len(corner) >= 4
+    assert (
+        max(
+            math.dist(
+                (first.north_m, first.east_m, first.down_m),
+                (second.north_m, second.east_m, second.down_m),
+            )
+            for first, second in zip(track, track[1:], strict=False)
+        )
+        <= 0.5 / rate_hz + 1e-9
+    )
 
 
 def test_executor_rejects_an_unbounded_setpoint_schedule():

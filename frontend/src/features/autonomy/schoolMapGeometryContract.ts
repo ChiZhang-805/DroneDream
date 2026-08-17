@@ -1,4 +1,4 @@
-const TEACHING_DOOR_OPEN_ANGLE_DEG = 78;
+const TEACHING_DOOR_OPEN_ANGLE_DEG = 90;
 const TEACHING_DOOR_OPEN_ANGLE_RAD = TEACHING_DOOR_OPEN_ANGLE_DEG * Math.PI / 180;
 const TEACHING_DOOR_LEAF_WIDTH_M = 1.995;
 const TEACHING_DOOR_LEAF_DEPTH_M = 0.095;
@@ -92,6 +92,7 @@ export const SCHOOL_MAP_GEOMETRY = {
     landingThicknessM: 0.18,
     handrailHeightM: 0.9,
     handrailRadiusM: 0.025,
+    routeCenterAboveTreadM: 0.85,
   },
   facilities: {
     bicycleShelter: {
@@ -104,6 +105,8 @@ export const SCHOOL_MAP_GEOMETRY = {
     pickupCanopy: {
       centerX: 48.5,
       centerZ: 1.5,
+      routeCenterZ: 1.25,
+      routeEnvelopeCenterY: 1.35,
       columnRadiusM: 0.075,
       columnHeightM: 2.71,
       roofBottomM: 2.71,
@@ -158,10 +161,14 @@ export const SCHOOL_MAP_GEOMETRY = {
     crosswalkBarWidthM: 0.34,
     crosswalkBarSpacingM: 0.62,
     crosswalkLengthM: 3.8,
+    junctionCenterlineInsetM: 0.3,
+    crosswalkClearanceM: 0.18,
   },
   vehicle: {
     collisionDiameterM: 0.76,
     collisionHeightM: 0.43,
+    collisionCenterAboveContactM: 0.215,
+    px4X500ModelRootToContactM: 0.013,
     minimumOpenDoorClearanceM: TEACHING_OPEN_DOOR_CLEARANCE_M,
     minimumIndoorClearWidthM: 1.6,
     minimumRoadWidthM: 4.8,
@@ -247,7 +254,9 @@ export function schoolMapStairRoutePoints(
   const startZ = stair.centerZ - dimensions.flightRunM / 2;
   const endZ = stair.centerZ + dimensions.flightRunM / 2;
   const routeInsetM = 0.04;
-  const flightClearanceM = 0.6;
+  const flightClearanceM = stair.routeCenterAboveTreadM;
+  const upperLandingTurnZ = startZ - stair.landingLengthM / 2;
+  const middleLandingTurnZ = endZ + stair.landingLengthM / 2;
   const lowerApproachZ = startZ
     - geometry.vehicle.collisionDiameterM / 2
     - stair.handrailRadiusM
@@ -258,14 +267,23 @@ export function schoolMapStairRoutePoints(
       + geometry.floor.slabThicknessM;
     const middleY = lowerY + dimensions.halfRiseM;
     const upperY = lowerY + geometry.floor.storeyHeightM;
+    if (storey === 1) {
+      ascending.push([
+        stair.centerX - dimensions.laneOffsetM,
+        lowerY + flightClearanceM,
+        upperLandingTurnZ,
+      ]);
+    }
     ascending.push(
       [stair.centerX - dimensions.laneOffsetM, lowerY + stair.riserM + flightClearanceM, lowerApproachZ],
       [stair.centerX - dimensions.laneOffsetM, lowerY + stair.riserM + flightClearanceM, startZ + routeInsetM],
       [stair.centerX - dimensions.laneOffsetM, middleY + flightClearanceM, endZ - routeInsetM],
-      [stair.centerX, middleY + flightClearanceM, endZ + stair.landingLengthM / 2],
+      [stair.centerX - dimensions.laneOffsetM, middleY + flightClearanceM, middleLandingTurnZ],
+      [stair.centerX + dimensions.laneOffsetM, middleY + flightClearanceM, middleLandingTurnZ],
       [stair.centerX + dimensions.laneOffsetM, middleY + stair.riserM + flightClearanceM, endZ - routeInsetM],
       [stair.centerX + dimensions.laneOffsetM, upperY + flightClearanceM, startZ + routeInsetM],
-      [stair.centerX, upperY + flightClearanceM, startZ - stair.landingLengthM / 2],
+      [stair.centerX + dimensions.laneOffsetM, upperY + flightClearanceM, upperLandingTurnZ],
+      [stair.centerX - dimensions.laneOffsetM, upperY + flightClearanceM, upperLandingTurnZ],
     );
   }
   return direction === "ascending" ? ascending : ascending.reverse();

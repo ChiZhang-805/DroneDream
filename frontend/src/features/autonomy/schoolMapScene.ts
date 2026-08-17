@@ -1092,9 +1092,9 @@ const SCHOOL_MAP_PEDESTRIAN_PATHS = [
 ] as const;
 
 export const SCHOOL_MAP_CROSSWALKS = [
-  { id: "teaching-entry-crosswalk", x: -25, z: -4.6, axis: "x" as const },
-  { id: "cafeteria-entry-crosswalk", x: 30, z: 3, axis: "x" as const },
-  { id: "main-gate-crosswalk", x: 0, z: -24.5, axis: "z" as const },
+  { id: "teaching-entry-crosswalk", x: -25, z: -4.6, axis: "x" as const, barCount: 7 },
+  { id: "cafeteria-entry-crosswalk", x: 30, z: 3, axis: "x" as const, barCount: 7 },
+  { id: "main-gate-crosswalk", x: 0, z: -24.5, axis: "x" as const, barCount: 9 },
 ];
 
 function createCampusSurface() {
@@ -1117,7 +1117,7 @@ function createCampusSurface() {
     });
     context.lineWidth = widthM * scale;
     context.lineCap = "butt";
-    context.lineJoin = "miter";
+    context.lineJoin = "round";
     context.strokeStyle = color;
     context.stroke();
   };
@@ -1137,8 +1137,41 @@ function createCampusSurface() {
   context.setLineDash([markings.centerlineDashM * scale, markings.centerlineGapM * scale]);
   SCHOOL_MAP_ROAD_NETWORK.segments.forEach((segment) => strokePath(segment.points, markings.centerlineWidthM, "rgba(233,215,128,.82)"));
   context.setLineDash([]);
-  SCHOOL_MAP_CROSSWALKS.forEach(({ x, z, axis }) => {
-    const halfCount = Math.floor(markings.crosswalkBarCount / 2);
+  SCHOOL_MAP_ROAD_NETWORK.junctions.forEach((junction) => {
+    const [canvasX, canvasY] = toCanvas([junction.x, junction.z]);
+    context.beginPath();
+    context.arc(
+      canvasX,
+      canvasY,
+      (junction.diameterM / 2 + markings.junctionCenterlineInsetM) * scale,
+      0,
+      Math.PI * 2,
+    );
+    context.fillStyle = "#3f4249";
+    context.fill();
+  });
+  SCHOOL_MAP_CROSSWALKS.forEach(({ x, z, axis, barCount }) => {
+    const halfCount = Math.floor(barCount / 2);
+    const barSpanM = (barCount - 1) * markings.crosswalkBarSpacingM
+      + markings.crosswalkBarWidthM
+      + markings.crosswalkClearanceM * 2;
+    const [crosswalkX, crosswalkY] = toCanvas([x, z]);
+    context.fillStyle = "#3f4249";
+    if (axis === "x") {
+      context.fillRect(
+        crosswalkX - barSpanM / 2 * scale,
+        crosswalkY - (markings.crosswalkLengthM / 2 + markings.crosswalkClearanceM) * scale,
+        barSpanM * scale,
+        (markings.crosswalkLengthM + markings.crosswalkClearanceM * 2) * scale,
+      );
+    } else {
+      context.fillRect(
+        crosswalkX - (markings.crosswalkLengthM / 2 + markings.crosswalkClearanceM) * scale,
+        crosswalkY - barSpanM / 2 * scale,
+        (markings.crosswalkLengthM + markings.crosswalkClearanceM * 2) * scale,
+        barSpanM * scale,
+      );
+    }
     for (let index = -halfCount; index <= halfCount; index += 1) {
       const along = index * markings.crosswalkBarSpacingM;
       context.fillStyle = "#f0eee9";
@@ -1188,8 +1221,8 @@ function addRoadJunction(parent: THREE.Object3D, x: number, z: number, diameterM
   }));
 }
 
-function addCrosswalk(parent: THREE.Object3D, x: number, z: number, axis: "x" | "z", id: string) {
-  parent.add(tag(new THREE.Group(), "crosswalk", id, { traversable: true, x, z, axis, surface: "school-map-ground-surface" }));
+function addCrosswalk(parent: THREE.Object3D, x: number, z: number, axis: "x" | "z", id: string, barCount: number) {
+  parent.add(tag(new THREE.Group(), "crosswalk", id, { traversable: true, x, z, axis, barCount, surface: "school-map-ground-surface" }));
 }
 
 function addTree(parent: THREE.Object3D, x: number, z: number, id: string, height = 5.6) {
@@ -1225,7 +1258,7 @@ function addStreetLight(parent: THREE.Object3D, x: number, z: number, id: string
 function addCampusInfrastructure(root: THREE.Group) {
   SCHOOL_MAP_ROAD_NETWORK.segments.forEach((segment) => addRoadRibbon(root, segment.points, segment.widthM, segment.id));
   SCHOOL_MAP_ROAD_NETWORK.junctions.forEach((junction) => addRoadJunction(root, junction.x, junction.z, junction.diameterM, junction.id));
-  SCHOOL_MAP_CROSSWALKS.forEach(({ x, z, axis, id }) => addCrosswalk(root, x, z, axis, id));
+  SCHOOL_MAP_CROSSWALKS.forEach(({ x, z, axis, id, barCount }) => addCrosswalk(root, x, z, axis, id, barCount));
   SCHOOL_MAP_PEDESTRIAN_PATHS.forEach((path) => root.add(tag(
     new THREE.Group(),
     "pedestrian-path",
@@ -1437,7 +1470,8 @@ export const SCHOOL_MAP_ROUTES: Record<SchoolMapMissionId, THREE.Vector3[]> = {
     [schoolMapOfficeDoorCenterX(), 8.15, 9.75], [-35.0, 8.12, 8.02], [-14.0, 8.08, 8.02], [-4.0, 8.05, 8.02],
     ...schoolMapStairRoutePoints("descending"), [-3.0, 1.05, 8.02], [-8.0, 1.25, 5.0],
     [schoolMapTeachingOpenDoorCenterX(), 1.35, 2.7], [schoolMapTeachingOpenDoorCenterX(), 1.45, -1.055], [-25.0, 1.55, -9.0], [-25.0, 1.65, -18.0], [0, 1.8, -18.0],
-    [30.0, 1.8, -18.0], [39.0, 1.7, -12.0], [46.0, 1.55, -5.0], [48.5, 1.15, 1.5],
+    [30.0, 1.8, -18.0], [39.0, 1.7, -12.0], [46.0, 1.55, -5.0],
+    [SCHOOL_MAP_GEOMETRY.facilities.pickupCanopy.centerX, SCHOOL_MAP_GEOMETRY.facilities.pickupCanopy.routeEnvelopeCenterY, SCHOOL_MAP_GEOMETRY.facilities.pickupCanopy.routeCenterZ],
     [46.0, 1.55, -5.0], [39.0, 1.7, -12.0], [30.0, 1.8, -18.0], [0, 1.8, -18.0], [-25.0, 1.65, -18.0],
     [-25.0, 1.55, -9.0], [schoolMapTeachingOpenDoorCenterX(), 1.45, -1.055], [schoolMapTeachingOpenDoorCenterX(), 1.35, 2.7],
     [-8.0, 1.25, 5.0], [-3.0, 1.05, 8.02], ...schoolMapStairRoutePoints("ascending"), [-4.0, 8.05, 8.02],

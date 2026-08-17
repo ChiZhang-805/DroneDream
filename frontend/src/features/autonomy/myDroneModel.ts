@@ -1,29 +1,8 @@
 import * as THREE from "three";
 
-export const MY_DRONE_CONTRACT = {
-  id: "aircraft-my-drone",
-  name: "My Drone",
-  referenceAirframe: "X500 V2 Quad X",
-  manufacturer: "DroneDream reference · Holybro X500 V2-derived",
-  wheelbaseM: 0.5,
-  propellerDiameterM: 0.254,
-  frameBodyM: { x: 0.144, y: 0.062, z: 0.144 },
-  collisionEnvelopeM: { x: 0.76, y: 0.43, z: 0.76 },
-  dryMassKg: 1.86,
-  maximumTakeoffMassKg: 2.8,
-  maximumPickupPayloadKg: 0.35,
-  battery: { cells: 4, capacityMah: 5000, nominalEnergyWh: 74 },
-  compute: { model: "Jetson Orin NX", moduleM: { x: 0.07, y: 0.045 }, powerW: "10–25" },
-  depthCamera: { model: "RealSense D455-class", sizeM: { x: 0.124, y: 0.026, z: 0.029 } },
-  planningLimits: {
-    maximumSpeedMps: 4,
-    maximumAccelerationMps2: 2.5,
-    maximumClimbMps: 1.5,
-    maximumDescentMps: 1,
-    maximumTiltDeg: 30,
-    reserveBatteryPercent: 30,
-  },
-} as const;
+import { MY_DRONE_CONTRACT } from "./myDroneContract";
+
+export { MY_DRONE_CONTRACT } from "./myDroneContract";
 
 function material(
   color: number,
@@ -123,49 +102,6 @@ function createPropeller(index: number, x: number, z: number) {
   return group;
 }
 
-function createDepthCamera() {
-  const group = semantic(new THREE.Group(), "rgbd-camera", "front-rgbd-camera");
-  group.position.set(0, -0.055, -0.155);
-  box(group, [0.124, 0.029, 0.026], [0, 0, 0], 0x34323a, "camera-housing", "d455-housing", 0.42, 0.25);
-  [-0.045, 0.045].forEach((x, index) => {
-    const lens = semantic(
-      new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.008, 18), material(0x15141a, 0.18, 0.1)),
-      "depth-lens",
-      `d455-depth-lens-${index + 1}`,
-    );
-    lens.position.set(x, 0, -0.017);
-    lens.rotation.x = Math.PI / 2;
-    group.add(lens);
-  });
-  const rgbLens = semantic(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.008, 18), material(0x312657, 0.15, 0.08)),
-    "rgb-lens",
-    "d455-rgb-lens",
-  );
-  rgbLens.position.set(0.015, 0, -0.017);
-  rgbLens.rotation.x = Math.PI / 2;
-  group.add(rgbLens);
-  const projector = semantic(
-    new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.008, 18), material(0x7b2f68, 0.15, 0.08)),
-    "infrared-projector",
-    "d455-ir-projector",
-  );
-  projector.position.set(-0.014, 0, -0.017);
-  projector.rotation.x = Math.PI / 2;
-  group.add(projector);
-  return group;
-}
-
-function createOnboardComputer() {
-  const group = semantic(new THREE.Group(), "onboard-compute", "jetson-orin-nx-stack");
-  group.position.set(0, 0.085, 0.018);
-  box(group, [0.11, 0.028, 0.085], [0, 0, 0], 0x2e3236, "compute-enclosure", "orin-nx-carrier", 0.5, 0.45);
-  for (let index = 0; index < 9; index += 1) {
-    box(group, [0.006, 0.022, 0.08], [-0.048 + index * 0.012, 0.023, 0], 0x6f757c, "heat-sink-fin", `orin-fin-${index + 1}`, 0.34, 0.72);
-  }
-  return group;
-}
-
 function createLandingGear() {
   const group = semantic(new THREE.Group(), "landing-gear", "landing-gear");
   [-0.115, 0.115].forEach((x, sideIndex) => {
@@ -218,8 +154,6 @@ export function createMyDroneModel(): THREE.Group {
   box(drone, [0.045, 0.018, 0.035], [0, 0.105, -0.015], 0xcc4aa6, "flight-controller", "pixhawk-6c", 0.42, 0.22);
   const battery = box(drone, [0.145, 0.045, 0.052], [0, 0.015, 0.07], 0x30343b, "battery", "4s-5000mah-battery", 0.55, 0.18);
   battery.userData.nominalEnergyWh = MY_DRONE_CONTRACT.battery.nominalEnergyWh;
-  drone.add(createOnboardComputer());
-  drone.add(createDepthCamera());
   drone.add(createLandingGear());
   drone.add(createPayloadGripper());
   const mast = cylinder(drone, 0.005, 0.006, 0.09, [0, 0.15, 0.07], 0x55565d, "gps-mast", "gps-mast", 10);

@@ -22,6 +22,7 @@ interface AutonomyWorld3DProps {
   dynamicEntityActive: boolean;
   perception: "fusion" | "vision" | "map";
   mapName: string;
+  vehicleEnvelopeCenterWorldEnuM?: { x: number; y: number; z: number } | null;
 }
 
 function material(color: number, roughness = 0.72, opacity = 1) {
@@ -69,13 +70,16 @@ export function AutonomyWorld3D({
   dynamicEntityActive,
   perception,
   mapName,
+  vehicleEnvelopeCenterWorldEnuM = null,
 }: AutonomyWorld3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef(progress);
+  const vehicleEnvelopeCenterRef = useRef(vehicleEnvelopeCenterWorldEnuM);
   const [webglError, setWebglError] = useState(false);
   const [xRay, setXRay] = useState(false);
   const [floor, setFloor] = useState<SchoolMapFloor>("all");
   progressRef.current = progress;
+  vehicleEnvelopeCenterRef.current = vehicleEnvelopeCenterWorldEnuM;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -209,10 +213,14 @@ export function AutonomyWorld3D({
     const render = () => {
       const elapsed = clock.getElapsedTime();
       const routeProgress = Math.min(1, Math.max(0, progressRef.current));
-      const position = curve.getPointAt(routeProgress);
+      const routePosition = curve.getPointAt(routeProgress);
+      const worldEnuPosition = vehicleEnvelopeCenterRef.current;
+      const position = worldEnuPosition
+        ? new THREE.Vector3(worldEnuPosition.x, worldEnuPosition.z, worldEnuPosition.y)
+        : routePosition;
       const tangent = curve.getTangentAt(Math.min(0.999, routeProgress));
       drone.position.copy(position);
-      drone.position.y += Math.sin(elapsed * 3.1) * 0.025;
+      if (!worldEnuPosition) drone.position.y += Math.sin(elapsed * 3.1) * 0.025;
       drone.rotation.y = Math.atan2(tangent.x, tangent.z);
       droneHalo.rotation.z = elapsed * 0.65;
       person.visible = dynamicEntityActive;

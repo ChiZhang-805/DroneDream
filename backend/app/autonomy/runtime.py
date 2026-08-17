@@ -57,6 +57,7 @@ class _SessionRecord:
     owner_id: str
     client_request_id: str
     vehicle: VehicleEnvelope
+    mission: RuntimeSessionCreateRequest
     result: RuntimeSession
     last_observation: RuntimeObservation | None = None
 
@@ -419,6 +420,7 @@ class RuntimeSessionRegistry:
                 owner_id=owner_id,
                 client_request_id=request.client_request_id,
                 vehicle=request.mission.vehicle.model_copy(deep=True),
+                mission=request.model_copy(deep=True),
                 result=session,
             )
             self._idempotency[idempotency_key] = session_id
@@ -427,6 +429,84 @@ class RuntimeSessionRegistry:
     def get(self, owner_id: str, session_id: str) -> RuntimeSession:
         with self._lock:
             record = self._owned(owner_id, session_id)
+            return record.result.model_copy(deep=True)
+
+    def execution_binding(
+        self,
+        owner_id: str,
+        session_id: str,
+    ) -> tuple[RuntimeSession, RuntimeSessionCreateRequest]:
+        """Return the owner-scoped runtime session and immutable launch request."""
+
+        with self._lock:
+            record = self._owned(owner_id, session_id)
+            return record.result.model_copy(deep=True), record.mission.model_copy(deep=True)
+
+    def finalize_simulation(
+        self,
+        owner_id: str,
+        session_id: str,
+        *,
+        verified: bool,
+        evidence_sha256: str | None,
+        failure: str | None,
+    ) -> RuntimeSession:
+        """Seal a physical simulator result into the runtime evidence chain."""
+
+        with self._lock:
+            record = self._owned(owner_id, session_id)
+            current = record.result
+            if current.terminal:
+                return current.model_copy(deep=True)
+            now = _now()
+            code = "runtime.simulation-verified" if verified else "runtime.simulation-failed"
+            summary = (
+                "PX4/Gazebo mission evidence passed every physical qualification gate."
+                if verified
+                else f"PX4/Gazebo mission failed closed: {(failure or 'unknown failure')[:180]}"
+            )
+            task_graph = current.task_graph.model_copy(deep=True)
+            if verified:
+                task_graph = task_graph.model_copy(
+                    update={
+                        "nodes": [
+                            node.model_copy(update={"status": "completed"})
+                            for node in task_graph.nodes
+                        ],
+                        "active_node_ids": [],
+                        "change_reason": "physical_simulation_verified",
+                    }
+                )
+            revision = current.decision_events[-1].revision + 1
+            event = RuntimeDecisionEvent(
+                revision=revision,
+                created_at=now,
+                kind="session",
+                code=code,
+                summary=summary,
+                task_ids=[node.task_id for node in task_graph.nodes[:MAX_ACTIVE_TASK_NODES]],
+            )
+            record.result = current.model_copy(
+                update={
+                    "phase": "completed" if verified else "aborted",
+                    "updated_at": now,
+                    "decision": SafetyDecision(
+                        action="continue" if verified else "abort",
+                        accepted=verified,
+                        codes=[code],
+                    ),
+                    "task_graph": task_graph,
+                    "decision_events": [*current.decision_events, event][-100:],
+                    "evidence_chain_head": _hash(
+                        {
+                            "previous": current.evidence_chain_head,
+                            "event": code,
+                            "mission_evidence_sha256": evidence_sha256,
+                        }
+                    ),
+                    "terminal": True,
+                }
+            )
             return record.result.model_copy(deep=True)
 
     def observe(

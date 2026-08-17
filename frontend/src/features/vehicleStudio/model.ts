@@ -1,3 +1,5 @@
+import { MY_DRONE_CONTRACT } from "../autonomy/myDroneContract";
+
 export const VEHICLE_MODEL_SCHEMA_VERSION = 2 as const;
 export const MAX_VEHICLE_SENSORS = 32;
 export const MAX_PARAMETER_FAMILIES = 64;
@@ -803,7 +805,11 @@ function createEngineeringConstraints(components: VehicleComponentDraft[]): Vehi
 
 export function createMyDroneVehicleModelDraft(now = new Date()): VehicleModelDraft {
   const timestamp = now.toISOString();
-  const components = defaultComponents(4, .25, .254);
+  const components = defaultComponents(
+    4,
+    MY_DRONE_CONTRACT.wheelbaseM / 2,
+    MY_DRONE_CONTRACT.propellerDiameterM,
+  );
   const frame = components.find((component) => component.kind === "frame");
   if (!frame) throw new Error("The My Drone reference assembly requires a center frame.");
 
@@ -836,25 +842,8 @@ export function createMyDroneVehicleModelDraft(now = new Date()): VehicleModelDr
     controller.tags = ["px4", "redundant-imu", "control-critical"];
   }
 
-  const legacyCamera = components.find((component) => component.kind === "camera-gimbal");
-  if (legacyCamera) {
-    legacyCamera.name = "Front RGB-D perception module";
-    legacyCamera.kind = "sensor";
-    legacyCamera.geometry = { primitive: "rounded-box", sizeM: { x: .124, y: .029, z: .026 }, radiusM: .013, lengthM: .124, meshUri: "" };
-    legacyCamera.transform.positionM = { x: .155, y: -.035, z: 0 };
-    legacyCamera.material = { baseColor: "#343840", metalness: .22, roughness: .38, opacity: 1 };
-    legacyCamera.mass.massKg = .09;
-    legacyCamera.tags = ["rgb", "depth", "stereo", "vio", "forward-facing"];
-  }
-
-  const compute = createVehicleComponent("custom", "Jetson Orin NX compute enclosure");
-  compute.parentId = frame.id;
-  compute.geometry = { primitive: "rounded-box", sizeM: { x: .103, y: .047, z: .083 }, radiusM: .018, lengthM: .103, meshUri: "" };
-  compute.transform.positionM = { x: -.055, y: .092, z: 0 };
-  compute.material = { baseColor: "#4c5554", metalness: .58, roughness: .31, opacity: 1 };
-  compute.mass.massKg = .19;
-  compute.tags = ["onboard-compute", "jetson-orin-nx", "10-25-w"];
-  components.push(compute);
+  const legacyCameraIndex = components.findIndex((component) => component.kind === "camera-gimbal");
+  if (legacyCameraIndex >= 0) components.splice(legacyCameraIndex, 1);
 
   const gnss = createVehicleComponent("sensor", "M10 GNSS and compass mast");
   gnss.parentId = frame.id;
@@ -871,30 +860,29 @@ export function createMyDroneVehicleModelDraft(now = new Date()): VehicleModelDr
   gripper.transform.positionM = { x: .01, y: -.145, z: 0 };
   gripper.material = { baseColor: "#e650ad", metalness: .2, roughness: .38, opacity: 1 };
   gripper.mass.massKg = .16;
-  gripper.tags = ["payload", "takeout", "quick-release", "0.55-kg-capacity"];
+  gripper.tags = ["payload", "takeout", "quick-release", "0.10-kg-capacity"];
   components.push(gripper);
 
   let draft: VehicleModelDraft = {
     schemaVersion: 2,
     draftId: uuid(),
     revision: 1,
-    name: "My Drone",
-    manufacturer: "DroneDream reference · Holybro X500 V2-derived",
+    name: MY_DRONE_CONTRACT.name,
+    manufacturer: MY_DRONE_CONTRACT.manufacturer,
     vehicleClass: "multicopter-research",
     body: { shape: "box", massKg: 0, lengthM: .36, widthM: .36, heightM: .33 },
     propulsion: {
       motorCount: 4,
-      armLengthM: .25,
-      propellerDiameterM: .254,
-      maximumThrustPerMotorN: 11,
-      batteryCells: 4,
-      batteryCapacityMah: 5000,
+      armLengthM: MY_DRONE_CONTRACT.wheelbaseM / 2,
+      propellerDiameterM: MY_DRONE_CONTRACT.propellerDiameterM,
+      maximumThrustPerMotorN: MY_DRONE_CONTRACT.maximumThrustN / 4,
+      batteryCells: MY_DRONE_CONTRACT.battery.cells,
+      batteryCapacityMah: MY_DRONE_CONTRACT.battery.capacityMah,
     },
     sensors: [
       { id: uuid(), type: "imu", model: "Pixhawk 6C redundant IMU", enabled: true, componentId: controller?.id },
       { id: uuid(), type: "gps", model: "M10 GNSS and compass", enabled: true, componentId: gnss.id },
       { id: uuid(), type: "barometer", model: "Temperature-compensated barometer", enabled: true, componentId: controller?.id },
-      { id: uuid(), type: "camera", model: "Front RGB-D stereo camera", enabled: true, componentId: legacyCamera?.id },
     ],
     autopilot: { family: "px4", controllerModel: "Pixhawk 6C", firmwareVersion: "v1.16.0" },
     controlTarget: { primary: "position", parameterFamilies: ["MPC_XY", "MPC_Z", "MC_ROLL", "MC_PITCH", "MC_YAW"] },
@@ -902,12 +890,12 @@ export function createMyDroneVehicleModelDraft(now = new Date()): VehicleModelDr
     components,
     constraints: createEngineeringConstraints(components),
     designParameters: { units: "metric", gridM: .005, symmetry: "x" },
-    notes: "Public reference aircraft for School Map missions. The editable assembly includes the X500-class frame, PX4 avionics, RGB-D perception, onboard compute, GNSS, and a 0.55 kg takeout gripper.",
+    notes: "Qualified public reference aircraft for School Map PX4/Gazebo missions. The editable dry assembly includes the X500-class frame, PX4 avionics, GNSS, and a gripper qualified for the 0.10 kg takeout payload. No RGB-D camera, VIO sensor, or Jetson compute module is installed.",
     createdAt: timestamp,
     updatedAt: timestamp,
   };
   draft.body.massKg = components.reduce((sum, component) => sum + getVehicleComponentMassProperties(component).massKg, 0);
-  draft = scaleVehicleModelMass(draft, 1.86);
+  draft = scaleVehicleModelMass(draft, MY_DRONE_CONTRACT.dryMassKg);
   draft.createdAt = timestamp;
   draft.updatedAt = timestamp;
   return draft;

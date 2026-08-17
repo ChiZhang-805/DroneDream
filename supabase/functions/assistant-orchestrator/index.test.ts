@@ -126,7 +126,38 @@ function autonomyPlan({ ready }: { ready: boolean }): string {
         context_sha256: "a".repeat(64),
       },
       grounded_entities: [],
-      task_graph: {},
+      task_graph: {
+        nodes: ready ? [
+          {
+            node_id: "takeoff",
+            action: "takeoff",
+            target: "office launch pad",
+            depends_on: [],
+            success_evidence: ["airborne telemetry"],
+          },
+          {
+            node_id: "pickup",
+            action: "pickup",
+            target: "coffee pickup",
+            depends_on: ["takeoff"],
+            success_evidence: ["payload attached"],
+          },
+          {
+            node_id: "return",
+            action: "return",
+            target: "office launch pad",
+            depends_on: ["pickup"],
+            success_evidence: ["office return reached"],
+          },
+          {
+            node_id: "land",
+            action: "land",
+            target: "office launch pad",
+            depends_on: ["return"],
+            success_evidence: ["landed telemetry"],
+          },
+        ] : [],
+      },
       tool_requests: [],
       tool_receipts: [],
       assumptions: [],
@@ -200,6 +231,17 @@ Deno.test("rejects model-authored autonomy tool receipts", () => {
   assertThrows(() => parseAssistantPlan(
     JSON.stringify(value),
     "lab",
+    "mission_autonomy",
+    autonomyRequestContext({ ready: true }),
+  ));
+});
+
+Deno.test("rejects duplicate autonomy task dependencies before backend compilation", () => {
+  const value = JSON.parse(autonomyPlan({ ready: true }));
+  value.draft.task_graph.nodes[1].depends_on = ["takeoff", "takeoff"];
+  assertThrows(() => parseAssistantPlan(
+    JSON.stringify(value),
+    "sim",
     "mission_autonomy",
     autonomyRequestContext({ ready: true }),
   ));

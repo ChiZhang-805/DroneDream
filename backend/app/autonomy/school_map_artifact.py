@@ -10,10 +10,66 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal, TypedDict
 from xml.etree import ElementTree
+
+from app.autonomy.px4_x500_vehicle import (
+    MY_DRONE_MODEL_NAME,
+    PX4_X500_DRY_MASS_KG,
+    PX4_X500_MAXIMUM_THRUST_N,
+    PX4_X500_MINIMUM_QUALIFIED_THRUST_TO_WEIGHT,
+    TAKEOUT_PAYLOAD_CENTER_ABOVE_MODEL_ROOT_M,
+    TAKEOUT_PAYLOAD_MASS_KG,
+    TAKEOUT_PAYLOAD_SIZE_M,
+    px4_x500_loaded_thrust_to_weight,
+)
+
+Point2D = tuple[float, float]
+
+
+class Crosswalk(TypedDict):
+    id: str
+    x: float
+    y: float
+    axis: Literal["x", "y"]
+    bar_count: int
+
+
+class RoadMarkings(TypedDict):
+    centerline_width_m: float
+    centerline_dash_m: float
+    centerline_gap_m: float
+    crosswalk_bar_count: int
+    crosswalk_bar_width_m: float
+    crosswalk_bar_spacing_m: float
+    crosswalk_length_m: float
+    junction_centerline_inset_m: float
+    crosswalk_clearance_m: float
+
+
+class RoadSegment(TypedDict):
+    id: str
+    width_m: float
+    points: tuple[Point2D, ...]
+
+
+class RoadJunction(TypedDict):
+    id: str
+    x: float
+    y: float
+    diameter_m: float
+    minimum_degree: int
+
+
+class RoadNetwork(TypedDict):
+    facility_anchors: dict[str, Point2D]
+    segments: tuple[RoadSegment, ...]
+    junctions: tuple[RoadJunction, ...]
+
 
 STRUCTURAL_TOLERANCE_M = 0.001
 ROUTE_ENDPOINT_TOLERANCE_M = 0.01
@@ -29,8 +85,14 @@ STAIR_LANDING_M = 1.6
 STAIR_LANDING_THICKNESS_M = 0.18
 STAIR_HANDRAIL_HEIGHT_M = 0.9
 STAIR_HANDRAIL_RADIUS_M = 0.025
+STAIR_ROUTE_CENTER_ABOVE_TREAD_M = 0.85
 VEHICLE_COLLISION_DIAMETER_M = 0.76
 VEHICLE_COLLISION_HEIGHT_M = 0.43
+VEHICLE_COLLISION_CENTER_ABOVE_CONTACT_M = VEHICLE_COLLISION_HEIGHT_M / 2
+PX4_X500_MODEL_ROOT_TO_CONTACT_M = 0.013
+PX4_X500_COLLISION_CENTER_ABOVE_MODEL_ROOT_M = (
+    PX4_X500_MODEL_ROOT_TO_CONTACT_M + VEHICLE_COLLISION_CENTER_ABOVE_CONTACT_M
+)
 TEACHING_ENTRANCE_CENTER_X = -25.0
 TEACHING_ENTRANCE_OPENING_M = 8.46
 ENTRANCE_DOOR_FRAME_WIDTH_M = 0.16
@@ -38,7 +100,7 @@ ENTRANCE_DOOR_FRAME_DEPTH_M = 0.11
 ENTRANCE_DOOR_LEAF_WIDTH_M = 1.995
 ENTRANCE_DOOR_LEAF_DEPTH_M = 0.095
 ENTRANCE_DOOR_HEIGHT_M = 2.7
-ENTRANCE_DOOR_OPEN_ANGLE_RAD = math.radians(78)
+ENTRANCE_DOOR_OPEN_ANGLE_RAD = math.radians(90)
 TEACHING_OPEN_DOOR_PAIR_CENTER_X = (
     TEACHING_ENTRANCE_CENTER_X - ENTRANCE_DOOR_FRAME_WIDTH_M / 2 - ENTRANCE_DOOR_LEAF_WIDTH_M
 )
@@ -129,6 +191,8 @@ BIKE_SHELTER_CENTER = (-42.0, 30.2)
 BIKE_SHELTER_COLUMN_RADIUS_M = 0.08
 BIKE_SHELTER_COLUMN_HEIGHT_M = 2.89
 PICKUP_CENTER = (48.5, 1.5)
+PICKUP_ROUTE_CENTER = (48.5, 1.25)
+PICKUP_ROUTE_ENVELOPE_CENTER_Z_M = 1.35
 PICKUP_COLUMN_RADIUS_M = 0.075
 PICKUP_COLUMN_HEIGHT_M = 2.71
 PICKUP_PAD_RADIUS_M = 1.0
@@ -150,12 +214,12 @@ TRAINING_GATE_COLLISION_MAX_ERROR_M = max(
     for _, _, radius_m in TRAINING_GATES
 )
 
-CROSSWALKS = (
-    {"id": "teaching-entry-crosswalk", "x": -25.0, "y": -4.6, "axis": "x"},
-    {"id": "cafeteria-entry-crosswalk", "x": 30.0, "y": 3.0, "axis": "x"},
-    {"id": "main-gate-crosswalk", "x": 0.0, "y": -24.5, "axis": "y"},
+CROSSWALKS: tuple[Crosswalk, ...] = (
+    {"id": "teaching-entry-crosswalk", "x": -25.0, "y": -4.6, "axis": "x", "bar_count": 7},
+    {"id": "cafeteria-entry-crosswalk", "x": 30.0, "y": 3.0, "axis": "x", "bar_count": 7},
+    {"id": "main-gate-crosswalk", "x": 0.0, "y": -24.5, "axis": "x", "bar_count": 9},
 )
-ROAD_MARKINGS = {
+ROAD_MARKINGS: RoadMarkings = {
     "centerline_width_m": 0.11,
     "centerline_dash_m": 1.6,
     "centerline_gap_m": 1.1,
@@ -163,56 +227,58 @@ ROAD_MARKINGS = {
     "crosswalk_bar_width_m": 0.34,
     "crosswalk_bar_spacing_m": 0.62,
     "crosswalk_length_m": 3.8,
+    "junction_centerline_inset_m": 0.3,
+    "crosswalk_clearance_m": 0.18,
 }
 
-ROAD_NETWORK = {
+ROAD_NETWORK: RoadNetwork = {
     "facility_anchors": {
-        "campus-gate": [0.0, -43.0],
-        "teaching-building": [-25.0, -1.055],
-        "cafeteria": [30.0, 6.245],
-        "takeout-pickup": [48.5, 1.5],
-        "bicycle-shelter": [-42.0, 35.4],
-        "tree-corridor": [0.0, -18.0],
+        "campus-gate": (0.0, -43.0),
+        "teaching-building": (-25.0, -1.055),
+        "cafeteria": (30.0, 6.245),
+        "takeout-pickup": (48.5, 1.5),
+        "bicycle-shelter": (-42.0, 35.4),
+        "tree-corridor": (0.0, -18.0),
     },
-    "segments": [
-        {"id": "campus-gate-spine", "width_m": 6.4, "points": [[0, -43], [0, -31], [0, -18]]},
+    "segments": (
+        {"id": "campus-gate-spine", "width_m": 6.4, "points": ((0, -43), (0, -31), (0, -18))},
         {
             "id": "campus-east-west-road",
             "width_m": 6.2,
-            "points": [[-51, -18], [-25, -18], [0, -18], [8, -18], [30, -18], [52, -18]],
+            "points": ((-51, -18), (-25, -18), (0, -18), (8, -18), (30, -18), (52, -18)),
         },
         {
             "id": "teaching-entrance-road",
             "width_m": 5.4,
-            "points": [[-25, -18], [-25, -9], [-25, -1.055]],
+            "points": ((-25, -18), (-25, -9), (-25, -1.055)),
         },
         {
             "id": "cafeteria-entrance-road",
             "width_m": 5.4,
-            "points": [[30, -18], [30, -6], [30, 1], [30, 6.245]],
+            "points": ((30, -18), (30, -6), (30, 1), (30, 6.245)),
         },
         {
             "id": "takeout-pickup-road",
             "width_m": 5.2,
-            "points": [[30, -18], [39, -12], [46, -5], [48.5, 1.5]],
+            "points": ((30, -18), (39, -12), (46, -5), (48.5, 1.5)),
         },
         {
             "id": "west-bicycle-service-road",
             "width_m": 4.8,
-            "points": [[-51, -18], [-55.6, -8], [-55.6, 24], [-51, 34], [-42, 35.4]],
+            "points": ((-51, -18), (-55.6, -8), (-55.6, 24), (-51, 34), (-42, 35.4)),
         },
         {
             "id": "campus-courtyard-road",
             "width_m": 4.8,
-            "points": [[8, -18], [8, -5], [8, 10], [8, 27], [8, 35.4], [-15, 35.4], [-42, 35.4]],
+            "points": ((8, -18), (8, -5), (8, 10), (8, 27), (8, 35.4), (-15, 35.4), (-42, 35.4)),
         },
         {
             "id": "north-cafeteria-service-road",
             "width_m": 4.8,
-            "points": [[8, 35.4], [30, 35.4], [45, 35.4], [52, 28], [52, -18]],
+            "points": ((8, 35.4), (30, 35.4), (45, 35.4), (52, 28), (52, -18)),
         },
-    ],
-    "junctions": [
+    ),
+    "junctions": (
         {
             "id": "south-gate-crossroads",
             "x": 0.0,
@@ -249,10 +315,10 @@ ROAD_NETWORK = {
             "diameter_m": 5.4,
             "minimum_degree": 2,
         },
-    ],
+    ),
 }
 
-PEDESTRIAN_PATHS = (
+PEDESTRIAN_PATHS: tuple[RoadSegment, ...] = (
     {"id": "teaching-south-pedestrian-path", "width_m": 2.2, "points": ((-55, -5.2), (5, -5.2))},
     {"id": "teaching-cafeteria-path", "width_m": 3.1, "points": ((8.2, -7), (8.2, 32))},
     {"id": "cafeteria-south-path", "width_m": 2.4, "points": ((10, 3.4), (49, 3.4))},
@@ -476,8 +542,8 @@ def _torus_mtl() -> str:
 def _segment_projection(
     x: float,
     y: float,
-    start: tuple[float, float] | list[float],
-    end: tuple[float, float] | list[float],
+    start: Point2D,
+    end: Point2D,
 ) -> tuple[float, float]:
     delta_x = end[0] - start[0]
     delta_y = end[1] - start[1]
@@ -496,7 +562,7 @@ def _segment_projection(
 def _within_polyline(
     x: float,
     y: float,
-    points: tuple[tuple[float, float], ...] | list[list[float]],
+    points: tuple[Point2D, ...],
     width_m: float,
 ) -> bool:
     return any(
@@ -520,7 +586,26 @@ def _campus_surface_ppm() -> str:
     }
     rows = [f"P3\n{width_px} {height_px}\n255"]
     dash_period = ROAD_MARKINGS["centerline_dash_m"] + ROAD_MARKINGS["centerline_gap_m"]
-    crosswalk_half_count = ROAD_MARKINGS["crosswalk_bar_count"] // 2
+
+    def within_crosswalk_clearance(world_x: float, world_y: float, crosswalk: Crosswalk) -> bool:
+        bar_span_m = (
+            (crosswalk["bar_count"] - 1) * ROAD_MARKINGS["crosswalk_bar_spacing_m"]
+            + ROAD_MARKINGS["crosswalk_bar_width_m"]
+            + 2 * ROAD_MARKINGS["crosswalk_clearance_m"]
+        )
+        long_half_m = (
+            ROAD_MARKINGS["crosswalk_length_m"] / 2 + ROAD_MARKINGS["crosswalk_clearance_m"]
+        )
+        if crosswalk["axis"] == "x":
+            return (
+                abs(world_x - crosswalk["x"]) <= bar_span_m / 2
+                and abs(world_y - crosswalk["y"]) <= long_half_m
+            )
+        return (
+            abs(world_x - crosswalk["x"]) <= long_half_m
+            and abs(world_y - crosswalk["y"]) <= bar_span_m / 2
+        )
+
     for pixel_y in range(height_px):
         world_y = bounds_y_m / 2 - (pixel_y + 0.5) / height_px * bounds_y_m
         row: list[str] = []
@@ -540,7 +625,14 @@ def _campus_surface_ppm() -> str:
                 <= junction["diameter_m"] / 2
                 for junction in ROAD_NETWORK["junctions"]
             )
-            if on_road:
+            centerline_excluded = any(
+                math.hypot(world_x - junction["x"], world_y - junction["y"])
+                <= junction["diameter_m"] / 2 + ROAD_MARKINGS["junction_centerline_inset_m"]
+                for junction in ROAD_NETWORK["junctions"]
+            ) or any(
+                within_crosswalk_clearance(world_x, world_y, crosswalk) for crosswalk in CROSSWALKS
+            )
+            if on_road and not centerline_excluded:
                 color = colors["road"]
             if on_road:
                 for segment in ROAD_NETWORK["segments"]:
@@ -566,7 +658,8 @@ def _campus_surface_ppm() -> str:
                         cumulative_length += math.dist(start, end)
                     if color == colors["centerline"]:
                         break
-            for crosswalk in CROSSWALKS:
+            for crosswalk in CROSSWALKS if on_road else ():
+                crosswalk_half_count = crosswalk["bar_count"] // 2
                 for bar_index in range(-crosswalk_half_count, crosswalk_half_count + 1):
                     along = bar_index * ROAD_MARKINGS["crosswalk_bar_spacing_m"]
                     if crosswalk["axis"] == "x":
@@ -578,8 +671,7 @@ def _campus_surface_ppm() -> str:
                         )
                     else:
                         inside = (
-                            abs(world_x - crosswalk["x"])
-                            <= ROAD_MARKINGS["crosswalk_length_m"] / 2
+                            abs(world_x - crosswalk["x"]) <= ROAD_MARKINGS["crosswalk_length_m"] / 2
                             and abs(world_y - (crosswalk["y"] + along))
                             <= ROAD_MARKINGS["crosswalk_bar_width_m"] / 2
                         )
@@ -610,15 +702,23 @@ def school_map_stair_route_points(
     start_y = 10.5 - run / 2
     end_y = 10.5 + run / 2
     route_inset_m = 0.04
-    flight_clearance_m = 0.6
-    lower_approach_y = (
-        start_y - VEHICLE_COLLISION_DIAMETER_M / 2 - STAIR_HANDRAIL_RADIUS_M - 0.05
-    )
+    flight_clearance_m = STAIR_ROUTE_CENTER_ABOVE_TREAD_M
+    upper_landing_turn_y = start_y - STAIR_LANDING_M / 2
+    middle_landing_turn_y = end_y + STAIR_LANDING_M / 2
+    lower_approach_y = start_y - VEHICLE_COLLISION_DIAMETER_M / 2 - STAIR_HANDRAIL_RADIUS_M - 0.05
     ascending: list[tuple[float, float, float]] = []
     for storey in (1, 2):
         lower_z = (storey - 1) * STOREY_HEIGHT_M + FLOOR_SLAB_M
         middle_z = lower_z + half_rise
         upper_z = lower_z + STOREY_HEIGHT_M
+        if storey == 1:
+            ascending.append(
+                (
+                    -0.1 - lane_offset,
+                    upper_landing_turn_y,
+                    lower_z + flight_clearance_m,
+                )
+            )
         ascending.extend(
             (
                 (
@@ -636,7 +736,16 @@ def school_map_stair_route_points(
                     end_y - route_inset_m,
                     middle_z + flight_clearance_m,
                 ),
-                (-0.1, end_y + STAIR_LANDING_M / 2, middle_z + flight_clearance_m),
+                (
+                    -0.1 - lane_offset,
+                    middle_landing_turn_y,
+                    middle_z + flight_clearance_m,
+                ),
+                (
+                    -0.1 + lane_offset,
+                    middle_landing_turn_y,
+                    middle_z + flight_clearance_m,
+                ),
                 (
                     -0.1 + lane_offset,
                     end_y - route_inset_m,
@@ -647,7 +756,16 @@ def school_map_stair_route_points(
                     start_y + route_inset_m,
                     upper_z + flight_clearance_m,
                 ),
-                (-0.1, start_y - STAIR_LANDING_M / 2, upper_z + flight_clearance_m),
+                (
+                    -0.1 + lane_offset,
+                    upper_landing_turn_y,
+                    upper_z + flight_clearance_m,
+                ),
+                (
+                    -0.1 - lane_offset,
+                    upper_landing_turn_y,
+                    upper_z + flight_clearance_m,
+                ),
             )
         )
     return ascending if direction == "ascending" else list(reversed(ascending))
@@ -890,13 +1008,9 @@ def _teaching_room_primitives() -> list[BoxPrimitive]:
             office = floor == 3 and room_index == 1
             east_stair_room = room_index == 4
             prefix = "office" if office else f"classroom-{floor}-{room_index}"
-            half_width_m = (
-                EAST_STAIR_ROOM_HALF_WIDTH_M if east_stair_room else ROOM_HALF_WIDTH_M
-            )
+            half_width_m = EAST_STAIR_ROOM_HALF_WIDTH_M if east_stair_room else ROOM_HALF_WIDTH_M
             window_offsets_x_m = (
-                EAST_STAIR_ROOM_WINDOW_OFFSETS_X_M
-                if east_stair_room
-                else ROOM_WINDOW_OFFSETS_X_M
+                EAST_STAIR_ROOM_WINDOW_OFFSETS_X_M if east_stair_room else ROOM_WINDOW_OFFSETS_X_M
             )
             inner_min_x = center_x - half_width_m + ROOM_WALL_THICKNESS_M / 2
             inner_max_x = center_x + half_width_m - ROOM_WALL_THICKNESS_M / 2
@@ -970,9 +1084,7 @@ def _teaching_room_primitives() -> list[BoxPrimitive]:
                     window_offsets_x_m,
                 )
             )
-            result.extend(
-                _room_door_primitives(prefix, door_center_x, floor, open_door=office)
-            )
+            result.extend(_room_door_primitives(prefix, door_center_x, floor, open_door=office))
     return result
 
 
@@ -1057,9 +1169,7 @@ def _teaching_floor_primitives() -> list[BoxPrimitive]:
                     (
                         pilaster_x,
                         24.17,
-                        (floor - 1) * STOREY_HEIGHT_M
-                        + FLOOR_SLAB_M
-                        + facade_pilaster_height / 2,
+                        (floor - 1) * STOREY_HEIGHT_M + FLOOR_SLAB_M + facade_pilaster_height / 2,
                     ),
                     (0.28, 0.12, facade_pilaster_height),
                     "facade-structure",
@@ -1306,7 +1416,11 @@ def _switchback_stair_primitives(
             result.append(
                 _cylinder(
                     f"{prefix}-stair-{storey}-rail-a-{side_index}",
-                    tuple((start[axis] + end[axis]) / 2 for axis in range(3)),
+                    (
+                        (start[0] + end[0]) / 2,
+                        (start[1] + end[1]) / 2,
+                        (start[2] + end[2]) / 2,
+                    ),
                     handrail_radius,
                     length,
                     "stair-handrail",
@@ -1328,7 +1442,11 @@ def _switchback_stair_primitives(
             result.append(
                 _cylinder(
                     f"{prefix}-stair-{storey}-rail-b-{side_index}",
-                    tuple((start[axis] + end[axis]) / 2 for axis in range(3)),
+                    (
+                        (start[0] + end[0]) / 2,
+                        (start[1] + end[1]) / 2,
+                        (start[2] + end[2]) / 2,
+                    ),
                     handrail_radius,
                     length,
                     "stair-handrail",
@@ -2046,11 +2164,9 @@ def _training_gate_primitives() -> list[CollisionPrimitive]:
             (
                 gate_x,
                 TRAINING_GATE_ROUTE_Y
-                + radius_m
-                * math.cos(2 * math.pi * point_index / TRAINING_GATE_SEGMENT_COUNT),
+                + radius_m * math.cos(2 * math.pi * point_index / TRAINING_GATE_SEGMENT_COUNT),
                 gate_z
-                + radius_m
-                * math.sin(2 * math.pi * point_index / TRAINING_GATE_SEGMENT_COUNT),
+                + radius_m * math.sin(2 * math.pi * point_index / TRAINING_GATE_SEGMENT_COUNT),
             )
             for point_index in range(TRAINING_GATE_SEGMENT_COUNT)
         ]
@@ -2095,10 +2211,13 @@ def _training_gate_primitives() -> list[CollisionPrimitive]:
 
 def _street_light_primitives() -> list[CollisionPrimitive]:
     lights: list[tuple[str, float, float, float]] = []
-    for index, light_x in enumerate((-50, -40, -30, -15, -5, 15, 25, 40, 50), start=1):
+    for index, light_x in enumerate(
+        (-50.0, -40.0, -30.0, -15.0, -5.0, 15.0, 25.0, 40.0, 50.0),
+        start=1,
+    ):
         lights.append((f"street-light-south-{index}", light_x, -14.4, 0.0))
         lights.append((f"street-light-north-{index}", light_x, -21.6, math.pi))
-    courtyard_lights = ((4.8, -4), (11.2, 8), (4.8, 21), (11.2, 31))
+    courtyard_lights: tuple[Point2D, ...] = ((4.8, -4), (11.2, 8), (4.8, 21), (11.2, 31))
     for index, (light_x, light_y) in enumerate(courtyard_lights, start=1):
         lights.append(
             (
@@ -2265,9 +2384,12 @@ def school_map_collision_primitives() -> list[CollisionPrimitive]:
     return primitives
 
 
-def _sdf_for(primitives: list[CollisionPrimitive]) -> str:
-    sdf = ElementTree.Element("sdf", {"version": "1.9"})
-    model = ElementTree.SubElement(sdf, "model", {"name": "school_map"})
+def _model_for(
+    primitives: list[CollisionPrimitive],
+    *,
+    include_visuals: bool,
+) -> ElementTree.Element:
+    model = ElementTree.Element("model", {"name": "school_map"})
     ElementTree.SubElement(model, "static").text = "true"
     link = ElementTree.SubElement(model, "link", {"name": "school-map-static-geometry"})
     ElementTree.SubElement(link, "self_collide").text = "false"
@@ -2287,13 +2409,13 @@ def _sdf_for(primitives: list[CollisionPrimitive]) -> str:
         "training-gate-ring": "0.4 0.24 0.85 1",
     }
     for primitive in primitives:
-        element_names = (
-            ("visual",)
-            if isinstance(primitive, MeshPrimitive)
-            else ("collision",)
-            if isinstance(primitive, CapsulePrimitive)
-            else ("collision", "visual")
-        )
+        element_names: tuple[str, ...]
+        if isinstance(primitive, MeshPrimitive):
+            element_names = ("visual",) if include_visuals else ()
+        elif isinstance(primitive, CapsulePrimitive) or not include_visuals:
+            element_names = ("collision",)
+        else:
+            element_names = ("collision", "visual")
         for element_name in element_names:
             element = ElementTree.SubElement(
                 link,
@@ -2307,9 +2429,9 @@ def _sdf_for(primitives: list[CollisionPrimitive]) -> str:
             geometry = ElementTree.SubElement(element, "geometry")
             if isinstance(primitive, BoxPrimitive):
                 box = ElementTree.SubElement(geometry, "box")
-                ElementTree.SubElement(box, "size").text = (
-                    f"{primitive.size_x:g} {primitive.size_y:g} {primitive.size_z:g}"
-                )
+                ElementTree.SubElement(
+                    box, "size"
+                ).text = f"{primitive.size_x:g} {primitive.size_y:g} {primitive.size_z:g}"
             elif isinstance(primitive, CylinderPrimitive):
                 cylinder = ElementTree.SubElement(geometry, "cylinder")
                 ElementTree.SubElement(cylinder, "radius").text = f"{primitive.radius_m:g}"
@@ -2324,9 +2446,9 @@ def _sdf_for(primitives: list[CollisionPrimitive]) -> str:
             else:
                 mesh = ElementTree.SubElement(geometry, "mesh")
                 ElementTree.SubElement(mesh, "uri").text = primitive.uri
-                ElementTree.SubElement(mesh, "scale").text = (
-                    f"{primitive.scale_x:g} {primitive.scale_y:g} {primitive.scale_z:g}"
-                )
+                ElementTree.SubElement(
+                    mesh, "scale"
+                ).text = f"{primitive.scale_x:g} {primitive.scale_y:g} {primitive.scale_z:g}"
             if element_name == "visual":
                 material = ElementTree.SubElement(element, "material")
                 color = semantic_colors.get(primitive.semantic, "0.56 0.55 0.58 1")
@@ -2338,52 +2460,69 @@ def _sdf_for(primitives: list[CollisionPrimitive]) -> str:
                 if primitive.name == "school-map-ground":
                     pbr = ElementTree.SubElement(material, "pbr")
                     metal = ElementTree.SubElement(pbr, "metal")
-                    ElementTree.SubElement(metal, "albedo_map").text = (
-                        "materials/textures/campus-surface.ppm"
-                    )
+                    ElementTree.SubElement(
+                        metal, "albedo_map"
+                    ).text = "materials/textures/campus-surface.ppm"
                     ElementTree.SubElement(metal, "roughness").text = "0.94"
                     ElementTree.SubElement(metal, "metalness").text = "0"
     ElementTree.SubElement(link, "enable_wind").text = "false"
+    return model
+
+
+def _sdf_for(model: ElementTree.Element) -> str:
+    sdf = ElementTree.Element("sdf", {"version": "1.9"})
+    sdf.append(deepcopy(model))
     return ElementTree.tostring(sdf, encoding="unicode", xml_declaration=False)
 
 
 def _model_config() -> str:
     return (
-        "<?xml version=\"1.0\"?>\n"
+        '<?xml version="1.0"?>\n'
         "<model>\n"
         "  <name>School Map</name>\n"
         "  <version>1.0.0</version>\n"
-        "  <sdf version=\"1.9\">model.sdf</sdf>\n"
+        '  <sdf version="1.9">model.sdf</sdf>\n'
         "  <author><name>DroneDream</name></author>\n"
         "  <description>Content-addressed School Map static simulation asset.</description>\n"
         "</model>\n"
     )
 
 
-def _world_sdf(model_sdf: str) -> str:
-    model = ElementTree.fromstring(model_sdf).find("./model")
-    if model is None:
-        raise ValueError("School Map model.sdf has no model element")
+def _world_sdf(model: ElementTree.Element) -> str:
     sdf = ElementTree.Element("sdf", {"version": "1.9"})
     world = ElementTree.SubElement(sdf, "world", {"name": "school_map_world"})
     ElementTree.SubElement(world, "gravity").text = "0 0 -9.80665"
+    ElementTree.SubElement(world, "magnetic_field").text = "6e-06 2.3e-05 -4.2e-05"
+    ElementTree.SubElement(world, "atmosphere", {"type": "adiabatic"})
     physics = ElementTree.SubElement(
         world,
         "physics",
-        {"name": "school-map-physics", "type": "ignored"},
+        {"name": "school-map-physics", "type": "ode"},
     )
-    ElementTree.SubElement(physics, "max_step_size").text = "0.001"
+    # Four milliseconds keeps the PX4 control clock real-time qualified on the
+    # bundled WSL runtime. Designated landing contact has its own measured
+    # solver tolerance; every School Map interface remains geometrically exact.
+    ElementTree.SubElement(physics, "max_step_size").text = "0.004"
     ElementTree.SubElement(physics, "real_time_factor").text = "1"
+    ElementTree.SubElement(physics, "real_time_update_rate").text = "250"
     scene = ElementTree.SubElement(world, "scene")
-    ElementTree.SubElement(scene, "ambient").text = "0.45 0.45 0.45 1"
-    ElementTree.SubElement(scene, "background").text = "0.72 0.82 0.92 1"
+    ElementTree.SubElement(scene, "grid").text = "false"
+    ElementTree.SubElement(scene, "ambient").text = "0.42 0.44 0.48 1"
+    ElementTree.SubElement(scene, "background").text = "0.72 0.81 0.9 1"
+    ElementTree.SubElement(scene, "shadows").text = "true"
+    spherical = ElementTree.SubElement(world, "spherical_coordinates")
+    ElementTree.SubElement(spherical, "surface_model").text = "EARTH_WGS84"
+    ElementTree.SubElement(spherical, "world_frame_orientation").text = "ENU"
+    ElementTree.SubElement(spherical, "latitude_deg").text = "30.27415"
+    ElementTree.SubElement(spherical, "longitude_deg").text = "120.15515"
+    ElementTree.SubElement(spherical, "elevation").text = "12"
     sun = ElementTree.SubElement(world, "light", {"type": "directional", "name": "sun"})
     ElementTree.SubElement(sun, "cast_shadows").text = "true"
     ElementTree.SubElement(sun, "pose").text = "0 0 20 0 0 0"
     ElementTree.SubElement(sun, "diffuse").text = "0.9 0.88 0.82 1"
     ElementTree.SubElement(sun, "specular").text = "0.2 0.2 0.2 1"
     ElementTree.SubElement(sun, "direction").text = "-0.45 0.35 -0.82"
-    world.append(model)
+    world.append(deepcopy(model))
     return ElementTree.tostring(sdf, encoding="unicode", xml_declaration=False)
 
 
@@ -2407,12 +2546,16 @@ This package is generated from the content-addressed DroneDream School Map geome
 ```sh
 gz sdf -k model.sdf
 gz sdf -k world.sdf
+gz sdf -k model.physics.sdf
+gz sdf -k world.physics.sdf
 gz sim -r world.sdf
 ```
 
 `world.sdf` embeds the static map model and resolves the relative `meshes/` and `materials/`
 assets from this directory. `model.config` also allows the directory to be installed as a
-Gazebo model package.
+Gazebo model package. `world.physics.sdf` contains the exact same collision primitives without
+render visuals for deterministic headless PX4 qualification; the visible desktop run uses
+`world.sdf`.
 
 ## ROS 2 bridge
 
@@ -2449,27 +2592,62 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "riser_m": STAIR_RISER_M,
             "tread_m": STAIR_TREAD_M,
             "storey_height_m": STOREY_HEIGHT_M,
+            "route_center_above_tread_m": STAIR_ROUTE_CENTER_ABOVE_TREAD_M,
         },
         "vehicle_clearance": {
             "collision_diameter_m": VEHICLE_COLLISION_DIAMETER_M,
             "collision_height_m": VEHICLE_COLLISION_HEIGHT_M,
+            "collision_center_above_contact_m": VEHICLE_COLLISION_CENTER_ABOVE_CONTACT_M,
+            "px4_x500_model_root_to_contact_m": PX4_X500_MODEL_ROOT_TO_CONTACT_M,
             "minimum_road_width_m": 4.8,
             "minimum_indoor_width_m": 1.6,
             "minimum_open_door_clearance_m": TEACHING_OPEN_DOOR_CLEARANCE_M,
+            "gazebo_vehicle_model": MY_DRONE_MODEL_NAME,
+            "dry_mass_kg": PX4_X500_DRY_MASS_KG,
+            "maximum_thrust_n": PX4_X500_MAXIMUM_THRUST_N,
+            "minimum_qualified_thrust_to_weight": (PX4_X500_MINIMUM_QUALIFIED_THRUST_TO_WEIGHT),
+            "mission_payload_mass_kg": TAKEOUT_PAYLOAD_MASS_KG,
+            "loaded_thrust_to_weight": px4_x500_loaded_thrust_to_weight(TAKEOUT_PAYLOAD_MASS_KG),
         },
         "simulation_bindings": {
             "gazebo_world_file": "world.sdf",
+            "gazebo_headless_physics_world_file": "world.physics.sdf",
             "gazebo_model_file": "model.sdf",
+            "gazebo_headless_physics_model_file": "model.physics.sdf",
             "gazebo_model_name": "school_map",
             "ros_gz_bridge_config": "ros_gz_bridge.yaml",
+            "px4_gz_bridge_axis_mapping": {
+                "gazebo_x_school_map_east": "px4_local_east_executor_y",
+                "gazebo_y_school_map_north": "px4_local_north_executor_x",
+                "gazebo_z_school_map_up": "negative_px4_local_down_executor_z_up",
+            },
             "px4_recommended_spawn": {
                 "x": -42.25,
                 "y": 15.3,
-                "z": 7.5 + VEHICLE_COLLISION_HEIGHT_M / 2,
+                "z": 7.5 - PX4_X500_MODEL_ROOT_TO_CONTACT_M,
                 "yaw_rad": math.pi,
                 "surface": "office-drone-launch-pad",
+                "pose_reference": "px4-x500-model-root",
+                "contact_surface_offset_z": PX4_X500_MODEL_ROOT_TO_CONTACT_M,
+            },
+            "mission_waypoint_reference": "vehicle-collision-envelope-center",
+            "vehicle_collision_center_offset": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": PX4_X500_COLLISION_CENTER_ABOVE_MODEL_ROOT_M,
             },
             "mission_launch_waypoint": {"x": -42.25, "y": 15.3, "z": 8.15},
+            "mission_pickup_waypoint": {
+                "x": PICKUP_ROUTE_CENTER[0],
+                "y": PICKUP_ROUTE_CENTER[1],
+                "z": PICKUP_ROUTE_ENVELOPE_CENTER_Z_M,
+            },
+            "takeout_payload": {
+                "mass_kg": TAKEOUT_PAYLOAD_MASS_KG,
+                "size_m": TAKEOUT_PAYLOAD_SIZE_M,
+                "center_above_px4_model_root_m": (TAKEOUT_PAYLOAD_CENTER_ABOVE_MODEL_ROOT_M),
+                "attachment": "gazebo-detachable-fixed-joint",
+            },
         },
         "training_gate_collision": {
             "visual_geometry": "closed-manifold-torus-mesh",
@@ -2488,9 +2666,7 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             if not isinstance(primitive, MeshPrimitive)
         ],
         "visual_only_primitives": [
-            primitive.__dict__
-            for primitive in primitives
-            if isinstance(primitive, MeshPrimitive)
+            primitive.__dict__ for primitive in primitives if isinstance(primitive, MeshPrimitive)
         ],
         "geometry_scope": [
             "terrain",
@@ -2535,8 +2711,12 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         },
     }
     semantic_json = json.dumps(semantic, sort_keys=True, separators=(",", ":"))
-    model_sdf = _sdf_for(primitives)
-    world_sdf = _world_sdf(model_sdf)
+    model = _model_for(primitives, include_visuals=True)
+    physics_model = _model_for(primitives, include_visuals=False)
+    model_sdf = _sdf_for(model)
+    physics_model_sdf = _sdf_for(physics_model)
+    world_sdf = _world_sdf(model)
+    physics_world_sdf = _world_sdf(physics_model)
     model_config = _model_config()
     mesh_files = {
         f"meshes/training-gate-{index}.obj": _torus_obj(radius_m, TRAINING_GATE_TUBE_RADIUS_M)
@@ -2546,8 +2726,10 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
     mesh_files["materials/textures/campus-surface.ppm"] = _campus_surface_ppm()
     package_files = {
         "model.sdf": model_sdf,
+        "model.physics.sdf": physics_model_sdf,
         "model.config": model_config,
         "world.sdf": world_sdf,
+        "world.physics.sdf": physics_world_sdf,
         "README.md": _runtime_readme(),
         "ros_gz_bridge.yaml": _ros_gz_bridge_yaml(),
         "semantic.json": semantic_json,
@@ -2569,6 +2751,8 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         "model_sdf_sha256": sdf_sha,
         "semantic_sha256": semantic_sha,
         "world_sdf_sha256": package_hashes["world.sdf"],
+        "physics_world_sdf_sha256": package_hashes["world.physics.sdf"],
+        "physics_model_sdf_sha256": package_hashes["model.physics.sdf"],
         "model_config_sha256": package_hashes["model.config"],
         "package_file_sha256": package_hashes,
         "package_manifest_sha256": package_manifest_sha,

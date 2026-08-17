@@ -14,6 +14,29 @@ export type AutonomyPlannerArtifactStatus =
   | "draft"
   | "blocked";
 
+export type AutonomyPlannerAction =
+  | "resolve"
+  | "takeoff"
+  | "navigate"
+  | "traverse"
+  | "pickup"
+  | "inspect"
+  | "return"
+  | "land"
+  | "abort";
+
+export interface AutonomyPlannerTaskNode {
+  node_id: string;
+  action: AutonomyPlannerAction;
+  target: string;
+  depends_on: string[];
+  success_evidence: string[];
+}
+
+export interface AutonomyPlannerTaskGraph {
+  nodes: AutonomyPlannerTaskNode[];
+}
+
 export interface AutonomyPlannerArtifact {
   schema_version: "dronedream.autonomy.planner-response.v1";
   status: AutonomyPlannerArtifactStatus;
@@ -26,7 +49,7 @@ export interface AutonomyPlannerArtifact {
     context_sha256: string;
   };
   grounded_entities: Array<Record<string, unknown>>;
-  task_graph: Record<string, unknown>;
+  task_graph: AutonomyPlannerTaskGraph;
   tool_requests: Array<Record<string, unknown>>;
   tool_receipts: Array<Record<string, unknown>>;
   assumptions: string[];
@@ -69,7 +92,7 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-async function sha256(value: unknown): Promise<string> {
+export async function autonomyCanonicalSha256(value: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(canonicalJson(value));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)]
@@ -188,7 +211,7 @@ export async function localAutonomyHarnessInspection(
     schema_version: "dronedream.autonomy.harness-context.v1",
     prompt_version: "dronedream.autonomy.system.v1",
     tool_registry_version: "dronedream.autonomy.tools.v1",
-    context_sha256: await sha256({ request, blockers }),
+    context_sha256: await autonomyCanonicalSha256({ request, blockers }),
     status: planningReady ? "draft" : "needs_assets",
     planning_ready: planningReady,
     blockers,
@@ -264,7 +287,7 @@ export function parseAutonomyPlannerArtifact(value: unknown): AutonomyPlannerArt
     || !Array.isArray(artifact.tool_receipts)
     || !Array.isArray(artifact.assumptions)
     || !Array.isArray(artifact.blockers)
-    || !artifact.task_graph
+    || !validPlannerTaskGraph(artifact.task_graph, artifact.status === "draft")
   ) return null;
   const bindings = artifact.asset_bindings;
   if (
@@ -292,6 +315,128 @@ export function parseAutonomyPlannerArtifact(value: unknown): AutonomyPlannerArt
       && typeof artifact.repair.stop_reason !== "string")
   ) return null;
   return artifact as AutonomyPlannerArtifact;
+}
+
+const PLANNER_ACTIONS = new Set<AutonomyPlannerAction>([
+  "resolve",
+  "takeoff",
+  "navigate",
+  "traverse",
+  "pickup",
+  "inspect",
+  "return",
+  "land",
+  "abort",
+]);
+
+function validPlannerTaskGraph(value: unknown, requireNodes: boolean): value is AutonomyPlannerTaskGraph {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const graph = value as Partial<AutonomyPlannerTaskGraph>;
+  if (!Array.isArray(graph.nodes) || graph.nodes.length > 64) return false;
+  if (requireNodes && graph.nodes.length === 0) return false;
+  const identifiers = new Set<string>();
+  for (const node of graph.nodes) {
+    if (
+      !node
+      || typeof node !== "object"
+      || Array.isArray(node)
+      || Object.keys(node).sort().join("\0")
+        !== "action\0depends_on\0node_id\0success_evidence\0target"
+      || typeof node.node_id !== "string"
+      || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(node.node_id)
+      || identifiers.has(node.node_id)
+      || typeof node.action !== "string"
+      || !PLANNER_ACTIONS.has(node.action as AutonomyPlannerAction)
+      || typeof node.target !== "string"
+      || node.target.trim().length === 0
+      || node.target.length > 160
+      || !Array.isArray(node.depends_on)
+      || node.depends_on.length > 16
+      || node.depends_on.some((dependency) => (
+        typeof dependency !== "string"
+        || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(dependency)
+      ))
+      || new Set(node.depends_on).size !== node.depends_on.length
+      || !Array.isArray(node.success_evidence)
+      || node.success_evidence.length < 1
+      || node.success_evidence.length > 16
+      || node.success_evidence.some((evidence) => (
+        typeof evidence !== "string" || !evidence.trim() || evidence.length > 120
+      ))
+    ) return false;
+    identifiers.add(node.node_id);
+  }
+  if (graph.nodes.some((node) => node.depends_on.some((dependency) => !identifiers.has(dependency)))) {
+    return false;
+  }
+  const remaining = new Map(graph.nodes.map((node) => [node.node_id, new Set(node.depends_on)]));
+  while (remaining.size > 0) {
+    const roots = [...remaining.entries()]
+      .filter(([, dependencies]) => dependencies.size === 0)
+      .map(([nodeId]) => nodeId);
+    if (roots.length === 0) return false;
+    roots.forEach((nodeId) => remaining.delete(nodeId));
+    remaining.forEach((dependencies) => roots.forEach((nodeId) => dependencies.delete(nodeId)));
+  }
+  return true;
+}
+
+export function autonomyPlannerBindingIssues(
+  artifact: AutonomyPlannerArtifact,
+  request: AutonomyHarnessInspectRequest,
+  inspection: AutonomyHarnessInspectResponse,
+): string[] {
+  const issues: string[] = [];
+  if (artifact.status !== "draft") issues.push(`planner.status.${artifact.status}`);
+  if (artifact.asset_bindings.aircraft_id !== request.aircraft.asset_id) {
+    issues.push("planner.aircraft-id.mismatch");
+  }
+  if (artifact.asset_bindings.aircraft_version !== request.aircraft.version) {
+    issues.push("planner.aircraft-version.mismatch");
+  }
+  if (artifact.asset_bindings.map_id !== request.map_pack.asset_id) {
+    issues.push("planner.map-id.mismatch");
+  }
+  if (artifact.asset_bindings.map_version !== request.map_pack.version) {
+    issues.push("planner.map-version.mismatch");
+  }
+  if (artifact.asset_bindings.context_sha256 !== inspection.context_sha256) {
+    issues.push("planner.context-hash.mismatch");
+  }
+  const actions = new Set(artifact.task_graph.nodes.map((node) => node.action));
+  if (!actions.has("takeoff")) issues.push("planner.task-graph.takeoff-missing");
+  if (!actions.has("land")) issues.push("planner.task-graph.land-missing");
+  const pickupRequested = /pickup|takeout|collect|retrieve|取物|取餐|外卖/iu
+    .test(request.natural_language);
+  const returnRequested = /return|come back|返航|返回|回来/iu
+    .test(request.natural_language);
+  if (pickupRequested && !actions.has("pickup")) {
+    issues.push("planner.task-graph.pickup-missing");
+  }
+  if (returnRequested && !actions.has("return")) {
+    issues.push("planner.task-graph.return-missing");
+  }
+  if (
+    pickupRequested
+    && returnRequested
+    && request.aircraft.asset_id === "aircraft-my-drone"
+    && request.map_pack.asset_id === "map-school"
+  ) {
+    const canonicalTargets = new Set([
+      "takeoff:office-drone-launch-pad",
+      "pickup:takeout-pickup",
+      "return:office-drone-launch-pad",
+      "land:office-drone-launch-pad",
+    ]);
+    const boundTargets = new Set(
+      artifact.task_graph.nodes.map((node) => `${node.action}:${node.target}`),
+    );
+    canonicalTargets.forEach((binding) => {
+      if (!boundTargets.has(binding)) issues.push(`planner.route-target.missing.${binding}`);
+    });
+  }
+  if (artifact.blockers.length > 0) issues.push("planner.blockers.present");
+  return issues;
 }
 
 export function autonomyAssetBlockerMessage(

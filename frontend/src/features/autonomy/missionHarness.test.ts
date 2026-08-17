@@ -8,6 +8,7 @@ import { SCHOOL_MAP_CONTRACT, SCHOOL_MAP_ROAD_NETWORK, SCHOOL_MAP_ROUTES } from 
 import {
   SCHOOL_MAP_GEOMETRY,
   schoolMapStairDimensions,
+  schoolMapStairRoutePoints,
   schoolMapTeachingOpenDoorCenterX,
   validateSchoolMapGeometryContract,
 } from "./schoolMapGeometryContract";
@@ -16,6 +17,7 @@ import {
   autonomyHarnessRequest,
   localAutonomyHarnessInspection,
   parseAutonomyPlannerArtifact,
+  autonomyPlannerBindingIssues,
 } from "./missionHarness";
 
 describe("autonomy mission harness", () => {
@@ -166,11 +168,30 @@ describe("autonomy mission harness", () => {
         + SCHOOL_MAP_GEOMETRY.stair.handrailRadiusM * 4,
       6,
     );
+    expect(SCHOOL_MAP_GEOMETRY.stair.routeCenterAboveTreadM).toBe(0.85);
+    const ascendingStairs = schoolMapStairRoutePoints("ascending");
+    for (const [start, end] of [
+      [[-1.12, 2.87, 12.98], [0.92, 2.87, 12.98]],
+      [[0.92, 4.67, 8.02], [-1.12, 4.67, 8.02]],
+      [[-1.12, 6.47, 12.98], [0.92, 6.47, 12.98]],
+      [[0.92, 8.27, 8.02], [-1.12, 8.27, 8.02]],
+    ] as const) {
+      const startIndex = ascendingStairs.findIndex((point) => point.every((value, index) => (
+        Math.abs(value - start[index]) < 1e-9
+      )));
+      expect(startIndex).toBeGreaterThanOrEqual(0);
+      expect(ascendingStairs[startIndex + 1]).toEqual(end);
+    }
     expect(SCHOOL_MAP_GEOMETRY.vehicle.minimumIndoorClearWidthM)
       .toBeGreaterThan(SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM);
     expect(MY_DRONE_CONTRACT.collisionEnvelopeM.x).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM);
     expect(MY_DRONE_CONTRACT.collisionEnvelopeM.z).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM);
     expect(MY_DRONE_CONTRACT.collisionEnvelopeM.y).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionHeightM);
+    expect(MY_DRONE_CONTRACT.px4ModelRootToContactPlaneM.up)
+      .toBe(SCHOOL_MAP_GEOMETRY.vehicle.px4X500ModelRootToContactM);
+    expect(MY_DRONE_CONTRACT.px4ModelRootToCollisionCenterM.up)
+      .toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionCenterAboveContactM
+        + SCHOOL_MAP_GEOMETRY.vehicle.px4X500ModelRootToContactM);
   });
 
   it("routes teaching-building missions through the open west door pair", () => {
@@ -221,13 +242,12 @@ describe("autonomy mission harness", () => {
     ]);
   });
 
-  it("publishes My Drone sensor mounts in the Vehicle Pack body frame", () => {
+  it("publishes only the GPS mount present in the qualified PX4 Gazebo vehicle", () => {
     const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
     const mounts = Object.fromEntries(workspace.aircraft.sensorMounts.map((mount) => [mount.id, mount]));
 
-    expect(mounts["front-rgb"].positionM).toEqual({ x: 0.155, y: 0, z: -0.055 });
-    expect(mounts["front-depth"].positionM).toEqual({ x: 0.155, y: 0, z: -0.055 });
-    expect(mounts["vio-primary"].positionM).toEqual({ x: 0.155, y: 0, z: -0.055 });
+    expect(workspace.aircraft.sensors).toEqual(["gps"]);
+    expect(Object.keys(mounts)).toEqual(["gps-primary"]);
     expect(mounts["gps-primary"].positionM).toEqual({ x: -0.07, y: 0, z: 0.2 });
   });
 
@@ -369,7 +389,14 @@ describe("autonomy mission harness", () => {
         context_sha256: "b".repeat(64),
       },
       grounded_entities: [],
-      task_graph: {},
+      task_graph: {
+        nodes: [
+          { node_id: "takeoff", action: "takeoff", target: "office-drone-launch-pad", depends_on: [], success_evidence: ["airborne telemetry"] },
+          { node_id: "pickup", action: "pickup", target: "takeout-pickup", depends_on: ["takeoff"], success_evidence: ["payload attached"] },
+          { node_id: "return", action: "return", target: "office-drone-launch-pad", depends_on: ["pickup"], success_evidence: ["office return reached"] },
+          { node_id: "land", action: "land", target: "office-drone-launch-pad", depends_on: ["return"], success_evidence: ["landed telemetry"] },
+        ],
+      },
       tool_requests: [],
       tool_receipts: [],
       assumptions: [],
@@ -396,5 +423,81 @@ describe("autonomy mission harness", () => {
       ...valid,
       repair: { ...valid.repair, max_attempts: 99 },
     })).toBeNull();
+    expect(parseAutonomyPlannerArtifact({
+      ...valid,
+      task_graph: { nodes: [] },
+    })).toBeNull();
+    expect(parseAutonomyPlannerArtifact({
+      ...valid,
+      task_graph: {
+        nodes: valid.task_graph.nodes.map((node) => ({
+          ...node,
+          depends_on: [node.node_id],
+        })),
+      },
+    })).toBeNull();
+    expect(parseAutonomyPlannerArtifact({
+      ...valid,
+      task_graph: {
+        nodes: valid.task_graph.nodes.map((node) => (
+          node.node_id === "pickup"
+            ? { ...node, depends_on: ["takeoff", "takeoff"] }
+            : node
+        )),
+      },
+    })).toBeNull();
+  });
+
+  it("fails closed when a planner draft changes an inspected asset binding", async () => {
+    const workspace = defaultAutonomyWorkspace(new Date("2026-08-18T00:00:00.000Z"));
+    const request = autonomyHarnessRequest("sim", workspace, "Retrieve the parcel and return.");
+    const inspection = await localAutonomyHarnessInspection(request);
+    const artifact = parseAutonomyPlannerArtifact({
+      schema_version: "dronedream.autonomy.planner-response.v1",
+      status: "draft",
+      goal: "Retrieve the parcel and return.",
+      asset_bindings: {
+        aircraft_id: request.aircraft.asset_id,
+        aircraft_version: request.aircraft.version,
+        map_id: request.map_pack.asset_id,
+        map_version: request.map_pack.version,
+        context_sha256: inspection.context_sha256,
+      },
+      grounded_entities: [],
+      task_graph: {
+        nodes: [
+          { node_id: "takeoff", action: "takeoff", target: "office-drone-launch-pad", depends_on: [], success_evidence: ["airborne telemetry"] },
+          { node_id: "pickup", action: "pickup", target: "takeout-pickup", depends_on: ["takeoff"], success_evidence: ["payload attached"] },
+          { node_id: "return", action: "return", target: "office-drone-launch-pad", depends_on: ["pickup"], success_evidence: ["office return reached"] },
+          { node_id: "land", action: "land", target: "office-drone-launch-pad", depends_on: ["return"], success_evidence: ["landed telemetry"] },
+        ],
+      },
+      tool_requests: [],
+      tool_receipts: [],
+      assumptions: [],
+      blockers: [],
+      repair: { attempt: 0, max_attempts: 3, repeated_plan_hashes: 0, stop_reason: null },
+      safety_policy: {
+        actuator_authority: false,
+        may_relax_constraints: false,
+        execution_requires_deterministic_validation: true,
+      },
+    });
+    expect(artifact).not.toBeNull();
+    expect(autonomyPlannerBindingIssues(artifact!, request, inspection)).toEqual([]);
+    expect(autonomyPlannerBindingIssues({
+      ...artifact!,
+      asset_bindings: { ...artifact!.asset_bindings, map_version: request.map_pack.version + 1 },
+    }, request, inspection)).toContain("planner.map-version.mismatch");
+    expect(autonomyPlannerBindingIssues({
+      ...artifact!,
+      task_graph: {
+        nodes: artifact!.task_graph.nodes.map((node) => (
+          node.action === "pickup" ? { ...node, target: "cafeteria-counter" } : node
+        )),
+      },
+    }, request, inspection)).toContain(
+      "planner.route-target.missing.pickup:takeout-pickup",
+    );
   });
 });
