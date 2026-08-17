@@ -97,6 +97,29 @@ describe("autonomy mission harness", () => {
     expect(normalized.mapPack.qualificationReceiptId).toBeNull();
   });
 
+  it("migrates retired bundled presets to the one canonical School Map", () => {
+    const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    workspace.mapPack = {
+      ...workspace.mapPack,
+      name: "Building stairwell · pickup · return v3",
+      compilerSceneId: "stairwell-coffee-return",
+      boundsM: { x: 42, y: 28, z: 11 },
+      floorCount: 3,
+      status: "qualified",
+      contentHash: "a".repeat(64),
+      qualificationReceiptId: "old-stairwell-receipt",
+    };
+
+    const normalized = normalizeAutonomyWorkspace(workspace);
+
+    expect(normalized.mapPack.name).toBe("School Map");
+    expect(normalized.mapPack.compilerSceneId).toBe("school-campus-v1");
+    expect(normalized.mapPack.boundsM).toEqual({ x: 120, y: 90, z: 12.6 });
+    expect(normalized.mapPack.status).toBe("draft");
+    expect(normalized.mapPack.contentHash).toBeNull();
+    expect(normalized.mapPack.qualificationReceiptId).toBeNull();
+  });
+
   it("connects every School Map facility to one shared meter-scale road graph", () => {
     const key = ([x, z]: [number, number]) => `${x},${z}`;
     const graph = new Map<string, Set<string>>();
@@ -138,7 +161,9 @@ describe("autonomy mission harness", () => {
     expect(SCHOOL_MAP_GEOMETRY.stair.risersPerFlight * SCHOOL_MAP_GEOMETRY.stair.flightsPerStorey).toBe(24);
     expect(stair.totalRiseM).toBeCloseTo(SCHOOL_MAP_GEOMETRY.floor.storeyHeightM, 6);
     expect(stair.opening.maxX - stair.opening.minX).toBeCloseTo(
-      SCHOOL_MAP_GEOMETRY.stair.clearWidthM * 2 + SCHOOL_MAP_GEOMETRY.stair.laneGapM,
+      SCHOOL_MAP_GEOMETRY.stair.clearWidthM * 2
+        + SCHOOL_MAP_GEOMETRY.stair.laneGapM
+        + SCHOOL_MAP_GEOMETRY.stair.handrailRadiusM * 4,
       6,
     );
     expect(SCHOOL_MAP_GEOMETRY.vehicle.minimumIndoorClearWidthM)

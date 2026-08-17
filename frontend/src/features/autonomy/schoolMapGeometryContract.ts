@@ -5,7 +5,7 @@ const TEACHING_DOOR_LEAF_DEPTH_M = 0.095;
 const TEACHING_OPEN_DOOR_FRAME_CLEARANCE_M = TEACHING_DOOR_LEAF_WIDTH_M * 2;
 const TEACHING_OPEN_DOOR_CLEARANCE_M = TEACHING_OPEN_DOOR_FRAME_CLEARANCE_M
   - 2 * TEACHING_DOOR_LEAF_WIDTH_M * Math.cos(TEACHING_DOOR_OPEN_ANGLE_RAD)
-  - TEACHING_DOOR_LEAF_DEPTH_M * Math.sin(TEACHING_DOOR_OPEN_ANGLE_RAD);
+  - 2 * TEACHING_DOOR_LEAF_DEPTH_M * Math.sin(TEACHING_DOOR_OPEN_ANGLE_RAD);
 
 export const SCHOOL_MAP_GEOMETRY = {
   tolerance: {
@@ -39,6 +39,27 @@ export const SCHOOL_MAP_GEOMETRY = {
     doorLeafDepthM: TEACHING_DOOR_LEAF_DEPTH_M,
     doorOpenAngleDeg: TEACHING_DOOR_OPEN_ANGLE_DEG,
   },
+  teachingRooms: {
+    centersX: [-45.25, -31.75, -18.25, -6.295],
+    centerZ: 12.2,
+    halfWidthM: 5.75,
+    frontZ: 10.6,
+    backZ: 19.3,
+    wallThicknessM: 0.14,
+    doorWidthM: 1.2,
+    doorHeightM: 2.2,
+    doorFrameWidthM: 0.08,
+    doorFrameDepthM: 0.11,
+    doorLeafDepthM: 0.06,
+    classroomDoorOffsetXM: 3.35,
+    eastStairRoomHalfWidthM: 4.205,
+    eastStairRoomDoorOffsetXM: 3,
+    eastStairRoomWindowOffsetsXM: [-3, -1, 1, 3],
+    officeDoorOffsetXM: 3.6,
+    windowOffsetsXM: [-3.9, -1.3, 1.3, 3.9],
+    windowWidthM: 1.5,
+    windowHeightM: 1.28,
+  },
   cafeteria: {
     centerX: 30,
     centerZ: 20,
@@ -54,6 +75,9 @@ export const SCHOOL_MAP_GEOMETRY = {
     doorPanelGroupWidthM: 3.59,
     doorLeafDepthM: 0.06,
     doorHeightM: 2.65,
+    windowCentersX: [18, 26, 34, 42],
+    windowWidthM: 2.7,
+    windowHeightM: 1.35,
   },
   stair: {
     centerX: -0.1,
@@ -66,11 +90,74 @@ export const SCHOOL_MAP_GEOMETRY = {
     laneGapM: 0.44,
     landingLengthM: 1.6,
     landingThicknessM: 0.18,
+    handrailHeightM: 0.9,
+    handrailRadiusM: 0.025,
   },
   facilities: {
-    bicycleShelter: { columnHeightM: 2.89, roofBottomM: 2.89 },
-    pickupCanopy: { columnHeightM: 2.71, roofBottomM: 2.71 },
-    streetLight: { poleHeightM: 4.3, armBottomM: 4.3 },
+    bicycleShelter: {
+      centerX: -42,
+      centerZ: 30.2,
+      columnRadiusM: 0.08,
+      columnHeightM: 2.89,
+      roofBottomM: 2.89,
+    },
+    pickupCanopy: {
+      centerX: 48.5,
+      centerZ: 1.5,
+      columnRadiusM: 0.075,
+      columnHeightM: 2.71,
+      roofBottomM: 2.71,
+      padRadiusM: 1,
+      padThicknessM: 0.08,
+    },
+    streetLight: {
+      baseRadiusM: 0.18,
+      baseHeightM: 0.12,
+      poleRadiusM: 0.085,
+      poleHeightM: 4.3,
+      armBottomM: 4.3,
+      armLengthM: 1.25,
+      armHeightM: 0.1,
+      lampSizeM: [0.48, 0.15, 0.3],
+    },
+    perimeterFence: {
+      minX: -59,
+      maxX: 59,
+      minZ: -44,
+      maxZ: 44,
+      postRadiusM: 0.045,
+      postHeightM: 1.8,
+      railHeightM: 0.055,
+      railDepthM: 0.055,
+      railCenterYM: 1.55,
+    },
+    mainGate: {
+      halfOpeningM: 8,
+      postRadiusM: 0.22,
+      postHeightM: 3.475,
+      headerHeightM: 0.35,
+      headerDepthM: 0.38,
+    },
+    trainingGate: {
+      centers: [
+        { x: -5, y: 2.4, radiusM: 1.55 },
+        { x: 15, y: 2.5, radiusM: 1.65 },
+        { x: 35, y: 2.25, radiusM: 1.5 },
+      ],
+      routeZ: -18,
+      tubeRadiusM: 0.09,
+      supportRadiusM: 0.075,
+      baseHeightM: 0.08,
+    },
+  },
+  roadMarkings: {
+    centerlineWidthM: 0.11,
+    centerlineDashM: 1.6,
+    centerlineGapM: 1.1,
+    crosswalkBarCount: 7,
+    crosswalkBarWidthM: 0.34,
+    crosswalkBarSpacingM: 0.62,
+    crosswalkLengthM: 3.8,
   },
   vehicle: {
     collisionDiameterM: 0.76,
@@ -123,6 +210,11 @@ export function schoolMapTeachingOpenDoorCenterX() {
   return entrance.entranceX - entrance.doorFrameWidthM / 2 - entrance.doorLeafWidthM;
 }
 
+export function schoolMapOfficeDoorCenterX() {
+  const rooms = SCHOOL_MAP_GEOMETRY.teachingRooms;
+  return rooms.centersX[0] + rooms.officeDoorOffsetXM;
+}
+
 export function schoolMapStairDimensions() {
   const stair = SCHOOL_MAP_GEOMETRY.stair;
   const floor = SCHOOL_MAP_GEOMETRY.floor;
@@ -131,8 +223,8 @@ export function schoolMapStairDimensions() {
   const totalRiseM = halfRiseM * stair.flightsPerStorey;
   const laneOffsetM = stair.clearWidthM / 2 + stair.laneGapM / 2;
   const opening = {
-    minX: stair.centerX - laneOffsetM - stair.clearWidthM / 2,
-    maxX: stair.centerX + laneOffsetM + stair.clearWidthM / 2,
+    minX: stair.centerX - laneOffsetM - stair.clearWidthM / 2 - stair.handrailRadiusM * 2,
+    maxX: stair.centerX + laneOffsetM + stair.clearWidthM / 2 + stair.handrailRadiusM * 2,
     minZ: stair.centerZ - flightRunM / 2 - stair.landingLengthM,
     maxZ: stair.centerZ + flightRunM / 2 + stair.landingLengthM,
   };
@@ -144,6 +236,39 @@ export function schoolMapStairDimensions() {
     opening,
     storeyHeightM: floor.storeyHeightM,
   };
+}
+
+export function schoolMapStairRoutePoints(
+  direction: "ascending" | "descending",
+): Array<[number, number, number]> {
+  const geometry = SCHOOL_MAP_GEOMETRY;
+  const stair = geometry.stair;
+  const dimensions = schoolMapStairDimensions();
+  const startZ = stair.centerZ - dimensions.flightRunM / 2;
+  const endZ = stair.centerZ + dimensions.flightRunM / 2;
+  const routeInsetM = 0.04;
+  const flightClearanceM = 0.6;
+  const lowerApproachZ = startZ
+    - geometry.vehicle.collisionDiameterM / 2
+    - stair.handrailRadiusM
+    - 0.05;
+  const ascending: Array<[number, number, number]> = [];
+  for (let storey = 1; storey <= 2; storey += 1) {
+    const lowerY = (storey - 1) * geometry.floor.storeyHeightM
+      + geometry.floor.slabThicknessM;
+    const middleY = lowerY + dimensions.halfRiseM;
+    const upperY = lowerY + geometry.floor.storeyHeightM;
+    ascending.push(
+      [stair.centerX - dimensions.laneOffsetM, lowerY + stair.riserM + flightClearanceM, lowerApproachZ],
+      [stair.centerX - dimensions.laneOffsetM, lowerY + stair.riserM + flightClearanceM, startZ + routeInsetM],
+      [stair.centerX - dimensions.laneOffsetM, middleY + flightClearanceM, endZ - routeInsetM],
+      [stair.centerX, middleY + flightClearanceM, endZ + stair.landingLengthM / 2],
+      [stair.centerX + dimensions.laneOffsetM, middleY + stair.riserM + flightClearanceM, endZ - routeInsetM],
+      [stair.centerX + dimensions.laneOffsetM, upperY + flightClearanceM, startZ + routeInsetM],
+      [stair.centerX, upperY + flightClearanceM, startZ - stair.landingLengthM / 2],
+    );
+  }
+  return direction === "ascending" ? ascending : ascending.reverse();
 }
 
 export function validateSchoolMapGeometryContract(

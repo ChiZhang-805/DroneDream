@@ -6,7 +6,13 @@ import { chromium } from "playwright";
 import { createServer } from "vite";
 
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const outputRoot = path.join(frontendRoot, "node_modules", ".cache", "school-map-and-drone");
+const outputRoot = path.resolve(
+  frontendRoot,
+  "..",
+  "artifacts",
+  "test-runs",
+  "school-map-visual-current",
+);
 const host = "127.0.0.1";
 const port = 5198;
 const externalOrigin = process.env.SCHOOL_MAP_VERIFY_ORIGIN?.replace(/\/$/, "");
@@ -212,8 +218,11 @@ try {
   const savedMapLabels = await page.locator('select[aria-label="Saved maps"] option').allTextContents();
   if (savedMapLabels.some((label) => /\s·\sv\d+$/iu.test(label))) throw new Error(`Map revision suffix returned: ${savedMapLabels.join(" | ")}`);
   const mapName = page.getByLabel("Map name", { exact: true });
-  await mapName.fill("School Map ");
-  await mapName.fill("School Map");
+  if (await mapName.inputValue() !== "School Map") throw new Error("The canonical bundled map name changed.");
+  if (await mapName.getAttribute("readonly") === null) throw new Error("The canonical School Map name must be immutable in the editor.");
+  const fixedScale = page.getByLabel("Confirm the bundled scene's fixed scale and ENU frame", { exact: true });
+  await fixedScale.uncheck();
+  await fixedScale.check();
   await page.getByRole("button", { name: "Save Map Pack", exact: true }).click();
   const persistedMap = await page.evaluate(() => {
     const stored = window.localStorage.getItem("dronedream:autonomy-workspace:v2:local:universal");

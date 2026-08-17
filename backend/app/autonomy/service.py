@@ -33,7 +33,11 @@ from app.autonomy.models import (
     TaskRisk,
     ValidationIssue,
 )
-from app.autonomy.school_map_artifact import TEACHING_OPEN_DOOR_PAIR_CENTER_X
+from app.autonomy.school_map_artifact import (
+    OFFICE_DOOR_CENTER_X,
+    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+    school_map_stair_route_points,
+)
 
 GRAVITY = 9.80665
 MIN_THRUST_TO_WEIGHT = 1.35
@@ -281,18 +285,31 @@ def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | 
             RoutePoint(x=48.0, y=-18.0, z=1.3, phase="land", speed_limit_mps=0.4),
         ]
     return [
-        RoutePoint(x=-49.0, y=15.3, z=8.15, phase="launch", speed_limit_mps=0.55),
-        RoutePoint(x=-46.0, y=9.4, z=8.3, phase="transit", speed_limit_mps=0.8),
-        RoutePoint(x=-35.0, y=5.0, z=8.1, phase="transit", speed_limit_mps=0.9),
-        RoutePoint(x=-23.0, y=5.0, z=8.0, phase="transit", speed_limit_mps=0.9),
-        RoutePoint(x=-12.0, y=5.0, z=8.0, phase="transit", speed_limit_mps=0.8),
-        RoutePoint(x=-2.4, y=6.7, z=7.9, phase="stairs", speed_limit_mps=0.5),
-        RoutePoint(x=-1.9, y=9.0, z=7.2, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=1.7, y=12.2, z=6.0, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=1.7, y=9.4, z=4.6, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=-1.9, y=8.7, z=3.2, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=1.7, y=12.3, z=1.35, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=1.7, y=8.8, z=1.15, phase="stairs", speed_limit_mps=0.45),
+        RoutePoint(x=-42.25, y=15.3, z=8.15, phase="launch", speed_limit_mps=0.55),
+        RoutePoint(x=-42.25, y=11.5, z=8.15, phase="transit", speed_limit_mps=0.55),
+        RoutePoint(
+            x=OFFICE_DOOR_CENTER_X,
+            y=11.0,
+            z=8.15,
+            phase="transit",
+            speed_limit_mps=0.55,
+        ),
+        RoutePoint(
+            x=OFFICE_DOOR_CENTER_X,
+            y=9.75,
+            z=8.15,
+            phase="transit",
+            speed_limit_mps=0.55,
+        ),
+        RoutePoint(x=-35.0, y=8.02, z=8.12, phase="transit", speed_limit_mps=0.8),
+        RoutePoint(x=-23.0, y=8.02, z=8.1, phase="transit", speed_limit_mps=0.8),
+        RoutePoint(x=-12.0, y=8.02, z=8.08, phase="transit", speed_limit_mps=0.75),
+        RoutePoint(x=-4.0, y=8.02, z=8.05, phase="transit", speed_limit_mps=0.65),
+        *[
+            RoutePoint(x=x, y=y, z=z, phase="stairs", speed_limit_mps=0.42)
+            for x, y, z in school_map_stair_route_points("descending")
+        ],
+        RoutePoint(x=-3.0, y=8.02, z=1.05, phase="transit", speed_limit_mps=0.55),
         RoutePoint(x=-8.0, y=5.0, z=1.2, phase="transit", speed_limit_mps=0.65),
         RoutePoint(
             x=TEACHING_OPEN_DOOR_PAIR_CENTER_X,
@@ -304,7 +321,7 @@ def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | 
         RoutePoint(
             x=TEACHING_OPEN_DOOR_PAIR_CENTER_X,
             y=-1.055,
-            z=1.3,
+            z=1.4,
             phase="land",
             speed_limit_mps=0.35,
         ),

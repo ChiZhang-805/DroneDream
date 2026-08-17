@@ -307,6 +307,7 @@ const COMPILED_SCENE_SET = new Set<AutonomyCompiledSceneId>([
   "forest-gate-inspection",
   "service-corridor-dock",
 ]);
+const CANONICAL_SCHOOL_SCENE_ID: AutonomyCompiledSceneId = "school-campus-v1";
 const SENSOR_SET = new Set<AutonomySensorKind>(["rgb", "depth", "stereo", "thermal", "lidar", "gps", "vio"]);
 const SEMANTIC_SET = new Set<AutonomyMapPack["semanticLayers"][number]>([
   "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
@@ -722,10 +723,24 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     && !mapPack.qualificationReceiptId.startsWith("bundled-public-")
     ? mapPack.qualificationReceiptId.slice(0, 160)
     : null;
+  const storedCompilerSceneId = COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
+    ? mapPack.compilerSceneId as AutonomyCompiledSceneId
+    : null;
+  // The compiler continues to accept retired preset identifiers for old task
+  // contracts, but the asset workspace exposes one replace-in-place School Map.
+  // Migrating an old bundled preset changes the geometry identity, so any
+  // qualification credential bound to that preset must fail closed.
+  const legacyBundledSceneMigrated = !importedMapAwaitingIngestion
+    && storedCompilerSceneId !== null
+    && storedCompilerSceneId !== CANONICAL_SCHOOL_SCENE_ID;
+  const normalizedCompilerSceneId = !importedMapAwaitingIngestion && storedCompilerSceneId
+    ? CANONICAL_SCHOOL_SCENE_ID
+    : null;
   const mapQualificationCredentialValid = mapPack.status === "qualified"
     && mapPack.version === 1
     && Boolean(normalizedMapContentHash)
-    && Boolean(normalizedMapReceiptId);
+    && Boolean(normalizedMapReceiptId)
+    && !legacyBundledSceneMigrated;
   const normalizedMap: AutonomyMapPack = {
     ...fallback.mapPack,
     schemaVersion: 2,
@@ -737,25 +752,33 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       ? (normalizedSourceFiles.every((file) => file.admission === "admitted") ? "assets-admitted" : "draft")
       : (mapQualificationCredentialValid
           && mapPack.calibrated === true
-          && COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
+          && normalizedCompilerSceneId !== null
         ? "qualified"
         : "draft"),
     contentHash: mapQualificationCredentialValid ? normalizedMapContentHash : null,
     qualificationReceiptId: mapQualificationCredentialValid ? normalizedMapReceiptId : null,
-    name: boundedText(mapPack.name, fallback.mapPack.name),
-    representation,
-    coordinateFrame,
-    resolutionM: boundedNumber(mapPack.resolutionM, fallback.mapPack.resolutionM, 0.005, 100),
-    floorCount: Math.round(boundedNumber(mapPack.floorCount, fallback.mapPack.floorCount, 1, 500)),
-    liveUpdates,
+    name: normalizedCompilerSceneId === CANONICAL_SCHOOL_SCENE_ID
+      ? fallback.mapPack.name
+      : boundedText(mapPack.name, fallback.mapPack.name),
+    representation: legacyBundledSceneMigrated ? fallback.mapPack.representation : representation,
+    coordinateFrame: legacyBundledSceneMigrated ? fallback.mapPack.coordinateFrame : coordinateFrame,
+    resolutionM: legacyBundledSceneMigrated
+      ? fallback.mapPack.resolutionM
+      : boundedNumber(mapPack.resolutionM, fallback.mapPack.resolutionM, 0.005, 100),
+    floorCount: legacyBundledSceneMigrated
+      ? fallback.mapPack.floorCount
+      : Math.round(boundedNumber(mapPack.floorCount, fallback.mapPack.floorCount, 1, 500)),
+    liveUpdates: legacyBundledSceneMigrated ? fallback.mapPack.liveUpdates : liveUpdates,
     calibrated: !importedMapAwaitingIngestion && mapPack.calibrated === true,
-    compilerSceneId: !importedMapAwaitingIngestion && COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
-      ? mapPack.compilerSceneId as AutonomyCompiledSceneId
-      : null,
-    semanticLayers: Array.isArray(mapPack.semanticLayers)
+    compilerSceneId: normalizedCompilerSceneId,
+    semanticLayers: legacyBundledSceneMigrated
+      ? fallback.mapPack.semanticLayers
+      : Array.isArray(mapPack.semanticLayers)
       ? [...new Set(mapPack.semanticLayers.filter((layer): layer is AutonomyMapPack["semanticLayers"][number] => SEMANTIC_SET.has(layer as AutonomyMapPack["semanticLayers"][number])))].slice(0, SEMANTIC_SET.size)
       : fallback.mapPack.semanticLayers,
-    planningLayers: Array.isArray(mapPack.planningLayers)
+    planningLayers: legacyBundledSceneMigrated
+      ? fallback.mapPack.planningLayers
+      : Array.isArray(mapPack.planningLayers)
       ? [...new Set(mapPack.planningLayers.filter((layer): layer is AutonomyMapPack["planningLayers"][number] => PLANNING_LAYER_SET.has(layer as AutonomyMapPack["planningLayers"][number])))].slice(0, PLANNING_LAYER_SET.size)
       : fallback.mapPack.planningLayers,
     origin: {
@@ -763,8 +786,12 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       longitude: typeof mapPack.origin?.longitude === "number" && Number.isFinite(mapPack.origin.longitude) ? Math.min(180, Math.max(-180, mapPack.origin.longitude)) : null,
       altitudeM: typeof mapPack.origin?.altitudeM === "number" && Number.isFinite(mapPack.origin.altitudeM) ? mapPack.origin.altitudeM : null,
     },
-    boundsM: boundedVector(mapPack.boundsM, fallback.mapPack.boundsM, 0.1, 100_000),
-    confidencePercent: boundedNumber(mapPack.confidencePercent, fallback.mapPack.confidencePercent, 0, 100),
+    boundsM: legacyBundledSceneMigrated
+      ? fallback.mapPack.boundsM
+      : boundedVector(mapPack.boundsM, fallback.mapPack.boundsM, 0.1, 100_000),
+    confidencePercent: legacyBundledSceneMigrated
+      ? fallback.mapPack.confidencePercent
+      : boundedNumber(mapPack.confidencePercent, fallback.mapPack.confidencePercent, 0, 100),
     sourceFiles: normalizedSourceFiles,
     updatedAt: boundedText(mapPack.updatedAt, updatedAt, 40),
   };

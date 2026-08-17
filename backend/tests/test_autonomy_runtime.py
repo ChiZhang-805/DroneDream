@@ -9,7 +9,10 @@ from app.autonomy.models import (
     Vector3,
 )
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry
-from app.autonomy.school_map_artifact import TEACHING_OPEN_DOOR_PAIR_CENTER_X
+from app.autonomy.school_map_artifact import (
+    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+    school_map_stair_route_points,
+)
 from app.autonomy.service import compile_autonomy_mission
 
 
@@ -159,10 +162,14 @@ def test_school_map_narrow_intent_compiles_switchback_stair_route() -> None:
         "traverse_stairs",
         "land",
     ]
-    assert [point.phase for point in compiled.trajectory].count("stairs") == 7
+    assert [point.phase for point in compiled.trajectory].count("stairs") == len(
+        school_map_stair_route_points("descending")
+    )
     assert compiled.trajectory[0].z == pytest.approx(8.15)
-    assert max(point.z for point in compiled.trajectory) == pytest.approx(8.3)
-    assert compiled.trajectory[-1].z == pytest.approx(1.3)
+    assert max(point.z for point in compiled.trajectory) == pytest.approx(
+        compiled.trajectory[0].z
+    )
+    assert compiled.trajectory[-1].z == pytest.approx(1.4)
     assert compiled.trajectory[-2].x == pytest.approx(TEACHING_OPEN_DOOR_PAIR_CENTER_X)
     assert compiled.trajectory[-1].x == pytest.approx(TEACHING_OPEN_DOOR_PAIR_CENTER_X)
 

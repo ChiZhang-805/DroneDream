@@ -143,10 +143,7 @@ def read_autonomy_scene_gazebo_artifact(
             "schema_version": "dronedream.autonomy.gazebo-artifact-export.v1",
             "compiler_scene_id": scene_id,
             "summary": artifact.summary,
-            "files": {
-                "model.sdf": artifact.model_sdf,
-                "semantic.json": artifact.semantic_json,
-            },
+            "files": artifact.package_files,
         }
     )
 

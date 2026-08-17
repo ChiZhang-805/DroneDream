@@ -1554,10 +1554,10 @@ const PLANNING_LAYER_LABELS: Record<AutonomyMapPack["planningLayers"][number], s
   confidence: "Confidence",
 };
 
-const FALLBACK_MAP_SCENE_MANIFESTS: Record<
+const FALLBACK_MAP_SCENE_MANIFESTS: Partial<Record<
   NonNullable<AutonomyMapPack["compilerSceneId"]>,
   AutonomyBundledMapManifest
-> = {
+>> = {
   "school-campus-v1": {
     schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
     compiler_scene_id: "school-campus-v1",
@@ -1573,49 +1573,7 @@ const FALLBACK_MAP_SCENE_MANIFESTS: Record<
       "rooms", "corridors", "roads", "vegetation", "street-furniture",
     ],
     planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "337c362d5d9f3c996283bc4f1c19fe8be3a40d18093d961928883b42ce65fe3c",
-  },
-  "stairwell-coffee-return": {
-    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
-    compiler_scene_id: "stairwell-coffee-return",
-    name: "Building stairwell · pickup · return",
-    representation: "hybrid-3d",
-    coordinate_frame: "ENU",
-    resolution_m: 0.1,
-    bounds_m: { x: 42, y: 28, z: 11 },
-    floor_count: 3,
-    confidence_percent: 100,
-    semantic_layers: ["free-space", "stairs", "doors", "people", "pickup-zones"],
-    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "0".repeat(64),
-  },
-  "forest-gate-inspection": {
-    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
-    compiler_scene_id: "forest-gate-inspection",
-    name: "Forest circular-gate inspection",
-    representation: "hybrid-3d",
-    coordinate_frame: "ENU",
-    resolution_m: 0.1,
-    bounds_m: { x: 48, y: 24, z: 8 },
-    floor_count: 1,
-    confidence_percent: 100,
-    semantic_layers: ["free-space", "gates", "people"],
-    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "0".repeat(64),
-  },
-  "service-corridor-dock": {
-    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
-    compiler_scene_id: "service-corridor-dock",
-    name: "Service corridor · autonomous dock",
-    representation: "hybrid-3d",
-    coordinate_frame: "ENU",
-    resolution_m: 0.1,
-    bounds_m: { x: 34, y: 18, z: 5 },
-    floor_count: 1,
-    confidence_percent: 100,
-    semantic_layers: ["free-space", "doors", "people"],
-    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "0".repeat(64),
+    manifest_sha256: "b9bb52dc4592790c31943694ced1cc8ccef90b83978dc4ccac6b7b6d5f22c4ca",
   },
 };
 
@@ -1801,9 +1759,7 @@ export function AutonomyMaps() {
     const manifest = compilerSceneId ? sceneManifests[compilerSceneId] : null;
     setForm((current) => ({
       ...current,
-      name: manifest && current.name === "Unconfigured environment"
-        ? manifest.name
-        : current.name,
+      name: manifest?.name ?? current.name,
       status: "draft",
       contentHash: null,
       qualificationReceiptId: null,
@@ -1898,7 +1854,7 @@ export function AutonomyMaps() {
         <section className="autonomy-config-card">
           <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存地图" : "Saved maps"} value={workspace.mapPack.id} onChange={(event) => selectMap(event.target.value)}>{assetLibrary.maps.map((mapPack) => <option value={mapPack.id} key={mapPack.id}>{mapPack.name}</option>)}</select><button className="btn" type="button" onClick={createMap}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
           <div className="autonomy-form-grid is-four">
-            <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateMap({ name: event.target.value })} /></label>
+            <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input readOnly={form.compilerSceneId === "school-campus-v1"} value={form.name} maxLength={120} onChange={(event) => updateMap({ name: event.target.value })} /></label>
             <label><span>{chinese ? "三维表示" : "3D representation"}</span><select value={form.representation} onChange={(event) => updateGeometry({ representation: event.target.value as AutonomyMapPack["representation"] })}><option value="hybrid-3d">Hybrid 3D</option><option value="mesh">Mesh</option><option value="point-cloud">Point cloud</option><option value="occupancy">Occupancy / ESDF</option><option value="terrain">Terrain / DEM</option></select></label>
             <label><span>{chinese ? "坐标系" : "Coordinate frame"}</span><select value={form.coordinateFrame} onChange={(event) => updateGeometry({ coordinateFrame: event.target.value as AutonomyMapPack["coordinateFrame"] })}><option>ENU</option><option>NED</option><option>WGS84</option><option value="building-local">Building local</option></select></label>
             <label><span>{chinese ? "分辨率 (m)" : "Resolution (m)"}</span><input type="number" min="0.005" step="0.005" value={form.resolutionM} onChange={(event) => updateGeometry({ resolutionM: Number(event.target.value) })} /></label>
