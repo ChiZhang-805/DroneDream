@@ -16,7 +16,7 @@ DESKTOP_PACKAGE = ROOT / "desktop/package.json"
 
 
 def _powershell() -> Path:
-    system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    system_root = Path(os.environ.get("SYSTEMROOT", r"C:\Windows"))
     return system_root / "System32/WindowsPowerShell/v1.0/powershell.exe"
 
 
@@ -60,6 +60,12 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         assert f'"desktop-{edition}-v*-build-*"' in workflow
     for fragment in (
         "resolve-desktop-edition-release.ps1",
+        "python -m pytest distribution/tests/test_desktop_release_workflow_contract.py",
+        "npm --prefix desktop run verify:updater-build",
+        "npm --prefix desktop run verify:updater-signing",
+        "invoke-tauri-updater-signer.ps1",
+        '"+refs/heads/main:refs/remotes/origin/main"',
+        "Formal desktop release tags must point to a commit already merged into main.",
         '-ValidationEditionId "${{ inputs.edition || \'universal\' }}"',
         '"DRONEDREAM_RELEASE_SOURCE_COMMIT=$env:GITHUB_SHA"',
         '"DRONEDREAM_RELEASE_BUILD_NUMBER=$($contract.buildNumber)"',
@@ -69,7 +75,8 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "needs.windows-nsis.outputs.is_release == 'true'",
         "desktop-stable-channel-${{ needs.windows-nsis.outputs.edition_id }}",
         "cancel-in-progress: false",
-        "release already exists and will never be overwritten; verified canonical assets will be reused",
+        "release already exists and will never be overwritten; "
+        "verified canonical assets will be reused",
         "removed incomplete unpublished draft so this run can recreate it",
         "published immutable release has an invalid asset count",
         '(cd "$existing_dir" && sha256sum --check',
@@ -85,7 +92,10 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "stable metadata rollback did not restore the previous bytes",
         "https://uploads.github.com/repos/",
         "stable channel already contains identical build",
-        "removed unpublished stable-channel draft so publication can restart",
+        "newer unpublished stable-channel draft preserved",
+        "same-build stable-channel draft has a different or unknown source; preserving it",
+        "recovered identical unpublished stable-channel draft build",
+        "removed older or same-source incomplete stable-channel draft so publication can restart",
         'gh release upload "$channel" "$metadata"',
         '--data-binary "@$source_file"',
         "Verify stable channel publication",
@@ -95,8 +105,15 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
     assert 'startsWith(github.ref, \'refs/tags/desktop-v\')' not in workflow
     assert "bundle/nsis/latest.json" not in workflow
     assert "--clobber" not in workflow
+    assert '--password=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)' not in workflow
     assert workflow.count("--json isDraft") == 2
-    assert workflow.count("--draft=false") == 3
+    assert workflow.count("--draft=false") == 4
+    assert workflow.index("if (( incoming_build < draft_build ))") < workflow.index(
+        '"repos/$GITHUB_REPOSITORY/releases/$incomplete_channel_id"',
+    )
+    assert workflow.index('if [[ "$draft_source" != "$GITHUB_SHA" ]]') < workflow.index(
+        '"repos/$GITHUB_REPOSITORY/releases/$incomplete_channel_id"',
+    )
     assert workflow.index("if (( incoming_build < existing_build ))") < workflow.index(
         "candidate_json=",
     )

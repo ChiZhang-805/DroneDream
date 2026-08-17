@@ -98,6 +98,17 @@ jobs:
           } else {
             ""
           }
+          if ($releaseTag) {
+            git fetch --no-tags origin `
+              "+refs/heads/main:refs/remotes/origin/main"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to fetch the authoritative main branch for release verification."
+            }
+            git merge-base --is-ancestor $env:GITHUB_SHA refs/remotes/origin/main
+            if ($LASTEXITCODE -ne 0) {
+              throw "Formal desktop release tags must point to a commit already merged into main."
+            }
+          }
           $contract = ./desktop/scripts/resolve-desktop-edition-release.ps1 `
             -ReleaseTag $releaseTag `
             -ValidationEditionId "${{ inputs.edition || 'universal' }}" `
@@ -184,6 +195,15 @@ jobs:
           toolchain: 1.97.0
           components: rustfmt, clippy
 
+      - name: Verify desktop release workflow contract
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install "pytest==9.1.1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest distribution/tests/test_desktop_release_workflow_contract.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Verify desktop browser-auth public configuration
         shell: pwsh
         run: node ./desktop/scripts/verify-browser-auth-config.mjs
@@ -195,6 +215,15 @@ jobs:
           npm ci --prefix frontend
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm ci --prefix desktop
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify updater build and signing contracts
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm --prefix desktop run verify:updater-build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix desktop run verify:updater-signing
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install backend test dependencies
@@ -501,12 +530,12 @@ jobs:
               $env:TAURI_SIGNING_PRIVATE_KEY,
               (New-Object Text.UTF8Encoding($false))
             )
-            $passwordArgument = "--password=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)"
-            node ./desktop/node_modules/@tauri-apps/cli/tauri.js signer sign `
-              --private-key-path $updaterKeyPath `
-              $passwordArgument `
-              $installer.FullName
-            if ($LASTEXITCODE -ne 0) { throw "Tauri updater signing failed." }
+            ./desktop/scripts/invoke-tauri-updater-signer.ps1 `
+              -NodeExecutable ((Get-Command node.exe).Source) `
+              -TauriCliPath (Resolve-Path `
+                "./desktop/node_modules/@tauri-apps/cli/tauri.js") `
+              -UpdaterKeyPath $updaterKeyPath `
+              -InstallerPath $installer.FullName
           } finally {
             Remove-Item -LiteralPath $updaterKeyPath -Force -ErrorAction SilentlyContinue
           }
@@ -1043,6 +1072,12 @@ jobs:
             jq -er '.notes | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build' \
               "$metadata"
           )"
+          channel_notes="$(printf \
+            'Authenticated updater metadata for %s build %s.\nbuild-number: %s\nsource-commit: %s' \
+            '${{ needs.windows-nsis.outputs.edition_id }}' \
+            "$incoming_build" \
+            "$incoming_build" \
+            "$GITHUB_SHA")"
 
           upload_asset() {
             local release_id="$1"
@@ -1064,9 +1099,74 @@ jobs:
           if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$channel" > "$channel_probe" 2>/dev/null &&
              [[ "$(jq -er '.draft' "$channel_probe")" == "true" ]]; then
             incomplete_channel_id="$(jq -er '.id' "$channel_probe")"
+            draft_asset_count="$(jq -er '.assets | length' "$channel_probe")"
+            draft_metadata_count="$(
+              jq -er --arg name "$metadata_name" \
+                '[.assets[] | select(.name == $name)] | length' \
+                "$channel_probe"
+            )"
+            draft_body_build="$(
+              jq -r 'try (.body | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build) catch ""' \
+                "$channel_probe"
+            )"
+            draft_body_source="$(
+              jq -r 'try (.body | capture("(?m)^source-commit: (?<source>[0-9a-f]{40})$").source) catch ""' \
+                "$channel_probe"
+            )"
+            draft_asset_build=""
+            draft_asset_source=""
+            draft_metadata="$(mktemp)"
+            if [[ "$draft_metadata_count" == "1" ]]; then
+              draft_metadata_id="$(
+                jq -er --arg name "$metadata_name" \
+                  '.assets[] | select(.name == $name) | .id' \
+                  "$channel_probe"
+              )"
+              gh api \
+                -H 'Accept: application/octet-stream' \
+                "repos/$GITHUB_REPOSITORY/releases/assets/$draft_metadata_id" > "$draft_metadata"
+              if ! draft_asset_build="$(
+                jq -er '.notes | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build' \
+                  "$draft_metadata"
+              )" || ! draft_asset_source="$(
+                jq -er '.notes | capture("(?m)^source-commit: (?<source>[0-9a-f]{40})$").source' \
+                  "$draft_metadata"
+              )"; then
+                echo "unpublished stable-channel draft metadata is malformed; preserving it" >&2
+                exit 3
+              fi
+            fi
+            draft_build="${draft_asset_build:-$draft_body_build}"
+            draft_source="${draft_asset_source:-$draft_body_source}"
+            if [[ -z "$draft_build" ]] ||
+               [[ -n "$draft_asset_build" && -n "$draft_body_build" && "$draft_asset_build" != "$draft_body_build" ]] ||
+               [[ -n "$draft_asset_source" && -n "$draft_body_source" && "$draft_asset_source" != "$draft_body_source" ]]; then
+              echo "unpublished stable-channel draft identity is ambiguous; preserving it" >&2
+              exit 3
+            fi
+            if (( incoming_build < draft_build )); then
+              echo "newer unpublished stable-channel draft preserved: draft=$draft_build incoming=$incoming_build" >&2
+              exit 2
+            fi
+            if (( incoming_build == draft_build )); then
+              if [[ "$draft_source" != "$GITHUB_SHA" ]]; then
+                echo "same-build stable-channel draft has a different or unknown source; preserving it" >&2
+                exit 3
+              fi
+              if [[ "$draft_asset_count" == "1" && "$draft_metadata_count" == "1" ]]; then
+                cmp "$metadata" "$draft_metadata"
+                gh release edit "$channel" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --draft=false \
+                  --prerelease \
+                  --notes "$channel_notes"
+                echo "recovered identical unpublished stable-channel draft build $incoming_build"
+                exit 0
+              fi
+            fi
             gh api --method DELETE \
               "repos/$GITHUB_REPOSITORY/releases/$incomplete_channel_id" >/dev/null
-            echo "removed unpublished stable-channel draft so publication can restart"
+            echo "removed older or same-source incomplete stable-channel draft so publication can restart"
           fi
 
           if gh release view "$channel" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -1188,7 +1288,7 @@ jobs:
             gh release edit "$channel" \
               --repo "$GITHUB_REPOSITORY" \
               --title "${{ needs.windows-nsis.outputs.product_name }} stable channel" \
-              --notes "Authenticated updater metadata for ${{ needs.windows-nsis.outputs.edition_id }} build $incoming_build." \
+              --notes "$channel_notes" \
               --prerelease
             trap - ERR
           else
@@ -1202,7 +1302,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "${{ needs.windows-nsis.outputs.product_name }} stable channel" \
-              --notes "Authenticated updater metadata for ${{ needs.windows-nsis.outputs.edition_id }} build $incoming_build." \
+              --notes "$channel_notes" \
               --draft \
               --prerelease
             gh release upload "$channel" "$metadata" \

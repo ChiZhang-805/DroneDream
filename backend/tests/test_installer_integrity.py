@@ -169,13 +169,23 @@ def _candidate(*, version: str = "1.0.1") -> dict[str, Any]:
         "single_installer_for_both_origins": True,
         "updater_manifest": {
             "version": version,
-            "edition_id": edition_id,
-            "build_number": build_number,
-            "source_commit": "d" * 40,
-            "metadata_file": f"latest-{edition_id}.json",
-            "channel_tag": f"desktop-{edition_id}-channel",
-            "signature": "tauri-minisign-signature",
-            "download_url": global_url,
+            "updatePolicy": "recommended",
+            "notes": "\n".join(
+                (
+                    f"DroneDream-Sim {version} for Windows x64.",
+                    f"edition-id: {edition_id}",
+                    f"build-number: {build_number}",
+                    f"source-commit: {'d' * 40}",
+                    "update-policy: recommended",
+                )
+            ),
+            "pub_date": "2026-08-17T00:00:00Z",
+            "platforms": {
+                "windows-x86_64": {
+                    "signature": "tauri-minisign-signature",
+                    "url": global_url,
+                }
+            },
         },
         "origin_metadata": {
             "global_github_release": {
@@ -413,6 +423,32 @@ def test_future_immutable_release_allows_equal_semver_but_rejects_downgrade(
         (lambda value: value.update(has_pe_certificate_table=False), "certificate table"),
         (lambda value: value.update(source_inventory_commit="e" * 40), "inventory"),
         (lambda value: value.update(single_installer_for_both_origins=False), "same exact"),
+        (
+            lambda value: value["updater_manifest"].update(
+                notes=value["updater_manifest"]["notes"].replace(
+                    "build-number: 805", "build-number: 804"
+                )
+            ),
+            "updater latest",
+        ),
+        (
+            lambda value: value["updater_manifest"]["platforms"][
+                "windows-x86_64"
+            ].update(url="https://example.invalid/wrong.exe"),
+            "updater latest",
+        ),
+        (
+            lambda value: value["updater_manifest"].update(
+                pub_date="2026-08-17T00:00:00+08:00"
+            ),
+            "explicit UTC",
+        ),
+        (
+            lambda value: value["updater_manifest"]["platforms"].update(
+                {"linux-x86_64": {"signature": "unexpected", "url": "unexpected"}}
+            ),
+            "only Windows x64",
+        ),
         (
             lambda value: value["origin_metadata"]["alibaba_baota_mirror"].update(sha256="f" * 64),
             "metadata does not bind",

@@ -693,8 +693,6 @@ def verify_new_immutable_installer_release(
     if filename != expected_filename or filename == previous_release.get("file_name"):
         raise ValueError("new installer bytes require the edition product filename")
     release_tag = f"desktop-{edition_id}-v{version}-build-{build_number}"
-    channel_tag = f"desktop-{edition_id}-channel"
-    metadata_file = f"latest-{edition_id}.json"
     if candidate.get("release_tag") != release_tag:
         raise ValueError("candidate release tag does not match edition and build")
     sha256 = _require_sha256(candidate.get("sha256"), field="candidate.sha256")
@@ -714,27 +712,62 @@ def verify_new_immutable_installer_release(
         raise ValueError("candidate lacks a PE certificate table")
     if candidate.get("updater_signature_present") is not True:
         raise ValueError("candidate lacks the independent Tauri updater signature")
-    if candidate.get("source_inventory_commit") != candidate.get("source_commit"):
+    source_commit = _require_commit(
+        candidate.get("source_commit"),
+        field="candidate.source_commit",
+    )
+    if candidate.get("source_inventory_commit") != source_commit:
         raise ValueError("candidate release inventory does not bind the source commit")
-    _require_commit(candidate.get("source_commit"), field="candidate.source_commit")
     if candidate.get("single_installer_for_both_origins") is not True:
         raise ValueError("both origins must consume the same exact installer bytes")
     updater = _require_mapping(
         candidate.get("updater_manifest"),
         field="candidate.updater_manifest",
     )
-    expected_url_suffix = f"/{release_tag}/{filename}"
+    notes = updater.get("notes")
+    update_policy = updater.get("updatePolicy")
+    _require_timestamp(
+        updater.get("pub_date"),
+        field="candidate.updater_manifest.pub_date",
+    )
+    expected_note_header = f"{product_name} {version} for Windows x64."
+    note_fields: dict[str, str] = {}
+    if isinstance(notes, str):
+        note_lines = notes.splitlines()
+        if len(note_lines) == 5 and note_lines[0] == expected_note_header:
+            for line in note_lines[1:]:
+                key, separator, value = line.partition(": ")
+                if not separator or key in note_fields or not value:
+                    note_fields = {}
+                    break
+                note_fields[key] = value
+    platforms = _require_mapping(
+        updater.get("platforms"),
+        field="candidate.updater_manifest.platforms",
+    )
+    if set(platforms) != {"windows-x86_64"}:
+        raise ValueError("candidate updater latest.json must contain only Windows x64")
+    windows = _require_mapping(
+        platforms.get("windows-x86_64"),
+        field="candidate.updater_manifest.platforms.windows-x86_64",
+    )
+    expected_url = (
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/"
+        f"{release_tag}/{filename}"
+    )
     if (
         updater.get("version") != version
-        or updater.get("edition_id") != edition_id
-        or updater.get("build_number") != build_number
-        or updater.get("source_commit") != candidate.get("source_commit")
-        or updater.get("metadata_file") != metadata_file
-        or updater.get("channel_tag") != channel_tag
-        or not isinstance(updater.get("signature"), str)
-        or not updater["signature"].strip()
-        or not isinstance(updater.get("download_url"), str)
-        or not str(updater["download_url"]).endswith(expected_url_suffix)
+        or update_policy not in {"recommended", "required"}
+        or note_fields
+        != {
+            "edition-id": edition_id,
+            "build-number": str(build_number),
+            "source-commit": source_commit,
+            "update-policy": update_policy,
+        }
+        or not isinstance(windows.get("signature"), str)
+        or not windows["signature"].strip()
+        or windows.get("url") != expected_url
     ):
         raise ValueError("candidate updater latest.json does not bind exact new bytes")
     origin_metadata = _require_mapping(

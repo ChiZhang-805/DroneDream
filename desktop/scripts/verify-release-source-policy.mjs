@@ -40,6 +40,7 @@ const readme = readText("README.md");
 const llvmBuildScript = readText("desktop/scripts/build-windows-llvm.ps1");
 const msvcBuildScript = readText("desktop/scripts/build-windows-msvc.ps1");
 const updaterSignerScript = readText("desktop/scripts/invoke-tauri-updater-signer.ps1");
+const desktopReleaseWorkflow = readText(".github/workflows/desktop-installer.yml");
 for (const requiredText of [
   "Free code signing provided by [SignPath.io]",
   "certificate by [SignPath Foundation]",
@@ -51,10 +52,13 @@ for (const requiredText of [
     fail(`CODE_SIGNING_POLICY.md is missing: ${requiredText}`);
   }
 }
-if ([llvmBuildScript, msvcBuildScript, updaterSignerScript].some((script) =>
+if ([llvmBuildScript, msvcBuildScript, updaterSignerScript, desktopReleaseWorkflow].some((script) =>
   /--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(script)
 )) {
   fail("the updater key password must not be interpolated into a process argument");
+}
+if (!desktopReleaseWorkflow.includes("invoke-tauri-updater-signer.ps1")) {
+  fail("the formal desktop workflow must use the tested updater signer helper");
 }
 for (const [name, script] of [["MSVC", msvcBuildScript], ["LLVM fallback", llvmBuildScript]]) {
   if (!script.includes("invoke-tauri-updater-signer.ps1")) {
