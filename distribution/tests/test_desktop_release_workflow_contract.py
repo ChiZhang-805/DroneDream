@@ -69,6 +69,8 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "desktop-stable-channel-${{ needs.windows-nsis.outputs.edition_id }}",
         "cancel-in-progress: false",
         "release already exists and will never be overwritten; verified canonical assets will be reused",
+        "removed incomplete unpublished draft so this run can recreate it",
+        "published immutable release has an invalid asset count",
         '(cd "$existing_dir" && sha256sum --check',
         'cp "$existing_dir"/* dist/',
         '--json isDraft',
@@ -81,6 +83,8 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "failed to restore previous stable metadata asset",
         "https://uploads.github.com/repos/",
         "stable channel already contains identical build",
+        "removed unpublished stable-channel draft so publication can restart",
+        'gh release upload "$channel" "$metadata"',
         '--data-binary "@$source_file"',
         "Verify stable channel publication",
         '"unregistered-$($contract.editionId)-validation-client"',
@@ -90,7 +94,7 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
     assert "bundle/nsis/latest.json" not in workflow
     assert "--clobber" not in workflow
     assert workflow.count("--json isDraft") == 2
-    assert workflow.count("--draft=false") == 2
+    assert workflow.count("--draft=false") == 3
     assert workflow.index("if (( incoming_build < existing_build ))") < workflow.index(
         "candidate_json=",
     )

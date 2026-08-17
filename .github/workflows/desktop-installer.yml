@@ -866,55 +866,71 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          release_json="$(mktemp)"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > "$release_json" 2>/dev/null; then
+            existing_release_id="$(jq -er '.id' "$release_json")"
+            existing_is_draft="$(jq -er '.draft' "$release_json")"
+            existing_asset_count="$(jq -er '.assets | length' "$release_json")"
             existing_dir="$(mktemp -d)"
-            gh release download "$GITHUB_REF_NAME" \
-              --repo "$GITHUB_REPOSITORY" \
-              --dir "$existing_dir"
-            version="${{ needs.windows-nsis.outputs.version }}"
-            product_name="${{ needs.windows-nsis.outputs.product_name }}"
-            installer_name="${{ needs.windows-nsis.outputs.public_installer }}"
-            metadata_name="${{ needs.windows-nsis.outputs.metadata_file }}"
-            installer="$existing_dir/$installer_name"
-            checksum="${installer}.sha256"
-            signature="${installer}.sig"
-            test "$(find "$existing_dir" -maxdepth 1 -type f | wc -l)" -eq 5
-            test -f "$installer"
-            test -f "$checksum"
-            test -f "$signature"
-            test -f "$existing_dir/$metadata_name"
-            test -f "$existing_dir/release-source-inventory.json"
-            (cd "$existing_dir" && sha256sum --check "$(basename "$checksum")")
-            jq -e \
-              --arg version "$version" \
-              --arg product_name "$product_name" \
-              '.schemaVersion == 1 and
-               .productName == $product_name and
-               .productVersion == $version and
-               .repositoryLicense == "MIT" and
-               .sourceCommit == env.GITHUB_SHA' \
-              "$existing_dir/release-source-inventory.json" >/dev/null
-            expected_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$installer_name"
-            published_signature="$(cat "$signature")"
-            jq -e \
-              --arg version "$version" \
-              --arg expected_url "$expected_url" \
-              --arg published_signature "$published_signature" \
-              '.version == $version and
-               .platforms["windows-x86_64"].url == $expected_url and
-               .platforms["windows-x86_64"].signature == $published_signature' \
-              "$existing_dir/$metadata_name" >/dev/null
-            rm -f dist/*
-            cp "$existing_dir"/* dist/
-            if [[ "$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "true" ]]; then
-              gh release edit "$GITHUB_REF_NAME" \
+            if (( existing_asset_count > 0 )); then
+              gh release download "$GITHUB_REF_NAME" \
                 --repo "$GITHUB_REPOSITORY" \
-                --draft=false \
-                --latest=false
+                --dir "$existing_dir"
             fi
-            test "$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "false"
-            echo "release already exists and will never be overwritten; verified canonical assets will be reused: $GITHUB_REF_NAME"
-            exit 0
+            if (( existing_asset_count != 5 )); then
+              if [[ "$existing_is_draft" != "true" ]]; then
+                echo "published immutable release has an invalid asset count: $existing_asset_count" >&2
+                exit 3
+              fi
+              gh api --method DELETE \
+                "repos/$GITHUB_REPOSITORY/releases/$existing_release_id" >/dev/null
+              echo "removed incomplete unpublished draft so this run can recreate it: $GITHUB_REF_NAME"
+            else
+              version="${{ needs.windows-nsis.outputs.version }}"
+              product_name="${{ needs.windows-nsis.outputs.product_name }}"
+              installer_name="${{ needs.windows-nsis.outputs.public_installer }}"
+              metadata_name="${{ needs.windows-nsis.outputs.metadata_file }}"
+              installer="$existing_dir/$installer_name"
+              checksum="${installer}.sha256"
+              signature="${installer}.sig"
+              test "$(find "$existing_dir" -maxdepth 1 -type f | wc -l)" -eq "$existing_asset_count"
+              test -f "$installer"
+              test -f "$checksum"
+              test -f "$signature"
+              test -f "$existing_dir/$metadata_name"
+              test -f "$existing_dir/release-source-inventory.json"
+              (cd "$existing_dir" && sha256sum --check "$(basename "$checksum")")
+              jq -e \
+                --arg version "$version" \
+                --arg product_name "$product_name" \
+                '.schemaVersion == 1 and
+                 .productName == $product_name and
+                 .productVersion == $version and
+                 .repositoryLicense == "MIT" and
+                 .sourceCommit == env.GITHUB_SHA' \
+                "$existing_dir/release-source-inventory.json" >/dev/null
+              expected_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$installer_name"
+              published_signature="$(cat "$signature")"
+              jq -e \
+                --arg version "$version" \
+                --arg expected_url "$expected_url" \
+                --arg published_signature "$published_signature" \
+                '.version == $version and
+                 .platforms["windows-x86_64"].url == $expected_url and
+                 .platforms["windows-x86_64"].signature == $published_signature' \
+                "$existing_dir/$metadata_name" >/dev/null
+              rm -f dist/*
+              cp "$existing_dir"/* dist/
+              if [[ "$existing_is_draft" == "true" ]]; then
+                gh release edit "$GITHUB_REF_NAME" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --draft=false \
+                  --latest=false
+              fi
+              test "$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "false"
+              echo "release already exists and will never be overwritten; verified canonical assets will be reused: $GITHUB_REF_NAME"
+              exit 0
+            fi
           fi
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
@@ -958,6 +974,15 @@ jobs:
               --data-binary "@$source_file" \
               "${channel_upload_url}?name=$asset_name"
           }
+
+          channel_probe="$(mktemp)"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$channel" > "$channel_probe" 2>/dev/null &&
+             [[ "$(jq -er '.draft' "$channel_probe")" == "true" ]]; then
+            incomplete_channel_id="$(jq -er '.id' "$channel_probe")"
+            gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/releases/$incomplete_channel_id" >/dev/null
+            echo "removed unpublished stable-channel draft so publication can restart"
+          fi
 
           if gh release view "$channel" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             transaction_dir="$(mktemp -d)"
@@ -1066,12 +1091,26 @@ jobs:
               --prerelease
             trap - ERR
           else
-            gh release create "$channel" "$metadata" \
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$channel" >/dev/null 2>&1; then
+              gh api -X PATCH \
+                "repos/$GITHUB_REPOSITORY/git/refs/tags/$channel" \
+                -f sha="$GITHUB_SHA" \
+                -F force=true >/dev/null
+            fi
+            gh release create "$channel" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "${{ needs.windows-nsis.outputs.product_name }} stable channel" \
               --notes "Authenticated updater metadata for ${{ needs.windows-nsis.outputs.edition_id }} build $incoming_build." \
+              --draft \
               --prerelease
+            gh release upload "$channel" "$metadata" \
+              --repo "$GITHUB_REPOSITORY"
+            gh release edit "$channel" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease
+            test "$(gh release view "$channel" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "false"
           fi
 
       - name: Verify stable channel publication
