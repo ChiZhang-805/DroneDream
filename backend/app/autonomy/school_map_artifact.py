@@ -25,6 +25,13 @@ STAIR_WIDTH_M = 1.6
 STAIR_LANE_GAP_M = 0.44
 STAIR_LANDING_M = 1.6
 STAIR_LANDING_THICKNESS_M = 0.18
+TEACHING_ENTRANCE_CENTER_X = -25.0
+TEACHING_ENTRANCE_OPENING_M = 8.46
+ENTRANCE_DOOR_FRAME_WIDTH_M = 0.16
+ENTRANCE_DOOR_FRAME_DEPTH_M = 0.11
+ENTRANCE_DOOR_LEAF_WIDTH_M = 1.995
+ENTRANCE_DOOR_LEAF_DEPTH_M = 0.095
+ENTRANCE_DOOR_HEIGHT_M = 2.7
 
 ROAD_NETWORK = {
     "facility_anchors": {
@@ -173,7 +180,7 @@ def _teaching_floor_primitives() -> list[BoxPrimitive]:
             )
         )
         if floor == 1:
-            side_width = (56 - 8.46) / 2
+            side_width = (56 - TEACHING_ENTRANCE_OPENING_M) / 2
             result.extend(
                 (
                     _box(
@@ -191,7 +198,7 @@ def _teaching_floor_primitives() -> list[BoxPrimitive]:
                     _box(
                         "teaching-south-1-header",
                         (-25, 2, (2.92 + 3.6) / 2),
-                        (8.46, 0.22, 3.6 - 2.92),
+                        (TEACHING_ENTRANCE_OPENING_M, 0.22, 3.6 - 2.92),
                         "door-header",
                     ),
                 )
@@ -216,14 +223,63 @@ def _teaching_floor_primitives() -> list[BoxPrimitive]:
                 "entrance-step",
             )
         )
+    threshold_depth = (ENTRANCE_DOOR_FRAME_DEPTH_M - ENTRANCE_DOOR_LEAF_DEPTH_M) / 2
+    threshold_center_y = 2.0 - ENTRANCE_DOOR_FRAME_DEPTH_M / 2 + threshold_depth / 2
     result.append(
         _box(
             "teaching-entry-threshold",
-            (-25, 1.94875, FLOOR_SLAB_M - 0.01),
-            (8.46, 0.0075, 0.02),
+            (TEACHING_ENTRANCE_CENTER_X, threshold_center_y, FLOOR_SLAB_M - 0.01),
+            (TEACHING_ENTRANCE_OPENING_M, threshold_depth, 0.02),
             "door-threshold",
         )
     )
+    opening_half = TEACHING_ENTRANCE_OPENING_M / 2
+    frame_half = ENTRANCE_DOOR_FRAME_WIDTH_M / 2
+    door_center_height = FLOOR_SLAB_M + ENTRANCE_DOOR_HEIGHT_M / 2
+    for suffix, frame_x in (
+        (
+            "west",
+            TEACHING_ENTRANCE_CENTER_X - opening_half + frame_half,
+        ),
+        ("center", TEACHING_ENTRANCE_CENTER_X),
+        (
+            "east",
+            TEACHING_ENTRANCE_CENTER_X + opening_half - frame_half,
+        ),
+    ):
+        result.append(
+            _box(
+                f"teaching-entry-frame-{suffix}",
+                (frame_x, 2.0, door_center_height),
+                (
+                    ENTRANCE_DOOR_FRAME_WIDTH_M,
+                    ENTRANCE_DOOR_FRAME_DEPTH_M,
+                    ENTRANCE_DOOR_HEIGHT_M,
+                ),
+                "door-frame",
+            )
+        )
+    for index, leaf_x in enumerate(
+        (
+            TEACHING_ENTRANCE_CENTER_X + frame_half + ENTRANCE_DOOR_LEAF_WIDTH_M / 2,
+            TEACHING_ENTRANCE_CENTER_X
+            + frame_half
+            + ENTRANCE_DOOR_LEAF_WIDTH_M * 1.5,
+        ),
+        start=3,
+    ):
+        result.append(
+            _box(
+                f"teaching-entry-door-{index}-east-closed",
+                (leaf_x, 2.0, door_center_height),
+                (
+                    ENTRANCE_DOOR_LEAF_WIDTH_M,
+                    ENTRANCE_DOOR_LEAF_DEPTH_M,
+                    ENTRANCE_DOOR_HEIGHT_M,
+                ),
+                "closed-door-leaf",
+            )
+        )
     return result
 
 
@@ -523,6 +579,7 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "building-shells-and-floor-openings",
             "teaching-and-cafeteria-switchback-stairs",
             "entrance-steps-and-thresholds",
+            "fixed-door-frames-and-closed-leaves",
             "canopies-and-columns",
             "street-light-obstacles",
         ],

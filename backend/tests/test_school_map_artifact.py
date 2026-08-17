@@ -155,6 +155,32 @@ def test_road_endpoints_share_entrance_step_and_threshold_planes() -> None:
         )
 
 
+def test_teaching_closed_doors_and_frames_match_the_rendered_collision_state() -> None:
+    primitives = {primitive.name: primitive for primitive in school_map_collision_primitives()}
+    west_wall = primitives["teaching-south-1-west"]
+    east_wall = primitives["teaching-south-1-east"]
+    west_frame = primitives["teaching-entry-frame-west"]
+    center_frame = primitives["teaching-entry-frame-center"]
+    east_frame = primitives["teaching-entry-frame-east"]
+    closed_west = primitives["teaching-entry-door-3-east-closed"]
+    closed_east = primitives["teaching-entry-door-4-east-closed"]
+    threshold = primitives["teaching-entry-threshold"]
+
+    interfaces = (
+        (_bounds(west_wall, "x")[1], _bounds(west_frame, "x")[0]),
+        (_bounds(center_frame, "x")[1], _bounds(closed_west, "x")[0]),
+        (_bounds(closed_west, "x")[1], _bounds(closed_east, "x")[0]),
+        (_bounds(closed_east, "x")[1], _bounds(east_frame, "x")[0]),
+        (_bounds(east_frame, "x")[1], _bounds(east_wall, "x")[0]),
+        (_bounds(threshold, "y")[1], _bounds(closed_west, "y")[0]),
+    )
+    assert all(abs(left - right) <= STRUCTURAL_TOLERANCE_M for left, right in interfaces)
+    assert _bounds(center_frame, "x")[0] - _bounds(west_frame, "x")[1] == pytest.approx(3.99)
+    for obstruction in (west_frame, center_frame, east_frame, closed_west, closed_east):
+        assert _bounds(obstruction, "z")[0] == pytest.approx(0.22)
+        assert _bounds(obstruction, "z")[1] == pytest.approx(2.92)
+
+
 def test_school_map_manifest_and_qualification_bind_unverified_gazebo_contract() -> None:
     manifest = get_bundled_map_manifest("school-campus-v1")
     assert manifest is not None

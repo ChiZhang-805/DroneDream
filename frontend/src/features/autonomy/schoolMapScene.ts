@@ -690,7 +690,7 @@ function addEntrance(parent: THREE.Object3D) {
   addEntranceDoorLeaf(group, [x + 4.07, doorY, doorZ], "teaching-main-door-4-east-closed", -1, false, entranceLeafWidth);
   [x - 4.15, x, x + 4.15].forEach((postX, index) => box(
     group,
-    [0.16, 2.7, 0.18],
+    [0.16, 2.7, frameDepth],
     [postX, doorY, doorZ],
     COLORS.trim,
     { id: `teaching-main-door-frame-${index + 1}`, kind: "door-frame", metalness: 0.2 },
