@@ -66,6 +66,8 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "Prepare edition release artifact",
         "desktop/release-dist/*",
         "needs.windows-nsis.outputs.is_release == 'true'",
+        "desktop-stable-channel-${{ needs.windows-nsis.outputs.edition_id }}",
+        "cancel-in-progress: false",
         "release already exists and will never be overwritten; verified canonical assets will be reused",
         '(cd "$existing_dir" && sha256sum --check',
         'cp "$existing_dir"/* dist/',

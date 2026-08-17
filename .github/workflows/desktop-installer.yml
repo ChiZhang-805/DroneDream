@@ -821,6 +821,9 @@ jobs:
     if: ${{ needs.windows-nsis.outputs.is_release == 'true' }}
     needs: windows-nsis
     runs-on: ubuntu-24.04
+    concurrency:
+      group: desktop-stable-channel-${{ needs.windows-nsis.outputs.edition_id }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
