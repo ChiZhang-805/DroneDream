@@ -234,6 +234,11 @@ Windows Store Python execution aliases are rejected.
 from one clean source commit. Use `npm run build:four:llvm` only as the explicit
 portable fallback.
 
+The manual `Desktop installer` GitHub workflow accepts an edition choice and
+produces an unsigned, lifecycle-checked validation artifact without release
+authority. Formal publication is tag-only and cannot be triggered by that
+manual validation input.
+
 `npm run build:llvm` is the no-administrator fallback for Windows development
 machines without a usable MSVC installation. It expects the official Rust
 `1.97.0-x86_64-pc-windows-gnullvm` toolchain plus the portable LLVM-MinGW UCRT
@@ -253,14 +258,25 @@ The LLVM fallback also verifies the pinned NSIS template and the generated
 WebView2 health gate, then rewrites the SHA-256 file for the exact configured
 desktop version. Pull requests and manual desktop workflow runs retain an
 unsigned verified installer as a 14-day Actions artifact for testing only.
-Pushing an immutable `desktop-v<version>` tag whose version exactly matches the
-Tauri, npm, and Cargo metadata starts the protected release path: SignPath
-manually approves and signs the application, NSIS packages those signed bytes,
-SignPath manually approves and signs the installer, and CI verifies both
-publisher signatures before creating the updater signature, checksum, source
-inventory, and immutable GitHub Release. An existing release is never
-overwritten. See `../CODE_SIGNING_POLICY.md` and
-`../docs/signpath-foundation-application.md` for the policy and configuration.
+Pushing an immutable
+`desktop-<edition>-v<version>-build-<git-commit-count>` tag starts the protected
+release path for exactly one of `universal`, `sim`, `lab`, or `field`. The
+version must match the Tauri, npm, and Cargo metadata and the build number must
+match the tagged commit count. SignPath manually approves and signs the
+application, NSIS packages those signed bytes, SignPath manually approves and
+signs the installer, and CI verifies both publisher signatures before creating
+the updater signature, checksum, edition-aware source inventory, and immutable
+GitHub Release. An existing immutable release is never overwritten.
+
+After the immutable release is public, CI advances only that edition's moving
+metadata channel (`desktop-<edition>-channel`) and replaces only its
+`latest-<edition>.json`. The metadata continues to point at the immutable
+installer asset, so the application can update without mixing products or
+rewriting historical binaries. Public installer names are
+`DroneDream-<Edition>-<version>.exe`; raw Tauri bundle names remain internal to
+the build. See `../CODE_SIGNING_POLICY.md`,
+`../distribution/desktop/edition-runtime-update-families.v1.json`, and
+`../docs/signpath-foundation-application.md` for the contracts.
 
 For this 16 GB development machine, keep `CARGO_BUILD_JOBS=4` and never compile
 PX4 while a Gazebo GUI simulation is running. The initial beta runtime target is

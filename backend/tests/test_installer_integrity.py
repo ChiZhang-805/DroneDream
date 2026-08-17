@@ -444,7 +444,9 @@ def test_desktop_workflow_bounds_pr_concurrency_and_artifact_retention() -> None
         "(github.event_name == 'workflow_dispatch' && 14 || 30) }}"
     )
     assert workflow.count(retention) == 1
-    assert 'name: DroneDream-Windows-x64' in workflow
-    assert 'tags:\n      - "desktop-v*"' in workflow
+    assert 'name: DroneDream-${{ steps.release.outputs.edition_id }}-Windows-x64' in workflow
+    for edition in ("universal", "sim", "lab", "field"):
+        assert f'      - "desktop-{edition}-v*-build-*"' in workflow
+    assert 'tags:\n      - "desktop-v*"' not in workflow
     assert "workflow_dispatch:" in workflow
     assert "pull_request:" in workflow

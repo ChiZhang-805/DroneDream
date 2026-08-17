@@ -9,9 +9,16 @@ const outputArgumentIndex = process.argv.indexOf("--output");
 const outputPath = outputArgumentIndex >= 0
   ? process.argv[outputArgumentIndex + 1]
   : null;
+const editionConfigArgumentIndex = process.argv.indexOf("--edition-config");
+const editionConfigPath = editionConfigArgumentIndex >= 0
+  ? process.argv[editionConfigArgumentIndex + 1]
+  : null;
 
 if (outputArgumentIndex >= 0 && !outputPath) {
   throw new Error("--output requires a path");
+}
+if (editionConfigArgumentIndex >= 0 && !editionConfigPath) {
+  throw new Error("--edition-config requires a path");
 }
 
 function readText(path) {
@@ -159,6 +166,20 @@ if (missingRustLicenses.length > 0) {
 }
 
 const tauriConfig = JSON.parse(readText("desktop/src-tauri/tauri.conf.json"));
+const editionConfig = editionConfigPath
+  ? JSON.parse(readFileSync(
+    isAbsolute(editionConfigPath)
+      ? editionConfigPath
+      : resolve(repositoryRoot, editionConfigPath),
+    "utf8",
+  ))
+  : null;
+if (editionConfig?.version && editionConfig.version !== tauriConfig.version) {
+  fail("edition Tauri config version must match the canonical product version");
+}
+if (editionConfig && !editionConfig.productName) {
+  fail("edition Tauri config must define its product name");
+}
 const mainWindow = tauriConfig.app?.windows?.find((window) => window.label === "main");
 if (!mainWindow) {
   fail("canonical Tauri config is missing the main application window");
@@ -204,7 +225,7 @@ const inventory = {
     cwd: repositoryRoot,
     encoding: "utf8",
   }).trim(),
-  productName: tauriConfig.productName,
+  productName: editionConfig?.productName ?? tauriConfig.productName,
   productVersion: tauriConfig.version,
   repositoryLicense: "MIT",
   trackedSourceFiles: trackedFiles.length,
