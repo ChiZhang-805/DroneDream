@@ -8,6 +8,7 @@ import {
   compareReleaseVersions,
   fallbackRelease,
   formatBinarySize,
+  isReleaseCandidateNonDowngrade,
   isWebsiteRelease,
 } from "../site/release";
 
@@ -366,6 +367,28 @@ describe("DroneDream public website", () => {
     })).toBe(false);
     expect(isWebsiteRelease({ ...editionRelease, buildNumber: 806 })).toBe(false);
     expect(isWebsiteRelease({ ...editionRelease, edition: undefined })).toBe(false);
+    const olderEditionBuild = {
+      ...editionRelease,
+      buildNumber: 804,
+      downloadUrl: editionRelease.downloadUrl.replace("build-805", "build-804"),
+      checksumUrl: editionRelease.checksumUrl.replace("build-805", "build-804"),
+    };
+    const newerEditionBuild = {
+      ...editionRelease,
+      buildNumber: 806,
+      downloadUrl: editionRelease.downloadUrl.replace("build-805", "build-806"),
+      checksumUrl: editionRelease.checksumUrl.replace("build-805", "build-806"),
+    };
+    expect(isWebsiteRelease(olderEditionBuild)).toBe(true);
+    expect(isWebsiteRelease(newerEditionBuild)).toBe(true);
+    expect(isReleaseCandidateNonDowngrade(olderEditionBuild, editionRelease)).toBe(false);
+    expect(isReleaseCandidateNonDowngrade(editionRelease, editionRelease)).toBe(true);
+    expect(isReleaseCandidateNonDowngrade(newerEditionBuild, editionRelease)).toBe(true);
+    expect(isReleaseCandidateNonDowngrade(
+      { ...newerEditionBuild, edition: "field" },
+      editionRelease,
+    )).toBe(false);
+    expect(isReleaseCandidateNonDowngrade(fallbackRelease, fallbackRelease)).toBe(true);
     expect(compareReleaseVersions("0.3.18", "0.3.18")).toBe(0);
     expect(compareReleaseVersions("0.4.0", "0.3.18")).toBe(1);
     expect(compareReleaseVersions("0.3.17", "0.3.18")).toBe(-1);

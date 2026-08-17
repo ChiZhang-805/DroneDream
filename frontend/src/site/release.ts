@@ -131,3 +131,21 @@ export function compareReleaseVersions(left: string, right: string) {
   }
   return 0;
 }
+
+export function isReleaseCandidateNonDowngrade(
+  candidate: WebsiteRelease,
+  current: WebsiteRelease,
+) {
+  const versionComparison = compareReleaseVersions(candidate.version, current.version);
+  if (versionComparison !== 0) return versionComparison > 0;
+
+  if (
+    candidate.edition === undefined ||
+    current.edition === undefined ||
+    candidate.buildNumber === undefined ||
+    current.buildNumber === undefined
+  ) return true;
+
+  return candidate.edition === current.edition &&
+    candidate.buildNumber >= current.buildNumber;
+}

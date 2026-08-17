@@ -27,9 +27,9 @@ import {
   type EditionAvailabilityDocument,
 } from "./editionAvailability";
 import {
-  compareReleaseVersions,
   fallbackRelease,
   formatBinarySize,
+  isReleaseCandidateNonDowngrade,
   isWebsiteRelease,
   type WebsiteRelease,
 } from "./release";
@@ -866,7 +866,7 @@ export function SiteApp() {
       .then((candidate) => {
         if (
           isWebsiteRelease(candidate) &&
-          compareReleaseVersions(candidate.version, fallbackRelease.version) >= 0
+          isReleaseCandidateNonDowngrade(candidate, fallbackRelease)
         ) {
           setRelease(candidate);
         }
