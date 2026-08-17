@@ -212,7 +212,27 @@ $installerSha256 = ([string]$metadata.sha256).ToLowerInvariant()
 if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
     throw "latest.json contains an invalid release version."
 }
-$expectedInstallerName = "DroneDream_${version}_x64-setup.exe"
+$hasEdition = $null -ne $metadata.PSObject.Properties['edition']
+$hasBuildNumber = $null -ne $metadata.PSObject.Properties['buildNumber']
+if ($hasEdition -xor $hasBuildNumber) {
+    throw "latest.json edition metadata is incomplete."
+}
+if ($hasEdition) {
+    $editionProducts = @{
+        universal = "DroneDream-Universal"
+        sim = "DroneDream-Sim"
+        lab = "DroneDream-Lab"
+        field = "DroneDream-Field"
+    }
+    $edition = [string]$metadata.edition
+    $buildNumber = [long]$metadata.buildNumber
+    if (-not $editionProducts.ContainsKey($edition) -or $buildNumber -le 0) {
+        throw "latest.json contains invalid edition release metadata."
+    }
+    $expectedInstallerName = "$($editionProducts[$edition])-$version.exe"
+} else {
+    $expectedInstallerName = "DroneDream_${version}_x64-setup.exe"
+}
 if ($installerName -ne $expectedInstallerName -or
     $installerSha256 -notmatch '^[0-9a-f]{64}$' -or
     [string]$metadata.downloadUrl -ne "/downloads/$installerName" -or

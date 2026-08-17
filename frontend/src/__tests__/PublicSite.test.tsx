@@ -351,6 +351,21 @@ describe("DroneDream public website", () => {
     })).toBe(false);
     expect(isWebsiteRelease({ ...fallbackRelease, version: "0.3.12" })).toBe(false);
     expect(isWebsiteRelease({ ...fallbackRelease, publishedAt: "2026-99-99" })).toBe(false);
+    const editionRelease = {
+      ...fallbackRelease,
+      edition: "sim" as const,
+      buildNumber: 805,
+      fileName: "DroneDream-Sim-1.0.0.exe",
+      downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-sim-v1.0.0-build-805/DroneDream-Sim-1.0.0.exe",
+      checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-sim-v1.0.0-build-805/DroneDream-Sim-1.0.0.exe.sha256",
+    };
+    expect(isWebsiteRelease(editionRelease)).toBe(true);
+    expect(isWebsiteRelease({
+      ...editionRelease,
+      fileName: "DroneDream-Field-1.0.0.exe",
+    })).toBe(false);
+    expect(isWebsiteRelease({ ...editionRelease, buildNumber: 806 })).toBe(false);
+    expect(isWebsiteRelease({ ...editionRelease, edition: undefined })).toBe(false);
     expect(compareReleaseVersions("0.3.18", "0.3.18")).toBe(0);
     expect(compareReleaseVersions("0.4.0", "0.3.18")).toBe(1);
     expect(compareReleaseVersions("0.3.17", "0.3.18")).toBe(-1);

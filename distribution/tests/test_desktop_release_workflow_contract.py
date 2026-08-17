@@ -67,16 +67,26 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "desktop/release-dist/*",
         "needs.windows-nsis.outputs.is_release == 'true'",
         "release already exists and will never be overwritten",
+        'cmp "$source_file" "$published_file"',
         "Advance edition stable channel",
-        'gh release upload "$channel" "$metadata"',
-        "--clobber",
+        "stable channel build must increase",
+        "candidate_name=",
+        "rollback_stable_metadata",
+        "failed to restore previous stable metadata asset",
+        "uploads.github.com",
         "Verify stable channel publication",
         '"unregistered-$($contract.editionId)-validation-client"',
     ):
         assert fragment in workflow
     assert 'startsWith(github.ref, \'refs/tags/desktop-v\')' not in workflow
     assert "bundle/nsis/latest.json" not in workflow
-    assert workflow.count("--clobber") == 1
+    assert "--clobber" not in workflow
+    assert workflow.index("if (( incoming_build <= existing_build ))") < workflow.index(
+        "candidate_json=",
+    )
+    assert workflow.index("final_replaced=true") < workflow.index(
+        '-f sha="$GITHUB_SHA"',
+    )
 
 
 def test_tauri_commands_convert_repo_root_config_for_npm_prefix() -> None:

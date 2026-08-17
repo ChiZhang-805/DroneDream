@@ -1,32 +1,58 @@
+param(
+    [ValidateSet("universal", "sim", "lab", "field")]
+    [string]$EditionId = "universal",
+    [UInt64]$BuildNumber = 0
+)
+
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $true
 
 $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $frontendRoot = Join-Path $repositoryRoot "frontend"
 $tauriConfigPath = Join-Path $repositoryRoot "desktop\src-tauri\tauri.conf.json"
+$familyContractPath = Join-Path $repositoryRoot `
+    "distribution\desktop\edition-runtime-update-families.v1.json"
 $tauriConfig = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
+$familyContract = Get-Content -LiteralPath $familyContractPath -Raw | ConvertFrom-Json
 $version = [string]$tauriConfig.version
+$family = @($familyContract.editions | Where-Object { $_.editionId -ceq $EditionId })
+if ($family.Count -ne 1) {
+    throw "The desktop release contract must contain exactly one $EditionId edition."
+}
+$family = $family[0]
+if ([string]$familyContract.productDisplayVersion -cne $version) {
+    throw "The desktop family contract version does not match the Tauri version."
+}
+if ($BuildNumber -eq 0) {
+    $resolvedBuildNumber = (& git rev-list --count HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $resolvedBuildNumber -notmatch '^[1-9]\d*$') {
+        throw "Unable to derive a positive desktop build number from Git."
+    }
+    $BuildNumber = [UInt64]$resolvedBuildNumber
+}
 
 $bundleDirectory = Join-Path $repositoryRoot `
-    "desktop\src-tauri\target\x86_64-pc-windows-gnullvm\release\bundle\nsis"
-$installerName = "DroneDream_${version}_x64-setup.exe"
-$installerPath = Join-Path $bundleDirectory $installerName
-$checksumPath = "$installerPath.sha256"
+    "desktop\src-tauri\target\release\bundle\nsis"
+$bundleInstallerName = [string]$family.tauriBundleInstallerFileName
+$installerName = [string]$family.publicArtifactFileName
+$installerPath = Join-Path $bundleDirectory $bundleInstallerName
+$sourceChecksumPath = "$installerPath.sha256"
 
 if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
     throw "Build the versioned desktop installer first. Missing: $installerPath"
 }
-if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
-    throw "The installer checksum is missing: $checksumPath"
-}
-
 $calculatedHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
-$checksumLine = (Get-Content -LiteralPath $checksumPath -Raw).Trim()
-if ($checksumLine -notmatch "^$calculatedHash\s+$([regex]::Escape($installerName))$") {
-    throw "The installer checksum file does not match the current EXE."
+if (Test-Path -LiteralPath $sourceChecksumPath -PathType Leaf) {
+    $checksumLine = (Get-Content -LiteralPath $sourceChecksumPath -Raw).Trim()
+    if ($checksumLine -notmatch "^$calculatedHash\s+$([regex]::Escape($bundleInstallerName))$") {
+        throw "The optional bundle checksum file does not match the current EXE."
+    }
 }
 
 $installer = Get-Item -LiteralPath $installerPath
 $metadata = [ordered]@{
+    edition = $EditionId
+    buildNumber = $BuildNumber
     version = $version
     fileName = $installerName
     downloadUrl = "/downloads/$installerName"
@@ -73,7 +99,12 @@ $downloadsDirectory = Join-Path $outputDirectory "downloads"
 New-Item -ItemType Directory -Force -Path $downloadsDirectory | Out-Null
 
 Copy-Item -LiteralPath $installerPath -Destination (Join-Path $downloadsDirectory $installerName) -Force
-Copy-Item -LiteralPath $checksumPath -Destination (Join-Path $downloadsDirectory "$installerName.sha256") -Force
+$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllText(
+    (Join-Path $downloadsDirectory "$installerName.sha256"),
+    "$calculatedHash  $installerName$([Environment]::NewLine)",
+    $utf8WithoutBom
+)
 
 # Keep the generated download directory unambiguous for local QA and server
 # uploads. Prune only versioned DroneDream installer artifacts, only inside the
@@ -91,7 +122,7 @@ $currentDownloadArtifacts = @(
 )
 Get-ChildItem -LiteralPath $downloadsDirectoryFull -File |
     Where-Object {
-        $_.Name -match '^DroneDream_.+_x64-setup\.exe(?:\.sha256)?$' -and
+        $_.Name -match '^DroneDream(?:_|-).+\.exe(?:\.sha256)?$' -and
         $_.FullName -notin $currentDownloadArtifacts
     } |
     ForEach-Object {
@@ -115,7 +146,6 @@ Copy-Item -LiteralPath $siteHtml -Destination (Join-Path $outputDirectory "index
 
 $metadataPath = Join-Path $downloadsDirectory "latest.json"
 $metadataJson = $metadata | ConvertTo-Json
-$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($metadataPath, "$metadataJson$([Environment]::NewLine)", $utf8WithoutBom)
 
 # Publish an integrity manifest for the complete static release, not just the
@@ -141,6 +171,6 @@ $manifestLines = @(
 )
 
 Write-Host "DroneDream website release built at $outputDirectory"
-Write-Host "Release: $version ($($installer.Length) bytes)"
+Write-Host "Release: $EditionId $version build $BuildNumber ($($installer.Length) bytes)"
 Write-Host "SHA-256: $calculatedHash"
 Write-Host "Integrity manifest: $($manifestLines.Count) files"

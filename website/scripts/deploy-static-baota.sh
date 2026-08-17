@@ -344,7 +344,24 @@ if data.get("sha256") != expected_sha:
 name = data.get("fileName")
 if not isinstance(name, str) or pathlib.PurePath(name).name != name:
     raise SystemExit("latest.json contains an unsafe installer filename")
-expected_name = f"DroneDream_{version}_x64-setup.exe"
+products = {
+    "universal": "DroneDream-Universal",
+    "sim": "DroneDream-Sim",
+    "lab": "DroneDream-Lab",
+    "field": "DroneDream-Field",
+}
+has_edition = "edition" in data
+has_build = "buildNumber" in data
+if has_edition != has_build:
+    raise SystemExit("latest.json edition metadata is incomplete")
+if has_edition:
+    edition = data.get("edition")
+    build_number = data.get("buildNumber")
+    if edition not in products or not isinstance(build_number, int) or isinstance(build_number, bool) or build_number <= 0:
+        raise SystemExit("latest.json contains invalid edition release metadata")
+    expected_name = f"{products[edition]}-{version}.exe"
+else:
+    expected_name = f"DroneDream_{version}_x64-setup.exe"
 if name != expected_name:
     raise SystemExit("latest.json installer filename does not match the release version")
 if data.get("downloadUrl") != f"/downloads/{name}":

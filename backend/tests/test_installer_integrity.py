@@ -131,27 +131,34 @@ def _build_frozen_audit(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 def _candidate() -> dict[str, Any]:
     version = "1.0.1"
-    filename = f"DroneDream_{version}_x64-setup.exe"
+    edition_id = "sim"
+    build_number = 805
+    filename = f"DroneDream-Sim-{version}.exe"
+    release_tag = f"desktop-{edition_id}-v{version}-build-{build_number}"
     sha256 = "c" * 64
     global_url = (
         "https://github.com/ChiZhang-805/DroneDream/releases/download/"
-        f"desktop-v{version}/{filename}"
+        f"{release_tag}/{filename}"
     )
     mirror_url = f"https://downloads.example.invalid/{filename}"
     metadata = {
         "version": version,
-        "release_tag": f"desktop-v{version}",
+        "edition_id": edition_id,
+        "build_number": build_number,
+        "release_tag": release_tag,
         "file_name": filename,
         "sha256": sha256,
         "size_bytes": 12_345,
     }
     return {
         "contract_version": IMMUTABLE_INSTALLER_RELEASE_CONTRACT_VERSION,
+        "edition_id": edition_id,
+        "build_number": build_number,
         "version": version,
         "version_owner_approved": True,
         "version_approval_reference": "owner-approved-release-ticket",
         "file_name": filename,
-        "release_tag": f"desktop-v{version}",
+        "release_tag": release_tag,
         "bytes": 12_345,
         "sha256": sha256,
         "checksum_verified": True,
@@ -163,6 +170,11 @@ def _candidate() -> dict[str, Any]:
         "single_installer_for_both_origins": True,
         "updater_manifest": {
             "version": version,
+            "edition_id": edition_id,
+            "build_number": build_number,
+            "source_commit": "d" * 40,
+            "metadata_file": f"latest-{edition_id}.json",
+            "channel_tag": f"desktop-{edition_id}-channel",
             "signature": "tauri-minisign-signature",
             "download_url": global_url,
         },
@@ -361,8 +373,10 @@ def test_future_immutable_release_contract_accepts_only_new_exact_signed_bytes(
 
     assert result == {
         "status": "passed",
+        "edition_id": "sim",
         "version": "1.0.1",
-        "file_name": "DroneDream_1.0.1_x64-setup.exe",
+        "build_number": 805,
+        "file_name": "DroneDream-Sim-1.0.1.exe",
         "sha256": "c" * 64,
         "source_commit": "d" * 40,
         "publication_authorized": False,
@@ -372,7 +386,8 @@ def test_future_immutable_release_contract_accepts_only_new_exact_signed_bytes(
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
-        (lambda value: value.update(version="1.0.0"), "new approved version"),
+        (lambda value: value.update(build_number=0), "positive integer"),
+        (lambda value: value.update(edition_id="unknown"), "supported desktop edition"),
         (
             lambda value: value.update(version_owner_approved=False),
             "explicit owner approval",

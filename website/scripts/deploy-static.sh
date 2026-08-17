@@ -30,6 +30,21 @@ fi
 
 mapfile -t release_metadata < <(node -e '
   const release = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+  const products = {
+    universal: "DroneDream-Universal",
+    sim: "DroneDream-Sim",
+    lab: "DroneDream-Lab",
+    field: "DroneDream-Field",
+  };
+  const hasEdition = Object.hasOwn(release, "edition");
+  const hasBuildNumber = Object.hasOwn(release, "buildNumber");
+  if (hasEdition !== hasBuildNumber) process.exit(2);
+  const expectedName = hasEdition
+    ? `${products[release.edition] ?? ""}-${release.version}.exe`
+    : `DroneDream_${release.version}_x64-setup.exe`;
+  if (hasEdition && (!Object.hasOwn(products, release.edition) ||
+      !Number.isSafeInteger(release.buildNumber) || release.buildNumber <= 0)) process.exit(2);
+  if (release.fileName !== expectedName) process.exit(2);
   console.log(release.version, release.fileName, release.sha256);
 ' "$metadata_file" | tr ' ' '\n')
 
@@ -37,7 +52,7 @@ version="${release_metadata[0]:-}"
 installer_name="${release_metadata[1]:-}"
 expected_sha256="${release_metadata[2]:-}"
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
-   [[ "$installer_name" != "DroneDream_${version}_x64-setup.exe" ]] ||
+   [[ ! "$installer_name" =~ ^DroneDream[-_][A-Za-z0-9._-]+\.exe$ ]] ||
    [[ ! "$expected_sha256" =~ ^[a-f0-9]{64}$ ]]; then
   echo "latest.json contains invalid release metadata." >&2
   exit 1

@@ -863,8 +863,18 @@ jobs:
         run: |
           set -Eeuo pipefail
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "release already exists and will never be overwritten: $GITHUB_REF_NAME" >&2
-            exit 2
+            existing_dir="$(mktemp -d)"
+            gh release download "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --dir "$existing_dir"
+            test "$(find "$existing_dir" -maxdepth 1 -type f | wc -l)" -eq 5
+            while IFS= read -r source_file; do
+              published_file="$existing_dir/$(basename "$source_file")"
+              test -f "$published_file"
+              cmp "$source_file" "$published_file"
+            done < <(find dist -maxdepth 1 -type f -print | sort)
+            echo "release already exists and will never be overwritten: $GITHUB_REF_NAME"
+            exit 0
           fi
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
@@ -887,25 +897,126 @@ jobs:
           set -Eeuo pipefail
           channel="${{ needs.windows-nsis.outputs.channel_tag }}"
           metadata="dist/${{ needs.windows-nsis.outputs.metadata_file }}"
+          metadata_name="$(basename "$metadata")"
+          incoming_build="$(
+            jq -er '.notes | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build' \
+              "$metadata"
+          )"
+
+          upload_asset() {
+            local release_id="$1"
+            local source_file="$2"
+            local asset_name="$3"
+            gh api \
+              --hostname uploads.github.com \
+              --method POST \
+              -H "Content-Type: application/json" \
+              --input "$source_file" \
+              "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$asset_name"
+          }
+
           if gh release view "$channel" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            transaction_dir="$(mktemp -d)"
+            channel_json="$transaction_dir/channel.json"
+            backup_metadata="$transaction_dir/$metadata_name"
+            candidate_name="${metadata_name}.candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            candidate_asset_id=""
+            replacement_asset_id=""
+            final_replaced=false
+
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$channel" > "$channel_json"
+            release_id="$(jq -er '.id' "$channel_json")"
+            old_tag_sha="$(
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$channel" --jq '.object.sha'
+            )"
+            old_asset_id="$(
+              jq -er --arg name "$metadata_name" \
+                '[.assets[] | select(.name == $name)] | if length == 1 then .[0].id else error("stable channel must contain exactly one metadata asset") end' \
+                "$channel_json"
+            )"
+            gh release download "$channel" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$metadata_name" \
+              --dir "$transaction_dir"
+            existing_build="$(
+              jq -er '.notes | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build' \
+                "$backup_metadata"
+            )"
+            if (( incoming_build <= existing_build )); then
+              echo "stable channel build must increase: existing=$existing_build incoming=$incoming_build" >&2
+              exit 2
+            fi
+
+            rollback_stable_metadata() {
+              local status=$?
+              set +e
+              if [[ -n "$candidate_asset_id" ]]; then
+                gh api --method DELETE \
+                  "repos/$GITHUB_REPOSITORY/releases/assets/$candidate_asset_id" >/dev/null
+              fi
+              if [[ "$final_replaced" == true ]]; then
+                if [[ -n "$replacement_asset_id" ]]; then
+                  gh api --method DELETE \
+                    "repos/$GITHUB_REPOSITORY/releases/assets/$replacement_asset_id" >/dev/null
+                fi
+                for restore_attempt in 1 2 3 4; do
+                  if upload_asset "$release_id" "$backup_metadata" "$metadata_name" >/dev/null; then
+                    break
+                  fi
+                  sleep "$restore_attempt"
+                done
+                restored_count="$(
+                  gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+                    --jq "[.assets[] | select(.name == \"$metadata_name\")] | length" \
+                    2>/dev/null
+                )"
+                if [[ "$restored_count" != "1" ]]; then
+                  echo "CRITICAL: failed to restore previous stable metadata asset" >&2
+                fi
+                gh api -X PATCH \
+                  "repos/$GITHUB_REPOSITORY/git/refs/tags/$channel" \
+                  -f sha="$old_tag_sha" \
+                  -F force=true >/dev/null
+              fi
+              exit "$status"
+            }
+            trap rollback_stable_metadata ERR
+
+            candidate_json="$transaction_dir/candidate.json"
+            upload_asset "$release_id" "$metadata" "$candidate_name" > "$candidate_json"
+            candidate_asset_id="$(jq -er '.id' "$candidate_json")"
+            mkdir "$transaction_dir/candidate"
+            gh release download "$channel" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$candidate_name" \
+              --dir "$transaction_dir/candidate"
+            cmp "$metadata" "$transaction_dir/candidate/$candidate_name"
+
+            gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/releases/assets/$old_asset_id" >/dev/null
+            final_replaced=true
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/releases/assets/$candidate_asset_id" \
+              -f name="$metadata_name" >/dev/null
+            replacement_asset_id="$candidate_asset_id"
+            candidate_asset_id=""
+
             gh api -X PATCH \
               "repos/$GITHUB_REPOSITORY/git/refs/tags/$channel" \
               -f sha="$GITHUB_SHA" \
               -F force=true >/dev/null
-            gh release upload "$channel" "$metadata" \
-              --repo "$GITHUB_REPOSITORY" \
-              --clobber
             gh release edit "$channel" \
               --repo "$GITHUB_REPOSITORY" \
               --title "${{ needs.windows-nsis.outputs.product_name }} stable channel" \
-              --notes "Authenticated updater metadata for the current ${{ needs.windows-nsis.outputs.edition_id }} stable release." \
+              --notes "Authenticated updater metadata for ${{ needs.windows-nsis.outputs.edition_id }} build $incoming_build." \
               --prerelease
+            trap - ERR
           else
             gh release create "$channel" "$metadata" \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "${{ needs.windows-nsis.outputs.product_name }} stable channel" \
-              --notes "Authenticated updater metadata for the current ${{ needs.windows-nsis.outputs.edition_id }} stable release." \
+              --notes "Authenticated updater metadata for ${{ needs.windows-nsis.outputs.edition_id }} build $incoming_build." \
               --prerelease
           fi
 

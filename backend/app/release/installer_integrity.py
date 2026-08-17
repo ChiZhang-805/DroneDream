@@ -58,6 +58,12 @@ _AUTHENTICODE_STATUSES = {
     "NotTrusted",
     "UnknownError",
 }
+_DESKTOP_EDITION_PRODUCTS = {
+    "universal": "DroneDream-Universal",
+    "sim": "DroneDream-Sim",
+    "lab": "DroneDream-Lab",
+    "field": "DroneDream-Field",
+}
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -626,20 +632,34 @@ def verify_new_immutable_installer_release(
         previous_release.get("version"),
         field="previous release.version",
     )
-    if version == previous_version:
-        raise ValueError("new installer bytes require a new approved version")
+    # Edition-scoped releases use a monotonically increasing build number, so
+    # independently signed builds may intentionally share the display version.
+    # The historical generic installer remains the previous-origin authority;
+    # it must not force all four first edition releases to invent a new SemVer.
+    _ = previous_version
     if (
         candidate.get("version_owner_approved") is not True
         or not isinstance(candidate.get("version_approval_reference"), str)
         or not candidate["version_approval_reference"].strip()
     ):
         raise ValueError("new installer version requires explicit owner approval")
+    edition_id = candidate.get("edition_id")
+    if edition_id not in _DESKTOP_EDITION_PRODUCTS:
+        raise ValueError("candidate.edition_id is not a supported desktop edition")
+    build_number = _require_positive_int(
+        candidate.get("build_number"),
+        field="candidate.build_number",
+    )
+    product_name = _DESKTOP_EDITION_PRODUCTS[edition_id]
     filename = candidate.get("file_name")
-    expected_filename = f"DroneDream_{version}_x64-setup.exe"
+    expected_filename = f"{product_name}-{version}.exe"
     if filename != expected_filename or filename == previous_release.get("file_name"):
-        raise ValueError("new installer bytes require a new versioned filename")
-    if candidate.get("release_tag") != f"desktop-v{version}":
-        raise ValueError("candidate release tag does not match the new version")
+        raise ValueError("new installer bytes require the edition product filename")
+    release_tag = f"desktop-{edition_id}-v{version}-build-{build_number}"
+    channel_tag = f"desktop-{edition_id}-channel"
+    metadata_file = f"latest-{edition_id}.json"
+    if candidate.get("release_tag") != release_tag:
+        raise ValueError("candidate release tag does not match edition and build")
     sha256 = _require_sha256(candidate.get("sha256"), field="candidate.sha256")
     _require_positive_int(candidate.get("bytes"), field="candidate.bytes")
     previous_origins = _require_mapping(previous_audit.get("origins"), field="previous origins")
@@ -666,9 +686,14 @@ def verify_new_immutable_installer_release(
         candidate.get("updater_manifest"),
         field="candidate.updater_manifest",
     )
-    expected_url_suffix = f"/desktop-v{version}/{filename}"
+    expected_url_suffix = f"/{release_tag}/{filename}"
     if (
         updater.get("version") != version
+        or updater.get("edition_id") != edition_id
+        or updater.get("build_number") != build_number
+        or updater.get("source_commit") != candidate.get("source_commit")
+        or updater.get("metadata_file") != metadata_file
+        or updater.get("channel_tag") != channel_tag
         or not isinstance(updater.get("signature"), str)
         or not updater["signature"].strip()
         or not isinstance(updater.get("download_url"), str)
@@ -686,7 +711,9 @@ def verify_new_immutable_installer_release(
         )
         if (
             metadata.get("version") != version
-            or metadata.get("release_tag") != f"desktop-v{version}"
+            or metadata.get("edition_id") != edition_id
+            or metadata.get("build_number") != build_number
+            or metadata.get("release_tag") != release_tag
             or metadata.get("file_name") != filename
             or metadata.get("sha256") != sha256
             or metadata.get("size_bytes") != candidate.get("bytes")
@@ -697,7 +724,9 @@ def verify_new_immutable_installer_release(
             raise ValueError(f"{name} metadata does not bind exact new bytes")
     return {
         "status": "passed",
+        "edition_id": edition_id,
         "version": version,
+        "build_number": build_number,
         "file_name": filename,
         "sha256": sha256,
         "source_commit": candidate["source_commit"],

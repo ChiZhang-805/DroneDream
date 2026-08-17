@@ -169,6 +169,23 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
             workflow,
         )
 
+    def test_release_build_and_deploy_accept_edition_scoped_msvc_artifacts(self) -> None:
+        pages_builder = self.read("website/scripts/build-pages-site.ps1")
+        release_builder = self.read("website/scripts/build-release-site.ps1")
+        wrapper = self.read("website/scripts/deploy-static-baota.ps1")
+        remote_deploy = self.read("website/scripts/deploy-static-baota.sh")
+        legacy_deploy = self.read("website/scripts/deploy-static.sh")
+
+        for script in (pages_builder, wrapper, remote_deploy, legacy_deploy):
+            self.assertIn("DroneDream-Universal", script)
+            self.assertIn("buildNumber", script)
+        self.assertIn("target\\release\\bundle\\nsis", release_builder)
+        self.assertNotIn("x86_64-pc-windows-gnullvm", release_builder)
+        self.assertIn("tauriBundleInstallerFileName", release_builder)
+        self.assertIn("publicArtifactFileName", release_builder)
+        self.assertIn("edition = $EditionId", release_builder)
+        self.assertIn("buildNumber = $BuildNumber", release_builder)
+
     def test_pages_build_verifies_policy_source_and_compiled_policy_links(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")
         policy = self.read("CODE_SIGNING_POLICY.md")
