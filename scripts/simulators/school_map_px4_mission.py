@@ -88,6 +88,7 @@ ROUTE_PROGRESS_MAXIMUM_LOOKAHEAD_WAYPOINTS = 6
 DESIGNATED_PAD_CONTACT_TOLERANCE_M = 0.002
 DESIGNATED_PAD_CONTACT_HORIZONTAL_RADIUS_M = 0.45
 DESIGNATED_PAD_CONTACT_VERTICAL_RADIUS_M = 0.08
+MAX_LIVE_ABORT_REQUEST_BYTES = 4096
 
 
 @dataclass(frozen=True)
@@ -928,15 +929,48 @@ def _payload_retention_measurements(
     }
 
 
+def _prepare_run_directory(run_dir: Path) -> None:
+    """Admit an empty run directory or the bounded early-abort control file."""
+
+    if run_dir.exists():
+        unexpected = [
+            path.name for path in run_dir.iterdir() if path.name != "live_abort.request.json"
+        ]
+        if unexpected:
+            raise FileExistsError(
+                f"run directory contains unexpected entries: {', '.join(sorted(unexpected))}"
+            )
+        early_abort = run_dir / "live_abort.request.json"
+        if early_abort.exists():
+            _read_live_abort_request(early_abort)
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _read_live_abort_request(path: Path) -> tuple[str, bool]:
+    if path.stat().st_size > MAX_LIVE_ABORT_REQUEST_BYTES:
+        raise RuntimeError("live abort request is oversized")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("live abort request is invalid") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("live abort request is invalid")
+    reason = payload.get("reason")
+    world_paused = payload.get("world_paused")
+    if not isinstance(reason, str) or not reason.strip() or len(reason) > 240:
+        raise RuntimeError("live abort reason is invalid")
+    if not isinstance(world_paused, bool):
+        raise RuntimeError("live abort world_paused flag is invalid")
+    return reason.strip(), world_paused
+
+
 def _prepare_run(
     run_dir: Path,
     px4_root: Path,
     velocity_m_s: float,
     acceleration_m_s2: float,
 ) -> tuple[Path, Path, Path, Path, WorldPoint, list[WorldPoint], float]:
-    if run_dir.exists() and any(run_dir.iterdir()):
-        raise FileExistsError(f"run directory must be absent or empty: {run_dir}")
-    run_dir.mkdir(parents=True, exist_ok=True)
+    _prepare_run_directory(run_dir)
     if not px4_root.is_dir():
         raise FileNotFoundError(f"PX4 root does not exist: {px4_root}")
     x500_model = px4_root / "Tools/simulation/gz/models/x500/model.sdf"
@@ -1174,9 +1208,10 @@ def _evaluate(
         "landed_on_office_pad": landed_root_error <= LANDED_ROOT_HEIGHT_TOLERANCE_M,
     }
     verified = all(gates.values()) and process_failure is None
+    aborted = process_failure is not None and "abort" in process_failure.casefold()
     payload: dict[str, Any] = {
         "schema_version": "dronedream.school-map-px4-mission-evidence.v1",
-        "status": "verified" if verified else "failed",
+        "status": "verified" if verified else "aborted" if aborted else "failed",
         "gazebo_runtime_verified": bool(samples),
         "px4_mission_smoke_verified": verified,
         "simulation_execution_ready": verified,
@@ -1582,6 +1617,11 @@ def main(argv: list[str] | None = None) -> int:
                 time.sleep(0.2)
             executor_return_code = executor_process.wait(timeout=10)
             time.sleep(args.post_flight_observation_seconds)
+            if live_abort_reason is None and abort_file.is_file():
+                try:
+                    live_abort_reason, _ = _read_live_abort_request(abort_file)
+                except RuntimeError as exc:
+                    live_abort_reason = f"invalid_live_abort_request: {exc}"
             if live_abort_reason is not None:
                 process_failure = live_abort_reason
             elif executor_return_code != 0:
@@ -1632,7 +1672,13 @@ def main(argv: list[str] | None = None) -> int:
         run_dir / "mission_live_status.json",
         {
             "schema_version": "dronedream.school-map-mission-live.v1",
-            "status": "verified" if verified else "failed",
+            "status": (
+                "verified"
+                if verified
+                else "aborted"
+                if process_failure is not None and "abort" in process_failure.casefold()
+                else "failed"
+            ),
             "phase": "land" if verified else "abort",
             "route_index": len(route) - 1,
             "route_waypoint_count": len(route),

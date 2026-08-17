@@ -12,7 +12,7 @@ from app.autonomy.school_map_artifact import (
     PICKUP_ROUTE_CENTER,
     PICKUP_ROUTE_ENVELOPE_CENTER_Z_M,
     TEACHING_OPEN_DOOR_PAIR_CENTER_X,
-    get_school_map_gazebo_artifact,
+    get_school_map_gazebo_summary,
     school_map_stair_route_points,
 )
 
@@ -526,9 +526,7 @@ def get_bundled_map_manifest(scene_id: str) -> BundledMapManifest | None:
     profile = _BUNDLED_MAP_PROFILES.get(scene_id)
     if scene is None or profile is None:
         return None
-    gazebo_artifact = (
-        get_school_map_gazebo_artifact().summary if scene_id == "school-campus-v1" else None
-    )
+    gazebo_artifact = get_school_map_gazebo_summary() if scene_id == "school-campus-v1" else None
     canonical = {
         "schema_version": "dronedream.autonomy.bundled-map-manifest.v1",
         "compiler_scene_id": scene.id,

@@ -785,7 +785,7 @@ function plannerPrompt(
           },
           grounded_entities: "array of typed semantic references; empty until resolved",
           task_graph: {
-            nodes: "0-64 nodes; draft status requires at least one node",
+            nodes: "0-64 nodes; draft status requires at least one node. For the official School Map office takeout roundtrip, emit exactly four nodes and no extras: takeoff, pickup, return, land, with that dependency chain",
             node_shape: {
               node_id: "unique lowercase kebab-case identifier",
               action: "resolve, takeoff, navigate, traverse, pickup, inspect, return, land, or abort",

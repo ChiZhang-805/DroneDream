@@ -21,24 +21,35 @@ from pathlib import Path
 from typing import IO, Any
 
 from app.autonomy.models import (
+    AutonomyPlannerAction,
+    AutonomyPlannerTaskGraph,
     SimulationExecutionStartRequest,
     SimulationExecutionStatus,
     Vector3,
 )
-from app.autonomy.px4_x500_vehicle import TAKEOUT_PAYLOAD_MASS_KG
+from app.autonomy.px4_x500_vehicle import (
+    PX4_X500_DRY_MASS_KG,
+    PX4_X500_MAXIMUM_THRUST_N,
+    TAKEOUT_PAYLOAD_MASS_KG,
+)
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry, runtime_sessions
+from app.autonomy.school_map_artifact import VEHICLE_COLLISION_DIAMETER_M
 
 MAX_EXECUTIONS = 32
 MAX_JSON_EVIDENCE_BYTES = 4 * 1024 * 1024
 POSIX_AUTONOMY_RUN_ROOT = Path("/var/lib/dronedream/artifacts/autonomy-runs")
 CANONICAL_AIRCRAFT_ASSET_ID = "aircraft-my-drone"
 CANONICAL_MAP_ASSET_ID = "map-school"
-CANONICAL_ROUTE_TARGETS = {
+CANONICAL_ROUTE_TARGETS: dict[AutonomyPlannerAction, str] = {
     "takeoff": "office-drone-launch-pad",
     "pickup": "takeout-pickup",
     "return": "office-drone-launch-pad",
     "land": "office-drone-launch-pad",
 }
+CANONICAL_AIRCRAFT_VERSION = 1
+CANONICAL_MAP_VERSION = 1
+FIXED_RUNNER_MAXIMUM_SPEED_M_S = 1.2
+FIXED_RUNNER_MAXIMUM_ACCELERATION_M_S2 = 0.8
 
 
 def _now() -> datetime:
@@ -56,6 +67,38 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _same_number(value: object, expected: float, *, tolerance: float = 1e-9) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(float(value))
+        and math.isclose(float(value), expected, rel_tol=0.0, abs_tol=tolerance)
+    )
+
+
+def _matches_canonical_route_graph(graph: AutonomyPlannerTaskGraph) -> bool:
+    if len(graph.nodes) != len(CANONICAL_ROUTE_TARGETS):
+        return False
+    nodes_by_action = {node.action: node for node in graph.nodes}
+    if set(nodes_by_action) != set(CANONICAL_ROUTE_TARGETS):
+        return False
+    if any(
+        nodes_by_action[action].target != target
+        for action, target in CANONICAL_ROUTE_TARGETS.items()
+    ):
+        return False
+    takeoff = nodes_by_action["takeoff"]
+    pickup = nodes_by_action["pickup"]
+    return_node = nodes_by_action["return"]
+    land = nodes_by_action["land"]
+    return (
+        takeoff.depends_on == []
+        and pickup.depends_on == [takeoff.node_id]
+        and return_node.depends_on == [pickup.node_id]
+        and land.depends_on == [return_node.node_id]
+    )
 
 
 def _read_json(path: Path, *, maximum_bytes: int = MAX_JSON_EVIDENCE_BYTES) -> dict[str, Any]:
@@ -152,20 +195,72 @@ class SimulationExecutionRegistry:
                 "The confirmed model planner artifact is missing or changed.",
             )
         assets = mission.asset_context
+        vehicle = mission.vehicle
+        localization_sources = (
+            assets.aircraft.capabilities.get("localization_sources") if assets is not None else None
+        )
         if (
             assets is None
             or assets.aircraft.asset_id != CANONICAL_AIRCRAFT_ASSET_ID
             or assets.map_pack.asset_id != CANONICAL_MAP_ASSET_ID
+            or assets.aircraft.version != CANONICAL_AIRCRAFT_VERSION
+            or assets.map_pack.version != CANONICAL_MAP_VERSION
+            or assets.aircraft.content_hash is None
+            or assets.aircraft.qualification_receipt_id is None
+            or assets.map_pack.content_hash is None
+            or assets.map_pack.qualification_receipt_id is None
+            or not _same_number(vehicle.dry_mass_kg, PX4_X500_DRY_MASS_KG)
+            or not _same_number(vehicle.launch_payload_kg, 0.0)
+            or not _same_number(vehicle.pickup_payload_kg, TAKEOUT_PAYLOAD_MASS_KG)
+            or not _same_number(
+                vehicle.max_takeoff_mass_kg,
+                PX4_X500_DRY_MASS_KG + TAKEOUT_PAYLOAD_MASS_KG,
+            )
+            or not _same_number(vehicle.max_total_thrust_n, PX4_X500_MAXIMUM_THRUST_N)
+            or not _same_number(vehicle.radius_m, VEHICLE_COLLISION_DIAMETER_M / 2)
+            or not _same_number(
+                assets.aircraft.capabilities.get("body_radius_m"),
+                VEHICLE_COLLISION_DIAMETER_M / 2,
+            )
+            or not _same_number(
+                assets.aircraft.capabilities.get("dry_mass_kg"),
+                PX4_X500_DRY_MASS_KG,
+            )
+            or not _same_number(
+                assets.aircraft.capabilities.get("maximum_takeoff_mass_kg"),
+                PX4_X500_DRY_MASS_KG + TAKEOUT_PAYLOAD_MASS_KG,
+            )
+            or not _same_number(
+                assets.aircraft.capabilities.get("maximum_thrust_n"),
+                PX4_X500_MAXIMUM_THRUST_N,
+            )
+            or not _same_number(
+                assets.aircraft.capabilities.get("maximum_pickup_payload_kg"),
+                TAKEOUT_PAYLOAD_MASS_KG,
+            )
+            or not _same_number(
+                assets.aircraft.capabilities.get("maximum_speed_mps"),
+                vehicle.max_speed_mps,
+            )
+            or vehicle.max_speed_mps > 4.0
+            or not _same_number(
+                assets.aircraft.capabilities.get("maximum_acceleration_mps2"),
+                vehicle.max_acceleration_mps2,
+            )
+            or vehicle.max_acceleration_mps2 > 2.5
+            or not _same_number(vehicle.reserve_battery_percent, 30.0)
+            or not _same_number(
+                assets.aircraft.capabilities.get("reserve_battery_percent"),
+                vehicle.reserve_battery_percent,
+            )
+            or not isinstance(localization_sources, list)
+            or "gps" not in localization_sources
         ):
             raise AutonomyRuntimeError(
                 "SIMULATION_ASSET_PROFILE_MISMATCH",
                 "The physical adapter requires the official My Drone and School Map assets.",
             )
-        bound_targets = {(node.action, node.target) for node in planner.task_graph.nodes}
-        if any(
-            (action, target) not in bound_targets
-            for action, target in CANONICAL_ROUTE_TARGETS.items()
-        ):
+        if not _matches_canonical_route_graph(planner.task_graph):
             raise AutonomyRuntimeError(
                 "SIMULATION_ROUTE_PROFILE_MISMATCH",
                 "The model plan is not bound to the canonical office-to-takeout roundtrip.",
@@ -207,17 +302,23 @@ class SimulationExecutionRegistry:
             parent = _run_root() / owner_token
             parent.mkdir(parents=True, exist_ok=True)
             run_dir = parent / execution_id
+            run_dir.mkdir()
             stdout = (parent / f"{execution_id}.stdout.log").open("w", encoding="utf-8")
             stderr = (parent / f"{execution_id}.stderr.log").open("w", encoding="utf-8")
+            runner_speed_m_s = min(FIXED_RUNNER_MAXIMUM_SPEED_M_S, vehicle.max_speed_mps)
+            runner_acceleration_m_s2 = min(
+                FIXED_RUNNER_MAXIMUM_ACCELERATION_M_S2,
+                vehicle.max_acceleration_mps2,
+            )
             argv = [
                 str(Path(sys.executable).resolve()),
                 str(_runner_path()),
                 "--run-dir",
                 str(run_dir),
                 "--velocity-m-s",
-                "1.2",
+                f"{runner_speed_m_s:.12g}",
                 "--acceleration-m-s2",
-                "0.8",
+                f"{runner_acceleration_m_s2:.12g}",
                 "--setpoint-rate-hz",
                 "20",
             ]
@@ -301,9 +402,10 @@ class SimulationExecutionRegistry:
             return
         root = live.get("vehicle_model_root_world_enu_m")
         center = live.get("vehicle_envelope_center_world_enu_m")
+        aborting = record.status.state == "aborting"
         record.status = record.status.model_copy(
             update={
-                "state": "running",
+                "state": "aborting" if aborting else "running",
                 "updated_at": _now(),
                 "progress": self._bounded_progress(live.get("progress")),
                 "phase": str(live.get("phase", "running"))[:80],
@@ -312,7 +414,9 @@ class SimulationExecutionRegistry:
                 "vehicle_speed_m_s": self._bounded_speed(live.get("vehicle_speed_m_s")),
                 "payload_spawned": live.get("payload_spawned") is True,
                 "payload_attached": live.get("payload_attached") is True,
-                "abort_reason": (
+                "abort_reason": record.status.abort_reason
+                if aborting
+                else (
                     str(live["abort_reason"])[:240]
                     if live.get("abort_reason") is not None
                     else record.status.abort_reason
@@ -362,11 +466,19 @@ class SimulationExecutionRegistry:
         evidence = _read_json(evidence_path)
         evidence_sha256 = _sha256_file(evidence_path) if evidence_path.is_file() else None
         verified = return_code == 0 and evidence.get("status") == "verified"
-        aborted = record.status.state == "aborting" or (
+        with self._lock:
+            acknowledged_abort_reason = (
+                record.status.abort_reason if record.status.state == "aborting" else None
+            )
+        if acknowledged_abort_reason is not None:
+            verified = False
+        aborted = acknowledged_abort_reason is not None or (
             isinstance(evidence.get("process_failure"), str)
             and "abort" in str(evidence["process_failure"]).lower()
         )
         failure = str(evidence.get("process_failure")) if evidence.get("process_failure") else None
+        if acknowledged_abort_reason is not None:
+            failure = f"operator_abort: {acknowledged_abort_reason}"
         try:
             sealed_runtime = self._runtime_sessions.finalize_simulation(
                 record.owner_id,

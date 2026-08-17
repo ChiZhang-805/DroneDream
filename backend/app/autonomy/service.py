@@ -41,6 +41,7 @@ from app.autonomy.school_map_artifact import (
 
 GRAVITY = 9.80665
 MIN_THRUST_TO_WEIGHT = 1.35
+MASS_COMPARISON_TOLERANCE_KG = 1e-9
 VALIDATED_SIGNED_PACK_COUNT = 0
 SchoolMissionProfile = Literal["coffee", "gates", "narrow"]
 
@@ -760,7 +761,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         + request.vehicle.radius_m
     )
     issues: list[ValidationIssue] = []
-    if loaded_mass > request.vehicle.max_takeoff_mass_kg:
+    if loaded_mass - request.vehicle.max_takeoff_mass_kg > MASS_COMPARISON_TOLERANCE_KG:
         issues.append(
             ValidationIssue(
                 code="vehicle.loaded-mass-exceeds-mtom",

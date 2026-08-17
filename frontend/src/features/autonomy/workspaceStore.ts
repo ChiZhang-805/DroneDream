@@ -106,6 +106,8 @@ export const AUTONOMY_AIRCRAFT_LIMITS = {
   maximumTiltDeg: { min: 5, max: 75 },
 } as const;
 
+const MASS_COMPARISON_TOLERANCE_KG = 1e-9;
+
 export function autonomyAircraftRadiusM(aircraft: AutonomyAircraftProfile): number {
   return Math.max(
     aircraft.rotorRadiusM,
@@ -138,7 +140,8 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     && within(aircraft.batteryEnergyWh, "batteryEnergyWh")
     && within(aircraft.reserveBatteryPercent, "reserveBatteryPercent")
     && within(aircraft.maximumPickupPayloadKg, "maximumPickupPayloadKg")
-    && aircraft.dryMassKg + aircraft.maximumPickupPayloadKg <= aircraft.maximumTakeoffMassKg
+    && aircraft.dryMassKg + aircraft.maximumPickupPayloadKg
+      <= aircraft.maximumTakeoffMassKg + MASS_COMPARISON_TOLERANCE_KG
     && within(aircraft.maximumSpeedMps, "maximumSpeedMps")
     && within(aircraft.maximumAccelerationMps2, "maximumAccelerationMps2")
     && within(aircraft.maximumClimbMps, "maximumClimbMps")
@@ -880,7 +883,7 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
         : [],
       aircraftProfileId: normalizedAircraft.id,
       mapPackId: normalizedMap.id,
-      compiledPlan: normalizedMissionPlan,
+      compiledPlan: legacyBundledSceneMigrated ? null : normalizedMissionPlan,
       currentStep: Math.round(boundedNumber(mission.currentStep, 0, 0, 5)),
       updatedAt: boundedText(mission.updatedAt, updatedAt, 40),
     },

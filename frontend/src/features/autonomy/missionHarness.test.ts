@@ -12,7 +12,11 @@ import {
   schoolMapTeachingOpenDoorCenterX,
   validateSchoolMapGeometryContract,
 } from "./schoolMapGeometryContract";
-import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "./workspaceStore";
+import {
+  defaultAutonomyWorkspace,
+  isAutonomyAircraftProfileValid,
+  normalizeAutonomyWorkspace,
+} from "./workspaceStore";
 import {
   autonomyHarnessRequest,
   localAutonomyHarnessInspection,
@@ -24,6 +28,7 @@ describe("autonomy mission harness", () => {
   it("keeps public assets unqualified until the owner receives server credentials", () => {
     const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
 
+    expect(isAutonomyAircraftProfileValid(workspace.aircraft)).toBe(true);
     expect(workspace.aircraft.status).toBe("draft");
     expect(workspace.aircraft.qualificationReceiptId).toBeNull();
     expect(workspace.aircraft.qualificationContentHash).toBeNull();
@@ -101,6 +106,10 @@ describe("autonomy mission harness", () => {
 
   it("migrates retired bundled presets to the one canonical School Map", () => {
     const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
+    workspace.mission.compiledPlan = {
+      readiness: "simulation_ready",
+      canExecute: true,
+    } as unknown as NonNullable<typeof workspace.mission.compiledPlan>;
     workspace.mapPack = {
       ...workspace.mapPack,
       name: "Building stairwell · pickup · return v3",
@@ -120,6 +129,7 @@ describe("autonomy mission harness", () => {
     expect(normalized.mapPack.status).toBe("draft");
     expect(normalized.mapPack.contentHash).toBeNull();
     expect(normalized.mapPack.qualificationReceiptId).toBeNull();
+    expect(normalized.mission.compiledPlan).toBeNull();
   });
 
   it("connects every School Map facility to one shared meter-scale road graph", () => {
@@ -499,5 +509,28 @@ describe("autonomy mission harness", () => {
     }, request, inspection)).toContain(
       "planner.route-target.missing.pickup:takeout-pickup",
     );
+    expect(autonomyPlannerBindingIssues({
+      ...artifact!,
+      task_graph: {
+        nodes: [
+          ...artifact!.task_graph.nodes,
+          {
+            node_id: "detour",
+            action: "navigate",
+            target: "cafeteria-counter",
+            depends_on: ["takeoff"],
+            success_evidence: ["detour reached"],
+          },
+        ],
+      },
+    }, request, inspection)).toContain("planner.route-profile.unsupported");
+    expect(autonomyPlannerBindingIssues({
+      ...artifact!,
+      task_graph: {
+        nodes: artifact!.task_graph.nodes.map((node) => (
+          node.action === "return" ? { ...node, depends_on: ["takeoff"] } : node
+        )),
+      },
+    }, request, inspection)).toContain("planner.route-profile.unsupported");
   });
 });

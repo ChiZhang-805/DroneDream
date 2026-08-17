@@ -434,6 +434,26 @@ export function autonomyPlannerBindingIssues(
     canonicalTargets.forEach((binding) => {
       if (!boundTargets.has(binding)) issues.push(`planner.route-target.missing.${binding}`);
     });
+    const nodesFor = (action: AutonomyPlannerAction) => (
+      artifact.task_graph.nodes.filter((node) => node.action === action)
+    );
+    const takeoff = nodesFor("takeoff");
+    const pickup = nodesFor("pickup");
+    const returnNodes = nodesFor("return");
+    const land = nodesFor("land");
+    const exactProfile = artifact.task_graph.nodes.length === 4
+      && takeoff.length === 1
+      && pickup.length === 1
+      && returnNodes.length === 1
+      && land.length === 1
+      && takeoff[0].depends_on.length === 0
+      && pickup[0].depends_on.length === 1
+      && pickup[0].depends_on[0] === takeoff[0].node_id
+      && returnNodes[0].depends_on.length === 1
+      && returnNodes[0].depends_on[0] === pickup[0].node_id
+      && land[0].depends_on.length === 1
+      && land[0].depends_on[0] === returnNodes[0].node_id;
+    if (!exactProfile) issues.push("planner.route-profile.unsupported");
   }
   if (artifact.blockers.length > 0) issues.push("planner.blockers.present");
   return issues;

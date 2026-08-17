@@ -29,6 +29,7 @@ from app.autonomy.school_map_artifact import (
     _canonicalize_semantic_value,
     export_school_map_gazebo_artifact,
     get_school_map_gazebo_artifact,
+    get_school_map_gazebo_summary,
     school_map_collision_primitives,
 )
 
@@ -255,6 +256,7 @@ def _sample_reference_route() -> list[tuple[float, float, float]]:
 
 def test_school_map_exports_parseable_content_addressed_sdf() -> None:
     artifact = get_school_map_gazebo_artifact()
+    assert artifact.summary == get_school_map_gazebo_summary()
     root = ElementTree.fromstring(artifact.model_sdf)
     links = root.findall("./model/link")
     collisions = root.findall("./model/link/collision")
@@ -318,13 +320,16 @@ def test_public_scene_catalog_exposes_only_the_canonical_school_map_name() -> No
 
 
 def test_frontend_fallback_manifest_matches_the_backend_geometry_digest() -> None:
+    artifact_cache_before = get_school_map_gazebo_artifact.cache_info()
     manifest = get_bundled_map_manifest("school-campus-v1")
+    artifact_cache_after = get_school_map_gazebo_artifact.cache_info()
     assert manifest is not None
     frontend_source = (
         Path(__file__).resolve().parents[2] / "frontend" / "src" / "pages" / "AutonomyPlatform.tsx"
     ).read_text(encoding="utf-8")
 
     assert f'manifest_sha256: "{manifest["manifest_sha256"]}"' in frontend_source
+    assert artifact_cache_after == artifact_cache_before
 
 
 def test_school_map_export_materializes_digest_bound_files(tmp_path: Path) -> None:

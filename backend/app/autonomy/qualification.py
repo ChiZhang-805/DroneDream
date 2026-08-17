@@ -26,6 +26,7 @@ from app.autonomy.models import StrictModel, Vector3
 
 MAX_MAP_ASSET_BYTES = 25 * 1024 * 1024
 MAX_ASSET_RECEIPTS = 512
+MASS_COMPARISON_TOLERANCE_KG = 1e-9
 SUPPORTED_MAP_FORMATS = {"glb", "gltf", "geojson", "json", "ply", "pcd"}
 MapLayer = Literal["mesh", "point-cloud", "semantic", "georeference"]
 MapRepresentation = Literal["hybrid-3d", "mesh", "point-cloud", "occupancy", "terrain"]
@@ -284,7 +285,7 @@ def qualify_vehicle_pack(
     planning_radius = (
         math.hypot(request.body_size_m.x, request.body_size_m.y) / 2 + request.rotor_radius_m
     )
-    if loaded_mass > request.max_takeoff_mass_kg:
+    if loaded_mass - request.max_takeoff_mass_kg > MASS_COMPARISON_TOLERANCE_KG:
         issues.append(
             QualificationIssue(
                 code="vehicle.loaded-mass-exceeds-mtom",

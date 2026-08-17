@@ -30,7 +30,17 @@ def _mission() -> AutonomyCompileRequest:
             ),
             "scene_id": "school-campus-v1",
             "perception_mode": "fusion",
-            "vehicle": {"pickup_payload_kg": 0.10},
+            "vehicle": {
+                "dry_mass_kg": 2.0643076923076924,
+                "launch_payload_kg": 0.0,
+                "pickup_payload_kg": 0.10,
+                "max_takeoff_mass_kg": 2.164307692307692,
+                "max_total_thrust_n": 34.19432,
+                "radius_m": 0.38,
+                "max_speed_mps": 4.0,
+                "max_acceleration_mps2": 2.5,
+                "reserve_battery_percent": 30.0,
+            },
             "asset_context": {
                 "schema_version": "dronedream.autonomy.compile-assets.v1",
                 "harness_context_sha256": "a" * 64,
@@ -42,7 +52,17 @@ def _mission() -> AutonomyCompileRequest:
                     "status": "validated-unsigned",
                     "content_hash": "b" * 64,
                     "qualification_receipt_id": "vehicle-receipt-test",
-                    "capabilities": {},
+                    "capabilities": {
+                        "body_radius_m": 0.38,
+                        "dry_mass_kg": 2.0643076923076924,
+                        "maximum_takeoff_mass_kg": 2.164307692307692,
+                        "maximum_thrust_n": 34.19432,
+                        "maximum_pickup_payload_kg": 0.10,
+                        "maximum_speed_mps": 4.0,
+                        "maximum_acceleration_mps2": 2.5,
+                        "reserve_battery_percent": 30.0,
+                        "localization_sources": ["gps"],
+                    },
                 },
                 "map_pack": {
                     "kind": "map",
@@ -189,6 +209,8 @@ def test_simulation_execution_is_model_bound_owner_scoped_and_idempotent(
     assert len(processes) == 1
     assert processes[0].argv[1].endswith("school_map_px4_mission.py")
     assert "--run-dir" in processes[0].argv
+    assert processes[0].argv[processes[0].argv.index("--velocity-m-s") + 1] == "1.2"
+    assert processes[0].argv[processes[0].argv.index("--acceleration-m-s2") + 1] == "0.8"
     assert _mission().natural_language not in processes[0].argv
     with pytest.raises(AutonomyRuntimeError) as hidden:
         registry.get("owner-b", created.execution_id)
@@ -358,6 +380,69 @@ def test_verified_runner_cannot_override_an_already_aborted_runtime_chain(
     assert sessions.get("owner-a", session.session_id).phase == "aborted"
 
 
+def test_execution_abort_cannot_be_overwritten_by_late_verified_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = sessions.create(
+        "owner-a",
+        RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-abort"),
+    )
+    created = registry.start(
+        "owner-a",
+        _start_request(session.session_id, session.contract_id),
+    )
+    run_dir = next(tmp_path.rglob(created.execution_id))
+    (run_dir / "mission_evidence.json").write_text(
+        json.dumps({"status": "verified", "gates": {"all": True}}),
+        encoding="utf-8",
+    )
+
+    registry.abort("owner-a", created.execution_id, "operator stopped execution")
+    (run_dir / "mission_live_status.json").write_text(
+        json.dumps({"progress": 0.9, "phase": "return", "abort_reason": None}),
+        encoding="utf-8",
+    )
+    assert registry.get("owner-a", created.execution_id).state == "aborting"
+    processes[0].finish(0)
+
+    deadline = time.monotonic() + 2
+    final = registry.get("owner-a", created.execution_id)
+    while final.state not in {"verified", "failed", "aborted"} and time.monotonic() < deadline:
+        time.sleep(0.01)
+        final = registry.get("owner-a", created.execution_id)
+
+    assert final.state == "aborted"
+    assert final.abort_reason == "operator_abort: operator stopped execution"
+    assert sessions.get("owner-a", session.session_id).phase == "aborted"
+
+
+def test_fixed_runner_obeys_lower_qualified_motion_limits(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    mission_payload = _mission().model_dump(mode="json")
+    mission_payload["vehicle"]["max_speed_mps"] = 0.4
+    mission_payload["vehicle"]["max_acceleration_mps2"] = 0.3
+    capabilities = mission_payload["asset_context"]["aircraft"]["capabilities"]
+    capabilities["maximum_speed_mps"] = 0.4
+    capabilities["maximum_acceleration_mps2"] = 0.3
+    mission = AutonomyCompileRequest.model_validate(mission_payload)
+    session = sessions.create(
+        "owner-a",
+        RuntimeSessionCreateRequest(mission=mission, client_request_id="runtime-request-slow"),
+    )
+
+    registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    argv = processes[0].argv
+    assert argv[argv.index("--velocity-m-s") + 1] == "0.4"
+    assert argv[argv.index("--acceleration-m-s2") + 1] == "0.3"
+    processes[0].finish(1)
+
+
 def test_noncanonical_assets_or_model_targets_never_start_the_fixed_runner(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -386,4 +471,59 @@ def test_noncanonical_assets_or_model_targets_never_start_the_fixed_runner(
     )
     with pytest.raises(ValueError, match="canonical route targets"):
         AutonomyCompileRequest.model_validate(wrong_target)
+    assert processes == []
+
+
+@pytest.mark.parametrize(
+    ("mutation", "error_code"),
+    (
+        (
+            lambda payload: payload["asset_context"]["planner_binding"]["task_graph"][
+                "nodes"
+            ].append(
+                {
+                    "node_id": "detour",
+                    "action": "navigate",
+                    "target": "cafeteria-counter",
+                    "depends_on": ["takeoff"],
+                    "success_evidence": ["detour reached"],
+                }
+            ),
+            "SIMULATION_ROUTE_PROFILE_MISMATCH",
+        ),
+        (
+            lambda payload: payload["vehicle"].__setitem__("dry_mass_kg", 2.0),
+            "SIMULATION_ASSET_PROFILE_MISMATCH",
+        ),
+        (
+            lambda payload: (
+                payload["asset_context"]["aircraft"].__setitem__("version", 2),
+                payload["asset_context"]["planner_binding"].__setitem__("aircraft_version", 2),
+            ),
+            "SIMULATION_ASSET_PROFILE_MISMATCH",
+        ),
+    ),
+)
+def test_edited_or_route_extended_profiles_never_start_the_fixed_runner(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    mutation: Any,
+    error_code: str,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    payload = _mission().model_dump(mode="json")
+    mutation(payload)
+    mission = AutonomyCompileRequest.model_validate(payload)
+    session = sessions.create(
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=mission,
+            client_request_id=f"runtime-request-{error_code.casefold()}",
+        ),
+    )
+
+    with pytest.raises(AutonomyRuntimeError) as rejected:
+        registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    assert rejected.value.code == error_code
     assert processes == []

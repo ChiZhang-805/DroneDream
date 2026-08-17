@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -109,3 +110,56 @@ def test_final_clearance_resampling_removes_stationary_pose_duplicates() -> None
     assert len(result) == 26
     assert result[0] == points[0]
     assert result[-1] == points[-1]
+
+
+def test_precreated_run_directory_preserves_only_a_valid_early_abort_file(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    abort_path = run_dir / "live_abort.request.json"
+    abort_path.write_text(
+        json.dumps({"reason": "operator_abort: stop", "world_paused": False}),
+        encoding="utf-8",
+    )
+
+    runner._prepare_run_directory(run_dir)
+
+    assert abort_path.is_file()
+    assert runner._read_live_abort_request(abort_path) == ("operator_abort: stop", False)
+
+
+def test_precreated_run_directory_rejects_unexpected_artifacts(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "unexpected.log").write_text("stale", encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="unexpected.log"):
+        runner._prepare_run_directory(run_dir)
+
+
+def test_precreated_run_directory_rejects_an_invalid_early_abort(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "live_abort.request.json").write_text("not-json", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="abort request is invalid"):
+        runner._prepare_run_directory(run_dir)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        "x" * (runner.MAX_LIVE_ABORT_REQUEST_BYTES + 1),
+        "not-json",
+        json.dumps({"reason": "", "world_paused": False}),
+        json.dumps({"reason": "operator_abort: stop", "world_paused": "false"}),
+    ),
+)
+def test_live_abort_reader_rejects_oversized_or_invalid_requests(
+    tmp_path: Path,
+    payload: str,
+) -> None:
+    path = tmp_path / "live_abort.request.json"
+    path.write_text(payload, encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="abort"):
+        runner._read_live_abort_request(path)

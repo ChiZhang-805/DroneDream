@@ -63,6 +63,26 @@ def test_vehicle_pack_qualification_is_versioned_and_unsigned() -> None:
     assert len(receipt.content_sha256) == 64
 
 
+def test_vehicle_pack_mass_gate_tolerates_only_machine_precision_at_mtom() -> None:
+    payload = vehicle_payload()
+    payload.update(
+        {
+            "dry_mass_kg": 2.0643076923076924,
+            "max_takeoff_mass_kg": 2.164307692307692,
+            "max_total_thrust_n": 34.19432,
+            "maximum_pickup_payload_kg": 0.1,
+        }
+    )
+
+    exact_receipt = qualify_vehicle_pack(VehiclePackQualificationRequest.model_validate(payload))
+    payload["max_takeoff_mass_kg"] = 2.164306692307692
+    excess_receipt = qualify_vehicle_pack(VehiclePackQualificationRequest.model_validate(payload))
+
+    assert exact_receipt.status == "validated_unsigned"
+    assert "vehicle.loaded-mass-exceeds-mtom" not in {issue.code for issue in exact_receipt.issues}
+    assert "vehicle.loaded-mass-exceeds-mtom" in {issue.code for issue in excess_receipt.issues}
+
+
 def test_vehicle_pack_receipt_binds_the_autopilot_family() -> None:
     px4_payload = vehicle_payload()
     px4_payload["control_interface"] = "mavlink"

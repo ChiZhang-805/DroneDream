@@ -411,6 +411,65 @@ class SchoolMapGazeboArtifact:
     package_files: dict[str, str]
 
 
+SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY: dict[str, object] = {
+    "schema_version": "dronedream.autonomy.gazebo-artifact-summary.v1",
+    "format": "sdf",
+    "sdf_version": "1.9",
+    "model_sdf_sha256": "58809c97af977fe637d66fe2b1b72072a3c81b084782a14bc00425a97eba7071",
+    "semantic_sha256": "a188c56169a616385e0c3998ae507ae656a6300207e9decd3442d1bd2cc6ccff",
+    "world_sdf_sha256": "ddcde7bd30484e0f2c90cbecb5e7a0704703d92929b2de5847e5d9e1fe22b6e0",
+    "physics_world_sdf_sha256": (
+        "f5a861691a24fab815f7f1800bd29ab2483fe77ea9be9eb9af721e1677303bae"
+    ),
+    "physics_model_sdf_sha256": (
+        "7d533e42aeffe2a612fa2f05c5fa711c9a1bdd3e0e1d7147e586b269fb6f7f14"
+    ),
+    "model_config_sha256": "eb06bf2d09e16f6e7b4c5ca379b5aea4c16b7a082f3e8a6e41c020049646dcf5",
+    "package_file_sha256": {
+        "README.md": "e81f2a37011ffd54e224917b373fb8f6d5e917586c60c55978b4e52661550b3a",
+        "materials/textures/campus-surface.ppm": (
+            "29514802bc60ff22947e116b350a0abb421f1d3c36d5337b2e89a09a31e087b0"
+        ),
+        "meshes/training-gate-1.obj": (
+            "352342d5fa8d60f3caf631f63c650c7fd1b40ae58d3f019f6a70b008ebdce7d8"
+        ),
+        "meshes/training-gate-2.obj": (
+            "c2f51abec480467ad1d84fb2a7f4fc64cc60350604c283f7ff61a96a2c39865b"
+        ),
+        "meshes/training-gate-3.obj": (
+            "9a4aade0b45086914fdb0bfdecb215d57fff28b18f6e3e8da6ab49eb9042e8ab"
+        ),
+        "meshes/training-gate.mtl": (
+            "d443f8c87e66c7fd914bdc86b19aa5266ab6376b4f4416b6c2aa78595cb23cb0"
+        ),
+        "model.config": "eb06bf2d09e16f6e7b4c5ca379b5aea4c16b7a082f3e8a6e41c020049646dcf5",
+        "model.physics.sdf": ("7d533e42aeffe2a612fa2f05c5fa711c9a1bdd3e0e1d7147e586b269fb6f7f14"),
+        "model.sdf": "58809c97af977fe637d66fe2b1b72072a3c81b084782a14bc00425a97eba7071",
+        "ros_gz_bridge.yaml": ("89220ef78125348776575b1a14fa1727c9cb098d9c46d84a74e27e5e8715f0b1"),
+        "semantic.json": "a188c56169a616385e0c3998ae507ae656a6300207e9decd3442d1bd2cc6ccff",
+        "world.physics.sdf": ("f5a861691a24fab815f7f1800bd29ab2483fe77ea9be9eb9af721e1677303bae"),
+        "world.sdf": "ddcde7bd30484e0f2c90cbecb5e7a0704703d92929b2de5847e5d9e1fe22b6e0",
+    },
+    "package_manifest_sha256": ("0f5135940c74844923a86cd6e000bb44f9097bbd79442fd9e014b94211c50f8d"),
+    "package_file_count": 13,
+    "collision_primitive_count": 4023,
+    "visual_primitive_count": 3930,
+    "geometry_scope": "simulation-static-scene-v2",
+    "known_export_limit_count": 4,
+    "gazebo_asset_contract_generated": True,
+    "gazebo_cli_validation_required": True,
+    "gazebo_runtime_verified": False,
+    "px4_mission_smoke_verified": False,
+    "simulation_execution_ready": False,
+}
+
+
+def get_school_map_gazebo_summary() -> dict[str, object]:
+    """Return the cheap, CI-pinned package identity used by catalog reads."""
+
+    return deepcopy(SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY)
+
+
 def _box(
     name: str,
     center: tuple[float, float, float],
@@ -2800,6 +2859,10 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         "px4_mission_smoke_verified": False,
         "simulation_execution_ready": False,
     }
+    if summary != SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY:
+        raise RuntimeError(
+            "School Map package identity changed; regenerate and review the pinned Gazebo summary"
+        )
     return SchoolMapGazeboArtifact(model_sdf, semantic_json, summary, package_files)
 
 
