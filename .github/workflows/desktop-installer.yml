@@ -906,6 +906,13 @@ jobs:
               "$existing_dir/$metadata_name" >/dev/null
             rm -f dist/*
             cp "$existing_dir"/* dist/
+            if [[ "$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "true" ]]; then
+              gh release edit "$GITHUB_REF_NAME" \
+                --repo "$GITHUB_REPOSITORY" \
+                --draft=false \
+                --latest=false
+            fi
+            test "$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "false"
             echo "release already exists and will never be overwritten; verified canonical assets will be reused: $GITHUB_REF_NAME"
             exit 0
           fi

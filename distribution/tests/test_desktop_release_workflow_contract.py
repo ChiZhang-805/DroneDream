@@ -71,6 +71,8 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "release already exists and will never be overwritten; verified canonical assets will be reused",
         '(cd "$existing_dir" && sha256sum --check',
         'cp "$existing_dir"/* dist/',
+        '--json isDraft',
+        '--draft=false',
         '-EditionId "${{ steps.release.outputs.edition_id }}"',
         "Advance edition stable channel",
         "stable channel build must increase",
@@ -87,6 +89,8 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
     assert 'startsWith(github.ref, \'refs/tags/desktop-v\')' not in workflow
     assert "bundle/nsis/latest.json" not in workflow
     assert "--clobber" not in workflow
+    assert workflow.count("--json isDraft") == 2
+    assert workflow.count("--draft=false") == 2
     assert workflow.index("if (( incoming_build < existing_build ))") < workflow.index(
         "candidate_json=",
     )
