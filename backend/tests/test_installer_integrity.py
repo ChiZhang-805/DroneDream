@@ -129,8 +129,7 @@ def _build_frozen_audit(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     )
 
 
-def _candidate() -> dict[str, Any]:
-    version = "1.0.1"
+def _candidate(*, version: str = "1.0.1") -> dict[str, Any]:
     edition_id = "sim"
     build_number = 805
     filename = f"DroneDream-Sim-{version}.exe"
@@ -381,6 +380,24 @@ def test_future_immutable_release_contract_accepts_only_new_exact_signed_bytes(
         "source_commit": "d" * 40,
         "publication_authorized": False,
     }
+
+
+def test_future_immutable_release_allows_equal_semver_but_rejects_downgrade(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    previous = _build_frozen_audit(monkeypatch)
+
+    equal = verify_new_immutable_installer_release(
+        previous_audit=previous,
+        candidate=_candidate(version="1.0.0"),
+    )
+    assert equal["version"] == "1.0.0"
+
+    with pytest.raises(ValueError, match="cannot downgrade"):
+        verify_new_immutable_installer_release(
+            previous_audit=previous,
+            candidate=_candidate(version="0.9.0"),
+        )
 
 
 @pytest.mark.parametrize(

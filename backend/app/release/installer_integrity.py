@@ -142,6 +142,38 @@ def _require_semver(value: object, *, field: str) -> str:
     return value
 
 
+def _compare_semver_precedence(left: str, right: str) -> int:
+    def parts(value: str) -> tuple[tuple[int, int, int], list[str] | None]:
+        without_build = value.split("+", 1)[0]
+        core, separator, prerelease = without_build.partition("-")
+        major, minor, patch = core.split(".")
+        return (int(major), int(minor), int(patch)), (
+            prerelease.split(".") if separator else None
+        )
+
+    left_core, left_prerelease = parts(left)
+    right_core, right_prerelease = parts(right)
+    if left_core != right_core:
+        return 1 if left_core > right_core else -1
+    if left_prerelease is None or right_prerelease is None:
+        if left_prerelease is right_prerelease:
+            return 0
+        return 1 if left_prerelease is None else -1
+    for left_identifier, right_identifier in zip(left_prerelease, right_prerelease):
+        if left_identifier == right_identifier:
+            continue
+        left_numeric = left_identifier.isdigit()
+        right_numeric = right_identifier.isdigit()
+        if left_numeric and right_numeric:
+            return 1 if int(left_identifier) > int(right_identifier) else -1
+        if left_numeric != right_numeric:
+            return -1 if left_numeric else 1
+        return 1 if left_identifier > right_identifier else -1
+    if len(left_prerelease) == len(right_prerelease):
+        return 0
+    return 1 if len(left_prerelease) > len(right_prerelease) else -1
+
+
 def _require_positive_int(value: object, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ValueError(f"{field} must be a positive integer")
@@ -636,7 +668,8 @@ def verify_new_immutable_installer_release(
     # independently signed builds may intentionally share the display version.
     # The historical generic installer remains the previous-origin authority;
     # it must not force all four first edition releases to invent a new SemVer.
-    _ = previous_version
+    if _compare_semver_precedence(version, previous_version) < 0:
+        raise ValueError("candidate.version cannot downgrade the audited release")
     if (
         candidate.get("version_owner_approved") is not True
         or not isinstance(candidate.get("version_approval_reference"), str)
