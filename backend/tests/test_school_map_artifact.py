@@ -15,6 +15,7 @@ from app.autonomy.school_map_artifact import (
     PX4_X500_MODEL_ROOT_TO_CONTACT_M,
     ROAD_NETWORK,
     ROUTE_ENDPOINT_TOLERANCE_M,
+    SEMANTIC_FLOAT_DECIMAL_PLACES,
     STRUCTURAL_TOLERANCE_M,
     TEACHING_OPEN_DOOR_CLEARANCE_M,
     TEACHING_OPEN_DOOR_PAIR_CENTER_X,
@@ -25,6 +26,7 @@ from app.autonomy.school_map_artifact import (
     CylinderPrimitive,
     MeshPrimitive,
     SpherePrimitive,
+    _canonicalize_semantic_value,
     export_school_map_gazebo_artifact,
     get_school_map_gazebo_artifact,
     school_map_collision_primitives,
@@ -33,6 +35,22 @@ from app.autonomy.school_map_artifact import (
 VEHICLE_COLLISION_RADIUS_M = VEHICLE_COLLISION_DIAMETER_M / 2
 VEHICLE_COLLISION_HALF_HEIGHT_M = VEHICLE_COLLISION_HEIGHT_M / 2
 ROUTE_COLLISION_SAMPLE_M = 0.04
+
+
+def test_school_map_semantic_float_projection_is_cross_platform_stable() -> None:
+    assert SEMANTIC_FLOAT_DECIMAL_PLACES == 12
+    windows_libm_value = 0.923884769991249355
+    linux_libm_value = 0.923884769991250021
+
+    assert _canonicalize_semantic_value(windows_libm_value) == _canonicalize_semantic_value(
+        linux_libm_value
+    )
+    canonical_zero = _canonicalize_semantic_value(-0.0)
+    assert isinstance(canonical_zero, float)
+    assert canonical_zero == 0.0
+    assert math.copysign(1.0, canonical_zero) == 1.0
+    with pytest.raises(ValueError, match="must be finite"):
+        _canonicalize_semantic_value(math.inf)
 
 
 def _bounds(primitive: object, axis: str) -> tuple[float, float]:

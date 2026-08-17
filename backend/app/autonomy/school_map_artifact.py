@@ -73,6 +73,7 @@ class RoadNetwork(TypedDict):
 
 STRUCTURAL_TOLERANCE_M = 0.001
 ROUTE_ENDPOINT_TOLERANCE_M = 0.01
+SEMANTIC_FLOAT_DECIMAL_PLACES = 12
 FLOOR_SLAB_M = 0.22
 STOREY_HEIGHT_M = 3.6
 WALL_HEIGHT_M = STOREY_HEIGHT_M - FLOOR_SLAB_M
@@ -2573,6 +2574,28 @@ execution has been smoke-tested.
 """
 
 
+def _canonicalize_semantic_value(value: object) -> object:
+    """Project semantic JSON onto a cross-platform, content-addressable form.
+
+    The collision compiler retains its native floats for SDF generation and
+    clearance calculations. Only the semantic JSON projection is rounded,
+    because equivalent libm trigonometry can differ by a few units in the last
+    place across operating systems. Twelve decimal places is nine orders of
+    magnitude tighter than the declared one-millimetre structural tolerance.
+    """
+
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("School Map semantic values must be finite")
+        rounded = round(value, SEMANTIC_FLOAT_DECIMAL_PLACES)
+        return 0.0 if rounded == 0.0 else rounded
+    if isinstance(value, dict):
+        return {key: _canonicalize_semantic_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_canonicalize_semantic_value(item) for item in value]
+    return value
+
+
 @lru_cache(maxsize=1)
 def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
     primitives = school_map_collision_primitives()
@@ -2710,7 +2733,13 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "simulation_execution_ready": False,
         },
     }
-    semantic_json = json.dumps(semantic, sort_keys=True, separators=(",", ":"))
+    canonical_semantic = _canonicalize_semantic_value(semantic)
+    semantic_json = json.dumps(
+        canonical_semantic,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
     model = _model_for(primitives, include_visuals=True)
     physics_model = _model_for(primitives, include_visuals=False)
     model_sdf = _sdf_for(model)

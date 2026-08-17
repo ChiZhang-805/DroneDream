@@ -1720,7 +1720,7 @@ const FALLBACK_MAP_SCENE_MANIFESTS: Partial<Record<
       "rooms", "corridors", "roads", "vegetation", "street-furniture",
     ],
     planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "770b66c5575a1af565a13c0088e174600b926cc7f222bd3b7f19d7b75b82a348",
+    manifest_sha256: "389fa2c3aae2ccf81d9a3c490da6b9d0f71b26e2cff5fb798c7e99736cafc58f",
   },
 };
 
