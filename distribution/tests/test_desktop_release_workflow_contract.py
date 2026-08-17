@@ -73,7 +73,9 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "candidate_name=",
         "rollback_stable_metadata",
         "failed to restore previous stable metadata asset",
-        "uploads.github.com",
+        "https://uploads.github.com/repos/",
+        "stable channel already contains identical build",
+        '--data-binary "@$source_file"',
         "Verify stable channel publication",
         '"unregistered-$($contract.editionId)-validation-client"',
     ):
@@ -81,7 +83,10 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
     assert 'startsWith(github.ref, \'refs/tags/desktop-v\')' not in workflow
     assert "bundle/nsis/latest.json" not in workflow
     assert "--clobber" not in workflow
-    assert workflow.index("if (( incoming_build <= existing_build ))") < workflow.index(
+    assert workflow.index("if (( incoming_build < existing_build ))") < workflow.index(
+        "candidate_json=",
+    )
+    assert workflow.index("if (( incoming_build == existing_build ))") < workflow.index(
         "candidate_json=",
     )
     assert workflow.index("final_replaced=true") < workflow.index(

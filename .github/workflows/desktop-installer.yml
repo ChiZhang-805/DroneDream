@@ -907,12 +907,16 @@ jobs:
             local release_id="$1"
             local source_file="$2"
             local asset_name="$3"
-            gh api \
-              --hostname uploads.github.com \
-              --method POST \
-              -H "Content-Type: application/json" \
-              --input "$source_file" \
-              "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$asset_name"
+            test "$release_id" = "$channel_release_id"
+            [[ "$asset_name" =~ ^[A-Za-z0-9._-]+$ ]]
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --header "Content-Type: application/json" \
+              --data-binary "@$source_file" \
+              "${channel_upload_url}?name=$asset_name"
           }
 
           if gh release view "$channel" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -926,6 +930,11 @@ jobs:
 
             gh api "repos/$GITHUB_REPOSITORY/releases/tags/$channel" > "$channel_json"
             release_id="$(jq -er '.id' "$channel_json")"
+            channel_release_id="$release_id"
+            channel_upload_url="$(
+              jq -er '.upload_url | sub("\\{\\?name,label\\}$"; "")' "$channel_json"
+            )"
+            [[ "$channel_upload_url" == "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$release_id/assets" ]]
             old_tag_sha="$(
               gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$channel" --jq '.object.sha'
             )"
@@ -942,9 +951,14 @@ jobs:
               jq -er '.notes | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build' \
                 "$backup_metadata"
             )"
-            if (( incoming_build <= existing_build )); then
+            if (( incoming_build < existing_build )); then
               echo "stable channel build must increase: existing=$existing_build incoming=$incoming_build" >&2
               exit 2
+            fi
+            if (( incoming_build == existing_build )); then
+              cmp "$metadata" "$backup_metadata"
+              echo "stable channel already contains identical build $incoming_build"
+              exit 0
             fi
 
             rollback_stable_metadata() {
