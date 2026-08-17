@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
 from xml.etree import ElementTree
 
 import pytest
 
-from app.autonomy.catalog import get_bundled_map_manifest
+from app.autonomy.catalog import get_bundled_map_manifest, get_scene
 from app.autonomy.qualification import MapPackQualificationRequest, qualify_map_pack
 from app.autonomy.school_map_artifact import (
     ROUTE_ENDPOINT_TOLERANCE_M,
     STRUCTURAL_TOLERANCE_M,
+    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
     export_school_map_gazebo_artifact,
     get_school_map_gazebo_artifact,
     school_map_collision_primitives,
@@ -162,6 +164,8 @@ def test_teaching_closed_doors_and_frames_match_the_rendered_collision_state() -
     west_frame = primitives["teaching-entry-frame-west"]
     center_frame = primitives["teaching-entry-frame-center"]
     east_frame = primitives["teaching-entry-frame-east"]
+    open_west = primitives["teaching-entry-door-1-west-open"]
+    open_east = primitives["teaching-entry-door-2-west-open"]
     closed_west = primitives["teaching-entry-door-3-east-closed"]
     closed_east = primitives["teaching-entry-door-4-east-closed"]
     threshold = primitives["teaching-entry-threshold"]
@@ -176,9 +180,75 @@ def test_teaching_closed_doors_and_frames_match_the_rendered_collision_state() -
     )
     assert all(abs(left - right) <= STRUCTURAL_TOLERANCE_M for left, right in interfaces)
     assert _bounds(center_frame, "x")[0] - _bounds(west_frame, "x")[1] == pytest.approx(3.99)
-    for obstruction in (west_frame, center_frame, east_frame, closed_west, closed_east):
+    for obstruction in (
+        west_frame,
+        center_frame,
+        east_frame,
+        open_west,
+        open_east,
+        closed_west,
+        closed_east,
+    ):
         assert _bounds(obstruction, "z")[0] == pytest.approx(0.22)
         assert _bounds(obstruction, "z")[1] == pytest.approx(2.92)
+    assert open_west.yaw_rad == pytest.approx(-open_east.yaw_rad)
+    west_inner_tip = open_west.center_x + math.cos(open_west.yaw_rad) * open_west.size_x / 2
+    east_inner_tip = open_east.center_x - math.cos(open_east.yaw_rad) * open_east.size_x / 2
+    assert east_inner_tip - west_inner_tip > 0.76
+    assert west_inner_tip + 0.38 < TEACHING_OPEN_DOOR_PAIR_CENTER_X < east_inner_tip - 0.38
+
+
+def test_cafeteria_closed_doors_and_frames_match_the_rendered_collision_state() -> None:
+    primitives = {primitive.name: primitive for primitive in school_map_collision_primitives()}
+    sequence = [
+        primitives["cafeteria-south-1-west"],
+        primitives["cafeteria-entry-frame-west-left"],
+        primitives["cafeteria-entry-door-west-1-closed"],
+        primitives["cafeteria-entry-door-west-2-closed"],
+        primitives["cafeteria-entry-frame-west-right"],
+        primitives["cafeteria-entry-frame-east-left"],
+        primitives["cafeteria-entry-door-east-1-closed"],
+        primitives["cafeteria-entry-door-east-2-closed"],
+        primitives["cafeteria-entry-frame-east-right"],
+        primitives["cafeteria-south-1-east"],
+    ]
+    for current, following in zip(sequence[:-1], sequence[1:], strict=True):
+        assert abs(_bounds(current, "x")[1] - _bounds(following, "x")[0]) <= STRUCTURAL_TOLERANCE_M
+
+    threshold = primitives["cafeteria-entry-threshold"]
+    second_step = primitives["cafeteria-entry-step-2"]
+    first_leaf = primitives["cafeteria-entry-door-west-1-closed"]
+    top_frame = primitives["cafeteria-entry-frame-west-top"]
+    header = primitives["cafeteria-south-1-header"]
+    assert _bounds(second_step, "y")[1] == pytest.approx(_bounds(threshold, "y")[0])
+    assert _bounds(threshold, "y")[1] == pytest.approx(_bounds(first_leaf, "y")[0])
+    assert _bounds(first_leaf, "z")[0] == pytest.approx(0.22)
+    assert _bounds(first_leaf, "z")[1] == pytest.approx(_bounds(top_frame, "z")[0])
+    assert _bounds(top_frame, "z")[1] == pytest.approx(_bounds(header, "z")[0])
+
+
+def test_reference_mission_crosses_teaching_facade_through_open_pair() -> None:
+    scene = get_scene("school-campus-v1")
+    assert scene is not None
+    primitives = {primitive.name: primitive for primitive in school_map_collision_primitives()}
+    west_clear_edge = _bounds(primitives["teaching-entry-frame-west"], "x")[1]
+    east_clear_edge = _bounds(primitives["teaching-entry-frame-center"], "x")[0]
+    vehicle_radius = 0.76 / 2
+    crossings: list[float] = []
+
+    for start, end in zip(scene.reference_path[:-1], scene.reference_path[1:], strict=True):
+        if start.y == end.y or (start.y - 2.0) * (end.y - 2.0) > 0:
+            continue
+        ratio = (2.0 - start.y) / (end.y - start.y)
+        crossing_x = start.x + (end.x - start.x) * ratio
+        if -29.23 <= crossing_x <= -20.77:
+            crossings.append(crossing_x)
+
+    assert crossings == pytest.approx([TEACHING_OPEN_DOOR_PAIR_CENTER_X] * 2)
+    assert all(
+        west_clear_edge + vehicle_radius <= crossing <= east_clear_edge - vehicle_radius
+        for crossing in crossings
+    )
 
 
 def test_school_map_manifest_and_qualification_bind_unverified_gazebo_contract() -> None:

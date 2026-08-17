@@ -4,10 +4,11 @@ import type { AutonomyCompileRequest } from "../../types/api";
 import { loadAutonomyAssetLibrary } from "./assetLibraryStore";
 import { createLocalAutonomyPreview } from "./missionAutonomy";
 import { MY_DRONE_CONTRACT } from "./myDroneModel";
-import { SCHOOL_MAP_CONTRACT, SCHOOL_MAP_ROAD_NETWORK } from "./schoolMapScene";
+import { SCHOOL_MAP_CONTRACT, SCHOOL_MAP_ROAD_NETWORK, SCHOOL_MAP_ROUTES } from "./schoolMapScene";
 import {
   SCHOOL_MAP_GEOMETRY,
   schoolMapStairDimensions,
+  schoolMapTeachingOpenDoorCenterX,
   validateSchoolMapGeometryContract,
 } from "./schoolMapGeometryContract";
 import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "./workspaceStore";
@@ -145,6 +146,35 @@ describe("autonomy mission harness", () => {
     expect(MY_DRONE_CONTRACT.collisionEnvelopeM.x).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM);
     expect(MY_DRONE_CONTRACT.collisionEnvelopeM.z).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM);
     expect(MY_DRONE_CONTRACT.collisionEnvelopeM.y).toBe(SCHOOL_MAP_GEOMETRY.vehicle.collisionHeightM);
+  });
+
+  it("routes teaching-building missions through the open west door pair", () => {
+    const entrance = SCHOOL_MAP_GEOMETRY.teachingBuilding;
+    const frameHalf = entrance.doorFrameWidthM / 2;
+    const westClearEdge = entrance.entranceX
+      - entrance.entranceOpeningWidthM / 2
+      + entrance.doorFrameWidthM;
+    const eastClearEdge = entrance.entranceX - frameHalf;
+    const vehicleRadius = SCHOOL_MAP_GEOMETRY.vehicle.collisionDiameterM / 2;
+
+    for (const [mission, expectedCrossingCount] of [["coffee", 2], ["narrow", 1]] as const) {
+      const crossings: number[] = [];
+      const points = SCHOOL_MAP_ROUTES[mission];
+      for (let index = 0; index < points.length - 1; index += 1) {
+        const start = points[index];
+        const end = points[index + 1];
+        if (start.z === end.z || (start.z - entrance.southFaceZ) * (end.z - entrance.southFaceZ) > 0) continue;
+        const ratio = (entrance.southFaceZ - start.z) / (end.z - start.z);
+        const crossingX = start.x + (end.x - start.x) * ratio;
+        if (Math.abs(crossingX - entrance.entranceX) <= entrance.entranceOpeningWidthM / 2) crossings.push(crossingX);
+      }
+      expect(crossings).toHaveLength(expectedCrossingCount);
+      crossings.forEach((crossingX) => {
+        expect(crossingX).toBeCloseTo(schoolMapTeachingOpenDoorCenterX(), 6);
+        expect(crossingX).toBeGreaterThanOrEqual(westClearEdge + vehicleRadius);
+        expect(crossingX).toBeLessThanOrEqual(eastClearEdge - vehicleRadius);
+      });
+    }
   });
 
   it("restores public assets when the persisted asset library is malformed", () => {

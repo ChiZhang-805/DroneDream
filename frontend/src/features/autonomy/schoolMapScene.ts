@@ -3,6 +3,7 @@ import {
   SCHOOL_MAP_GEOMETRY,
   schoolMapFloorSurfaceY,
   schoolMapStairDimensions,
+  schoolMapTeachingOpenDoorCenterX,
   schoolMapWallSpan,
 } from "./schoolMapGeometryContract";
 
@@ -288,8 +289,9 @@ function addDoor(
   width = 1.05,
   height = 2.2,
   double = false,
+  traversable = true,
 ) {
-  const group = tag(new THREE.Group(), "door", id, { traversable: true, clearanceM: width });
+  const group = tag(new THREE.Group(), "door", id, { traversable, clearanceM: traversable ? width : 0 });
   group.position.set(...position);
   group.rotation.y = rotationY;
   const frame = 0.08;
@@ -683,14 +685,17 @@ function addEntrance(parent: THREE.Object3D) {
   // The stair core sits at the east end of the teaching building. Keep the two
   // western leaves open so the active flight entrance is the pair furthest
   // from the stair traffic, while retaining all four modeled door leaves.
-  const entranceLeafWidth = 1.995;
-  addEntranceDoorLeaf(group, [x - 4.07, doorY, doorZ], "teaching-main-door-1-west-open", 1, true, entranceLeafWidth);
-  addEntranceDoorLeaf(group, [x - 0.08, doorY, doorZ], "teaching-main-door-2-west-open", -1, true, entranceLeafWidth);
-  addEntranceDoorLeaf(group, [x + 0.08, doorY, doorZ], "teaching-main-door-3-east-closed", 1, false, entranceLeafWidth);
-  addEntranceDoorLeaf(group, [x + 4.07, doorY, doorZ], "teaching-main-door-4-east-closed", -1, false, entranceLeafWidth);
-  [x - 4.15, x, x + 4.15].forEach((postX, index) => box(
+  const entranceOpeningHalf = SCHOOL_MAP_GEOMETRY.teachingBuilding.entranceOpeningWidthM / 2;
+  const entranceFrameWidth = SCHOOL_MAP_GEOMETRY.teachingBuilding.doorFrameWidthM;
+  const entranceFrameHalf = entranceFrameWidth / 2;
+  const entranceLeafWidth = SCHOOL_MAP_GEOMETRY.teachingBuilding.doorLeafWidthM;
+  addEntranceDoorLeaf(group, [x - entranceOpeningHalf + entranceFrameWidth, doorY, doorZ], "teaching-main-door-1-west-open", 1, true, entranceLeafWidth);
+  addEntranceDoorLeaf(group, [x - entranceFrameHalf, doorY, doorZ], "teaching-main-door-2-west-open", -1, true, entranceLeafWidth);
+  addEntranceDoorLeaf(group, [x + entranceFrameHalf, doorY, doorZ], "teaching-main-door-3-east-closed", 1, false, entranceLeafWidth);
+  addEntranceDoorLeaf(group, [x + entranceOpeningHalf - entranceFrameWidth, doorY, doorZ], "teaching-main-door-4-east-closed", -1, false, entranceLeafWidth);
+  [x - entranceOpeningHalf + entranceFrameHalf, x, x + entranceOpeningHalf - entranceFrameHalf].forEach((postX, index) => box(
     group,
-    [0.16, 2.7, frameDepth],
+    [entranceFrameWidth, 2.7, frameDepth],
     [postX, doorY, doorZ],
     COLORS.trim,
     { id: `teaching-main-door-frame-${index + 1}`, kind: "door-frame", metalness: 0.2 },
@@ -923,8 +928,10 @@ function addCafeteria(root: THREE.Group, options: SchoolMapSceneOptions) {
   }
   const roof = box(group, [34.8, SCHOOL_MAP_GEOMETRY.floor.roofThicknessM, 25.8], [30, 7.2 + SCHOOL_MAP_GEOMETRY.floor.roofThicknessM / 2, 20], COLORS.roof, { id: "cafeteria-roof", kind: "roof", opacity: options.xRay ? 0.05 : 1 });
   roof.visible = options.floor === "all" && !options.xRay;
-  addDoor(group, [28.125, schoolMapFloorSurfaceY(1) + 1.325, 7.5], 0, "cafeteria-main-door-west", 3.59, 2.65, true);
-  addDoor(group, [31.875, schoolMapFloorSurfaceY(1) + 1.325, 7.5], 0, "cafeteria-main-door-east", 3.59, 2.65, true);
+  const cafeteriaDoorGroupOffset = SCHOOL_MAP_GEOMETRY.cafeteria.entranceOpeningWidthM / 4;
+  const cafeteriaDoorCenterY = schoolMapFloorSurfaceY(1) + SCHOOL_MAP_GEOMETRY.cafeteria.doorHeightM / 2;
+  addDoor(group, [30 - cafeteriaDoorGroupOffset, cafeteriaDoorCenterY, 7.5], 0, "cafeteria-main-door-west", SCHOOL_MAP_GEOMETRY.cafeteria.doorPanelGroupWidthM, SCHOOL_MAP_GEOMETRY.cafeteria.doorHeightM, true, false);
+  addDoor(group, [30 + cafeteriaDoorGroupOffset, cafeteriaDoorCenterY, 7.5], 0, "cafeteria-main-door-east", SCHOOL_MAP_GEOMETRY.cafeteria.doorPanelGroupWidthM, SCHOOL_MAP_GEOMETRY.cafeteria.doorHeightM, true, false);
   const cafeteriaStepCount = SCHOOL_MAP_GEOMETRY.cafeteria.entranceStepCount;
   const cafeteriaStepDepth = SCHOOL_MAP_GEOMETRY.cafeteria.entranceStepDepthM;
   const cafeteriaStepRise = schoolMapFloorSurfaceY(1) / cafeteriaStepCount;
@@ -1335,10 +1342,10 @@ export const SCHOOL_MAP_ROUTES: Record<SchoolMapMissionId, THREE.Vector3[]> = {
     [-49.0, 8.15, 15.3], [-46.0, 8.35, 9.4], [-35.0, 8.25, 5.0], [-14.0, 8.15, 5.0], [-2.3, 8.05, 6.9],
     [-1.9, 7.45, 8.7], [-1.9, 6.65, 10.7], [1.7, 5.65, 12.3], [1.7, 4.45, 10.0], [1.7, 3.75, 7.0],
     [-1.9, 3.15, 8.7], [-1.9, 2.35, 10.7], [1.7, 1.35, 12.3], [1.7, 1.15, 8.8], [-8.0, 1.25, 5.0],
-    [-24.8, 1.35, 2.7], [-25.0, 1.45, -1.055], [-25.0, 1.55, -9.0], [-25.0, 1.65, -18.0], [0, 1.8, -18.0],
+    [schoolMapTeachingOpenDoorCenterX(), 1.35, 2.7], [schoolMapTeachingOpenDoorCenterX(), 1.45, -1.055], [-25.0, 1.55, -9.0], [-25.0, 1.65, -18.0], [0, 1.8, -18.0],
     [30.0, 1.8, -18.0], [39.0, 1.7, -12.0], [46.0, 1.55, -5.0], [48.5, 1.15, 1.5],
     [46.0, 1.55, -5.0], [39.0, 1.7, -12.0], [30.0, 1.8, -18.0], [0, 1.8, -18.0], [-25.0, 1.65, -18.0],
-    [-25.0, 1.55, -9.0], [-25.0, 1.45, -1.055], [-24.8, 1.35, 2.7], [-8.0, 1.25, 5.0], [1.7, 1.15, 8.8], [1.7, 1.35, 12.3],
+    [-25.0, 1.55, -9.0], [schoolMapTeachingOpenDoorCenterX(), 1.45, -1.055], [schoolMapTeachingOpenDoorCenterX(), 1.35, 2.7], [-8.0, 1.25, 5.0], [1.7, 1.15, 8.8], [1.7, 1.35, 12.3],
     [-1.9, 2.35, 10.7], [-1.9, 3.15, 8.7], [1.7, 3.75, 7.0], [1.7, 4.45, 10.0], [1.7, 5.65, 12.3],
     [-1.9, 6.65, 10.7], [-1.9, 7.45, 8.7], [-2.3, 8.05, 6.9], [-14.0, 8.15, 5.0], [-35.0, 8.25, 5.0],
     [-46.0, 8.35, 9.4], [-49.0, 8.15, 15.3],
@@ -1350,7 +1357,7 @@ export const SCHOOL_MAP_ROUTES: Record<SchoolMapMissionId, THREE.Vector3[]> = {
   narrow: route([
     [-49, 8.15, 15.3], [-46, 8.3, 9.4], [-35, 8.1, 5.0], [-23, 8.0, 5.0], [-12, 8.0, 5.0],
     [-2.4, 7.9, 6.7], [-1.9, 7.2, 9.0], [1.7, 6.0, 12.2], [1.7, 4.6, 9.4], [-1.9, 3.2, 8.7],
-    [1.7, 1.35, 12.3], [1.7, 1.15, 8.8], [-8, 1.2, 5], [-24.8, 1.3, 2.7], [-25, 1.4, -1.055],
+    [1.7, 1.35, 12.3], [1.7, 1.15, 8.8], [-8, 1.2, 5], [schoolMapTeachingOpenDoorCenterX(), 1.3, 2.7], [schoolMapTeachingOpenDoorCenterX(), 1.4, -1.055],
   ]),
 };
 

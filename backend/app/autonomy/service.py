@@ -33,6 +33,7 @@ from app.autonomy.models import (
     TaskRisk,
     ValidationIssue,
 )
+from app.autonomy.school_map_artifact import TEACHING_OPEN_DOOR_PAIR_CENTER_X
 
 GRAVITY = 9.80665
 MIN_THRUST_TO_WEIGHT = 1.35
@@ -293,8 +294,20 @@ def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | 
         RoutePoint(x=1.7, y=12.3, z=1.35, phase="stairs", speed_limit_mps=0.42),
         RoutePoint(x=1.7, y=8.8, z=1.15, phase="stairs", speed_limit_mps=0.45),
         RoutePoint(x=-8.0, y=5.0, z=1.2, phase="transit", speed_limit_mps=0.65),
-        RoutePoint(x=-24.8, y=2.7, z=1.3, phase="transit", speed_limit_mps=0.5),
-        RoutePoint(x=-25.0, y=-1.055, z=1.3, phase="land", speed_limit_mps=0.35),
+        RoutePoint(
+            x=TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+            y=2.7,
+            z=1.3,
+            phase="transit",
+            speed_limit_mps=0.5,
+        ),
+        RoutePoint(
+            x=TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+            y=-1.055,
+            z=1.3,
+            phase="land",
+            speed_limit_mps=0.35,
+        ),
     ]
 
 

@@ -23,7 +23,10 @@ export const SCHOOL_MAP_GEOMETRY = {
     southFaceZ: 2,
     entranceStepCount: 4,
     entranceStepDepthM: 0.75,
+    entranceOpeningWidthM: 8.46,
+    doorFrameWidthM: 0.16,
     doorFrameDepthM: 0.11,
+    doorLeafWidthM: 1.995,
     doorLeafDepthM: 0.095,
   },
   cafeteria: {
@@ -35,8 +38,12 @@ export const SCHOOL_MAP_GEOMETRY = {
     southFaceZ: 7.5,
     entranceStepCount: 2,
     entranceStepDepthM: 0.6,
+    entranceOpeningWidthM: 7.5,
+    doorFrameWidthM: 0.08,
     doorFrameDepthM: 0.11,
+    doorPanelGroupWidthM: 3.59,
     doorLeafDepthM: 0.06,
+    doorHeightM: 2.65,
   },
   stair: {
     centerX: -0.1,
@@ -99,6 +106,11 @@ export function schoolMapWallSpan(floor: number) {
     heightM: topY - bottomY,
     centerY: (bottomY + topY) / 2,
   };
+}
+
+export function schoolMapTeachingOpenDoorCenterX() {
+  const entrance = SCHOOL_MAP_GEOMETRY.teachingBuilding;
+  return entrance.entranceX - entrance.doorFrameWidthM / 2 - entrance.doorLeafWidthM;
 }
 
 export function schoolMapStairDimensions() {

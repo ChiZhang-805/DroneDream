@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from xml.etree import ElementTree
@@ -32,6 +33,17 @@ ENTRANCE_DOOR_FRAME_DEPTH_M = 0.11
 ENTRANCE_DOOR_LEAF_WIDTH_M = 1.995
 ENTRANCE_DOOR_LEAF_DEPTH_M = 0.095
 ENTRANCE_DOOR_HEIGHT_M = 2.7
+ENTRANCE_DOOR_OPEN_ANGLE_RAD = math.radians(78)
+TEACHING_OPEN_DOOR_PAIR_CENTER_X = (
+    TEACHING_ENTRANCE_CENTER_X - ENTRANCE_DOOR_FRAME_WIDTH_M / 2 - ENTRANCE_DOOR_LEAF_WIDTH_M
+)
+CAFETERIA_ENTRANCE_CENTER_X = 30.0
+CAFETERIA_ENTRANCE_OPENING_M = 7.5
+CAFETERIA_DOOR_GROUP_WIDTH_M = 3.59
+CAFETERIA_DOOR_FRAME_WIDTH_M = 0.08
+CAFETERIA_DOOR_FRAME_DEPTH_M = 0.11
+CAFETERIA_DOOR_LEAF_DEPTH_M = 0.06
+CAFETERIA_DOOR_HEIGHT_M = 2.65
 
 ROAD_NETWORK = {
     "facility_anchors": {
@@ -93,6 +105,7 @@ class BoxPrimitive:
     size_y: float
     size_z: float
     semantic: str
+    yaw_rad: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -107,8 +120,9 @@ def _box(
     center: tuple[float, float, float],
     size: tuple[float, float, float],
     semantic: str,
+    yaw_rad: float = 0.0,
 ) -> BoxPrimitive:
-    return BoxPrimitive(name, *center, *size, semantic)
+    return BoxPrimitive(name, *center, *size, semantic, yaw_rad)
 
 
 def _wall_span(floor: int) -> tuple[float, float]:
@@ -259,12 +273,37 @@ def _teaching_floor_primitives() -> list[BoxPrimitive]:
                 "door-frame",
             )
         )
+    for index, hinge_x, direction in (
+        (
+            1,
+            TEACHING_ENTRANCE_CENTER_X - opening_half + ENTRANCE_DOOR_FRAME_WIDTH_M,
+            1,
+        ),
+        (2, TEACHING_ENTRANCE_CENTER_X - frame_half, -1),
+    ):
+        three_angle = direction * ENTRANCE_DOOR_OPEN_ANGLE_RAD
+        local_center_x = direction * ENTRANCE_DOOR_LEAF_WIDTH_M / 2
+        result.append(
+            _box(
+                f"teaching-entry-door-{index}-west-open",
+                (
+                    hinge_x + math.cos(three_angle) * local_center_x,
+                    2.0 - math.sin(three_angle) * local_center_x,
+                    door_center_height,
+                ),
+                (
+                    ENTRANCE_DOOR_LEAF_WIDTH_M,
+                    ENTRANCE_DOOR_LEAF_DEPTH_M,
+                    ENTRANCE_DOOR_HEIGHT_M,
+                ),
+                "open-door-leaf",
+                yaw_rad=-three_angle,
+            )
+        )
     for index, leaf_x in enumerate(
         (
             TEACHING_ENTRANCE_CENTER_X + frame_half + ENTRANCE_DOOR_LEAF_WIDTH_M / 2,
-            TEACHING_ENTRANCE_CENTER_X
-            + frame_half
-            + ENTRANCE_DOOR_LEAF_WIDTH_M * 1.5,
+            TEACHING_ENTRANCE_CENTER_X + frame_half + ENTRANCE_DOOR_LEAF_WIDTH_M * 1.5,
         ),
         start=3,
     ):
@@ -363,6 +402,9 @@ def _cafeteria_primitives() -> list[BoxPrimitive]:
         "min_y": 20 - run / 2 - STAIR_LANDING_M,
         "max_y": 20 + run / 2 + STAIR_LANDING_M,
     }
+    entrance_side_width = (34 - CAFETERIA_ENTRANCE_OPENING_M) / 2
+    threshold_depth = (CAFETERIA_DOOR_FRAME_DEPTH_M - CAFETERIA_DOOR_LEAF_DEPTH_M) / 2
+    threshold_center_y = 7.5 - CAFETERIA_DOOR_FRAME_DEPTH_M / 2 + threshold_depth / 2
     for floor in (1, 2):
         base_z = (floor - 1) * STOREY_HEIGHT_M
         center_z, height = _wall_span(floor)
@@ -415,20 +457,20 @@ def _cafeteria_primitives() -> list[BoxPrimitive]:
                 (
                     _box(
                         "cafeteria-south-1-west",
-                        (19.625, 7.5, center_z),
-                        (13.25, 0.22, height),
+                        (13 + entrance_side_width / 2, 7.5, center_z),
+                        (entrance_side_width, 0.22, height),
                         "exterior-wall",
                     ),
                     _box(
                         "cafeteria-south-1-east",
-                        (40.375, 7.5, center_z),
-                        (13.25, 0.22, height),
+                        (47 - entrance_side_width / 2, 7.5, center_z),
+                        (entrance_side_width, 0.22, height),
                         "exterior-wall",
                     ),
                     _box(
                         "cafeteria-south-1-header",
                         (30, 7.5, (2.95 + 3.6) / 2),
-                        (7.5, 0.22, 3.6 - 2.95),
+                        (CAFETERIA_ENTRANCE_OPENING_M, 0.22, 3.6 - 2.95),
                         "door-header",
                     ),
                 )
@@ -440,17 +482,95 @@ def _cafeteria_primitives() -> list[BoxPrimitive]:
     result.append(_box("cafeteria-roof", (30, 20, 7.2 + 0.35 / 2), (34.8, 25.8, 0.35), "roof"))
     result.extend(
         (
-            _box("cafeteria-entry-step-1", (30, 6.545, 0.055), (7.5, 0.6, 0.11), "entrance-step"),
-            _box("cafeteria-entry-step-2", (30, 7.145, 0.11), (7.5, 0.6, 0.22), "entrance-step"),
+            _box(
+                "cafeteria-entry-step-1",
+                (30, 6.545, 0.055),
+                (CAFETERIA_ENTRANCE_OPENING_M, 0.6, 0.11),
+                "entrance-step",
+            ),
+            _box(
+                "cafeteria-entry-step-2",
+                (30, 7.145, 0.11),
+                (CAFETERIA_ENTRANCE_OPENING_M, 0.6, 0.22),
+                "entrance-step",
+            ),
             _box(
                 "cafeteria-entry-threshold",
-                (30, 7.4575, 0.21),
-                (7.5, 0.025, 0.02),
+                (30, threshold_center_y, 0.21),
+                (CAFETERIA_ENTRANCE_OPENING_M, threshold_depth, 0.02),
                 "door-threshold",
             ),
-            _box("cafeteria-entry-canopy", (30, 6.195, 3.1), (7.5, 2.39, 0.28), "canopy"),
+            _box(
+                "cafeteria-entry-canopy",
+                (30, 6.195, 3.1),
+                (CAFETERIA_ENTRANCE_OPENING_M, 2.39, 0.28),
+                "canopy",
+            ),
         )
     )
+    door_center_height = FLOOR_SLAB_M + CAFETERIA_DOOR_HEIGHT_M / 2
+    door_group_offset = CAFETERIA_ENTRANCE_OPENING_M / 4
+    for side, group_x in (
+        ("west", CAFETERIA_ENTRANCE_CENTER_X - door_group_offset),
+        ("east", CAFETERIA_ENTRANCE_CENTER_X + door_group_offset),
+    ):
+        for jamb, frame_x in (
+            (
+                "left",
+                group_x - CAFETERIA_DOOR_GROUP_WIDTH_M / 2 - CAFETERIA_DOOR_FRAME_WIDTH_M / 2,
+            ),
+            (
+                "right",
+                group_x + CAFETERIA_DOOR_GROUP_WIDTH_M / 2 + CAFETERIA_DOOR_FRAME_WIDTH_M / 2,
+            ),
+        ):
+            result.append(
+                _box(
+                    f"cafeteria-entry-frame-{side}-{jamb}",
+                    (frame_x, 7.5, door_center_height),
+                    (
+                        CAFETERIA_DOOR_FRAME_WIDTH_M,
+                        CAFETERIA_DOOR_FRAME_DEPTH_M,
+                        CAFETERIA_DOOR_HEIGHT_M,
+                    ),
+                    "door-frame",
+                )
+            )
+        result.append(
+            _box(
+                f"cafeteria-entry-frame-{side}-top",
+                (
+                    group_x,
+                    7.5,
+                    FLOOR_SLAB_M + CAFETERIA_DOOR_HEIGHT_M + CAFETERIA_DOOR_FRAME_WIDTH_M / 2,
+                ),
+                (
+                    CAFETERIA_DOOR_GROUP_WIDTH_M,
+                    CAFETERIA_DOOR_FRAME_DEPTH_M,
+                    CAFETERIA_DOOR_FRAME_WIDTH_M,
+                ),
+                "door-frame",
+            )
+        )
+        for leaf_index, leaf_x in enumerate(
+            (
+                group_x - CAFETERIA_DOOR_GROUP_WIDTH_M / 4,
+                group_x + CAFETERIA_DOOR_GROUP_WIDTH_M / 4,
+            ),
+            start=1,
+        ):
+            result.append(
+                _box(
+                    f"cafeteria-entry-door-{side}-{leaf_index}-closed",
+                    (leaf_x, 7.5, door_center_height),
+                    (
+                        CAFETERIA_DOOR_GROUP_WIDTH_M / 2,
+                        CAFETERIA_DOOR_LEAF_DEPTH_M,
+                        CAFETERIA_DOOR_HEIGHT_M,
+                    ),
+                    "closed-door-leaf",
+                )
+            )
     return result
 
 
@@ -533,9 +653,10 @@ def _sdf_for(primitives: list[BoxPrimitive]) -> str:
     ElementTree.SubElement(model, "static").text = "true"
     for primitive in primitives:
         link = ElementTree.SubElement(model, "link", {"name": primitive.name})
-        ElementTree.SubElement(
-            link, "pose"
-        ).text = f"{primitive.center_x:g} {primitive.center_y:g} {primitive.center_z:g} 0 0 0"
+        ElementTree.SubElement(link, "pose").text = (
+            f"{primitive.center_x:g} {primitive.center_y:g} {primitive.center_z:g} "
+            f"0 0 {primitive.yaw_rad:g}"
+        )
         size = f"{primitive.size_x:g} {primitive.size_y:g} {primitive.size_z:g}"
         for element_name in ("collision", "visual"):
             element = ElementTree.SubElement(link, element_name, {"name": element_name})
@@ -579,7 +700,7 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "building-shells-and-floor-openings",
             "teaching-and-cafeteria-switchback-stairs",
             "entrance-steps-and-thresholds",
-            "fixed-door-frames-and-closed-leaves",
+            "door-frames-and-open-closed-door-leaves",
             "canopies-and-columns",
             "street-light-obstacles",
         ],

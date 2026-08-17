@@ -7,7 +7,10 @@ import json
 from typing import Literal, TypedDict
 
 from app.autonomy.models import RoutePoint, TerrainObject, TerrainScene, Vector3
-from app.autonomy.school_map_artifact import get_school_map_gazebo_artifact
+from app.autonomy.school_map_artifact import (
+    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+    get_school_map_gazebo_artifact,
+)
 
 
 def _p(
@@ -164,8 +167,8 @@ SCENES: dict[str, TerrainScene] = {
             _p(1.7, 7.0, 3.75, "stairs", 0.45),
             _p(-1.9, 10.7, 2.35, "stairs", 0.45),
             _p(1.7, 12.3, 1.35, "stairs", 0.45),
-            _p(-24.8, 2.7, 1.35, "transit", 0.7),
-            _p(-25.0, -1.055, 1.45, "transit", 0.7),
+            _p(TEACHING_OPEN_DOOR_PAIR_CENTER_X, 2.7, 1.35, "transit", 0.7),
+            _p(TEACHING_OPEN_DOOR_PAIR_CENTER_X, -1.055, 1.45, "transit", 0.7),
             _p(-25.0, -9.0, 1.55, "transit", 0.9),
             _p(-25.0, -18.0, 1.65, "transit", 1.0),
             _p(0.0, -18.0, 1.8, "transit", 1.1),
@@ -179,8 +182,8 @@ SCENES: dict[str, TerrainScene] = {
             _p(0.0, -18.0, 1.8, "return", 1.0),
             _p(-25.0, -18.0, 1.65, "return", 0.9),
             _p(-25.0, -9.0, 1.55, "return", 0.8),
-            _p(-25.0, -1.055, 1.45, "return", 0.7),
-            _p(-24.8, 2.7, 1.35, "return", 0.7),
+            _p(TEACHING_OPEN_DOOR_PAIR_CENTER_X, -1.055, 1.45, "return", 0.7),
+            _p(TEACHING_OPEN_DOOR_PAIR_CENTER_X, 2.7, 1.35, "return", 0.7),
             _p(1.7, 12.3, 1.35, "stairs", 0.42),
             _p(-1.9, 10.7, 2.35, "stairs", 0.42),
             _p(1.7, 7.0, 3.75, "stairs", 0.42),
