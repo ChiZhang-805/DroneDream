@@ -54,7 +54,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-releas
 ```
 
 The builder reads the desktop version, verifies the installer checksum, builds
-the static site, copies the exact versioned preview EXE and checksum, writes
+the source-bound MSVC build receipt and installer checksum, builds the static
+site, copies the exact versioned preview EXE and checksum, writes
 `downloads/latest.json`, and generates `SHA256SUMS` for the complete site. It
 refuses missing or ambiguous handoffs instead of guessing between stale builds.
 The EXE is not Authenticode-signed, so

@@ -234,10 +234,12 @@ foreach ($name in @("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")) {
 
 $sourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
 $sourceTree = (& git -C $repoRoot rev-parse 'HEAD^{tree}').Trim()
+$sourceBuildNumber = (& git -C $repoRoot rev-list --count $sourceCommit).Trim()
 $sourceStatus = (& git -C $repoRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or
     $sourceCommit -cnotmatch '^[0-9a-f]{40}$' -or
     $sourceTree -cnotmatch '^[0-9a-f]{40}$' -or
+    $sourceBuildNumber -cnotmatch '^[1-9][0-9]*$' -or
     $sourceStatus) {
     throw "The four-edition build requires one exact clean source commit."
 }
@@ -410,6 +412,7 @@ try {
             editionId = $editionId
             productName = $contract.product
             version = $version
+            buildNumber = [UInt64]$sourceBuildNumber
             sourceCommit = $sourceCommit
             sourceTree = $sourceTree
             desktopVisualQa = $desktopVisualQa

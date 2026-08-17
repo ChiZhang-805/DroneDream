@@ -438,6 +438,29 @@ $checksumPath = "$installer.sha256"
     Set-Content -Encoding ascii -LiteralPath $checksumPath
 Write-Host "Wrote verified installer checksum to $checksumPath"
 
+[ordered]@{
+    schemaVersion = 1
+    kind = "dronedream-four-edition-build-receipt"
+    editionId = $EditionId
+    productName = $ExpectedProductName
+    version = [string]$tauriConfig.version
+    buildNumber = [UInt64]$releaseBuildNumber
+    sourceCommit = $releaseSourceCommit
+    sourceTree = $releaseSourceTree
+    desktopVisualQa = $desktopVisualQa
+    compilerFamily = "msvc"
+    targetTriple = "x86_64-pc-windows-msvc"
+    installer = [ordered]@{
+        fileName = [IO.Path]::GetFileName($installer)
+        bytes = (Get-Item -LiteralPath $installer).Length
+        sha256 = $hash.Hash.ToLowerInvariant()
+        updaterSignature = -not $AllowUnsignedUpdater
+    }
+    generatedAt = [DateTimeOffset]::UtcNow.ToString("o")
+} | ConvertTo-Json -Depth 8 | Set-Content `
+    -LiteralPath (Join-Path $bundleDirectory "build-receipt.json") `
+    -Encoding UTF8
+
 if (-not $AllowUnsignedUpdater) {
     if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
         throw "The signed Tauri updater artifact is missing: $updaterSignature"

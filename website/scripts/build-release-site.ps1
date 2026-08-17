@@ -86,6 +86,39 @@ if (Test-Path -LiteralPath $sourceChecksumPath -PathType Leaf) {
 }
 
 $installer = Get-Item -LiteralPath $installerPath
+$receiptPath = Join-Path $installer.DirectoryName "build-receipt.json"
+if (-not (Test-Path -LiteralPath $receiptPath -PathType Leaf)) {
+    throw "The supported MSVC installer handoff is missing build-receipt.json: $receiptPath"
+}
+$receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$currentSourceCommit = (& git -C $repositoryRoot rev-parse --verify HEAD).Trim()
+$currentSourceTree = (& git -C $repositoryRoot rev-parse 'HEAD^{tree}').Trim()
+$currentBuildNumber = (& git -C $repositoryRoot rev-list --count $currentSourceCommit).Trim()
+$currentSourceStatus = (& git -C $repositoryRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or
+    $currentSourceCommit -cnotmatch '^[0-9a-f]{40}$' -or
+    $currentSourceTree -cnotmatch '^[0-9a-f]{40}$' -or
+    $currentBuildNumber -cnotmatch '^[1-9][0-9]*$' -or
+    $currentSourceStatus) {
+    throw "The release website requires one exact clean source commit."
+}
+if ([int]$receipt.schemaVersion -ne 1 -or
+    [string]$receipt.kind -cne "dronedream-four-edition-build-receipt" -or
+    [string]$receipt.editionId -cne $EditionId -or
+    [string]$receipt.productName -cne [string]$family.installerProductName -or
+    [string]$receipt.version -cne $version -or
+    [UInt64]$receipt.buildNumber -ne $BuildNumber -or
+    [UInt64]$receipt.buildNumber -ne [UInt64]$currentBuildNumber -or
+    [string]$receipt.sourceCommit -cne $currentSourceCommit -or
+    [string]$receipt.sourceTree -cne $currentSourceTree -or
+    [bool]$receipt.desktopVisualQa -or
+    [string]$receipt.compilerFamily -cne "msvc" -or
+    [string]$receipt.targetTriple -cne "x86_64-pc-windows-msvc" -or
+    [string]$receipt.installer.fileName -cne $bundleInstallerName -or
+    [Int64]$receipt.installer.bytes -ne $installer.Length -or
+    [string]$receipt.installer.sha256 -cne $calculatedHash) {
+    throw "The MSVC build receipt does not bind this installer to the current source, build, edition, and artifact."
+}
 $metadata = [ordered]@{
     edition = $EditionId
     buildNumber = $BuildNumber
