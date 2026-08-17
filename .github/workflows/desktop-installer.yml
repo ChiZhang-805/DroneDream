@@ -399,7 +399,8 @@ jobs:
           ./desktop/scripts/verify-installer-locales.ps1 `
             -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
           ./desktop/scripts/verify-installer-planner.ps1 `
-            -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+            -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe" `
+            -EditionId "${{ steps.release.outputs.edition_id }}"
 
       - name: Upload unsigned installer for SignPath
         if: ${{ steps.release.outputs.is_release == 'true' }}
@@ -867,13 +868,42 @@ jobs:
             gh release download "$GITHUB_REF_NAME" \
               --repo "$GITHUB_REPOSITORY" \
               --dir "$existing_dir"
+            version="${{ needs.windows-nsis.outputs.version }}"
+            product_name="${{ needs.windows-nsis.outputs.product_name }}"
+            installer_name="${{ needs.windows-nsis.outputs.public_installer }}"
+            metadata_name="${{ needs.windows-nsis.outputs.metadata_file }}"
+            installer="$existing_dir/$installer_name"
+            checksum="${installer}.sha256"
+            signature="${installer}.sig"
             test "$(find "$existing_dir" -maxdepth 1 -type f | wc -l)" -eq 5
-            while IFS= read -r source_file; do
-              published_file="$existing_dir/$(basename "$source_file")"
-              test -f "$published_file"
-              cmp "$source_file" "$published_file"
-            done < <(find dist -maxdepth 1 -type f -print | sort)
-            echo "release already exists and will never be overwritten: $GITHUB_REF_NAME"
+            test -f "$installer"
+            test -f "$checksum"
+            test -f "$signature"
+            test -f "$existing_dir/$metadata_name"
+            test -f "$existing_dir/release-source-inventory.json"
+            (cd "$existing_dir" && sha256sum --check "$(basename "$checksum")")
+            jq -e \
+              --arg version "$version" \
+              --arg product_name "$product_name" \
+              '.schemaVersion == 1 and
+               .productName == $product_name and
+               .productVersion == $version and
+               .repositoryLicense == "MIT" and
+               .sourceCommit == env.GITHUB_SHA' \
+              "$existing_dir/release-source-inventory.json" >/dev/null
+            expected_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$installer_name"
+            published_signature="$(cat "$signature")"
+            jq -e \
+              --arg version "$version" \
+              --arg expected_url "$expected_url" \
+              --arg published_signature "$published_signature" \
+              '.version == $version and
+               .platforms["windows-x86_64"].url == $expected_url and
+               .platforms["windows-x86_64"].signature == $published_signature' \
+              "$existing_dir/$metadata_name" >/dev/null
+            rm -f dist/*
+            cp "$existing_dir"/* dist/
+            echo "release already exists; verified canonical assets will be reused without overwrite: $GITHUB_REF_NAME"
             exit 0
           fi
           gh release create "$GITHUB_REF_NAME" \
