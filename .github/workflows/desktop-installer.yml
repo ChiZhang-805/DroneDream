@@ -796,9 +796,39 @@ jobs:
             Copy-Item `
               -LiteralPath (Join-Path $sourceDir "${{ steps.release.outputs.metadata_file }}") `
               -Destination (Join-Path $distDir "${{ steps.release.outputs.metadata_file }}")
+            $sourceTree = (& git rev-parse 'HEAD^{tree}').Trim()
+            if ($LASTEXITCODE -ne 0 -or $sourceTree -cnotmatch '^[0-9a-f]{40}$') {
+              throw "Unable to bind the release receipt to the source tree."
+            }
+            $receipt = [ordered]@{
+              schemaVersion = 1
+              kind = "dronedream-four-edition-build-receipt"
+              editionId = "${{ steps.release.outputs.edition_id }}"
+              productName = "${{ steps.release.outputs.product_name }}"
+              version = "${{ steps.release.outputs.version }}"
+              buildNumber = [UInt64]"${{ steps.release.outputs.build_number }}"
+              sourceCommit = $env:GITHUB_SHA
+              sourceTree = $sourceTree
+              compilerFamily = "msvc"
+              targetTriple = "x86_64-pc-windows-msvc"
+              installer = [ordered]@{
+                fileName = [IO.Path]::GetFileName($publicInstaller)
+                bytes = (Get-Item -LiteralPath $publicInstaller).Length
+                sha256 = $hash.Hash.ToLowerInvariant()
+                authenticodeVerified = $true
+                updaterSignature = $true
+              }
+              releaseTag = "${{ steps.release.outputs.release_tag }}"
+            }
+            $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
+            [IO.File]::WriteAllText(
+              "$publicInstaller.receipt.json",
+              "$(($receipt | ConvertTo-Json -Depth 8))$([Environment]::NewLine)",
+              $utf8WithoutBom
+            )
             $releaseFiles = @(Get-ChildItem -LiteralPath $distDir -File)
-            if ($releaseFiles.Count -ne 5) {
-              throw "A formal edition release must contain exactly five files."
+            if ($releaseFiles.Count -ne 6) {
+              throw "A formal edition release must contain exactly six files."
             }
           } else {
             $validationFiles = @(Get-ChildItem -LiteralPath $distDir -File)
@@ -845,16 +875,44 @@ jobs:
           installer="dist/$installer_name"
           checksum="${installer}.sha256"
           signature="${installer}.sig"
+          receipt="${installer}.receipt.json"
           test -f "$installer"
           test -f "$checksum"
           test -f "$signature"
+          test -f "$receipt"
           test -f "dist/$metadata_name"
           test -f "dist/release-source-inventory.json"
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 5
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 6
           (cd dist && sha256sum --check "$(basename "$checksum")")
+          installer_sha="$(sha256sum "$installer" | cut -d' ' -f1)"
+          installer_bytes="$(stat -c '%s' "$installer")"
           jq -e --arg version "$version" --arg product "$product_name" \
             '.schemaVersion == 1 and .productName == $product and .productVersion == $version and .repositoryLicense == "MIT" and .sourceCommit == env.GITHUB_SHA' \
             dist/release-source-inventory.json >/dev/null
+          jq -e \
+            --arg edition "${{ needs.windows-nsis.outputs.edition_id }}" \
+            --arg product "$product_name" \
+            --arg version "$version" \
+            --arg file_name "$installer_name" \
+            --arg release_tag "$release_tag" \
+            --arg installer_sha "$installer_sha" \
+            --argjson installer_bytes "$installer_bytes" \
+            '.schemaVersion == 1 and
+             .kind == "dronedream-four-edition-build-receipt" and
+             .editionId == $edition and
+             .productName == $product and
+             .version == $version and
+             .sourceCommit == env.GITHUB_SHA and
+             (.sourceTree | test("^[0-9a-f]{40}$")) and
+             .compilerFamily == "msvc" and
+             .targetTriple == "x86_64-pc-windows-msvc" and
+             .installer.fileName == $file_name and
+             .installer.bytes == $installer_bytes and
+             .installer.sha256 == $installer_sha and
+             .installer.authenticodeVerified == true and
+             .installer.updaterSignature == true and
+             .releaseTag == $release_tag' \
+            "$receipt" >/dev/null
           expected_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$release_tag/$installer_name"
           jq -e --arg version "$version" --arg expected_url "$expected_url" \
             '.version == $version and .platforms["windows-x86_64"].signature != "" and .platforms["windows-x86_64"].url == $expected_url' \
@@ -877,7 +935,7 @@ jobs:
                 --repo "$GITHUB_REPOSITORY" \
                 --dir "$existing_dir"
             fi
-            if (( existing_asset_count != 5 )); then
+            if (( existing_asset_count != 6 )); then
               if [[ "$existing_is_draft" != "true" ]]; then
                 echo "published immutable release has an invalid asset count: $existing_asset_count" >&2
                 exit 3
@@ -893,13 +951,17 @@ jobs:
               installer="$existing_dir/$installer_name"
               checksum="${installer}.sha256"
               signature="${installer}.sig"
+              receipt="${installer}.receipt.json"
               test "$(find "$existing_dir" -maxdepth 1 -type f | wc -l)" -eq "$existing_asset_count"
               test -f "$installer"
               test -f "$checksum"
               test -f "$signature"
+              test -f "$receipt"
               test -f "$existing_dir/$metadata_name"
               test -f "$existing_dir/release-source-inventory.json"
               (cd "$existing_dir" && sha256sum --check "$(basename "$checksum")")
+              installer_sha="$(sha256sum "$installer" | cut -d' ' -f1)"
+              installer_bytes="$(stat -c '%s' "$installer")"
               jq -e \
                 --arg version "$version" \
                 --arg product_name "$product_name" \
@@ -909,6 +971,29 @@ jobs:
                  .repositoryLicense == "MIT" and
                  .sourceCommit == env.GITHUB_SHA' \
                 "$existing_dir/release-source-inventory.json" >/dev/null
+              jq -e \
+                --arg edition "${{ needs.windows-nsis.outputs.edition_id }}" \
+                --arg product_name "$product_name" \
+                --arg version "$version" \
+                --arg file_name "$installer_name" \
+                --arg installer_sha "$installer_sha" \
+                --argjson installer_bytes "$installer_bytes" \
+                '.schemaVersion == 1 and
+                 .kind == "dronedream-four-edition-build-receipt" and
+                 .editionId == $edition and
+                 .productName == $product_name and
+                 .version == $version and
+                 .sourceCommit == env.GITHUB_SHA and
+                 (.sourceTree | test("^[0-9a-f]{40}$")) and
+                 .compilerFamily == "msvc" and
+                 .targetTriple == "x86_64-pc-windows-msvc" and
+                 .installer.fileName == $file_name and
+                 .installer.bytes == $installer_bytes and
+                 .installer.sha256 == $installer_sha and
+                 .installer.authenticodeVerified == true and
+                 .installer.updaterSignature == true and
+                 .releaseTag == env.GITHUB_REF_NAME' \
+                "$receipt" >/dev/null
               expected_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$installer_name"
               published_signature="$(cat "$signature")"
               jq -e \

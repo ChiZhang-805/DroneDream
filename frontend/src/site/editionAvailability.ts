@@ -8,6 +8,12 @@ export const editionInstallerNames: Record<PrimaryEditionId, string> = {
   field: "DroneDream-Field_1.0.0_x64-setup.exe",
 };
 
+const formalEditionInstallerNames: Record<PrimaryEditionId, string> = {
+  sim: "DroneDream-Sim-1.0.0.exe",
+  lab: "DroneDream-Lab-1.0.0.exe",
+  field: "DroneDream-Field-1.0.0.exe",
+};
+
 export type EditionArtifact = {
   id: PrimaryEditionId;
   status: "unavailable" | "published";
@@ -100,7 +106,10 @@ function isEditionArtifact(value: unknown, expectedId: PrimaryEditionId): value 
   if (
     edition.id !== expectedId
     || edition.version !== "1.0.0"
-    || edition.fileName !== editionInstallerNames[expectedId]
+    || (
+      edition.fileName !== editionInstallerNames[expectedId]
+      && edition.fileName !== formalEditionInstallerNames[expectedId]
+    )
   ) return false;
 
   const releaseFields = [
