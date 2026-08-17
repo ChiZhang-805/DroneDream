@@ -13,7 +13,7 @@ application aid, not proof that DroneDream has been accepted or signed.
 | Maintainer | Chi Zhang (`@ChiZhang-805`) |
 | Contact | cz005623@gmail.com |
 | License | MIT |
-| Public website | http://47.93.180.216/ |
+| Public website | https://getdronedream.com/ |
 | Releases | https://github.com/ChiZhang-805/DroneDream/releases |
 | Existing installer form | Public Windows x64 NSIS installer, currently unsigned |
 | Release workflow | `.github/workflows/desktop-installer.yml` |
@@ -45,15 +45,13 @@ application aid, not proof that DroneDream has been accepted or signed.
 
 Use the following English text in the SignPath application form:
 
-> DroneDream is an open-source, local-first Windows desktop application for
-> designing and evaluating PX4/Gazebo drone-control tuning experiments. Users
-> select bounded controller parameters, flight tracks, scenario matrices,
-> optimization strategies, and acceptance criteria; DroneDream then executes
-> repeatable simulations, records evidence, compares candidates, and exports
-> artifacts and reports. The application installs an isolated WSL2 Runtime and
-> does not modify a user's existing Ubuntu distribution. DroneDream is a
-> research and simulation tool and does not claim to certify parameters for
-> real aircraft.
+> DroneDream is an open-source, local-first Windows desktop platform with four
+> separately identified products: Universal, SIM, LAB, and FIELD. It supports
+> parametric vehicle design, PX4/Gazebo simulation, bounded controller-tuning
+> experiments, simulation-to-hardware qualification, and field evidence. The
+> Windows products share a separately managed Runtime where required and do not
+> modify a user's existing Ubuntu distribution. DroneDream is an engineering
+> and research tool and does not claim to certify parameters for real aircraft.
 
 For the reason for requesting signing, use:
 
@@ -74,9 +72,11 @@ For build and release provenance, use:
 > dependencies from committed lockfiles, runs frontend/backend/Rust tests and
 > static checks, builds and signs the application executable, bundles and signs
 > the NSIS installer, verifies both Authenticode signatures, creates the Tauri
-> updater signature, computes SHA-256, writes `latest.json`, and publishes an
-> immutable GitHub Release. The public website is allowed to deploy only the
-> same version, byte length, and SHA-256.
+> updater signature, computes SHA-256, writes the edition-specific
+> `latest-<edition>.json`, and publishes an immutable per-edition GitHub
+> Release. Only after that immutable release succeeds does CI advance the
+> corresponding authenticated stable metadata channel. The public website is
+> allowed to deploy only the same version, byte length, and SHA-256.
 
 ## Requested SignPath configuration
 
@@ -84,12 +84,17 @@ Ask SignPath to provision one project with GitHub.com as a trusted build
 system, origin verification enabled, and two artifact configurations:
 
 1. `windows-application`: one PE file named `drone-dream-desktop.exe`, requiring
-   `ProductName=DroneDream` and `ProductVersion=${version}`, signed with
-   Authenticode SHA-256 and a trusted timestamp.
-2. `windows-installer`: one PE file named
-   `DroneDream_${version}_x64-setup.exe`, requiring
-   `ProductName=DroneDream` and `ProductVersion=${version}`, signed with
-   Authenticode SHA-256 and a trusted timestamp.
+   `ProductName` to be exactly one of `DroneDream-Universal`, `DroneDream-Sim`,
+   `DroneDream-Lab`, or `DroneDream-Field`, and requiring
+   `ProductVersion=${version}`. Sign with Authenticode SHA-256 and a trusted
+   timestamp.
+2. `windows-installer`: one PE file whose name is exactly one of
+   `DroneDream-Universal_${version}_x64-setup.exe`,
+   `DroneDream-Sim_${version}_x64-setup.exe`,
+   `DroneDream-Lab_${version}_x64-setup.exe`, or
+   `DroneDream-Field_${version}_x64-setup.exe`, with the matching `ProductName`
+   and `ProductVersion=${version}`. Sign with Authenticode SHA-256 and a trusted
+   timestamp.
 
 Use a release signing policy that accepts only the public DroneDream GitHub
 repository, GitHub-hosted runners, the committed desktop workflow, and a
@@ -108,6 +113,14 @@ The release workflow is prepared to use these GitHub configuration values:
 - variable `SIGNPATH_INSTALLER_POLICY_SLUG`; and
 - variable `SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG`.
 
+The same workflow also requires one registered public OAuth client identifier
+for each desktop callback identity:
+
+- variable `DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL`;
+- variable `DRONEDREAM_OAUTH_CLIENT_ID_SIM`;
+- variable `DRONEDREAM_OAUTH_CLIENT_ID_LAB`; and
+- variable `DRONEDREAM_OAUTH_CLIENT_ID_FIELD`.
+
 The SignPath GitHub App must be installed for this repository and the
 predefined GitHub.com trusted build system must be linked to the SignPath
 project before the first signed release.
@@ -123,7 +136,14 @@ authorization and cannot be delegated to a build script:
 4. If accepted, create/authorize the SignPath account, install the SignPath
    GitHub App, link GitHub.com as the trusted build system, and approve the
    requested artifact/policy configuration.
-5. Create a least-privilege SignPath submitter token and enter it directly as
+5. Register or confirm the four public desktop OAuth clients in the browser and
+   enter their public client IDs as the four GitHub repository variables above.
+6. Create a least-privilege SignPath submitter token and enter it directly as
    the GitHub `SIGNPATH_API_TOKEN` secret. Never send the token in chat or
    commit it to the repository.
-6. Manually approve each production signing request in SignPath.
+7. Manually approve each production signing request in SignPath.
+
+All source changes, workflow implementation, validation, artifact naming,
+release checks, and stable-channel advancement are automated. The steps above
+remain human-only because they require the maintainer's identity, account
+consent, secret entry, or an explicit production-signing approval.

@@ -58,6 +58,12 @@ _AUTHENTICODE_STATUSES = {
     "NotTrusted",
     "UnknownError",
 }
+_DESKTOP_EDITION_PRODUCTS = {
+    "universal": "DroneDream-Universal",
+    "sim": "DroneDream-Sim",
+    "lab": "DroneDream-Lab",
+    "field": "DroneDream-Field",
+}
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -134,6 +140,42 @@ def _require_semver(value: object, *, field: str) -> str:
     if not isinstance(value, str) or not _SEMVER.fullmatch(value):
         raise ValueError(f"{field} must be a supported semantic version")
     return value
+
+
+def _compare_semver_precedence(left: str, right: str) -> int:
+    def parts(value: str) -> tuple[tuple[int, int, int], list[str] | None]:
+        without_build = value.split("+", 1)[0]
+        core, separator, prerelease = without_build.partition("-")
+        major, minor, patch = core.split(".")
+        return (int(major), int(minor), int(patch)), (
+            prerelease.split(".") if separator else None
+        )
+
+    left_core, left_prerelease = parts(left)
+    right_core, right_prerelease = parts(right)
+    if left_core != right_core:
+        return 1 if left_core > right_core else -1
+    if left_prerelease is None or right_prerelease is None:
+        if left_prerelease is right_prerelease:
+            return 0
+        return 1 if left_prerelease is None else -1
+    for left_identifier, right_identifier in zip(
+        left_prerelease,
+        right_prerelease,
+        strict=False,
+    ):
+        if left_identifier == right_identifier:
+            continue
+        left_numeric = left_identifier.isdigit()
+        right_numeric = right_identifier.isdigit()
+        if left_numeric and right_numeric:
+            return 1 if int(left_identifier) > int(right_identifier) else -1
+        if left_numeric != right_numeric:
+            return -1 if left_numeric else 1
+        return 1 if left_identifier > right_identifier else -1
+    if len(left_prerelease) == len(right_prerelease):
+        return 0
+    return 1 if len(left_prerelease) > len(right_prerelease) else -1
 
 
 def _require_positive_int(value: object, *, field: str) -> int:
@@ -626,20 +668,33 @@ def verify_new_immutable_installer_release(
         previous_release.get("version"),
         field="previous release.version",
     )
-    if version == previous_version:
-        raise ValueError("new installer bytes require a new approved version")
+    # Edition-scoped releases use a monotonically increasing build number, so
+    # independently signed builds may intentionally share the display version.
+    # The historical generic installer remains the previous-origin authority;
+    # it must not force all four first edition releases to invent a new SemVer.
+    if _compare_semver_precedence(version, previous_version) < 0:
+        raise ValueError("candidate.version cannot downgrade the audited release")
     if (
         candidate.get("version_owner_approved") is not True
         or not isinstance(candidate.get("version_approval_reference"), str)
         or not candidate["version_approval_reference"].strip()
     ):
         raise ValueError("new installer version requires explicit owner approval")
+    edition_id = candidate.get("edition_id")
+    if edition_id not in _DESKTOP_EDITION_PRODUCTS:
+        raise ValueError("candidate.edition_id is not a supported desktop edition")
+    build_number = _require_positive_int(
+        candidate.get("build_number"),
+        field="candidate.build_number",
+    )
+    product_name = _DESKTOP_EDITION_PRODUCTS[edition_id]
     filename = candidate.get("file_name")
-    expected_filename = f"DroneDream_{version}_x64-setup.exe"
+    expected_filename = f"{product_name}-{version}.exe"
     if filename != expected_filename or filename == previous_release.get("file_name"):
-        raise ValueError("new installer bytes require a new versioned filename")
-    if candidate.get("release_tag") != f"desktop-v{version}":
-        raise ValueError("candidate release tag does not match the new version")
+        raise ValueError("new installer bytes require the edition product filename")
+    release_tag = f"desktop-{edition_id}-v{version}-build-{build_number}"
+    if candidate.get("release_tag") != release_tag:
+        raise ValueError("candidate release tag does not match edition and build")
     sha256 = _require_sha256(candidate.get("sha256"), field="candidate.sha256")
     _require_positive_int(candidate.get("bytes"), field="candidate.bytes")
     previous_origins = _require_mapping(previous_audit.get("origins"), field="previous origins")
@@ -657,22 +712,62 @@ def verify_new_immutable_installer_release(
         raise ValueError("candidate lacks a PE certificate table")
     if candidate.get("updater_signature_present") is not True:
         raise ValueError("candidate lacks the independent Tauri updater signature")
-    if candidate.get("source_inventory_commit") != candidate.get("source_commit"):
+    source_commit = _require_commit(
+        candidate.get("source_commit"),
+        field="candidate.source_commit",
+    )
+    if candidate.get("source_inventory_commit") != source_commit:
         raise ValueError("candidate release inventory does not bind the source commit")
-    _require_commit(candidate.get("source_commit"), field="candidate.source_commit")
     if candidate.get("single_installer_for_both_origins") is not True:
         raise ValueError("both origins must consume the same exact installer bytes")
     updater = _require_mapping(
         candidate.get("updater_manifest"),
         field="candidate.updater_manifest",
     )
-    expected_url_suffix = f"/desktop-v{version}/{filename}"
+    notes = updater.get("notes")
+    update_policy = updater.get("updatePolicy")
+    _require_timestamp(
+        updater.get("pub_date"),
+        field="candidate.updater_manifest.pub_date",
+    )
+    expected_note_header = f"{product_name} {version} for Windows x64."
+    note_fields: dict[str, str] = {}
+    if isinstance(notes, str):
+        note_lines = notes.splitlines()
+        if len(note_lines) == 5 and note_lines[0] == expected_note_header:
+            for line in note_lines[1:]:
+                key, separator, value = line.partition(": ")
+                if not separator or key in note_fields or not value:
+                    note_fields = {}
+                    break
+                note_fields[key] = value
+    platforms = _require_mapping(
+        updater.get("platforms"),
+        field="candidate.updater_manifest.platforms",
+    )
+    if set(platforms) != {"windows-x86_64"}:
+        raise ValueError("candidate updater latest.json must contain only Windows x64")
+    windows = _require_mapping(
+        platforms.get("windows-x86_64"),
+        field="candidate.updater_manifest.platforms.windows-x86_64",
+    )
+    expected_url = (
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/"
+        f"{release_tag}/{filename}"
+    )
     if (
         updater.get("version") != version
-        or not isinstance(updater.get("signature"), str)
-        or not updater["signature"].strip()
-        or not isinstance(updater.get("download_url"), str)
-        or not str(updater["download_url"]).endswith(expected_url_suffix)
+        or update_policy not in {"recommended", "required"}
+        or note_fields
+        != {
+            "edition-id": edition_id,
+            "build-number": str(build_number),
+            "source-commit": source_commit,
+            "update-policy": update_policy,
+        }
+        or not isinstance(windows.get("signature"), str)
+        or not windows["signature"].strip()
+        or windows.get("url") != expected_url
     ):
         raise ValueError("candidate updater latest.json does not bind exact new bytes")
     origin_metadata = _require_mapping(
@@ -686,7 +781,9 @@ def verify_new_immutable_installer_release(
         )
         if (
             metadata.get("version") != version
-            or metadata.get("release_tag") != f"desktop-v{version}"
+            or metadata.get("edition_id") != edition_id
+            or metadata.get("build_number") != build_number
+            or metadata.get("release_tag") != release_tag
             or metadata.get("file_name") != filename
             or metadata.get("sha256") != sha256
             or metadata.get("size_bytes") != candidate.get("bytes")
@@ -697,7 +794,9 @@ def verify_new_immutable_installer_release(
             raise ValueError(f"{name} metadata does not bind exact new bytes")
     return {
         "status": "passed",
+        "edition_id": edition_id,
         "version": version,
+        "build_number": build_number,
         "file_name": filename,
         "sha256": sha256,
         "source_commit": candidate["source_commit"],

@@ -1,4 +1,6 @@
 export type WebsiteRelease = {
+  edition?: "universal" | "sim" | "lab" | "field";
+  buildNumber?: number;
   version: string;
   fileName: string;
   downloadUrl: string;
@@ -36,7 +38,18 @@ function isIsoCalendarDate(value: string) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function isAllowedArtifactUrl(value: string, expectedArtifactName: string) {
+const editionProducts = {
+  universal: "DroneDream-Universal",
+  sim: "DroneDream-Sim",
+  lab: "DroneDream-Lab",
+  field: "DroneDream-Field",
+} as const;
+
+function isAllowedArtifactUrl(
+  value: string,
+  expectedArtifactName: string,
+  expectedTag?: string,
+) {
   if (value === `/downloads/${expectedArtifactName}`) return true;
 
   try {
@@ -58,7 +71,8 @@ function isAllowedArtifactUrl(value: string, expectedArtifactName: string) {
     if (separatorIndex <= 0) return false;
     const tag = remainder.slice(0, separatorIndex);
     const artifactName = remainder.slice(separatorIndex + 1);
-    return /^[A-Za-z0-9._-]+$/u.test(tag) && artifactName === expectedArtifactName;
+    return (expectedTag ? tag === expectedTag : /^[A-Za-z0-9._-]+$/u.test(tag)) &&
+      artifactName === expectedArtifactName;
   } catch {
     return false;
   }
@@ -70,7 +84,6 @@ export function isWebsiteRelease(value: unknown): value is WebsiteRelease {
   const hasValidShape = typeof release.version === "string" &&
     /^\d+\.\d+\.\d+$/u.test(release.version) &&
     typeof release.fileName === "string" &&
-    /^DroneDream_[\w.-]+_x64-setup\.exe$/u.test(release.fileName) &&
     typeof release.downloadUrl === "string" &&
     typeof release.checksumUrl === "string" &&
     typeof release.sha256 === "string" &&
@@ -83,10 +96,30 @@ export function isWebsiteRelease(value: unknown): value is WebsiteRelease {
   if (!hasValidShape) return false;
 
   const validatedRelease = release as WebsiteRelease;
-  const expectedFileName = `DroneDream_${validatedRelease.version}_x64-setup.exe`;
+  const hasEditionMetadata = release.edition !== undefined || release.buildNumber !== undefined;
+  let expectedFileName: string;
+  let expectedTag: string | undefined;
+  if (hasEditionMetadata) {
+    if (
+      typeof release.edition !== "string" ||
+      !(release.edition in editionProducts) ||
+      typeof release.buildNumber !== "number" ||
+      !Number.isSafeInteger(release.buildNumber) ||
+      release.buildNumber <= 0
+    ) return false;
+    const edition = release.edition as keyof typeof editionProducts;
+    expectedFileName = `${editionProducts[edition]}-${validatedRelease.version}.exe`;
+    expectedTag = `desktop-${edition}-v${validatedRelease.version}-build-${release.buildNumber}`;
+  } else {
+    expectedFileName = `DroneDream_${validatedRelease.version}_x64-setup.exe`;
+  }
   return validatedRelease.fileName === expectedFileName &&
-    isAllowedArtifactUrl(validatedRelease.downloadUrl, expectedFileName) &&
-    isAllowedArtifactUrl(validatedRelease.checksumUrl, `${expectedFileName}.sha256`);
+    isAllowedArtifactUrl(validatedRelease.downloadUrl, expectedFileName, expectedTag) &&
+    isAllowedArtifactUrl(
+      validatedRelease.checksumUrl,
+      `${expectedFileName}.sha256`,
+      expectedTag,
+    );
 }
 
 export function compareReleaseVersions(left: string, right: string) {
@@ -97,4 +130,22 @@ export function compareReleaseVersions(left: string, right: string) {
     if (difference !== 0) return Math.sign(difference);
   }
   return 0;
+}
+
+export function isReleaseCandidateNonDowngrade(
+  candidate: WebsiteRelease,
+  current: WebsiteRelease,
+) {
+  const versionComparison = compareReleaseVersions(candidate.version, current.version);
+  if (versionComparison !== 0) return versionComparison > 0;
+
+  if (
+    candidate.edition === undefined ||
+    current.edition === undefined ||
+    candidate.buildNumber === undefined ||
+    current.buildNumber === undefined
+  ) return true;
+
+  return candidate.edition === current.edition &&
+    candidate.buildNumber >= current.buildNumber;
 }

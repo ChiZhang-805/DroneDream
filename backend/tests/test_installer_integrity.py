@@ -129,29 +129,35 @@ def _build_frozen_audit(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     )
 
 
-def _candidate() -> dict[str, Any]:
-    version = "1.0.1"
-    filename = f"DroneDream_{version}_x64-setup.exe"
+def _candidate(*, version: str = "1.0.1") -> dict[str, Any]:
+    edition_id = "sim"
+    build_number = 805
+    filename = f"DroneDream-Sim-{version}.exe"
+    release_tag = f"desktop-{edition_id}-v{version}-build-{build_number}"
     sha256 = "c" * 64
     global_url = (
         "https://github.com/ChiZhang-805/DroneDream/releases/download/"
-        f"desktop-v{version}/{filename}"
+        f"{release_tag}/{filename}"
     )
     mirror_url = f"https://downloads.example.invalid/{filename}"
     metadata = {
         "version": version,
-        "release_tag": f"desktop-v{version}",
+        "edition_id": edition_id,
+        "build_number": build_number,
+        "release_tag": release_tag,
         "file_name": filename,
         "sha256": sha256,
         "size_bytes": 12_345,
     }
     return {
         "contract_version": IMMUTABLE_INSTALLER_RELEASE_CONTRACT_VERSION,
+        "edition_id": edition_id,
+        "build_number": build_number,
         "version": version,
         "version_owner_approved": True,
         "version_approval_reference": "owner-approved-release-ticket",
         "file_name": filename,
-        "release_tag": f"desktop-v{version}",
+        "release_tag": release_tag,
         "bytes": 12_345,
         "sha256": sha256,
         "checksum_verified": True,
@@ -163,8 +169,23 @@ def _candidate() -> dict[str, Any]:
         "single_installer_for_both_origins": True,
         "updater_manifest": {
             "version": version,
-            "signature": "tauri-minisign-signature",
-            "download_url": global_url,
+            "updatePolicy": "recommended",
+            "notes": "\n".join(
+                (
+                    f"DroneDream-Sim {version} for Windows x64.",
+                    f"edition-id: {edition_id}",
+                    f"build-number: {build_number}",
+                    f"source-commit: {'d' * 40}",
+                    "update-policy: recommended",
+                )
+            ),
+            "pub_date": "2026-08-17T00:00:00Z",
+            "platforms": {
+                "windows-x86_64": {
+                    "signature": "tauri-minisign-signature",
+                    "url": global_url,
+                }
+            },
         },
         "origin_metadata": {
             "global_github_release": {
@@ -361,18 +382,39 @@ def test_future_immutable_release_contract_accepts_only_new_exact_signed_bytes(
 
     assert result == {
         "status": "passed",
+        "edition_id": "sim",
         "version": "1.0.1",
-        "file_name": "DroneDream_1.0.1_x64-setup.exe",
+        "build_number": 805,
+        "file_name": "DroneDream-Sim-1.0.1.exe",
         "sha256": "c" * 64,
         "source_commit": "d" * 40,
         "publication_authorized": False,
     }
 
 
+def test_future_immutable_release_allows_equal_semver_but_rejects_downgrade(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    previous = _build_frozen_audit(monkeypatch)
+
+    equal = verify_new_immutable_installer_release(
+        previous_audit=previous,
+        candidate=_candidate(version="1.0.0"),
+    )
+    assert equal["version"] == "1.0.0"
+
+    with pytest.raises(ValueError, match="cannot downgrade"):
+        verify_new_immutable_installer_release(
+            previous_audit=previous,
+            candidate=_candidate(version="0.9.0"),
+        )
+
+
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
-        (lambda value: value.update(version="1.0.0"), "new approved version"),
+        (lambda value: value.update(build_number=0), "positive integer"),
+        (lambda value: value.update(edition_id="unknown"), "supported desktop edition"),
         (
             lambda value: value.update(version_owner_approved=False),
             "explicit owner approval",
@@ -381,6 +423,32 @@ def test_future_immutable_release_contract_accepts_only_new_exact_signed_bytes(
         (lambda value: value.update(has_pe_certificate_table=False), "certificate table"),
         (lambda value: value.update(source_inventory_commit="e" * 40), "inventory"),
         (lambda value: value.update(single_installer_for_both_origins=False), "same exact"),
+        (
+            lambda value: value["updater_manifest"].update(
+                notes=value["updater_manifest"]["notes"].replace(
+                    "build-number: 805", "build-number: 804"
+                )
+            ),
+            "updater latest",
+        ),
+        (
+            lambda value: value["updater_manifest"]["platforms"][
+                "windows-x86_64"
+            ].update(url="https://example.invalid/wrong.exe"),
+            "updater latest",
+        ),
+        (
+            lambda value: value["updater_manifest"].update(
+                pub_date="2026-08-17T00:00:00+08:00"
+            ),
+            "explicit UTC",
+        ),
+        (
+            lambda value: value["updater_manifest"]["platforms"].update(
+                {"linux-x86_64": {"signature": "unexpected", "url": "unexpected"}}
+            ),
+            "only Windows x64",
+        ),
         (
             lambda value: value["origin_metadata"]["alibaba_baota_mirror"].update(sha256="f" * 64),
             "metadata does not bind",
@@ -444,7 +512,9 @@ def test_desktop_workflow_bounds_pr_concurrency_and_artifact_retention() -> None
         "(github.event_name == 'workflow_dispatch' && 14 || 30) }}"
     )
     assert workflow.count(retention) == 1
-    assert 'name: DroneDream-Windows-x64' in workflow
-    assert 'tags:\n      - "desktop-v*"' in workflow
+    assert 'name: DroneDream-${{ steps.release.outputs.edition_id }}-Windows-x64' in workflow
+    for edition in ("universal", "sim", "lab", "field"):
+        assert f'      - "desktop-{edition}-v*-build-*"' in workflow
+    assert 'tags:\n      - "desktop-v*"' not in workflow
     assert "workflow_dispatch:" in workflow
     assert "pull_request:" in workflow

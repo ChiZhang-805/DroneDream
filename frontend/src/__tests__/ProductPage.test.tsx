@@ -66,6 +66,22 @@ describe("ProductPage", () => {
     expect(isEditionAvailabilityDocument(invalid)).toBe(false);
   });
 
+  it("accepts the edition-scoped formal release filename and receipt", () => {
+    const availability = publishedSim();
+    const releaseFamily = "desktop-sim-v1.0.0-build-42";
+    const fileName = "DroneDream-Sim-1.0.0.exe";
+    availability.editions[0] = {
+      ...availability.editions[0],
+      fileName,
+      downloadUrl: `https://github.com/ChiZhang-805/DroneDream/releases/download/${releaseFamily}/${fileName}`,
+      checksumUrl: `https://github.com/ChiZhang-805/DroneDream/releases/download/${releaseFamily}/${fileName}.sha256`,
+      signatureUrl: `https://github.com/ChiZhang-805/DroneDream/releases/download/${releaseFamily}/${fileName}.sig`,
+      receiptUrl: `https://github.com/ChiZhang-805/DroneDream/releases/download/${releaseFamily}/${fileName}.receipt.json`,
+    };
+
+    expect(isEditionAvailabilityDocument(availability)).toBe(true);
+  });
+
   it("authors the Simplified Chinese product surface independently", () => {
     render(<ProductPage availability={fallbackEditionAvailability} locale="zh-CN" />);
 

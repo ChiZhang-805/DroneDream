@@ -16,12 +16,39 @@ $releaseTag = [string]$release.releaseTag
 $sha256 = ([string]$release.sha256).ToLowerInvariant()
 $sizeBytes = [long]$release.sizeBytes
 $publishedAt = [string]$release.publishedAt
-$expectedFileName = "DroneDream_${version}_x64-setup.exe"
+$hasEdition = $null -ne $release.PSObject.Properties['edition']
+$hasBuildNumber = $null -ne $release.PSObject.Properties['buildNumber']
+$edition = if ($hasEdition) { [string]$release.edition } else { "" }
+$buildNumber = if ($hasBuildNumber) { [long]$release.buildNumber } else { 0 }
+$editionProducts = @{
+    universal = "DroneDream-Universal"
+    sim = "DroneDream-Sim"
+    lab = "DroneDream-Lab"
+    field = "DroneDream-Field"
+}
+
+if ($hasEdition -xor $hasBuildNumber) {
+    throw "Pages edition release metadata must include both edition and buildNumber."
+}
+if ($hasEdition) {
+    if (-not $editionProducts.ContainsKey($edition)) {
+        throw "Unsupported Pages release edition: $edition"
+    }
+    if ($buildNumber -le 0) { throw "Pages release buildNumber must be positive." }
+    $expectedFileName = "$($editionProducts[$edition])-$version.exe"
+    $expectedReleaseTag = "desktop-$edition-v$version-build-$buildNumber"
+} else {
+    $expectedFileName = "DroneDream_${version}_x64-setup.exe"
+    $expectedReleaseTag = $null
+}
 
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid Pages release version: $version" }
 if ($version -ne [string]$tauriConfig.version) { throw "Pages release version must match the desktop version." }
 if ($fileName -ne $expectedFileName) { throw "Pages release file name must be $expectedFileName" }
 if ($releaseTag -notmatch '^[A-Za-z0-9._-]+$') { throw "Invalid GitHub release tag: $releaseTag" }
+if ($hasEdition -and $releaseTag -cne $expectedReleaseTag) {
+    throw "Pages release tag must be $expectedReleaseTag"
+}
 if ($sha256 -notmatch '^[a-f0-9]{64}$') { throw "Invalid SHA-256 in $releaseConfigPath" }
 if ($sizeBytes -le 0) { throw "Pages release size must be positive." }
 foreach ($attribution in @(
@@ -50,6 +77,10 @@ $metadata = [ordered]@{
     sha256 = $sha256
     sizeBytes = $sizeBytes
     publishedAt = $publishedAt
+}
+if ($hasEdition) {
+    $metadata["edition"] = $edition
+    $metadata["buildNumber"] = $buildNumber
 }
 
 $npmCommand = if (Get-Command npm.cmd -ErrorAction SilentlyContinue) { "npm.cmd" } else { "npm" }

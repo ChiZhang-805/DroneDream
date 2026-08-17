@@ -2,6 +2,17 @@ name: Desktop installer
 
 on:
   workflow_dispatch:
+    inputs:
+      edition:
+        description: Edition to build as an unsigned validation artifact
+        required: true
+        type: choice
+        default: universal
+        options:
+          - universal
+          - sim
+          - lab
+          - field
   pull_request:
     paths:
       - ".gitattributes"
@@ -13,9 +24,12 @@ on:
       - "SECURITY.md"
       - "VERSIONING.md"
       - "desktop/**"
+      - "distribution/desktop/**"
+      - "distribution/tests/test_desktop_release_workflow_contract.py"
       - "frontend/**"
       - "backend/**"
       - "docs/14-runtime-release.md"
+      - "docs/signpath-foundation-application.md"
       - "LICENSE"
       - "runtime/release-public-keys.json"
       - "runtime/tests/fixtures/jcs-release-vector.input.json"
@@ -25,7 +39,10 @@ on:
       - "runtime/licenses/valkey-COPYING"
   push:
     tags:
-      - "desktop-v*"
+      - "desktop-universal-v*-build-*"
+      - "desktop-sim-v*-build-*"
+      - "desktop-lab-v*-build-*"
+      - "desktop-field-v*-build-*"
 
 permissions:
   actions: read
@@ -42,6 +59,16 @@ jobs:
     # Two SignPath requests require explicit release approval. Keep enough
     # headroom for review without turning a stalled request into an endless job.
     timeout-minutes: 180
+    outputs:
+      is_release: ${{ steps.release.outputs.is_release }}
+      edition_id: ${{ steps.release.outputs.edition_id }}
+      product_name: ${{ steps.release.outputs.product_name }}
+      version: ${{ steps.release.outputs.version }}
+      build_number: ${{ steps.release.outputs.build_number }}
+      public_installer: ${{ steps.release.outputs.public_installer }}
+      metadata_file: ${{ steps.release.outputs.metadata_file }}
+      channel_tag: ${{ steps.release.outputs.channel_tag }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
     env:
       CARGO_BUILD_JOBS: "4"
       # These are public browser client identifiers, not service credentials.
@@ -56,6 +83,59 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Resolve edition release contract
+        id: release
+        shell: pwsh
+        env:
+          OAUTH_UNIVERSAL: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL }}
+          OAUTH_SIM: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_SIM }}
+          OAUTH_LAB: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_LAB }}
+          OAUTH_FIELD: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_FIELD }}
+        run: |
+          $releaseTag = if ($env:GITHUB_REF_TYPE -eq "tag") {
+            $env:GITHUB_REF_NAME
+          } else {
+            ""
+          }
+          if ($releaseTag) {
+            git fetch --no-tags origin `
+              "+refs/heads/main:refs/remotes/origin/main"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to fetch the authoritative main branch for release verification."
+            }
+            git merge-base --is-ancestor $env:GITHUB_SHA refs/remotes/origin/main
+            if ($LASTEXITCODE -ne 0) {
+              throw "Formal desktop release tags must point to a commit already merged into main."
+            }
+          }
+          $contract = ./desktop/scripts/resolve-desktop-edition-release.ps1 `
+            -ReleaseTag $releaseTag `
+            -ValidationEditionId "${{ inputs.edition || 'universal' }}" `
+            -GitHubOutputPath $env:GITHUB_OUTPUT
+          $oauthName = "OAUTH_$($contract.editionId.ToUpperInvariant())"
+          $oauthClientId = [Environment]::GetEnvironmentVariable($oauthName)
+          if (-not $contract.isRelease -and [string]::IsNullOrWhiteSpace($oauthClientId)) {
+            # Validation artifacts cannot complete browser sign-in, but they
+            # must still exercise the same edition-bound application build.
+            $oauthClientId = "unregistered-$($contract.editionId)-validation-client"
+          }
+          if ($contract.isRelease -and $oauthClientId -notmatch `
+            '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$') {
+            throw "Formal releases require the registered public OAuth client ID for $($contract.editionId)."
+          }
+          @(
+            "DRONEDREAM_DESKTOP_EDITION_ID=$($contract.editionId)",
+            "DRONEDREAM_EDITION_PROFILE=$($contract.runtimeProfileId)",
+            "DRONEDREAM_OAUTH_CLIENT_ID=$oauthClientId",
+            "VITE_DRONEDREAM_EDITION=$($contract.editionId)"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          if ($contract.isRelease) {
+            @(
+              "DRONEDREAM_RELEASE_SOURCE_COMMIT=$env:GITHUB_SHA",
+              "DRONEDREAM_RELEASE_BUILD_NUMBER=$($contract.buildNumber)"
+            ) | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
 
       - name: Verify release version consistency
         id: release-version
@@ -115,6 +195,15 @@ jobs:
           toolchain: 1.97.0
           components: rustfmt, clippy
 
+      - name: Verify desktop release workflow contract
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install "pytest==9.1.1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest distribution/tests/test_desktop_release_workflow_contract.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Verify desktop browser-auth public configuration
         shell: pwsh
         run: node ./desktop/scripts/verify-browser-auth-config.mjs
@@ -128,11 +217,20 @@ jobs:
           npm ci --prefix desktop
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Verify updater build and signing contracts
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm --prefix desktop run verify:updater-build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix desktop run verify:updater-signing
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Install backend test dependencies
         # Pull requests are already gated by the repository quality workflow.
         # Keep the duplicated full backend suite only for immutable release tags,
         # where this workflow must remain independently reproducible.
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -145,7 +243,7 @@ jobs:
         run: npm --prefix desktop run verify:release-source
 
       - name: Verify backend
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         working-directory: backend
         env:
@@ -160,7 +258,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify shared frontend
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -175,7 +273,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify desktop Rust
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
@@ -192,7 +290,7 @@ jobs:
         run: ./desktop/scripts/verify-nsis-template.ps1
 
       - name: Validate SignPath release configuration
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         env:
           SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -223,17 +321,23 @@ jobs:
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
-          $releaseBuild = $env:GITHUB_REF -like "refs/tags/desktop-v*"
+          $releaseBuild = "${{ steps.release.outputs.is_release }}" -ceq "true"
+          # `npm --prefix desktop` executes Tauri with `desktop` as its working
+          # directory, while the resolver deliberately emits repository-root
+          # paths for the later release-inventory checks.
+          $configPath = "${{ steps.release.outputs.config_path }}" -replace '^desktop/', ''
           $buildExitCode = 1
           foreach ($attempt in 1..3) {
             if ($releaseBuild) {
               # Sign the application before NSIS embeds it. Tauri's separate
               # bundle command below packages these already signed bytes.
-              npm --prefix desktop run build -- --no-bundle
+              npm --prefix desktop run build -- --config $configPath --no-bundle
             } else {
-              # Pull requests exercise the complete unsigned installer without
-              # obtaining or publishing a release signature.
-              npm --prefix desktop run build -- --config '{"bundle":{"createUpdaterArtifacts":false}}'
+              # Pull requests exercise a real edition installer without
+              # obtaining or publishing either release signature.
+              npm --prefix desktop run build -- `
+                --config $configPath `
+                --config '{"bundle":{"createUpdaterArtifacts":false}}'
             }
             $buildExitCode = $LASTEXITCODE
             if ($buildExitCode -eq 0) { break }
@@ -245,7 +349,7 @@ jobs:
           if ($buildExitCode -ne 0) { exit $buildExitCode }
 
       - name: Upload unsigned application for SignPath
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         id: upload-unsigned-application
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -256,7 +360,7 @@ jobs:
           path: desktop/src-tauri/target/release/drone-dream-desktop.exe
 
       - name: Submit application signing request
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -271,9 +375,10 @@ jobs:
           skip-decompress: true
           parameters: |
             version: "${{ steps.release-version.outputs.version }}"
+            productName: "${{ steps.release.outputs.product_name }}"
 
       - name: Install and verify signed application
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         run: |
           $target = "desktop/src-tauri/target/release/drone-dream-desktop.exe"
@@ -292,13 +397,15 @@ jobs:
           }
 
       - name: Bundle the signed application as NSIS
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
           $bundleExitCode = 1
           foreach ($attempt in 1..3) {
-            npm --prefix desktop run tauri -- bundle --bundles nsis
+            npm --prefix desktop run tauri -- bundle `
+              --config ("${{ steps.release.outputs.config_path }}" -replace '^desktop/', '') `
+              --bundles nsis
             $bundleExitCode = $LASTEXITCODE
             if ($bundleExitCode -eq 0) { break }
             if ($attempt -lt 3) {
@@ -321,10 +428,11 @@ jobs:
           ./desktop/scripts/verify-installer-locales.ps1 `
             -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
           ./desktop/scripts/verify-installer-planner.ps1 `
-            -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+            -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe" `
+            -EditionId "${{ steps.release.outputs.edition_id }}"
 
       - name: Upload unsigned installer for SignPath
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         id: upload-unsigned-installer
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -332,10 +440,10 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 1
-          path: desktop/src-tauri/target/release/bundle/nsis/DroneDream_${{ steps.release-version.outputs.version }}_x64-setup.exe
+          path: desktop/src-tauri/target/release/bundle/nsis/${{ steps.release.outputs.bundle_installer }}
 
       - name: Submit installer signing request
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -350,19 +458,20 @@ jobs:
           skip-decompress: true
           parameters: |
             version: "${{ steps.release-version.outputs.version }}"
+            productName: "${{ steps.release.outputs.product_name }}"
 
       - name: Install and verify signed installer
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         run: |
           $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
           $target = Join-Path `
             $bundleDir `
-            "DroneDream_${{ steps.release-version.outputs.version }}_x64-setup.exe"
+            "${{ steps.release.outputs.bundle_installer }}"
           $signed = @(
             Get-ChildItem `
               -LiteralPath "desktop/src-tauri/target/release/signpath/installer" `
-              -Recurse -Filter "DroneDream_*_x64-setup.exe" -File
+              -Recurse -Filter "${{ steps.release.outputs.bundle_installer }}" -File
           )
           if ($signed.Count -ne 1) {
             throw "Expected exactly one signed installer from SignPath, found $($signed.Count)."
@@ -380,29 +489,29 @@ jobs:
         shell: pwsh
         run: |
           $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
-          $installers = @(Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File)
-          if ($installers.Count -ne 1) {
-            throw "Expected exactly one NSIS installer, found $($installers.Count)"
-          }
-          $installer = $installers[0]
+          $installer = Get-Item -LiteralPath (
+            Join-Path $bundleDir "${{ steps.release.outputs.bundle_installer }}"
+          )
           $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer.FullName
           $checksumPath = "$($installer.FullName).sha256"
           "$($hash.Hash.ToLowerInvariant())  $($installer.Name)" |
             Set-Content -Encoding ascii -LiteralPath $checksumPath
           npm --prefix desktop run verify:release-source -- `
-            --output "$bundleDir/release-source-inventory.json"
+            --output "$bundleDir/release-source-inventory.json" `
+            --edition-config "${{ steps.release.outputs.config_path }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify publisher signatures and write updater manifest
-        if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
-          $installer = Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File |
-            Select-Object -First 1
+          $installer = Get-Item -LiteralPath (
+            Join-Path $bundleDir "${{ steps.release.outputs.bundle_installer }}"
+          )
           if (-not $installer) { throw "The signed installer was not produced." }
           $application = "desktop/src-tauri/target/release/drone-dream-desktop.exe"
           foreach ($signedFile in @($application, $installer.FullName)) {
@@ -421,16 +530,20 @@ jobs:
               $env:TAURI_SIGNING_PRIVATE_KEY,
               (New-Object Text.UTF8Encoding($false))
             )
-            $passwordArgument = "--password=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)"
-            node ./desktop/node_modules/@tauri-apps/cli/tauri.js signer sign `
-              --private-key-path $updaterKeyPath `
-              $passwordArgument `
-              $installer.FullName
-            if ($LASTEXITCODE -ne 0) { throw "Tauri updater signing failed." }
+            ./desktop/scripts/invoke-tauri-updater-signer.ps1 `
+              -NodeExecutable ((Get-Command node.exe).Source) `
+              -TauriCliPath (Resolve-Path `
+                "./desktop/node_modules/@tauri-apps/cli/tauri.js") `
+              -UpdaterKeyPath $updaterKeyPath `
+              -InstallerPath $installer.FullName
           } finally {
             Remove-Item -LiteralPath $updaterKeyPath -Force -ErrorAction SilentlyContinue
           }
-          ./desktop/scripts/write-updater-manifest.ps1 -BundleDirectory $bundleDir
+          ./desktop/scripts/write-updater-manifest.ps1 `
+            -BundleDirectory $bundleDir `
+            -EditionId "${{ steps.release.outputs.edition_id }}" `
+            -BuildNumber ([UInt64]"${{ steps.release.outputs.build_number }}") `
+            -SourceCommit $env:GITHUB_SHA
 
       - name: Verify installer lifecycle and checksum
         shell: pwsh
@@ -470,11 +583,9 @@ jobs:
           [void][DroneDreamSmokeNative]::SetErrorMode(0x8003)
 
           $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
-          $installers = @(Get-ChildItem -LiteralPath $bundleDir -Filter "*-setup.exe" -File)
-          if ($installers.Count -ne 1) {
-            throw "Expected exactly one NSIS installer, found $($installers.Count)"
-          }
-          $installer = $installers[0]
+          $installer = Get-Item -LiteralPath (
+            Join-Path $bundleDir "${{ steps.release.outputs.bundle_installer }}"
+          )
           $checksumPath = "$($installer.FullName).sha256"
           $checksumLine = (Get-Content -LiteralPath $checksumPath -Raw).Trim()
           $checksumMatch = [regex]::Match(
@@ -511,7 +622,9 @@ jobs:
           # allowed to remove this bundle-owned directory. Runtime diagnostics
           # live in the separately marker-owned download cache and are even
           # further outside the uninstaller's ownership boundary.
-          $appDataRoot = Join-Path $env:LOCALAPPDATA "io.dronedream.desktop"
+          $appDataRoot = Join-Path `
+            $env:LOCALAPPDATA `
+            "io.dronedream.desktop.${{ steps.release.outputs.edition_id }}"
           $diagnosticRoot = Join-Path $appDataRoot "diagnostics"
           $diagnosticSentinel = Join-Path $diagnosticRoot "ci-uninstall-preserve.txt"
           New-Item -ItemType Directory -Force -Path $diagnosticRoot | Out-Null
@@ -527,7 +640,7 @@ jobs:
             if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
               throw "Installed application was not found at $application"
             }
-            if ($env:GITHUB_REF -like "refs/tags/desktop-v*") {
+            if ("${{ steps.release.outputs.is_release }}" -ceq "true") {
               $installedSignature = Get-AuthenticodeSignature -LiteralPath $application
               if ($installedSignature.Status -ne "Valid") {
                 throw "Installed application failed Authenticode verification: $($installedSignature.StatusMessage)"
@@ -572,10 +685,10 @@ jobs:
                 throw "Installed application exited during the launch smoke test with code $($appProcess.ExitCode)"
               }
             } until (
-              $appProcess.MainWindowTitle -ceq "DroneDream" -or
+              $appProcess.MainWindowTitle -ceq "${{ steps.release.outputs.window_title }}" -or
               [DateTime]::UtcNow -ge $launchDeadline
             )
-            if ($appProcess.MainWindowTitle -cne "DroneDream") {
+            if ($appProcess.MainWindowTitle -cne "${{ steps.release.outputs.window_title }}") {
               throw "Installed application did not open its DroneDream window; observed title: '$($appProcess.MainWindowTitle)'"
             }
 
@@ -681,55 +794,158 @@ jobs:
             )
           }
 
+      - name: Prepare edition release artifact
+        shell: pwsh
+        run: |
+          $sourceDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $distDir = "desktop/release-dist"
+          if (Test-Path -LiteralPath $distDir) {
+            Remove-Item -LiteralPath $distDir -Recurse -Force
+          }
+          New-Item -ItemType Directory -Path $distDir | Out-Null
+
+          $bundleInstaller = Join-Path `
+            $sourceDir `
+            "${{ steps.release.outputs.bundle_installer }}"
+          $publicInstaller = Join-Path `
+            $distDir `
+            "${{ steps.release.outputs.public_installer }}"
+          Copy-Item -LiteralPath $bundleInstaller -Destination $publicInstaller
+          $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $publicInstaller
+          "$($hash.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($publicInstaller))" |
+            Set-Content -Encoding ascii -LiteralPath "$publicInstaller.sha256"
+          Copy-Item `
+            -LiteralPath (Join-Path $sourceDir "release-source-inventory.json") `
+            -Destination (Join-Path $distDir "release-source-inventory.json")
+
+          if ("${{ steps.release.outputs.is_release }}" -ceq "true") {
+            Copy-Item `
+              -LiteralPath "$bundleInstaller.sig" `
+              -Destination "$publicInstaller.sig"
+            Copy-Item `
+              -LiteralPath (Join-Path $sourceDir "${{ steps.release.outputs.metadata_file }}") `
+              -Destination (Join-Path $distDir "${{ steps.release.outputs.metadata_file }}")
+            $sourceTree = (& git rev-parse 'HEAD^{tree}').Trim()
+            if ($LASTEXITCODE -ne 0 -or $sourceTree -cnotmatch '^[0-9a-f]{40}$') {
+              throw "Unable to bind the release receipt to the source tree."
+            }
+            $receipt = [ordered]@{
+              schemaVersion = 1
+              kind = "dronedream-four-edition-build-receipt"
+              editionId = "${{ steps.release.outputs.edition_id }}"
+              productName = "${{ steps.release.outputs.product_name }}"
+              version = "${{ steps.release.outputs.version }}"
+              buildNumber = [UInt64]"${{ steps.release.outputs.build_number }}"
+              sourceCommit = $env:GITHUB_SHA
+              sourceTree = $sourceTree
+              compilerFamily = "msvc"
+              targetTriple = "x86_64-pc-windows-msvc"
+              installer = [ordered]@{
+                fileName = [IO.Path]::GetFileName($publicInstaller)
+                bytes = (Get-Item -LiteralPath $publicInstaller).Length
+                sha256 = $hash.Hash.ToLowerInvariant()
+                authenticodeVerified = $true
+                updaterSignature = $true
+              }
+              releaseTag = "${{ steps.release.outputs.release_tag }}"
+            }
+            $utf8WithoutBom = New-Object Text.UTF8Encoding($false)
+            [IO.File]::WriteAllText(
+              "$publicInstaller.receipt.json",
+              "$(($receipt | ConvertTo-Json -Depth 8))$([Environment]::NewLine)",
+              $utf8WithoutBom
+            )
+            $releaseFiles = @(Get-ChildItem -LiteralPath $distDir -File)
+            if ($releaseFiles.Count -ne 6) {
+              throw "A formal edition release must contain exactly six files."
+            }
+          } else {
+            $validationFiles = @(Get-ChildItem -LiteralPath $distDir -File)
+            if ($validationFiles.Count -ne 3) {
+              throw "A validation artifact must contain exactly three files."
+            }
+          }
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: DroneDream-Windows-x64
+          name: DroneDream-${{ steps.release.outputs.edition_id }}-Windows-x64
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 3 || (github.event_name == 'workflow_dispatch' && 14 || 30) }}
           compression-level: 0
-          path: |
-            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
-            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sha256
-            desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
-            desktop/src-tauri/target/release/bundle/nsis/latest.json
-            desktop/src-tauri/target/release/bundle/nsis/release-source-inventory.json
+          path: desktop/release-dist/*
 
   publish-release:
     name: Publish signed Windows release
-    if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
+    if: ${{ needs.windows-nsis.outputs.is_release == 'true' }}
     needs: windows-nsis
     runs-on: ubuntu-24.04
+    concurrency:
+      group: desktop-stable-channel-${{ needs.windows-nsis.outputs.edition_id }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
       - name: Download verified installer
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: DroneDream-Windows-x64
+          name: DroneDream-${{ needs.windows-nsis.outputs.edition_id }}-Windows-x64
           path: dist
 
       - name: Validate release files
         shell: bash
         run: |
           set -Eeuo pipefail
-          version="${GITHUB_REF_NAME#desktop-v}"
-          installer="dist/DroneDream_${version}_x64-setup.exe"
+          version="${{ needs.windows-nsis.outputs.version }}"
+          product_name="${{ needs.windows-nsis.outputs.product_name }}"
+          release_tag="${{ needs.windows-nsis.outputs.release_tag }}"
+          installer_name="${{ needs.windows-nsis.outputs.public_installer }}"
+          metadata_name="${{ needs.windows-nsis.outputs.metadata_file }}"
+          installer="dist/$installer_name"
           checksum="${installer}.sha256"
           signature="${installer}.sig"
+          receipt="${installer}.receipt.json"
           test -f "$installer"
           test -f "$checksum"
           test -f "$signature"
-          test -f "dist/latest.json"
+          test -f "$receipt"
+          test -f "dist/$metadata_name"
           test -f "dist/release-source-inventory.json"
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 5
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 6
           (cd dist && sha256sum --check "$(basename "$checksum")")
-          jq -e --arg version "$version" \
-            '.schemaVersion == 1 and .productName == "DroneDream" and .productVersion == $version and .repositoryLicense == "MIT" and .sourceCommit == env.GITHUB_SHA' \
+          installer_sha="$(sha256sum "$installer" | cut -d' ' -f1)"
+          installer_bytes="$(stat -c '%s' "$installer")"
+          jq -e --arg version "$version" --arg product "$product_name" \
+            '.schemaVersion == 1 and .productName == $product and .productVersion == $version and .repositoryLicense == "MIT" and .sourceCommit == env.GITHUB_SHA' \
             dist/release-source-inventory.json >/dev/null
-          jq -e --arg version "$version" \
-            '.version == $version and .platforms["windows-x86_64"].signature != "" and (.platforms["windows-x86_64"].url | endswith("/DroneDream_" + $version + "_x64-setup.exe"))' \
-            dist/latest.json >/dev/null
+          jq -e \
+            --arg edition "${{ needs.windows-nsis.outputs.edition_id }}" \
+            --arg product "$product_name" \
+            --arg version "$version" \
+            --arg file_name "$installer_name" \
+            --arg release_tag "$release_tag" \
+            --arg installer_sha "$installer_sha" \
+            --argjson installer_bytes "$installer_bytes" \
+            '.schemaVersion == 1 and
+             .kind == "dronedream-four-edition-build-receipt" and
+             .editionId == $edition and
+             .productName == $product and
+             .version == $version and
+             .sourceCommit == env.GITHUB_SHA and
+             (.sourceTree | test("^[0-9a-f]{40}$")) and
+             .compilerFamily == "msvc" and
+             .targetTriple == "x86_64-pc-windows-msvc" and
+             .installer.fileName == $file_name and
+             .installer.bytes == $installer_bytes and
+             .installer.sha256 == $installer_sha and
+             .installer.authenticodeVerified == true and
+             .installer.updaterSignature == true and
+             .releaseTag == $release_tag' \
+            "$receipt" >/dev/null
+          expected_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$release_tag/$installer_name"
+          jq -e --arg version "$version" --arg expected_url "$expected_url" \
+            '.version == $version and .platforms["windows-x86_64"].signature != "" and .platforms["windows-x86_64"].url == $expected_url' \
+            "dist/$metadata_name" >/dev/null
 
       - name: Publish immutable signed GitHub release
         shell: bash
@@ -737,19 +953,383 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "release already exists and will never be overwritten: $GITHUB_REF_NAME" >&2
-            exit 2
+          release_json="$(mktemp)"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" > "$release_json" 2>/dev/null; then
+            existing_release_id="$(jq -er '.id' "$release_json")"
+            existing_is_draft="$(jq -er '.draft' "$release_json")"
+            existing_asset_count="$(jq -er '.assets | length' "$release_json")"
+            existing_dir="$(mktemp -d)"
+            if (( existing_asset_count > 0 )); then
+              gh release download "$GITHUB_REF_NAME" \
+                --repo "$GITHUB_REPOSITORY" \
+                --dir "$existing_dir"
+            fi
+            if (( existing_asset_count != 6 )); then
+              if [[ "$existing_is_draft" != "true" ]]; then
+                echo "published immutable release has an invalid asset count: $existing_asset_count" >&2
+                exit 3
+              fi
+              gh api --method DELETE \
+                "repos/$GITHUB_REPOSITORY/releases/$existing_release_id" >/dev/null
+              echo "removed incomplete unpublished draft so this run can recreate it: $GITHUB_REF_NAME"
+            else
+              version="${{ needs.windows-nsis.outputs.version }}"
+              product_name="${{ needs.windows-nsis.outputs.product_name }}"
+              installer_name="${{ needs.windows-nsis.outputs.public_installer }}"
+              metadata_name="${{ needs.windows-nsis.outputs.metadata_file }}"
+              installer="$existing_dir/$installer_name"
+              checksum="${installer}.sha256"
+              signature="${installer}.sig"
+              receipt="${installer}.receipt.json"
+              test "$(find "$existing_dir" -maxdepth 1 -type f | wc -l)" -eq "$existing_asset_count"
+              test -f "$installer"
+              test -f "$checksum"
+              test -f "$signature"
+              test -f "$receipt"
+              test -f "$existing_dir/$metadata_name"
+              test -f "$existing_dir/release-source-inventory.json"
+              (cd "$existing_dir" && sha256sum --check "$(basename "$checksum")")
+              installer_sha="$(sha256sum "$installer" | cut -d' ' -f1)"
+              installer_bytes="$(stat -c '%s' "$installer")"
+              jq -e \
+                --arg version "$version" \
+                --arg product_name "$product_name" \
+                '.schemaVersion == 1 and
+                 .productName == $product_name and
+                 .productVersion == $version and
+                 .repositoryLicense == "MIT" and
+                 .sourceCommit == env.GITHUB_SHA' \
+                "$existing_dir/release-source-inventory.json" >/dev/null
+              jq -e \
+                --arg edition "${{ needs.windows-nsis.outputs.edition_id }}" \
+                --arg product_name "$product_name" \
+                --arg version "$version" \
+                --arg file_name "$installer_name" \
+                --arg installer_sha "$installer_sha" \
+                --argjson installer_bytes "$installer_bytes" \
+                '.schemaVersion == 1 and
+                 .kind == "dronedream-four-edition-build-receipt" and
+                 .editionId == $edition and
+                 .productName == $product_name and
+                 .version == $version and
+                 .sourceCommit == env.GITHUB_SHA and
+                 (.sourceTree | test("^[0-9a-f]{40}$")) and
+                 .compilerFamily == "msvc" and
+                 .targetTriple == "x86_64-pc-windows-msvc" and
+                 .installer.fileName == $file_name and
+                 .installer.bytes == $installer_bytes and
+                 .installer.sha256 == $installer_sha and
+                 .installer.authenticodeVerified == true and
+                 .installer.updaterSignature == true and
+                 .releaseTag == env.GITHUB_REF_NAME' \
+                "$receipt" >/dev/null
+              expected_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$installer_name"
+              published_signature="$(cat "$signature")"
+              jq -e \
+                --arg version "$version" \
+                --arg expected_url "$expected_url" \
+                --arg published_signature "$published_signature" \
+                '.version == $version and
+                 .platforms["windows-x86_64"].url == $expected_url and
+                 .platforms["windows-x86_64"].signature == $published_signature' \
+                "$existing_dir/$metadata_name" >/dev/null
+              rm -f dist/*
+              cp "$existing_dir"/* dist/
+              if [[ "$existing_is_draft" == "true" ]]; then
+                gh release edit "$GITHUB_REF_NAME" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --draft=false \
+                  --latest=false
+              fi
+              test "$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "false"
+              echo "release already exists and will never be overwritten; verified canonical assets will be reused: $GITHUB_REF_NAME"
+              exit 0
+            fi
           fi
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
-            --title "DroneDream Desktop ${GITHUB_REF_NAME#desktop-v}" \
-            --notes "DroneDream Windows x64 release: application and NSIS installer Authenticode-signed through SignPath Foundation, authenticated for in-app updates, and published with SHA-256 plus a source/dependency inventory." \
+            --title "${{ needs.windows-nsis.outputs.product_name }} ${{ needs.windows-nsis.outputs.version }} (build ${{ needs.windows-nsis.outputs.build_number }})" \
+            --notes "Immutable ${{ needs.windows-nsis.outputs.edition_id }} Windows x64 release: application and NSIS installer Authenticode-signed through SignPath Foundation, authenticated for in-app updates, and published with SHA-256 plus a source/dependency inventory." \
             --draft
           gh release upload "$GITHUB_REF_NAME" dist/* \
             --repo "$GITHUB_REPOSITORY"
           gh release edit "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --draft=false \
-            --latest
+            --latest=false
+
+      - name: Advance edition stable channel
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          channel="${{ needs.windows-nsis.outputs.channel_tag }}"
+          metadata="dist/${{ needs.windows-nsis.outputs.metadata_file }}"
+          metadata_name="$(basename "$metadata")"
+          incoming_build="$(
+            jq -er '.notes | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build' \
+              "$metadata"
+          )"
+          channel_notes="$(printf \
+            'Authenticated updater metadata for %s build %s.\nbuild-number: %s\nsource-commit: %s' \
+            '${{ needs.windows-nsis.outputs.edition_id }}' \
+            "$incoming_build" \
+            "$incoming_build" \
+            "$GITHUB_SHA")"
+
+          upload_asset() {
+            local release_id="$1"
+            local source_file="$2"
+            local asset_name="$3"
+            test "$release_id" = "$channel_release_id"
+            [[ "$asset_name" =~ ^[A-Za-z0-9._-]+$ ]]
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --header "Content-Type: application/json" \
+              --data-binary "@$source_file" \
+              "${channel_upload_url}?name=$asset_name"
+          }
+
+          channel_probe="$(mktemp)"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$channel" > "$channel_probe" 2>/dev/null &&
+             [[ "$(jq -er '.draft' "$channel_probe")" == "true" ]]; then
+            incomplete_channel_id="$(jq -er '.id' "$channel_probe")"
+            draft_asset_count="$(jq -er '.assets | length' "$channel_probe")"
+            draft_metadata_count="$(
+              jq -er --arg name "$metadata_name" \
+                '[.assets[] | select(.name == $name)] | length' \
+                "$channel_probe"
+            )"
+            draft_body_build="$(
+              jq -r 'try (.body | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build) catch ""' \
+                "$channel_probe"
+            )"
+            draft_body_source="$(
+              jq -r 'try (.body | capture("(?m)^source-commit: (?<source>[0-9a-f]{40})$").source) catch ""' \
+                "$channel_probe"
+            )"
+            draft_asset_build=""
+            draft_asset_source=""
+            draft_metadata="$(mktemp)"
+            if [[ "$draft_metadata_count" == "1" ]]; then
+              draft_metadata_id="$(
+                jq -er --arg name "$metadata_name" \
+                  '.assets[] | select(.name == $name) | .id' \
+                  "$channel_probe"
+              )"
+              gh api \
+                -H 'Accept: application/octet-stream' \
+                "repos/$GITHUB_REPOSITORY/releases/assets/$draft_metadata_id" > "$draft_metadata"
+              if ! draft_asset_build="$(
+                jq -er '.notes | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build' \
+                  "$draft_metadata"
+              )" || ! draft_asset_source="$(
+                jq -er '.notes | capture("(?m)^source-commit: (?<source>[0-9a-f]{40})$").source' \
+                  "$draft_metadata"
+              )"; then
+                echo "unpublished stable-channel draft metadata is malformed; preserving it" >&2
+                exit 3
+              fi
+            fi
+            draft_build="${draft_asset_build:-$draft_body_build}"
+            draft_source="${draft_asset_source:-$draft_body_source}"
+            if [[ -z "$draft_build" ]] ||
+               [[ -n "$draft_asset_build" && -n "$draft_body_build" && "$draft_asset_build" != "$draft_body_build" ]] ||
+               [[ -n "$draft_asset_source" && -n "$draft_body_source" && "$draft_asset_source" != "$draft_body_source" ]]; then
+              echo "unpublished stable-channel draft identity is ambiguous; preserving it" >&2
+              exit 3
+            fi
+            if (( incoming_build < draft_build )); then
+              echo "newer unpublished stable-channel draft preserved: draft=$draft_build incoming=$incoming_build" >&2
+              exit 2
+            fi
+            if (( incoming_build == draft_build )); then
+              if [[ "$draft_source" != "$GITHUB_SHA" ]]; then
+                echo "same-build stable-channel draft has a different or unknown source; preserving it" >&2
+                exit 3
+              fi
+              if [[ "$draft_asset_count" == "1" && "$draft_metadata_count" == "1" ]]; then
+                cmp "$metadata" "$draft_metadata"
+                gh release edit "$channel" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --draft=false \
+                  --prerelease \
+                  --notes "$channel_notes"
+                echo "recovered identical unpublished stable-channel draft build $incoming_build"
+                exit 0
+              fi
+            fi
+            gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/releases/$incomplete_channel_id" >/dev/null
+            echo "removed older or same-source incomplete stable-channel draft so publication can restart"
+          fi
+
+          if gh release view "$channel" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            transaction_dir="$(mktemp -d)"
+            channel_json="$transaction_dir/channel.json"
+            backup_metadata="$transaction_dir/$metadata_name"
+            candidate_name="${metadata_name}.candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            candidate_asset_id=""
+            replacement_asset_id=""
+            final_replaced=false
+
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$channel" > "$channel_json"
+            release_id="$(jq -er '.id' "$channel_json")"
+            channel_release_id="$release_id"
+            channel_upload_url="$(
+              jq -er '.upload_url | sub("\\{\\?name,label\\}$"; "")' "$channel_json"
+            )"
+            [[ "$channel_upload_url" == "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$release_id/assets" ]]
+            old_tag_sha="$(
+              gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$channel" --jq '.object.sha'
+            )"
+            old_asset_id="$(
+              jq -er --arg name "$metadata_name" \
+                '[.assets[] | select(.name == $name)] | if length == 1 then .[0].id else error("stable channel must contain exactly one metadata asset") end' \
+                "$channel_json"
+            )"
+            gh release download "$channel" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$metadata_name" \
+              --dir "$transaction_dir"
+            existing_build="$(
+              jq -er '.notes | capture("(?m)^build-number: (?<build>[1-9][0-9]*)$").build' \
+                "$backup_metadata"
+            )"
+            if (( incoming_build < existing_build )); then
+              echo "stable channel build must increase: existing=$existing_build incoming=$incoming_build" >&2
+              exit 2
+            fi
+            if (( incoming_build == existing_build )); then
+              cmp "$metadata" "$backup_metadata"
+              echo "stable channel already contains identical build $incoming_build"
+              exit 0
+            fi
+
+            rollback_stable_metadata() {
+              local status=$?
+              set +e
+              if [[ -n "$candidate_asset_id" ]]; then
+                gh api --method DELETE \
+                  "repos/$GITHUB_REPOSITORY/releases/assets/$candidate_asset_id" >/dev/null
+              fi
+              if [[ "$final_replaced" == true ]]; then
+                if [[ -n "$replacement_asset_id" ]]; then
+                  gh api --method DELETE \
+                    "repos/$GITHUB_REPOSITORY/releases/assets/$replacement_asset_id" >/dev/null
+                fi
+                restored_count="$(
+                  gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+                    --jq "[.assets[] | select(.name == \"$metadata_name\")] | length" \
+                    2>/dev/null
+                )"
+                if [[ "$restored_count" == "0" ]]; then
+                  for restore_attempt in 1 2 3 4; do
+                    if upload_asset "$release_id" "$backup_metadata" "$metadata_name" >/dev/null; then
+                      break
+                    fi
+                    sleep "$restore_attempt"
+                  done
+                  restored_count="$(
+                    gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+                      --jq "[.assets[] | select(.name == \"$metadata_name\")] | length" \
+                      2>/dev/null
+                  )"
+                fi
+                if [[ "$restored_count" != "1" ]]; then
+                  echo "CRITICAL: failed to restore previous stable metadata asset" >&2
+                else
+                  mkdir -p "$transaction_dir/restored"
+                  gh release download "$channel" \
+                    --repo "$GITHUB_REPOSITORY" \
+                    --pattern "$metadata_name" \
+                    --dir "$transaction_dir/restored" >/dev/null 2>&1
+                  if ! cmp "$backup_metadata" "$transaction_dir/restored/$metadata_name"; then
+                    echo "CRITICAL: stable metadata rollback did not restore the previous bytes" >&2
+                  fi
+                fi
+                gh api -X PATCH \
+                  "repos/$GITHUB_REPOSITORY/git/refs/tags/$channel" \
+                  -f sha="$old_tag_sha" \
+                  -F force=true >/dev/null
+              fi
+              exit "$status"
+            }
+            trap rollback_stable_metadata ERR
+
+            candidate_json="$transaction_dir/candidate.json"
+            upload_asset "$release_id" "$metadata" "$candidate_name" > "$candidate_json"
+            candidate_asset_id="$(jq -er '.id' "$candidate_json")"
+            mkdir "$transaction_dir/candidate"
+            gh release download "$channel" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern "$candidate_name" \
+              --dir "$transaction_dir/candidate"
+            cmp "$metadata" "$transaction_dir/candidate/$candidate_name"
+
+            final_replaced=true
+            gh api --method DELETE \
+              "repos/$GITHUB_REPOSITORY/releases/assets/$old_asset_id" >/dev/null
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/releases/assets/$candidate_asset_id" \
+              -f name="$metadata_name" >/dev/null
+            replacement_asset_id="$candidate_asset_id"
+            candidate_asset_id=""
+
+            gh api -X PATCH \
+              "repos/$GITHUB_REPOSITORY/git/refs/tags/$channel" \
+              -f sha="$GITHUB_SHA" \
+              -F force=true >/dev/null
+            gh release edit "$channel" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "${{ needs.windows-nsis.outputs.product_name }} stable channel" \
+              --notes "$channel_notes" \
+              --prerelease
+            trap - ERR
+          else
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$channel" >/dev/null 2>&1; then
+              gh api -X PATCH \
+                "repos/$GITHUB_REPOSITORY/git/refs/tags/$channel" \
+                -f sha="$GITHUB_SHA" \
+                -F force=true >/dev/null
+            fi
+            gh release create "$channel" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "${{ needs.windows-nsis.outputs.product_name }} stable channel" \
+              --notes "$channel_notes" \
+              --draft \
+              --prerelease
+            gh release upload "$channel" "$metadata" \
+              --repo "$GITHUB_REPOSITORY"
+            gh release edit "$channel" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft=false \
+              --prerelease
+            test "$(gh release view "$channel" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" == "false"
+          fi
+
+      - name: Verify stable channel publication
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          channel="${{ needs.windows-nsis.outputs.channel_tag }}"
+          metadata_name="${{ needs.windows-nsis.outputs.metadata_file }}"
+          mkdir channel-verification
+          gh release download "$channel" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "$metadata_name" \
+            --dir channel-verification
+          cmp "dist/$metadata_name" "channel-verification/$metadata_name"
+          installer_url="$(jq -r '.platforms["windows-x86_64"].url' "dist/$metadata_name")"
+          curl --fail --location --silent --show-error \
+            --range 0-0 \
+            --output /dev/null \
+            "$installer_url"
