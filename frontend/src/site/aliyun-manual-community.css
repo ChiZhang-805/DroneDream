@@ -2371,7 +2371,7 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
 
 @media (min-width: 1200px) and (min-height: 900px) {
   .community-page {
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .community-page.is-all-topics .community-hero {
