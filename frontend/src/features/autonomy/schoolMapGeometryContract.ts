@@ -1,3 +1,12 @@
+const TEACHING_DOOR_OPEN_ANGLE_DEG = 78;
+const TEACHING_DOOR_OPEN_ANGLE_RAD = TEACHING_DOOR_OPEN_ANGLE_DEG * Math.PI / 180;
+const TEACHING_DOOR_LEAF_WIDTH_M = 1.995;
+const TEACHING_DOOR_LEAF_DEPTH_M = 0.095;
+const TEACHING_OPEN_DOOR_FRAME_CLEARANCE_M = TEACHING_DOOR_LEAF_WIDTH_M * 2;
+const TEACHING_OPEN_DOOR_CLEARANCE_M = TEACHING_OPEN_DOOR_FRAME_CLEARANCE_M
+  - 2 * TEACHING_DOOR_LEAF_WIDTH_M * Math.cos(TEACHING_DOOR_OPEN_ANGLE_RAD)
+  - TEACHING_DOOR_LEAF_DEPTH_M * Math.sin(TEACHING_DOOR_OPEN_ANGLE_RAD);
+
 export const SCHOOL_MAP_GEOMETRY = {
   tolerance: {
     structuralM: 0.001,
@@ -26,8 +35,9 @@ export const SCHOOL_MAP_GEOMETRY = {
     entranceOpeningWidthM: 8.46,
     doorFrameWidthM: 0.16,
     doorFrameDepthM: 0.11,
-    doorLeafWidthM: 1.995,
-    doorLeafDepthM: 0.095,
+    doorLeafWidthM: TEACHING_DOOR_LEAF_WIDTH_M,
+    doorLeafDepthM: TEACHING_DOOR_LEAF_DEPTH_M,
+    doorOpenAngleDeg: TEACHING_DOOR_OPEN_ANGLE_DEG,
   },
   cafeteria: {
     centerX: 30,
@@ -65,7 +75,7 @@ export const SCHOOL_MAP_GEOMETRY = {
   vehicle: {
     collisionDiameterM: 0.76,
     collisionHeightM: 0.43,
-    minimumOpenDoorClearanceM: 3.8,
+    minimumOpenDoorClearanceM: TEACHING_OPEN_DOOR_CLEARANCE_M,
     minimumIndoorClearWidthM: 1.6,
     minimumRoadWidthM: 4.8,
   },

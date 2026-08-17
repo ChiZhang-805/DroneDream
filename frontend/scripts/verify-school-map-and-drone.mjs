@@ -36,6 +36,29 @@ async function clearBlockingDialog(page) {
   });
 }
 
+async function changeSchoolMapView(page, schoolCanvas, buttonName, cameraPreset) {
+  const button = page.getByRole("button", { name: buttonName, exact: true });
+  const isFloorButton = /^(ALL|L[123])$/.test(buttonName);
+  const isAlreadySelectedFloor = isFloorButton && await button.getAttribute("aria-pressed") === "true";
+  if (!isAlreadySelectedFloor) {
+    const marker = `before-${buttonName}-${Date.now()}`;
+    await schoolCanvas.evaluate((canvas, value) => {
+      canvas.dataset.schoolMapVerificationMarker = value;
+    }, marker);
+    await button.click();
+    await page.waitForFunction((value) => {
+      const canvas = document.querySelector('.autonomy-world-3d[data-scene="school-campus-v1"] canvas');
+      return canvas instanceof HTMLCanvasElement
+        && canvas.dataset.schoolMapVerificationMarker !== value;
+    }, marker);
+  }
+  await schoolCanvas.waitFor({ state: "visible" });
+  await page.evaluate((preset) => {
+    window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset } }));
+  }, cameraPreset);
+  await page.waitForTimeout(700);
+}
+
 try {
   await server?.listen();
   browser = await chromium.launch({ channel: "msedge", headless: true });
@@ -83,27 +106,20 @@ try {
   await page.mouse.up();
   await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-west-angle-1600x1000.png`), fullPage: false });
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "teaching-stair" } })));
-  await page.waitForTimeout(500);
-  await page.getByRole("button", { name: "X-ray" }).click();
+  await changeSchoolMapView(page, schoolCanvas, "X-ray", "teaching-stair");
   if (await world.getAttribute("data-xray") !== "true") throw new Error("X-ray state did not reach the rendered world.");
   for (const floor of ["L1", "L2", "L3"]) {
-    await page.getByRole("button", { name: floor, exact: true }).click();
-    await page.waitForTimeout(700);
+    await changeSchoolMapView(page, schoolCanvas, floor, "teaching-stair");
     await page.screenshot({
       path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-${floor.slice(1)}-1600x1000.png`),
       fullPage: false,
     });
   }
-  await page.getByRole("button", { name: "L1", exact: true }).click();
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "cafeteria-stair" } })));
-  await page.waitForTimeout(700);
+  await changeSchoolMapView(page, schoolCanvas, "L1", "cafeteria-stair");
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-cafeteria-stair-1600x1000.png`), fullPage: false });
-  await page.getByRole("button", { name: "Solid" }).click();
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "teaching-stair" } })));
+  await changeSchoolMapView(page, schoolCanvas, "Solid", "teaching-stair");
   for (const floor of ["L1", "L2", "L3"]) {
-    await page.getByRole("button", { name: floor, exact: true }).click();
-    await page.waitForTimeout(500);
+    await changeSchoolMapView(page, schoolCanvas, floor, "teaching-stair");
     await page.screenshot({
       path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-${floor.slice(1)}-1600x1000.png`),
       fullPage: false,

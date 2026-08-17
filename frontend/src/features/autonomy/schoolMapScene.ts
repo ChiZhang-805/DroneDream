@@ -321,10 +321,12 @@ function addEntranceDoorLeaf(
   const group = tag(new THREE.Group(), "door", id, {
     traversable: open,
     state: open ? "open" : "closed",
-    clearanceM: open ? width * 2 : 0,
+    clearanceM: open ? SCHOOL_MAP_GEOMETRY.vehicle.minimumOpenDoorClearanceM : 0,
   });
   group.position.set(...hinge);
-  group.rotation.y = open ? direction * THREE.MathUtils.degToRad(78) : 0;
+  group.rotation.y = open
+    ? direction * THREE.MathUtils.degToRad(SCHOOL_MAP_GEOMETRY.teachingBuilding.doorOpenAngleDeg)
+    : 0;
   const panel = tag(new THREE.Group(), "door-leaf", `${id}-panel`);
   const panelCenterX = direction * width / 2;
   const glazingWidth = width * 0.72;

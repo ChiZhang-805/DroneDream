@@ -13,6 +13,7 @@ from app.autonomy.qualification import MapPackQualificationRequest, qualify_map_
 from app.autonomy.school_map_artifact import (
     ROUTE_ENDPOINT_TOLERANCE_M,
     STRUCTURAL_TOLERANCE_M,
+    TEACHING_OPEN_DOOR_CLEARANCE_M,
     TEACHING_OPEN_DOOR_PAIR_CENTER_X,
     export_school_map_gazebo_artifact,
     get_school_map_gazebo_artifact,
@@ -35,8 +36,16 @@ def test_school_map_exports_parseable_content_addressed_sdf() -> None:
     assert root.findtext("./model/static") == "true"
     assert len(links) == artifact.summary["collision_primitive_count"]
     assert len({link.attrib["name"] for link in links}) == len(links)
-    assert all(link.find("./collision/geometry/box/size") is not None for link in links)
-    assert all(link.find("./visual/geometry/box/size") is not None for link in links)
+    assert all(
+        link.find("./collision/geometry/box/size") is not None
+        or link.find("./collision/geometry/cylinder/radius") is not None
+        for link in links
+    )
+    assert all(
+        link.find("./visual/geometry/box/size") is not None
+        or link.find("./visual/geometry/cylinder/radius") is not None
+        for link in links
+    )
     assert (
         hashlib.sha256(artifact.model_sdf.encode()).hexdigest()
         == artifact.summary["model_sdf_sha256"]
@@ -249,6 +258,47 @@ def test_reference_mission_crosses_teaching_facade_through_open_pair() -> None:
         west_clear_edge + vehicle_radius <= crossing <= east_clear_edge - vehicle_radius
         for crossing in crossings
     )
+
+
+def test_open_door_semantic_clearance_is_derived_from_rotated_leaf_envelopes() -> None:
+    semantic = json.loads(get_school_map_gazebo_artifact().semantic_json)
+    primitives = {primitive.name: primitive for primitive in school_map_collision_primitives()}
+    west_leaf = primitives["teaching-entry-door-1-west-open"]
+    west_frame = primitives["teaching-entry-frame-west"]
+    center_frame = primitives["teaching-entry-frame-center"]
+    frame_clearance = _bounds(center_frame, "x")[0] - _bounds(west_frame, "x")[1]
+    leaf_projection = (
+        west_leaf.size_x * math.cos(abs(west_leaf.yaw_rad))
+        + west_leaf.size_y / 2 * math.sin(abs(west_leaf.yaw_rad))
+    )
+    measured_clearance = frame_clearance - 2 * leaf_projection
+
+    assert measured_clearance == pytest.approx(TEACHING_OPEN_DOOR_CLEARANCE_M)
+    assert semantic["vehicle_clearance"]["minimum_open_door_clearance_m"] == pytest.approx(
+        measured_clearance
+    )
+    assert measured_clearance > 0.76 * 2
+
+
+def test_visible_tree_trunks_are_exported_as_matching_cylinder_collisions() -> None:
+    artifact = get_school_map_gazebo_artifact()
+    semantic = json.loads(artifact.semantic_json)
+    root = ElementTree.fromstring(artifact.model_sdf)
+    trunk_primitives = [
+        primitive
+        for primitive in school_map_collision_primitives()
+        if primitive.semantic == "tree-trunk"
+    ]
+
+    assert len(trunk_primitives) == 38
+    assert all(primitive.radius_m == pytest.approx(0.24) for primitive in trunk_primitives)
+    assert all(
+        primitive.center_z == pytest.approx(primitive.height_m / 2)
+        for primitive in trunk_primitives
+    )
+    assert len(root.findall("./model/link/collision/geometry/cylinder")) == 38
+    assert "tree-trunk-obstacles" in semantic["geometry_scope"]
+    assert "tree crowns" in semantic["known_export_limits"][0]
 
 
 def test_school_map_manifest_and_qualification_bind_unverified_gazebo_contract() -> None:

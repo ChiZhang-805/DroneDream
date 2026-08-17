@@ -37,6 +37,12 @@ ENTRANCE_DOOR_OPEN_ANGLE_RAD = math.radians(78)
 TEACHING_OPEN_DOOR_PAIR_CENTER_X = (
     TEACHING_ENTRANCE_CENTER_X - ENTRANCE_DOOR_FRAME_WIDTH_M / 2 - ENTRANCE_DOOR_LEAF_WIDTH_M
 )
+TEACHING_OPEN_DOOR_FRAME_CLEARANCE_M = ENTRANCE_DOOR_LEAF_WIDTH_M * 2
+TEACHING_OPEN_DOOR_CLEARANCE_M = (
+    TEACHING_OPEN_DOOR_FRAME_CLEARANCE_M
+    - 2 * ENTRANCE_DOOR_LEAF_WIDTH_M * math.cos(ENTRANCE_DOOR_OPEN_ANGLE_RAD)
+    - ENTRANCE_DOOR_LEAF_DEPTH_M * math.sin(ENTRANCE_DOOR_OPEN_ANGLE_RAD)
+)
 CAFETERIA_ENTRANCE_CENTER_X = 30.0
 CAFETERIA_ENTRANCE_OPENING_M = 7.5
 CAFETERIA_DOOR_GROUP_WIDTH_M = 3.59
@@ -44,6 +50,22 @@ CAFETERIA_DOOR_FRAME_WIDTH_M = 0.08
 CAFETERIA_DOOR_FRAME_DEPTH_M = 0.11
 CAFETERIA_DOOR_LEAF_DEPTH_M = 0.06
 CAFETERIA_DOOR_HEIGHT_M = 2.65
+
+TREE_POSITIONS = [
+    *((x, z) for x in (-48, -40, -32, -16, -8, 16, 24, 40, 48) for z in (-12.8, -23.2)),
+    *((-53.5, z) for z in (-34, -26, -8, 0, 8, 16, 24)),
+    *((x, 40.2) for x in (20, 28, 36, 44)),
+    (-44, 40),
+    (-34, 40),
+    (43, 28),
+    (56, 20),
+    (56, 8),
+    (44, -30),
+    (20, -32),
+    (-12, -32),
+    (-36, -32),
+]
+TREE_TRUNK_RADIUS_M = 0.24
 
 ROAD_NETWORK = {
     "facility_anchors": {
@@ -109,6 +131,21 @@ class BoxPrimitive:
 
 
 @dataclass(frozen=True)
+class CylinderPrimitive:
+    name: str
+    center_x: float
+    center_y: float
+    center_z: float
+    radius_m: float
+    height_m: float
+    semantic: str
+    yaw_rad: float = 0.0
+
+
+CollisionPrimitive = BoxPrimitive | CylinderPrimitive
+
+
+@dataclass(frozen=True)
 class SchoolMapGazeboArtifact:
     model_sdf: str
     semantic_json: str
@@ -123,6 +160,16 @@ def _box(
     yaw_rad: float = 0.0,
 ) -> BoxPrimitive:
     return BoxPrimitive(name, *center, *size, semantic, yaw_rad)
+
+
+def _cylinder(
+    name: str,
+    center: tuple[float, float, float],
+    radius_m: float,
+    height_m: float,
+    semantic: str,
+) -> CylinderPrimitive:
+    return CylinderPrimitive(name, *center, radius_m, height_m, semantic)
 
 
 def _wall_span(floor: int) -> tuple[float, float]:
@@ -635,8 +682,8 @@ def _facility_primitives() -> list[BoxPrimitive]:
     return result
 
 
-def school_map_collision_primitives() -> list[BoxPrimitive]:
-    primitives = [
+def school_map_collision_primitives() -> list[CollisionPrimitive]:
+    primitives: list[CollisionPrimitive] = [
         _box("school-map-ground", (0, 0, -0.09), (120, 90, 0.18), "terrain"),
         *_teaching_floor_primitives(),
         *_switchback_stair_primitives("teaching", -0.1, 10.5, (1, 2)),
@@ -644,10 +691,22 @@ def school_map_collision_primitives() -> list[BoxPrimitive]:
         *_switchback_stair_primitives("cafeteria", 40, 20, (1,)),
         *_facility_primitives(),
     ]
+    for index, (tree_x, tree_y) in enumerate(TREE_POSITIONS, start=1):
+        tree_height = 4.8 + ((index - 1) % 4) * 0.45
+        trunk_height = tree_height * 0.48
+        primitives.append(
+            _cylinder(
+                f"campus-tree-{index}-trunk",
+                (tree_x, tree_y, trunk_height / 2),
+                TREE_TRUNK_RADIUS_M,
+                trunk_height,
+                "tree-trunk",
+            )
+        )
     return primitives
 
 
-def _sdf_for(primitives: list[BoxPrimitive]) -> str:
+def _sdf_for(primitives: list[CollisionPrimitive]) -> str:
     sdf = ElementTree.Element("sdf", {"version": "1.9"})
     model = ElementTree.SubElement(sdf, "model", {"name": "school_map"})
     ElementTree.SubElement(model, "static").text = "true"
@@ -657,12 +716,18 @@ def _sdf_for(primitives: list[BoxPrimitive]) -> str:
             f"{primitive.center_x:g} {primitive.center_y:g} {primitive.center_z:g} "
             f"0 0 {primitive.yaw_rad:g}"
         )
-        size = f"{primitive.size_x:g} {primitive.size_y:g} {primitive.size_z:g}"
         for element_name in ("collision", "visual"):
             element = ElementTree.SubElement(link, element_name, {"name": element_name})
             geometry = ElementTree.SubElement(element, "geometry")
-            box = ElementTree.SubElement(geometry, "box")
-            ElementTree.SubElement(box, "size").text = size
+            if isinstance(primitive, BoxPrimitive):
+                box = ElementTree.SubElement(geometry, "box")
+                ElementTree.SubElement(box, "size").text = (
+                    f"{primitive.size_x:g} {primitive.size_y:g} {primitive.size_z:g}"
+                )
+            else:
+                cylinder = ElementTree.SubElement(geometry, "cylinder")
+                ElementTree.SubElement(cylinder, "radius").text = f"{primitive.radius_m:g}"
+                ElementTree.SubElement(cylinder, "length").text = f"{primitive.height_m:g}"
         ElementTree.SubElement(link, "enable_wind").text = "false"
     return ElementTree.tostring(sdf, encoding="unicode", xml_declaration=False)
 
@@ -691,7 +756,7 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "collision_height_m": 0.43,
             "minimum_road_width_m": 4.8,
             "minimum_indoor_width_m": 1.6,
-            "minimum_open_door_clearance_m": 3.8,
+            "minimum_open_door_clearance_m": TEACHING_OPEN_DOOR_CLEARANCE_M,
         },
         "roads": ROAD_NETWORK,
         "collision_primitives": [primitive.__dict__ for primitive in primitives],
@@ -703,6 +768,7 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "door-frames-and-open-closed-door-leaves",
             "canopies-and-columns",
             "street-light-obstacles",
+            "tree-trunk-obstacles",
         ],
         "known_export_limits": [
             (
@@ -730,7 +796,7 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         "semantic_sha256": semantic_sha,
         "collision_primitive_count": len(primitives),
         "visual_primitive_count": len(primitives),
-        "geometry_scope": "structural-shell-stairs-facilities-v1",
+        "geometry_scope": "structural-shell-stairs-facilities-vegetation-v1",
         "known_export_limit_count": 2,
         "gazebo_asset_contract_generated": True,
         "gazebo_runtime_verified": False,
