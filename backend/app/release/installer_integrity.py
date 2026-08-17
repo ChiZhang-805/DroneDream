@@ -159,7 +159,11 @@ def _compare_semver_precedence(left: str, right: str) -> int:
         if left_prerelease is right_prerelease:
             return 0
         return 1 if left_prerelease is None else -1
-    for left_identifier, right_identifier in zip(left_prerelease, right_prerelease):
+    for left_identifier, right_identifier in zip(
+        left_prerelease,
+        right_prerelease,
+        strict=False,
+    ):
         if left_identifier == right_identifier:
             continue
         left_numeric = left_identifier.isdigit()
