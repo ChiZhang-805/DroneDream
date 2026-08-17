@@ -104,6 +104,11 @@ jobs:
             -GitHubOutputPath $env:GITHUB_OUTPUT
           $oauthName = "OAUTH_$($contract.editionId.ToUpperInvariant())"
           $oauthClientId = [Environment]::GetEnvironmentVariable($oauthName)
+          if (-not $contract.isRelease -and [string]::IsNullOrWhiteSpace($oauthClientId)) {
+            # Validation artifacts cannot complete browser sign-in, but they
+            # must still exercise the same edition-bound application build.
+            $oauthClientId = "unregistered-$($contract.editionId)-validation-client"
+          }
           if ($contract.isRelease -and $oauthClientId -notmatch `
             '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$') {
             throw "Formal releases require the registered public OAuth client ID for $($contract.editionId)."

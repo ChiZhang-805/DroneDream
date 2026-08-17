@@ -71,6 +71,7 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         'gh release upload "$channel" "$metadata"',
         "--clobber",
         "Verify stable channel publication",
+        '"unregistered-$($contract.editionId)-validation-client"',
     ):
         assert fragment in workflow
     assert 'startsWith(github.ref, \'refs/tags/desktop-v\')' not in workflow
