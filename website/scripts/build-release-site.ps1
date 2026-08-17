@@ -1,7 +1,9 @@
 param(
     [ValidateSet("universal", "sim", "lab", "field")]
     [string]$EditionId = "universal",
-    [UInt64]$BuildNumber = 0
+    [UInt64]$BuildNumber = 0,
+    [string]$InstallerHandoffRoot = "",
+    [string]$CargoTargetRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,16 +33,50 @@ if ($BuildNumber -eq 0) {
     $BuildNumber = [UInt64]$resolvedBuildNumber
 }
 
-$bundleDirectory = Join-Path $repositoryRoot `
-    "desktop\src-tauri\target\release\bundle\nsis"
 $bundleInstallerName = [string]$family.tauriBundleInstallerFileName
 $installerName = [string]$family.publicArtifactFileName
-$installerPath = Join-Path $bundleDirectory $bundleInstallerName
-$sourceChecksumPath = "$installerPath.sha256"
-
-if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
-    throw "Build the versioned desktop installer first. Missing: $installerPath"
+if ($InstallerHandoffRoot -and $CargoTargetRoot) {
+    throw "Specify InstallerHandoffRoot or CargoTargetRoot, not both."
 }
+
+$installerCandidates = [Collections.Generic.List[string]]::new()
+if ($InstallerHandoffRoot) {
+    $installerCandidates.Add([IO.Path]::GetFullPath((Join-Path `
+        (Join-Path $InstallerHandoffRoot $EditionId) $bundleInstallerName)))
+} elseif ($CargoTargetRoot) {
+    $installerCandidates.Add([IO.Path]::GetFullPath((Join-Path $CargoTargetRoot `
+        "x86_64-pc-windows-msvc\release\bundle\nsis\$bundleInstallerName")))
+} else {
+    $installerCandidates.Add([IO.Path]::GetFullPath((Join-Path $repositoryRoot `
+        "desktop\src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis\$bundleInstallerName")))
+    $installerCandidates.Add([IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA `
+        "DroneDream\codex-builds\core-four-msvc\$EditionId\$bundleInstallerName")))
+    if ($env:CARGO_TARGET_DIR) {
+        $installerCandidates.Add([IO.Path]::GetFullPath((Join-Path $env:CARGO_TARGET_DIR `
+            "x86_64-pc-windows-msvc\release\bundle\nsis\$bundleInstallerName")))
+    }
+}
+$existingInstallerCandidates = @(
+    $installerCandidates |
+        Select-Object -Unique |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+)
+if ($existingInstallerCandidates.Count -eq 0) {
+    throw (
+        "No supported MSVC installer handoff was found for $EditionId. " +
+        "Build it first, or pass InstallerHandoffRoot/CargoTargetRoot explicitly. " +
+        "Checked: $($installerCandidates -join '; ')"
+    )
+}
+if ($existingInstallerCandidates.Count -ne 1) {
+    throw (
+        "Multiple supported installer handoffs were found for $EditionId. " +
+        "Select the intended build explicitly with InstallerHandoffRoot or CargoTargetRoot: " +
+        "$($existingInstallerCandidates -join '; ')"
+    )
+}
+$installerPath = $existingInstallerCandidates[0]
+$sourceChecksumPath = "$installerPath.sha256"
 $calculatedHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
 if (Test-Path -LiteralPath $sourceChecksumPath -PathType Leaf) {
     $checksumLine = (Get-Content -LiteralPath $sourceChecksumPath -Raw).Trim()

@@ -12,6 +12,7 @@ WORKFLOW = ROOT / ".github/workflows/desktop-installer.yml"
 RESOLVER = ROOT / "desktop/scripts/resolve-desktop-edition-release.ps1"
 SOURCE_POLICY = ROOT / "desktop/scripts/verify-release-source-policy.mjs"
 FAMILY_CONTRACT = ROOT / "distribution/desktop/edition-runtime-update-families.v1.json"
+DESKTOP_PACKAGE = ROOT / "desktop/package.json"
 
 
 def _powershell() -> Path:
@@ -81,6 +82,7 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
         "candidate_name=",
         "rollback_stable_metadata",
         "failed to restore previous stable metadata asset",
+        "stable metadata rollback did not restore the previous bytes",
         "https://uploads.github.com/repos/",
         "stable channel already contains identical build",
         "removed unpublished stable-channel draft so publication can restart",
@@ -101,14 +103,26 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
     assert workflow.index("if (( incoming_build == existing_build ))") < workflow.index(
         "candidate_json=",
     )
-    assert workflow.index("final_replaced=true") < workflow.index(
-        '-f sha="$GITHUB_SHA"',
+    final_replaced_index = workflow.index("final_replaced=true")
+    destructive_delete_index = workflow.index(
+        '"repos/$GITHUB_REPOSITORY/releases/assets/$old_asset_id"',
     )
+    assert final_replaced_index < destructive_delete_index
+    assert final_replaced_index < workflow.index('-f sha="$GITHUB_SHA"')
 
 
 def test_tauri_commands_convert_repo_root_config_for_npm_prefix() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert workflow.count("-replace '^desktop/', ''") == 2
+
+
+def test_pinned_single_msvc_release_uses_the_universal_identity() -> None:
+    package = json.loads(DESKTOP_PACKAGE.read_text(encoding="utf-8"))
+    command = package["scripts"]["build:msvc"]
+    assert "build-windows-msvc.ps1" in command
+    assert "tauri.universal.conf.json" in command
+    assert "-ExpectedProductName DroneDream-Universal" in command
+    assert "-EditionId universal" in command
 
 
 def test_release_source_inventory_uses_edition_product_identity() -> None:

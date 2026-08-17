@@ -14,6 +14,15 @@ param(
     [ValidateSet("preserve", "install")]
     [string]$VhostMode = "preserve",
 
+    [ValidateSet("universal", "sim", "lab", "field")]
+    [string]$EditionId = "universal",
+
+    [UInt64]$BuildNumber = 0,
+
+    [string]$InstallerHandoffRoot = "",
+
+    [string]$CargoTargetRoot = "",
+
     [switch]$SkipBuild
 )
 
@@ -181,11 +190,20 @@ $publicConfig = Join-Path $repositoryRoot `
 
 if (-not $SkipBuild) {
     $windowsPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
-    Invoke-NativeCommand -CommandPath $windowsPowerShell -CommandArguments @(
+    $buildArguments = @(
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
-        '-File', $buildScript
+        '-File', $buildScript,
+        '-EditionId', $EditionId,
+        '-BuildNumber', [string]$BuildNumber
     )
+    if ($InstallerHandoffRoot) {
+        $buildArguments += @('-InstallerHandoffRoot', $InstallerHandoffRoot)
+    }
+    if ($CargoTargetRoot) {
+        $buildArguments += @('-CargoTargetRoot', $CargoTargetRoot)
+    }
+    Invoke-NativeCommand -CommandPath $windowsPowerShell -CommandArguments $buildArguments
 }
 
 $indexPath = Join-Path $siteDirectory 'index.html'

@@ -1038,19 +1038,35 @@ jobs:
                   gh api --method DELETE \
                     "repos/$GITHUB_REPOSITORY/releases/assets/$replacement_asset_id" >/dev/null
                 fi
-                for restore_attempt in 1 2 3 4; do
-                  if upload_asset "$release_id" "$backup_metadata" "$metadata_name" >/dev/null; then
-                    break
-                  fi
-                  sleep "$restore_attempt"
-                done
                 restored_count="$(
                   gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
                     --jq "[.assets[] | select(.name == \"$metadata_name\")] | length" \
                     2>/dev/null
                 )"
+                if [[ "$restored_count" == "0" ]]; then
+                  for restore_attempt in 1 2 3 4; do
+                    if upload_asset "$release_id" "$backup_metadata" "$metadata_name" >/dev/null; then
+                      break
+                    fi
+                    sleep "$restore_attempt"
+                  done
+                  restored_count="$(
+                    gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+                      --jq "[.assets[] | select(.name == \"$metadata_name\")] | length" \
+                      2>/dev/null
+                  )"
+                fi
                 if [[ "$restored_count" != "1" ]]; then
                   echo "CRITICAL: failed to restore previous stable metadata asset" >&2
+                else
+                  mkdir -p "$transaction_dir/restored"
+                  gh release download "$channel" \
+                    --repo "$GITHUB_REPOSITORY" \
+                    --pattern "$metadata_name" \
+                    --dir "$transaction_dir/restored" >/dev/null 2>&1
+                  if ! cmp "$backup_metadata" "$transaction_dir/restored/$metadata_name"; then
+                    echo "CRITICAL: stable metadata rollback did not restore the previous bytes" >&2
+                  fi
                 fi
                 gh api -X PATCH \
                   "repos/$GITHUB_REPOSITORY/git/refs/tags/$channel" \
@@ -1071,9 +1087,9 @@ jobs:
               --dir "$transaction_dir/candidate"
             cmp "$metadata" "$transaction_dir/candidate/$candidate_name"
 
+            final_replaced=true
             gh api --method DELETE \
               "repos/$GITHUB_REPOSITORY/releases/assets/$old_asset_id" >/dev/null
-            final_replaced=true
             gh api --method PATCH \
               "repos/$GITHUB_REPOSITORY/releases/assets/$candidate_asset_id" \
               -f name="$metadata_name" >/dev/null

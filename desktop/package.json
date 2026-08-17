@@ -11,7 +11,7 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
-    "build:msvc": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-msvc.ps1",
+    "build:msvc": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-msvc.ps1 -AdditionalConfigPath src-tauri/tauri.universal.conf.json -ExpectedProductName DroneDream-Universal -EditionId universal",
     "build:llvm": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-llvm.ps1",
     "build:four": "npm run build:four:msvc",
     "build:four:msvc": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-four-edition-installers.ps1 -Toolchain msvc",

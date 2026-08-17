@@ -225,7 +225,8 @@ npm run build:four
 build` first runs the existing frontend build and then compiles the desktop
 executable and `DroneDream_<version>_x64-setup.exe` NSIS installer.
 
-`npm run build:msvc` is the pinned native Windows release build. It loads the
+`npm run build:msvc` is the pinned native Windows Universal release build. It
+applies the Universal edition identity and updater channel, then loads the
 repository `.vsconfig` toolchain, requires Python 3.11 and Rust
 `1.97.0-x86_64-pc-windows-msvc`, verifies `cl`, `link`, `rc`, and `dumpbin`, and
 checks the produced PE dependency table before accepting the NSIS installer.

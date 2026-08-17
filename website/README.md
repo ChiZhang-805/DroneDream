@@ -35,16 +35,29 @@ approved and its public GitHub Release asset has been verified.
 
 ## Build and review a release
 
-Build the versioned Windows installer first, then run from the repository root:
+Build the versioned Windows installer first, then pass its supported MSVC output
+to the website builder from the repository root. For a single-edition MSVC
+build:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-release-site.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-release-site.ps1 `
+  -EditionId universal `
+  -CargoTargetRoot desktop/src-tauri/target
+```
+
+For the four-edition build handoff:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-release-site.ps1 `
+  -EditionId universal `
+  -InstallerHandoffRoot "$env:LOCALAPPDATA/DroneDream/codex-builds/core-four-msvc"
 ```
 
 The builder reads the desktop version, verifies the installer checksum, builds
 the static site, copies the exact versioned preview EXE and checksum, writes
 `downloads/latest.json`, and generates `SHA256SUMS` for the complete site. It
-refuses stale or inconsistent artifacts. The EXE is not Authenticode-signed, so
+refuses missing or ambiguous handoffs instead of guessing between stale builds.
+The EXE is not Authenticode-signed, so
 the website must continue to describe it as a preview rather than a signed
 production release.
 

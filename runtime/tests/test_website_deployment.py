@@ -179,8 +179,11 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         for script in (pages_builder, wrapper, remote_deploy, legacy_deploy):
             self.assertIn("DroneDream-Universal", script)
             self.assertIn("buildNumber", script)
-        self.assertIn("target\\release\\bundle\\nsis", release_builder)
+        self.assertIn("x86_64-pc-windows-msvc\\release\\bundle\\nsis", release_builder)
         self.assertNotIn("x86_64-pc-windows-gnullvm", release_builder)
+        self.assertIn("InstallerHandoffRoot", release_builder)
+        self.assertIn("CargoTargetRoot", release_builder)
+        self.assertIn("Multiple supported installer handoffs", release_builder)
         self.assertIn("tauriBundleInstallerFileName", release_builder)
         self.assertIn("publicArtifactFileName", release_builder)
         self.assertIn("edition = $EditionId", release_builder)
