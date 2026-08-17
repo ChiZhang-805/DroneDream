@@ -903,7 +903,7 @@ jobs:
               "$existing_dir/$metadata_name" >/dev/null
             rm -f dist/*
             cp "$existing_dir"/* dist/
-            echo "release already exists; verified canonical assets will be reused without overwrite: $GITHUB_REF_NAME"
+            echo "release already exists and will never be overwritten; verified canonical assets will be reused: $GITHUB_REF_NAME"
             exit 0
           fi
           gh release create "$GITHUB_REF_NAME" \
