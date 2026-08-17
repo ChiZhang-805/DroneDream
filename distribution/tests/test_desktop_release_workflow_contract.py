@@ -78,6 +78,11 @@ def test_workflow_has_four_isolated_release_and_update_channels() -> None:
     assert workflow.count("--clobber") == 1
 
 
+def test_tauri_commands_convert_repo_root_config_for_npm_prefix() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert workflow.count("-replace '^desktop/', ''") == 2
+
+
 def test_release_source_inventory_uses_edition_product_identity() -> None:
     policy = SOURCE_POLICY.read_text(encoding="utf-8")
     assert 'process.argv.indexOf("--edition-config")' in policy
