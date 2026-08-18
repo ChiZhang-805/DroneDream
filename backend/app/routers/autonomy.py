@@ -13,9 +13,11 @@ from app.auth import get_current_user
 from app.autonomy.catalog import get_bundled_map_manifest, list_scenes
 from app.autonomy.credentials import (
     QualificationCredentialConflict,
+    VerifiedAutonomyAssetReceipt,
     compile_binding_issues,
     issue_map_credential,
     issue_vehicle_credential,
+    verified_asset_receipt,
     verify_harness_credentials,
 )
 from app.autonomy.harness import inspect_autonomy_harness
@@ -71,7 +73,11 @@ async def _authorize_compile_request(
     current_user: models.User,
     db: Session,
     authorization: str | None,
-) -> tuple[str, VerifiedPlannerArtifactReceipt | None]:
+) -> tuple[
+    str,
+    VerifiedPlannerArtifactReceipt | None,
+    VerifiedAutonomyAssetReceipt,
+]:
     asset_context = request.asset_context
     if asset_context is None:
         raise HTTPException(
@@ -122,7 +128,11 @@ async def _authorize_compile_request(
                 status_code=exc.status_code,
                 detail={"code": exc.code, "message": exc.message},
             ) from exc
-    return inspection.context_sha256, planner_receipt
+    return (
+        inspection.context_sha256,
+        planner_receipt,
+        verified_asset_receipt(current_user.id, verification),
+    )
 
 
 @router.get("/scenes")
@@ -335,7 +345,7 @@ async def create_runtime_session(
 ) -> dict[str, object]:
     """Create an idempotent, process-local simulation supervision session."""
 
-    _context_sha256, planner_receipt = await _authorize_compile_request(
+    _context_sha256, planner_receipt, asset_receipt = await _authorize_compile_request(
         request.mission,
         current_user,
         db,
@@ -347,6 +357,7 @@ async def create_runtime_session(
             current_user.id,
             request,
             planner_receipt=planner_receipt,
+            asset_receipt=asset_receipt,
         )
     except AutonomyRuntimeError as exc:
         raise _runtime_error(exc) from exc

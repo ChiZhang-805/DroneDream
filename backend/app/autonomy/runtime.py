@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
 
+from app.autonomy.credentials import VerifiedAutonomyAssetReceipt
 from app.autonomy.models import (
     AutonomyCompileResponse,
     MissionTaskGraph,
@@ -62,6 +63,7 @@ class _SessionRecord:
     vehicle: VehicleEnvelope
     mission: RuntimeSessionCreateRequest
     planner_receipt: VerifiedPlannerArtifactReceipt | None
+    asset_receipt: VerifiedAutonomyAssetReceipt | None
     result: RuntimeSession
     last_observation: RuntimeObservation | None = None
 
@@ -358,6 +360,7 @@ class RuntimeSessionRegistry:
         request: RuntimeSessionCreateRequest,
         *,
         planner_receipt: VerifiedPlannerArtifactReceipt | None = None,
+        asset_receipt: VerifiedAutonomyAssetReceipt | None = None,
     ) -> RuntimeSession:
         compiled = compile_autonomy_mission(request.mission)
         if not compiled.execution_policy.can_execute:
@@ -374,6 +377,7 @@ class RuntimeSessionRegistry:
                 if (
                     existing.result.contract_id != compiled.contract.contract_id
                     or existing.planner_receipt != planner_receipt
+                    or existing.asset_receipt != asset_receipt
                 ):
                     raise AutonomyRuntimeError(
                         "AUTONOMY_RUNTIME_IDEMPOTENCY_CONFLICT",
@@ -435,6 +439,7 @@ class RuntimeSessionRegistry:
                 vehicle=request.mission.vehicle.model_copy(deep=True),
                 mission=request.model_copy(deep=True),
                 planner_receipt=planner_receipt,
+                asset_receipt=asset_receipt,
                 result=session,
             )
             self._idempotency[idempotency_key] = session_id
@@ -453,6 +458,7 @@ class RuntimeSessionRegistry:
         RuntimeSession,
         RuntimeSessionCreateRequest,
         VerifiedPlannerArtifactReceipt | None,
+        VerifiedAutonomyAssetReceipt | None,
     ]:
         """Return the owner-scoped runtime session and immutable launch request."""
 
@@ -462,6 +468,7 @@ class RuntimeSessionRegistry:
                 record.result.model_copy(deep=True),
                 record.mission.model_copy(deep=True),
                 record.planner_receipt,
+                record.asset_receipt,
             )
 
     @contextmanager
@@ -474,6 +481,7 @@ class RuntimeSessionRegistry:
             RuntimeSession,
             RuntimeSessionCreateRequest,
             VerifiedPlannerArtifactReceipt | None,
+            VerifiedAutonomyAssetReceipt | None,
         ]
     ]:
         """Hold the session lock while a ready session crosses the launch boundary."""
@@ -490,6 +498,7 @@ class RuntimeSessionRegistry:
                 current.model_copy(deep=True),
                 record.mission.model_copy(deep=True),
                 record.planner_receipt,
+                record.asset_receipt,
             )
 
     def finalize_simulation(

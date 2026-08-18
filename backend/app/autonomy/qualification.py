@@ -27,6 +27,11 @@ from app.autonomy.models import StrictModel, Vector3
 MAX_MAP_ASSET_BYTES = 25 * 1024 * 1024
 MAX_ASSET_RECEIPTS = 512
 MASS_COMPARISON_TOLERANCE_KG = 1e-9
+OFFICIAL_MY_DRONE_PACK_ID = "aircraft-my-drone"
+OFFICIAL_MY_DRONE_VERSION = 1
+OFFICIAL_MY_DRONE_BODY_SIZE_M = (0.36, 0.36, 0.33)
+OFFICIAL_MY_DRONE_ROTOR_RADIUS_M = 0.127
+OFFICIAL_MY_DRONE_PLANNING_RADIUS_M = 0.38
 SUPPORTED_MAP_FORMATS = {"glb", "gltf", "geojson", "json", "ply", "pcd"}
 MapLayer = Literal["mesh", "point-cloud", "semantic", "georeference"]
 MapRepresentation = Literal["hybrid-3d", "mesh", "point-cloud", "occupancy", "terrain"]
@@ -98,6 +103,7 @@ class VehiclePackQualificationRequest(StrictModel):
     maximum_acceleration_mps2: float = Field(ge=0.2, le=30.0)
     maximum_climb_mps: float = Field(ge=0.1, le=15.0)
     maximum_descent_mps: float = Field(ge=0.1, le=10.0)
+    maximum_tilt_deg: float = Field(default=30.0, ge=5.0, le=75.0)
     command_link_latency_ms: float = Field(ge=0.0, le=60_000.0)
     command_link_bandwidth_mbps: float = Field(gt=0.0, le=100_000.0)
     sensors: list[SensorCalibration] = Field(default_factory=list, max_length=64)
@@ -282,8 +288,28 @@ def qualify_vehicle_pack(
     issues: list[QualificationIssue] = []
     loaded_mass = request.dry_mass_kg + request.maximum_pickup_payload_kg
     thrust_to_weight = request.max_total_thrust_n / (loaded_mass * 9.80665)
+    official_geometry = (
+        request.pack_id == OFFICIAL_MY_DRONE_PACK_ID
+        and request.version == OFFICIAL_MY_DRONE_VERSION
+        and all(
+            math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-12)
+            for actual, expected in zip(
+                (request.body_size_m.x, request.body_size_m.y, request.body_size_m.z),
+                OFFICIAL_MY_DRONE_BODY_SIZE_M,
+                strict=True,
+            )
+        )
+        and math.isclose(
+            request.rotor_radius_m,
+            OFFICIAL_MY_DRONE_ROTOR_RADIUS_M,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+    )
     planning_radius = (
-        math.hypot(request.body_size_m.x, request.body_size_m.y) / 2 + request.rotor_radius_m
+        OFFICIAL_MY_DRONE_PLANNING_RADIUS_M
+        if official_geometry
+        else math.hypot(request.body_size_m.x, request.body_size_m.y) / 2 + request.rotor_radius_m
     )
     if loaded_mass - request.max_takeoff_mass_kg > MASS_COMPARISON_TOLERANCE_KG:
         issues.append(

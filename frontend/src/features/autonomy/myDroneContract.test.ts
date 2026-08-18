@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { MY_DRONE_CONTRACT } from "./myDroneModel";
-import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "./workspaceStore";
+import {
+  autonomyAircraftRadiusM,
+  defaultAutonomyWorkspace,
+  normalizeAutonomyWorkspace,
+} from "./workspaceStore";
 
 describe("My Drone qualified PX4 Gazebo contract", () => {
   it("keeps displayed mass, thrust, payload, and adapter aligned with the workspace", () => {
@@ -12,6 +16,8 @@ describe("My Drone qualified PX4 Gazebo contract", () => {
     expect(aircraft.maximumTakeoffMassKg).toBeCloseTo(MY_DRONE_CONTRACT.maximumTakeoffMassKg, 12);
     expect(aircraft.maximumThrustN).toBeCloseTo(MY_DRONE_CONTRACT.maximumThrustN, 8);
     expect(aircraft.maximumPickupPayloadKg).toBe(MY_DRONE_CONTRACT.maximumPickupPayloadKg);
+    expect(autonomyAircraftRadiusM(aircraft)).toBe(0.38);
+    expect(autonomyAircraftRadiusM({ ...aircraft, bodyLengthM: 0.4 })).toBeGreaterThan(0.38);
     expect(MY_DRONE_CONTRACT.qualifiedPayload.sizeM).toEqual({ x: 0.16, y: 0.06, z: 0.16 });
     expect(aircraft.sensors).toEqual(["gps"]);
     expect(aircraft.sensorMounts.map((sensor) => sensor.kind)).toEqual(["gps"]);

@@ -197,6 +197,7 @@ function vehicleQualificationRequest(
     maximum_acceleration_mps2: aircraft.maximumAccelerationMps2,
     maximum_climb_mps: aircraft.maximumClimbMps,
     maximum_descent_mps: aircraft.maximumDescentMps,
+    maximum_tilt_deg: aircraft.maximumTiltDeg,
     command_link_latency_ms: aircraft.commandLink.latencyMs,
     command_link_bandwidth_mbps: aircraft.commandLink.bandwidthMbps,
     sensors: aircraft.sensorMounts.map((sensor) => ({

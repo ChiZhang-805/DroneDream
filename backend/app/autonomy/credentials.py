@@ -43,6 +43,28 @@ class QualificationCredentialConflict(ValueError):
     """Raised when an asset version would violate immutable credential history."""
 
 
+@dataclass(frozen=True)
+class VerifiedAutonomyAssetReceipt:
+    """Server-only binding to the qualification rows used for one runtime session."""
+
+    owner_id: str
+    aircraft_receipt_id: str
+    aircraft_content_sha256: str
+    aircraft_fixed_adapter_identity_sha256: str
+    map_receipt_id: str
+    map_content_sha256: str
+
+
+def fixed_adapter_vehicle_identity_sha256(request: VehiclePackQualificationRequest) -> str:
+    """Hash every fixed-adapter field except the two supported motion-limit overrides."""
+
+    canonical = request.model_dump(mode="json")
+    canonical.pop("maximum_speed_mps")
+    canonical.pop("maximum_acceleration_mps2")
+    payload = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 def _store(
     db: Session,
     *,
@@ -184,6 +206,36 @@ class CredentialVerification:
     map_issues: list[str]
     aircraft: orm_models.AutonomyQualificationCredential | None
     map_pack: orm_models.AutonomyQualificationCredential | None
+
+
+def verified_asset_receipt(
+    owner_id: str,
+    verification: CredentialVerification,
+) -> VerifiedAutonomyAssetReceipt:
+    """Materialize an immutable server-only receipt after the credential gates pass."""
+
+    aircraft = verification.aircraft
+    map_pack = verification.map_pack
+    if (
+        verification.aircraft_issues
+        or verification.map_issues
+        or aircraft is None
+        or map_pack is None
+        or aircraft.user_id != owner_id
+        or map_pack.user_id != owner_id
+    ):
+        raise ValueError("verified autonomy asset credentials are required")
+    aircraft_request = VehiclePackQualificationRequest.model_validate(aircraft.request_json)
+    return VerifiedAutonomyAssetReceipt(
+        owner_id=owner_id,
+        aircraft_receipt_id=aircraft.receipt_id,
+        aircraft_content_sha256=aircraft.content_sha256,
+        aircraft_fixed_adapter_identity_sha256=fixed_adapter_vehicle_identity_sha256(
+            aircraft_request
+        ),
+        map_receipt_id=map_pack.receipt_id,
+        map_content_sha256=map_pack.content_sha256,
+    )
 
 
 def _credential(
@@ -407,8 +459,11 @@ def compile_binding_issues(
 __all__ = [
     "CredentialVerification",
     "QualificationCredentialConflict",
+    "VerifiedAutonomyAssetReceipt",
     "compile_binding_issues",
+    "fixed_adapter_vehicle_identity_sha256",
     "issue_map_credential",
     "issue_vehicle_credential",
+    "verified_asset_receipt",
     "verify_harness_credentials",
 ]

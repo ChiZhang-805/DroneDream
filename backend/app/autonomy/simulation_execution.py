@@ -15,11 +15,15 @@ import subprocess
 import sys
 import threading
 from collections import OrderedDict
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import IO, Any
 
+from app.autonomy.credentials import (
+    fixed_adapter_vehicle_identity_sha256,
+)
 from app.autonomy.models import (
     AutonomyPlannerAction,
     AutonomyPlannerTaskGraph,
@@ -32,6 +36,7 @@ from app.autonomy.px4_x500_vehicle import (
     PX4_X500_MAXIMUM_THRUST_N,
     TAKEOUT_PAYLOAD_MASS_KG,
 )
+from app.autonomy.qualification import VehiclePackQualificationRequest
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry, runtime_sessions
 from app.autonomy.school_map_artifact import VEHICLE_COLLISION_DIAMETER_M
 from app.autonomy.service import school_mission_profile
@@ -51,6 +56,52 @@ CANONICAL_AIRCRAFT_VERSION = 1
 CANONICAL_MAP_VERSION = 1
 FIXED_RUNNER_MAXIMUM_SPEED_M_S = 1.2
 FIXED_RUNNER_MAXIMUM_ACCELERATION_M_S2 = 0.8
+RUNTIME_CONTROL_POLL_SECONDS = 0.1
+
+CANONICAL_FIXED_ADAPTER_VEHICLE_REQUEST = VehiclePackQualificationRequest.model_validate(
+    {
+        "pack_id": CANONICAL_AIRCRAFT_ASSET_ID,
+        "version": CANONICAL_AIRCRAFT_VERSION,
+        "autopilot": "px4",
+        "firmware": "PX4 v1.16",
+        "flight_controller": "Pixhawk 6C",
+        "control_interface": "mavsdk",
+        "dry_mass_kg": PX4_X500_DRY_MASS_KG,
+        # Keep the exact published Vehicle Pack decimal; its credential hash is
+        # content-addressed and therefore stricter than the later numeric gate.
+        "max_takeoff_mass_kg": 2.164307692307692,
+        "max_total_thrust_n": PX4_X500_MAXIMUM_THRUST_N,
+        "body_size_m": {"x": 0.36, "y": 0.36, "z": 0.33},
+        "rotor_radius_m": 0.127,
+        "center_of_gravity_m": {"x": 0.0, "y": 0.0, "z": -0.018},
+        "inertia_kg_m2": {"x": 0.035, "y": 0.035, "z": 0.061},
+        "battery_energy_wh": 74.0,
+        "reserve_battery_percent": 30.0,
+        "maximum_pickup_payload_kg": TAKEOUT_PAYLOAD_MASS_KG,
+        "maximum_speed_mps": 4.0,
+        "maximum_acceleration_mps2": 2.5,
+        "maximum_climb_mps": 1.5,
+        "maximum_descent_mps": 1.0,
+        "maximum_tilt_deg": 30.0,
+        "command_link_latency_ms": 35.0,
+        "command_link_bandwidth_mbps": 40.0,
+        "sensors": [
+            {
+                "sensor_id": "gps-primary",
+                "kind": "gps",
+                "calibrated": True,
+                "calibration_status": "verified",
+                "position_m": {"x": -0.07, "y": 0.0, "z": 0.2},
+                "roll_pitch_yaw_deg": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "rate_hz": 10.0,
+                "calibration_age_days": 0.0,
+            }
+        ],
+    }
+)
+CANONICAL_FIXED_ADAPTER_VEHICLE_IDENTITY_SHA256 = fixed_adapter_vehicle_identity_sha256(
+    CANONICAL_FIXED_ADAPTER_VEHICLE_REQUEST
+)
 
 
 def _now() -> datetime:
@@ -179,10 +230,12 @@ class SimulationExecutionRegistry:
         owner_id: str,
         request: SimulationExecutionStartRequest,
     ) -> SimulationExecutionStatus:
-        session, session_request, planner_receipt = self._runtime_sessions.execution_binding(
-            owner_id,
-            request.runtime_session_id,
-        )
+        (
+            session,
+            session_request,
+            planner_receipt,
+            asset_receipt,
+        ) = self._runtime_sessions.execution_binding(owner_id, request.runtime_session_id)
         mission = session_request.mission
         planner = mission.asset_context.planner_binding if mission.asset_context else None
         if session.contract_id != request.contract_id:
@@ -214,6 +267,8 @@ class SimulationExecutionRegistry:
         )
         if (
             assets is None
+            or asset_receipt is None
+            or asset_receipt.owner_id != owner_id
             or assets.aircraft.asset_id != CANONICAL_AIRCRAFT_ASSET_ID
             or assets.map_pack.asset_id != CANONICAL_MAP_ASSET_ID
             or assets.aircraft.version != CANONICAL_AIRCRAFT_VERSION
@@ -222,6 +277,12 @@ class SimulationExecutionRegistry:
             or assets.aircraft.qualification_receipt_id is None
             or assets.map_pack.content_hash is None
             or assets.map_pack.qualification_receipt_id is None
+            or asset_receipt.aircraft_receipt_id != assets.aircraft.qualification_receipt_id
+            or asset_receipt.aircraft_content_sha256 != assets.aircraft.content_hash
+            or asset_receipt.map_receipt_id != assets.map_pack.qualification_receipt_id
+            or asset_receipt.map_content_sha256 != assets.map_pack.content_hash
+            or asset_receipt.aircraft_fixed_adapter_identity_sha256
+            != CANONICAL_FIXED_ADAPTER_VEHICLE_IDENTITY_SHA256
             or not _same_number(vehicle.dry_mass_kg, PX4_X500_DRY_MASS_KG)
             or not _same_number(vehicle.launch_payload_kg, 0.0)
             or not _same_number(vehicle.pickup_payload_kg, TAKEOUT_PAYLOAD_MASS_KG)
@@ -357,7 +418,7 @@ class SimulationExecutionRegistry:
             with self._runtime_sessions.simulation_launch_binding(
                 owner_id,
                 request.runtime_session_id,
-            ) as (launch_session, _launch_request, launch_receipt):
+            ) as (launch_session, _launch_request, launch_receipt, launch_asset_receipt):
                 if launch_session.contract_id != request.contract_id:
                     raise AutonomyRuntimeError(
                         "SIMULATION_CONTRACT_MISMATCH",
@@ -367,6 +428,12 @@ class SimulationExecutionRegistry:
                     raise AutonomyRuntimeError(
                         "SIMULATION_PLANNER_RECEIPT_CHANGED",
                         "The verified planner receipt changed before simulation launch.",
+                        403,
+                    )
+                if launch_asset_receipt != asset_receipt:
+                    raise AutonomyRuntimeError(
+                        "SIMULATION_ASSET_RECEIPT_CHANGED",
+                        "The verified autonomy asset receipt changed before simulation launch.",
                         403,
                     )
                 parent.mkdir(parents=True, exist_ok=True)
@@ -385,6 +452,14 @@ class SimulationExecutionRegistry:
                 except BaseException:
                     stdout.close()
                     stderr.close()
+                    for created_path in (
+                        parent / f"{execution_id}.stdout.log",
+                        parent / f"{execution_id}.stderr.log",
+                    ):
+                        with suppress(OSError):
+                            created_path.unlink(missing_ok=True)
+                    with suppress(OSError):
+                        run_dir.rmdir()
                     raise
             now = _now()
             status = SimulationExecutionStatus(
@@ -429,28 +504,63 @@ class SimulationExecutionRegistry:
             record = self._owned(owner_id, execution_id)
             if record.process.poll() is not None:
                 return record.status.model_copy(deep=True)
-            record.run_dir.mkdir(parents=True, exist_ok=True)
-            abort_path = record.run_dir / "live_abort.request.json"
-            abort_path.write_text(
-                json.dumps(
-                    {
-                        "schema_version": "dronedream.school-map-live-abort.v1",
-                        "reason": f"operator_abort: {reason[:200]}",
-                        "world_paused": False,
-                    },
-                    sort_keys=True,
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            record.status = record.status.model_copy(
-                update={
-                    "state": "aborting",
-                    "updated_at": _now(),
-                    "abort_reason": reason[:240],
-                }
-            )
+            self._request_abort(record, reason, request_reason=f"operator_abort: {reason[:200]}")
             return record.status.model_copy(deep=True)
+
+    def _request_abort(
+        self,
+        record: _ExecutionRecord,
+        status_reason: str,
+        *,
+        request_reason: str,
+    ) -> None:
+        record.run_dir.mkdir(parents=True, exist_ok=True)
+        abort_path = record.run_dir / "live_abort.request.json"
+        pending_path = record.run_dir / "live_abort.request.json.pending"
+        pending_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "dronedream.school-map-live-abort.v1",
+                    "reason": request_reason[:240],
+                    "world_paused": False,
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        pending_path.replace(abort_path)
+        record.status = record.status.model_copy(
+            update={
+                "state": "aborting",
+                "updated_at": _now(),
+                "abort_reason": status_reason[:240],
+            }
+        )
+
+    def _sync_runtime_control(self, record: _ExecutionRecord) -> None:
+        try:
+            runtime = self._runtime_sessions.get(
+                record.owner_id,
+                record.status.runtime_session_id,
+            )
+        except AutonomyRuntimeError as exc:
+            runtime_phase = "missing"
+            runtime_reason = exc.code
+        else:
+            runtime_phase = runtime.phase
+            runtime_reason = ",".join(runtime.decision.codes[:4])
+        if runtime_phase not in {"holding", "aborted", "missing"}:
+            return
+        with self._lock:
+            if record.process.poll() is not None or record.status.state == "aborting":
+                return
+            status_reason = f"runtime_session_{runtime_phase}: {runtime_reason}"[:240]
+            self._request_abort(
+                record,
+                status_reason,
+                request_reason=f"runtime_control_abort: {status_reason}",
+            )
 
     def _refresh_live(self, record: _ExecutionRecord) -> None:
         live = _read_json(record.run_dir / "mission_live_status.json")
@@ -515,7 +625,12 @@ class SimulationExecutionRegistry:
     def _watch(self, execution_id: str) -> None:
         with self._lock:
             record = self._records[execution_id]
-        return_code = record.process.wait()
+        while True:
+            try:
+                return_code = record.process.wait(timeout=RUNTIME_CONTROL_POLL_SECONDS)
+                break
+            except (subprocess.TimeoutExpired, TimeoutError):
+                self._sync_runtime_control(record)
         record.stdout.close()
         record.stderr.close()
         evidence_path = record.run_dir / "mission_evidence.json"

@@ -9,6 +9,10 @@ from typing import Any
 import pytest
 
 import app.autonomy.simulation_execution as simulation_execution_module
+from app.autonomy.credentials import (
+    VerifiedAutonomyAssetReceipt,
+    fixed_adapter_vehicle_identity_sha256,
+)
 from app.autonomy.models import (
     AutonomyCompileRequest,
     RuntimeOperatorCommand,
@@ -16,6 +20,7 @@ from app.autonomy.models import (
     SimulationExecutionStartRequest,
 )
 from app.autonomy.planner_artifact import VerifiedPlannerArtifactReceipt
+from app.autonomy.qualification import VehiclePackQualificationRequest, qualify_vehicle_pack
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry
 from app.autonomy.simulation_execution import SimulationExecutionRegistry
 
@@ -197,7 +202,10 @@ def _create_session(
     owner_id: str,
     request: RuntimeSessionCreateRequest,
 ):
-    planner = request.mission.asset_context.planner_binding  # type: ignore[union-attr]
+    assets = request.mission.asset_context
+    assert assets is not None
+    planner = assets.planner_binding
+    assert planner is not None
     return sessions.create(
         owner_id,
         request,
@@ -207,6 +215,16 @@ def _create_session(
             provider=planner.provider,
             model=planner.model,
             artifact_sha256=planner.artifact_sha256,
+        ),
+        asset_receipt=VerifiedAutonomyAssetReceipt(
+            owner_id=owner_id,
+            aircraft_receipt_id=assets.aircraft.qualification_receipt_id or "",
+            aircraft_content_sha256=assets.aircraft.content_hash or "",
+            aircraft_fixed_adapter_identity_sha256=(
+                simulation_execution_module.CANONICAL_FIXED_ADAPTER_VEHICLE_IDENTITY_SHA256
+            ),
+            map_receipt_id=assets.map_pack.qualification_receipt_id or "",
+            map_content_sha256=assets.map_pack.content_hash or "",
         ),
     )
 
@@ -420,6 +438,81 @@ def test_operator_abort_writes_bounded_runner_request(
     processes[0].finish(1)
 
 
+@pytest.mark.parametrize("action", ["hold", "abort"])
+def test_runtime_operator_control_stops_an_active_simulator(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    action: str,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id=f"runtime-request-active-{action}",
+        ),
+    )
+    created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    sessions.command(
+        "owner-a",
+        session.session_id,
+        RuntimeOperatorCommand.model_validate(
+            {"action": action, "reason": f"operator selected {action}"}
+        ),
+    )
+    abort_request = next(tmp_path.rglob("live_abort.request.json"), None)
+    deadline = time.monotonic() + 2
+    while abort_request is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+        abort_request = next(tmp_path.rglob("live_abort.request.json"), None)
+
+    assert abort_request is not None
+    payload = json.loads(abort_request.read_text(encoding="utf-8"))
+    assert payload["reason"].startswith("runtime_control_abort: runtime_session_")
+    assert registry.get("owner-a", created.execution_id).state == "aborting"
+    processes[0].finish(1)
+
+
+def test_spawn_failure_cleans_owned_artifacts_and_allows_safe_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    original_popen = simulation_execution_module.subprocess.Popen
+    attempts = 0
+
+    def fail_once(argv: list[str], **kwargs: Any):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("transient spawn failure")
+        return original_popen(argv, **kwargs)
+
+    monkeypatch.setattr(simulation_execution_module.subprocess, "Popen", fail_once)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-spawn-retry",
+        ),
+    )
+    request = _start_request(session.session_id, session.contract_id)
+
+    with pytest.raises(OSError, match="transient spawn failure"):
+        registry.start("owner-a", request)
+
+    assert not list(tmp_path.rglob("*.log"))
+    assert not list(tmp_path.rglob("simexec-*"))
+    created = registry.start("owner-a", request)
+    assert created.state == "starting"
+    assert attempts == 2
+    assert len(processes) == 1
+    processes[0].finish(1)
+
+
 def test_contract_or_planner_digest_mismatch_never_starts_a_process(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -548,6 +641,94 @@ def test_fixed_runner_obeys_lower_qualified_motion_limits(
     assert argv[argv.index("--velocity-m-s") + 1] == "0.4"
     assert argv[argv.index("--acceleration-m-s2") + 1] == "0.3"
     processes[0].finish(1)
+
+
+def test_fixed_runner_rejects_a_server_verified_noncanonical_vehicle_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    mission = _mission()
+    assets = mission.asset_context
+    assert assets is not None
+    planner = assets.planner_binding
+    assert planner is not None
+    session = sessions.create(
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=mission,
+            client_request_id="runtime-request-noncanonical-fixed-identity",
+        ),
+        planner_receipt=VerifiedPlannerArtifactReceipt(
+            owner_subject="owner-a",
+            run_id=planner.run_id,
+            provider=planner.provider,
+            model=planner.model,
+            artifact_sha256=planner.artifact_sha256,
+        ),
+        asset_receipt=VerifiedAutonomyAssetReceipt(
+            owner_id="owner-a",
+            aircraft_receipt_id=assets.aircraft.qualification_receipt_id or "",
+            aircraft_content_sha256=assets.aircraft.content_hash or "",
+            aircraft_fixed_adapter_identity_sha256="f" * 64,
+            map_receipt_id=assets.map_pack.qualification_receipt_id or "",
+            map_content_sha256=assets.map_pack.content_hash or "",
+        ),
+    )
+
+    with pytest.raises(AutonomyRuntimeError) as rejected:
+        registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    assert rejected.value.code == "SIMULATION_ASSET_PROFILE_MISMATCH"
+    assert processes == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("firmware", "PX4 v1.17"),
+        ("control_interface", "mavlink"),
+        ("body_size_m", {"x": 0.4, "y": 0.36, "z": 0.33}),
+        ("center_of_gravity_m", {"x": 0.01, "y": 0.0, "z": -0.018}),
+        ("inertia_kg_m2", {"x": 0.04, "y": 0.035, "z": 0.061}),
+        ("battery_energy_wh", 80.0),
+        ("maximum_climb_mps", 1.6),
+        ("maximum_tilt_deg", 32.0),
+    ),
+)
+def test_fixed_adapter_identity_binds_every_nonoverridable_vehicle_field(
+    field: str,
+    value: object,
+) -> None:
+    canonical = simulation_execution_module.CANONICAL_FIXED_ADAPTER_VEHICLE_REQUEST
+    payload = canonical.model_dump(mode="json")
+    payload[field] = value
+    changed = VehiclePackQualificationRequest.model_validate(payload)
+
+    assert fixed_adapter_vehicle_identity_sha256(changed) != (
+        simulation_execution_module.CANONICAL_FIXED_ADAPTER_VEHICLE_IDENTITY_SHA256
+    )
+
+
+def test_fixed_adapter_identity_allows_only_the_supported_motion_limit_overrides() -> None:
+    canonical = simulation_execution_module.CANONICAL_FIXED_ADAPTER_VEHICLE_REQUEST
+    payload = canonical.model_dump(mode="json")
+    payload["maximum_speed_mps"] = 0.4
+    payload["maximum_acceleration_mps2"] = 0.3
+    slowed = VehiclePackQualificationRequest.model_validate(payload)
+
+    assert fixed_adapter_vehicle_identity_sha256(slowed) == (
+        simulation_execution_module.CANONICAL_FIXED_ADAPTER_VEHICLE_IDENTITY_SHA256
+    )
+
+
+def test_official_vehicle_qualification_uses_the_gazebo_collision_envelope() -> None:
+    receipt = qualify_vehicle_pack(
+        simulation_execution_module.CANONICAL_FIXED_ADAPTER_VEHICLE_REQUEST
+    )
+
+    assert receipt.status == "validated_unsigned"
+    assert receipt.planning_radius_m == pytest.approx(0.38, abs=1e-12)
 
 
 def test_noncanonical_assets_or_model_targets_never_start_the_fixed_runner(

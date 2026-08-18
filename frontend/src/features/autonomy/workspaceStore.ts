@@ -109,6 +109,15 @@ export const AUTONOMY_AIRCRAFT_LIMITS = {
 const MASS_COMPARISON_TOLERANCE_KG = 1e-9;
 
 export function autonomyAircraftRadiusM(aircraft: AutonomyAircraftProfile): number {
+  const isOfficialMyDroneGeometry = aircraft.id === MY_DRONE_CONTRACT.id
+    && aircraft.version === 1
+    && Math.abs(aircraft.bodyLengthM - 0.36) <= 1e-12
+    && Math.abs(aircraft.bodyWidthM - 0.36) <= 1e-12
+    && Math.abs(aircraft.bodyHeightM - 0.33) <= 1e-12
+    && Math.abs(aircraft.rotorRadiusM - MY_DRONE_CONTRACT.propellerDiameterM / 2) <= 1e-12;
+  if (isOfficialMyDroneGeometry) {
+    return MY_DRONE_CONTRACT.collisionEnvelopeM.x / 2;
+  }
   return Math.max(
     aircraft.rotorRadiusM,
     Math.hypot(aircraft.bodyLengthM, aircraft.bodyWidthM) / 2 + aircraft.rotorRadiusM,

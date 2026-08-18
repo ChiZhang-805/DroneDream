@@ -1533,6 +1533,7 @@ export interface AutonomyVehiclePackQualificationRequest {
   maximum_acceleration_mps2: number;
   maximum_climb_mps: number;
   maximum_descent_mps: number;
+  maximum_tilt_deg: number;
   command_link_latency_ms: number;
   command_link_bandwidth_mbps: number;
   sensors: Array<{
