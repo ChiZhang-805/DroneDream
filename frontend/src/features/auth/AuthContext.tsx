@@ -212,7 +212,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!deferDesktopAuth || authActivated) return undefined;
     const activate = () => {
-      setLoading(cloudAuthConfigured && !docsPreview);
+      // The caller owns the visible restore/browser/adoption transaction.
+      // Toggling the provider-wide loading state here would unmount a required
+      // account dialog and orphan its cancellation controller mid-flight.
+      setLoading(false);
       setAuthActivated(true);
     };
     window.addEventListener(ACTIVATE_DESKTOP_AUTH_EVENT, activate, { once: true });
@@ -249,7 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [adoptUser, authActivated, docsPreview]);
+  }, [adoptUser, authActivated, deferDesktopAuth, docsPreview]);
 
   const signInWithPassword = useCallback(async (
     email: string,

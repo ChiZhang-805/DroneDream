@@ -100,6 +100,10 @@ import {
 import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import {
+  cancelDesktopBrowserSignIn,
+  completeDesktopBrowserSignIn,
+} from "./features/auth/desktopBrowserSignIn";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import {
   useAdminAccess,
@@ -2225,6 +2229,14 @@ const ACCOUNT_COPY = {
     sendCode: "Send code",
     resendCode: "Resend code",
     signIn: "Sign in",
+    browserSignIn: "Continue securely in browser",
+    browserSignInWaiting: "Waiting for browser authorization…",
+    browserSignInBody:
+      "Your browser verifies the account and returns only this edition's session to DroneDream.",
+    browserSignInFailed: "Browser sign-in did not complete. Try again.",
+    cancelBrowserSignIn: "Cancel",
+    browserRuntimeRequired: "Prepare and start DroneDreamRuntime before account authorization.",
+    openEnvironment: "Open Environment",
     register: "Register",
     createAccount: "Create account",
     registerNow: "New to DroneDream? Register now",
@@ -2291,6 +2303,13 @@ const ACCOUNT_COPY = {
     sendCode: "发送验证码",
     resendCode: "重新发送",
     signIn: "登录",
+    browserSignIn: "在浏览器中安全登录",
+    browserSignInWaiting: "正在等待浏览器授权…",
+    browserSignInBody: "浏览器负责核验账号，并只把当前版本的会话安全交还给 DroneDream。",
+    browserSignInFailed: "浏览器登录未完成，请重试。",
+    cancelBrowserSignIn: "取消",
+    browserRuntimeRequired: "请先准备并启动 DroneDreamRuntime，再进行账号授权。",
+    openEnvironment: "打开运行环境",
     register: "注册",
     createAccount: "创建账号",
     registerNow: "还没有账号？立即注册",
@@ -2391,20 +2410,25 @@ function AccountAvatar({
   );
 }
 
-function AccountDialog({
+export function AccountDialog({
   closeRef,
   required,
   edition,
+  desktopBrowserAuthReady = false,
+  onOpenDesktopSetup,
   onClose,
 }: {
   closeRef: RefObject<HTMLButtonElement>;
   required: boolean;
   edition: BrandEditionId;
+  desktopBrowserAuthReady?: boolean;
+  onOpenDesktopSetup?: () => void;
   onClose: () => void;
 }) {
   const { locale } = useI18n();
   const copy = ACCOUNT_COPY[locale];
   const auth = useAuth();
+  const desktopRuntime = isDesktopRuntime();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
@@ -2418,6 +2442,7 @@ function AccountDialog({
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [browserAuthWaiting, setBrowserAuthWaiting] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [avatarCropSource, setAvatarCropSource] = useState<{
@@ -2429,11 +2454,39 @@ function AccountDialog({
   const cameraButtonRef = useRef<HTMLButtonElement>(null);
   const cameraVideoRef = useRef<HTMLVideoElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  const browserAuthControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     setDisplayName(auth.account?.displayName ?? "");
   }, [auth.account?.displayName]);
+
+  const startDesktopBrowserSignIn = useCallback(async () => {
+    if (!desktopRuntime || browserAuthControllerRef.current) return;
+    const controller = new AbortController();
+    browserAuthControllerRef.current = controller;
+    setError(null);
+    setBrowserAuthWaiting(true);
+    try {
+      await completeDesktopBrowserSignIn(locale, { signal: controller.signal });
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : String(reason);
+      if (mountedRef.current && !/cancelled/iu.test(message)) {
+        setError(copy.browserSignInFailed);
+      }
+    } finally {
+      if (browserAuthControllerRef.current === controller) {
+        browserAuthControllerRef.current = null;
+        if (mountedRef.current) setBrowserAuthWaiting(false);
+      }
+    }
+  }, [copy.browserSignInFailed, desktopRuntime, locale]);
+
+  const cancelDesktopSignIn = useCallback(async () => {
+    const controller = browserAuthControllerRef.current;
+    if (!desktopRuntime || !controller) return;
+    await cancelDesktopBrowserSignIn(controller);
+  }, [desktopRuntime]);
 
   const stopCamera = useCallback(() => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -2452,6 +2505,8 @@ function AccountDialog({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      const controller = browserAuthControllerRef.current;
+      if (controller) void cancelDesktopBrowserSignIn(controller);
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
     };
@@ -2783,6 +2838,37 @@ function AccountDialog({
                 closeAvatarCrop();
               }}
             />
+          ) : null}
+        </div>
+      ) : desktopRuntime ? (
+        <div className="account-desktop-browser-auth">
+          <p>{desktopBrowserAuthReady
+            ? copy.browserSignInBody
+            : copy.browserRuntimeRequired}</p>
+          {desktopBrowserAuthReady ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={browserAuthWaiting}
+              onClick={() => void startDesktopBrowserSignIn()}
+            >
+              <LogIn aria-hidden="true" strokeWidth={1.85} />
+              {browserAuthWaiting ? copy.browserSignInWaiting : copy.browserSignIn}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onOpenDesktopSetup}
+            >
+              <MonitorCog aria-hidden="true" strokeWidth={1.85} />
+              {copy.openEnvironment}
+            </button>
+          )}
+          {desktopBrowserAuthReady && browserAuthWaiting ? (
+            <button type="button" className="btn" onClick={() => void cancelDesktopSignIn()}>
+              {copy.cancelBrowserSignIn}
+            </button>
           ) : null}
         </div>
       ) : (
@@ -3608,6 +3694,8 @@ function AppShellContent() {
         closeRef={accountCloseRef}
         required={accountDialogRequired}
         edition={activeThemeEdition}
+        desktopBrowserAuthReady={runtimeAccess.canUseRuntime}
+        onOpenDesktopSetup={() => navigate("/desktop/setup")}
         onClose={closeAccount}
       />
     </div>

@@ -68,6 +68,29 @@ describe("browser auth session adoption", () => {
     })).rejects.toThrow("Session is no longer valid.");
   });
 
+  it("does not publish an account after adoption is cancelled", async () => {
+    let resolveUser!: (value: {
+      data: { user: { id: string } };
+      error: null;
+    }) => void;
+    authMock.getUser.mockReturnValue(new Promise((resolve) => {
+      resolveUser = resolve;
+    }));
+    const controller = new AbortController();
+    const listener = vi.fn();
+    window.addEventListener("drone-dream:adopt-desktop-auth", listener);
+
+    const adoption = adoptBrowserAuthSession(validSession, {
+      signal: controller.signal,
+    });
+    controller.abort();
+    resolveUser({ data: { user: { id: "user-1" } }, error: null });
+
+    await expect(adoption).rejects.toThrow("cancelled");
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("drone-dream:adopt-desktop-auth", listener);
+  });
+
   it("rejects a session issued for another desktop edition before adoption", async () => {
     authMock.getUser.mockResolvedValue({ data: { user: {} }, error: null });
 

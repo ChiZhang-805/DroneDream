@@ -16,10 +16,6 @@ import { SectionCard } from "../components/SectionCard";
 import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
 import {
   autoStartInstallerRuntime,
-  beginBrowserAuth,
-  clearBrowserAuthVault,
-  restoreBrowserAuthVault,
-  cancelBrowserAuth,
   cancelRuntimeInstall,
   discardInstallerRuntimeIntent,
   getInstallerRuntimeIntent,
@@ -45,8 +41,10 @@ import type {
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useOptionalAuth } from "../features/auth/AuthContext";
-import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
-import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
+import {
+  cancelDesktopBrowserSignIn,
+  completeDesktopBrowserSignIn,
+} from "../features/auth/desktopBrowserSignIn";
 import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
@@ -309,6 +307,7 @@ export function DesktopSetup() {
   const navigate = useNavigate();
   const auth = useOptionalAuth();
   const updater = useAppUpdaterState();
+  const checkForAppUpdates = updater.checkForUpdates;
   const startupGate = useSyncExternalStore(
     subscribeDesktopStartupGate,
     getDesktopStartupGateSession,
@@ -326,7 +325,7 @@ export function DesktopSetup() {
   const installerDiscardRequested = useRef(false);
   const installerDiscardSucceeded = useRef(false);
   const componentMounted = useRef(false);
-  const browserAuthActive = useRef(false);
+  const browserAuthController = useRef<AbortController | null>(null);
   const selectedDriveRef = useRef("");
   const [state, setState] = useState<ProbeState>(() => ({
     ...INITIAL_STATE,
@@ -533,9 +532,8 @@ export function DesktopSetup() {
     componentMounted.current = true;
     return () => {
       componentMounted.current = false;
-      if (browserAuthActive.current) {
-        void cancelBrowserAuth().catch(() => undefined);
-      }
+      const controller = browserAuthController.current;
+      if (controller) void cancelDesktopBrowserSignIn(controller);
     };
   }, []);
 
@@ -635,36 +633,31 @@ export function DesktopSetup() {
   ]);
 
   const startBrowserSignIn = useCallback(async () => {
-    if (!launcherEnvironmentReady || browserAuthStatus !== "idle") return;
+    if (!launcherEnvironmentReady || browserAuthController.current) return;
     const configuration = browserAuthConfiguration();
     if (!configuration) {
       setBrowserAuthError(t("launcher.browserAuthNotConfigured"));
       return;
     }
     setBrowserAuthError(null);
-    activateDesktopAuthSession();
     setBrowserAuthCompletedForLaunch(false);
     setDesktopStartupGateState("idle");
     setBrowserAuthStatus("waiting");
-    browserAuthActive.current = true;
-    let sessionIssued = false;
+    const controller = new AbortController();
+    browserAuthController.current = controller;
     try {
-      const session = await restoreBrowserAuthVault() ?? await beginBrowserAuth({ locale });
-      sessionIssued = true;
+      await completeDesktopBrowserSignIn(locale, {
+        signal: controller.signal,
+        onAdopting: () => {
+          if (componentMounted.current) setBrowserAuthStatus("adopting");
+        },
+      });
       if (!componentMounted.current) return;
-      setBrowserAuthStatus("adopting");
-      await adoptBrowserAuthSession(session);
       if (componentMounted.current) {
         setBrowserAuthCompletedForLaunch(true);
         setBrowserAuthStatus("idle");
       }
     } catch (error) {
-      if (sessionIssued) {
-        // Native persists only this edition's refresh grant before returning
-        // the session. If the WebView refuses that session, do not leave a
-        // credential that would be retried on the next explicit sign-in.
-        await clearBrowserAuthVault().catch(() => false);
-      }
       if (!componentMounted.current) return;
       setBrowserAuthStatus("idle");
       const message = error instanceof Error ? error.message : String(error);
@@ -672,9 +665,11 @@ export function DesktopSetup() {
         setBrowserAuthError(t("launcher.browserAuthFailed"));
       }
     } finally {
-      browserAuthActive.current = false;
+      if (browserAuthController.current === controller) {
+        browserAuthController.current = null;
+      }
     }
-  }, [browserAuthStatus, launcherEnvironmentReady, locale, t]);
+  }, [launcherEnvironmentReady, locale, t]);
 
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
@@ -1004,8 +999,8 @@ export function DesktopSetup() {
     ) return;
     completedOperation.current = snapshot.operationId;
     void refresh();
-    void updater.checkForUpdates();
-  }, [installState.snapshot, refresh, updater.checkForUpdates]);
+    void checkForAppUpdates();
+  }, [checkForAppUpdates, installState.snapshot, refresh]);
 
   useEffect(() => {
     if (!desktopAvailable) return;

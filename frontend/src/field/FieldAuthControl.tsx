@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { LogIn, LogOut, LoaderCircle } from "lucide-react";
 
-import {
-  beginBrowserAuth,
-  cancelBrowserAuth,
-  clearBrowserAuthVault,
-  isDesktopRuntime,
-} from "../desktop/bridge";
+import { isDesktopRuntime } from "../desktop/bridge";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
-import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
-import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
+import {
+  cancelDesktopBrowserSignIn,
+  completeDesktopBrowserSignIn,
+} from "../features/auth/desktopBrowserSignIn";
 import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import type { FieldLocale } from "./catalog";
 
@@ -57,47 +54,46 @@ export function FieldAuthControl({
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
-  const browserAuthActive = useRef(false);
+  const browserAuthController = useRef<AbortController | null>(null);
   const copy = COPY[locale];
   const available = configured && isDesktopRuntime();
 
   useEffect(() => () => {
     mounted.current = false;
-    if (browserAuthActive.current) {
-      void cancelBrowserAuth().catch(() => false);
-    }
+    const controller = browserAuthController.current;
+    if (controller) void cancelDesktopBrowserSignIn(controller);
   }, []);
 
   const startSignIn = async () => {
-    if (!available || status !== "idle") return;
+    if (!available || browserAuthController.current) return;
     if (!browserAuthConfiguration()) {
       setError(copy.unavailable);
       return;
     }
     setError(null);
     setStatus("waiting");
-    activateDesktopAuthSession();
-    browserAuthActive.current = true;
-    let sessionIssued = false;
+    const controller = new AbortController();
+    browserAuthController.current = controller;
     try {
       // Every click starts a fresh Field browser transaction. Browser cookies
       // may reduce credential entry, but no other edition session is restored.
-      const session = await beginBrowserAuth({ locale });
-      sessionIssued = true;
-      if (!mounted.current) return;
-      setStatus("adopting");
-      await adoptBrowserAuthSession(session);
+      await completeDesktopBrowserSignIn(locale, {
+        signal: controller.signal,
+        restoreFromVault: false,
+        onAdopting: () => {
+          if (mounted.current) setStatus("adopting");
+        },
+      });
       if (mounted.current) onAuthenticated?.();
     } catch (cause) {
-      if (sessionIssued) {
-        await clearBrowserAuthVault().catch(() => false);
-      }
       const message = cause instanceof Error ? cause.message : String(cause);
       if (mounted.current && !/cancelled/iu.test(message)) {
         setError(copy.failed);
       }
     } finally {
-      browserAuthActive.current = false;
+      if (browserAuthController.current === controller) {
+        browserAuthController.current = null;
+      }
       if (mounted.current) setStatus("idle");
     }
   };
