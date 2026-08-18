@@ -694,13 +694,6 @@ def build_outputs() -> dict[Path, bytes]:
             or sha256_bytes(superseded_large_path.read_bytes()) != superseded_large["sha256"]
         ):
             raise BrandBuildError(f"superseded large-label lockup evidence drifted: {edition_id}")
-        superseded = descriptor["supersededDotLockup"]
-        superseded_path = REPO / superseded["path"]
-        if (
-            not superseded_path.is_file()
-            or sha256_bytes(superseded_path.read_bytes()) != superseded["sha256"]
-        ):
-            raise BrandBuildError(f"superseded {edition_id} lockup evidence drifted")
         approved_asset_records[edition_id] = {
             "mark": {
                 "path": descriptor["markPath"],
@@ -719,7 +712,6 @@ def build_outputs() -> dict[Path, bytes]:
                 "canonicalOutputPath": f"brand/generated/{edition_id}/lockup-primary.png",
             },
             "supersededLargeLabelLockup": superseded_large,
-            "supersededDotLockup": superseded,
         }
 
     manifest = {
