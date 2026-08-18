@@ -93,6 +93,13 @@ class Settings(BaseSettings):
     llm_max_response_bytes: int = Field(default=1_000_000, ge=1024, le=10_000_000)
     llm_max_prompt_bytes: int = Field(default=262_144, ge=32_768, le=2_000_000)
     model_gateway_base_url: str = Field(default="")
+    assistant_orchestrator_url: str = Field(default="")
+    assistant_orchestrator_timeout_seconds: float = Field(default=10.0, ge=1.0, le=30.0)
+    assistant_orchestrator_max_response_bytes: int = Field(
+        default=2 * 1024 * 1024,
+        ge=4096,
+        le=8 * 1024 * 1024,
+    )
     model_gateway_managed_model_alias: str = Field(
         default="DroneDream Managed",
         min_length=1,
@@ -213,6 +220,28 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "MODEL_GATEWAY_BASE_URL must be a credential-free absolute HTTPS URL"
                 )
+        if self.assistant_orchestrator_url.strip():
+            orchestrator_url = urlsplit(self.assistant_orchestrator_url.strip().rstrip("/"))
+            if (
+                orchestrator_url.scheme != "https"
+                or not orchestrator_url.hostname
+                or orchestrator_url.username
+                or orchestrator_url.password
+                or orchestrator_url.query
+                or orchestrator_url.fragment
+            ):
+                raise ValueError(
+                    "ASSISTANT_ORCHESTRATOR_URL must be a credential-free absolute HTTPS URL"
+                )
+            if self.oidc_issuer:
+                issuer_url = urlsplit(self.oidc_issuer.strip().rstrip("/"))
+                if (
+                    orchestrator_url.scheme != issuer_url.scheme
+                    or orchestrator_url.netloc != issuer_url.netloc
+                ):
+                    raise ValueError(
+                        "ASSISTANT_ORCHESTRATOR_URL must share the trusted OIDC issuer origin"
+                    )
         for origin in self.cors_origin_list:
             parsed_origin = urlsplit(origin)
             try:

@@ -7,6 +7,14 @@ import json
 from typing import Literal, TypedDict
 
 from app.autonomy.models import RoutePoint, TerrainObject, TerrainScene, Vector3
+from app.autonomy.school_map_artifact import (
+    OFFICE_DOOR_CENTER_X,
+    PICKUP_ROUTE_CENTER,
+    PICKUP_ROUTE_ENVELOPE_CENTER_Z_M,
+    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+    get_school_map_gazebo_summary,
+    school_map_stair_route_points,
+)
 
 
 def _p(
@@ -32,8 +40,16 @@ SCENES: dict[str, TerrainScene] = {
         floors=3,
         minimum_clearance_m=0.82,
         tags=[
-            "school", "indoor-outdoor", "switchback-stairs", "classrooms",
-            "office", "cafeteria", "roads", "dynamic-people", "payload", "return",
+            "school",
+            "indoor-outdoor",
+            "switchback-stairs",
+            "classrooms",
+            "office",
+            "cafeteria",
+            "roads",
+            "dynamic-people",
+            "payload",
+            "return",
         ],
         objects=[
             TerrainObject(
@@ -95,7 +111,7 @@ SCENES: dict[str, TerrainScene] = {
                 kind="door",
                 center=Vector3(x=30.0, y=7.5, z=1.45),
                 size=Vector3(x=7.5, y=0.2, z=2.9),
-                traversable=True,
+                traversable=False,
                 required_clearance_m=1.1,
             ),
             TerrainObject(
@@ -127,8 +143,8 @@ SCENES: dict[str, TerrainScene] = {
             TerrainObject(
                 id="office-drone-launch",
                 kind="launch",
-                center=Vector3(x=-49.0, y=15.3, z=7.25),
-                size=Vector3(x=1.7, y=1.7, z=0.1),
+                center=Vector3(x=-42.25, y=15.3, z=7.46),
+                size=Vector3(x=1.7, y=1.7, z=0.08),
                 traversable=True,
                 required_clearance_m=0.75,
             ),
@@ -146,40 +162,55 @@ SCENES: dict[str, TerrainScene] = {
             ),
         ],
         reference_path=[
-            _p(-49.0, 15.3, 8.15, "launch", 0.55),
-            _p(-46.0, 9.4, 8.35, "transit", 0.9),
-            _p(-14.0, 5.0, 8.15, "transit", 1.0),
-            _p(-2.3, 6.9, 8.05, "stairs", 0.55),
-            _p(-1.9, 10.7, 6.65, "stairs", 0.45),
-            _p(1.7, 12.3, 5.65, "stairs", 0.45),
-            _p(1.7, 7.0, 3.75, "stairs", 0.45),
-            _p(-1.9, 10.7, 2.35, "stairs", 0.45),
-            _p(1.7, 12.3, 1.35, "stairs", 0.45),
-            _p(-24.8, 2.7, 1.35, "transit", 0.7),
-            _p(-25.0, -0.85, 1.45, "transit", 0.7),
+            _p(-42.25, 15.3, 8.15, "launch", 0.55),
+            _p(-42.25, 11.5, 8.15, "transit", 0.55),
+            _p(OFFICE_DOOR_CENTER_X, 11.0, 8.15, "transit", 0.55),
+            _p(OFFICE_DOOR_CENTER_X, 9.75, 8.15, "transit", 0.55),
+            _p(-35.0, 8.02, 8.12, "transit", 0.8),
+            _p(-14.0, 8.02, 8.08, "transit", 0.9),
+            _p(-4.0, 8.02, 8.05, "transit", 0.65),
+            *[
+                _p(x, y, z, "stairs", 0.42)
+                for x, y, z in school_map_stair_route_points("descending")
+            ],
+            _p(-3.0, 8.02, 1.05, "transit", 0.55),
+            _p(-8.0, 5.0, 1.25, "transit", 0.65),
+            _p(TEACHING_OPEN_DOOR_PAIR_CENTER_X, 2.7, 1.35, "transit", 0.7),
+            _p(TEACHING_OPEN_DOOR_PAIR_CENTER_X, -1.055, 1.45, "transit", 0.7),
             _p(-25.0, -9.0, 1.55, "transit", 0.9),
             _p(-25.0, -18.0, 1.65, "transit", 1.0),
             _p(0.0, -18.0, 1.8, "transit", 1.1),
             _p(30.0, -18.0, 1.8, "transit", 1.1),
             _p(39.0, -12.0, 1.7, "transit", 0.9),
             _p(46.0, -5.0, 1.55, "transit", 0.75),
-            _p(48.5, 1.5, 1.15, "pickup", 0.4),
+            _p(
+                PICKUP_ROUTE_CENTER[0],
+                PICKUP_ROUTE_CENTER[1],
+                PICKUP_ROUTE_ENVELOPE_CENTER_Z_M,
+                "pickup",
+                0.4,
+            ),
             _p(46.0, -5.0, 1.55, "return", 0.75),
             _p(39.0, -12.0, 1.7, "return", 0.9),
             _p(30.0, -18.0, 1.8, "return", 1.0),
             _p(0.0, -18.0, 1.8, "return", 1.0),
             _p(-25.0, -18.0, 1.65, "return", 0.9),
             _p(-25.0, -9.0, 1.55, "return", 0.8),
-            _p(-25.0, -0.85, 1.45, "return", 0.7),
-            _p(-24.8, 2.7, 1.35, "return", 0.7),
-            _p(1.7, 12.3, 1.35, "stairs", 0.42),
-            _p(-1.9, 10.7, 2.35, "stairs", 0.42),
-            _p(1.7, 7.0, 3.75, "stairs", 0.42),
-            _p(1.7, 12.3, 5.65, "stairs", 0.42),
-            _p(-1.9, 10.7, 6.65, "stairs", 0.42),
-            _p(-2.3, 6.9, 8.05, "stairs", 0.42),
-            _p(-46.0, 9.4, 8.35, "return", 0.7),
-            _p(-49.0, 15.3, 8.15, "land", 0.3),
+            _p(TEACHING_OPEN_DOOR_PAIR_CENTER_X, -1.055, 1.45, "return", 0.7),
+            _p(TEACHING_OPEN_DOOR_PAIR_CENTER_X, 2.7, 1.35, "return", 0.7),
+            _p(-8.0, 5.0, 1.25, "return", 0.65),
+            _p(-3.0, 8.02, 1.05, "return", 0.55),
+            *[
+                _p(x, y, z, "stairs", 0.42)
+                for x, y, z in school_map_stair_route_points("ascending")
+            ],
+            _p(-4.0, 8.02, 8.05, "return", 0.65),
+            _p(-14.0, 8.02, 8.08, "return", 0.8),
+            _p(-35.0, 8.02, 8.12, "return", 0.8),
+            _p(OFFICE_DOOR_CENTER_X, 9.75, 8.15, "return", 0.55),
+            _p(OFFICE_DOOR_CENTER_X, 11.0, 8.15, "return", 0.55),
+            _p(-42.25, 11.5, 8.15, "return", 0.55),
+            _p(-42.25, 15.3, 8.15, "land", 0.3),
         ],
     ),
     "stairwell-coffee-return": TerrainScene(
@@ -409,6 +440,7 @@ class BundledMapManifest(TypedDict):
     confidence_percent: float
     semantic_layers: list[str]
     planning_layers: list[str]
+    gazebo_artifact: dict[str, object] | None
     manifest_sha256: str
 
 
@@ -494,11 +526,13 @@ def get_bundled_map_manifest(scene_id: str) -> BundledMapManifest | None:
     profile = _BUNDLED_MAP_PROFILES.get(scene_id)
     if scene is None or profile is None:
         return None
+    gazebo_artifact = get_school_map_gazebo_summary() if scene_id == "school-campus-v1" else None
     canonical = {
         "schema_version": "dronedream.autonomy.bundled-map-manifest.v1",
         "compiler_scene_id": scene.id,
         "scene": scene.model_dump(mode="json"),
         "profile": profile,
+        "gazebo_artifact": gazebo_artifact,
     }
     digest = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -515,12 +549,15 @@ def get_bundled_map_manifest(scene_id: str) -> BundledMapManifest | None:
         "confidence_percent": profile["confidence_percent"],
         "semantic_layers": list(profile["semantic_layers"]),
         "planning_layers": list(profile["planning_layers"]),
+        "gazebo_artifact": gazebo_artifact,
         "manifest_sha256": digest,
     }
 
 
 def list_scenes() -> list[TerrainScene]:
-    return list(SCENES.values())
+    # Legacy compiler identifiers remain accepted for stored contracts, but the
+    # product exposes one canonical bundled map asset and one user-visible name.
+    return [SCENES["school-campus-v1"]]
 
 
 def get_scene(scene_id: str) -> TerrainScene | None:

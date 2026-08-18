@@ -84,10 +84,13 @@ import {
 } from "../features/autonomy/missionAutonomy";
 import {
   autonomyAssetBlockerMessage,
+  autonomyCanonicalSha256,
   autonomyHarnessRequest,
   autonomyModelContext,
+  autonomyPlannerBindingIssues,
   localAutonomyHarnessInspection,
   parseAutonomyPlannerArtifact,
+  type AutonomyPlannerArtifact,
 } from "../features/autonomy/missionHarness";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { publicDemoConsole } from "../features/demo/publicDemo";
@@ -113,6 +116,8 @@ import type {
   AutonomyCompileRequest,
   AutonomyCompileResponse,
   AutonomyHarnessInspectResponse,
+  AutonomyMapPackQualificationRequest,
+  AutonomyVehiclePackQualificationRequest,
 } from "../types/api";
 import { AutonomyLab } from "./AutonomyLab";
 
@@ -166,6 +171,74 @@ function updatedWorkspace(
   patch: Partial<AutonomyWorkspaceState>,
 ): AutonomyWorkspaceState {
   return { ...workspace, ...patch };
+}
+
+function vehicleQualificationRequest(
+  aircraft: AutonomyAircraftProfile,
+): AutonomyVehiclePackQualificationRequest {
+  return {
+    pack_id: aircraft.id,
+    version: aircraft.version,
+    autopilot: aircraft.autopilot,
+    firmware: aircraft.firmware,
+    flight_controller: aircraft.flightController,
+    control_interface: aircraft.controlInterface,
+    dry_mass_kg: aircraft.dryMassKg,
+    max_takeoff_mass_kg: aircraft.maximumTakeoffMassKg,
+    max_total_thrust_n: aircraft.maximumThrustN,
+    body_size_m: { x: aircraft.bodyLengthM, y: aircraft.bodyWidthM, z: aircraft.bodyHeightM },
+    rotor_radius_m: aircraft.rotorRadiusM,
+    center_of_gravity_m: aircraft.centerOfGravityM,
+    inertia_kg_m2: aircraft.inertiaKgM2,
+    battery_energy_wh: aircraft.batteryEnergyWh,
+    reserve_battery_percent: aircraft.reserveBatteryPercent,
+    maximum_pickup_payload_kg: aircraft.maximumPickupPayloadKg,
+    maximum_speed_mps: aircraft.maximumSpeedMps,
+    maximum_acceleration_mps2: aircraft.maximumAccelerationMps2,
+    maximum_climb_mps: aircraft.maximumClimbMps,
+    maximum_descent_mps: aircraft.maximumDescentMps,
+    maximum_tilt_deg: aircraft.maximumTiltDeg,
+    command_link_latency_ms: aircraft.commandLink.latencyMs,
+    command_link_bandwidth_mbps: aircraft.commandLink.bandwidthMbps,
+    sensors: aircraft.sensorMounts.map((sensor) => ({
+      sensor_id: sensor.id,
+      kind: sensor.kind,
+      calibrated: sensor.calibrated,
+      calibration_status: sensor.calibrationStatus,
+      position_m: sensor.positionM,
+      roll_pitch_yaw_deg: sensor.rollPitchYawDeg,
+      rate_hz: sensor.rateHz,
+      calibration_age_days: sensor.calibrationAgeDays,
+    })),
+  };
+}
+
+function mapQualificationRequest(mapPack: AutonomyMapPack): AutonomyMapPackQualificationRequest {
+  return {
+    schema_version: "dronedream.autonomy.map-pack-qualification.v1",
+    name: mapPack.name,
+    pack_id: mapPack.id,
+    version: mapPack.version,
+    compiler_scene_id: mapPack.compilerSceneId ?? "",
+    representation: mapPack.representation,
+    coordinate_frame: mapPack.coordinateFrame,
+    resolution_m: mapPack.resolutionM,
+    floor_count: mapPack.floorCount,
+    bounds_m: mapPack.boundsM,
+    origin: {
+      latitude: mapPack.origin.latitude,
+      longitude: mapPack.origin.longitude,
+      altitude_m: mapPack.origin.altitudeM,
+    },
+    live_updates: mapPack.liveUpdates,
+    calibrated: mapPack.calibrated,
+    confidence_percent: mapPack.confidencePercent,
+    semantic_layers: mapPack.semanticLayers,
+    planning_layers: mapPack.planningLayers,
+    source_asset_receipt_ids: mapPack.sourceFiles
+      .map((file) => file.receiptId)
+      .filter((receiptId): receiptId is string => Boolean(receiptId)),
+  };
 }
 
 function formatTime(value: string): string {
@@ -333,6 +406,7 @@ function missionPlanSnapshot(
   response: AutonomyCompileResponse,
   workspace: AutonomyWorkspaceState,
   source: AutonomyMissionPlanSnapshot["source"],
+  plannerBinding: AutonomyCompileAssetContext["planner_binding"],
 ): AutonomyMissionPlanSnapshot {
   const aircraftReady = isAutonomyAircraftProfileValid(workspace.aircraft);
   const mapReady = autonomyMapPackQualified(workspace.mapPack);
@@ -360,6 +434,7 @@ function missionPlanSnapshot(
     readiness: assetsReady && authoritative ? response.execution_policy.readiness : "denied",
     canExecute: assetsReady && authoritative && response.execution_policy.can_execute,
     perceptionMode: response.contract.perception_mode,
+    plannerBinding,
     steps: response.contract.steps.map((step) => ({
       order: step.order,
       action: step.action,
@@ -455,6 +530,7 @@ export function AutonomyPlatform() {
     return loadAutonomyAssetLibrary(ownerId, edition, current);
   });
   const [missionComposerDraft, setMissionComposerDraft] = useState("");
+  const bundledQualificationAttempt = useRef<string | null>(null);
 
   useEffect(() => {
     const next = loadAutonomyWorkspace(ownerId, edition);
@@ -472,6 +548,77 @@ export function AutonomyPlatform() {
       withCurrentAutonomyAssets(current, saved),
     ));
   }, [edition, ownerId]);
+
+  useEffect(() => {
+    const officialAircraftSelected = workspace.aircraft.id === "aircraft-my-drone";
+    const officialMapSelected = workspace.mapPack.id === "map-school";
+    const aircraftNeedsQualification = officialAircraftSelected
+      && (workspace.aircraft.status === "draft"
+        || !workspace.aircraft.qualificationReceiptId
+        || !workspace.aircraft.qualificationContentHash);
+    const mapNeedsQualification = officialMapSelected
+      && (workspace.mapPack.status !== "qualified"
+        || !workspace.mapPack.qualificationReceiptId
+        || !workspace.mapPack.contentHash);
+    if (
+      publicDemoConsole
+      || !auth?.account?.id
+      || (!aircraftNeedsQualification && !mapNeedsQualification)
+    ) return undefined;
+    const attemptKey = [
+      ownerId,
+      workspace.aircraft.updatedAt,
+      workspace.mapPack.updatedAt,
+      aircraftNeedsQualification,
+      mapNeedsQualification,
+    ].join(":");
+    if (bundledQualificationAttempt.current === attemptKey) return undefined;
+    bundledQualificationAttempt.current = attemptKey;
+    let cancelled = false;
+    void Promise.all([
+      aircraftNeedsQualification
+        ? apiClient.qualifyAutonomyVehiclePack(vehicleQualificationRequest(workspace.aircraft))
+        : Promise.resolve(null),
+      mapNeedsQualification
+        ? apiClient.qualifyAutonomyMapPack(mapQualificationRequest(workspace.mapPack))
+        : Promise.resolve(null),
+    ]).then(([aircraftReceipt, mapReceipt]) => {
+      if (cancelled) return;
+      if (aircraftReceipt && aircraftReceipt.status !== "validated_unsigned") return;
+      if (mapReceipt && mapReceipt.status !== "qualified") return;
+      const updatedAt = new Date().toISOString();
+      const aircraft = aircraftReceipt ? {
+        ...workspace.aircraft,
+        status: "validated-unsigned" as const,
+        qualificationReceiptId: aircraftReceipt.receipt_id,
+        qualificationContentHash: aircraftReceipt.content_sha256,
+        updatedAt,
+      } : workspace.aircraft;
+      const mapPack = mapReceipt ? {
+        ...workspace.mapPack,
+        status: "qualified" as const,
+        qualificationReceiptId: mapReceipt.receipt_id,
+        contentHash: mapReceipt.content_sha256,
+        updatedAt,
+      } : workspace.mapPack;
+      persist(updatedWorkspace(workspace, {
+        aircraft,
+        mapPack,
+        mission: {
+          ...workspace.mission,
+          aircraftProfileId: aircraft.id,
+          mapPackId: mapPack.id,
+          compiledPlan: null,
+          updatedAt,
+        },
+      }));
+    }).catch(() => {
+      // The existing qualification surfaces remain the explicit retry path.
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [auth?.account?.id, ownerId, persist, workspace]);
 
   const selectAircraft = useCallback((aircraftId: string) => {
     const aircraft = assetLibrary.aircraft.find((candidate) => candidate.id === aircraftId);
@@ -795,15 +942,13 @@ export function AutonomyOverview() {
       setComposer("");
       const harnessRequest = autonomyHarnessRequest(edition, missionWorkspace, revisedIntent);
       let harnessInspection: AutonomyHarnessInspectResponse;
-      try {
-        if (publicDemoConsole) throw new Error("Public demo uses the bounded local asset gate.");
-        harnessInspection = await apiClient.inspectAutonomyHarness(harnessRequest);
-      } catch {
-        harnessInspection = await localAutonomyHarnessInspection(harnessRequest);
-      }
+      harnessInspection = publicDemoConsole
+        ? await localAutonomyHarnessInspection(harnessRequest)
+        : await apiClient.inspectAutonomyHarness(harnessRequest);
       let planningBrief = "";
       let planningRunId: string | null = assistantWorkspaceId;
-      let modelReasoningUnavailable = false;
+      let planningArtifactSha256: string | null = null;
+      let autonomyArtifact: AutonomyPlannerArtifact | null = null;
       if (!publicDemoConsole) {
         try {
           const workflow = await apiClient.compileTaskWorkflow({
@@ -876,13 +1021,34 @@ export function AutonomyOverview() {
             },
             documentContext: null,
           })).response;
-        const autonomyArtifact = parseAutonomyPlannerArtifact(
+        autonomyArtifact = parseAutonomyPlannerArtifact(
           response.orchestration?.artifact_payload,
         );
+        if (!autonomyArtifact) {
+          throw new Error("The model did not return a valid autonomy planner artifact.");
+        }
+        const serverArtifactSha256 = response.orchestration?.artifact_sha256;
+        const localArtifactSha256 = await autonomyCanonicalSha256(autonomyArtifact);
+        if (
+          !serverArtifactSha256
+          || !/^[0-9a-f]{64}$/u.test(serverArtifactSha256)
+          || serverArtifactSha256 !== localArtifactSha256
+        ) {
+          throw new Error("The model planner artifact did not match its server-issued digest.");
+        }
+        planningArtifactSha256 = serverArtifactSha256;
+        const plannerBindingIssues = autonomyPlannerBindingIssues(
+          autonomyArtifact,
+          harnessRequest,
+          harnessInspection,
+        );
+        if (plannerBindingIssues.length > 0) {
+          throw new Error(`The model planner artifact failed binding: ${plannerBindingIssues.join(", ")}`);
+        }
         planningBrief = !harnessInspection.planning_ready
           ? autonomyAssetBlockerMessage(harnessInspection, chinese)
           : response.assistant_message?.trim() || response.experiment_summary.trim();
-        if (autonomyArtifact && autonomyArtifact.status !== "draft") {
+        if (autonomyArtifact.status !== "draft") {
           harnessInspection = {
             ...harnessInspection,
             status: autonomyArtifact.status,
@@ -894,9 +1060,13 @@ export function AutonomyOverview() {
           };
         }
         planningRunId = response.orchestration?.run_id ?? planningRunId;
-      } catch {
-        modelReasoningUnavailable = true;
+      } catch (reason) {
         planningBrief = planningBrief || autonomyAssetBlockerMessage(harnessInspection, chinese);
+        if (!publicDemoConsole) {
+          throw reason instanceof Error
+            ? reason
+            : new Error("The model planner did not produce a bound mission draft.");
+        }
       }
       if (!harnessInspection.planning_ready) {
         const updatedAt = new Date().toISOString();
@@ -934,21 +1104,43 @@ export function AutonomyOverview() {
           harness_context_sha256: harnessInspection.context_sha256,
           aircraft: harnessRequest.aircraft,
           map_pack: harnessRequest.map_pack,
+          planner_binding: publicDemoConsole || !autonomyArtifact || !planningRunId
+            || !planningArtifactSha256
+            ? null
+            : {
+                schema_version: "dronedream.autonomy.planner-binding.v1",
+                status: "draft",
+                run_id: planningRunId,
+                provider: selectedPlanningModel.provider,
+                model: selectedPlanningModel.model,
+                artifact_sha256: planningArtifactSha256,
+                goal: autonomyArtifact.goal,
+                aircraft_id: autonomyArtifact.asset_bindings.aircraft_id,
+                aircraft_version: autonomyArtifact.asset_bindings.aircraft_version,
+                map_id: autonomyArtifact.asset_bindings.map_id,
+                map_version: autonomyArtifact.asset_bindings.map_version,
+                context_sha256: autonomyArtifact.asset_bindings.context_sha256,
+                task_graph: autonomyArtifact.task_graph,
+              },
         },
       );
       const localMissionId = missionIdForScene(compileRequest.scene_id, compileRequest.natural_language);
       let compileResult: AutonomyCompileResponse;
       let compileSource: AutonomyMissionPlanSnapshot["source"];
-      try {
-        if (publicDemoConsole) throw new Error("Public demo uses the bounded local compiler.");
+      if (!publicDemoConsole) {
         compileResult = await apiClient.compileAutonomyMission(compileRequest);
         compileSource = "backend";
-      } catch {
+      } else {
         compileResult = createLocalAutonomyPreview(localMissionId, compileRequest);
         compileSource = "local-preview";
       }
       const updatedAt = new Date().toISOString();
-      const compiledPlan = missionPlanSnapshot(compileResult, missionWorkspace, compileSource);
+      const compiledPlan = missionPlanSnapshot(
+        compileResult,
+        missionWorkspace,
+        compileSource,
+        compileRequest.asset_context?.planner_binding ?? null,
+      );
       const assistantMessage: AutonomyConversationMessage = {
         id: `assistant-${turnId}`,
         role: "assistant",
@@ -972,7 +1164,6 @@ export function AutonomyOverview() {
           updatedAt,
         },
       }));
-      if (modelReasoningUnavailable) setError(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : copy.modelUnavailable);
     } finally {
@@ -1085,7 +1276,7 @@ export function AutonomyOverview() {
                     <header><span><Navigation2 aria-hidden="true" />{copy.aircraft}</span><Link to="/autonomy/aircraft" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
                     {[publicAircraft].map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
                       <input type="radio" name="autonomy-aircraft" value={aircraft.id} checked={aircraft.id === workspace.aircraft.id} onChange={() => selectAircraft(aircraft.id)} />
-                      <span><b>{aircraft.name}</b><small>{aircraft.airframe} · RGB-D · VIO</small></span>
+                      <span><b>{aircraft.name}</b><small>{aircraft.airframe} · GPS · {aircraft.controlInterface.toUpperCase()}</small></span>
                       {aircraft.id === workspace.aircraft.id ? <em>{copy.selected}</em> : null}
                     </label>)}
                   </section>
@@ -1369,40 +1560,9 @@ export function AutonomyAircraft() {
     }
     setQualificationState("working");
     try {
-      const receipt = await apiClient.qualifyAutonomyVehiclePack({
-        pack_id: form.id,
-        version: form.version,
-        autopilot: form.autopilot,
-        firmware: form.firmware,
-        flight_controller: form.flightController,
-        control_interface: form.controlInterface,
-        dry_mass_kg: form.dryMassKg,
-        max_takeoff_mass_kg: form.maximumTakeoffMassKg,
-        max_total_thrust_n: form.maximumThrustN,
-        body_size_m: { x: form.bodyLengthM, y: form.bodyWidthM, z: form.bodyHeightM },
-        rotor_radius_m: form.rotorRadiusM,
-        center_of_gravity_m: form.centerOfGravityM,
-        inertia_kg_m2: form.inertiaKgM2,
-        battery_energy_wh: form.batteryEnergyWh,
-        reserve_battery_percent: form.reserveBatteryPercent,
-        maximum_pickup_payload_kg: form.maximumPickupPayloadKg,
-        maximum_speed_mps: form.maximumSpeedMps,
-        maximum_acceleration_mps2: form.maximumAccelerationMps2,
-        maximum_climb_mps: form.maximumClimbMps,
-        maximum_descent_mps: form.maximumDescentMps,
-        command_link_latency_ms: form.commandLink.latencyMs,
-        command_link_bandwidth_mbps: form.commandLink.bandwidthMbps,
-        sensors: form.sensorMounts.map((sensor) => ({
-          sensor_id: sensor.id,
-          kind: sensor.kind,
-          calibrated: sensor.calibrated,
-          calibration_status: sensor.calibrationStatus,
-          position_m: sensor.positionM,
-          roll_pitch_yaw_deg: sensor.rollPitchYawDeg,
-          rate_hz: sensor.rateHz,
-          calibration_age_days: sensor.calibrationAgeDays,
-        })),
-      });
+      const receipt = await apiClient.qualifyAutonomyVehiclePack(
+        vehicleQualificationRequest(form),
+      );
       const next = {
         ...form,
         status: receipt.status === "validated_unsigned" ? "validated-unsigned" as const : "draft" as const,
@@ -1554,10 +1714,10 @@ const PLANNING_LAYER_LABELS: Record<AutonomyMapPack["planningLayers"][number], s
   confidence: "Confidence",
 };
 
-const FALLBACK_MAP_SCENE_MANIFESTS: Record<
+const FALLBACK_MAP_SCENE_MANIFESTS: Partial<Record<
   NonNullable<AutonomyMapPack["compilerSceneId"]>,
   AutonomyBundledMapManifest
-> = {
+>> = {
   "school-campus-v1": {
     schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
     compiler_scene_id: "school-campus-v1",
@@ -1573,49 +1733,7 @@ const FALLBACK_MAP_SCENE_MANIFESTS: Record<
       "rooms", "corridors", "roads", "vegetation", "street-furniture",
     ],
     planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "337c362d5d9f3c996283bc4f1c19fe8be3a40d18093d961928883b42ce65fe3c",
-  },
-  "stairwell-coffee-return": {
-    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
-    compiler_scene_id: "stairwell-coffee-return",
-    name: "Building stairwell · pickup · return",
-    representation: "hybrid-3d",
-    coordinate_frame: "ENU",
-    resolution_m: 0.1,
-    bounds_m: { x: 42, y: 28, z: 11 },
-    floor_count: 3,
-    confidence_percent: 100,
-    semantic_layers: ["free-space", "stairs", "doors", "people", "pickup-zones"],
-    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "0".repeat(64),
-  },
-  "forest-gate-inspection": {
-    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
-    compiler_scene_id: "forest-gate-inspection",
-    name: "Forest circular-gate inspection",
-    representation: "hybrid-3d",
-    coordinate_frame: "ENU",
-    resolution_m: 0.1,
-    bounds_m: { x: 48, y: 24, z: 8 },
-    floor_count: 1,
-    confidence_percent: 100,
-    semantic_layers: ["free-space", "gates", "people"],
-    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "0".repeat(64),
-  },
-  "service-corridor-dock": {
-    schema_version: "dronedream.autonomy.bundled-map-manifest.v1",
-    compiler_scene_id: "service-corridor-dock",
-    name: "Service corridor · autonomous dock",
-    representation: "hybrid-3d",
-    coordinate_frame: "ENU",
-    resolution_m: 0.1,
-    bounds_m: { x: 34, y: 18, z: 5 },
-    floor_count: 1,
-    confidence_percent: 100,
-    semantic_layers: ["free-space", "doors", "people"],
-    planning_layers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-    manifest_sha256: "0".repeat(64),
+    manifest_sha256: "389fa2c3aae2ccf81d9a3c490da6b9d0f71b26e2cff5fb798c7e99736cafc58f",
   },
 };
 
@@ -1801,9 +1919,7 @@ export function AutonomyMaps() {
     const manifest = compilerSceneId ? sceneManifests[compilerSceneId] : null;
     setForm((current) => ({
       ...current,
-      name: manifest && current.name === "Unconfigured environment"
-        ? manifest.name
-        : current.name,
+      name: manifest?.name ?? current.name,
       status: "draft",
       contentHash: null,
       qualificationReceiptId: null,
@@ -1847,31 +1963,9 @@ export function AutonomyMaps() {
     }
     setQualificationState("working");
     try {
-      const receipt = await apiClient.qualifyAutonomyMapPack({
-        schema_version: "dronedream.autonomy.map-pack-qualification.v1",
-        name: form.name,
-        pack_id: form.id,
-        version: form.version,
-        compiler_scene_id: form.compilerSceneId,
-        representation: form.representation,
-        coordinate_frame: form.coordinateFrame,
-        resolution_m: form.resolutionM,
-        floor_count: form.floorCount,
-        bounds_m: form.boundsM,
-        origin: {
-          latitude: form.origin.latitude,
-          longitude: form.origin.longitude,
-          altitude_m: form.origin.altitudeM,
-        },
-        live_updates: form.liveUpdates,
-        calibrated: form.calibrated,
-        confidence_percent: form.confidencePercent,
-        semantic_layers: form.semanticLayers,
-        planning_layers: form.planningLayers,
-        source_asset_receipt_ids: form.sourceFiles
-          .map((file) => file.receiptId)
-          .filter((receiptId): receiptId is string => Boolean(receiptId)),
-      });
+      const receipt = await apiClient.qualifyAutonomyMapPack(
+        mapQualificationRequest(form),
+      );
       const next: AutonomyMapPack = {
         ...form,
         status: receipt.status === "qualified" ? "qualified" : "draft",
@@ -1898,7 +1992,7 @@ export function AutonomyMaps() {
         <section className="autonomy-config-card">
           <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存地图" : "Saved maps"} value={workspace.mapPack.id} onChange={(event) => selectMap(event.target.value)}>{assetLibrary.maps.map((mapPack) => <option value={mapPack.id} key={mapPack.id}>{mapPack.name}</option>)}</select><button className="btn" type="button" onClick={createMap}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
           <div className="autonomy-form-grid is-four">
-            <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input value={form.name} maxLength={120} onChange={(event) => updateMap({ name: event.target.value })} /></label>
+            <label className="is-wide"><span>{chinese ? "地图名称" : "Map name"}</span><input readOnly={form.compilerSceneId === "school-campus-v1"} value={form.name} maxLength={120} onChange={(event) => updateMap({ name: event.target.value })} /></label>
             <label><span>{chinese ? "三维表示" : "3D representation"}</span><select value={form.representation} onChange={(event) => updateGeometry({ representation: event.target.value as AutonomyMapPack["representation"] })}><option value="hybrid-3d">Hybrid 3D</option><option value="mesh">Mesh</option><option value="point-cloud">Point cloud</option><option value="occupancy">Occupancy / ESDF</option><option value="terrain">Terrain / DEM</option></select></label>
             <label><span>{chinese ? "坐标系" : "Coordinate frame"}</span><select value={form.coordinateFrame} onChange={(event) => updateGeometry({ coordinateFrame: event.target.value as AutonomyMapPack["coordinateFrame"] })}><option>ENU</option><option>NED</option><option>WGS84</option><option value="building-local">Building local</option></select></label>
             <label><span>{chinese ? "分辨率 (m)" : "Resolution (m)"}</span><input type="number" min="0.005" step="0.005" value={form.resolutionM} onChange={(event) => updateGeometry({ resolutionM: Number(event.target.value) })} /></label>

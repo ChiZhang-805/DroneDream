@@ -55,11 +55,11 @@ try {
     const workspace = JSON.parse(window.localStorage.getItem(storageKey));
     workspace.mapPack = {
       ...workspace.mapPack,
-      name: "Engineering Building semantic map",
+      name: "School Map",
       status: "qualified",
       calibrated: true,
-      compilerSceneId: "stairwell-coffee-return",
-      confidencePercent: 94,
+      compilerSceneId: "school-campus-v1",
+      confidencePercent: 100,
     };
     const nodeSpecs = [
       ["preflight-pack-identity", "绑定机型、固件和控制接口", "mission_executive", "critical", []],
@@ -114,7 +114,7 @@ try {
         {
           id: "assistant-browser-verification",
           role: "assistant",
-          content: "我已经绑定当前无人机和工程楼语义地图，并生成了可审阅的任务计划。执行前会依次验证传感器、质量包络、地图坐标和动态障碍物。",
+          content: "我已经绑定当前无人机和 School Map，并生成了可审阅的任务计划。执行前会依次验证传感器、质量包络、地图坐标和动态障碍物。",
           createdAt: new Date().toISOString(),
           planContractId: "mission-browser-verification",
         },
@@ -125,8 +125,8 @@ try {
         schemaVersion: 1,
         source: "backend",
         contractId: "mission-browser-verification",
-        sceneId: "stairwell-coffee-return",
-        sceneName: "Engineering Building semantic map",
+        sceneId: "school-campus-v1",
+        sceneName: "School Map",
         feasible: true,
         readiness: "simulation_ready",
         canExecute: true,

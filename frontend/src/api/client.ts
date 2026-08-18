@@ -27,6 +27,7 @@ import type {
   AutonomyHarnessInspectResponse,
   AutonomyRuntimeObservation,
   AutonomyRuntimeSession,
+  AutonomySimulationExecution,
   AutonomyMapAssetAdmissionReceipt,
   AutonomyMapPackQualificationReceipt,
   AutonomyMapPackQualificationRequest,
@@ -544,6 +545,42 @@ export const apiClient = {
     return request<AutonomyRuntimeSession>(
       `/autonomy/runtime/sessions/${encodeURIComponent(sessionId)}/operator-commands`,
       { method: "POST", body: JSON.stringify({ action, reason }) },
+    );
+  },
+
+  async startAutonomySimulationExecution(
+    runtimeSessionId: string,
+    contractId: string,
+    plannerArtifactSha256: string,
+    clientRequestId: string,
+  ): Promise<AutonomySimulationExecution> {
+    return request<AutonomySimulationExecution>("/autonomy/runtime/simulation-executions", {
+      method: "POST",
+      body: JSON.stringify({
+        runtime_session_id: runtimeSessionId,
+        contract_id: contractId,
+        planner_artifact_sha256: plannerArtifactSha256,
+        client_request_id: clientRequestId,
+        operator_confirmed: true,
+      }),
+    });
+  },
+
+  async getAutonomySimulationExecution(
+    executionId: string,
+  ): Promise<AutonomySimulationExecution> {
+    return request<AutonomySimulationExecution>(
+      `/autonomy/runtime/simulation-executions/${encodeURIComponent(executionId)}`,
+    );
+  },
+
+  async abortAutonomySimulationExecution(
+    executionId: string,
+    reason: string,
+  ): Promise<AutonomySimulationExecution> {
+    return request<AutonomySimulationExecution>(
+      `/autonomy/runtime/simulation-executions/${encodeURIComponent(executionId)}/abort`,
+      { method: "POST", body: JSON.stringify({ action: "abort", reason }) },
     );
   },
 

@@ -74,6 +74,7 @@ export interface AssistantOrchestratedRun {
       | "lab_real_to_sim_workflow"
       | "field_task_plan";
     artifact_payload?: Record<string, unknown>;
+    artifact_sha256?: string;
     artifact_id: string;
     artifact_version: number;
     product_link: string;
@@ -271,6 +272,11 @@ function validCompletedResult(value: unknown): boolean {
     && typeof value.assistant_message === "string"
     && Array.isArray(value.questions)
     && ARTIFACT_KINDS.includes(value.artifact_kind as typeof ARTIFACT_KINDS[number])
+    && (
+      value.artifact_sha256 === undefined
+      || (typeof value.artifact_sha256 === "string"
+        && /^[0-9a-f]{64}$/u.test(value.artifact_sha256))
+    )
     && typeof value.artifact_id === "string"
     && typeof value.artifact_version === "number"
     && typeof value.product_link === "string"
@@ -464,6 +470,7 @@ function completedRunResponse(
       product_link: run.result_json.product_link,
       artifact_kind: run.result_json.artifact_kind,
       artifact_payload: run.result_json.artifact_payload,
+      artifact_sha256: run.result_json.artifact_sha256,
       sequence: run.sequence,
       intent: run.intent,
       workflow: run.workflow_json,

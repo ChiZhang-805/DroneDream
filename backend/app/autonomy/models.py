@@ -195,8 +195,8 @@ class MissionTaskGraph(StrictModel):
 
 class VehicleEnvelope(StrictModel):
     dry_mass_kg: float = Field(default=1.55, gt=0.1, le=50.0)
-    launch_payload_kg: float = Field(default=0.10, ge=0.0, le=20.0)
-    pickup_payload_kg: float = Field(default=0.35, ge=0.0, le=20.0)
+    launch_payload_kg: float = Field(default=0.0, ge=0.0, le=20.0)
+    pickup_payload_kg: float = Field(default=0.1, ge=0.0, le=20.0)
     max_takeoff_mass_kg: float = Field(default=2.60, gt=0.1, le=70.0)
     max_total_thrust_n: float = Field(default=39.0, gt=1.0, le=5000.0)
     radius_m: float = Field(default=0.28, ge=0.05, le=3.0)
@@ -258,6 +258,89 @@ class AutonomyHarnessInspectRequest(StrictModel):
         return self
 
 
+AutonomyPlannerAction = Literal[
+    "resolve",
+    "takeoff",
+    "navigate",
+    "traverse",
+    "pickup",
+    "inspect",
+    "return",
+    "land",
+    "abort",
+]
+
+
+class AutonomyPlannerTaskNode(StrictModel):
+    node_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9][a-z0-9-]*$")
+    action: AutonomyPlannerAction
+    target: str = Field(min_length=1, max_length=160)
+    depends_on: list[str] = Field(default_factory=list, max_length=16)
+    success_evidence: list[str] = Field(min_length=1, max_length=16)
+
+    @field_validator("depends_on")
+    @classmethod
+    def validate_dependencies(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)) or any(
+            not dependency
+            or len(dependency) > 64
+            or any(
+                character not in "abcdefghijklmnopqrstuvwxyz0123456789-" for character in dependency
+            )
+            for dependency in value
+        ):
+            raise ValueError("planner task dependencies are invalid")
+        return value
+
+    @field_validator("success_evidence")
+    @classmethod
+    def validate_success_evidence(cls, value: list[str]) -> list[str]:
+        if any(not evidence.strip() or len(evidence) > 120 for evidence in value):
+            raise ValueError("planner task success evidence is invalid")
+        return value
+
+
+class AutonomyPlannerTaskGraph(StrictModel):
+    nodes: list[AutonomyPlannerTaskNode] = Field(min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def validate_dag(self) -> AutonomyPlannerTaskGraph:
+        identifiers = [node.node_id for node in self.nodes]
+        if len(identifiers) != len(set(identifiers)):
+            raise ValueError("planner task node identifiers must be unique")
+        known = set(identifiers)
+        if any(dependency not in known for node in self.nodes for dependency in node.depends_on):
+            raise ValueError("planner task dependency is unknown")
+        remaining = {node.node_id: set(node.depends_on) for node in self.nodes}
+        while remaining:
+            roots = [node_id for node_id, dependencies in remaining.items() if not dependencies]
+            if not roots:
+                raise ValueError("planner task graph must be acyclic")
+            for node_id in roots:
+                del remaining[node_id]
+            for dependencies in remaining.values():
+                dependencies.difference_update(roots)
+        return self
+
+
+class AutonomyPlannerBinding(StrictModel):
+    schema_version: Literal["dronedream.autonomy.planner-binding.v1"] = (
+        "dronedream.autonomy.planner-binding.v1"
+    )
+    status: Literal["draft"] = "draft"
+    run_id: str = Field(min_length=8, max_length=160, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+    provider: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    model: str = Field(min_length=1, max_length=160)
+    artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    goal: str = Field(min_length=3, max_length=2000)
+    aircraft_id: str = Field(min_length=1, max_length=80)
+    aircraft_version: int = Field(ge=1, le=1_000_000)
+    map_id: str = Field(min_length=1, max_length=80)
+    map_version: int = Field(ge=1, le=1_000_000)
+    context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task_graph: AutonomyPlannerTaskGraph
+
+
 class AutonomyCompileAssetContext(StrictModel):
     schema_version: Literal["dronedream.autonomy.compile-assets.v1"] = (
         "dronedream.autonomy.compile-assets.v1"
@@ -265,11 +348,21 @@ class AutonomyCompileAssetContext(StrictModel):
     harness_context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     aircraft: AutonomyHarnessAsset
     map_pack: AutonomyHarnessAsset
+    planner_binding: AutonomyPlannerBinding | None = None
 
     @model_validator(mode="after")
     def validate_asset_kinds(self) -> AutonomyCompileAssetContext:
         if self.aircraft.kind != "aircraft" or self.map_pack.kind != "map":
             raise ValueError("compile assets are bound to the wrong slots")
+        planner = self.planner_binding
+        if planner is not None and (
+            planner.aircraft_id != self.aircraft.asset_id
+            or planner.aircraft_version != self.aircraft.version
+            or planner.map_id != self.map_pack.asset_id
+            or planner.map_version != self.map_pack.version
+            or planner.context_sha256 != self.harness_context_sha256
+        ):
+            raise ValueError("planner binding does not match the inspected compile assets")
         return self
 
 
@@ -334,6 +427,51 @@ class AutonomyCompileRequest(StrictModel):
         if any(ord(char) < 32 and char not in {"\n", "\t"} for char in value):
             raise ValueError("natural_language contains control characters")
         return value
+
+    @model_validator(mode="after")
+    def validate_planner_task_semantics(self) -> AutonomyCompileRequest:
+        planner = self.asset_context.planner_binding if self.asset_context else None
+        if planner is None:
+            return self
+        actions = {node.action for node in planner.task_graph.nodes}
+        required: set[AutonomyPlannerAction] = {"takeoff", "land"}
+        intent = self.natural_language.casefold()
+        pickup_requested = any(
+            token in intent
+            for token in ("pickup", "takeout", "collect", "retrieve", "取物", "取餐", "外卖")
+        )
+        return_requested = any(
+            token in intent for token in ("return", "come back", "返航", "返回", "回来")
+        )
+        if pickup_requested:
+            required.add("pickup")
+        if return_requested:
+            required.add("return")
+        missing = required - actions
+        if missing:
+            raise ValueError(
+                "planner task graph is missing required actions: " + ", ".join(sorted(missing))
+            )
+        assets = self.asset_context
+        if (
+            pickup_requested
+            and return_requested
+            and assets is not None
+            and assets.aircraft.asset_id == "aircraft-my-drone"
+            and assets.map_pack.asset_id == "map-school"
+        ):
+            required_targets = {
+                ("takeoff", "office-drone-launch-pad"),
+                ("pickup", "takeout-pickup"),
+                ("return", "office-drone-launch-pad"),
+                ("land", "office-drone-launch-pad"),
+            }
+            bound_targets = {(node.action, node.target) for node in planner.task_graph.nodes}
+            if not required_targets.issubset(bound_targets):
+                raise ValueError(
+                    "official School Map planner graph is missing canonical route targets"
+                )
+        return self
 
 
 class TerrainScene(StrictModel):
@@ -523,6 +661,55 @@ class RuntimeSession(StrictModel):
     decision_events: list[RuntimeDecisionEvent] = Field(default_factory=list, max_length=100)
     evidence_chain_head: str
     terminal: bool
+
+
+SimulationExecutionState = Literal[
+    "starting",
+    "running",
+    "verified",
+    "failed",
+    "aborting",
+    "aborted",
+]
+
+
+class SimulationExecutionStartRequest(StrictModel):
+    runtime_session_id: str = Field(
+        min_length=8,
+        max_length=160,
+        pattern=r"^runtime-[a-f0-9]{24}$",
+    )
+    contract_id: str = Field(min_length=8, max_length=160)
+    planner_artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    client_request_id: str = Field(
+        min_length=8,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+    operator_confirmed: Literal[True]
+
+
+class SimulationExecutionStatus(StrictModel):
+    schema_version: Literal["dronedream.autonomy.simulation-execution.v1"] = (
+        "dronedream.autonomy.simulation-execution.v1"
+    )
+    execution_id: str
+    runtime_session_id: str
+    contract_id: str
+    planner_artifact_sha256: str
+    state: SimulationExecutionState
+    created_at: datetime
+    updated_at: datetime
+    progress: float = Field(ge=0.0, le=1.0)
+    phase: str
+    vehicle_model_root_world_enu_m: Vector3 | None = None
+    vehicle_envelope_center_world_enu_m: Vector3 | None = None
+    vehicle_speed_m_s: float | None = Field(default=None, ge=0.0, le=100.0)
+    payload_spawned: bool = False
+    payload_attached: bool = False
+    abort_reason: str | None = None
+    mission_evidence_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    mission_evidence: dict[str, object] | None = None
 
 
 class AutonomyCompileResponse(StrictModel):

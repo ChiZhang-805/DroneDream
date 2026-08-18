@@ -9,6 +9,10 @@ from app.autonomy.models import (
     Vector3,
 )
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry
+from app.autonomy.school_map_artifact import (
+    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+    school_map_stair_route_points,
+)
 from app.autonomy.service import compile_autonomy_mission
 
 
@@ -20,6 +24,62 @@ def mission(target: str = "simulation") -> AutonomyCompileRequest:
             "natural_language": "Fly through three gates and land at the goal.",
             "scene_id": "forest-gate-inspection",
             "perception_mode": "fusion",
+            "asset_context": {
+                "schema_version": "dronedream.autonomy.compile-assets.v1",
+                "harness_context_sha256": "a" * 64,
+                "aircraft": {
+                    "kind": "aircraft",
+                    "asset_id": "aircraft-test-x500",
+                    "name": "Test X500",
+                    "version": 1,
+                    "status": "validated-unsigned",
+                    "content_hash": "b" * 64,
+                    "qualification_receipt_id": "vehicle-receipt-test",
+                    "capabilities": {},
+                },
+                "map_pack": {
+                    "kind": "map",
+                    "asset_id": "map-test",
+                    "name": "Test map",
+                    "version": 1,
+                    "status": "qualified",
+                    "content_hash": "c" * 64,
+                    "qualification_receipt_id": "map-receipt-test",
+                    "capabilities": {},
+                },
+                "planner_binding": {
+                    "schema_version": "dronedream.autonomy.planner-binding.v1",
+                    "status": "draft",
+                    "run_id": "planner-run-test-001",
+                    "provider": "test",
+                    "model": "test-model",
+                    "artifact_sha256": "d" * 64,
+                    "goal": "Fly through three gates and land at the goal.",
+                    "aircraft_id": "aircraft-test-x500",
+                    "aircraft_version": 1,
+                    "map_id": "map-test",
+                    "map_version": 1,
+                    "context_sha256": "a" * 64,
+                    "task_graph": {
+                        "nodes": [
+                            {
+                                "node_id": "takeoff",
+                                "action": "takeoff",
+                                "target": "mission route",
+                                "depends_on": [],
+                                "success_evidence": ["airborne telemetry"],
+                            },
+                            {
+                                "node_id": "land",
+                                "action": "land",
+                                "target": "mission endpoint",
+                                "depends_on": ["takeoff"],
+                                "success_evidence": ["landed telemetry"],
+                            },
+                        ]
+                    },
+                },
+            },
         }
     )
 
@@ -95,6 +155,14 @@ def test_pickup_requalifies_the_loaded_vehicle_before_return_planning() -> None:
     assert return_observation.depends_on == [payload_check.task_id]
 
 
+def test_model_bound_pickup_request_rejects_a_semantically_incomplete_planner_graph() -> None:
+    payload = mission().model_dump(mode="json")
+    payload["natural_language"] = "Pick up the takeout order and return to the office."
+
+    with pytest.raises(ValueError, match="pickup, return"):
+        AutonomyCompileRequest.model_validate(payload)
+
+
 def test_school_map_gate_intent_compiles_gate_steps_and_visual_route() -> None:
     gate_mission = mission().model_copy(
         update={
@@ -158,10 +226,14 @@ def test_school_map_narrow_intent_compiles_switchback_stair_route() -> None:
         "traverse_stairs",
         "land",
     ]
-    assert [point.phase for point in compiled.trajectory].count("stairs") == 7
+    assert [point.phase for point in compiled.trajectory].count("stairs") == len(
+        school_map_stair_route_points("descending")
+    )
     assert compiled.trajectory[0].z == pytest.approx(8.15)
-    assert max(point.z for point in compiled.trajectory) == pytest.approx(8.3)
-    assert compiled.trajectory[-1].z == pytest.approx(1.3)
+    assert max(point.z for point in compiled.trajectory) == pytest.approx(8.27)
+    assert compiled.trajectory[-1].z == pytest.approx(1.4)
+    assert compiled.trajectory[-2].x == pytest.approx(TEACHING_OPEN_DOOR_PAIR_CENTER_X)
+    assert compiled.trajectory[-1].x == pytest.approx(TEACHING_OPEN_DOOR_PAIR_CENTER_X)
 
 
 def test_legacy_service_corridor_keeps_its_transit_contract() -> None:

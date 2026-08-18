@@ -289,7 +289,7 @@ export function VehicleStudio() {
     name: "Survey engineering multirotor",
     mission: "survey" as VehicleDesignMission,
     motorCount: "auto" as "auto" | "4" | "6" | "8",
-    payloadKg: .35,
+    payloadKg: .1,
     targetFlightMinutes: 24,
     operatingEnvironment: "outdoor" as "indoor" | "outdoor" | "windy",
     camera: true,

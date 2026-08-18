@@ -643,6 +643,7 @@ export interface ExperimentAssistantTurnResponse {
         | "lab_real_to_sim_workflow"
         | "field_task_plan";
     artifact_payload?: Record<string, unknown>;
+    artifact_sha256?: string;
     sequence: number;
     intent: string | null;
     workflow: Array<{
@@ -1233,6 +1234,29 @@ export interface AutonomyCompileAssetContext {
   harness_context_sha256: string;
   aircraft: AutonomyHarnessAsset;
   map_pack: AutonomyHarnessAsset;
+  planner_binding: {
+    schema_version: "dronedream.autonomy.planner-binding.v1";
+    status: "draft";
+    run_id: string;
+    provider: string;
+    model: string;
+    artifact_sha256: string;
+    goal: string;
+    aircraft_id: string;
+    aircraft_version: number;
+    map_id: string;
+    map_version: number;
+    context_sha256: string;
+    task_graph: {
+      nodes: Array<{
+        node_id: string;
+        action: "resolve" | "takeoff" | "navigate" | "traverse" | "pickup" | "inspect" | "return" | "land" | "abort";
+        target: string;
+        depends_on: string[];
+        success_evidence: string[];
+      }>;
+    };
+  } | null;
 }
 
 export interface AutonomyCompileRequest {
@@ -1467,6 +1491,27 @@ export interface AutonomyRuntimeSession {
   terminal: boolean;
 }
 
+export interface AutonomySimulationExecution {
+  schema_version: "dronedream.autonomy.simulation-execution.v1";
+  execution_id: string;
+  runtime_session_id: string;
+  contract_id: string;
+  planner_artifact_sha256: string;
+  state: "starting" | "running" | "verified" | "failed" | "aborting" | "aborted";
+  created_at: string;
+  updated_at: string;
+  progress: number;
+  phase: string;
+  vehicle_model_root_world_enu_m: { x: number; y: number; z: number } | null;
+  vehicle_envelope_center_world_enu_m: { x: number; y: number; z: number } | null;
+  vehicle_speed_m_s: number | null;
+  payload_spawned: boolean;
+  payload_attached: boolean;
+  abort_reason: string | null;
+  mission_evidence_sha256: string | null;
+  mission_evidence: Record<string, unknown> | null;
+}
+
 export interface AutonomyVehiclePackQualificationRequest {
   pack_id: string;
   version: number;
@@ -1488,6 +1533,7 @@ export interface AutonomyVehiclePackQualificationRequest {
   maximum_acceleration_mps2: number;
   maximum_climb_mps: number;
   maximum_descent_mps: number;
+  maximum_tilt_deg: number;
   command_link_latency_ms: number;
   command_link_bandwidth_mbps: number;
   sensors: Array<{

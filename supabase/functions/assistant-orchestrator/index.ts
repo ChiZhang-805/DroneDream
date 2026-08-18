@@ -784,7 +784,16 @@ function plannerPrompt(
             context_sha256: "must exactly match the supplied context hash",
           },
           grounded_entities: "array of typed semantic references; empty until resolved",
-          task_graph: "declarative task DAG; empty object when assets block planning",
+          task_graph: {
+            nodes: "0-64 nodes; draft status requires at least one node. For the official School Map office takeout roundtrip, emit exactly four nodes and no extras: takeoff, pickup, return, land, with that dependency chain",
+            node_shape: {
+              node_id: "unique lowercase kebab-case identifier",
+              action: "resolve, takeoff, navigate, traverse, pickup, inspect, return, land, or abort",
+              target: "bound semantic target without invented coordinates; for the official School Map office takeout roundtrip use office-drone-launch-pad for takeoff/return/land and takeout-pickup for pickup",
+              depends_on: "array of node IDs forming an acyclic graph",
+              success_evidence: "non-empty array of deterministic evidence names",
+            },
+          },
           tool_requests: "array using only eligible tool IDs",
           tool_receipts: "must be an empty array; reserved for server receipts",
           assumptions: "bounded array of explicit non-safety assumptions",
@@ -1221,6 +1230,76 @@ function validateAutonomyDraft(
       throw new OrchestratorError("MODEL_RESPONSE_INVALID", "An autonomy tool request is invalid.", 502);
     }
   }
+  if (!isRecord(draft.task_graph)) {
+    throw new OrchestratorError("MODEL_RESPONSE_INVALID", "The autonomy task graph is invalid.", 502);
+  }
+  exactRecordKeys(draft.task_graph, ["nodes"], "autonomy task graph");
+  const graphNodes = draft.task_graph.nodes;
+  if (
+    !Array.isArray(graphNodes)
+    || graphNodes.length > 64
+    || (draft.status === "draft" && graphNodes.length < 1)
+  ) {
+    throw new OrchestratorError("MODEL_RESPONSE_INVALID", "The autonomy task graph is empty or oversized.", 502);
+  }
+  const allowedActions = new Set([
+    "resolve", "takeoff", "navigate", "traverse", "pickup", "inspect", "return", "land", "abort",
+  ]);
+  const graphIds = new Set<string>();
+  for (const item of graphNodes) {
+    if (!isRecord(item)) {
+      throw new OrchestratorError("MODEL_RESPONSE_INVALID", "An autonomy task node is invalid.", 502);
+    }
+    exactRecordKeys(
+      item,
+      ["node_id", "action", "target", "depends_on", "success_evidence"],
+      "autonomy task node",
+    );
+    if (
+      typeof item.node_id !== "string"
+      || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(item.node_id)
+      || graphIds.has(item.node_id)
+      || typeof item.action !== "string"
+      || !allowedActions.has(item.action)
+      || typeof item.target !== "string"
+      || !item.target.trim()
+      || item.target.length > 160
+      || !Array.isArray(item.depends_on)
+      || item.depends_on.length > 16
+      || item.depends_on.some((dependency) => (
+        typeof dependency !== "string"
+        || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(dependency)
+      ))
+      || new Set(item.depends_on).size !== item.depends_on.length
+      || !Array.isArray(item.success_evidence)
+      || item.success_evidence.length < 1
+      || item.success_evidence.length > 16
+      || item.success_evidence.some((evidence) => (
+        typeof evidence !== "string" || !evidence.trim() || evidence.length > 120
+      ))
+    ) {
+      throw new OrchestratorError("MODEL_RESPONSE_INVALID", "An autonomy task node is invalid.", 502);
+    }
+    graphIds.add(item.node_id);
+  }
+  const remainingGraph = new Map<string, Set<string>>();
+  for (const item of graphNodes as JsonRecord[]) {
+    const dependencies = new Set(item.depends_on as string[]);
+    if ([...dependencies].some((dependency) => !graphIds.has(dependency))) {
+      throw new OrchestratorError("MODEL_RESPONSE_INVALID", "An autonomy task dependency is unknown.", 502);
+    }
+    remainingGraph.set(item.node_id as string, dependencies);
+  }
+  while (remainingGraph.size > 0) {
+    const roots = [...remainingGraph.entries()]
+      .filter(([, dependencies]) => dependencies.size === 0)
+      .map(([nodeId]) => nodeId);
+    if (roots.length === 0) {
+      throw new OrchestratorError("MODEL_RESPONSE_INVALID", "The autonomy task graph is cyclic.", 502);
+    }
+    roots.forEach((nodeId) => remainingGraph.delete(nodeId));
+    remainingGraph.forEach((dependencies) => roots.forEach((nodeId) => dependencies.delete(nodeId)));
+  }
   if (!isRecord(draft.repair)) {
     throw new OrchestratorError("MODEL_RESPONSE_INVALID", "The autonomy repair state is invalid.", 502);
   }
@@ -1368,6 +1447,17 @@ function newGrantToken(): string {
 async function sha256Hex(value: string): Promise<string> {
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
   return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (isRecord(value)) {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 async function issueInternalGrant(
@@ -1789,6 +1879,7 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
         hardware_control: false,
       });
     const result = legacyAssistantResponse(plan, model);
+    const artifactSha256 = await sha256Hex(canonicalJson(plan.draft));
     await registerGeneratedDraft(userId, runId, plan.artifact_kind, plan.draft);
     await recordStep(userId, runId, leaseToken, "persist", 5, "persist", "completed",
       "Persisted the generated draft file and prepared its immutable artifact version", {
@@ -1808,6 +1899,7 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
         questions: plan.questions,
         artifact_kind: plan.artifact_kind,
         artifact_payload: plan.draft,
+        artifact_sha256: artifactSha256,
         product_link_template: productLink(selectedEdition, selectedWorkspace, "{artifact_id}"),
       },
       p_assistant_message: plan.assistant_message,

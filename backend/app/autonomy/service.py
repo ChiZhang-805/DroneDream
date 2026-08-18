@@ -33,9 +33,15 @@ from app.autonomy.models import (
     TaskRisk,
     ValidationIssue,
 )
+from app.autonomy.school_map_artifact import (
+    OFFICE_DOOR_CENTER_X,
+    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+    school_map_stair_route_points,
+)
 
 GRAVITY = 9.80665
 MIN_THRUST_TO_WEIGHT = 1.35
+MASS_COMPARISON_TOLERANCE_KG = 1e-9
 VALIDATED_SIGNED_PACK_COUNT = 0
 SchoolMissionProfile = Literal["coffee", "gates", "narrow"]
 
@@ -67,15 +73,22 @@ def runtime_profile_for(request: AutonomyCompileRequest) -> OnboardRuntimeProfil
         status = "locked"
         authority = False
 
+    localization_role = (
+        "Consumes the qualified School Map and PX4 Gazebo GPS state; no camera or VIO stream "
+        "is attached to the official vehicle."
+        if request.perception_mode == "map"
+        else "Accepts versioned VIO, SLAM, map and vision observations."
+    )
+    localization_rate_hz = 10.0 if request.perception_mode == "map" else 30.0
     component_specs: tuple[tuple[RuntimeComponentId, str, float], ...] = (
         ("mission_executive", "Runs the bounded mission state machine.", 20.0),
-        ("perception_vio_slam", "Accepts versioned VIO, SLAM, map and vision observations.", 30.0),
+        ("perception_vio_slam", localization_role, localization_rate_hz),
         ("world_model", "Maintains obstacle, gate, terrain and payload state.", 20.0),
         ("global_planner", "Builds the route corridor between mission checkpoints.", 2.0),
         ("local_planner", "Repairs the trajectory inside the approved corridor.", 20.0),
-        ("trajectory_tracker", "Converts a qualified trajectory to PX4 setpoint contracts.", 50.0),
-        ("px4_bridge", "Separates simulator, HITL shadow and locked aircraft transports.", 50.0),
-        ("safety_supervisor", "Overrides progress with hold, land or abort decisions.", 50.0),
+        ("trajectory_tracker", "Converts a qualified trajectory to PX4 setpoint contracts.", 20.0),
+        ("px4_bridge", "Separates simulator, HITL shadow and locked aircraft transports.", 20.0),
+        ("safety_supervisor", "Checks live clearance and overrides with abort decisions.", 5.0),
         ("evidence_recorder", "Hash-chains accepted observations and decisions.", 20.0),
     )
     components = [
@@ -131,7 +144,7 @@ def _select_perception(request: AutonomyCompileRequest) -> PerceptionMode:
     return "fusion"
 
 
-def _school_mission_profile(
+def school_mission_profile(
     request: AutonomyCompileRequest,
     scene_id: str,
 ) -> SchoolMissionProfile:
@@ -268,7 +281,7 @@ def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | 
         return None
     if profile == "gates":
         return [
-            RoutePoint(x=-24.8, y=-0.85, z=1.4, phase="launch", speed_limit_mps=0.7),
+            RoutePoint(x=-24.8, y=-1.055, z=1.4, phase="launch", speed_limit_mps=0.7),
             RoutePoint(x=-25.0, y=-9.0, z=1.7, phase="transit", speed_limit_mps=0.9),
             RoutePoint(x=-25.0, y=-18.0, z=1.9, phase="transit", speed_limit_mps=1.0),
             RoutePoint(x=-13.0, y=-18.0, z=2.2, phase="transit", speed_limit_mps=1.1),
@@ -280,21 +293,46 @@ def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | 
             RoutePoint(x=48.0, y=-18.0, z=1.3, phase="land", speed_limit_mps=0.4),
         ]
     return [
-        RoutePoint(x=-49.0, y=15.3, z=8.15, phase="launch", speed_limit_mps=0.55),
-        RoutePoint(x=-46.0, y=9.4, z=8.3, phase="transit", speed_limit_mps=0.8),
-        RoutePoint(x=-35.0, y=5.0, z=8.1, phase="transit", speed_limit_mps=0.9),
-        RoutePoint(x=-23.0, y=5.0, z=8.0, phase="transit", speed_limit_mps=0.9),
-        RoutePoint(x=-12.0, y=5.0, z=8.0, phase="transit", speed_limit_mps=0.8),
-        RoutePoint(x=-2.4, y=6.7, z=7.9, phase="stairs", speed_limit_mps=0.5),
-        RoutePoint(x=-1.9, y=9.0, z=7.2, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=1.7, y=12.2, z=6.0, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=1.7, y=9.4, z=4.6, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=-1.9, y=8.7, z=3.2, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=1.7, y=12.3, z=1.35, phase="stairs", speed_limit_mps=0.42),
-        RoutePoint(x=1.7, y=8.8, z=1.15, phase="stairs", speed_limit_mps=0.45),
+        RoutePoint(x=-42.25, y=15.3, z=8.15, phase="launch", speed_limit_mps=0.55),
+        RoutePoint(x=-42.25, y=11.5, z=8.15, phase="transit", speed_limit_mps=0.55),
+        RoutePoint(
+            x=OFFICE_DOOR_CENTER_X,
+            y=11.0,
+            z=8.15,
+            phase="transit",
+            speed_limit_mps=0.55,
+        ),
+        RoutePoint(
+            x=OFFICE_DOOR_CENTER_X,
+            y=9.75,
+            z=8.15,
+            phase="transit",
+            speed_limit_mps=0.55,
+        ),
+        RoutePoint(x=-35.0, y=8.02, z=8.12, phase="transit", speed_limit_mps=0.8),
+        RoutePoint(x=-23.0, y=8.02, z=8.1, phase="transit", speed_limit_mps=0.8),
+        RoutePoint(x=-12.0, y=8.02, z=8.08, phase="transit", speed_limit_mps=0.75),
+        RoutePoint(x=-4.0, y=8.02, z=8.05, phase="transit", speed_limit_mps=0.65),
+        *[
+            RoutePoint(x=x, y=y, z=z, phase="stairs", speed_limit_mps=0.42)
+            for x, y, z in school_map_stair_route_points("descending")
+        ],
+        RoutePoint(x=-3.0, y=8.02, z=1.05, phase="transit", speed_limit_mps=0.55),
         RoutePoint(x=-8.0, y=5.0, z=1.2, phase="transit", speed_limit_mps=0.65),
-        RoutePoint(x=-24.8, y=2.7, z=1.3, phase="transit", speed_limit_mps=0.5),
-        RoutePoint(x=-25.0, y=-0.85, z=1.3, phase="land", speed_limit_mps=0.35),
+        RoutePoint(
+            x=TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+            y=2.7,
+            z=1.3,
+            phase="transit",
+            speed_limit_mps=0.5,
+        ),
+        RoutePoint(
+            x=TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+            y=-1.055,
+            z=1.4,
+            phase="land",
+            speed_limit_mps=0.35,
+        ),
     ]
 
 
@@ -595,6 +633,9 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
         adapter = "hardware_contract"
     blockers: list[str] = []
     required: list[str] = []
+    planner_binding = (
+        request.asset_context.planner_binding if request.asset_context is not None else None
+    )
 
     if target != "simulation" and request.edition == "sim":
         blockers.append("edition.sim.forbids-hardware-and-hitl")
@@ -616,8 +657,10 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
             blockers.append(code)
     if not feasible:
         blockers.append("trajectory.not-feasible")
+    if target == "simulation" and planner_binding is None:
+        blockers.append("planner.model-artifact-binding.missing")
 
-    if target == "simulation" and feasible:
+    if target == "simulation" and feasible and planner_binding is not None:
         return ExecutionPolicy(
             readiness="simulation_ready",
             adapter=adapter,
@@ -625,7 +668,8 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
             validated_signed_pack_count=VALIDATED_SIGNED_PACK_COUNT,
             blockers=[],
             required_next_steps=[
-                "Run the PX4/Gazebo qualification job and retain its signed evidence receipt."
+                "Confirm the launch, run the fixed PX4/Gazebo mission, and retain its "
+                "evidence receipt."
             ],
         )
     if blockers:
@@ -683,7 +727,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             503,
         )
     perception = _select_perception(request)
-    mission_profile = _school_mission_profile(request, scene_id)
+    mission_profile = school_mission_profile(request, scene_id)
     steps = _steps(scene_id, mission_profile, request.vehicle.pickup_payload_kg)
     task_graph = _task_graph(steps)
     profile_path = (
@@ -717,7 +761,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         + request.vehicle.radius_m
     )
     issues: list[ValidationIssue] = []
-    if loaded_mass > request.vehicle.max_takeoff_mass_kg:
+    if loaded_mass - request.vehicle.max_takeoff_mass_kg > MASS_COMPARISON_TOLERANCE_KG:
         issues.append(
             ValidationIssue(
                 code="vehicle.loaded-mass-exceeds-mtom",
@@ -789,6 +833,12 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         "steps": [step.model_dump(mode="json") for step in steps],
         "task_graph": task_graph.model_dump(mode="json"),
         "vehicle": request.vehicle.model_dump(mode="json"),
+        "planner_binding": (
+            request.asset_context.planner_binding.model_dump(mode="json")
+            if request.asset_context is not None
+            and request.asset_context.planner_binding is not None
+            else None
+        ),
     }
     digest = hashlib.sha256(
         json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -840,6 +890,24 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         metrics=metrics,
         execution_policy=_policy(request, feasible),
         planner={
+            "binding": (
+                "model-bound"
+                if request.asset_context is not None
+                and request.asset_context.planner_binding is not None
+                else "missing"
+            ),
+            "artifact_sha256": (
+                request.asset_context.planner_binding.artifact_sha256
+                if request.asset_context is not None
+                and request.asset_context.planner_binding is not None
+                else ""
+            ),
+            "run_id": (
+                request.asset_context.planner_binding.run_id
+                if request.asset_context is not None
+                and request.asset_context.planner_binding is not None
+                else ""
+            ),
             "semantic_layer": "bounded-natural-language-contract-v1",
             "global_layer": "prevalidated-corridor-graph-v1",
             "trajectory_layer": "payload-aware-speed-profile-v1",
@@ -849,4 +917,8 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
     )
 
 
-__all__ = ["AutonomyCompileError", "compile_autonomy_mission"]
+__all__ = [
+    "AutonomyCompileError",
+    "compile_autonomy_mission",
+    "school_mission_profile",
+]

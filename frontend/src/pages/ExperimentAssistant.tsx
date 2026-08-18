@@ -1606,7 +1606,7 @@ export function ExperimentAssistant() {
                   onClick={() => bindPublicAutonomyAsset("aircraft")}
                 >
                   <span className="assistant-task-icon" aria-hidden="true"><Navigation2 strokeWidth={1.8} /></span>
-                  <span className="assistant-task-popover-copy"><b>My Drone</b><small>{chinese ? "公共 X500 V2 级机型" : "Public X500 V2-class aircraft"}</small></span>
+                  <span className="assistant-task-popover-copy"><b>My Drone</b><small>{chinese ? "已校核 PX4/Gazebo X500 机型" : "Qualified PX4/Gazebo X500 aircraft"}</small></span>
                 </button>
                 <button
                   type="button"

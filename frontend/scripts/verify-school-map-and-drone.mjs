@@ -6,7 +6,13 @@ import { chromium } from "playwright";
 import { createServer } from "vite";
 
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const outputRoot = path.join(frontendRoot, "node_modules", ".cache", "school-map-and-drone");
+const outputRoot = path.resolve(
+  frontendRoot,
+  "..",
+  "artifacts",
+  "test-runs",
+  "school-map-visual-current",
+);
 const host = "127.0.0.1";
 const port = 5198;
 const externalOrigin = process.env.SCHOOL_MAP_VERIFY_ORIGIN?.replace(/\/$/, "");
@@ -34,6 +40,29 @@ async function clearBlockingDialog(page) {
     document.querySelector(".account-dialog-backdrop")?.remove();
     document.querySelectorAll("[inert]").forEach((element) => element.removeAttribute("inert"));
   });
+}
+
+async function changeSchoolMapView(page, schoolCanvas, buttonName, cameraPreset) {
+  const button = page.getByRole("button", { name: buttonName, exact: true });
+  const isFloorButton = /^(ALL|L[123])$/.test(buttonName);
+  const isAlreadySelectedFloor = isFloorButton && await button.getAttribute("aria-pressed") === "true";
+  if (!isAlreadySelectedFloor) {
+    const marker = `before-${buttonName}-${Date.now()}`;
+    await schoolCanvas.evaluate((canvas, value) => {
+      canvas.dataset.schoolMapVerificationMarker = value;
+    }, marker);
+    await button.click();
+    await page.waitForFunction((value) => {
+      const canvas = document.querySelector('.autonomy-world-3d[data-scene="school-campus-v1"] canvas');
+      return canvas instanceof HTMLCanvasElement
+        && canvas.dataset.schoolMapVerificationMarker !== value;
+    }, marker);
+  }
+  await schoolCanvas.waitFor({ state: "visible" });
+  await page.evaluate((preset) => {
+    window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset } }));
+  }, cameraPreset);
+  await page.waitForTimeout(700);
 }
 
 try {
@@ -65,15 +94,43 @@ try {
     if (await page.getByRole("button", { name: label, exact: true }).count() !== 1) throw new Error(`School Map is missing ${label}.`);
   }
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`), fullPage: false });
-  await schoolCanvas.hover();
-  await page.mouse.wheel(0, -900);
-  await page.waitForTimeout(800);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "teaching-entrance" } })));
+  await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-entrances-1600x1000.png`), fullPage: false });
-  await page.getByRole("button", { name: "X-ray" }).click();
-  await page.getByRole("button", { name: "L3", exact: true }).click();
-  await page.waitForTimeout(1200);
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "cafeteria-entrance" } })));
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-cafeteria-entrance-1600x1000.png`), fullPage: false });
+  await page.reload({ waitUntil: "networkidle" });
+  await clearBlockingDialog(page);
+  await schoolCanvas.waitFor({ state: "visible" });
+  await page.waitForTimeout(1000);
+  const canvasBounds = await schoolCanvas.boundingBox();
+  if (!canvasBounds) throw new Error("School Map canvas bounds are unavailable for orbit verification.");
+  await page.mouse.move(canvasBounds.x + canvasBounds.width * 0.56, canvasBounds.y + canvasBounds.height * 0.52);
+  await page.mouse.down();
+  await page.mouse.move(canvasBounds.x + canvasBounds.width * 0.76, canvasBounds.y + canvasBounds.height * 0.47, { steps: 14 });
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-west-angle-1600x1000.png`), fullPage: false });
+  await changeSchoolMapView(page, schoolCanvas, "X-ray", "teaching-stair");
   if (await world.getAttribute("data-xray") !== "true") throw new Error("X-ray state did not reach the rendered world.");
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-3-1600x1000.png`), fullPage: false });
+  for (const floor of ["L1", "L2", "L3"]) {
+    await changeSchoolMapView(page, schoolCanvas, floor, "teaching-stair");
+    await page.screenshot({
+      path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-${floor.slice(1)}-1600x1000.png`),
+      fullPage: false,
+    });
+  }
+  await changeSchoolMapView(page, schoolCanvas, "L1", "cafeteria-stair");
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-cafeteria-stair-1600x1000.png`), fullPage: false });
+  await changeSchoolMapView(page, schoolCanvas, "Solid", "teaching-stair");
+  for (const floor of ["L1", "L2", "L3"]) {
+    await changeSchoolMapView(page, schoolCanvas, floor, "teaching-stair");
+    await page.screenshot({
+      path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-${floor.slice(1)}-1600x1000.png`),
+      fullPage: false,
+    });
+  }
 
   await page.goto(`${origin}/console/vehicle-studio`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);
@@ -83,7 +140,10 @@ try {
   const vehicleText = await page.locator("body").innerText();
   const inputValues = await page.locator("input").evaluateAll((elements) => elements.map((element) => element.value));
   if (!vehicleText.includes("My Drone") && !inputValues.includes("My Drone")) throw new Error(`Vehicle Studio did not open My Drone. Inputs: ${inputValues.join(" | ")}`);
-  if (await page.getByText("Jetson Orin NX compute enclosure", { exact: true }).count() < 1) throw new Error("My Drone is missing its onboard compute component.");
+  if (await page.getByText("Jetson Orin NX compute enclosure", { exact: true }).count() !== 0) throw new Error("My Drone still exposes a Jetson module that is absent from the qualified PX4/Gazebo contract.");
+  if (await page.getByText("Front RGB-D perception module", { exact: true }).count() !== 0) throw new Error("My Drone still exposes an RGB-D module that is absent from the qualified PX4/Gazebo contract.");
+  if (await page.getByText("M10 GNSS and compass mast", { exact: true }).count() < 1) throw new Error("My Drone is missing its qualified GNSS component.");
+  if (!vehicleText.includes("2.06 kg")) throw new Error("Vehicle Studio does not display the qualified My Drone dry mass.");
 
   await page.goto(`${origin}/console/assistant`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);
@@ -161,8 +221,11 @@ try {
   const savedMapLabels = await page.locator('select[aria-label="Saved maps"] option').allTextContents();
   if (savedMapLabels.some((label) => /\s·\sv\d+$/iu.test(label))) throw new Error(`Map revision suffix returned: ${savedMapLabels.join(" | ")}`);
   const mapName = page.getByLabel("Map name", { exact: true });
-  await mapName.fill("School Map ");
-  await mapName.fill("School Map");
+  if (await mapName.inputValue() !== "School Map") throw new Error("The canonical bundled map name changed.");
+  if (await mapName.getAttribute("readonly") === null) throw new Error("The canonical School Map name must be immutable in the editor.");
+  const fixedScale = page.getByLabel("Confirm the bundled scene's fixed scale and ENU frame", { exact: true });
+  await fixedScale.uncheck();
+  await fixedScale.check();
   await page.getByRole("button", { name: "Save Map Pack", exact: true }).click();
   const persistedMap = await page.evaluate(() => {
     const stored = window.localStorage.getItem("dronedream:autonomy-workspace:v2:local:universal");
@@ -176,7 +239,15 @@ try {
     screenshots: [
       path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}school-map-entrances-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-cafeteria-entrance-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-solid-west-angle-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-1-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-2-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-3-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-xray-cafeteria-stair-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-1-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-2-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-3-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}my-drone-vehicle-studio-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`),

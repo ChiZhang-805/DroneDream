@@ -1,5 +1,7 @@
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
+import { MY_DRONE_CONTRACT } from "./myDroneContract";
 import type {
+  AutonomyCompileAssetContext,
   AutonomyTaskGraph,
   AutonomyTaskNode,
 } from "../../types/api";
@@ -104,7 +106,18 @@ export const AUTONOMY_AIRCRAFT_LIMITS = {
   maximumTiltDeg: { min: 5, max: 75 },
 } as const;
 
+const MASS_COMPARISON_TOLERANCE_KG = 1e-9;
+
 export function autonomyAircraftRadiusM(aircraft: AutonomyAircraftProfile): number {
+  const isOfficialMyDroneGeometry = aircraft.id === MY_DRONE_CONTRACT.id
+    && aircraft.version === 1
+    && Math.abs(aircraft.bodyLengthM - 0.36) <= 1e-12
+    && Math.abs(aircraft.bodyWidthM - 0.36) <= 1e-12
+    && Math.abs(aircraft.bodyHeightM - 0.33) <= 1e-12
+    && Math.abs(aircraft.rotorRadiusM - MY_DRONE_CONTRACT.propellerDiameterM / 2) <= 1e-12;
+  if (isOfficialMyDroneGeometry) {
+    return MY_DRONE_CONTRACT.collisionEnvelopeM.x / 2;
+  }
   return Math.max(
     aircraft.rotorRadiusM,
     Math.hypot(aircraft.bodyLengthM, aircraft.bodyWidthM) / 2 + aircraft.rotorRadiusM,
@@ -136,7 +149,8 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     && within(aircraft.batteryEnergyWh, "batteryEnergyWh")
     && within(aircraft.reserveBatteryPercent, "reserveBatteryPercent")
     && within(aircraft.maximumPickupPayloadKg, "maximumPickupPayloadKg")
-    && aircraft.dryMassKg + aircraft.maximumPickupPayloadKg <= aircraft.maximumTakeoffMassKg
+    && aircraft.dryMassKg + aircraft.maximumPickupPayloadKg
+      <= aircraft.maximumTakeoffMassKg + MASS_COMPARISON_TOLERANCE_KG
     && within(aircraft.maximumSpeedMps, "maximumSpeedMps")
     && within(aircraft.maximumAccelerationMps2, "maximumAccelerationMps2")
     && within(aircraft.maximumClimbMps, "maximumClimbMps")
@@ -263,6 +277,7 @@ export interface AutonomyMissionPlanSnapshot {
   readiness: "simulation_ready" | "preview_only" | "denied";
   canExecute: boolean;
   perceptionMode: "map" | "vision" | "fusion";
+  plannerBinding: AutonomyCompileAssetContext["planner_binding"];
   steps: Array<{
     order: number;
     action: string;
@@ -307,6 +322,7 @@ const COMPILED_SCENE_SET = new Set<AutonomyCompiledSceneId>([
   "forest-gate-inspection",
   "service-corridor-dock",
 ]);
+const CANONICAL_SCHOOL_SCENE_ID: AutonomyCompiledSceneId = "school-campus-v1";
 const SENSOR_SET = new Set<AutonomySensorKind>(["rgb", "depth", "stereo", "thermal", "lidar", "gps", "vio"]);
 const SEMANTIC_SET = new Set<AutonomyMapPack["semanticLayers"][number]>([
   "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
@@ -416,6 +432,24 @@ function normalizeMissionPlan(value: unknown): AutonomyMissionPlanSnapshot | nul
   const perceptionMode = ["map", "vision", "fusion"].includes(String(plan.perceptionMode))
     ? plan.perceptionMode as AutonomyMissionPlanSnapshot["perceptionMode"]
     : "fusion";
+  const rawPlannerBinding = plan.plannerBinding && typeof plan.plannerBinding === "object"
+    ? plan.plannerBinding
+    : null;
+  const plannerBinding: AutonomyCompileAssetContext["planner_binding"] = rawPlannerBinding
+    && rawPlannerBinding.schema_version === "dronedream.autonomy.planner-binding.v1"
+    && rawPlannerBinding.status === "draft"
+    && typeof rawPlannerBinding.run_id === "string"
+    && typeof rawPlannerBinding.provider === "string"
+    && typeof rawPlannerBinding.model === "string"
+    && typeof rawPlannerBinding.artifact_sha256 === "string"
+    && /^[0-9a-f]{64}$/u.test(rawPlannerBinding.artifact_sha256)
+    && typeof rawPlannerBinding.context_sha256 === "string"
+    && /^[0-9a-f]{64}$/u.test(rawPlannerBinding.context_sha256)
+    && rawPlannerBinding.task_graph
+    && typeof rawPlannerBinding.task_graph === "object"
+    && !Array.isArray(rawPlannerBinding.task_graph)
+    ? rawPlannerBinding
+    : null;
   return {
     schemaVersion: 1,
     source: plan.source === "backend" ? "backend" : "local-preview",
@@ -426,6 +460,7 @@ function normalizeMissionPlan(value: unknown): AutonomyMissionPlanSnapshot | nul
     readiness,
     canExecute: plan.canExecute === true && readiness === "simulation_ready",
     perceptionMode,
+    plannerBinding,
     steps,
     taskGraph: {
       schema_version: "dronedream.autonomy.task-graph.v1",
@@ -464,50 +499,45 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
     schemaVersion: 2,
     aircraft: {
       schemaVersion: 2,
-      id: "aircraft-my-drone",
+      id: MY_DRONE_CONTRACT.id,
       version: 1,
       status: "draft",
       qualificationReceiptId: null,
       qualificationContentHash: null,
-      name: "My Drone",
-      manufacturer: "DroneDream reference · Holybro X500 V2-derived",
-      airframe: "X500 V2 Quad X",
-      flightController: "Pixhawk 6C",
-      autopilot: "px4",
-      firmware: "PX4 v1.16",
-      controlInterface: "px4-ros2",
-      computePlatform: "Jetson Orin NX",
-      dryMassKg: 1.86,
-      maximumTakeoffMassKg: 2.8,
+      name: MY_DRONE_CONTRACT.name,
+      manufacturer: MY_DRONE_CONTRACT.manufacturer,
+      airframe: MY_DRONE_CONTRACT.referenceAirframe,
+      flightController: MY_DRONE_CONTRACT.flightController,
+      autopilot: MY_DRONE_CONTRACT.autopilot,
+      firmware: MY_DRONE_CONTRACT.firmware,
+      controlInterface: MY_DRONE_CONTRACT.controlInterface,
+      computePlatform: MY_DRONE_CONTRACT.runtimeHost,
+      dryMassKg: MY_DRONE_CONTRACT.dryMassKg,
+      maximumTakeoffMassKg: MY_DRONE_CONTRACT.maximumTakeoffMassKg,
       bodyLengthM: 0.36,
       bodyWidthM: 0.36,
       bodyHeightM: 0.33,
-      rotorRadiusM: 0.127,
-      maximumThrustN: 44,
-      batteryEnergyWh: 74,
-      reserveBatteryPercent: 30,
+      rotorRadiusM: MY_DRONE_CONTRACT.propellerDiameterM / 2,
+      maximumThrustN: MY_DRONE_CONTRACT.maximumThrustN,
+      batteryEnergyWh: MY_DRONE_CONTRACT.battery.nominalEnergyWh,
+      reserveBatteryPercent: MY_DRONE_CONTRACT.planningLimits.reserveBatteryPercent,
       centerOfGravityM: { x: 0, y: 0, z: -0.018 },
       inertiaKgM2: { x: 0.035, y: 0.035, z: 0.061 },
-      maximumPickupPayloadKg: 0.35,
-      maximumSpeedMps: 4,
-      maximumAccelerationMps2: 2.5,
-      maximumClimbMps: 1.5,
-      maximumDescentMps: 1,
-      maximumTiltDeg: 30,
+      maximumPickupPayloadKg: MY_DRONE_CONTRACT.maximumPickupPayloadKg,
+      maximumSpeedMps: MY_DRONE_CONTRACT.planningLimits.maximumSpeedMps,
+      maximumAccelerationMps2: MY_DRONE_CONTRACT.planningLimits.maximumAccelerationMps2,
+      maximumClimbMps: MY_DRONE_CONTRACT.planningLimits.maximumClimbMps,
+      maximumDescentMps: MY_DRONE_CONTRACT.planningLimits.maximumDescentMps,
+      maximumTiltDeg: MY_DRONE_CONTRACT.planningLimits.maximumTiltDeg,
       commandLink: {
         kind: "wifi",
         latencyMs: 35,
         bandwidthMbps: 40,
         lossAction: "hold-land",
       },
-      sensors: ["rgb", "depth", "gps", "vio"],
+      sensors: ["gps"],
       sensorMounts: [
-        // The renderer is X-right/Y-up/Z-aft; Vehicle Pack extrinsics are
-        // X-forward/Y-right/Z-up. Publish (-renderZ, renderX, renderY).
-        { id: "front-rgb", kind: "rgb", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.155, y: 0, z: -0.055 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
-        { id: "front-depth", kind: "depth", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.155, y: 0, z: -0.055 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
-        { id: "gps-primary", kind: "gps", calibrated: true, calibrationStatus: "verified", positionM: { x: -0.07, y: 0, z: 0.2 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: 10, calibrationAgeDays: 0 },
-        { id: "vio-primary", kind: "vio", calibrated: true, calibrationStatus: "verified", positionM: { x: 0.155, y: 0, z: -0.055 }, rollPitchYawDeg: { x: 0, y: -8, z: 0 }, rateHz: 30, calibrationAgeDays: 0 },
+        { id: "gps-primary", kind: "gps", calibrated: true, calibrationStatus: "verified", positionM: { x: -0.07, y: 0, z: 0.2 }, rollPitchYawDeg: { x: 0, y: 0, z: 0 }, rateHz: MY_DRONE_CONTRACT.localization.rateHz, calibrationAgeDays: 0 },
       ],
       updatedAt,
     },
@@ -523,7 +553,7 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       coordinateFrame: "ENU",
       resolutionM: 0.05,
       floorCount: 3,
-      liveUpdates: "depth-fusion",
+      liveUpdates: "fixed",
       calibrated: true,
       compilerSceneId: "school-campus-v1",
       semanticLayers: [
@@ -566,10 +596,27 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
   const storedMapPack = candidate.mapPack && typeof candidate.mapPack === "object"
     ? candidate.mapPack as Partial<AutonomyMapPack>
     : {};
-  const aircraft = storedAircraft.id === "aircraft-primary"
+  const selectedAircraft = storedAircraft.id === "aircraft-primary"
     && storedAircraft.name === "Primary research quadrotor"
     ? fallback.aircraft
     : storedAircraft;
+  const staleBundledX500Physics = selectedAircraft.id === "aircraft-my-drone"
+    && selectedAircraft.controlInterface === "px4-ros2"
+    && selectedAircraft.dryMassKg === 1.86
+    && selectedAircraft.maximumTakeoffMassKg === 2.8
+    && selectedAircraft.maximumThrustN === 44
+    && selectedAircraft.maximumPickupPayloadKg === 0.35;
+  const aircraft: Partial<AutonomyAircraftProfile> = staleBundledX500Physics
+    ? {
+        ...selectedAircraft,
+        controlInterface: fallback.aircraft.controlInterface,
+        computePlatform: fallback.aircraft.computePlatform,
+        dryMassKg: fallback.aircraft.dryMassKg,
+        maximumTakeoffMassKg: fallback.aircraft.maximumTakeoffMassKg,
+        maximumThrustN: fallback.aircraft.maximumThrustN,
+        maximumPickupPayloadKg: fallback.aircraft.maximumPickupPayloadKg,
+      }
+    : selectedAircraft;
   const mapPack = storedMapPack.id === "map-primary"
     && storedMapPack.name === "Unconfigured environment"
     ? fallback.mapPack
@@ -606,7 +653,7 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     }))
     : [];
   const importedMapAwaitingIngestion = normalizedSourceFiles.length > 0;
-  const normalizedSensors = Array.isArray(aircraft.sensors)
+  const storedSensors = Array.isArray(aircraft.sensors)
     ? [...new Set(aircraft.sensors.filter((sensor): sensor is AutonomySensorKind => SENSOR_SET.has(sensor as AutonomySensorKind)))].slice(0, SENSOR_SET.size)
     : fallback.aircraft.sensors;
   const sensorCalibrationContractMigrated = Array.isArray(aircraft.sensorMounts) && aircraft.sensorMounts.some((sensor) => (
@@ -614,7 +661,7 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     || typeof sensor !== "object"
     || !["unverified", "verified", "expired", "failed"].includes(String(sensor.calibrationStatus))
   ));
-  const normalizedSensorMounts = Array.isArray(aircraft.sensorMounts)
+  const storedSensorMounts = Array.isArray(aircraft.sensorMounts)
     ? aircraft.sensorMounts.filter((sensor): sensor is AutonomySensorMount => Boolean(
       sensor && typeof sensor === "object" && SENSOR_SET.has(sensor.kind as AutonomySensorKind),
     )).slice(0, 64).map((sensor, index) => ({
@@ -631,7 +678,16 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       rateHz: boundedNumber(sensor.rateHz, 30, 0.1, 1_000),
       calibrationAgeDays: boundedNumber(sensor.calibrationAgeDays, 0, 0, 3_650),
     }))
-    : fallback.aircraft.sensorMounts.filter((sensor) => normalizedSensors.includes(sensor.kind));
+    : fallback.aircraft.sensorMounts.filter((sensor) => storedSensors.includes(sensor.kind));
+  const bundledMyDroneSensorContractMigrated = String(aircraft.id) === "aircraft-my-drone"
+    && (storedSensors.some((sensor) => sensor !== "gps")
+      || storedSensorMounts.some((sensor) => sensor.kind !== "gps"));
+  const normalizedSensors = bundledMyDroneSensorContractMigrated
+    ? fallback.aircraft.sensors
+    : storedSensors;
+  const normalizedSensorMounts = bundledMyDroneSensorContractMigrated
+    ? fallback.aircraft.sensorMounts
+    : storedSensorMounts;
   const commandLink = aircraft.commandLink && typeof aircraft.commandLink === "object"
     ? aircraft.commandLink
     : fallback.aircraft.commandLink;
@@ -654,6 +710,8 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
   const hasFabricatedBundledAircraftReceipt = typeof aircraft.qualificationReceiptId === "string"
     && aircraft.qualificationReceiptId.startsWith("bundled-public-");
   const qualificationContractMigrated = autopilotWasInferred
+    || staleBundledX500Physics
+    || bundledMyDroneSensorContractMigrated
     || normalizedControlInterface !== requestedControlInterface
     || sensorCalibrationContractMigrated
     || String(aircraft.flightController).trim().toLowerCase() === "custom"
@@ -722,10 +780,24 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     && !mapPack.qualificationReceiptId.startsWith("bundled-public-")
     ? mapPack.qualificationReceiptId.slice(0, 160)
     : null;
+  const storedCompilerSceneId = COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
+    ? mapPack.compilerSceneId as AutonomyCompiledSceneId
+    : null;
+  // The compiler continues to accept retired preset identifiers for old task
+  // contracts, but the asset workspace exposes one replace-in-place School Map.
+  // Migrating an old bundled preset changes the geometry identity, so any
+  // qualification credential bound to that preset must fail closed.
+  const legacyBundledSceneMigrated = !importedMapAwaitingIngestion
+    && storedCompilerSceneId !== null
+    && storedCompilerSceneId !== CANONICAL_SCHOOL_SCENE_ID;
+  const normalizedCompilerSceneId = !importedMapAwaitingIngestion && storedCompilerSceneId
+    ? CANONICAL_SCHOOL_SCENE_ID
+    : null;
   const mapQualificationCredentialValid = mapPack.status === "qualified"
     && mapPack.version === 1
     && Boolean(normalizedMapContentHash)
-    && Boolean(normalizedMapReceiptId);
+    && Boolean(normalizedMapReceiptId)
+    && !legacyBundledSceneMigrated;
   const normalizedMap: AutonomyMapPack = {
     ...fallback.mapPack,
     schemaVersion: 2,
@@ -737,25 +809,33 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       ? (normalizedSourceFiles.every((file) => file.admission === "admitted") ? "assets-admitted" : "draft")
       : (mapQualificationCredentialValid
           && mapPack.calibrated === true
-          && COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
+          && normalizedCompilerSceneId !== null
         ? "qualified"
         : "draft"),
     contentHash: mapQualificationCredentialValid ? normalizedMapContentHash : null,
     qualificationReceiptId: mapQualificationCredentialValid ? normalizedMapReceiptId : null,
-    name: boundedText(mapPack.name, fallback.mapPack.name),
-    representation,
-    coordinateFrame,
-    resolutionM: boundedNumber(mapPack.resolutionM, fallback.mapPack.resolutionM, 0.005, 100),
-    floorCount: Math.round(boundedNumber(mapPack.floorCount, fallback.mapPack.floorCount, 1, 500)),
-    liveUpdates,
+    name: normalizedCompilerSceneId === CANONICAL_SCHOOL_SCENE_ID
+      ? fallback.mapPack.name
+      : boundedText(mapPack.name, fallback.mapPack.name),
+    representation: legacyBundledSceneMigrated ? fallback.mapPack.representation : representation,
+    coordinateFrame: legacyBundledSceneMigrated ? fallback.mapPack.coordinateFrame : coordinateFrame,
+    resolutionM: legacyBundledSceneMigrated
+      ? fallback.mapPack.resolutionM
+      : boundedNumber(mapPack.resolutionM, fallback.mapPack.resolutionM, 0.005, 100),
+    floorCount: legacyBundledSceneMigrated
+      ? fallback.mapPack.floorCount
+      : Math.round(boundedNumber(mapPack.floorCount, fallback.mapPack.floorCount, 1, 500)),
+    liveUpdates: legacyBundledSceneMigrated ? fallback.mapPack.liveUpdates : liveUpdates,
     calibrated: !importedMapAwaitingIngestion && mapPack.calibrated === true,
-    compilerSceneId: !importedMapAwaitingIngestion && COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
-      ? mapPack.compilerSceneId as AutonomyCompiledSceneId
-      : null,
-    semanticLayers: Array.isArray(mapPack.semanticLayers)
+    compilerSceneId: normalizedCompilerSceneId,
+    semanticLayers: legacyBundledSceneMigrated
+      ? fallback.mapPack.semanticLayers
+      : Array.isArray(mapPack.semanticLayers)
       ? [...new Set(mapPack.semanticLayers.filter((layer): layer is AutonomyMapPack["semanticLayers"][number] => SEMANTIC_SET.has(layer as AutonomyMapPack["semanticLayers"][number])))].slice(0, SEMANTIC_SET.size)
       : fallback.mapPack.semanticLayers,
-    planningLayers: Array.isArray(mapPack.planningLayers)
+    planningLayers: legacyBundledSceneMigrated
+      ? fallback.mapPack.planningLayers
+      : Array.isArray(mapPack.planningLayers)
       ? [...new Set(mapPack.planningLayers.filter((layer): layer is AutonomyMapPack["planningLayers"][number] => PLANNING_LAYER_SET.has(layer as AutonomyMapPack["planningLayers"][number])))].slice(0, PLANNING_LAYER_SET.size)
       : fallback.mapPack.planningLayers,
     origin: {
@@ -763,8 +843,12 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       longitude: typeof mapPack.origin?.longitude === "number" && Number.isFinite(mapPack.origin.longitude) ? Math.min(180, Math.max(-180, mapPack.origin.longitude)) : null,
       altitudeM: typeof mapPack.origin?.altitudeM === "number" && Number.isFinite(mapPack.origin.altitudeM) ? mapPack.origin.altitudeM : null,
     },
-    boundsM: boundedVector(mapPack.boundsM, fallback.mapPack.boundsM, 0.1, 100_000),
-    confidencePercent: boundedNumber(mapPack.confidencePercent, fallback.mapPack.confidencePercent, 0, 100),
+    boundsM: legacyBundledSceneMigrated
+      ? fallback.mapPack.boundsM
+      : boundedVector(mapPack.boundsM, fallback.mapPack.boundsM, 0.1, 100_000),
+    confidencePercent: legacyBundledSceneMigrated
+      ? fallback.mapPack.confidencePercent
+      : boundedNumber(mapPack.confidencePercent, fallback.mapPack.confidencePercent, 0, 100),
     sourceFiles: normalizedSourceFiles,
     updatedAt: boundedText(mapPack.updatedAt, updatedAt, 40),
   };
@@ -808,7 +892,7 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
         : [],
       aircraftProfileId: normalizedAircraft.id,
       mapPackId: normalizedMap.id,
-      compiledPlan: normalizedMissionPlan,
+      compiledPlan: legacyBundledSceneMigrated ? null : normalizedMissionPlan,
       currentStep: Math.round(boundedNumber(mission.currentStep, 0, 0, 5)),
       updatedAt: boundedText(mission.updatedAt, updatedAt, 40),
     },

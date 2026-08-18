@@ -13,9 +13,11 @@ from app.auth import get_current_user
 from app.autonomy.catalog import get_bundled_map_manifest, list_scenes
 from app.autonomy.credentials import (
     QualificationCredentialConflict,
+    VerifiedAutonomyAssetReceipt,
     compile_binding_issues,
     issue_map_credential,
     issue_vehicle_credential,
+    verified_asset_receipt,
     verify_harness_credentials,
 )
 from app.autonomy.harness import inspect_autonomy_harness
@@ -25,6 +27,12 @@ from app.autonomy.models import (
     RuntimeObservation,
     RuntimeOperatorCommand,
     RuntimeSessionCreateRequest,
+    SimulationExecutionStartRequest,
+)
+from app.autonomy.planner_artifact import (
+    PlannerArtifactVerificationError,
+    VerifiedPlannerArtifactReceipt,
+    verify_planner_artifact_binding,
 )
 from app.autonomy.qualification import (
     MapPackQualificationRequest,
@@ -34,7 +42,9 @@ from app.autonomy.qualification import (
     qualify_vehicle_pack,
 )
 from app.autonomy.runtime import AutonomyRuntimeError, runtime_sessions
+from app.autonomy.school_map_artifact import get_school_map_gazebo_artifact
 from app.autonomy.service import AutonomyCompileError, compile_autonomy_mission
+from app.autonomy.simulation_execution import simulation_executions
 from app.db import get_db
 from app.response import ok
 
@@ -58,11 +68,16 @@ def _credential_conflict(exc: QualificationCredentialConflict) -> HTTPException:
     )
 
 
-def _authorize_compile_request(
+async def _authorize_compile_request(
     request: AutonomyCompileRequest,
     current_user: models.User,
     db: Session,
-) -> str:
+    authorization: str | None,
+) -> tuple[
+    str,
+    VerifiedPlannerArtifactReceipt | None,
+    VerifiedAutonomyAssetReceipt,
+]:
     asset_context = request.asset_context
     if asset_context is None:
         raise HTTPException(
@@ -100,7 +115,24 @@ def _authorize_compile_request(
                 "details": {"blockers": blockers},
             },
         )
-    return inspection.context_sha256
+    planner_receipt: VerifiedPlannerArtifactReceipt | None = None
+    if request.execution_target == "simulation":
+        try:
+            planner_receipt = await verify_planner_artifact_binding(
+                request,
+                authorization,
+                current_user.external_subject,
+            )
+        except PlannerArtifactVerificationError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+    return (
+        inspection.context_sha256,
+        planner_receipt,
+        verified_asset_receipt(current_user.id, verification),
+    )
 
 
 @router.get("/scenes")
@@ -121,15 +153,47 @@ def read_autonomy_scenes(
     )
 
 
+@router.get("/scenes/{scene_id}/gazebo-artifact")
+def read_autonomy_scene_gazebo_artifact(
+    scene_id: str,
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Export a content-addressed static SDF plus its semantic contract."""
+
+    if scene_id != "school-campus-v1":
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "AUTONOMY_GAZEBO_ARTIFACT_NOT_FOUND",
+                "message": "The requested scene has no exported Gazebo artifact.",
+            },
+        )
+    artifact = get_school_map_gazebo_artifact()
+    return ok(
+        {
+            "schema_version": "dronedream.autonomy.gazebo-artifact-export.v1",
+            "compiler_scene_id": scene_id,
+            "summary": artifact.summary,
+            "files": artifact.package_files,
+        }
+    )
+
+
 @router.post("/compile")
 async def compile_mission(
     request: AutonomyCompileRequest,
+    http_request: Request,
     current_user: Annotated[models.User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
     """Compile and qualify a mission without starting a simulator or vehicle."""
 
-    _authorize_compile_request(request, current_user, db)
+    await _authorize_compile_request(
+        request,
+        current_user,
+        db,
+        http_request.headers.get("Authorization"),
+    )
     try:
         result = await asyncio.to_thread(compile_autonomy_mission, request)
     except AutonomyCompileError as exc:
@@ -215,17 +279,86 @@ def read_runtime_capabilities(
     return ok(runtime_sessions.capabilities())
 
 
+@router.get("/runtime/simulation-executions/capabilities")
+def read_simulation_execution_capabilities(
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    return ok(simulation_executions.capabilities())
+
+
+@router.post("/runtime/simulation-executions", status_code=201)
+async def start_simulation_execution(
+    request: SimulationExecutionStartRequest,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        result = await asyncio.to_thread(simulation_executions.start, current_user.id, request)
+    except AutonomyRuntimeError as exc:
+        raise _runtime_error(exc) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.get("/runtime/simulation-executions/{execution_id}")
+def read_simulation_execution(
+    execution_id: str,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        result = simulation_executions.get(current_user.id, execution_id)
+    except AutonomyRuntimeError as exc:
+        raise _runtime_error(exc) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.post("/runtime/simulation-executions/{execution_id}/abort")
+async def abort_simulation_execution(
+    execution_id: str,
+    command: RuntimeOperatorCommand,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    if command.action != "abort":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "SIMULATION_ABORT_ACTION_REQUIRED",
+                "message": "This endpoint accepts only an abort operator command.",
+            },
+        )
+    try:
+        result = await asyncio.to_thread(
+            simulation_executions.abort,
+            current_user.id,
+            execution_id,
+            command.reason,
+        )
+    except AutonomyRuntimeError as exc:
+        raise _runtime_error(exc) from exc
+    return ok(result.model_dump(mode="json"))
+
+
 @router.post("/runtime/sessions", status_code=201)
 async def create_runtime_session(
     request: RuntimeSessionCreateRequest,
+    http_request: Request,
     current_user: Annotated[models.User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
     """Create an idempotent, process-local simulation supervision session."""
 
-    _authorize_compile_request(request.mission, current_user, db)
+    _context_sha256, planner_receipt, asset_receipt = await _authorize_compile_request(
+        request.mission,
+        current_user,
+        db,
+        http_request.headers.get("Authorization"),
+    )
     try:
-        result = await asyncio.to_thread(runtime_sessions.create, current_user.id, request)
+        result = await asyncio.to_thread(
+            runtime_sessions.create,
+            current_user.id,
+            request,
+            planner_receipt=planner_receipt,
+            asset_receipt=asset_receipt,
+        )
     except AutonomyRuntimeError as exc:
         raise _runtime_error(exc) from exc
     return ok(result.model_dump(mode="json"))

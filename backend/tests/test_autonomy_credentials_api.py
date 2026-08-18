@@ -136,6 +136,52 @@ def _compile_payload(
             "harness_context_sha256": context_sha256,
             "aircraft": harness["aircraft"],
             "map_pack": harness["map_pack"],
+            "planner_binding": {
+                "schema_version": "dronedream.autonomy.planner-binding.v1",
+                "status": "draft",
+                "run_id": "planner-run-credential-001",
+                "provider": "test",
+                "model": "test-model",
+                "artifact_sha256": "d" * 64,
+                "goal": INTENT,
+                "aircraft_id": harness["aircraft"]["asset_id"],
+                "aircraft_version": harness["aircraft"]["version"],
+                "map_id": harness["map_pack"]["asset_id"],
+                "map_version": harness["map_pack"]["version"],
+                "context_sha256": context_sha256,
+                "task_graph": {
+                    "nodes": [
+                        {
+                            "node_id": "takeoff",
+                            "action": "takeoff",
+                            "target": "mission route",
+                            "depends_on": [],
+                            "success_evidence": ["airborne telemetry"],
+                        },
+                        {
+                            "node_id": "pickup",
+                            "action": "pickup",
+                            "target": "coffee pickup point",
+                            "depends_on": ["takeoff"],
+                            "success_evidence": ["payload attached"],
+                        },
+                        {
+                            "node_id": "return",
+                            "action": "return",
+                            "target": "office",
+                            "depends_on": ["pickup"],
+                            "success_evidence": ["office return reached"],
+                        },
+                        {
+                            "node_id": "land",
+                            "action": "land",
+                            "target": "mission endpoint",
+                            "depends_on": ["return"],
+                            "success_evidence": ["landed telemetry"],
+                        },
+                    ]
+                },
+            },
         },
     }
 

@@ -22,6 +22,7 @@ interface AutonomyWorld3DProps {
   dynamicEntityActive: boolean;
   perception: "fusion" | "vision" | "map";
   mapName: string;
+  vehicleEnvelopeCenterWorldEnuM?: { x: number; y: number; z: number } | null;
 }
 
 function material(color: number, roughness = 0.72, opacity = 1) {
@@ -69,13 +70,16 @@ export function AutonomyWorld3D({
   dynamicEntityActive,
   perception,
   mapName,
+  vehicleEnvelopeCenterWorldEnuM = null,
 }: AutonomyWorld3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef(progress);
+  const vehicleEnvelopeCenterRef = useRef(vehicleEnvelopeCenterWorldEnuM);
   const [webglError, setWebglError] = useState(false);
   const [xRay, setXRay] = useState(false);
   const [floor, setFloor] = useState<SchoolMapFloor>("all");
   progressRef.current = progress;
+  vehicleEnvelopeCenterRef.current = vehicleEnvelopeCenterWorldEnuM;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -110,6 +114,21 @@ export function AutonomyWorld3D({
     controls.maxPolarAngle = Math.PI * 0.495;
     if (floor === "all") controls.target.set(-4, 3.2, 1);
     else controls.target.set(-27, (floor - 1) * 3.6 + 1.8, 5);
+    const cameraPresets = {
+      "teaching-entrance": { position: [-25, 5.8, -12], target: [-25, 1.35, 2] },
+      "teaching-stair": { position: [15, 10, -1], target: [-0.1, 3.6, 10.5] },
+      "cafeteria-entrance": { position: [30, 6.2, -8], target: [30, 1.5, 7.5] },
+      "cafeteria-stair": { position: [54, 8, 8], target: [40, 2.2, 20] },
+    } satisfies Record<string, { position: [number, number, number]; target: [number, number, number] }>;
+    const applyCameraPreset = (event: Event) => {
+      const presetName = (event as CustomEvent<{ preset?: keyof typeof cameraPresets }>).detail?.preset;
+      if (!presetName) return;
+      const preset = cameraPresets[presetName];
+      camera.position.set(...preset.position);
+      controls.target.set(...preset.target);
+      controls.update();
+    };
+    window.addEventListener("dronedream:school-map-camera", applyCameraPreset);
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x6c6974, perception === "vision" ? 1.2 : 1.25));
     const sun = new THREE.DirectionalLight(0xfff9ef, perception === "vision" ? 1.7 : 1.9);
@@ -194,10 +213,14 @@ export function AutonomyWorld3D({
     const render = () => {
       const elapsed = clock.getElapsedTime();
       const routeProgress = Math.min(1, Math.max(0, progressRef.current));
-      const position = curve.getPointAt(routeProgress);
+      const routePosition = curve.getPointAt(routeProgress);
+      const worldEnuPosition = vehicleEnvelopeCenterRef.current;
+      const position = worldEnuPosition
+        ? new THREE.Vector3(worldEnuPosition.x, worldEnuPosition.z, worldEnuPosition.y)
+        : routePosition;
       const tangent = curve.getTangentAt(Math.min(0.999, routeProgress));
       drone.position.copy(position);
-      drone.position.y += Math.sin(elapsed * 3.1) * 0.025;
+      if (!worldEnuPosition) drone.position.y += Math.sin(elapsed * 3.1) * 0.025;
       drone.rotation.y = Math.atan2(tangent.x, tangent.z);
       droneHalo.rotation.z = elapsed * 0.65;
       person.visible = dynamicEntityActive;
@@ -211,6 +234,7 @@ export function AutonomyWorld3D({
     return () => {
       window.cancelAnimationFrame(animationFrame);
       observer.disconnect();
+      window.removeEventListener("dronedream:school-map-camera", applyCameraPreset);
       controls.dispose();
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();

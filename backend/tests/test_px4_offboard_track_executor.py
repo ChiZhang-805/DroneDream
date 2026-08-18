@@ -32,6 +32,224 @@ def _write_json(path: Path, payload: dict) -> Path:
     return path
 
 
+@pytest.mark.parametrize("world_paused", [False, True])
+def test_external_abort_contract_distinguishes_operator_and_paused_world(
+    tmp_path: Path,
+    world_paused: bool,
+) -> None:
+    abort_path = _write_json(
+        tmp_path / "abort.json",
+        {
+            "schema_version": "dronedream.school-map-live-abort.v1",
+            "reason": "operator_abort" if not world_paused else "live_collision_penetration",
+            "world_paused": world_paused,
+        },
+    )
+
+    reason, observed_world_paused = executor._read_external_abort_request(abort_path)
+
+    assert reason
+    assert observed_world_paused is world_paused
+
+
+def test_external_abort_contract_rejects_missing_world_pause_state(tmp_path: Path) -> None:
+    abort_path = _write_json(tmp_path / "abort.json", {"reason": "operator_abort"})
+
+    with pytest.raises(RuntimeError, match="world_paused flag"):
+        executor._read_external_abort_request(abort_path)
+
+
+def test_executor_honors_preexisting_abort_before_connecting_or_commanding(
+    tmp_path: Path,
+) -> None:
+    abort_path = _write_json(
+        tmp_path / "abort.json",
+        {"reason": "operator_abort", "world_paused": False},
+    )
+    timing_path = tmp_path / "offboard_timing.json"
+    client = executor.FakeOffboardClient()
+
+    with pytest.raises(executor.ExternalSafetyAbort, match="operator_abort"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=timing_path,
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.connected is False
+    assert client.armed is False
+    assert client.setpoints == []
+    assert client.landed is False
+    assert client.closed is True
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["external_abort"] == {
+        "reason": "operator_abort",
+        "world_paused": False,
+    }
+
+
+def test_executor_rejects_oversized_preflight_abort_before_connecting(tmp_path: Path) -> None:
+    abort_path = tmp_path / "abort.json"
+    abort_path.write_text("x" * (executor.MAX_ABORT_REQUEST_BYTES + 1), encoding="utf-8")
+    client = executor.FakeOffboardClient()
+
+    with pytest.raises(RuntimeError, match="abort request is oversized"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.connected is False
+    assert client.armed is False
+    assert client.setpoints == []
+    assert client.closed is True
+
+
+def test_executor_polls_abort_while_waiting_for_preflight_readiness(tmp_path: Path) -> None:
+    abort_path = tmp_path / "abort.json"
+
+    class ReadinessAbortClient(executor.FakeOffboardClient):
+        async def wait_until_ready(self, timeout_seconds: float) -> executor.TelemetryHealth:
+            _ = timeout_seconds
+            _write_json(abort_path, {"reason": "operator_abort", "world_paused": False})
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+    client = ReadinessAbortClient()
+    with pytest.raises(executor.ExternalSafetyAbort, match="operator_abort"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.connected is True
+    assert client.armed is False
+    assert client.setpoints == []
+    assert client.landed is False
+    assert client.closed is True
+
+
+def test_executor_does_not_start_offboard_when_abort_arrives_with_arm_ack(
+    tmp_path: Path,
+) -> None:
+    abort_path = tmp_path / "abort.json"
+
+    class ArmBoundaryAbortClient(executor.FakeOffboardClient):
+        async def arm(self) -> None:
+            await super().arm()
+            _write_json(abort_path, {"reason": "operator_abort", "world_paused": False})
+
+    client = ArmBoundaryAbortClient()
+    with pytest.raises(executor.ExternalSafetyAbort, match="operator_abort"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.armed is True
+    assert client.offboard_started is False
+    assert client.landed is True
+    assert client.closed is True
+
+
+@pytest.mark.parametrize("world_paused", [False, True])
+def test_executor_stops_takeoff_commands_when_external_abort_appears(
+    tmp_path: Path,
+    world_paused: bool,
+) -> None:
+    abort_path = tmp_path / "abort.json"
+
+    class TakeoffAbortClient(executor.FakeOffboardClient):
+        sample_calls = 0
+        setpoint_count_at_abort: int | None = None
+
+        async def sample_position_velocity_ned(
+            self,
+            timeout_seconds: float,
+        ) -> executor.PositionVelocityNed:
+            _ = timeout_seconds
+            self.sample_calls += 1
+            if self.sample_calls == 1:
+                return executor.PositionVelocityNed(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            _write_json(
+                abort_path,
+                {"reason": "live_collision_penetration", "world_paused": world_paused},
+            )
+            self.setpoint_count_at_abort = len(self.setpoints)
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+    timing_path = tmp_path / "offboard_timing.json"
+    client = TakeoffAbortClient()
+    with pytest.raises(executor.ExternalSafetyAbort, match="live_collision_penetration"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=timing_path,
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.armed is True
+    assert client.offboard_started is False
+    assert client.setpoint_count_at_abort is not None
+    assert len(client.setpoints) == client.setpoint_count_at_abort
+    assert client.landed is (not world_paused)
+    assert client.closed is True
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["takeoff_gate"]["failure_reason"] == "external_safety_abort"
+    assert timing["external_abort"]["world_paused"] is world_paused
+    expected_land = (
+        "suppressed_world_paused_external_safety_abort"
+        if world_paused
+        else "confirmed_on_ground_during_failure_cleanup"
+    )
+    assert timing["cleanup"]["land"] == expected_land
+
+
 def test_load_reference_track_and_controller_params(tmp_path: Path):
     track = _write_json(
         tmp_path / "reference_track.json",
@@ -139,6 +357,68 @@ def test_executor_rejects_unsafe_controller_params(
     params = _write_json(tmp_path / "controller_params.json", payload)
     with pytest.raises(ValueError, match=expected_error):
         executor.load_controller_params(params)
+
+
+def test_reference_track_loads_segment_speed_and_waypoint_stop_contract(tmp_path: Path) -> None:
+    track = _write_json(
+        tmp_path / "reference_track.json",
+        {
+            "track_type": "custom",
+            "stop_at_waypoints": True,
+            "waypoint_hold_seconds": 0.4,
+            "points": [
+                {"x": 0.0, "y": 0.0, "z": 1.0, "speed_limit_mps": 0.42},
+                {"x": 1.0, "y": 0.0, "z": 1.0, "speed_limit_mps": 0.7},
+            ],
+        },
+    )
+
+    plan = executor.load_reference_track_plan(track)
+
+    assert plan.stop_at_waypoints is True
+    assert plan.waypoint_hold_seconds == pytest.approx(0.4)
+    assert [point.speed_limit_mps for point in plan.points] == pytest.approx([0.42, 0.7])
+
+
+def test_waypoint_stop_schedule_decelerates_and_holds_at_a_right_angle() -> None:
+    points = [
+        executor.TrackPoint(0.0, 0.0, 3.0, 0.5),
+        executor.TrackPoint(1.0, 0.0, 3.0, 0.5),
+        executor.TrackPoint(1.0, 1.0, 3.0, 0.5),
+    ]
+    params = executor.ControllerParams(1.0, 0.2, 0.1, 2.0, 0.8, 0.5)
+    rate_hz = 10.0
+
+    plan = executor.build_setpoint_schedule_plan(
+        points,
+        params,
+        rate_hz,
+        stop_at_waypoints=True,
+        waypoint_hold_seconds=0.4,
+    )
+    track = plan.schedule[plan.track_start_index : plan.track_end_index + 1]
+    corner = [
+        index
+        for index, setpoint in enumerate(track)
+        if (
+            setpoint.north_m,
+            setpoint.east_m,
+            setpoint.down_m,
+        )
+        == pytest.approx((1.0, 0.0, -3.0))
+    ]
+
+    assert len(corner) >= 4
+    assert (
+        max(
+            math.dist(
+                (first.north_m, first.east_m, first.down_m),
+                (second.north_m, second.east_m, second.down_m),
+            )
+            for first, second in zip(track, track[1:], strict=False)
+        )
+        <= 0.5 / rate_hz + 1e-9
+    )
 
 
 def test_executor_rejects_an_unbounded_setpoint_schedule():
