@@ -139,7 +139,7 @@ def _fetch_run(
     settings: Settings,
 ) -> dict[str, Any]:
     url = f"{_orchestrator_url(settings)}/runs/{quote(run_id, safe='')}"
-    request = url_request.Request(
+    request = url_request.Request(  # noqa: S310 - URL is pinned to trusted OIDC HTTPS.
         url,
         method="GET",
         headers={
