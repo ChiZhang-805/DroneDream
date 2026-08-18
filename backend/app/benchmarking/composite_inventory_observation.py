@@ -771,7 +771,7 @@ def _validate_engine_manifest(raw: bytes) -> dict[str, Any]:
         raise CompositeObservationCompilationError("Engine Pack manifest is not canonical")
     if (
         type(manifest["schemaVersion"]) is not int
-        or manifest["schemaVersion"] != 1
+        or manifest["schemaVersion"] != 2
         or manifest["kind"] != "dronedream-engine-pack"
         or type(manifest["engineApiVersion"]) is not int
         or manifest["engineApiVersion"] != 1

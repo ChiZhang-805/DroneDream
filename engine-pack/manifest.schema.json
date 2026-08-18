@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dronedream.local/schemas/engine-pack-manifest.v1.json",
+  "$id": "https://dronedream.local/schemas/engine-pack-manifest.v2.json",
   "title": "DroneDream Engine Pack manifest",
   "type": "object",
   "additionalProperties": false,
@@ -15,7 +15,7 @@
     "files"
   ],
   "properties": {
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"const": 2},
     "kind": {"const": "dronedream-engine-pack"},
     "packId": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "engineApiVersion": {"const": 1},

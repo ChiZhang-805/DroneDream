@@ -81,12 +81,12 @@ def active_observation(
     engine_manifest_path = tmp_path / "engine-pack-manifest.json"
     write_json(
         engine_manifest_path,
-        {
-            "schemaVersion": 1,
-            "kind": "dronedream-engine-pack",
-            "source": {"gitCommit": source["repositoryCommit"]},
-            "files": records,
-        },
+        engine_pack.build_manifest(
+            ROOT,
+            str(source["repositoryCommit"]),
+            1_722_000_000,
+            records,
+        ),
     )
     runtime_manifest_path = tmp_path / "runtime-manifest.json"
     write_json(
@@ -223,6 +223,38 @@ def test_test_only_validated_fixture_can_reach_runtime_allow(tmp_path: Path) -> 
     result = gate.evaluate_runtime_authorization(request, observation)
     assert result.decision == "allow"
     assert result.reason_codes == ("runtime.contract.allow",)
+
+
+def test_legacy_engine_pack_is_readable_but_cannot_enter_execution_gate(
+    tmp_path: Path,
+) -> None:
+    request = request_fixture()
+    observation = allow_override(active_observation(tmp_path, request))
+    manifest = json.loads(
+        observation.active_engine_pack_manifest_path.read_text(encoding="utf-8")
+    )
+    manifest.pop("editionProfile")
+    manifest["schemaVersion"] = 1
+    manifest["packId"] = "sha256:" + engine_pack.legacy_manifest_identity(
+        manifest["source"],
+        manifest["runtimeCompatibility"],
+        manifest["files"],
+    )
+    write_json(observation.active_engine_pack_manifest_path, manifest)
+    source = request["source"]
+    assert isinstance(source, dict)
+    source["enginePackManifestSha256"] = contract.sha256_file(
+        observation.active_engine_pack_manifest_path
+    )
+    refresh_context_hashes(request)
+
+    result = gate.evaluate_runtime_authorization(request, observation)
+
+    assert result.decision == "deny"
+    assert {
+        "runtime.engine-pack.schema-unsupported",
+        "runtime.engine-pack.edition-profile-unsupported",
+    } <= set(result.reason_codes)
 
 
 def test_mismatched_active_edition_manifest_is_denied(tmp_path: Path) -> None:

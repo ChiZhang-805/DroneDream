@@ -336,6 +336,72 @@ _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 _ENGINE_PACK_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
 _ENGINE_PACK_STATE_PATH = Path("/var/lib/dronedream/engine-pack-state.json")
 _ENGINE_PACK_ACTIVE_PATH = Path("/opt/dronedream/engine/current")
+_ENGINE_PACK_BASE_FIELDS = {
+    "schemaVersion",
+    "kind",
+    "packId",
+    "engineApiVersion",
+    "source",
+    "runtimeCompatibility",
+    "files",
+}
+
+
+def _engine_pack_profile_identity(
+    manifest: dict[str, Any], schema_version: int
+) -> dict[str, Any]:
+    if schema_version == 1:
+        if set(manifest) != _ENGINE_PACK_BASE_FIELDS:
+            raise RunnerError("legacy Engine Pack manifest fields are invalid")
+        return {"status": "legacy-unscoped", "profile_id": None}
+
+    if set(manifest) != {*_ENGINE_PACK_BASE_FIELDS, "editionProfile"}:
+        raise RunnerError("Engine Pack manifest v2 fields are invalid")
+    profile = manifest.get("editionProfile")
+    if not isinstance(profile, dict):
+        raise RunnerError("Engine Pack editionProfile is invalid")
+    profile_id = profile.get("profileId")
+    expected_base = {"profileId", "includesLargeSimulator", "excludedSourcePaths"}
+    expected_keys = (
+        {
+            *expected_base,
+            "profileVersion",
+            "profileManifestPath",
+            "profileManifestSha256",
+        }
+        if profile_id == "sim-only"
+        else expected_base
+    )
+    excluded_paths = profile.get("excludedSourcePaths")
+    if (
+        set(profile) != expected_keys
+        or type(profile.get("includesLargeSimulator")) is not bool
+        or not isinstance(excluded_paths, list)
+        or any(not isinstance(path, str) for path in excluded_paths)
+        or excluded_paths != list(dict.fromkeys(excluded_paths))
+    ):
+        raise RunnerError("Engine Pack editionProfile fields are invalid")
+    expected = {
+        "field-lightweight": (False, ["backend/app/simulator", "scripts/simulators"]),
+        "sim-only": (True, ["backend/app/distribution_safety.py"]),
+        "unified-sim-lab": (True, []),
+    }.get(profile_id)
+    if expected is None or (profile["includesLargeSimulator"], excluded_paths) != expected:
+        raise RunnerError("Engine Pack editionProfile is unsupported")
+    if profile_id == "sim-only" and (
+        profile.get("profileVersion") != "1.0.0"
+        or profile.get("profileManifestPath")
+        != "distribution/engine-pack-profiles/sim-only.v1.json"
+        or not isinstance(profile.get("profileManifestSha256"), str)
+        or not _SHA256_HEX.fullmatch(profile["profileManifestSha256"])
+    ):
+        raise RunnerError("Sim-only Engine Pack profile binding is invalid")
+    return {
+        "status": "verified",
+        "profile_id": profile_id,
+        "includes_large_simulator": profile["includesLargeSimulator"],
+        "excluded_source_paths": excluded_paths,
+    }
 
 
 def _profile_token(name: str, value: Any, *, default: str) -> str:
@@ -523,8 +589,10 @@ def _engine_pack_identity(
     compatibility = manifest.get("runtimeCompatibility")
     source_commit = source.get("gitCommit") if isinstance(source, dict) else None
     source_date_epoch = source.get("sourceDateEpoch") if isinstance(source, dict) else None
-    if manifest.get("schemaVersion") != 1 or manifest.get("kind") != "dronedream-engine-pack":
+    manifest_schema_version = manifest.get("schemaVersion")
+    if manifest_schema_version not in {1, 2} or manifest.get("kind") != "dronedream-engine-pack":
         raise RunnerError("Engine Pack manifest kind or schemaVersion is unsupported")
+    profile_identity = _engine_pack_profile_identity(manifest, manifest_schema_version)
     if manifest.get("engineApiVersion") != 1:
         raise RunnerError("Engine Pack manifest engineApiVersion is unsupported")
     if not isinstance(pack_id, str) or not _ENGINE_PACK_ID.fullmatch(pack_id):
@@ -598,6 +666,8 @@ def _engine_pack_identity(
         "source_date_epoch": source_date_epoch,
         "manifest_file": "engine-pack-manifest.json",
         "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "manifest_schema_version": manifest_schema_version,
+        "edition_profile": profile_identity,
         "engine_api_version": 1,
         "runtime_compatibility": {
             "runtime_product_id": compatibility.get("runtimeProductId"),

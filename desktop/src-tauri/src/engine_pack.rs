@@ -13,6 +13,8 @@ use crate::process::{command_output, windows_command};
 use crate::runtime_installer::RuntimeInstaller;
 
 const MANAGER_PATH: &str = "/usr/lib/dronedream/engine-pack-manager.py";
+const LEGACY_ENGINE_PACK_SCHEMA_VERSION: u32 = 1;
+const ENGINE_PACK_SCHEMA_VERSION: u32 = 2;
 const STATE_PATH: &str = "/var/lib/dronedream/engine-pack-state.json";
 const ARCHIVE_FILENAME: &str = "DroneDreamEnginePack.tar.gz";
 const DESCRIPTOR_FILENAME: &str = "engine-pack-bundle.json";
@@ -91,6 +93,15 @@ struct EnginePackManifestSource {
     source_date_epoch: u64,
 }
 
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ManagerCapabilities {
+    schema_version: u32,
+    kind: String,
+    readable_manifest_schema_versions: Vec<u32>,
+    current_manifest_schema_version: u32,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct EnginePackStatus {
@@ -153,8 +164,10 @@ fn parse_manifest_identity(
 ) -> Result<EnginePackManifestIdentity, String> {
     let identity: EnginePackManifestIdentity =
         serde_json::from_slice(bytes).map_err(|error| format!("{label} is invalid: {error}"))?;
-    if identity.schema_version != 1
-        || identity.kind != "dronedream-engine-pack"
+    if !matches!(
+        identity.schema_version,
+        LEGACY_ENGINE_PACK_SCHEMA_VERSION | ENGINE_PACK_SCHEMA_VERSION
+    ) || identity.kind != "dronedream-engine-pack"
         || identity.pack_id != expected_pack_id
         || identity.source.git_commit != expected_source_commit
         || identity.source.source_date_epoch == 0
@@ -164,15 +177,47 @@ fn parse_manifest_identity(
     Ok(identity)
 }
 
+fn parse_manager_capabilities(
+    bytes: &[u8],
+    required_manifest_schema: u32,
+) -> Result<ManagerCapabilities, String> {
+    let capabilities: ManagerCapabilities = serde_json::from_slice(bytes)
+        .map_err(|error| format!("Engine Pack manager capabilities are invalid: {error}"))?;
+    if capabilities.schema_version != 1
+        || capabilities.kind != "dronedream-engine-pack-manager-capabilities"
+        || capabilities.readable_manifest_schema_versions.is_empty()
+        || capabilities
+            .readable_manifest_schema_versions
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        || !capabilities
+            .readable_manifest_schema_versions
+            .contains(&capabilities.current_manifest_schema_version)
+        || !capabilities
+            .readable_manifest_schema_versions
+            .contains(&required_manifest_schema)
+    {
+        return Err(
+            "The installed Runtime Base cannot verify this Engine Pack manifest schema."
+                .to_string(),
+        );
+    }
+    Ok(capabilities)
+}
+
 fn embedded_manifest_identity(
     descriptor: &EmbeddedDescriptor,
 ) -> Result<EnginePackManifestIdentity, String> {
-    parse_manifest_identity(
+    let identity = parse_manifest_identity(
         EMBEDDED_MANIFEST,
         &descriptor.pack_id,
         &descriptor.source_commit,
         "Embedded Engine Pack manifest",
-    )
+    )?;
+    if identity.schema_version != ENGINE_PACK_SCHEMA_VERSION {
+        return Err("Embedded Engine Pack manifest schema is not current.".to_string());
+    }
+    Ok(identity)
 }
 
 fn embedded_update_required(
@@ -238,6 +283,18 @@ fn manager_available() -> bool {
         Duration::from_secs(8),
         "Engine Pack manager probe",
     )
+    .is_ok()
+}
+
+#[cfg(target_os = "windows")]
+fn manager_supports_manifest_schema(schema_version: u32) -> bool {
+    wsl_output(
+        MANAGER_PATH,
+        &["--capabilities"],
+        Duration::from_secs(8),
+        "Engine Pack manager capability probe",
+    )
+    .and_then(|output| parse_manager_capabilities(&output, schema_version))
     .is_ok()
 }
 
@@ -361,6 +418,20 @@ fn status() -> Result<EnginePackStatus, String> {
             installed_source_commit: None,
             message: Some(
                 "The installed Runtime Base predates Engine Pack updates and must be upgraded once."
+                    .to_string(),
+            ),
+        });
+    }
+    if !manager_supports_manifest_schema(embedded_identity.schema_version) {
+        return Ok(EnginePackStatus {
+            supported: false,
+            update_required: true,
+            embedded_pack_id: embedded.pack_id,
+            embedded_source_commit: embedded.source_commit,
+            installed_pack_id: None,
+            installed_source_commit: None,
+            message: Some(
+                "The installed Runtime Base must be upgraded before it can verify this Engine Pack."
                     .to_string(),
             ),
         });
@@ -656,6 +727,21 @@ mod tests {
         assert_eq!(descriptor.manifest.sha256, sha256(EMBEDDED_MANIFEST));
         assert_eq!(manifest.pack_id, descriptor.pack_id);
         assert_eq!(manifest.source.git_commit, descriptor.source_commit);
+        assert_eq!(manifest.schema_version, ENGINE_PACK_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn manager_capability_contract_accepts_only_the_current_transition() {
+        let current = br#"{"schemaVersion":1,"kind":"dronedream-engine-pack-manager-capabilities","readableManifestSchemaVersions":[1,2],"currentManifestSchemaVersion":2}"#;
+        assert!(parse_manager_capabilities(current, 1).is_ok());
+        assert!(parse_manager_capabilities(current, 2).is_ok());
+        assert!(parse_manager_capabilities(current, 3).is_err());
+
+        let legacy = br#"{"schemaVersion":1,"kind":"dronedream-engine-pack-manager-capabilities","readableManifestSchemaVersions":[1],"currentManifestSchemaVersion":1}"#;
+        assert!(parse_manager_capabilities(legacy, 2).is_err());
+
+        let future = br#"{"schemaVersion":1,"kind":"dronedream-engine-pack-manager-capabilities","readableManifestSchemaVersions":[1,2,3],"currentManifestSchemaVersion":3}"#;
+        assert!(parse_manager_capabilities(future, 2).is_ok());
     }
 
     fn release_identity(
