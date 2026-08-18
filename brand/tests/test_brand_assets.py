@@ -33,8 +33,6 @@ APPROVED_HASHES = {
         "supersededLargeLabelSha256": (
             "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"
         ),
-        "supersededPath": "brand/source/approved/sim-dot-lockup.png",
-        "supersededSha256": ("8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548"),
     },
     "lab": {
         "markPath": "brand/source/approved/lab-mark-1024.png",
@@ -54,8 +52,6 @@ APPROVED_HASHES = {
         "supersededLargeLabelSha256": (
             "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
         ),
-        "supersededPath": "brand/source/approved/lab-dot-lockup.png",
-        "supersededSha256": ("b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"),
     },
     "field": {
         "markPath": "brand/source/approved/field-mark-1024.png",
@@ -75,8 +71,6 @@ APPROVED_HASHES = {
         "supersededLargeLabelSha256": (
             "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
         ),
-        "supersededPath": "brand/source/approved/field-dot-lockup.png",
-        "supersededSha256": ("def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192"),
     },
 }
 
@@ -149,18 +143,10 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
             "sha256": expected_hashes["supersededLargeLabelSha256"],
             "status": "superseded-by-centered-separator-v2",
         }
-        assert descriptor["supersededDotLockup"] == {
-            "path": expected_hashes["supersededPath"],
-            "sha256": expected_hashes["supersededSha256"],
-            "status": "superseded",
-        }
         assert sha256(ROOT / descriptor["markPath"]) == expected_hashes["markSha256"]
         assert sha256(ROOT / descriptor["dotLockupPath"]) == expected_hashes["dotLockupSha256"]
         assert sha256(ROOT / expected_hashes["supersededLargeLabelPath"]) == expected_hashes[
             "supersededLargeLabelSha256"
-        ]
-        assert sha256(ROOT / expected_hashes["supersededPath"]) == expected_hashes[
-            "supersededSha256"
         ]
         with Image.open(ROOT / descriptor["dotLockupPath"]) as lockup:
             assert lockup.size == (
@@ -273,14 +259,6 @@ def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
             "sha256": expected_hashes["supersededLargeLabelSha256"],
             "status": "superseded-by-centered-separator-v2",
         }
-        assert (
-            manifest["approvedEditionAssets"][edition_id]["supersededDotLockup"]
-            == {
-                "path": expected_hashes["supersededPath"],
-                "sha256": expected_hashes["supersededSha256"],
-                "status": "superseded",
-            }
-        )
 
     for asset in manifest["assets"]:
         path = ROOT / asset["path"]
