@@ -103,12 +103,14 @@ describe("desktop browser sign-in transaction", () => {
       signal: controller.signal,
     });
     await cancelDesktopBrowserSignIn(controller);
-    restored.resolve(SESSION);
 
     await expect(transaction).rejects.toThrow("cancelled");
     expect(cancelBrowserAuth).toHaveBeenCalledOnce();
     expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
     expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+    restored.resolve(SESSION);
+    await Promise.resolve();
+    expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
   });
 
   it("lets cancellation win while WebView adoption is pending", async () => {
@@ -123,10 +125,31 @@ describe("desktop browser sign-in transaction", () => {
     });
     await vi.waitFor(() => expect(adoptBrowserAuthSession).toHaveBeenCalledOnce());
     await cancelDesktopBrowserSignIn(controller);
-    adoption.resolve();
 
     await expect(transaction).rejects.toThrow("cancelled");
     expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+    adoption.resolve();
+    await Promise.resolve();
+  });
+
+  it("cancels a pending native browser flow without waiting for its timeout", async () => {
+    const browser = deferred<typeof SESSION>();
+    vi.mocked(restoreBrowserAuthVault).mockResolvedValue(null);
+    vi.mocked(beginBrowserAuth).mockReturnValue(browser.promise);
+    vi.mocked(cancelBrowserAuth).mockResolvedValue(true);
+    const controller = new AbortController();
+
+    const transaction = completeDesktopBrowserSignIn("zh-CN", {
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(beginBrowserAuth).toHaveBeenCalledOnce());
+    await cancelDesktopBrowserSignIn(controller);
+
+    await expect(transaction).rejects.toThrow("cancelled");
+    expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
+    browser.resolve(SESSION);
+    await Promise.resolve();
+    expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
   });
 
   it("supports a fresh edition transaction without restoring another session", async () => {
