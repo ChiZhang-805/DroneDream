@@ -15,9 +15,11 @@ from app.autonomy.credentials import (
 )
 from app.autonomy.models import (
     AutonomyCompileRequest,
+    RuntimeObservation,
     RuntimeOperatorCommand,
     RuntimeSessionCreateRequest,
     SimulationExecutionStartRequest,
+    Vector3,
 )
 from app.autonomy.planner_artifact import VerifiedPlannerArtifactReceipt
 from app.autonomy.qualification import VehiclePackQualificationRequest, qualify_vehicle_pack
@@ -195,6 +197,27 @@ def _start_request(session_id: str, contract_id: str) -> SimulationExecutionStar
         client_request_id="simulation-request-001",
         operator_confirmed=True,
     )
+
+
+def _runtime_observation(**updates: object) -> RuntimeObservation:
+    payload: dict[str, object] = {
+        "sequence": 1,
+        "monotonic_ms": 1_000,
+        "armed": True,
+        "landed": False,
+        "position_m": Vector3(x=-49.0, y=15.3, z=10.6),
+        "velocity_mps": Vector3(x=0.4, y=0.0, z=0.0),
+        "localization_covariance_m2": 0.04,
+        "perception_age_ms": 40,
+        "minimum_clearance_m": 1.0,
+        "battery_percent": 82.0,
+        "link_ok": True,
+        "geofence_ok": True,
+        "payload_mass_kg": 0.0,
+        "mission_progress": 0.2,
+    }
+    payload.update(updates)
+    return RuntimeObservation.model_validate(payload)
 
 
 def _create_session(
@@ -489,6 +512,77 @@ def test_runtime_operator_control_stops_an_active_simulator(
     processes[0].finish(1)
 
 
+def test_runtime_landing_decision_stops_an_active_simulator(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-active-landing",
+        ),
+    )
+    created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    landing = sessions.observe(
+        "owner-a",
+        session.session_id,
+        _runtime_observation(geofence_ok=False),
+    )
+    abort_request = next(tmp_path.rglob("live_abort.request.json"), None)
+    deadline = time.monotonic() + 2
+    while abort_request is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+        abort_request = next(tmp_path.rglob("live_abort.request.json"), None)
+
+    assert landing.phase == "landing"
+    assert landing.decision.action == "land"
+    assert abort_request is not None
+    payload = json.loads(abort_request.read_text(encoding="utf-8"))
+    assert "runtime_session_landing" in payload["reason"]
+    assert registry.get("owner-a", created.execution_id).state == "aborting"
+    processes[0].finish(1)
+
+
+def test_missing_runtime_session_stops_an_active_simulator(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-active-missing",
+        ),
+    )
+    created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    def missing_runtime(*_: object) -> None:
+        raise AutonomyRuntimeError(
+            "AUTONOMY_RUNTIME_NOT_FOUND",
+            "Runtime session not found.",
+            404,
+        )
+
+    monkeypatch.setattr(sessions, "get", missing_runtime)
+    abort_request = next(tmp_path.rglob("live_abort.request.json"), None)
+    deadline = time.monotonic() + 2
+    while abort_request is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+        abort_request = next(tmp_path.rglob("live_abort.request.json"), None)
+
+    assert abort_request is not None
+    payload = json.loads(abort_request.read_text(encoding="utf-8"))
+    assert "runtime_session_missing" in payload["reason"]
+    assert registry.get("owner-a", created.execution_id).state == "aborting"
+    processes[0].finish(1)
+
+
 def test_spawn_failure_cleans_owned_artifacts_and_allows_safe_retry(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -561,6 +655,35 @@ def test_log_open_failure_cleans_owned_artifacts_and_allows_safe_retry(
     created = registry.start("owner-a", request)
     assert created.state == "starting"
     assert attempts == 1
+    assert len(processes) == 1
+    processes[0].finish(1)
+
+
+def test_retained_run_directory_returns_a_controlled_restart_conflict(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-retained-artifact",
+        ),
+    )
+    request = _start_request(session.session_id, session.contract_id)
+    created = registry.start("owner-a", request)
+    retained_run_dir = next(tmp_path.rglob(created.execution_id))
+
+    restarted = SimulationExecutionRegistry(sessions, max_executions=4)
+    monkeypatch.setattr(restarted, "capabilities", lambda: {"available": True})
+    with pytest.raises(AutonomyRuntimeError) as conflict:
+        restarted.start("owner-a", request)
+
+    assert conflict.value.code == "SIMULATION_EXECUTION_ARTIFACT_CONFLICT"
+    assert conflict.value.status_code == 409
+    assert retained_run_dir.is_dir()
     assert len(processes) == 1
     processes[0].finish(1)
 

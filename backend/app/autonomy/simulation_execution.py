@@ -384,13 +384,6 @@ class SimulationExecutionRegistry:
                         "client_request_id was already used for another simulation binding.",
                     )
                 return existing.status.model_copy(deep=True)
-            if any(record.process.poll() is None for record in self._records.values()):
-                raise AutonomyRuntimeError(
-                    "SIMULATION_EXECUTION_BUSY",
-                    "Another PX4/Gazebo execution is already running.",
-                    503,
-                )
-            self._make_room()
             execution_id = (
                 "simexec-"
                 + _sha256_text([owner_id, request.client_request_id, request.contract_id])[:24]
@@ -398,6 +391,19 @@ class SimulationExecutionRegistry:
             owner_token = hashlib.sha256(owner_id.encode()).hexdigest()[:16]
             parent = _run_root() / owner_token
             run_dir = parent / execution_id
+            if run_dir.exists():
+                raise AutonomyRuntimeError(
+                    "SIMULATION_EXECUTION_ARTIFACT_CONFLICT",
+                    "A retained artifact already exists for this simulation request.",
+                    409,
+                )
+            if any(record.process.poll() is None for record in self._records.values()):
+                raise AutonomyRuntimeError(
+                    "SIMULATION_EXECUTION_BUSY",
+                    "Another PX4/Gazebo execution is already running.",
+                    503,
+                )
+            self._make_room()
             runner_speed_m_s = min(FIXED_RUNNER_MAXIMUM_SPEED_M_S, vehicle.max_speed_mps)
             runner_acceleration_m_s2 = min(
                 FIXED_RUNNER_MAXIMUM_ACCELERATION_M_S2,
@@ -437,7 +443,14 @@ class SimulationExecutionRegistry:
                         403,
                     )
                 parent.mkdir(parents=True, exist_ok=True)
-                run_dir.mkdir()
+                try:
+                    run_dir.mkdir()
+                except FileExistsError as exc:
+                    raise AutonomyRuntimeError(
+                        "SIMULATION_EXECUTION_ARTIFACT_CONFLICT",
+                        "A retained artifact already exists for this simulation request.",
+                        409,
+                    ) from exc
                 stdout_path = parent / f"{execution_id}.stdout.log"
                 stderr_path = parent / f"{execution_id}.stderr.log"
                 stdout: IO[str] | None = None
@@ -558,7 +571,7 @@ class SimulationExecutionRegistry:
         else:
             runtime_phase = runtime.phase
             runtime_reason = ",".join(runtime.decision.codes[:4])
-        if runtime_phase not in {"holding", "aborted", "missing"}:
+        if runtime_phase not in {"holding", "landing", "aborted", "missing"}:
             return
         with self._lock:
             if record.process.poll() is not None or record.status.state == "aborting":

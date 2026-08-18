@@ -22,7 +22,7 @@ import {
   Weight,
   Waypoints,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { apiClient } from "../api/client";
@@ -718,6 +718,10 @@ export function AutonomyLab({
   const [dynamicEntityActive, setDynamicEntityActive] = useState(false);
   const [runtimeSession, setRuntimeSession] = useState<AutonomyRuntimeSession | null>(null);
   const [simulationExecution, setSimulationExecution] = useState<AutonomySimulationExecution | null>(null);
+  const runtimeSessionRef = useRef<AutonomyRuntimeSession | null>(null);
+  const simulationExecutionRef = useRef<AutonomySimulationExecution | null>(null);
+  runtimeSessionRef.current = runtimeSession;
+  simulationExecutionRef.current = simulationExecution;
   const runtimeRequestId = useRef<string | null>(null);
   const simulationExecutionRequestId = useRef<string | null>(null);
   const simulationTerminalHandled = useRef(false);
@@ -731,6 +735,33 @@ export function AutonomyLab({
   const workspaceBindingKey = workspace
     ? `${workspace.aircraft.updatedAt}:${workspace.mapPack.updatedAt}:${workspace.mission.updatedAt}:${workspace.mission.intent}`
     : "standalone";
+  const stopActiveSimulation = useCallback((reason: string) => {
+    if (publicDemoConsole) return;
+    const activeExecution = simulationExecutionRef.current;
+    const activeRuntime = runtimeSessionRef.current;
+    const cleanupRequests: Array<Promise<unknown>> = [];
+    if (
+      activeExecution
+      && !["verified", "failed", "aborted"].includes(activeExecution.state)
+    ) {
+      cleanupRequests.push(apiClient.abortAutonomySimulationExecution(
+        activeExecution.execution_id,
+        reason,
+      ));
+    }
+    if (
+      activeRuntime
+      && !activeRuntime.terminal
+      && activeExecution?.state !== "verified"
+    ) {
+      cleanupRequests.push(apiClient.stopAutonomyRuntimeSession(
+        activeRuntime.session_id,
+        "abort",
+        reason,
+      ));
+    }
+    if (cleanupRequests.length > 0) void Promise.allSettled(cleanupRequests);
+  }, []);
 
   useEffect(() => {
     if (workspaceBindingApplied.current === workspaceBindingKey) return;
@@ -754,7 +785,8 @@ export function AutonomyLab({
 
   useEffect(() => () => {
     launchGeneration.current += 1;
-  }, []);
+    stopActiveSimulation("Autonomy workspace closed while the simulation was active.");
+  }, [stopActiveSimulation]);
 
   useEffect(() => {
     setTarget(defaultTarget(edition));
@@ -942,6 +974,7 @@ export function AutonomyLab({
   }, [activeTaskGraph.revision, command, complete, events.length, obstacleInjected, onRunCompleted, qualification.contract.contract_id, qualification.scene.name, runtimeSession, simulationExecution, target, workspace?.aircraft.name, workspace?.aircraft.version, workspace?.mapPack.name, workspace?.mapPack.version]);
 
   useEffect(() => {
+    stopActiveSimulation("Autonomy mission contract changed while the simulation was active.");
     compileGeneration.current += 1;
     launchGeneration.current += 1;
     setCompileResult(null);
@@ -961,7 +994,7 @@ export function AutonomyLab({
     simulationTerminalHandled.current = false;
     evidenceReported.current = false;
     previewRunId.current = null;
-  }, [compileRequest]);
+  }, [compileRequest, stopActiveSimulation]);
 
   const appendEvent = (text: string) => {
     setEvents((current) => [{ time: eventTime(), text }, ...current].slice(0, 4));
@@ -1136,19 +1169,7 @@ export function AutonomyLab({
 
   const resetMission = () => {
     launchGeneration.current += 1;
-    if (simulationExecution && !["verified", "failed", "aborted"].includes(simulationExecution.state) && !publicDemoConsole) {
-      void apiClient.abortAutonomySimulationExecution(
-        simulationExecution.execution_id,
-        "Operator reset the mission workspace.",
-      );
-    }
-    if (runtimeSession && !runtimeSession.terminal && simulationExecution?.state !== "verified" && !publicDemoConsole) {
-      void apiClient.stopAutonomyRuntimeSession(
-        runtimeSession.session_id,
-        "abort",
-        "Operator reset the mission workspace.",
-      );
-    }
+    stopActiveSimulation("Operator reset the mission workspace.");
     setRunning(false);
     setLaunching(false);
     setPaused(false);
@@ -1280,6 +1301,7 @@ export function AutonomyLab({
                   key={candidate.id}
                   type="button"
                   className={candidate.id === missionId ? "is-active" : ""}
+                  disabled={planning || launching || running || Boolean(runtimeSession && !runtimeSession.terminal)}
                   onClick={() => chooseMission(candidate.id)}
                 >
                   <Icon aria-hidden="true" />
@@ -1298,6 +1320,7 @@ export function AutonomyLab({
                   key={mode}
                   type="button"
                   className={perception === mode ? "is-active" : ""}
+                  disabled={planning || launching || running || Boolean(runtimeSession && !runtimeSession.terminal)}
                   onClick={() => setPerception(mode)}
                 >
                   {mode === "vision" ? <Camera aria-hidden="true" /> : mode === "map" ? <Map aria-hidden="true" /> : <Navigation2 aria-hidden="true" />}
@@ -1316,6 +1339,7 @@ export function AutonomyLab({
                 max="1.2"
                 step="0.05"
                 value={pickupPayloadKg}
+                disabled={planning || launching || running || Boolean(runtimeSession && !runtimeSession.terminal)}
                 onChange={(event) => setPickupPayloadKg(Number(event.target.value))}
               />
               <strong>{pickupPayloadKg.toFixed(2)} kg</strong>
@@ -1331,7 +1355,7 @@ export function AutonomyLab({
             </ol>
           </div>
 
-          <button className="btn btn-primary autonomy-plan-button" type="button" onClick={() => void planTrajectory()} disabled={planning || command.trim().length < 3}>
+          <button className="btn btn-primary autonomy-plan-button" type="button" onClick={() => void planTrajectory()} disabled={planning || launching || running || Boolean(runtimeSession && !runtimeSession.terminal) || command.trim().length < 3}>
             {planning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <Route aria-hidden="true" />}
             {planning ? copy.planning : planned ? copy.replan : copy.plan}
           </button>
