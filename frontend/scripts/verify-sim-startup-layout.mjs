@@ -215,6 +215,15 @@ async function installDesktopFixture(context, testCase) {
       installedVersion: null,
       updatedAt: null,
     };
+    const enginePackStatus = {
+      supported: true,
+      updateRequired: false,
+      embeddedPackId: `sha256:${"1".repeat(64)}`,
+      embeddedSourceCommit: "2".repeat(40),
+      installedPackId: `sha256:${"1".repeat(64)}`,
+      installedSourceCommit: "2".repeat(40),
+      message: null,
+    };
     window.__TAURI__ = {
       core: {
         invoke: async (command) => {
@@ -229,6 +238,7 @@ async function installDesktopFixture(context, testCase) {
           if (command === "get_installer_runtime_intent") {
             return { status: "none", mode: null, targetRoot: null, message: null };
           }
+          if (command === "get_engine_pack_status") return enginePackStatus;
           if (command === "restore_browser_auth_vault") return null;
           if (command === "clear_browser_auth_vault") return true;
           if (command === "get_installer_locale") return locale;

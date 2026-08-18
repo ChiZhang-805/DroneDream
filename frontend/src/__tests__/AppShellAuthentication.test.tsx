@@ -1,15 +1,24 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { createRef } from "react";
 import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AppShell } from "../AppShell";
+import { AccountDialog, AppShell } from "../AppShell";
 import { I18nProvider } from "../i18n/I18nProvider";
 
 const authMock = vi.hoisted(() => ({
   signInWithPassword: vi.fn(async () => undefined),
   sendRegistrationCode: vi.fn(async () => undefined),
   verifyRegistrationCode: vi.fn(async () => undefined),
+}));
+
+const desktopSignInMock = vi.hoisted(() => ({
+  complete: vi.fn(async () => undefined),
+}));
+
+vi.mock("../features/auth/desktopBrowserSignIn", () => ({
+  completeDesktopBrowserSignIn: desktopSignInMock.complete,
 }));
 
 vi.mock("../features/auth/AuthContext", () => ({
@@ -54,6 +63,8 @@ describe("workspace email and password authentication", () => {
     authMock.signInWithPassword.mockClear();
     authMock.sendRegistrationCode.mockClear();
     authMock.verifyRegistrationCode.mockClear();
+    desktopSignInMock.complete.mockClear();
+    delete window.__TAURI__;
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -124,5 +135,69 @@ describe("workspace email and password authentication", () => {
     });
 
     router.dispose();
+  });
+
+  it("uses only the edition-bound browser flow in the desktop account dialog", async () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    const invoke = vi.fn(async (command: string) => command === "cancel_browser_auth");
+    window.__TAURI__ = { core: { invoke } };
+    let finishSignIn: (() => void) | undefined;
+    desktopSignInMock.complete.mockImplementationOnce(() => new Promise<undefined>((resolve) => {
+      finishSignIn = () => resolve(undefined);
+    }));
+
+    render(
+      <I18nProvider>
+        <AccountDialog
+          closeRef={createRef<HTMLButtonElement>()}
+          required
+          edition="sim"
+          desktopBrowserAuthReady
+          onClose={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Sign in to DroneDream" });
+    expect(within(dialog).queryByLabelText("Email address")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Password")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", {
+      name: "Continue securely in browser",
+    }));
+    await waitFor(() => {
+      expect(desktopSignInMock.complete).toHaveBeenCalledWith("en");
+    });
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("cancel_browser_auth", undefined);
+    });
+    finishSignIn?.();
+  });
+
+  it("routes desktop users to Environment before browser authorization", () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    window.__TAURI__ = { core: { invoke: vi.fn() } };
+    const onOpenDesktopSetup = vi.fn();
+
+    render(
+      <I18nProvider>
+        <AccountDialog
+          closeRef={createRef<HTMLButtonElement>()}
+          required
+          edition="sim"
+          onOpenDesktopSetup={onOpenDesktopSetup}
+          onClose={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Sign in to DroneDream" });
+    expect(within(dialog).queryByRole("button", {
+      name: "Continue securely in browser",
+    })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Open Environment" }));
+    expect(onOpenDesktopSetup).toHaveBeenCalledOnce();
+    expect(desktopSignInMock.complete).not.toHaveBeenCalled();
   });
 });

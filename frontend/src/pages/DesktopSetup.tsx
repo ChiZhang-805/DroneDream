@@ -16,9 +16,6 @@ import { SectionCard } from "../components/SectionCard";
 import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
 import {
   autoStartInstallerRuntime,
-  beginBrowserAuth,
-  clearBrowserAuthVault,
-  restoreBrowserAuthVault,
   cancelBrowserAuth,
   cancelRuntimeInstall,
   discardInstallerRuntimeIntent,
@@ -45,8 +42,7 @@ import type {
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useOptionalAuth } from "../features/auth/AuthContext";
-import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
-import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
+import { completeDesktopBrowserSignIn } from "../features/auth/desktopBrowserSignIn";
 import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
@@ -309,6 +305,7 @@ export function DesktopSetup() {
   const navigate = useNavigate();
   const auth = useOptionalAuth();
   const updater = useAppUpdaterState();
+  const checkForAppUpdates = updater.checkForUpdates;
   const startupGate = useSyncExternalStore(
     subscribeDesktopStartupGate,
     getDesktopStartupGateSession,
@@ -642,29 +639,19 @@ export function DesktopSetup() {
       return;
     }
     setBrowserAuthError(null);
-    activateDesktopAuthSession();
     setBrowserAuthCompletedForLaunch(false);
     setDesktopStartupGateState("idle");
     setBrowserAuthStatus("waiting");
     browserAuthActive.current = true;
-    let sessionIssued = false;
     try {
-      const session = await restoreBrowserAuthVault() ?? await beginBrowserAuth({ locale });
-      sessionIssued = true;
+      await completeDesktopBrowserSignIn(locale);
       if (!componentMounted.current) return;
       setBrowserAuthStatus("adopting");
-      await adoptBrowserAuthSession(session);
       if (componentMounted.current) {
         setBrowserAuthCompletedForLaunch(true);
         setBrowserAuthStatus("idle");
       }
     } catch (error) {
-      if (sessionIssued) {
-        // Native persists only this edition's refresh grant before returning
-        // the session. If the WebView refuses that session, do not leave a
-        // credential that would be retried on the next explicit sign-in.
-        await clearBrowserAuthVault().catch(() => false);
-      }
       if (!componentMounted.current) return;
       setBrowserAuthStatus("idle");
       const message = error instanceof Error ? error.message : String(error);
@@ -1004,8 +991,8 @@ export function DesktopSetup() {
     ) return;
     completedOperation.current = snapshot.operationId;
     void refresh();
-    void updater.checkForUpdates();
-  }, [installState.snapshot, refresh, updater.checkForUpdates]);
+    void checkForAppUpdates();
+  }, [checkForAppUpdates, installState.snapshot, refresh]);
 
   useEffect(() => {
     if (!desktopAvailable) return;
