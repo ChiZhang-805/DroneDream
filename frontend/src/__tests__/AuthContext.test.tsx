@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
@@ -142,6 +142,12 @@ function adoptDesktopAccount(): void {
       accessToken: "session-token",
     },
   }));
+}
+
+function LoadingHistoryProbe({ history }: { history: boolean[] }) {
+  const auth = useAuth();
+  history.push(auth.loading);
+  return <output aria-label="auth-loading">{String(auth.loading)}</output>;
 }
 
 describe("AuthContext account profile", () => {
@@ -290,6 +296,21 @@ describe("AuthContext account profile", () => {
     });
     },
   );
+
+  it("keeps the required desktop account surface mounted during activation", () => {
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+    const loadingHistory: boolean[] = [];
+
+    render(
+      <AuthProvider>
+        <LoadingHistoryProbe history={loadingHistory} />
+      </AuthProvider>,
+    );
+    act(() => activateDesktopAuthSession());
+
+    expect(screen.getByLabelText("auth-loading")).toHaveTextContent("false");
+    expect(loadingHistory).not.toContain(true);
+  });
 
   it("updates a desktop username with the native-adopted access token", async () => {
     const request = vi.fn(async () => new Response("{}", { status: 200 }));

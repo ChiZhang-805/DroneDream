@@ -85,7 +85,14 @@ function expectedDesktopEdition(): keyof typeof CLIENT_BY_EDITION {
 
 export async function adoptBrowserAuthSession(
   session: BrowserAuthSession,
+  options: { signal?: AbortSignal } = {},
 ): Promise<void> {
+  const throwIfCancelled = () => {
+    if (options.signal?.aborted) {
+      throw new Error("Desktop browser sign-in cancelled.");
+    }
+  };
+  throwIfCancelled();
   if (!supabaseClient) {
     throw new Error("DroneDream account authentication is not configured.");
   }
@@ -98,6 +105,9 @@ export async function adoptBrowserAuthSession(
     throw new Error("The browser session belongs to a different DroneDream edition.");
   }
   const { data, error } = await supabaseClient.auth.getUser(session.accessToken);
+  // Cancellation must win over a token response. No account event or access
+  // token may escape after the operator has cancelled the transaction.
+  throwIfCancelled();
   if (error || !data.user) {
     throw new Error(error?.message || "The browser session could not be adopted.");
   }

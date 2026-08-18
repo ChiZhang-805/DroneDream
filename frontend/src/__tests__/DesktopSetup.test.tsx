@@ -766,7 +766,9 @@ describe("DesktopSetup", () => {
 
     await waitFor(() => {
       expect(browserAuthMocks.adoptSession).toHaveBeenCalledTimes(1);
-      expect(browserAuthMocks.adoptSession).toHaveBeenCalledWith(browserSession);
+      expect(browserAuthMocks.adoptSession).toHaveBeenCalledWith(browserSession, {
+        signal: expect.any(AbortSignal),
+      });
     });
     expect(invoke).toHaveBeenCalledWith("begin_browser_auth", {
       request: {
@@ -798,7 +800,9 @@ describe("DesktopSetup", () => {
     }));
 
     await waitFor(() => {
-      expect(browserAuthMocks.adoptSession).toHaveBeenCalledWith(validBrowserSession);
+      expect(browserAuthMocks.adoptSession).toHaveBeenCalledWith(validBrowserSession, {
+        signal: expect.any(AbortSignal),
+      });
     });
     expect(invoke).toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
     expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());

@@ -77,7 +77,6 @@ import {
   type BrandEditionId,
 } from "./brand/edition-brand.generated";
 import {
-  cancelBrowserAuth,
   getDesktopWindowHandle,
   isDesktopRuntime,
   stopRuntimeForExit,
@@ -101,7 +100,10 @@ import {
 import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
-import { completeDesktopBrowserSignIn } from "./features/auth/desktopBrowserSignIn";
+import {
+  cancelDesktopBrowserSignIn,
+  completeDesktopBrowserSignIn,
+} from "./features/auth/desktopBrowserSignIn";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import {
   useAdminAccess,
@@ -2452,6 +2454,7 @@ export function AccountDialog({
   const cameraButtonRef = useRef<HTMLButtonElement>(null);
   const cameraVideoRef = useRef<HTMLVideoElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  const browserAuthControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -2459,23 +2462,31 @@ export function AccountDialog({
   }, [auth.account?.displayName]);
 
   const startDesktopBrowserSignIn = useCallback(async () => {
-    if (!desktopRuntime || browserAuthWaiting) return;
+    if (!desktopRuntime || browserAuthControllerRef.current) return;
+    const controller = new AbortController();
+    browserAuthControllerRef.current = controller;
     setError(null);
     setBrowserAuthWaiting(true);
     try {
-      await completeDesktopBrowserSignIn(locale);
+      await completeDesktopBrowserSignIn(locale, { signal: controller.signal });
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : String(reason);
-      if (!/cancelled/iu.test(message)) setError(copy.browserSignInFailed);
+      if (mountedRef.current && !/cancelled/iu.test(message)) {
+        setError(copy.browserSignInFailed);
+      }
     } finally {
-      setBrowserAuthWaiting(false);
+      if (browserAuthControllerRef.current === controller) {
+        browserAuthControllerRef.current = null;
+        if (mountedRef.current) setBrowserAuthWaiting(false);
+      }
     }
-  }, [browserAuthWaiting, copy.browserSignInFailed, desktopRuntime, locale]);
+  }, [copy.browserSignInFailed, desktopRuntime, locale]);
 
-  const cancelDesktopBrowserSignIn = useCallback(async () => {
-    if (!desktopRuntime || !browserAuthWaiting) return;
-    await cancelBrowserAuth().catch(() => false);
-  }, [browserAuthWaiting, desktopRuntime]);
+  const cancelDesktopSignIn = useCallback(async () => {
+    const controller = browserAuthControllerRef.current;
+    if (!desktopRuntime || !controller) return;
+    await cancelDesktopBrowserSignIn(controller);
+  }, [desktopRuntime]);
 
   const stopCamera = useCallback(() => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -2494,6 +2505,8 @@ export function AccountDialog({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      const controller = browserAuthControllerRef.current;
+      if (controller) void cancelDesktopBrowserSignIn(controller);
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
     };
@@ -2853,7 +2866,7 @@ export function AccountDialog({
             </button>
           )}
           {desktopBrowserAuthReady && browserAuthWaiting ? (
-            <button type="button" className="btn" onClick={() => void cancelDesktopBrowserSignIn()}>
+            <button type="button" className="btn" onClick={() => void cancelDesktopSignIn()}>
               {copy.cancelBrowserSignIn}
             </button>
           ) : null}

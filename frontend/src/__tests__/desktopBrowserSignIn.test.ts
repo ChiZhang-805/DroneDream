@@ -2,15 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   beginBrowserAuth,
+  cancelBrowserAuth,
   clearBrowserAuthVault,
   restoreBrowserAuthVault,
 } from "../desktop/bridge";
 import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
-import { completeDesktopBrowserSignIn } from "../features/auth/desktopBrowserSignIn";
+import {
+  cancelDesktopBrowserSignIn,
+  completeDesktopBrowserSignIn,
+} from "../features/auth/desktopBrowserSignIn";
 import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
 
 vi.mock("../desktop/bridge", () => ({
   beginBrowserAuth: vi.fn(),
+  cancelBrowserAuth: vi.fn(),
   clearBrowserAuthVault: vi.fn(),
   restoreBrowserAuthVault: vi.fn(),
 }));
@@ -33,9 +38,18 @@ const SESSION = {
   completedAt: "2026-08-18T00:00:01.000Z",
 };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
 describe("desktop browser sign-in transaction", () => {
   beforeEach(() => {
     vi.mocked(beginBrowserAuth).mockReset();
+    vi.mocked(cancelBrowserAuth).mockReset();
     vi.mocked(clearBrowserAuthVault).mockReset();
     vi.mocked(restoreBrowserAuthVault).mockReset();
     vi.mocked(adoptBrowserAuthSession).mockReset();
@@ -50,7 +64,9 @@ describe("desktop browser sign-in transaction", () => {
 
     expect(activateDesktopAuthSession).toHaveBeenCalledOnce();
     expect(beginBrowserAuth).not.toHaveBeenCalled();
-    expect(adoptBrowserAuthSession).toHaveBeenCalledWith(SESSION);
+    expect(adoptBrowserAuthSession).toHaveBeenCalledWith(SESSION, {
+      signal: undefined,
+    });
     expect(clearBrowserAuthVault).not.toHaveBeenCalled();
   });
 
@@ -62,7 +78,9 @@ describe("desktop browser sign-in transaction", () => {
     await completeDesktopBrowserSignIn("zh-CN");
 
     expect(beginBrowserAuth).toHaveBeenCalledWith({ locale: "zh-CN" });
-    expect(adoptBrowserAuthSession).toHaveBeenCalledWith(SESSION);
+    expect(adoptBrowserAuthSession).toHaveBeenCalledWith(SESSION, {
+      signal: undefined,
+    });
   });
 
   it("removes only the unusable edition grant when WebView adoption fails", async () => {
@@ -73,5 +91,51 @@ describe("desktop browser sign-in transaction", () => {
 
     await expect(completeDesktopBrowserSignIn("en")).rejects.toThrow("invalid session");
     expect(clearBrowserAuthVault).toHaveBeenCalledOnce();
+  });
+
+  it("cancels vault restoration before any session can be adopted", async () => {
+    const restored = deferred<typeof SESSION>();
+    vi.mocked(restoreBrowserAuthVault).mockReturnValue(restored.promise);
+    vi.mocked(cancelBrowserAuth).mockResolvedValue(false);
+    const controller = new AbortController();
+
+    const transaction = completeDesktopBrowserSignIn("en", {
+      signal: controller.signal,
+    });
+    await cancelDesktopBrowserSignIn(controller);
+    restored.resolve(SESSION);
+
+    await expect(transaction).rejects.toThrow("cancelled");
+    expect(cancelBrowserAuth).toHaveBeenCalledOnce();
+    expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
+    expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+  });
+
+  it("lets cancellation win while WebView adoption is pending", async () => {
+    const adoption = deferred<void>();
+    vi.mocked(restoreBrowserAuthVault).mockResolvedValue(SESSION);
+    vi.mocked(adoptBrowserAuthSession).mockReturnValue(adoption.promise);
+    vi.mocked(cancelBrowserAuth).mockResolvedValue(false);
+    const controller = new AbortController();
+
+    const transaction = completeDesktopBrowserSignIn("en", {
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(adoptBrowserAuthSession).toHaveBeenCalledOnce());
+    await cancelDesktopBrowserSignIn(controller);
+    adoption.resolve();
+
+    await expect(transaction).rejects.toThrow("cancelled");
+    expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+  });
+
+  it("supports a fresh edition transaction without restoring another session", async () => {
+    vi.mocked(beginBrowserAuth).mockResolvedValue(SESSION);
+    vi.mocked(adoptBrowserAuthSession).mockResolvedValue(undefined);
+
+    await completeDesktopBrowserSignIn("en", { restoreFromVault: false });
+
+    expect(restoreBrowserAuthVault).not.toHaveBeenCalled();
+    expect(beginBrowserAuth).toHaveBeenCalledOnce();
   });
 });

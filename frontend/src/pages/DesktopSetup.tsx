@@ -16,7 +16,6 @@ import { SectionCard } from "../components/SectionCard";
 import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
 import {
   autoStartInstallerRuntime,
-  cancelBrowserAuth,
   cancelRuntimeInstall,
   discardInstallerRuntimeIntent,
   getInstallerRuntimeIntent,
@@ -42,7 +41,10 @@ import type {
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useOptionalAuth } from "../features/auth/AuthContext";
-import { completeDesktopBrowserSignIn } from "../features/auth/desktopBrowserSignIn";
+import {
+  cancelDesktopBrowserSignIn,
+  completeDesktopBrowserSignIn,
+} from "../features/auth/desktopBrowserSignIn";
 import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
@@ -323,7 +325,7 @@ export function DesktopSetup() {
   const installerDiscardRequested = useRef(false);
   const installerDiscardSucceeded = useRef(false);
   const componentMounted = useRef(false);
-  const browserAuthActive = useRef(false);
+  const browserAuthController = useRef<AbortController | null>(null);
   const selectedDriveRef = useRef("");
   const [state, setState] = useState<ProbeState>(() => ({
     ...INITIAL_STATE,
@@ -530,9 +532,8 @@ export function DesktopSetup() {
     componentMounted.current = true;
     return () => {
       componentMounted.current = false;
-      if (browserAuthActive.current) {
-        void cancelBrowserAuth().catch(() => undefined);
-      }
+      const controller = browserAuthController.current;
+      if (controller) void cancelDesktopBrowserSignIn(controller);
     };
   }, []);
 
@@ -632,7 +633,7 @@ export function DesktopSetup() {
   ]);
 
   const startBrowserSignIn = useCallback(async () => {
-    if (!launcherEnvironmentReady || browserAuthStatus !== "idle") return;
+    if (!launcherEnvironmentReady || browserAuthController.current) return;
     const configuration = browserAuthConfiguration();
     if (!configuration) {
       setBrowserAuthError(t("launcher.browserAuthNotConfigured"));
@@ -642,11 +643,16 @@ export function DesktopSetup() {
     setBrowserAuthCompletedForLaunch(false);
     setDesktopStartupGateState("idle");
     setBrowserAuthStatus("waiting");
-    browserAuthActive.current = true;
+    const controller = new AbortController();
+    browserAuthController.current = controller;
     try {
-      await completeDesktopBrowserSignIn(locale);
+      await completeDesktopBrowserSignIn(locale, {
+        signal: controller.signal,
+        onAdopting: () => {
+          if (componentMounted.current) setBrowserAuthStatus("adopting");
+        },
+      });
       if (!componentMounted.current) return;
-      setBrowserAuthStatus("adopting");
       if (componentMounted.current) {
         setBrowserAuthCompletedForLaunch(true);
         setBrowserAuthStatus("idle");
@@ -659,9 +665,11 @@ export function DesktopSetup() {
         setBrowserAuthError(t("launcher.browserAuthFailed"));
       }
     } finally {
-      browserAuthActive.current = false;
+      if (browserAuthController.current === controller) {
+        browserAuthController.current = null;
+      }
     }
-  }, [browserAuthStatus, launcherEnvironmentReady, locale, t]);
+  }, [launcherEnvironmentReady, locale, t]);
 
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;

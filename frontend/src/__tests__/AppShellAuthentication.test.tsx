@@ -15,9 +15,14 @@ const authMock = vi.hoisted(() => ({
 
 const desktopSignInMock = vi.hoisted(() => ({
   complete: vi.fn(async () => undefined),
+  cancel: vi.fn(async (controller: AbortController) => {
+    controller.abort();
+    return false;
+  }),
 }));
 
 vi.mock("../features/auth/desktopBrowserSignIn", () => ({
+  cancelDesktopBrowserSignIn: desktopSignInMock.cancel,
   completeDesktopBrowserSignIn: desktopSignInMock.complete,
 }));
 
@@ -64,6 +69,7 @@ describe("workspace email and password authentication", () => {
     authMock.sendRegistrationCode.mockClear();
     authMock.verifyRegistrationCode.mockClear();
     desktopSignInMock.complete.mockClear();
+    desktopSignInMock.cancel.mockClear();
     delete window.__TAURI__;
     window.localStorage.clear();
     window.sessionStorage.clear();
@@ -139,8 +145,7 @@ describe("workspace email and password authentication", () => {
 
   it("uses only the edition-bound browser flow in the desktop account dialog", async () => {
     window.localStorage.setItem("drone-dream:locale", "en");
-    const invoke = vi.fn(async (command: string) => command === "cancel_browser_auth");
-    window.__TAURI__ = { core: { invoke } };
+    window.__TAURI__ = { core: { invoke: vi.fn() } };
     let finishSignIn: (() => void) | undefined;
     desktopSignInMock.complete.mockImplementationOnce(() => new Promise<undefined>((resolve) => {
       finishSignIn = () => resolve(undefined);
@@ -165,12 +170,16 @@ describe("workspace email and password authentication", () => {
       name: "Continue securely in browser",
     }));
     await waitFor(() => {
-      expect(desktopSignInMock.complete).toHaveBeenCalledWith("en");
+      expect(desktopSignInMock.complete).toHaveBeenCalledWith("en", {
+        signal: expect.any(AbortSignal),
+      });
     });
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeVisible();
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("cancel_browser_auth", undefined);
+      expect(desktopSignInMock.cancel).toHaveBeenCalledWith(
+        expect.any(AbortController),
+      );
     });
     finishSignIn?.();
   });
