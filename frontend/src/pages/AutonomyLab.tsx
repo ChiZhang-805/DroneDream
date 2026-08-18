@@ -705,6 +705,7 @@ export function AutonomyLab({
   const [compileSource, setCompileSource] = useState<"backend" | "preview">("preview");
   const [compileError, setCompileError] = useState<string | null>(null);
   const compileGeneration = useRef(0);
+  const launchGeneration = useRef(0);
   const authorizedCompileRequest = useRef<AutonomyCompileRequest | null>(null);
   const [planned, setPlanned] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -749,6 +750,10 @@ export function AutonomyLab({
     const handleMode = () => setEdition(loadAutonomyEdition());
     window.addEventListener(UNIVERSAL_WORKSPACE_CHANGED_EVENT, handleMode);
     return () => window.removeEventListener(UNIVERSAL_WORKSPACE_CHANGED_EVENT, handleMode);
+  }, []);
+
+  useEffect(() => () => {
+    launchGeneration.current += 1;
   }, []);
 
   useEffect(() => {
@@ -938,6 +943,7 @@ export function AutonomyLab({
 
   useEffect(() => {
     compileGeneration.current += 1;
+    launchGeneration.current += 1;
     setCompileResult(null);
     setCompileSource("preview");
     setCompileError(null);
@@ -1058,6 +1064,7 @@ export function AutonomyLab({
       if (publicDemoConsole) {
         previewRunId.current ??= `preview-run-${crypto.randomUUID()}`;
       } else {
+        const generation = ++launchGeneration.current;
         setLaunching(true);
         try {
           runtimeRequestId.current ??= crypto.randomUUID();
@@ -1070,6 +1077,18 @@ export function AutonomyLab({
             runtimeMission,
             runtimeRequestId.current,
           );
+          if (generation !== launchGeneration.current) {
+            if (!created.terminal) {
+              await Promise.allSettled([
+                apiClient.stopAutonomyRuntimeSession(
+                  created.session_id,
+                  "abort",
+                  "Launch was cancelled before simulator startup.",
+                ),
+              ]);
+            }
+            return;
+          }
           setRuntimeSession(created);
           const execution = await apiClient.startAutonomySimulationExecution(
             created.session_id,
@@ -1077,14 +1096,31 @@ export function AutonomyLab({
             plannerArtifactSha256,
             simulationExecutionRequestId.current,
           );
+          if (generation !== launchGeneration.current) {
+            await Promise.allSettled([
+              apiClient.abortAutonomySimulationExecution(
+                execution.execution_id,
+                "Launch was cancelled before the simulator response was applied.",
+              ),
+              ...(!created.terminal
+                ? [apiClient.stopAutonomyRuntimeSession(
+                    created.session_id,
+                    "abort",
+                    "Launch was cancelled before the simulator response was applied.",
+                  )]
+                : []),
+            ]);
+            return;
+          }
           simulationTerminalHandled.current = false;
           setSimulationExecution(execution);
         } catch {
-          setCompileError(copy.compileFailed);
+          if (generation === launchGeneration.current) setCompileError(copy.compileFailed);
           return;
         } finally {
-          setLaunching(false);
+          if (generation === launchGeneration.current) setLaunching(false);
         }
+        if (generation !== launchGeneration.current) return;
       }
       setRunning(true);
       setPaused(false);
@@ -1099,6 +1135,7 @@ export function AutonomyLab({
   };
 
   const resetMission = () => {
+    launchGeneration.current += 1;
     if (simulationExecution && !["verified", "failed", "aborted"].includes(simulationExecution.state) && !publicDemoConsole) {
       void apiClient.abortAutonomySimulationExecution(
         simulationExecution.execution_id,

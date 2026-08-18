@@ -286,7 +286,17 @@ class SimulationExecutionRegistry:
         with self._lock:
             existing_id = self._idempotency.get(idempotency_key)
             if existing_id is not None:
-                return self._records[existing_id].status.model_copy(deep=True)
+                existing = self._records[existing_id]
+                if (
+                    existing.status.runtime_session_id != request.runtime_session_id
+                    or existing.status.contract_id != request.contract_id
+                    or existing.status.planner_artifact_sha256 != request.planner_artifact_sha256
+                ):
+                    raise AutonomyRuntimeError(
+                        "SIMULATION_EXECUTION_IDEMPOTENCY_CONFLICT",
+                        "client_request_id was already used for another simulation binding.",
+                    )
+                return existing.status.model_copy(deep=True)
             if any(record.process.poll() is None for record in self._records.values()):
                 raise AutonomyRuntimeError(
                     "SIMULATION_EXECUTION_BUSY",
@@ -300,11 +310,7 @@ class SimulationExecutionRegistry:
             )
             owner_token = hashlib.sha256(owner_id.encode()).hexdigest()[:16]
             parent = _run_root() / owner_token
-            parent.mkdir(parents=True, exist_ok=True)
             run_dir = parent / execution_id
-            run_dir.mkdir()
-            stdout = (parent / f"{execution_id}.stdout.log").open("w", encoding="utf-8")
-            stderr = (parent / f"{execution_id}.stderr.log").open("w", encoding="utf-8")
             runner_speed_m_s = min(FIXED_RUNNER_MAXIMUM_SPEED_M_S, vehicle.max_speed_mps)
             runner_acceleration_m_s2 = min(
                 FIXED_RUNNER_MAXIMUM_ACCELERATION_M_S2,
@@ -322,19 +328,37 @@ class SimulationExecutionRegistry:
                 "--setpoint-rate-hz",
                 "20",
             ]
-            process = subprocess.Popen(  # noqa: S603 - fixed executable and fixed runner argv.
-                argv,
-                cwd=_runner_path().parents[2],
-                stdout=stdout,
-                stderr=stderr,
-                text=True,
-                start_new_session=True,
-            )
+            with self._runtime_sessions.simulation_launch_binding(
+                owner_id,
+                request.runtime_session_id,
+            ) as (launch_session, _launch_request):
+                if launch_session.contract_id != request.contract_id:
+                    raise AutonomyRuntimeError(
+                        "SIMULATION_CONTRACT_MISMATCH",
+                        "The confirmed runtime contract changed before simulation launch.",
+                    )
+                parent.mkdir(parents=True, exist_ok=True)
+                run_dir.mkdir()
+                stdout = (parent / f"{execution_id}.stdout.log").open("w", encoding="utf-8")
+                stderr = (parent / f"{execution_id}.stderr.log").open("w", encoding="utf-8")
+                try:
+                    process = subprocess.Popen(  # noqa: S603 - fixed executable and fixed runner argv.
+                        argv,
+                        cwd=_runner_path().parents[2],
+                        stdout=stdout,
+                        stderr=stderr,
+                        text=True,
+                        start_new_session=True,
+                    )
+                except BaseException:
+                    stdout.close()
+                    stderr.close()
+                    raise
             now = _now()
             status = SimulationExecutionStatus(
                 execution_id=execution_id,
-                runtime_session_id=session.session_id,
-                contract_id=session.contract_id,
+                runtime_session_id=launch_session.session_id,
+                contract_id=launch_session.contract_id,
                 planner_artifact_sha256=planner.artifact_sha256,
                 state="starting",
                 created_at=now,

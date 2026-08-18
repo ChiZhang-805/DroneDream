@@ -219,6 +219,62 @@ def test_simulation_execution_is_model_bound_owner_scoped_and_idempotent(
     processes[0].finish(1)
 
 
+def test_simulation_execution_rejects_conflicting_idempotency_binding(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    first = sessions.create(
+        "owner-a",
+        RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-idem-a"),
+    )
+    second = sessions.create(
+        "owner-a",
+        RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-idem-b"),
+    )
+    first_request = _start_request(first.session_id, first.contract_id)
+    registry.start("owner-a", first_request)
+
+    with pytest.raises(AutonomyRuntimeError) as conflict:
+        registry.start(
+            "owner-a",
+            first_request.model_copy(update={"runtime_session_id": second.session_id}),
+        )
+
+    assert conflict.value.code == "SIMULATION_EXECUTION_IDEMPOTENCY_CONFLICT"
+    assert len(processes) == 1
+    processes[0].finish(1)
+
+
+@pytest.mark.parametrize("action", ["hold", "abort"])
+def test_simulation_execution_rejects_nonlaunchable_runtime_session(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    action: str,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = sessions.create(
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id=f"runtime-request-{action}-before-launch",
+        ),
+    )
+    sessions.command(
+        "owner-a",
+        session.session_id,
+        RuntimeOperatorCommand.model_validate(
+            {"action": action, "reason": f"operator selected {action} before launch"}
+        ),
+    )
+
+    with pytest.raises(AutonomyRuntimeError) as blocked:
+        registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    assert blocked.value.code == "AUTONOMY_RUNTIME_NOT_LAUNCHABLE"
+    assert processes == []
+
+
 def test_live_pose_and_signed_final_evidence_come_from_runner_files(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

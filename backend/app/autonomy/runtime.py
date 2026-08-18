@@ -13,6 +13,8 @@ import json
 import math
 import re
 from collections import OrderedDict
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
@@ -441,6 +443,24 @@ class RuntimeSessionRegistry:
         with self._lock:
             record = self._owned(owner_id, session_id)
             return record.result.model_copy(deep=True), record.mission.model_copy(deep=True)
+
+    @contextmanager
+    def simulation_launch_binding(
+        self,
+        owner_id: str,
+        session_id: str,
+    ) -> Iterator[tuple[RuntimeSession, RuntimeSessionCreateRequest]]:
+        """Hold the session lock while a ready session crosses the launch boundary."""
+
+        with self._lock:
+            record = self._owned(owner_id, session_id)
+            current = record.result
+            if current.terminal or current.phase != "ready":
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_RUNTIME_NOT_LAUNCHABLE",
+                    "Only a ready, nonterminal runtime session can launch the simulator.",
+                )
+            yield current.model_copy(deep=True), record.mission.model_copy(deep=True)
 
     def finalize_simulation(
         self,
