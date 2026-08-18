@@ -9,12 +9,13 @@ DroneDream uses two explicit operating modes:
   account, and keeps the current experiment draft only for the current app
   session.
 - **Cloud workspace** is opt-in. It uses Supabase Auth as the identity
-  provider and DroneDream's authenticated API as the data boundary. New users
-  register with an email address, a password, and the verification code sent
-  to that address; returning users sign in with email and password. Google can
-  be enabled for the browser deployment after its OAuth callback is
-  configured. SMS is excluded from the first release because it adds provider
-  cost and abuse controls.
+  provider and DroneDream's authenticated API as the data boundary. The web
+  deployment owns email/password registration and sign-in. The signed desktop
+  application never collects those credentials inside its WebView: it opens
+  the system browser, completes an edition-bound authorization-code + PKCE
+  flow, and adopts only the resulting session. Google can be enabled for the
+  browser deployment after its OAuth callback is configured. SMS is excluded
+  from the first release because it adds provider cost and abuse controls.
 
 The product must never display a successful cloud sign-in while continuing to
 query unscoped local or cloud records. Authentication and tenant filtering are
@@ -39,10 +40,17 @@ The frontend now has an optional Supabase account layer:
   beginning;
 - a Supabase access token is attached to API requests in memory;
 - signing out or changing accounts clears the unfinished experiment draft;
-- the desktop refresh-token session uses `sessionStorage` until an
-  OS-keychain-backed Tauri storage adapter is added;
-- Google and Apple buttons are build flags and stay hidden in the desktop
-  WebView until its signed deep-link callback is implemented.
+- desktop browser authorization uses a fixed per-edition loopback callback,
+  validates state, nonce, audience and PKCE, and rejects redirect or token
+  contracts that do not match the compiled public client;
+- the desktop refresh grant is stored only in the edition-specific Windows
+  Credential Manager namespace; the WebView receives the adopted session but
+  never persists the grant in browser storage;
+- a failed WebView adoption clears only that edition's unusable vault entry so
+  a later explicit sign-in cannot loop on stale credentials; and
+- Google and Apple buttons remain browser-deployment build flags. Desktop
+  sign-in delegates provider interaction to the system browser instead of
+  embedding provider credentials in the WebView.
 
 The model API key remains separate from account authentication. It is never
 placed in an experiment draft or persistent browser storage.
@@ -56,6 +64,17 @@ VITE_SUPABASE_URL=https://PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 VITE_AUTH_GOOGLE_ENABLED=false
 VITE_AUTH_APPLE_ENABLED=false
+```
+
+Desktop release build variables are public application identifiers, not
+secrets. Each edition has a separately registered loopback callback and must
+be compiled with its own provider-issued client ID:
+
+```text
+DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL
+DRONEDREAM_OAUTH_CLIENT_ID_SIM
+DRONEDREAM_OAUTH_CLIENT_ID_LAB
+DRONEDREAM_OAUTH_CLIENT_ID_FIELD
 ```
 
 Backend runtime variables:
@@ -93,6 +112,13 @@ password, or any signing key in frontend variables or the repository.
    `VITE_AUTH_GOOGLE_ENABLED=true` for the browser build.
 8. Defer Apple login until an Apple Developer account, Services ID, verified
    domain, redirect URL, and secret-rotation owner are ready.
+9. Register the four public desktop OAuth clients with their exact edition
+   loopback callbacks, enter only the public client IDs as GitHub repository
+   variables, and run
+   `desktop/scripts/verify-four-edition-oauth-registration.ps1` before a signed
+   release. An unsigned validation build may use an explicit unregistered
+   placeholder to exercise layout and routing, but it cannot complete a real
+   account sign-in with that placeholder.
 
 No mailbox password is needed. The operator configures the SMTP provider
 inside Supabase; DroneDream receives only the resulting authenticated session.
