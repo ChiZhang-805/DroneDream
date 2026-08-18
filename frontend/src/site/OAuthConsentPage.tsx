@@ -30,6 +30,8 @@ interface OAuthConsentPageProps {
   authConfigured: boolean;
   authLoading: boolean;
   onRequireSignIn: () => void;
+  onRequireRegistration: () => void;
+  onSwitchAccount: () => void;
 }
 
 const copy = {
@@ -38,15 +40,19 @@ const copy = {
     title: "Continue to DroneDream",
     invalidRequest: "This desktop sign-in request is missing or invalid. Return to the app and try again.",
     unavailable: "DroneDream account sign-in is not configured on this website deployment.",
-    signInBody: "Sign in with your DroneDream account in this browser. If you are new, create an account from the same sign-in window, then continue this request.",
-    signIn: "Sign in or create an account",
+    signInBody: "Sign in in this browser to verify your email and password before authorizing the desktop app.",
+    signIn: "Sign in and continue",
+    register: "New to DroneDream? Create an account",
     loading: "Checking the desktop sign-in request…",
     requestFailed: "The desktop sign-in request could not be verified. Return to the app and try again.",
     signedInAs: "Signed in as",
+    verifiedSession: "This browser has already verified this account.",
+    switchAccount: "Not your account? Switch account",
     wantsAccess: "wants to access your DroneDream account.",
     permissions: "Requested access",
     permissionAccount: "Confirm your account identity",
     permissionSession: "Create a session for this desktop edition",
+    standardFields: "Standard account fields",
     localReturn: "After approval, this browser returns only to the requesting app on this computer.",
     approve: "Approve and return to the app",
     deny: "Cancel sign-in",
@@ -57,15 +63,19 @@ const copy = {
     title: "继续登录 DroneDream",
     invalidRequest: "本次桌面端登录请求缺失或无效。请返回软件后重新尝试。",
     unavailable: "当前网站部署尚未配置 DroneDream 账户登录。",
-    signInBody: "请在浏览器中登录 DroneDream 账户。如果还没有账户，可在同一个登录窗口中注册新账号，然后继续本次授权。",
-    signIn: "登录或注册新账号",
+    signInBody: "请先在浏览器中输入邮箱与密码完成身份验证，再授权桌面软件。",
+    signIn: "登录并继续",
+    register: "还没有 DroneDream 账号？立即注册",
     loading: "正在核对桌面端登录请求…",
     requestFailed: "无法验证本次桌面端登录请求。请返回软件后重新尝试。",
     signedInAs: "当前登录账户",
+    verifiedSession: "当前浏览器已完成该账户的身份验证。",
+    switchAccount: "不是您的账户？切换账户",
     wantsAccess: "正在申请访问您的 DroneDream 账户。",
     permissions: "申请的权限",
     permissionAccount: "确认您的账户身份",
     permissionSession: "为当前桌面端版本创建独立会话",
+    standardFields: "标准账户字段",
     localReturn: "授权后，浏览器只会回到本机上发起请求的 DroneDream 软件。",
     approve: "同意并返回软件",
     deny: "取消登录",
@@ -92,6 +102,8 @@ export function OAuthConsentPage({
   authConfigured,
   authLoading,
   onRequireSignIn,
+  onRequireRegistration,
+  onSwitchAccount,
 }: OAuthConsentPageProps) {
   const text = copy[locale];
   const authorizationId = authorizationIdFromLocation();
@@ -181,6 +193,13 @@ export function OAuthConsentPage({
             <button type="button" className="site-button site-button-primary" onClick={onRequireSignIn}>
               {text.signIn}
             </button>
+            <button
+              type="button"
+              className="site-oauth-text-button"
+              onClick={onRequireRegistration}
+            >
+              {text.register}
+            </button>
           </div>
         ) : null}
         {details && account && edition ? (
@@ -190,16 +209,28 @@ export function OAuthConsentPage({
               <strong>{details.client.name || edition.product}</strong>
               <p>{text.wantsAccess}</p>
             </div>
-            <dl>
-              <div><dt>{text.signedInAs}</dt><dd>{account.email}</dd></div>
+            <dl className="site-oauth-facts">
+              <div className="site-oauth-identity">
+                <dt>{text.signedInAs}</dt>
+                <dd>
+                  <strong>{account.email ?? account.displayName}</strong>
+                  <span>{text.verifiedSession}</span>
+                  <button type="button" onClick={onSwitchAccount}>
+                    {text.switchAccount}
+                  </button>
+                </dd>
+              </div>
               <div>
                 <dt>{text.permissions}</dt>
                 <dd>
                   <ul>
                     <li>{text.permissionAccount}</li>
                     <li>{text.permissionSession}</li>
-                    {scopes.map((scope) => <li key={scope}><code>{scope}</code></li>)}
                   </ul>
+                  <div className="site-oauth-scopes" aria-label={text.standardFields}>
+                    <span>{text.standardFields}</span>
+                    {scopes.map((scope) => <code key={scope}>{scope}</code>)}
+                  </div>
                 </dd>
               </div>
             </dl>

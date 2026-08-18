@@ -74,6 +74,8 @@ describe("desktop OAuth consent page", () => {
         authConfigured
         authLoading={false}
         onRequireSignIn={vi.fn()}
+        onRequireRegistration={vi.fn()}
+        onSwitchAccount={vi.fn()}
       />,
     );
 
@@ -84,8 +86,9 @@ describe("desktop OAuth consent page", () => {
     expect(oauthMock.getAuthorizationDetails).toHaveBeenCalledWith("authorization-1");
   });
 
-  it("keeps sign-in and account registration on the browser page", async () => {
+  it("keeps distinct sign-in and account registration actions on the browser page", async () => {
     const onRequireSignIn = vi.fn();
+    const onRequireRegistration = vi.fn();
     render(
       <OAuthConsentPage
         locale="en"
@@ -93,12 +96,16 @@ describe("desktop OAuth consent page", () => {
         authConfigured
         authLoading={false}
         onRequireSignIn={onRequireSignIn}
+        onRequireRegistration={onRequireRegistration}
+        onSwitchAccount={vi.fn()}
       />,
     );
 
-    expect(screen.getByText(/create an account from the same sign-in window/i)).toBeVisible();
-    screen.getByRole("button", { name: "Sign in or create an account" }).click();
+    expect(screen.getByText(/verify your email and password/i)).toBeVisible();
+    screen.getByRole("button", { name: "Sign in and continue" }).click();
     await waitFor(() => expect(onRequireSignIn).toHaveBeenCalledTimes(1));
+    screen.getByRole("button", { name: /create an account/i }).click();
+    await waitFor(() => expect(onRequireRegistration).toHaveBeenCalledTimes(1));
     expect(oauthMock.getAuthorizationDetails).not.toHaveBeenCalled();
   });
 
@@ -111,6 +118,8 @@ describe("desktop OAuth consent page", () => {
         authConfigured
         authLoading={false}
         onRequireSignIn={vi.fn()}
+        onRequireRegistration={vi.fn()}
+        onSwitchAccount={vi.fn()}
       />,
     );
 

@@ -2809,6 +2809,28 @@ html[lang="zh-CN"] .site-hero h1 {
   color: #fff;
 }
 
+.site-auth-guidance {
+  margin: -0.1rem 0 0;
+  color: rgba(235, 237, 249, 0.72);
+  line-height: 1.55;
+}
+
+.site-auth-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.1rem 1.1rem;
+}
+
+.site-auth-notice {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(104, 232, 255, 0.3);
+  border-radius: 11px;
+  color: #cdf7ff;
+  background: rgba(104, 232, 255, 0.09);
+  font-size: 0.86rem;
+}
+
 .site-auth-error {
   padding: 0.75rem 0.85rem;
   border: 1px solid rgba(255, 113, 156, 0.3);
@@ -3468,10 +3490,10 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-parameter-stack i b { transform: scaleX(1); }
 }
 .site-oauth-consent {
-  min-height: calc(100vh - 78px);
+  min-height: 100svh;
   display: grid;
   place-items: center;
-  padding: 132px 24px 72px;
+  padding: 112px 24px 24px;
   background:
     radial-gradient(circle at 12% 18%, rgba(102, 231, 255, 0.16), transparent 32%),
     radial-gradient(circle at 84% 22%, rgba(231, 83, 205, 0.17), transparent 34%),
@@ -3479,8 +3501,8 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .site-oauth-card {
-  width: min(680px, 100%);
-  padding: clamp(28px, 5vw, 52px);
+  width: min(1240px, 100%);
+  padding: clamp(26px, 3vw, 40px);
   border: 1px solid rgba(169, 143, 255, 0.24);
   border-radius: 28px;
   background: rgba(14, 9, 30, 0.9);
@@ -3489,15 +3511,20 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .site-oauth-card h1 {
-  margin: 10px 0 24px;
-  font-size: clamp(2rem, 6vw, 3.6rem);
+  margin: 8px 0 20px;
+  font-size: clamp(2.5rem, 4vw, 4rem);
   line-height: 1.02;
+  white-space: nowrap;
 }
 
 .site-oauth-sign-in,
 .site-oauth-request {
   display: grid;
-  gap: 22px;
+  gap: 14px;
+}
+
+.site-oauth-sign-in {
+  max-width: 620px;
 }
 
 .site-oauth-sign-in p,
@@ -3505,18 +3532,21 @@ html[lang="zh-CN"] .site-hero h1 {
 .site-oauth-product p {
   margin: 0;
   color: rgba(244, 240, 255, 0.74);
-  line-height: 1.75;
+  line-height: 1.55;
 }
 
 .site-oauth-product {
-  padding: 22px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px 18px;
+  padding: 17px 20px;
   border-radius: 20px;
   background: linear-gradient(135deg, rgba(102, 231, 255, 0.1), rgba(230, 82, 203, 0.12));
 }
 
 .site-oauth-product span {
   display: block;
-  margin-bottom: 8px;
   color: #71e7f8;
   font-size: 0.75rem;
   font-weight: 800;
@@ -3525,21 +3555,29 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-oauth-product strong {
   display: block;
-  margin-bottom: 8px;
   font-size: 1.4rem;
+}
+
+.site-oauth-product p {
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .site-oauth-request dl {
   display: grid;
-  gap: 18px;
+  grid-template-columns: minmax(270px, 0.72fr) minmax(0, 1.5fr);
+  gap: 14px;
   margin: 0;
 }
 
 .site-oauth-request dl > div {
   display: grid;
   gap: 8px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  align-content: start;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .site-oauth-request dt {
@@ -3555,10 +3593,65 @@ html[lang="zh-CN"] .site-hero h1 {
   margin: 0;
 }
 
+.site-oauth-identity dd {
+  display: grid;
+  gap: 5px;
+}
+
+.site-oauth-identity dd > strong {
+  font-size: 1.06rem;
+}
+
+.site-oauth-identity dd > span {
+  color: rgba(244, 240, 255, 0.66);
+  font-size: 0.85rem;
+}
+
+.site-oauth-identity button,
+.site-oauth-text-button {
+  width: fit-content;
+  padding: 3px 0;
+  border: 0;
+  color: #8defff;
+  background: transparent;
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.site-oauth-identity button:hover,
+.site-oauth-identity button:focus-visible,
+.site-oauth-text-button:hover,
+.site-oauth-text-button:focus-visible {
+  color: #fff;
+}
+
 .site-oauth-request ul {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 22px;
   padding-left: 20px;
+}
+
+.site-oauth-scopes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.site-oauth-scopes > span {
+  margin-right: 2px;
+  color: rgba(244, 240, 255, 0.55);
+  font-size: 0.76rem;
+}
+
+.site-oauth-scopes code {
+  padding: 2px 7px;
+  border-radius: 7px;
+  background: rgba(187, 166, 255, 0.1);
+  font-size: 0.78rem;
 }
 
 .site-oauth-request code {
@@ -3569,6 +3662,10 @@ html[lang="zh-CN"] .site-hero h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.site-oauth-local-return {
+  white-space: nowrap;
 }
 
 .site-oauth-loading,
@@ -3587,4 +3684,63 @@ html[lang="zh-CN"] .site-hero h1 {
   margin-top: 16px;
   background: rgba(250, 98, 138, 0.12);
   color: #ffb7ca;
+}
+
+@media (max-width: 900px) {
+  .site-oauth-consent {
+    min-height: 100svh;
+    padding: 104px 16px 32px;
+  }
+
+  .site-oauth-card {
+    padding: 24px;
+    border-radius: 22px;
+  }
+
+  .site-oauth-card h1 {
+    font-size: clamp(2.1rem, 10vw, 3.2rem);
+    white-space: normal;
+  }
+
+  .site-oauth-product,
+  .site-oauth-request dl {
+    grid-template-columns: 1fr;
+  }
+
+  .site-oauth-product p {
+    justify-self: start;
+    white-space: normal;
+  }
+
+  .site-oauth-request ul {
+    grid-template-columns: 1fr;
+  }
+
+  .site-oauth-local-return {
+    white-space: normal;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 760px) {
+  .site-oauth-consent {
+    padding-top: 92px;
+  }
+
+  .site-oauth-card {
+    padding: 22px 28px;
+  }
+
+  .site-oauth-card h1 {
+    margin-bottom: 14px;
+    font-size: 2.55rem;
+  }
+
+  .site-oauth-request {
+    gap: 10px;
+  }
+
+  .site-oauth-product,
+  .site-oauth-request dl > div {
+    padding-block: 12px;
+  }
 }

@@ -16,6 +16,7 @@ import type { TranslationKey } from "../i18n/I18nProvider";
 import type { Job } from "../types/api";
 import { formatDateTime } from "../utils/format";
 import { openAppSettings } from "../appSettings";
+import { useAuthOrLocal } from "../features/auth/AuthContext";
 
 type Translator = ReturnType<typeof useI18n>["t"];
 
@@ -84,9 +85,15 @@ function buildJobColumns(t: Translator): Column<Job>[] {
 
 export function Dashboard() {
   const runtimeAccess = useDesktopRuntimeAccess();
+  const auth = useAuthOrLocal();
   const { t } = useI18n();
+  const accountBoundary = auth.configured
+    ? auth.account?.id ?? "signed-out"
+    : "local";
+  const accountReady = !auth.configured
+    || (!auth.loading && Boolean(auth.account));
   const jobsQuery = useQuery({
-    queryKey: ["jobs", "dashboard"],
+    queryKey: ["jobs", "dashboard", accountBoundary],
     queryFn: async () => {
       const [recentPage, ...statusPages] = await Promise.all([
         apiClient.listJobs({ page: 1, page_size: DASHBOARD_RECENT_JOB_LIMIT }),
@@ -107,7 +114,7 @@ export function Dashboard() {
         counts,
       };
     },
-    enabled: runtimeAccess.canUseRuntime,
+    enabled: runtimeAccess.canUseRuntime && accountReady,
   });
   const runtimeNetworkUnavailable =
     jobsQuery.error instanceof ApiClientError &&
