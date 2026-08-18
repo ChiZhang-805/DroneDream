@@ -40,6 +40,7 @@ export interface DroneDreamAccount {
 interface AuthContextValue {
   configured: boolean;
   loading: boolean;
+  passwordRecovery: boolean;
   account: DroneDreamAccount | null;
   googleEnabled: boolean;
   appleEnabled: boolean;
@@ -57,6 +58,11 @@ interface AuthContextValue {
     token: string,
     password: string,
   ) => Promise<void>;
+  requestPasswordReset: (
+    email: string,
+    captchaToken?: string,
+  ) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signInWithProvider: (provider: "google" | "apple") => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
   updateAvatar: (avatarDataUrl: string | null) => Promise<void>;
@@ -70,12 +76,15 @@ const unavailableAuthAction = async () => {
 const OPTIONAL_AUTH_FALLBACK: AuthContextValue = {
   configured: false,
   loading: false,
+  passwordRecovery: false,
   account: null,
   googleEnabled: false,
   appleEnabled: false,
   signInWithPassword: unavailableAuthAction,
   sendRegistrationCode: unavailableAuthAction,
   verifyRegistrationCode: unavailableAuthAction,
+  requestPasswordReset: unavailableAuthAction,
+  updatePassword: unavailableAuthAction,
   signInWithProvider: unavailableAuthAction,
   updateDisplayName: unavailableAuthAction,
   updateAvatar: unavailableAuthAction,
@@ -165,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(
     cloudAuthConfigured && !docsPreview && !deferDesktopAuth,
   );
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [account, setAccount] = useState<DroneDreamAccount | null>(
     docsPreview
       ? {
@@ -243,8 +253,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     });
-    const { data } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+    const { data } = supabaseClient.auth.onAuthStateChange((event, session) => {
       if (!active) return;
+      if (event === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+      } else if (event === "SIGNED_OUT") {
+        setPasswordRecovery(false);
+      }
       adoptUser(session?.user ?? null, session?.access_token ?? null);
       setLoading(false);
     });
@@ -295,6 +310,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     const { error: passwordError } = await client.auth.updateUser({ password });
     if (passwordError) throw passwordError;
+  }, []);
+
+  const requestPasswordReset = useCallback(async (
+    email: string,
+    captchaToken?: string,
+  ) => {
+    const redirectTo = new URL("/", window.location.origin).toString();
+    const { error } = await requireClient().auth.resetPasswordForEmail(
+      email.trim(),
+      {
+        redirectTo,
+        ...(captchaToken ? { captchaToken } : {}),
+      },
+    );
+    if (error) throw error;
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await requireClient().auth.updateUser({ password });
+    if (error) throw error;
+    setPasswordRecovery(false);
   }, []);
 
   const signInWithProvider = useCallback(
@@ -414,12 +450,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       configured: cloudAuthConfigured || docsPreview,
       loading,
+      passwordRecovery,
       account,
       googleEnabled: googleAuthEnabled && !isDesktopRuntime(),
       appleEnabled: appleAuthEnabled && !isDesktopRuntime(),
       signInWithPassword,
       sendRegistrationCode,
       verifyRegistrationCode,
+      requestPasswordReset,
+      updatePassword,
       signInWithProvider,
       updateDisplayName,
       updateAvatar,
@@ -429,12 +468,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       account,
       docsPreview,
       loading,
+      passwordRecovery,
+      requestPasswordReset,
       sendRegistrationCode,
       signInWithProvider,
       signInWithPassword,
       signOut,
       updateAvatar,
       updateDisplayName,
+      updatePassword,
       verifyRegistrationCode,
     ],
   );

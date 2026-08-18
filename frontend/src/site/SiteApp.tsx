@@ -39,6 +39,8 @@ const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`
 const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 const COMMUNITY_GUIDELINES_URL = `${GITHUB_URL}/blob/main/COMMUNITY_GUIDELINES.md`;
 
+type AuthMode = "sign-in" | "register" | "reset-request" | "reset-update";
+
 const WEBSITE_DRONE_THEME = Object.freeze({
   primary: 0x68e8ff,
   secondary: 0x9b72ff,
@@ -90,6 +92,15 @@ const content = {
     completeCaptcha: "Complete the security check before continuing.",
     registerNow: "New to DroneDream? Register now",
     backToSignIn: "Already registered? Sign in",
+    forgotPassword: "Forgot your password? Reset it by email",
+    resetRequestTitle: "Reset password",
+    resetRequestBody: "Enter your account email. We will send a secure link that opens the password reset screen.",
+    sendResetLink: "Send reset link",
+    resetEmailSent: "If an account exists for this email, a password reset link has been sent.",
+    resetUpdateTitle: "Choose a new password",
+    resetUpdateBody: "This email link verified the reset request. Choose a new password to finish.",
+    updatePassword: "Update password",
+    passwordUpdated: "Your password has been updated.",
     openConsole: "Open console",
     signOut: "Sign out",
     closeAuth: "Close account dialog",
@@ -280,6 +291,15 @@ const content = {
     completeCaptcha: "请先完成安全验证，再继续。",
     registerNow: "还没有账号？立即注册",
     backToSignIn: "已经注册？返回登录",
+    forgotPassword: "忘记密码？通过邮件重置",
+    resetRequestTitle: "重置密码",
+    resetRequestBody: "输入账户邮箱，我们会发送一封包含安全链接的邮件，点击后进入密码重置界面。",
+    sendResetLink: "发送重置链接",
+    resetEmailSent: "如果该邮箱已注册，密码重置链接已经发送。",
+    resetUpdateTitle: "设置新密码",
+    resetUpdateBody: "邮件链接已确认本次重置请求，请设置新密码以完成操作。",
+    updatePassword: "更新密码",
+    passwordUpdated: "密码已更新。",
     openConsole: "进入控制台",
     signOut: "退出登录",
     closeAuth: "关闭账号窗口",
@@ -782,7 +802,7 @@ export function SiteApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
+  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [authEmail, setAuthEmail] = useState("");
   const [authCode, setAuthCode] = useState("");
   const [authCodeSent, setAuthCodeSent] = useState(false);
@@ -792,6 +812,7 @@ export function SiteApp() {
   const [authCaptchaCycle, setAuthCaptchaCycle] = useState(0);
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [organizationAccess, setOrganizationAccess] =
     useState<OrganizationAccess | null>(null);
   const [accountPlan, setAccountPlan] = useState<{
@@ -971,10 +992,14 @@ export function SiteApp() {
       const firstInput = authDialogRef.current?.querySelector<HTMLInputElement>(
         "input:not(:disabled)",
       );
-      (auth.account ? authCloseRef.current : firstInput)?.focus();
+      (
+        auth.account && authMode !== "reset-update"
+          ? authCloseRef.current
+          : firstInput
+      )?.focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && authMode !== "reset-update") {
         setAuthOpen(false);
         return;
       }
@@ -1004,7 +1029,7 @@ export function SiteApp() {
       });
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [auth.account, authOpen]);
+  }, [auth.account, authMode, authOpen]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -1043,7 +1068,7 @@ export function SiteApp() {
   };
 
   const closeMenu = () => setMenuOpen(false);
-  const openAccount = (mode: "sign-in" | "register" = "sign-in") => {
+  const openAccount = (mode: AuthMode = "sign-in") => {
     setAuthMode(mode);
     setAuthCode("");
     setAuthCodeSent(false);
@@ -1052,13 +1077,24 @@ export function SiteApp() {
     setAuthCaptchaToken(null);
     setAuthCaptchaCycle((current) => current + 1);
     setAuthError(null);
+    setAuthNotice(null);
     setMenuOpen(false);
     setAuthOpen(true);
   };
 
   useEffect(() => {
+    if (!auth.passwordRecovery) return;
+    setAuthMode("reset-update");
+    setAuthPassword("");
+    setAuthPasswordConfirmation("");
+    setAuthError(null);
+    setAuthNotice(null);
+    setAuthOpen(true);
+  }, [auth.passwordRecovery]);
+
+  useEffect(() => {
     if (sitePage !== "oauth-consent") return;
-    if (auth.account && authOpen) {
+    if (auth.account && authOpen && !auth.passwordRecovery) {
       setAuthOpen(false);
     } else if (
       auth.configured
@@ -1070,7 +1106,7 @@ export function SiteApp() {
       oauthPromptedRef.current = true;
       openAccount("sign-in");
     }
-  }, [auth.account, auth.configured, auth.loading, authOpen, sitePage]);
+  }, [auth.account, auth.configured, auth.loading, auth.passwordRecovery, authOpen, sitePage]);
 
   const openConsole = () => {
     if (auth.account) {
@@ -1085,8 +1121,30 @@ export function SiteApp() {
     if (authPending) return;
     setAuthPending(true);
     setAuthError(null);
+    setAuthNotice(null);
     try {
-      if (authMode === "sign-in") {
+      if (authMode === "reset-request") {
+        if (captchaProtectionConfigured && !authCaptchaToken) {
+          throw new Error(copy.completeCaptcha);
+        }
+        await auth.requestPasswordReset(
+          authEmail,
+          authCaptchaToken ?? undefined,
+        );
+        setAuthNotice(copy.resetEmailSent);
+      } else if (authMode === "reset-update") {
+        if (authPassword.length < 8) {
+          throw new Error(copy.passwordTooShort);
+        }
+        if (authPassword !== authPasswordConfirmation) {
+          throw new Error(copy.passwordMismatch);
+        }
+        await auth.updatePassword(authPassword);
+        setAuthPassword("");
+        setAuthPasswordConfirmation("");
+        setAuthMode("sign-in");
+        setAuthNotice(copy.passwordUpdated);
+      } else if (authMode === "sign-in") {
         if (captchaProtectionConfigured && !authCaptchaToken) {
           throw new Error(copy.completeCaptcha);
         }
@@ -1121,7 +1179,10 @@ export function SiteApp() {
       );
     } finally {
       setAuthPending(false);
-      if (authMode === "sign-in" && captchaProtectionConfigured) {
+      if (
+        (authMode === "sign-in" || authMode === "reset-request")
+        && captchaProtectionConfigured
+      ) {
         setAuthCaptchaToken(null);
         setAuthCaptchaCycle((current) => current + 1);
       }
@@ -1247,6 +1308,22 @@ export function SiteApp() {
             authConfigured={auth.configured}
             authLoading={auth.loading}
             onRequireSignIn={() => openAccount("sign-in")}
+            onRequireRegistration={() => openAccount("register")}
+            onSwitchAccount={() => {
+              setAuthPending(true);
+              setAuthError(null);
+              void auth.signOut()
+                .then(() => openAccount("sign-in"))
+                .catch((reason: unknown) => {
+                  setAuthError(
+                    reason instanceof Error
+                      ? reason.message
+                      : "Account request failed.",
+                  );
+                  setAuthOpen(true);
+                })
+                .finally(() => setAuthPending(false));
+            }}
           />
         ) : (
           <>
@@ -1488,7 +1565,12 @@ export function SiteApp() {
         <div
           className="site-auth-backdrop"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setAuthOpen(false);
+            if (
+              event.target === event.currentTarget
+              && authMode !== "reset-update"
+            ) {
+              setAuthOpen(false);
+            }
           }}
         >
           <section
@@ -1500,24 +1582,30 @@ export function SiteApp() {
           >
             <header>
               <h2 id="site-auth-title">
-                {auth.account
+                {authMode === "reset-request"
+                  ? copy.resetRequestTitle
+                  : authMode === "reset-update"
+                    ? copy.resetUpdateTitle
+                    : auth.account
                   ? copy.account
                   : authMode === "register"
                     ? copy.registerTitle
                     : copy.authTitle}
               </h2>
-              <button
-                ref={authCloseRef}
-                type="button"
-                aria-label={copy.closeAuth}
-                onClick={() => setAuthOpen(false)}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m7 7 10 10M17 7 7 17" />
-                </svg>
-              </button>
+              {authMode !== "reset-update" ? (
+                <button
+                  ref={authCloseRef}
+                  type="button"
+                  aria-label={copy.closeAuth}
+                  onClick={() => setAuthOpen(false)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m7 7 10 10M17 7 7 17" />
+                  </svg>
+                </button>
+              ) : null}
             </header>
-            {auth.account ? (
+            {auth.account && authMode !== "reset-update" ? (
               <div className="site-auth-account">
                 <AccountIcon />
                 <strong>{auth.account.displayName}</strong>
@@ -1560,39 +1648,48 @@ export function SiteApp() {
               </div>
             ) : (
               <>
+                {authMode === "reset-request" ? (
+                  <p className="site-auth-guidance">{copy.resetRequestBody}</p>
+                ) : authMode === "reset-update" ? (
+                  <p className="site-auth-guidance">{copy.resetUpdateBody}</p>
+                ) : null}
                 <form className="site-auth-form" onSubmit={(event) => void submitAuth(event)}>
-                  <label>
-                    <span>{copy.email}</span>
-                    <input
-                      type="email"
-                      required
-                      autoComplete="email"
-                      value={authEmail}
-                      disabled={
-                        authPending ||
-                        (authMode === "register" && authCodeSent)
-                      }
-                      onChange={(event) => setAuthEmail(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>{copy.password}</span>
-                    <input
-                      type="password"
-                      required
-                      minLength={8}
-                      autoComplete={
-                        authMode === "register"
-                          ? "new-password"
-                          : "current-password"
-                      }
-                      value={authPassword}
-                      placeholder={copy.passwordPlaceholder}
-                      disabled={authPending}
-                      onChange={(event) => setAuthPassword(event.target.value)}
-                    />
-                  </label>
-                  {authMode === "register" ? (
+                  {authMode !== "reset-update" ? (
+                    <label>
+                      <span>{copy.email}</span>
+                      <input
+                        type="email"
+                        required
+                        autoComplete="email"
+                        value={authEmail}
+                        disabled={
+                          authPending
+                          || (authMode === "register" && authCodeSent)
+                        }
+                        onChange={(event) => setAuthEmail(event.target.value)}
+                      />
+                    </label>
+                  ) : null}
+                  {authMode !== "reset-request" ? (
+                    <label>
+                      <span>{copy.password}</span>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete={
+                          authMode === "sign-in"
+                            ? "current-password"
+                            : "new-password"
+                        }
+                        value={authPassword}
+                        placeholder={copy.passwordPlaceholder}
+                        disabled={authPending}
+                        onChange={(event) => setAuthPassword(event.target.value)}
+                      />
+                    </label>
+                  ) : null}
+                  {authMode === "register" || authMode === "reset-update" ? (
                     <>
                       <label>
                         <span>{copy.confirmPassword}</span>
@@ -1609,39 +1706,41 @@ export function SiteApp() {
                           }
                         />
                       </label>
-                      <div className="site-auth-code-field">
-                        <label htmlFor="site-registration-code">
-                          <span>{copy.code}</span>
-                        </label>
-                        <div className="site-auth-code-row">
-                          <input
-                            id="site-registration-code"
-                            type="text"
-                            required
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            minLength={6}
-                            maxLength={12}
-                            value={authCode}
-                            placeholder={copy.codePlaceholder}
-                            disabled={authPending}
-                            onChange={(event) =>
-                              setAuthCode(event.target.value.replace(/\s/gu, ""))
-                            }
-                          />
-                          <button
-                            type="button"
-                            className="site-auth-code-button"
-                            disabled={authPending || !authEmail.trim()}
-                            onClick={() => void sendRegistrationCode()}
-                          >
-                            {authCodeSent ? copy.resendCode : copy.sendCode}
-                          </button>
+                      {authMode === "register" ? (
+                        <div className="site-auth-code-field">
+                          <label htmlFor="site-registration-code">
+                            <span>{copy.code}</span>
+                          </label>
+                          <div className="site-auth-code-row">
+                            <input
+                              id="site-registration-code"
+                              type="text"
+                              required
+                              inputMode="numeric"
+                              autoComplete="one-time-code"
+                              minLength={6}
+                              maxLength={12}
+                              value={authCode}
+                              placeholder={copy.codePlaceholder}
+                              disabled={authPending}
+                              onChange={(event) =>
+                                setAuthCode(event.target.value.replace(/\s/gu, ""))
+                              }
+                            />
+                            <button
+                              type="button"
+                              className="site-auth-code-button"
+                              disabled={authPending || !authEmail.trim()}
+                              onClick={() => void sendRegistrationCode()}
+                            >
+                              {authCodeSent ? copy.resendCode : copy.sendCode}
+                            </button>
+                          </div>
                         </div>
-                      </div>
+                      ) : null}
                     </>
                   ) : null}
-                  {captchaProtectionConfigured ? (
+                  {captchaProtectionConfigured && authMode !== "reset-update" ? (
                     <AuthCaptcha
                       key={authCaptchaCycle}
                       siteKey={turnstileSiteKey}
@@ -1651,32 +1750,42 @@ export function SiteApp() {
                   <button type="submit" disabled={authPending || auth.loading}>
                     {authMode === "register"
                       ? copy.createAccount
-                      : copy.signInAction}
+                      : authMode === "reset-request"
+                        ? copy.sendResetLink
+                        : authMode === "reset-update"
+                          ? copy.updatePassword
+                          : copy.signInAction}
                   </button>
                 </form>
-                <button
-                  type="button"
-                  className="site-auth-text-button"
-                  disabled={authPending}
-                  onClick={() => {
-                    setAuthMode((current) =>
-                      current === "sign-in" ? "register" : "sign-in",
-                    );
-                    setAuthCode("");
-                    setAuthCodeSent(false);
-                    setAuthPassword("");
-                    setAuthPasswordConfirmation("");
-                    setAuthCaptchaToken(null);
-                    setAuthCaptchaCycle((current) => current + 1);
-                    setAuthError(null);
-                  }}
-                >
-                  {authMode === "sign-in"
-                    ? copy.registerNow
-                    : copy.backToSignIn}
-                </button>
+                {authMode !== "reset-update" ? (
+                  <div className="site-auth-link-row">
+                    {authMode === "sign-in" ? (
+                      <button
+                        type="button"
+                        className="site-auth-text-button"
+                        disabled={authPending}
+                        onClick={() => openAccount("reset-request")}
+                      >
+                        {copy.forgotPassword}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="site-auth-text-button"
+                      disabled={authPending}
+                      onClick={() => openAccount(
+                        authMode === "sign-in" ? "register" : "sign-in",
+                      )}
+                    >
+                      {authMode === "sign-in"
+                        ? copy.registerNow
+                        : copy.backToSignIn}
+                    </button>
+                  </div>
+                ) : null}
               </>
             )}
+            {authNotice ? <div className="site-auth-notice" role="status">{authNotice}</div> : null}
             {authError ? <div className="site-auth-error" role="alert">{authError}</div> : null}
           </section>
         </div>

@@ -24,17 +24,22 @@ const authMock = vi.hoisted(() => {
     },
     error: null,
   }));
-  const onAuthStateChange = vi.fn(() => ({
-    data: {
-      subscription: { unsubscribe: vi.fn() },
-    },
-  }));
+  let stateChangeCallback: ((event: string, session: unknown) => void) | null = null;
+  const onAuthStateChange = vi.fn((callback: (event: string, session: unknown) => void) => {
+    stateChangeCallback = callback;
+    return {
+      data: {
+        subscription: { unsubscribe: vi.fn() },
+      },
+    };
+  });
   return {
     state,
     getSession,
     onAuthStateChange,
     signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
     signInWithOtp: vi.fn(async () => ({ data: {}, error: null })),
+    resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
     verifyOtp: vi.fn(async () => ({ data: {}, error: null })),
     signOut: vi.fn(async (): Promise<{
       data: Record<string, never>;
@@ -52,6 +57,9 @@ const authMock = vi.hoisted(() => {
       return { data: { user: state.user }, error: null };
     }),
     unsubscribe: vi.fn(),
+    emitAuthStateChange: (event: string, session: unknown) => {
+      stateChangeCallback?.(event, session);
+    },
   };
 });
 
@@ -69,6 +77,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
       onAuthStateChange: authMock.onAuthStateChange,
       signInWithPassword: authMock.signInWithPassword,
       signInWithOtp: authMock.signInWithOtp,
+      resetPasswordForEmail: authMock.resetPasswordForEmail,
       verifyOtp: authMock.verifyOtp,
       signOut: authMock.signOut,
       updateUser: authMock.updateUser,
@@ -83,6 +92,7 @@ function AccountProbe() {
       <output aria-label="username">{auth.account?.displayName ?? ""}</output>
       <output aria-label="email">{auth.account?.email ?? ""}</output>
       <output aria-label="avatar">{auth.account?.avatarUrl ?? ""}</output>
+      <output aria-label="password-recovery">{String(auth.passwordRecovery)}</output>
       <button
         type="button"
         onClick={() => void auth.updateDisplayName("Flight Pilot")}
@@ -127,6 +137,20 @@ function AccountProbe() {
       </button>
       <button
         type="button"
+        onClick={() =>
+          void auth.requestPasswordReset("pilot@example.com", "captcha-reset")
+        }
+      >
+        Request password reset
+      </button>
+      <button
+        type="button"
+        onClick={() => void auth.updatePassword("new-correct-horse")}
+      >
+        Update password
+      </button>
+      <button
+        type="button"
         onClick={() => void auth.signOut().catch(() => undefined)}
       >
         Sign out
@@ -162,6 +186,7 @@ describe("AuthContext account profile", () => {
     authMock.onAuthStateChange.mockClear();
     authMock.signInWithPassword.mockClear();
     authMock.signInWithOtp.mockClear();
+    authMock.resetPasswordForEmail.mockClear();
     authMock.verifyOtp.mockClear();
     authMock.signOut.mockReset();
     authMock.signOut.mockResolvedValue({ data: {}, error: null });
@@ -262,6 +287,43 @@ describe("AuthContext account profile", () => {
       expect(authMock.updateUser).toHaveBeenCalledWith({
         password: "correct-horse",
       });
+    });
+  });
+
+  it("uses a same-origin email link and enters password recovery only after Supabase verifies it", async () => {
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(screen.getByRole("button", { name: "Request password reset" }));
+    await waitFor(() => {
+      expect(authMock.resetPasswordForEmail).toHaveBeenCalledWith(
+        "pilot@example.com",
+        {
+          redirectTo: new URL("/", window.location.origin).toString(),
+          captchaToken: "captcha-reset",
+        },
+      );
+    });
+    expect(screen.getByLabelText("password-recovery")).toHaveTextContent("false");
+
+    act(() => {
+      authMock.emitAuthStateChange("PASSWORD_RECOVERY", {
+        user: authMock.state.user,
+        access_token: "recovery-token",
+      });
+    });
+    expect(screen.getByLabelText("password-recovery")).toHaveTextContent("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
+    await waitFor(() => {
+      expect(authMock.updateUser).toHaveBeenCalledWith({
+        password: "new-correct-horse",
+      });
+      expect(screen.getByLabelText("password-recovery")).toHaveTextContent("false");
     });
   });
 

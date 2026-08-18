@@ -9,6 +9,8 @@ const supabasePublishableKey = (
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
 )?.trim();
 const desktopRuntime = isDesktopRuntime();
+export const BROWSER_AUTH_STORAGE_KEY = "dronedream-browser-auth:v1";
+const LEGACY_BROWSER_AUTH_STORAGE_KEY = "undefined";
 
 export function editionAuthStorageKey(editionId: string | undefined): string | null {
   const normalized = editionId?.trim().toLowerCase();
@@ -93,11 +95,37 @@ function authStorage(): Storage | undefined {
   }
 }
 
+export function migrateLegacyBrowserAuthStorage(
+  storage: Storage | undefined,
+): void {
+  if (!storage || desktopRuntime) return;
+  try {
+    if (storage.getItem(BROWSER_AUTH_STORAGE_KEY)) return;
+    const legacy = storage.getItem(LEGACY_BROWSER_AUTH_STORAGE_KEY);
+    if (!legacy) return;
+    const parsed = JSON.parse(legacy) as Record<string, unknown>;
+    if (
+      typeof parsed.access_token !== "string"
+      || typeof parsed.refresh_token !== "string"
+      || typeof parsed.user !== "object"
+      || parsed.user === null
+    ) {
+      return;
+    }
+    storage.setItem(BROWSER_AUTH_STORAGE_KEY, legacy);
+    storage.removeItem(LEGACY_BROWSER_AUTH_STORAGE_KEY);
+  } catch {
+    // A malformed or inaccessible legacy entry must not block authentication.
+  }
+}
+
 interface DroneDreamGlobal {
   __droneDreamSupabaseClient?: SupabaseClient;
 }
 
 const clientHost = globalThis as typeof globalThis & DroneDreamGlobal;
+const selectedAuthStorage = authStorage();
+migrateLegacyBrowserAuthStorage(selectedAuthStorage);
 
 export const supabaseClient: SupabaseClient | null = cloudAuthConfigured
   ? (clientHost.__droneDreamSupabaseClient ??=
@@ -106,8 +134,8 @@ export const supabaseClient: SupabaseClient | null = cloudAuthConfigured
           autoRefreshToken: true,
           detectSessionInUrl: !isDesktopRuntime(),
           persistSession: true,
-          storage: authStorage(),
-          storageKey: desktopStorageKey ?? undefined,
+          storage: selectedAuthStorage,
+          storageKey: desktopStorageKey ?? BROWSER_AUTH_STORAGE_KEY,
         },
       }))
   : null;
