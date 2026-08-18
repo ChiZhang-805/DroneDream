@@ -230,9 +230,7 @@ def test_legacy_engine_pack_is_readable_but_cannot_enter_execution_gate(
 ) -> None:
     request = request_fixture()
     observation = allow_override(active_observation(tmp_path, request))
-    manifest = json.loads(
-        observation.active_engine_pack_manifest_path.read_text(encoding="utf-8")
-    )
+    manifest = json.loads(observation.active_engine_pack_manifest_path.read_text(encoding="utf-8"))
     manifest.pop("editionProfile")
     manifest["schemaVersion"] = 1
     manifest["packId"] = "sha256:" + engine_pack.legacy_manifest_identity(

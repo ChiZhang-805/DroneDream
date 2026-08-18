@@ -347,9 +347,7 @@ _ENGINE_PACK_BASE_FIELDS = {
 }
 
 
-def _engine_pack_profile_identity(
-    manifest: dict[str, Any], schema_version: int
-) -> dict[str, Any]:
+def _engine_pack_profile_identity(manifest: dict[str, Any], schema_version: int) -> dict[str, Any]:
     if schema_version == 1:
         if set(manifest) != _ENGINE_PACK_BASE_FIELDS:
             raise RunnerError("legacy Engine Pack manifest fields are invalid")
