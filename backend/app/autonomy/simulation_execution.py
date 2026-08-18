@@ -424,6 +424,7 @@ class SimulationExecutionRegistry:
             with self._runtime_sessions.simulation_launch_binding(
                 owner_id,
                 request.runtime_session_id,
+                execution_id,
             ) as (launch_session, _launch_request, launch_receipt, launch_asset_receipt):
                 if launch_session.contract_id != request.contract_id:
                     raise AutonomyRuntimeError(
@@ -478,37 +479,37 @@ class SimulationExecutionRegistry:
                     raise
                 if stdout is None or stderr is None:
                     raise RuntimeError("simulation log streams were not initialized")
-            now = _now()
-            status = SimulationExecutionStatus(
-                execution_id=execution_id,
-                runtime_session_id=launch_session.session_id,
-                contract_id=launch_session.contract_id,
-                planner_artifact_sha256=planner.artifact_sha256,
-                state="starting",
-                created_at=now,
-                updated_at=now,
-                progress=0.0,
-                phase="preflight",
-            )
-            record = _ExecutionRecord(
-                owner_id=owner_id,
-                client_request_id=request.client_request_id,
-                run_dir=run_dir,
-                process=process,
-                stdout=stdout,
-                stderr=stderr,
-                status=status,
-            )
-            self._records[execution_id] = record
-            self._idempotency[idempotency_key] = execution_id
-            watcher = threading.Thread(
-                target=self._watch,
-                args=(execution_id,),
-                name=f"simulation-execution-{execution_id}",
-                daemon=True,
-            )
-            watcher.start()
-            return status.model_copy(deep=True)
+                now = _now()
+                status = SimulationExecutionStatus(
+                    execution_id=execution_id,
+                    runtime_session_id=launch_session.session_id,
+                    contract_id=launch_session.contract_id,
+                    planner_artifact_sha256=planner.artifact_sha256,
+                    state="starting",
+                    created_at=now,
+                    updated_at=now,
+                    progress=0.0,
+                    phase="preflight",
+                )
+                record = _ExecutionRecord(
+                    owner_id=owner_id,
+                    client_request_id=request.client_request_id,
+                    run_dir=run_dir,
+                    process=process,
+                    stdout=stdout,
+                    stderr=stderr,
+                    status=status,
+                )
+                self._records[execution_id] = record
+                self._idempotency[idempotency_key] = execution_id
+                watcher = threading.Thread(
+                    target=self._watch,
+                    args=(execution_id,),
+                    name=f"simulation-execution-{execution_id}",
+                    daemon=True,
+                )
+                watcher.start()
+                return status.model_copy(deep=True)
 
     def get(self, owner_id: str, execution_id: str) -> SimulationExecutionStatus:
         with self._lock:
@@ -675,6 +676,7 @@ class SimulationExecutionRegistry:
             sealed_runtime = self._runtime_sessions.finalize_simulation(
                 record.owner_id,
                 record.status.runtime_session_id,
+                execution_id=record.status.execution_id,
                 verified=verified,
                 evidence_sha256=evidence_sha256,
                 failure=failure,

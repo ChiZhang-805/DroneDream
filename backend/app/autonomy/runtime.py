@@ -66,6 +66,7 @@ class _SessionRecord:
     asset_receipt: VerifiedAutonomyAssetReceipt | None
     result: RuntimeSession
     last_observation: RuntimeObservation | None = None
+    managed_simulation_execution_id: str | None = None
 
 
 def _now() -> datetime:
@@ -476,6 +477,7 @@ class RuntimeSessionRegistry:
         self,
         owner_id: str,
         session_id: str,
+        execution_id: str,
     ) -> Iterator[
         tuple[
             RuntimeSession,
@@ -494,18 +496,30 @@ class RuntimeSessionRegistry:
                     "AUTONOMY_RUNTIME_NOT_LAUNCHABLE",
                     "Only a ready, nonterminal runtime session can launch the simulator.",
                 )
-            yield (
-                current.model_copy(deep=True),
-                record.mission.model_copy(deep=True),
-                record.planner_receipt,
-                record.asset_receipt,
-            )
+            if record.managed_simulation_execution_id is not None:
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_RUNTIME_EXECUTION_ALREADY_BOUND",
+                    "The runtime session is already bound to a managed simulation execution.",
+                )
+            record.managed_simulation_execution_id = execution_id
+            try:
+                yield (
+                    current.model_copy(deep=True),
+                    record.mission.model_copy(deep=True),
+                    record.planner_receipt,
+                    record.asset_receipt,
+                )
+            except BaseException:
+                if record.managed_simulation_execution_id == execution_id:
+                    record.managed_simulation_execution_id = None
+                raise
 
     def finalize_simulation(
         self,
         owner_id: str,
         session_id: str,
         *,
+        execution_id: str,
         verified: bool,
         evidence_sha256: str | None,
         failure: str | None,
@@ -514,18 +528,39 @@ class RuntimeSessionRegistry:
 
         with self._lock:
             record = self._owned(owner_id, session_id)
+            if record.managed_simulation_execution_id != execution_id:
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_RUNTIME_EXECUTION_BINDING_MISMATCH",
+                    (
+                        "Only the bound managed simulation execution can finalize this "
+                        "runtime session."
+                    ),
+                )
+            record.managed_simulation_execution_id = None
             current = record.result
             if current.terminal:
                 return current.model_copy(deep=True)
+            safety_stopped = current.phase in {"holding", "landing", "aborted"}
+            effective_verified = verified and not safety_stopped
+            effective_failure = failure
+            if safety_stopped and effective_failure is None:
+                effective_failure = (
+                    f"runtime phase {current.phase} denied the physical evidence seal"
+                )
             now = _now()
-            code = "runtime.simulation-verified" if verified else "runtime.simulation-failed"
+            code = (
+                "runtime.simulation-verified" if effective_verified else "runtime.simulation-failed"
+            )
             summary = (
                 "PX4/Gazebo mission evidence passed every physical qualification gate."
-                if verified
-                else f"PX4/Gazebo mission failed closed: {(failure or 'unknown failure')[:180]}"
+                if effective_verified
+                else (
+                    "PX4/Gazebo mission failed closed: "
+                    f"{(effective_failure or 'unknown failure')[:180]}"
+                )
             )
             task_graph = current.task_graph.model_copy(deep=True)
-            if verified:
+            if effective_verified:
                 task_graph = task_graph.model_copy(
                     update={
                         "nodes": [
@@ -547,11 +582,11 @@ class RuntimeSessionRegistry:
             )
             record.result = current.model_copy(
                 update={
-                    "phase": "completed" if verified else "aborted",
+                    "phase": "completed" if effective_verified else "aborted",
                     "updated_at": now,
                     "decision": SafetyDecision(
-                        action="continue" if verified else "abort",
-                        accepted=verified,
+                        action="continue" if effective_verified else "abort",
+                        accepted=effective_verified,
                         codes=[code],
                     ),
                     "task_graph": task_graph,
@@ -598,6 +633,11 @@ class RuntimeSessionRegistry:
                 previous_monotonic_ms=current.latest_monotonic_ms,
             )
             phase = _next_phase(observation, decision)
+            if phase == "completed" and record.managed_simulation_execution_id is not None:
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_RUNTIME_SIMULATION_EVIDENCE_PENDING",
+                    "A managed simulation can complete only after its physical evidence is sealed.",
+                )
             task_graph = _advance_task_graph(current.task_graph, observation, decision)
             all_entity_ids = [entity.track_id for entity in _dynamic_entities(observation)]
             entity_ids = all_entity_ids[:32]

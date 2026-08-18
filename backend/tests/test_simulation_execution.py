@@ -547,6 +547,160 @@ def test_runtime_landing_decision_stops_an_active_simulator(
     processes[0].finish(1)
 
 
+def test_completed_observation_cannot_outrun_managed_simulation_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-active-completion",
+        ),
+    )
+    created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    with pytest.raises(AutonomyRuntimeError) as pending:
+        sessions.observe(
+            "owner-a",
+            session.session_id,
+            _runtime_observation(
+                armed=False,
+                landed=True,
+                mission_progress=1.0,
+                velocity_mps=Vector3(x=0.0, y=0.0, z=0.0),
+            ),
+        )
+
+    assert pending.value.code == "AUTONOMY_RUNTIME_SIMULATION_EVIDENCE_PENDING"
+    unsealed = sessions.get("owner-a", session.session_id)
+    assert unsealed.phase == "ready"
+    assert unsealed.terminal is False
+    assert unsealed.observation_count == 0
+    assert not list(tmp_path.rglob("live_abort.request.json"))
+
+    run_dir = next(path for path in tmp_path.rglob(created.execution_id) if path.is_dir())
+    (run_dir / "mission_evidence.json").write_text(
+        json.dumps({"status": "verified", "gates": {}}, sort_keys=True),
+        encoding="utf-8",
+    )
+    processes[0].finish(0)
+    deadline = time.monotonic() + 2
+    final = registry.get("owner-a", created.execution_id)
+    while final.state not in {"verified", "failed", "aborted"} and time.monotonic() < deadline:
+        time.sleep(0.01)
+        final = registry.get("owner-a", created.execution_id)
+
+    assert final.state == "verified"
+    sealed = sessions.get("owner-a", session.session_id)
+    assert sealed.phase == "completed"
+    assert sealed.terminal is True
+    assert sealed.decision.codes == ["runtime.simulation-verified"]
+
+
+def test_stale_execution_cannot_finalize_or_release_the_active_binding(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-finalizer-binding",
+        ),
+    )
+    created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    with pytest.raises(AutonomyRuntimeError) as mismatch:
+        sessions.finalize_simulation(
+            "owner-a",
+            session.session_id,
+            execution_id="simexec-stale-finalizer",
+            verified=True,
+            evidence_sha256="e" * 64,
+            failure=None,
+        )
+
+    assert mismatch.value.code == "AUTONOMY_RUNTIME_EXECUTION_BINDING_MISMATCH"
+    with pytest.raises(AutonomyRuntimeError) as still_pending:
+        sessions.observe(
+            "owner-a",
+            session.session_id,
+            _runtime_observation(armed=False, landed=True, mission_progress=1.0),
+        )
+    assert still_pending.value.code == "AUTONOMY_RUNTIME_SIMULATION_EVIDENCE_PENDING"
+
+    run_dir = next(path for path in tmp_path.rglob(created.execution_id) if path.is_dir())
+    (run_dir / "mission_evidence.json").write_text(
+        json.dumps({"status": "verified", "gates": {}}, sort_keys=True),
+        encoding="utf-8",
+    )
+    processes[0].finish(0)
+    deadline = time.monotonic() + 2
+    final = registry.get("owner-a", created.execution_id)
+    while final.state not in {"verified", "failed", "aborted"} and time.monotonic() < deadline:
+        time.sleep(0.01)
+        final = registry.get("owner-a", created.execution_id)
+    assert final.state == "verified"
+
+
+@pytest.mark.parametrize("runtime_phase", ["holding", "landing"])
+def test_last_moment_runtime_safety_state_denies_a_verified_process_seal(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    runtime_phase: str,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    monkeypatch.setattr(registry, "_sync_runtime_control", lambda _record: None)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id=f"runtime-request-finalize-{runtime_phase}",
+        ),
+    )
+    created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+    if runtime_phase == "holding":
+        controlled = sessions.command(
+            "owner-a",
+            session.session_id,
+            RuntimeOperatorCommand.model_validate(
+                {"action": "hold", "reason": "operator hold at process exit"}
+            ),
+        )
+    else:
+        controlled = sessions.observe(
+            "owner-a",
+            session.session_id,
+            _runtime_observation(geofence_ok=False),
+        )
+    assert controlled.phase == runtime_phase
+
+    run_dir = next(path for path in tmp_path.rglob(created.execution_id) if path.is_dir())
+    (run_dir / "mission_evidence.json").write_text(
+        json.dumps({"status": "verified", "gates": {}}, sort_keys=True),
+        encoding="utf-8",
+    )
+    processes[0].finish(0)
+    deadline = time.monotonic() + 2
+    final = registry.get("owner-a", created.execution_id)
+    while final.state not in {"verified", "failed", "aborted"} and time.monotonic() < deadline:
+        time.sleep(0.01)
+        final = registry.get("owner-a", created.execution_id)
+
+    assert final.state == "aborted"
+    sealed = sessions.get("owner-a", session.session_id)
+    assert sealed.phase == "aborted"
+    assert sealed.decision.action == "abort"
+    assert sealed.decision.accepted is False
+    assert sealed.decision.codes == ["runtime.simulation-failed"]
+
+
 def test_missing_runtime_session_stops_an_active_simulator(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
