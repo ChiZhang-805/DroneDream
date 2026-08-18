@@ -643,6 +643,7 @@ export interface ExperimentAssistantTurnResponse {
         | "lab_real_to_sim_workflow"
         | "field_task_plan";
     artifact_payload?: Record<string, unknown>;
+    artifact_sha256?: string;
     sequence: number;
     intent: string | null;
     workflow: Array<{

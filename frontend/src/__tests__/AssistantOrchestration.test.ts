@@ -41,6 +41,7 @@ function completedRun() {
       assistant_message: "I prepared the draft without running it.",
       questions: [],
       artifact_kind: "simulation_experiment",
+      artifact_sha256: "b".repeat(64),
       artifact_id: "44444444-4444-4444-8444-444444444444",
       artifact_version: 1,
       generated_files: [{

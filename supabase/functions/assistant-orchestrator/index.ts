@@ -1449,6 +1449,17 @@ async function sha256Hex(value: string): Promise<string> {
   return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (isRecord(value)) {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 async function issueInternalGrant(
   userId: string,
   provider: ManagedProvider,
@@ -1868,6 +1879,7 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
         hardware_control: false,
       });
     const result = legacyAssistantResponse(plan, model);
+    const artifactSha256 = await sha256Hex(canonicalJson(plan.draft));
     await registerGeneratedDraft(userId, runId, plan.artifact_kind, plan.draft);
     await recordStep(userId, runId, leaseToken, "persist", 5, "persist", "completed",
       "Persisted the generated draft file and prepared its immutable artifact version", {
@@ -1887,6 +1899,7 @@ async function processClaimedRun(userId: string, run: JsonRecord, leaseToken: st
         questions: plan.questions,
         artifact_kind: plan.artifact_kind,
         artifact_payload: plan.draft,
+        artifact_sha256: artifactSha256,
         product_link_template: productLink(selectedEdition, selectedWorkspace, "{artifact_id}"),
       },
       p_assistant_message: plan.assistant_message,

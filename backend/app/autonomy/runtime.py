@@ -35,6 +35,7 @@ from app.autonomy.models import (
     SafetyDecision,
     VehicleEnvelope,
 )
+from app.autonomy.planner_artifact import VerifiedPlannerArtifactReceipt
 from app.autonomy.service import compile_autonomy_mission
 
 MAX_SESSIONS = 256
@@ -60,6 +61,7 @@ class _SessionRecord:
     client_request_id: str
     vehicle: VehicleEnvelope
     mission: RuntimeSessionCreateRequest
+    planner_receipt: VerifiedPlannerArtifactReceipt | None
     result: RuntimeSession
     last_observation: RuntimeObservation | None = None
 
@@ -350,7 +352,13 @@ class RuntimeSessionRegistry:
             "perception_stream_health_contract": True,
         }
 
-    def create(self, owner_id: str, request: RuntimeSessionCreateRequest) -> RuntimeSession:
+    def create(
+        self,
+        owner_id: str,
+        request: RuntimeSessionCreateRequest,
+        *,
+        planner_receipt: VerifiedPlannerArtifactReceipt | None = None,
+    ) -> RuntimeSession:
         compiled = compile_autonomy_mission(request.mission)
         if not compiled.execution_policy.can_execute:
             raise AutonomyRuntimeError(
@@ -363,7 +371,10 @@ class RuntimeSessionRegistry:
             existing_id = self._idempotency.get(idempotency_key)
             if existing_id:
                 existing = self._records[existing_id]
-                if existing.result.contract_id != compiled.contract.contract_id:
+                if (
+                    existing.result.contract_id != compiled.contract.contract_id
+                    or existing.planner_receipt != planner_receipt
+                ):
                     raise AutonomyRuntimeError(
                         "AUTONOMY_RUNTIME_IDEMPOTENCY_CONFLICT",
                         "client_request_id was already used for another mission contract.",
@@ -423,6 +434,7 @@ class RuntimeSessionRegistry:
                 client_request_id=request.client_request_id,
                 vehicle=request.mission.vehicle.model_copy(deep=True),
                 mission=request.model_copy(deep=True),
+                planner_receipt=planner_receipt,
                 result=session,
             )
             self._idempotency[idempotency_key] = session_id
@@ -437,19 +449,33 @@ class RuntimeSessionRegistry:
         self,
         owner_id: str,
         session_id: str,
-    ) -> tuple[RuntimeSession, RuntimeSessionCreateRequest]:
+    ) -> tuple[
+        RuntimeSession,
+        RuntimeSessionCreateRequest,
+        VerifiedPlannerArtifactReceipt | None,
+    ]:
         """Return the owner-scoped runtime session and immutable launch request."""
 
         with self._lock:
             record = self._owned(owner_id, session_id)
-            return record.result.model_copy(deep=True), record.mission.model_copy(deep=True)
+            return (
+                record.result.model_copy(deep=True),
+                record.mission.model_copy(deep=True),
+                record.planner_receipt,
+            )
 
     @contextmanager
     def simulation_launch_binding(
         self,
         owner_id: str,
         session_id: str,
-    ) -> Iterator[tuple[RuntimeSession, RuntimeSessionCreateRequest]]:
+    ) -> Iterator[
+        tuple[
+            RuntimeSession,
+            RuntimeSessionCreateRequest,
+            VerifiedPlannerArtifactReceipt | None,
+        ]
+    ]:
         """Hold the session lock while a ready session crosses the launch boundary."""
 
         with self._lock:
@@ -460,7 +486,11 @@ class RuntimeSessionRegistry:
                     "AUTONOMY_RUNTIME_NOT_LAUNCHABLE",
                     "Only a ready, nonterminal runtime session can launch the simulator.",
                 )
-            yield current.model_copy(deep=True), record.mission.model_copy(deep=True)
+            yield (
+                current.model_copy(deep=True),
+                record.mission.model_copy(deep=True),
+                record.planner_receipt,
+            )
 
     def finalize_simulation(
         self,

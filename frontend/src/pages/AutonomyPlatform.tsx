@@ -946,6 +946,7 @@ export function AutonomyOverview() {
         : await apiClient.inspectAutonomyHarness(harnessRequest);
       let planningBrief = "";
       let planningRunId: string | null = assistantWorkspaceId;
+      let planningArtifactSha256: string | null = null;
       let autonomyArtifact: AutonomyPlannerArtifact | null = null;
       if (!publicDemoConsole) {
         try {
@@ -1025,6 +1026,16 @@ export function AutonomyOverview() {
         if (!autonomyArtifact) {
           throw new Error("The model did not return a valid autonomy planner artifact.");
         }
+        const serverArtifactSha256 = response.orchestration?.artifact_sha256;
+        const localArtifactSha256 = await autonomyCanonicalSha256(autonomyArtifact);
+        if (
+          !serverArtifactSha256
+          || !/^[0-9a-f]{64}$/u.test(serverArtifactSha256)
+          || serverArtifactSha256 !== localArtifactSha256
+        ) {
+          throw new Error("The model planner artifact did not match its server-issued digest.");
+        }
+        planningArtifactSha256 = serverArtifactSha256;
         const plannerBindingIssues = autonomyPlannerBindingIssues(
           autonomyArtifact,
           harnessRequest,
@@ -1093,6 +1104,7 @@ export function AutonomyOverview() {
           aircraft: harnessRequest.aircraft,
           map_pack: harnessRequest.map_pack,
           planner_binding: publicDemoConsole || !autonomyArtifact || !planningRunId
+            || !planningArtifactSha256
             ? null
             : {
                 schema_version: "dronedream.autonomy.planner-binding.v1",
@@ -1100,7 +1112,7 @@ export function AutonomyOverview() {
                 run_id: planningRunId,
                 provider: selectedPlanningModel.provider,
                 model: selectedPlanningModel.model,
-                artifact_sha256: await autonomyCanonicalSha256(autonomyArtifact),
+                artifact_sha256: planningArtifactSha256,
                 goal: autonomyArtifact.goal,
                 aircraft_id: autonomyArtifact.asset_bindings.aircraft_id,
                 aircraft_version: autonomyArtifact.asset_bindings.aircraft_version,

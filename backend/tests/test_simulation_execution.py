@@ -15,6 +15,7 @@ from app.autonomy.models import (
     RuntimeSessionCreateRequest,
     SimulationExecutionStartRequest,
 )
+from app.autonomy.planner_artifact import VerifiedPlannerArtifactReceipt
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry
 from app.autonomy.simulation_execution import SimulationExecutionRegistry
 
@@ -191,12 +192,32 @@ def _start_request(session_id: str, contract_id: str) -> SimulationExecutionStar
     )
 
 
+def _create_session(
+    sessions: RuntimeSessionRegistry,
+    owner_id: str,
+    request: RuntimeSessionCreateRequest,
+):
+    planner = request.mission.asset_context.planner_binding  # type: ignore[union-attr]
+    return sessions.create(
+        owner_id,
+        request,
+        planner_receipt=VerifiedPlannerArtifactReceipt(
+            owner_subject=owner_id,
+            run_id=planner.run_id,
+            provider=planner.provider,
+            model=planner.model,
+            artifact_sha256=planner.artifact_sha256,
+        ),
+    )
+
+
 def test_simulation_execution_is_model_bound_owner_scoped_and_idempotent(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-001"),
     )
@@ -219,16 +240,39 @@ def test_simulation_execution_is_model_bound_owner_scoped_and_idempotent(
     processes[0].finish(1)
 
 
+def test_simulation_execution_requires_a_server_verified_planner_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = sessions.create(
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-unverified-planner",
+        ),
+    )
+
+    with pytest.raises(AutonomyRuntimeError) as rejected:
+        registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    assert rejected.value.code == "SIMULATION_PLANNER_RECEIPT_REQUIRED"
+    assert rejected.value.status_code == 403
+    assert processes == []
+
+
 def test_simulation_execution_rejects_conflicting_idempotency_binding(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
-    first = sessions.create(
+    first = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-idem-a"),
     )
-    second = sessions.create(
+    second = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-idem-b"),
     )
@@ -253,7 +297,8 @@ def test_simulation_execution_rejects_nonlaunchable_runtime_session(
     action: str,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(
             mission=_mission(),
@@ -280,7 +325,8 @@ def test_live_pose_and_signed_final_evidence_come_from_runner_files(
     tmp_path: Path,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-002"),
     )
@@ -357,7 +403,8 @@ def test_operator_abort_writes_bounded_runner_request(
     tmp_path: Path,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-003"),
     )
@@ -378,7 +425,8 @@ def test_contract_or_planner_digest_mismatch_never_starts_a_process(
     tmp_path: Path,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-004"),
     )
@@ -394,7 +442,8 @@ def test_verified_runner_cannot_override_an_already_aborted_runtime_chain(
     tmp_path: Path,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-race"),
     )
@@ -441,7 +490,8 @@ def test_execution_abort_cannot_be_overwritten_by_late_verified_evidence(
     tmp_path: Path,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=_mission(), client_request_id="runtime-request-abort"),
     )
@@ -486,7 +536,8 @@ def test_fixed_runner_obeys_lower_qualified_motion_limits(
     capabilities["maximum_speed_mps"] = 0.4
     capabilities["maximum_acceleration_mps2"] = 0.3
     mission = AutonomyCompileRequest.model_validate(mission_payload)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(mission=mission, client_request_id="runtime-request-slow"),
     )
@@ -507,7 +558,8 @@ def test_noncanonical_assets_or_model_targets_never_start_the_fixed_runner(
     wrong_asset = _mission().model_dump(mode="json")
     wrong_asset["asset_context"]["aircraft"]["asset_id"] = "aircraft-custom"
     wrong_asset["asset_context"]["planner_binding"]["aircraft_id"] = "aircraft-custom"
-    asset_session = sessions.create(
+    asset_session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(
             mission=AutonomyCompileRequest.model_validate(wrong_asset),
@@ -527,6 +579,64 @@ def test_noncanonical_assets_or_model_targets_never_start_the_fixed_runner(
     )
     with pytest.raises(ValueError, match="canonical route targets"):
         AutonomyCompileRequest.model_validate(wrong_target)
+    assert processes == []
+
+
+@pytest.mark.parametrize(
+    "natural_language",
+    (
+        "Fly through every circular training gate and land.",
+        "Traverse the narrow stair corridor and dock in the lobby.",
+    ),
+)
+def test_noncoffee_compiler_profiles_cannot_reuse_the_coffee_runner(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    natural_language: str,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    payload = _mission().model_dump(mode="json")
+    payload["natural_language"] = natural_language
+    mission = AutonomyCompileRequest.model_validate(payload)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=mission,
+            client_request_id=f"runtime-request-profile-{len(natural_language)}",
+        ),
+    )
+
+    with pytest.raises(AutonomyRuntimeError) as rejected:
+        registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    assert rejected.value.code == "SIMULATION_ROUTE_PROFILE_MISMATCH"
+    assert processes == []
+
+
+def test_noncoffee_server_planner_goal_cannot_reuse_the_coffee_runner(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    payload = _mission().model_dump(mode="json")
+    payload["asset_context"]["planner_binding"]["goal"] = (
+        "Inspect every circular training gate and land."
+    )
+    mission = AutonomyCompileRequest.model_validate(payload)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=mission,
+            client_request_id="runtime-request-noncoffee-planner-goal",
+        ),
+    )
+
+    with pytest.raises(AutonomyRuntimeError) as rejected:
+        registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    assert rejected.value.code == "SIMULATION_ROUTE_PROFILE_MISMATCH"
     assert processes == []
 
 
@@ -570,7 +680,8 @@ def test_edited_or_route_extended_profiles_never_start_the_fixed_runner(
     payload = _mission().model_dump(mode="json")
     mutation(payload)
     mission = AutonomyCompileRequest.model_validate(payload)
-    session = sessions.create(
+    session = _create_session(
+        sessions,
         "owner-a",
         RuntimeSessionCreateRequest(
             mission=mission,

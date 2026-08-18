@@ -66,6 +66,26 @@ def test_managed_model_gateway_requires_credential_free_https() -> None:
         Settings(model_gateway_base_url="https://user:pass@example.com/model-gateway")
 
 
+def test_assistant_orchestrator_requires_the_trusted_oidc_origin() -> None:
+    settings = Settings(
+        oidc_issuer="https://example.supabase.co/auth/v1",
+        assistant_orchestrator_url=(
+            "https://example.supabase.co/functions/v1/assistant-orchestrator"
+        ),
+    )
+    assert settings.assistant_orchestrator_url.endswith("/assistant-orchestrator")
+
+    with pytest.raises(ValidationError, match="credential-free absolute HTTPS"):
+        Settings(assistant_orchestrator_url="http://example.supabase.co/orchestrator")
+    with pytest.raises(ValidationError, match="trusted OIDC issuer origin"):
+        Settings(
+            oidc_issuer="https://example.supabase.co/auth/v1",
+            assistant_orchestrator_url=(
+                "https://attacker.example/functions/v1/assistant-orchestrator"
+            ),
+        )
+
+
 def test_runtime_id_is_optional_and_requires_a_canonical_uuid() -> None:
     assert Settings().dronedream_runtime_id is None
     assert (

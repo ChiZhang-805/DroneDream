@@ -34,6 +34,7 @@ from app.autonomy.px4_x500_vehicle import (
 )
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry, runtime_sessions
 from app.autonomy.school_map_artifact import VEHICLE_COLLISION_DIAMETER_M
+from app.autonomy.service import school_mission_profile
 
 MAX_EXECUTIONS = 32
 MAX_JSON_EVIDENCE_BYTES = 4 * 1024 * 1024
@@ -178,7 +179,7 @@ class SimulationExecutionRegistry:
         owner_id: str,
         request: SimulationExecutionStartRequest,
     ) -> SimulationExecutionStatus:
-        session, session_request = self._runtime_sessions.execution_binding(
+        session, session_request, planner_receipt = self._runtime_sessions.execution_binding(
             owner_id,
             request.runtime_session_id,
         )
@@ -193,6 +194,18 @@ class SimulationExecutionRegistry:
             raise AutonomyRuntimeError(
                 "SIMULATION_PLANNER_BINDING_MISMATCH",
                 "The confirmed model planner artifact is missing or changed.",
+            )
+        if (
+            planner_receipt is None
+            or planner_receipt.run_id != planner.run_id
+            or planner_receipt.provider != planner.provider
+            or planner_receipt.model != planner.model
+            or planner_receipt.artifact_sha256 != planner.artifact_sha256
+        ):
+            raise AutonomyRuntimeError(
+                "SIMULATION_PLANNER_RECEIPT_REQUIRED",
+                "The runtime session has no matching server-verified planner receipt.",
+                403,
             )
         assets = mission.asset_context
         vehicle = mission.vehicle
@@ -265,6 +278,19 @@ class SimulationExecutionRegistry:
                 "SIMULATION_ROUTE_PROFILE_MISMATCH",
                 "The model plan is not bound to the canonical office-to-takeout roundtrip.",
             )
+        planner_goal_mission = mission.model_copy(update={"natural_language": planner.goal})
+        if (
+            school_mission_profile(mission, mission.scene_id or "school-campus-v1") != "coffee"
+            or school_mission_profile(
+                planner_goal_mission,
+                planner_goal_mission.scene_id or "school-campus-v1",
+            )
+            != "coffee"
+        ):
+            raise AutonomyRuntimeError(
+                "SIMULATION_ROUTE_PROFILE_MISMATCH",
+                "The compiled mission profile is not the office-to-takeout roundtrip.",
+            )
         if mission.scene_id != "school-campus-v1":
             raise AutonomyRuntimeError(
                 "SIMULATION_SCENE_UNSUPPORTED",
@@ -331,11 +357,17 @@ class SimulationExecutionRegistry:
             with self._runtime_sessions.simulation_launch_binding(
                 owner_id,
                 request.runtime_session_id,
-            ) as (launch_session, _launch_request):
+            ) as (launch_session, _launch_request, launch_receipt):
                 if launch_session.contract_id != request.contract_id:
                     raise AutonomyRuntimeError(
                         "SIMULATION_CONTRACT_MISMATCH",
                         "The confirmed runtime contract changed before simulation launch.",
+                    )
+                if launch_receipt != planner_receipt:
+                    raise AutonomyRuntimeError(
+                        "SIMULATION_PLANNER_RECEIPT_CHANGED",
+                        "The verified planner receipt changed before simulation launch.",
+                        403,
                     )
                 parent.mkdir(parents=True, exist_ok=True)
                 run_dir.mkdir()

@@ -144,7 +144,7 @@ def _select_perception(request: AutonomyCompileRequest) -> PerceptionMode:
     return "fusion"
 
 
-def _school_mission_profile(
+def school_mission_profile(
     request: AutonomyCompileRequest,
     scene_id: str,
 ) -> SchoolMissionProfile:
@@ -727,7 +727,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             503,
         )
     perception = _select_perception(request)
-    mission_profile = _school_mission_profile(request, scene_id)
+    mission_profile = school_mission_profile(request, scene_id)
     steps = _steps(scene_id, mission_profile, request.vehicle.pickup_payload_kg)
     task_graph = _task_graph(steps)
     profile_path = (
@@ -917,4 +917,8 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
     )
 
 
-__all__ = ["AutonomyCompileError", "compile_autonomy_mission"]
+__all__ = [
+    "AutonomyCompileError",
+    "compile_autonomy_mission",
+    "school_mission_profile",
+]
