@@ -438,9 +438,13 @@ class SimulationExecutionRegistry:
                     )
                 parent.mkdir(parents=True, exist_ok=True)
                 run_dir.mkdir()
-                stdout = (parent / f"{execution_id}.stdout.log").open("w", encoding="utf-8")
-                stderr = (parent / f"{execution_id}.stderr.log").open("w", encoding="utf-8")
+                stdout_path = parent / f"{execution_id}.stdout.log"
+                stderr_path = parent / f"{execution_id}.stderr.log"
+                stdout: IO[str] | None = None
+                stderr: IO[str] | None = None
                 try:
+                    stdout = stdout_path.open("w", encoding="utf-8")
+                    stderr = stderr_path.open("w", encoding="utf-8")
                     process = subprocess.Popen(  # noqa: S603 - fixed executable and fixed runner argv.
                         argv,
                         cwd=_runner_path().parents[2],
@@ -450,17 +454,17 @@ class SimulationExecutionRegistry:
                         start_new_session=True,
                     )
                 except BaseException:
-                    stdout.close()
-                    stderr.close()
-                    for created_path in (
-                        parent / f"{execution_id}.stdout.log",
-                        parent / f"{execution_id}.stderr.log",
-                    ):
+                    for stream in (stdout, stderr):
+                        if stream is not None:
+                            stream.close()
+                    for created_path in (stdout_path, stderr_path):
                         with suppress(OSError):
                             created_path.unlink(missing_ok=True)
                     with suppress(OSError):
                         run_dir.rmdir()
                     raise
+                if stdout is None or stderr is None:
+                    raise RuntimeError("simulation log streams were not initialized")
             now = _now()
             status = SimulationExecutionStatus(
                 execution_id=execution_id,
@@ -516,20 +520,24 @@ class SimulationExecutionRegistry:
     ) -> None:
         record.run_dir.mkdir(parents=True, exist_ok=True)
         abort_path = record.run_dir / "live_abort.request.json"
-        pending_path = record.run_dir / "live_abort.request.json.pending"
-        pending_path.write_text(
-            json.dumps(
-                {
-                    "schema_version": "dronedream.school-map-live-abort.v1",
-                    "reason": request_reason[:240],
-                    "world_paused": False,
-                },
-                sort_keys=True,
+        pending_path = record.run_dir.parent / f".{record.status.execution_id}.live-abort.pending"
+        try:
+            pending_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "dronedream.school-map-live-abort.v1",
+                        "reason": request_reason[:240],
+                        "world_paused": False,
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
             )
-            + "\n",
-            encoding="utf-8",
-        )
-        pending_path.replace(abort_path)
+            pending_path.replace(abort_path)
+        finally:
+            with suppress(OSError):
+                pending_path.unlink(missing_ok=True)
         record.status = record.status.model_copy(
             update={
                 "state": "aborting",

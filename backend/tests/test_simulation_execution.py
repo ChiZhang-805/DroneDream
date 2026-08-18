@@ -420,6 +420,15 @@ def test_operator_abort_writes_bounded_runner_request(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    original_replace = Path.replace
+    replace_paths: list[tuple[Path, Path]] = []
+
+    def observe_replace(source: Path, target: Path) -> Path:
+        if source.name.endswith(".live-abort.pending"):
+            replace_paths.append((source, target))
+        return original_replace(source, target)
+
+    monkeypatch.setattr(Path, "replace", observe_replace)
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
     session = _create_session(
         sessions,
@@ -435,6 +444,11 @@ def test_operator_abort_writes_bounded_runner_request(
     assert aborting.state == "aborting"
     assert payload["reason"] == "operator_abort: Operator requested stop"
     assert payload["world_paused"] is False
+    assert len(replace_paths) == 1
+    pending_path, observed_abort_path = replace_paths[0]
+    assert pending_path.parent == observed_abort_path.parent.parent
+    assert pending_path.parent != observed_abort_path.parent
+    assert not list(tmp_path.rglob("*.pending"))
     processes[0].finish(1)
 
 
@@ -509,6 +523,44 @@ def test_spawn_failure_cleans_owned_artifacts_and_allows_safe_retry(
     created = registry.start("owner-a", request)
     assert created.state == "starting"
     assert attempts == 2
+    assert len(processes) == 1
+    processes[0].finish(1)
+
+
+def test_log_open_failure_cleans_owned_artifacts_and_allows_safe_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    original_open = Path.open
+    attempts = 0
+
+    def fail_stderr_once(path: Path, *args: Any, **kwargs: Any):
+        nonlocal attempts
+        if path.name.endswith(".stderr.log") and attempts == 0:
+            attempts += 1
+            raise OSError("transient log open failure")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", fail_stderr_once)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-log-open-retry",
+        ),
+    )
+    request = _start_request(session.session_id, session.contract_id)
+
+    with pytest.raises(OSError, match="transient log open failure"):
+        registry.start("owner-a", request)
+
+    assert not list(tmp_path.rglob("*.log"))
+    assert not list(tmp_path.rglob("simexec-*"))
+    created = registry.start("owner-a", request)
+    assert created.state == "starting"
+    assert attempts == 1
     assert len(processes) == 1
     processes[0].finish(1)
 
