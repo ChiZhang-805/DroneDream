@@ -46,10 +46,20 @@ MIN_HOVER_DURATION_SECONDS = 1.0
 MAX_HOVER_DURATION_SECONDS = 300.0
 MAX_WAYPOINT_HOLD_SECONDS = 10.0
 MAX_ABORT_REQUEST_BYTES = 4096
+ABORT_POLL_INTERVAL_SECONDS = 0.05
 BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS = 15.0
 RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
 
 _T = TypeVar("_T")
+
+
+class ExternalSafetyAbort(RuntimeError):
+    """Bounded runner-to-executor stop request with cleanup semantics."""
+
+    def __init__(self, reason: str, *, world_paused: bool) -> None:
+        super().__init__(f"external safety abort requested: {reason}")
+        self.reason = reason
+        self.world_paused = world_paused
 
 
 def _require_runtime_details(
@@ -1158,6 +1168,13 @@ def _read_external_abort_request(path: Path) -> tuple[str, bool]:
     return reason.strip(), world_paused
 
 
+def _raise_if_external_abort_requested(path: Path | None) -> None:
+    if path is None or not path.is_file():
+        return
+    reason, world_paused = _read_external_abort_request(path)
+    raise ExternalSafetyAbort(reason, world_paused=world_paused)
+
+
 def load_reference_track(path: Path) -> list[TrackPoint]:
     return load_reference_track_plan(path).points
 
@@ -1475,6 +1492,7 @@ async def _await_with_setpoint_keepalive(
     *,
     hold_setpoint: Setpoint,
     rate_hz: float,
+    abort_check: Callable[[], None] | None = None,
 ) -> _T:
     """Await a bounded control operation without starving PX4 Offboard input."""
 
@@ -1483,10 +1501,37 @@ async def _await_with_setpoint_keepalive(
     operation_task = asyncio.ensure_future(operation)
     try:
         while not operation_task.done():
+            if abort_check is not None:
+                abort_check()
             await client.set_position_ned(hold_setpoint)
             if operation_task.done():
                 break
             await asyncio.wait({operation_task}, timeout=1.0 / rate_hz)
+        if abort_check is not None:
+            abort_check()
+        return operation_task.result()
+    finally:
+        if not operation_task.done():
+            operation_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await operation_task
+
+
+async def _await_with_abort_polling(
+    operation: Awaitable[_T],
+    *,
+    abort_check: Callable[[], None],
+    poll_interval_seconds: float = ABORT_POLL_INTERVAL_SECONDS,
+) -> _T:
+    """Await an operation while cancelling it promptly on an external stop."""
+
+    if not math.isfinite(poll_interval_seconds) or poll_interval_seconds <= 0.0:
+        raise ValueError("abort poll interval must be finite and greater than zero")
+    operation_task = asyncio.ensure_future(operation)
+    try:
+        while not operation_task.done():
+            abort_check()
+            await asyncio.wait({operation_task}, timeout=poll_interval_seconds)
         return operation_task.result()
     finally:
         if not operation_task.done():
@@ -1509,6 +1554,7 @@ async def _wait_for_takeoff_stability(
     horizontal_speed_tolerance_m_s: float,
     vertical_speed_tolerance_m_s: float,
     evidence: dict[str, Any],
+    abort_check: Callable[[], None] | None = None,
 ) -> None:
     for label, value, allow_zero in (
         ("timeout_seconds", timeout_seconds, False),
@@ -1577,6 +1623,8 @@ async def _wait_for_takeoff_stability(
     )
 
     while True:
+        if abort_check is not None:
+            abort_check()
         now = time.monotonic()
         remaining = deadline - now
         if remaining <= 0:
@@ -1615,7 +1663,12 @@ async def _wait_for_takeoff_stability(
                 client.sample_position_velocity_ned(min(telemetry_timeout_seconds, remaining)),
                 hold_setpoint=commanded,
                 rate_hz=sample_rate_hz,
+                abort_check=abort_check,
             )
+        except ExternalSafetyAbort:
+            evidence["status"] = "failed"
+            evidence["failure_reason"] = "external_safety_abort"
+            raise
         except BaseException as exc:
             if evidence["sample_count"] > 0 and time.monotonic() >= deadline:
                 latest = evidence.get("latest_observation")
@@ -2039,10 +2092,22 @@ async def run_executor(
             tick_count=tick_count,
             execution_identity_sha256=str(runtime_profile_details["execution_identity_sha256"]),
         )
+
+    def check_external_abort() -> None:
+        _raise_if_external_abort_requested(abort_file)
+
     try:
-        await client.connect(connection)
+        check_external_abort()
+        await _await_with_abort_polling(
+            client.connect(connection),
+            abort_check=check_external_abort,
+        )
         _log(log_path, f"connected via {connection}")
-        health = await client.wait_until_ready(takeoff_timeout_seconds)
+        check_external_abort()
+        health = await _await_with_abort_polling(
+            client.wait_until_ready(takeoff_timeout_seconds),
+            abort_check=check_external_abort,
+        )
         takeoff_gate["readiness"] = _health_payload(health)
         takeoff_gate["readiness_policy"] = "local_ned_with_px4_preflight_authority"
         takeoff_gate["required_readiness"] = {
@@ -2059,7 +2124,11 @@ async def run_executor(
                 "bypass the preflight safety gate"
             )
         if isinstance(gps_profile, dict):
-            baseline_satellites = await client.get_param_int("SIM_GPS_USED")
+            check_external_abort()
+            baseline_satellites = await _await_with_abort_polling(
+                client.get_param_int("SIM_GPS_USED"),
+                abort_check=check_external_abort,
+            )
             if baseline_satellites < 4:
                 raise RuntimeError(
                     "PX4 SIM_GPS_USED baseline must be at least 4 satellites for "
@@ -2076,11 +2145,21 @@ async def run_executor(
                 f"SIM_GPS_USED baseline recorded as {baseline_satellites}",
             )
         if isinstance(battery_profile, dict):
-            battery_takeoff_gate_parameters = await _hold_battery_during_takeoff_gate(client)
-        try:
-            takeoff_origin = await client.sample_position_velocity_ned(
-                min(2.0, takeoff_timeout_seconds)
+            check_external_abort()
+            battery_takeoff_gate_parameters = await _await_with_abort_polling(
+                _hold_battery_during_takeoff_gate(client),
+                abort_check=check_external_abort,
             )
+        try:
+            check_external_abort()
+            takeoff_origin = await _await_with_abort_polling(
+                client.sample_position_velocity_ned(min(2.0, takeoff_timeout_seconds)),
+                abort_check=check_external_abort,
+            )
+        except ExternalSafetyAbort:
+            takeoff_gate["status"] = "failed"
+            takeoff_gate["failure_reason"] = "external_safety_abort"
+            raise
         except BaseException as exc:
             takeoff_gate["status"] = "failed"
             takeoff_gate["failure_reason"] = "initial_position_velocity_telemetry_unavailable"
@@ -2100,7 +2179,11 @@ async def run_executor(
             down_m=takeoff_origin.down_m,
             yaw_deg=schedule[0].yaw_deg,
         )
-        await client.set_position_ned(initial_hold)
+        check_external_abort()
+        await _await_with_abort_polling(
+            client.set_position_ned(initial_hold),
+            abort_check=check_external_abort,
+        )
         last_commanded_setpoint = initial_hold
         takeoff_gate["initial_setpoint_ned"] = {
             "north_m": initial_hold.north_m,
@@ -2108,13 +2191,21 @@ async def run_executor(
             "down_m": initial_hold.down_m,
             "yaw_deg": initial_hold.yaw_deg,
         }
-        await client.arm()
+        check_external_abort()
+        await _await_with_abort_polling(
+            client.arm(),
+            abort_check=check_external_abort,
+        )
         armed = True
         takeoff_gate["px4_arm_command"] = "accepted"
         _log(log_path, "armed")
 
         timing["takeoff_start_t"] = time.monotonic() - exec_start
-        await client.start_offboard()
+        check_external_abort()
+        await _await_with_abort_polling(
+            client.start_offboard(),
+            abort_check=check_external_abort,
+        )
         offboard_started = True
         timing["offboard_start_t"] = time.monotonic() - exec_start
         _log(log_path, "offboard started")
@@ -2132,6 +2223,7 @@ async def run_executor(
             horizontal_speed_tolerance_m_s=takeoff_horizontal_speed_tolerance_m_s,
             vertical_speed_tolerance_m_s=takeoff_vertical_speed_tolerance_m_s,
             evidence=takeoff_gate,
+            abort_check=check_external_abort,
         )
         last_commanded_setpoint = schedule[0]
         timing["takeoff_stable_t"] = time.monotonic() - exec_start
@@ -2150,6 +2242,7 @@ async def run_executor(
                 ),
                 hold_setpoint=schedule[0],
                 rate_hz=rate_hz,
+                abort_check=check_external_abort,
             )
             if not isinstance(wind_observation, dict):
                 raise RuntimeError("post-hover wind activator returned invalid evidence")
@@ -2176,6 +2269,7 @@ async def run_executor(
                 ),
                 hold_setpoint=schedule[0],
                 rate_hz=rate_hz,
+                abort_check=check_external_abort,
             )
             battery_details["takeoff_gate_parameters"] = _require_runtime_details(
                 battery_takeoff_gate_parameters,
@@ -2187,20 +2281,21 @@ async def run_executor(
         start = event_loop.time()
         track_deadline = start + track_timeout_seconds
         for idx, setpoint in enumerate(schedule):
-            if abort_file is not None and abort_file.is_file():
-                reason, external_abort_world_paused = _read_external_abort_request(abort_file)
-                raise RuntimeError(f"external safety abort requested: {reason}")
+            check_external_abort()
             if idx == track_start and isinstance(battery_profile, dict):
                 conditioning_started = event_loop.time()
-                battery_details = await _transition_battery_at_track_start(
-                    client,
-                    battery_profile,
-                    _require_runtime_details(
-                        battery_details,
-                        label="battery control details",
+                battery_details = await _await_with_abort_polling(
+                    _transition_battery_at_track_start(
+                        client,
+                        battery_profile,
+                        _require_runtime_details(
+                            battery_details,
+                            label="battery control details",
+                        ),
+                        hold_setpoint=schedule[max(0, track_start - 1)],
+                        rate_hz=rate_hz,
                     ),
-                    hold_setpoint=schedule[max(0, track_start - 1)],
-                    rate_hz=rate_hz,
+                    abort_check=check_external_abort,
                 )
                 # Battery conditioning is a bounded pre-track safety gate, not
                 # part of the trajectory execution timeout budget.
@@ -2242,6 +2337,7 @@ async def run_executor(
                                     ),
                                     hold_setpoint=last_commanded_setpoint or schedule[0],
                                     rate_hz=rate_hz,
+                                    abort_check=check_external_abort,
                                 )
                                 gps_off = desired_off
                                 gps_transitions.append(
@@ -2253,7 +2349,10 @@ async def run_executor(
                                         "verification": verification,
                                     }
                                 )
-                    await client.set_position_ned(setpoint)
+                    await _await_with_abort_polling(
+                        client.set_position_ned(setpoint),
+                        abort_check=check_external_abort,
+                    )
                     last_commanded_setpoint = setpoint
                     now_t = time.monotonic() - exec_start
                     if idx == track_start:
@@ -2271,6 +2370,7 @@ async def run_executor(
                                     client.sample_battery(5.0),
                                     hold_setpoint=setpoint,
                                     rate_hz=rate_hz,
+                                    abort_check=check_external_abort,
                                 ),
                                 label="PX4 track-end battery telemetry",
                             )
@@ -2292,7 +2392,10 @@ async def run_executor(
                                 end_percent <= start_percent + 0.5
                             )
                     next_tick_at = start + (idx + 1) * dt
-                    await asyncio.sleep(max(0.0, next_tick_at - event_loop.time()))
+                    await _await_with_abort_polling(
+                        asyncio.sleep(max(0.0, next_tick_at - event_loop.time())),
+                        abort_check=check_external_abort,
+                    )
             except TimeoutError:
                 if timeout_scope.expired():
                     raise TimeoutError(f"track timeout after {track_timeout_seconds:g}s") from None
@@ -2312,6 +2415,7 @@ async def run_executor(
                 ),
                 hold_setpoint=last_commanded_setpoint or schedule[0],
                 rate_hz=rate_hz,
+                abort_check=check_external_abort,
             )
             gps_control["restore"] = verification
             gps_control["restore_verified"] = True
@@ -2354,6 +2458,7 @@ async def run_executor(
         cleanup["stop_offboard"] = "completed"
         _log(log_path, "offboard stopped")
         if land_after:
+            check_external_abort()
             timing["land_start_t"] = time.monotonic() - exec_start
             await client.land()
             land_command_sent = True
@@ -2361,7 +2466,10 @@ async def run_executor(
             _log(log_path, "land command sent")
             landing_confirmation_attempted = True
             try:
-                landing_observation = await client.wait_until_landed(landing_timeout_seconds)
+                landing_observation = await _await_with_abort_polling(
+                    client.wait_until_landed(landing_timeout_seconds),
+                    abort_check=check_external_abort,
+                )
             except Exception as exc:
                 cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
                 raise
@@ -2370,6 +2478,12 @@ async def run_executor(
             timing["land_confirmed_t"] = time.monotonic() - exec_start
             _log(log_path, "landing confirmed ON_GROUND by PX4 telemetry")
     except BaseException as exc:
+        if isinstance(exc, ExternalSafetyAbort):
+            external_abort_world_paused = exc.world_paused
+            timing["external_abort"] = {
+                "reason": exc.reason,
+                "world_paused": exc.world_paused,
+            }
         runtime_failure = f"{type(exc).__name__}: {exc}"
         if takeoff_gate.get("status") not in {"achieved", "failed"}:
             takeoff_gate["status"] = "failed"

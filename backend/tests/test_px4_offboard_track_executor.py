@@ -59,6 +59,197 @@ def test_external_abort_contract_rejects_missing_world_pause_state(tmp_path: Pat
         executor._read_external_abort_request(abort_path)
 
 
+def test_executor_honors_preexisting_abort_before_connecting_or_commanding(
+    tmp_path: Path,
+) -> None:
+    abort_path = _write_json(
+        tmp_path / "abort.json",
+        {"reason": "operator_abort", "world_paused": False},
+    )
+    timing_path = tmp_path / "offboard_timing.json"
+    client = executor.FakeOffboardClient()
+
+    with pytest.raises(executor.ExternalSafetyAbort, match="operator_abort"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=timing_path,
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.connected is False
+    assert client.armed is False
+    assert client.setpoints == []
+    assert client.landed is False
+    assert client.closed is True
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["external_abort"] == {
+        "reason": "operator_abort",
+        "world_paused": False,
+    }
+
+
+def test_executor_rejects_oversized_preflight_abort_before_connecting(tmp_path: Path) -> None:
+    abort_path = tmp_path / "abort.json"
+    abort_path.write_text("x" * (executor.MAX_ABORT_REQUEST_BYTES + 1), encoding="utf-8")
+    client = executor.FakeOffboardClient()
+
+    with pytest.raises(RuntimeError, match="abort request is oversized"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.connected is False
+    assert client.armed is False
+    assert client.setpoints == []
+    assert client.closed is True
+
+
+def test_executor_polls_abort_while_waiting_for_preflight_readiness(tmp_path: Path) -> None:
+    abort_path = tmp_path / "abort.json"
+
+    class ReadinessAbortClient(executor.FakeOffboardClient):
+        async def wait_until_ready(self, timeout_seconds: float) -> executor.TelemetryHealth:
+            _ = timeout_seconds
+            _write_json(abort_path, {"reason": "operator_abort", "world_paused": False})
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+    client = ReadinessAbortClient()
+    with pytest.raises(executor.ExternalSafetyAbort, match="operator_abort"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.connected is True
+    assert client.armed is False
+    assert client.setpoints == []
+    assert client.landed is False
+    assert client.closed is True
+
+
+def test_executor_does_not_start_offboard_when_abort_arrives_with_arm_ack(
+    tmp_path: Path,
+) -> None:
+    abort_path = tmp_path / "abort.json"
+
+    class ArmBoundaryAbortClient(executor.FakeOffboardClient):
+        async def arm(self) -> None:
+            await super().arm()
+            _write_json(abort_path, {"reason": "operator_abort", "world_paused": False})
+
+    client = ArmBoundaryAbortClient()
+    with pytest.raises(executor.ExternalSafetyAbort, match="operator_abort"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.armed is True
+    assert client.offboard_started is False
+    assert client.landed is True
+    assert client.closed is True
+
+
+@pytest.mark.parametrize("world_paused", [False, True])
+def test_executor_stops_takeoff_commands_when_external_abort_appears(
+    tmp_path: Path,
+    world_paused: bool,
+) -> None:
+    abort_path = tmp_path / "abort.json"
+
+    class TakeoffAbortClient(executor.FakeOffboardClient):
+        sample_calls = 0
+        setpoint_count_at_abort: int | None = None
+
+        async def sample_position_velocity_ned(
+            self,
+            timeout_seconds: float,
+        ) -> executor.PositionVelocityNed:
+            _ = timeout_seconds
+            self.sample_calls += 1
+            if self.sample_calls == 1:
+                return executor.PositionVelocityNed(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            _write_json(
+                abort_path,
+                {"reason": "live_collision_penetration", "world_paused": world_paused},
+            )
+            self.setpoint_count_at_abort = len(self.setpoints)
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+    timing_path = tmp_path / "offboard_timing.json"
+    client = TakeoffAbortClient()
+    with pytest.raises(executor.ExternalSafetyAbort, match="live_collision_penetration"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=timing_path,
+                abort_file=abort_path,
+            )
+        )
+
+    assert client.armed is True
+    assert client.offboard_started is False
+    assert client.setpoint_count_at_abort is not None
+    assert len(client.setpoints) == client.setpoint_count_at_abort
+    assert client.landed is (not world_paused)
+    assert client.closed is True
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["takeoff_gate"]["failure_reason"] == "external_safety_abort"
+    assert timing["external_abort"]["world_paused"] is world_paused
+    expected_land = (
+        "suppressed_world_paused_external_safety_abort"
+        if world_paused
+        else "confirmed_on_ground_during_failure_cleanup"
+    )
+    assert timing["cleanup"]["land"] == expected_land
+
+
 def test_load_reference_track_and_controller_params(tmp_path: Path):
     track = _write_json(
         tmp_path / "reference_track.json",
