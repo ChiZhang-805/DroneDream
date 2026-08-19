@@ -1280,6 +1280,7 @@ def main(argv: list[str] | None = None) -> int:
         route,
         route_length_m,
     ) = _prepare_run(run_dir, px4_root, velocity_m_s, acceleration_m_s2)
+    designated_landing_contact_center = model_root_to_world_envelope_center(model_root_world)
 
     gz_binary = _require_executable("gz")
     trial_rootfs, px4_executable = _prepare_isolated_px4_rootfs(px4_root, run_dir)
@@ -1583,7 +1584,7 @@ def main(argv: list[str] | None = None) -> int:
                     live_clearance = _dynamic_safety_clearance(
                         [center],
                         primitives,
-                        route[0],
+                        designated_landing_contact_center,
                     )
                     if live_clearance["unsafe_collision_count"]:
                         live_abort_reason = (

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -65,8 +66,11 @@ def test_landing_contact_over_two_millimeters_fails_the_contact_gate() -> None:
 
 def test_live_clearance_uses_the_same_designated_pad_contact_contract() -> None:
     primitives = runner.school_map_collision_primitives()
-    exact = runner._route_points()[0]
+    spawn_model_root = (-42.25, 15.3, 7.487)
+    exact = model_root_to_world_envelope_center(spawn_model_root)
     solver_contact = (exact[0], exact[1], exact[2] - 0.0018)
+
+    assert math.dist(exact, runner._route_points()[0]) > 0.4
 
     result = runner._dynamic_safety_clearance(
         [solver_contact],

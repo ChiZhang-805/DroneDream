@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
@@ -29,6 +30,259 @@ from app.autonomy.px4_x500_vehicle import (
 )
 
 Point2D = tuple[float, float]
+
+
+class PhysicalMaterialProfile(TypedDict):
+    density_kg_m3: float
+    youngs_modulus_pa: float
+    poisson_ratio: float
+    characteristic_strength_mpa: float
+    strength_basis: str
+    friction_mu: float
+    friction_mu2: float
+    restitution: float
+    contact_stiffness_n_m: float
+    contact_damping_n_s_m: float
+    visual_opacity: float
+
+
+# Representative engineering properties for the rigid-body simulation contract.
+# Density and strength document the intended real material. Gazebo uses its
+# real-time-qualified DART rigid-contact model for this static map; applying
+# thousands of per-collision elastic overrides makes the PX4 control clock miss
+# real time. Fracture and permanent deformation remain outside the map model, so
+# strength values are not a crashworthiness simulation claim.
+PHYSICAL_MATERIAL_PROFILES: dict[str, PhysicalMaterialProfile] = {
+    "campus-surface": {
+        "density_kg_m3": 2200.0,
+        "youngs_modulus_pa": 8.0e9,
+        "poisson_ratio": 0.28,
+        "characteristic_strength_mpa": 12.0,
+        "strength_basis": "compressive",
+        "friction_mu": 0.78,
+        "friction_mu2": 0.72,
+        "restitution": 0.04,
+        "contact_stiffness_n_m": 6.0e7,
+        "contact_damping_n_s_m": 1.0e5,
+        "visual_opacity": 1.0,
+    },
+    "structural-concrete": {
+        "density_kg_m3": 2400.0,
+        "youngs_modulus_pa": 30.0e9,
+        "poisson_ratio": 0.20,
+        "characteristic_strength_mpa": 30.0,
+        "strength_basis": "compressive",
+        "friction_mu": 0.75,
+        "friction_mu2": 0.70,
+        "restitution": 0.03,
+        "contact_stiffness_n_m": 1.0e8,
+        "contact_damping_n_s_m": 1.0e5,
+        "visual_opacity": 1.0,
+    },
+    "masonry": {
+        "density_kg_m3": 1900.0,
+        "youngs_modulus_pa": 14.0e9,
+        "poisson_ratio": 0.20,
+        "characteristic_strength_mpa": 15.0,
+        "strength_basis": "compressive",
+        "friction_mu": 0.65,
+        "friction_mu2": 0.60,
+        "restitution": 0.04,
+        "contact_stiffness_n_m": 8.0e7,
+        "contact_damping_n_s_m": 1.0e5,
+        "visual_opacity": 1.0,
+    },
+    "gypsum-board": {
+        "density_kg_m3": 950.0,
+        "youngs_modulus_pa": 2.5e9,
+        "poisson_ratio": 0.25,
+        "characteristic_strength_mpa": 5.0,
+        "strength_basis": "compressive",
+        "friction_mu": 0.55,
+        "friction_mu2": 0.50,
+        "restitution": 0.03,
+        "contact_stiffness_n_m": 3.0e7,
+        "contact_damping_n_s_m": 8.0e4,
+        "visual_opacity": 1.0,
+    },
+    "safety-glass": {
+        "density_kg_m3": 2500.0,
+        "youngs_modulus_pa": 70.0e9,
+        "poisson_ratio": 0.22,
+        "characteristic_strength_mpa": 40.0,
+        "strength_basis": "tensile",
+        "friction_mu": 0.25,
+        "friction_mu2": 0.22,
+        "restitution": 0.08,
+        "contact_stiffness_n_m": 8.0e7,
+        "contact_damping_n_s_m": 1.0e5,
+        "visual_opacity": 0.42,
+    },
+    "painted-steel": {
+        "density_kg_m3": 7850.0,
+        "youngs_modulus_pa": 200.0e9,
+        "poisson_ratio": 0.30,
+        "characteristic_strength_mpa": 250.0,
+        "strength_basis": "yield",
+        "friction_mu": 0.45,
+        "friction_mu2": 0.40,
+        "restitution": 0.06,
+        "contact_stiffness_n_m": 1.5e8,
+        "contact_damping_n_s_m": 2.0e5,
+        "visual_opacity": 1.0,
+    },
+    "aluminium": {
+        "density_kg_m3": 2700.0,
+        "youngs_modulus_pa": 69.0e9,
+        "poisson_ratio": 0.33,
+        "characteristic_strength_mpa": 150.0,
+        "strength_basis": "yield",
+        "friction_mu": 0.38,
+        "friction_mu2": 0.33,
+        "restitution": 0.05,
+        "contact_stiffness_n_m": 1.0e8,
+        "contact_damping_n_s_m": 1.2e5,
+        "visual_opacity": 1.0,
+    },
+    "hardwood": {
+        "density_kg_m3": 700.0,
+        "youngs_modulus_pa": 11.0e9,
+        "poisson_ratio": 0.35,
+        "characteristic_strength_mpa": 45.0,
+        "strength_basis": "bending",
+        "friction_mu": 0.55,
+        "friction_mu2": 0.50,
+        "restitution": 0.04,
+        "contact_stiffness_n_m": 3.0e7,
+        "contact_damping_n_s_m": 8.0e4,
+        "visual_opacity": 1.0,
+    },
+    "furniture-laminate": {
+        "density_kg_m3": 750.0,
+        "youngs_modulus_pa": 4.0e9,
+        "poisson_ratio": 0.30,
+        "characteristic_strength_mpa": 25.0,
+        "strength_basis": "bending",
+        "friction_mu": 0.50,
+        "friction_mu2": 0.45,
+        "restitution": 0.04,
+        "contact_stiffness_n_m": 2.0e7,
+        "contact_damping_n_s_m": 6.0e4,
+        "visual_opacity": 1.0,
+    },
+    "engineering-polymer": {
+        "density_kg_m3": 1100.0,
+        "youngs_modulus_pa": 2.0e9,
+        "poisson_ratio": 0.38,
+        "characteristic_strength_mpa": 35.0,
+        "strength_basis": "tensile",
+        "friction_mu": 0.50,
+        "friction_mu2": 0.45,
+        "restitution": 0.08,
+        "contact_stiffness_n_m": 1.0e7,
+        "contact_damping_n_s_m": 4.0e4,
+        "visual_opacity": 1.0,
+    },
+    "living-wood": {
+        "density_kg_m3": 650.0,
+        "youngs_modulus_pa": 9.0e9,
+        "poisson_ratio": 0.35,
+        "characteristic_strength_mpa": 35.0,
+        "strength_basis": "compressive",
+        "friction_mu": 0.60,
+        "friction_mu2": 0.55,
+        "restitution": 0.03,
+        "contact_stiffness_n_m": 1.0e7,
+        "contact_damping_n_s_m": 5.0e4,
+        "visual_opacity": 1.0,
+    },
+    "foliage-envelope": {
+        "density_kg_m3": 150.0,
+        "youngs_modulus_pa": 5.0e6,
+        "poisson_ratio": 0.40,
+        "characteristic_strength_mpa": 0.5,
+        "strength_basis": "compressive",
+        "friction_mu": 0.70,
+        "friction_mu2": 0.60,
+        "restitution": 0.02,
+        "contact_stiffness_n_m": 2.0e5,
+        "contact_damping_n_s_m": 2.0e4,
+        "visual_opacity": 1.0,
+    },
+    "flexible-gate-composite": {
+        "density_kg_m3": 1200.0,
+        "youngs_modulus_pa": 8.0e7,
+        "poisson_ratio": 0.45,
+        "characteristic_strength_mpa": 10.0,
+        "strength_basis": "tensile",
+        "friction_mu": 0.85,
+        "friction_mu2": 0.80,
+        "restitution": 0.20,
+        "contact_stiffness_n_m": 3.0e6,
+        "contact_damping_n_s_m": 2.0e4,
+        "visual_opacity": 1.0,
+    },
+}
+
+
+SEMANTIC_PHYSICAL_MATERIAL: dict[str, str] = {
+    "terrain": "campus-surface",
+    "floor": "structural-concrete",
+    "stair-tread": "structural-concrete",
+    "stair-landing": "structural-concrete",
+    "entrance-step": "structural-concrete",
+    "door-threshold": "structural-concrete",
+    "launch-pad": "structural-concrete",
+    "pickup-pad": "structural-concrete",
+    "roof": "structural-concrete",
+    "exterior-wall": "masonry",
+    "facade-structure": "masonry",
+    "guard-booth": "masonry",
+    "interior-wall": "gypsum-board",
+    "window-glazing": "safety-glass",
+    "window-frame": "aluminium",
+    "window-mullion": "aluminium",
+    "canopy": "painted-steel",
+    "canopy-column": "painted-steel",
+    "door-frame": "painted-steel",
+    "door-header": "painted-steel",
+    "fence-post": "painted-steel",
+    "fence-rail": "painted-steel",
+    "gate-header": "painted-steel",
+    "gate-post": "painted-steel",
+    "stair-handrail": "painted-steel",
+    "stair-handrail-post": "painted-steel",
+    "street-light-arm": "painted-steel",
+    "street-light-base": "painted-steel",
+    "street-light-lamp": "painted-steel",
+    "street-light-pole": "painted-steel",
+    "furniture-support": "painted-steel",
+    "conservative-bicycle-and-rack-envelope": "painted-steel",
+    "conservative-bike-rack-envelope": "painted-steel",
+    "training-gate-base": "painted-steel",
+    "training-gate-support": "painted-steel",
+    "closed-door-leaf": "hardwood",
+    "open-door-leaf": "hardwood",
+    "blackboard": "furniture-laminate",
+    "bookshelf": "furniture-laminate",
+    "cafeteria-table": "furniture-laminate",
+    "office-desk": "furniture-laminate",
+    "pickup-shelf": "furniture-laminate",
+    "podium": "furniture-laminate",
+    "service-counter": "furniture-laminate",
+    "student-desktop": "furniture-laminate",
+    "teacher-desk": "furniture-laminate",
+    "chair": "engineering-polymer",
+    "plant-pot": "engineering-polymer",
+    "tree-trunk": "living-wood",
+    "plant-crown": "foliage-envelope",
+    "tree-crown": "foliage-envelope",
+    "training-gate-ring": "flexible-gate-composite",
+    "training-gate-ring-collision": "flexible-gate-composite",
+    "conservative-window-assembly-envelope": "safety-glass",
+    "conservative-furniture-assembly-envelope": "furniture-laminate",
+    "conservative-tree-crown-envelope": "foliage-envelope",
+}
 
 
 class Crosswalk(TypedDict):
@@ -74,6 +328,8 @@ class RoadNetwork(TypedDict):
 STRUCTURAL_TOLERANCE_M = 0.001
 ROUTE_ENDPOINT_TOLERANCE_M = 0.01
 SEMANTIC_FLOAT_DECIMAL_PLACES = 12
+SCHOOL_MAP_PHYSICS_STEP_SECONDS = 0.004
+SCHOOL_MAP_PHYSICS_UPDATE_RATE_HZ = 250
 FLOOR_SLAB_M = 0.22
 STOREY_HEIGHT_M = 3.6
 WALL_HEIGHT_M = STOREY_HEIGHT_M - FLOOR_SLAB_M
@@ -415,14 +671,14 @@ SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY: dict[str, object] = {
     "schema_version": "dronedream.autonomy.gazebo-artifact-summary.v1",
     "format": "sdf",
     "sdf_version": "1.9",
-    "model_sdf_sha256": "58809c97af977fe637d66fe2b1b72072a3c81b084782a14bc00425a97eba7071",
-    "semantic_sha256": "a188c56169a616385e0c3998ae507ae656a6300207e9decd3442d1bd2cc6ccff",
-    "world_sdf_sha256": "ddcde7bd30484e0f2c90cbecb5e7a0704703d92929b2de5847e5d9e1fe22b6e0",
+    "model_sdf_sha256": "dc397b181a9f170ab571c69395f02427a32596b6674854f3cba97ad6016cc50f",
+    "semantic_sha256": "3a8e560a1974af6d17e8cb8146591982898d0b2cb4c2c0b9deba9b3c636bd8a7",
+    "world_sdf_sha256": "6cfb6d1716418529e28e06089278faa8701de809c78f11fa3ac9012dc111c903",
     "physics_world_sdf_sha256": (
-        "f5a861691a24fab815f7f1800bd29ab2483fe77ea9be9eb9af721e1677303bae"
+        "5848b1d403f535fade24f4562f2cfc0162bf7560274767c6c97e7f8ac66e0121"
     ),
     "physics_model_sdf_sha256": (
-        "7d533e42aeffe2a612fa2f05c5fa711c9a1bdd3e0e1d7147e586b269fb6f7f14"
+        "c244e03f3e53d2ba64e798dc47e3486210ace25ef42ae35e64e294d24e47042a"
     ),
     "model_config_sha256": "eb06bf2d09e16f6e7b4c5ca379b5aea4c16b7a082f3e8a6e41c020049646dcf5",
     "package_file_sha256": {
@@ -443,19 +699,19 @@ SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY: dict[str, object] = {
             "d443f8c87e66c7fd914bdc86b19aa5266ab6376b4f4416b6c2aa78595cb23cb0"
         ),
         "model.config": "eb06bf2d09e16f6e7b4c5ca379b5aea4c16b7a082f3e8a6e41c020049646dcf5",
-        "model.physics.sdf": ("7d533e42aeffe2a612fa2f05c5fa711c9a1bdd3e0e1d7147e586b269fb6f7f14"),
-        "model.sdf": "58809c97af977fe637d66fe2b1b72072a3c81b084782a14bc00425a97eba7071",
+        "model.physics.sdf": ("c244e03f3e53d2ba64e798dc47e3486210ace25ef42ae35e64e294d24e47042a"),
+        "model.sdf": "dc397b181a9f170ab571c69395f02427a32596b6674854f3cba97ad6016cc50f",
         "ros_gz_bridge.yaml": ("89220ef78125348776575b1a14fa1727c9cb098d9c46d84a74e27e5e8715f0b1"),
-        "semantic.json": "a188c56169a616385e0c3998ae507ae656a6300207e9decd3442d1bd2cc6ccff",
-        "world.physics.sdf": ("f5a861691a24fab815f7f1800bd29ab2483fe77ea9be9eb9af721e1677303bae"),
-        "world.sdf": "ddcde7bd30484e0f2c90cbecb5e7a0704703d92929b2de5847e5d9e1fe22b6e0",
+        "semantic.json": "3a8e560a1974af6d17e8cb8146591982898d0b2cb4c2c0b9deba9b3c636bd8a7",
+        "world.physics.sdf": ("5848b1d403f535fade24f4562f2cfc0162bf7560274767c6c97e7f8ac66e0121"),
+        "world.sdf": "6cfb6d1716418529e28e06089278faa8701de809c78f11fa3ac9012dc111c903",
     },
-    "package_manifest_sha256": ("0f5135940c74844923a86cd6e000bb44f9097bbd79442fd9e014b94211c50f8d"),
+    "package_manifest_sha256": ("f7685a1009ace23b8cd8a64e7828e326f4fb04d66b3e5826c5169b92c571b3e2"),
     "package_file_count": 13,
-    "collision_primitive_count": 4023,
+    "collision_primitive_count": 1535,
     "visual_primitive_count": 3930,
     "geometry_scope": "simulation-static-scene-v2",
-    "known_export_limit_count": 4,
+    "known_export_limit_count": 5,
     "gazebo_asset_contract_generated": True,
     "gazebo_cli_validation_required": True,
     "gazebo_runtime_verified": False,
@@ -2444,10 +2700,149 @@ def school_map_collision_primitives() -> list[CollisionPrimitive]:
     return primitives
 
 
+def _box_group_envelope(
+    name: str,
+    primitives: list[BoxPrimitive],
+    semantic: str,
+) -> BoxPrimitive:
+    """Return the exact world-axis envelope for a group of unpitched boxes."""
+
+    if not primitives:
+        raise ValueError(f"Cannot create empty collision envelope {name}")
+    bounds: list[tuple[float, float, float, float, float, float]] = []
+    for primitive in primitives:
+        if abs(primitive.roll_rad) > 1e-12 or abs(primitive.pitch_rad) > 1e-12:
+            raise ValueError(f"Envelope source {primitive.name} is pitched or rolled")
+        cosine = abs(math.cos(primitive.yaw_rad))
+        sine = abs(math.sin(primitive.yaw_rad))
+        half_x = (cosine * primitive.size_x + sine * primitive.size_y) / 2
+        half_y = (sine * primitive.size_x + cosine * primitive.size_y) / 2
+        bounds.append(
+            (
+                primitive.center_x - half_x,
+                primitive.center_x + half_x,
+                primitive.center_y - half_y,
+                primitive.center_y + half_y,
+                primitive.center_z - primitive.size_z / 2,
+                primitive.center_z + primitive.size_z / 2,
+            )
+        )
+    minimum_x = min(bound[0] for bound in bounds)
+    maximum_x = max(bound[1] for bound in bounds)
+    minimum_y = min(bound[2] for bound in bounds)
+    maximum_y = max(bound[3] for bound in bounds)
+    minimum_z = min(bound[4] for bound in bounds)
+    maximum_z = max(bound[5] for bound in bounds)
+    return _box(
+        name,
+        (
+            (minimum_x + maximum_x) / 2,
+            (minimum_y + maximum_y) / 2,
+            (minimum_z + maximum_z) / 2,
+        ),
+        (maximum_x - minimum_x, maximum_y - minimum_y, maximum_z - minimum_z),
+        semantic,
+    )
+
+
+def _furniture_assembly_key(name: str) -> str | None:
+    for pattern in (
+        r"^(classroom-\d+-\d+-desk-\d+-\d+)",
+        r"^(cafeteria-\d+-table-\d+-\d+)",
+    ):
+        match = re.match(pattern, name)
+        if match:
+            return match.group(1)
+    match = re.match(r"^office-(?:desk|chair)-(\d+)", name)
+    if match:
+        return f"office-workstation-{match.group(1)}"
+    return None
+
+
+def school_map_runtime_collision_primitives() -> list[CollisionPrimitive]:
+    """Compile a conservative real-time collision representation.
+
+    Detailed render and semantic geometry remains available through
+    :func:`school_map_collision_primitives`. Repetitive sub-centimetre furniture
+    supports, window members and overlapping organic crown lobes are grouped
+    into exact or conservative envelopes so the 250 Hz PX4/Gazebo clock does not
+    miss real time. Every omitted solid is contained by one named replacement.
+    """
+
+    detailed = school_map_collision_primitives()
+    retained: list[CollisionPrimitive] = []
+    windows: dict[str, list[BoxPrimitive]] = {}
+    furniture: dict[str, list[BoxPrimitive]] = {}
+    tree_crowns: dict[str, list[SpherePrimitive]] = {}
+    window_semantics = {"window-frame", "window-mullion", "window-glazing"}
+
+    for primitive in detailed:
+        if primitive.semantic in window_semantics:
+            if not isinstance(primitive, BoxPrimitive):
+                raise TypeError(f"Window primitive {primitive.name} must be a box")
+            window_key = re.sub(r"-(?:frame-.+|mullion-.+|glass)$", "", primitive.name)
+            windows.setdefault(window_key, []).append(primitive)
+            continue
+        furniture_key = _furniture_assembly_key(primitive.name)
+        if furniture_key is not None:
+            if not isinstance(primitive, BoxPrimitive):
+                raise TypeError(f"Furniture primitive {primitive.name} must be a box")
+            furniture.setdefault(furniture_key, []).append(primitive)
+            continue
+        tree_match = re.match(r"^(campus-tree-\d+)-crown-\d+$", primitive.name)
+        if tree_match:
+            if not isinstance(primitive, SpherePrimitive):
+                raise TypeError(f"Tree crown primitive {primitive.name} must be a sphere")
+            tree_crowns.setdefault(tree_match.group(1), []).append(primitive)
+            continue
+        if not isinstance(primitive, MeshPrimitive):
+            retained.append(primitive)
+
+    for key in sorted(windows):
+        retained.append(
+            _box_group_envelope(
+                f"{key}-conservative-window-envelope",
+                windows[key],
+                "conservative-window-assembly-envelope",
+            )
+        )
+    for key in sorted(furniture):
+        retained.append(
+            _box_group_envelope(
+                f"{key}-conservative-furniture-envelope",
+                furniture[key],
+                "conservative-furniture-assembly-envelope",
+            )
+        )
+    for key in sorted(tree_crowns):
+        crowns = tree_crowns[key]
+        center_x = sum(crown.center_x for crown in crowns) / len(crowns)
+        center_y = sum(crown.center_y for crown in crowns) / len(crowns)
+        center_z = sum(crown.center_z for crown in crowns) / len(crowns)
+        radius_m = max(
+            math.dist(
+                (center_x, center_y, center_z),
+                (crown.center_x, crown.center_y, crown.center_z),
+            )
+            + crown.radius_m
+            for crown in crowns
+        )
+        retained.append(
+            _sphere(
+                f"{key}-conservative-crown-envelope",
+                (center_x, center_y, center_z),
+                radius_m,
+                "conservative-tree-crown-envelope",
+            )
+        )
+    return retained
+
+
 def _model_for(
-    primitives: list[CollisionPrimitive],
+    collision_primitives: list[CollisionPrimitive],
     *,
     include_visuals: bool,
+    visual_primitives: list[CollisionPrimitive] | None = None,
 ) -> ElementTree.Element:
     model = ElementTree.Element("model", {"name": "school_map"})
     ElementTree.SubElement(model, "static").text = "true"
@@ -2468,63 +2863,66 @@ def _model_for(
         "tree-crown": "0.18 0.46 0.2 1",
         "training-gate-ring": "0.4 0.24 0.85 1",
     }
-    for primitive in primitives:
-        element_names: tuple[str, ...]
-        if isinstance(primitive, MeshPrimitive):
-            element_names = ("visual",) if include_visuals else ()
-        elif isinstance(primitive, CapsulePrimitive) or not include_visuals:
-            element_names = ("collision",)
+    element_primitives: list[tuple[str, CollisionPrimitive]] = [
+        ("collision", primitive)
+        for primitive in collision_primitives
+        if not isinstance(primitive, MeshPrimitive)
+    ]
+    if include_visuals:
+        element_primitives.extend(
+            ("visual", primitive)
+            for primitive in (visual_primitives or collision_primitives)
+            if not isinstance(primitive, CapsulePrimitive)
+        )
+    for element_name, primitive in element_primitives:
+        element = ElementTree.SubElement(
+            link,
+            element_name,
+            {"name": f"{primitive.name}-{element_name}"},
+        )
+        ElementTree.SubElement(element, "pose").text = (
+            f"{primitive.center_x:g} {primitive.center_y:g} {primitive.center_z:g} "
+            f"{primitive.roll_rad:g} {primitive.pitch_rad:g} {primitive.yaw_rad:g}"
+        )
+        geometry = ElementTree.SubElement(element, "geometry")
+        if isinstance(primitive, BoxPrimitive):
+            box = ElementTree.SubElement(geometry, "box")
+            ElementTree.SubElement(
+                box, "size"
+            ).text = f"{primitive.size_x:g} {primitive.size_y:g} {primitive.size_z:g}"
+        elif isinstance(primitive, CylinderPrimitive):
+            cylinder = ElementTree.SubElement(geometry, "cylinder")
+            ElementTree.SubElement(cylinder, "radius").text = f"{primitive.radius_m:g}"
+            ElementTree.SubElement(cylinder, "length").text = f"{primitive.height_m:g}"
+        elif isinstance(primitive, CapsulePrimitive):
+            capsule = ElementTree.SubElement(geometry, "capsule")
+            ElementTree.SubElement(capsule, "radius").text = f"{primitive.radius_m:g}"
+            ElementTree.SubElement(capsule, "length").text = f"{primitive.length_m:g}"
+        elif isinstance(primitive, SpherePrimitive):
+            sphere = ElementTree.SubElement(geometry, "sphere")
+            ElementTree.SubElement(sphere, "radius").text = f"{primitive.radius_m:g}"
         else:
-            element_names = ("collision", "visual")
-        for element_name in element_names:
-            element = ElementTree.SubElement(
-                link,
-                element_name,
-                {"name": f"{primitive.name}-{element_name}"},
-            )
-            ElementTree.SubElement(element, "pose").text = (
-                f"{primitive.center_x:g} {primitive.center_y:g} {primitive.center_z:g} "
-                f"{primitive.roll_rad:g} {primitive.pitch_rad:g} {primitive.yaw_rad:g}"
-            )
-            geometry = ElementTree.SubElement(element, "geometry")
-            if isinstance(primitive, BoxPrimitive):
-                box = ElementTree.SubElement(geometry, "box")
+            mesh = ElementTree.SubElement(geometry, "mesh")
+            ElementTree.SubElement(mesh, "uri").text = primitive.uri
+            ElementTree.SubElement(
+                mesh, "scale"
+            ).text = f"{primitive.scale_x:g} {primitive.scale_y:g} {primitive.scale_z:g}"
+        if element_name == "visual":
+            material = ElementTree.SubElement(element, "material")
+            color = semantic_colors.get(primitive.semantic, "0.56 0.55 0.58 1")
+            ElementTree.SubElement(material, "ambient").text = color
+            ElementTree.SubElement(material, "diffuse").text = color
+            if primitive.semantic == "window-glazing":
+                ElementTree.SubElement(element, "transparency").text = "0.58"
+                ElementTree.SubElement(element, "cast_shadows").text = "false"
+            if primitive.name == "school-map-ground":
+                pbr = ElementTree.SubElement(material, "pbr")
+                metal = ElementTree.SubElement(pbr, "metal")
                 ElementTree.SubElement(
-                    box, "size"
-                ).text = f"{primitive.size_x:g} {primitive.size_y:g} {primitive.size_z:g}"
-            elif isinstance(primitive, CylinderPrimitive):
-                cylinder = ElementTree.SubElement(geometry, "cylinder")
-                ElementTree.SubElement(cylinder, "radius").text = f"{primitive.radius_m:g}"
-                ElementTree.SubElement(cylinder, "length").text = f"{primitive.height_m:g}"
-            elif isinstance(primitive, CapsulePrimitive):
-                capsule = ElementTree.SubElement(geometry, "capsule")
-                ElementTree.SubElement(capsule, "radius").text = f"{primitive.radius_m:g}"
-                ElementTree.SubElement(capsule, "length").text = f"{primitive.length_m:g}"
-            elif isinstance(primitive, SpherePrimitive):
-                sphere = ElementTree.SubElement(geometry, "sphere")
-                ElementTree.SubElement(sphere, "radius").text = f"{primitive.radius_m:g}"
-            else:
-                mesh = ElementTree.SubElement(geometry, "mesh")
-                ElementTree.SubElement(mesh, "uri").text = primitive.uri
-                ElementTree.SubElement(
-                    mesh, "scale"
-                ).text = f"{primitive.scale_x:g} {primitive.scale_y:g} {primitive.scale_z:g}"
-            if element_name == "visual":
-                material = ElementTree.SubElement(element, "material")
-                color = semantic_colors.get(primitive.semantic, "0.56 0.55 0.58 1")
-                ElementTree.SubElement(material, "ambient").text = color
-                ElementTree.SubElement(material, "diffuse").text = color
-                if primitive.semantic == "window-glazing":
-                    ElementTree.SubElement(element, "transparency").text = "0.58"
-                    ElementTree.SubElement(element, "cast_shadows").text = "false"
-                if primitive.name == "school-map-ground":
-                    pbr = ElementTree.SubElement(material, "pbr")
-                    metal = ElementTree.SubElement(pbr, "metal")
-                    ElementTree.SubElement(
-                        metal, "albedo_map"
-                    ).text = "materials/textures/campus-surface.ppm"
-                    ElementTree.SubElement(metal, "roughness").text = "0.94"
-                    ElementTree.SubElement(metal, "metalness").text = "0"
+                    metal, "albedo_map"
+                ).text = "materials/textures/campus-surface.ppm"
+                ElementTree.SubElement(metal, "roughness").text = "0.94"
+                ElementTree.SubElement(metal, "metalness").text = "0"
     ElementTree.SubElement(link, "enable_wind").text = "false"
     return model
 
@@ -2559,12 +2957,16 @@ def _world_sdf(model: ElementTree.Element) -> str:
         "physics",
         {"name": "school-map-physics", "type": "ode"},
     )
-    # Four milliseconds keeps the PX4 control clock real-time qualified on the
-    # bundled WSL runtime. Designated landing contact has its own measured
-    # solver tolerance; every School Map interface remains geometrically exact.
-    ElementTree.SubElement(physics, "max_step_size").text = "0.004"
+    # A 250 Hz rigid-body clock preserves twelve physics updates per 20 Hz PX4
+    # setpoint and avoids the contact penetration observed at 125 Hz. Runtime
+    # collision envelopes keep this precision real-time on the supported WSL
+    # CPU profile. Designated landing contact has its own measured solver
+    # tolerance; every School Map interface remains geometrically exact.
+    ElementTree.SubElement(physics, "max_step_size").text = f"{SCHOOL_MAP_PHYSICS_STEP_SECONDS:g}"
     ElementTree.SubElement(physics, "real_time_factor").text = "1"
-    ElementTree.SubElement(physics, "real_time_update_rate").text = "250"
+    ElementTree.SubElement(physics, "real_time_update_rate").text = str(
+        SCHOOL_MAP_PHYSICS_UPDATE_RATE_HZ
+    )
     scene = ElementTree.SubElement(world, "scene")
     ElementTree.SubElement(scene, "grid").text = "false"
     ElementTree.SubElement(scene, "ambient").text = "0.42 0.44 0.48 1"
@@ -2658,6 +3060,7 @@ def _canonicalize_semantic_value(value: object) -> object:
 @lru_cache(maxsize=1)
 def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
     primitives = school_map_collision_primitives()
+    runtime_collision_primitives = school_map_runtime_collision_primitives()
     semantic = {
         "schema_version": "dronedream.autonomy.school-map-semantic.v1",
         "compiler_scene_id": "school-campus-v1",
@@ -2697,6 +3100,8 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "gazebo_model_file": "model.sdf",
             "gazebo_headless_physics_model_file": "model.physics.sdf",
             "gazebo_model_name": "school_map",
+            "physics_step_seconds": SCHOOL_MAP_PHYSICS_STEP_SECONDS,
+            "physics_update_rate_hz": SCHOOL_MAP_PHYSICS_UPDATE_RATE_HZ,
             "ros_gz_bridge_config": "ros_gz_bridge.yaml",
             "px4_gz_bridge_axis_mapping": {
                 "gazebo_x_school_map_east": "px4_local_east_executor_y",
@@ -2738,6 +3143,14 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "maximum_centerline_error_m": TRAINING_GATE_COLLISION_MAX_ERROR_M,
             "default_dart_engine_compatible": True,
         },
+        "physical_material_contract": {
+            "schema_version": "dronedream.autonomy.physical-materials.v1",
+            "simulation_scope": "rigid-contact-without-fracture-or-plastic-deformation",
+            "gazebo_contact_model": "dart-default-rigid-contact",
+            "custom_elastic_contact_enabled": False,
+            "profiles": PHYSICAL_MATERIAL_PROFILES,
+            "semantic_material_ids": SEMANTIC_PHYSICAL_MATERIAL,
+        },
         "roads": ROAD_NETWORK,
         "pedestrian_paths": PEDESTRIAN_PATHS,
         "road_markings": ROAD_MARKINGS,
@@ -2747,6 +3160,18 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             for primitive in primitives
             if not isinstance(primitive, MeshPrimitive)
         ],
+        "runtime_collision_primitives": [
+            primitive.__dict__ for primitive in runtime_collision_primitives
+        ],
+        "runtime_collision_optimization": {
+            "detail_primitive_count": sum(
+                not isinstance(primitive, MeshPrimitive) for primitive in primitives
+            ),
+            "runtime_primitive_count": len(runtime_collision_primitives),
+            "coverage_rule": "every-omitted-solid-contained-by-a-named-runtime-envelope",
+            "visual_geometry_preserved": True,
+            "physics_step_seconds": SCHOOL_MAP_PHYSICS_STEP_SECONDS,
+        },
         "visual_only_primitives": [
             primitive.__dict__ for primitive in primitives if isinstance(primitive, MeshPrimitive)
         ],
@@ -2776,6 +3201,11 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
                 "capsule collision chains bound centerline error to "
                 f"{TRAINING_GATE_COLLISION_MAX_ERROR_M:.6f} m."
             ),
+            (
+                "Repeated window members, furniture subparts and organic crown lobes retain exact "
+                "visuals while named conservative envelopes provide 250 Hz runtime collision; "
+                "the semantic contract records both representations."
+            ),
             "Dynamic people are runtime-spawned semantic actors, not static map collisions.",
             "Occupancy and ESDF layers must be generated and smoke-tested by the signed Runtime.",
         ],
@@ -2799,8 +3229,12 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         separators=(",", ":"),
         allow_nan=False,
     )
-    model = _model_for(primitives, include_visuals=True)
-    physics_model = _model_for(primitives, include_visuals=False)
+    model = _model_for(
+        runtime_collision_primitives,
+        include_visuals=True,
+        visual_primitives=primitives,
+    )
+    physics_model = _model_for(runtime_collision_primitives, include_visuals=False)
     model_sdf = _sdf_for(model)
     physics_model_sdf = _sdf_for(physics_model)
     world_sdf = _world_sdf(model)
@@ -2846,7 +3280,7 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         "package_manifest_sha256": package_manifest_sha,
         "package_file_count": len(package_files),
         "collision_primitive_count": sum(
-            not isinstance(primitive, MeshPrimitive) for primitive in primitives
+            not isinstance(primitive, MeshPrimitive) for primitive in runtime_collision_primitives
         ),
         "visual_primitive_count": sum(
             not isinstance(primitive, CapsulePrimitive) for primitive in primitives
@@ -2861,7 +3295,8 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
     }
     if summary != SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY:
         raise RuntimeError(
-            "School Map package identity changed; regenerate and review the pinned Gazebo summary"
+            "School Map package identity changed; regenerate and review the "
+            "pinned Gazebo summary:\n" + json.dumps(summary, indent=2, sort_keys=True)
         )
     return SchoolMapGazeboArtifact(model_sdf, semantic_json, summary, package_files)
 
