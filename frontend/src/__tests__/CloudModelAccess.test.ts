@@ -14,6 +14,15 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("cloud model access client", () => {
+  it("fills the allowance bar from remaining credits and clamps invalid values", async () => {
+    const { cloud } = await loadCloudAccess();
+    expect(cloud.remainingAllowanceRatio(2_000, 2_000)).toBe(100);
+    expect(cloud.remainingAllowanceRatio(1_316, 2_000)).toBeCloseTo(65.8);
+    expect(cloud.remainingAllowanceRatio(-1, 2_000)).toBe(0);
+    expect(cloud.remainingAllowanceRatio(2_001, 2_000)).toBe(100);
+    expect(cloud.remainingAllowanceRatio(10, 0)).toBe(0);
+  });
+
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv(
