@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
@@ -188,8 +189,10 @@ fn parse_manager_capabilities(
         || capabilities.readable_manifest_schema_versions.is_empty()
         || capabilities
             .readable_manifest_schema_versions
-            .windows(2)
-            .any(|pair| pair[0] >= pair[1])
+            .iter()
+            .collect::<HashSet<_>>()
+            .len()
+            != capabilities.readable_manifest_schema_versions.len()
         || !capabilities
             .readable_manifest_schema_versions
             .contains(&capabilities.current_manifest_schema_version)
@@ -224,6 +227,9 @@ fn embedded_update_required(
     embedded: &EnginePackManifestIdentity,
     installed: &EnginePackManifestIdentity,
 ) -> Result<bool, String> {
+    if embedded.schema_version != installed.schema_version && embedded.source == installed.source {
+        return Ok(embedded.schema_version > installed.schema_version);
+    }
     if embedded.pack_id == installed.pack_id {
         if embedded.source != installed.source {
             return Err(
@@ -742,15 +748,22 @@ mod tests {
 
         let future = br#"{"schemaVersion":1,"kind":"dronedream-engine-pack-manager-capabilities","readableManifestSchemaVersions":[1,2,3],"currentManifestSchemaVersion":3}"#;
         assert!(parse_manager_capabilities(future, 2).is_ok());
+
+        let reversed = br#"{"schemaVersion":1,"kind":"dronedream-engine-pack-manager-capabilities","readableManifestSchemaVersions":[2,1],"currentManifestSchemaVersion":2}"#;
+        assert!(parse_manager_capabilities(reversed, 2).is_ok());
+
+        let duplicate = br#"{"schemaVersion":1,"kind":"dronedream-engine-pack-manager-capabilities","readableManifestSchemaVersions":[1,2,2],"currentManifestSchemaVersion":2}"#;
+        assert!(parse_manager_capabilities(duplicate, 2).is_err());
     }
 
     fn release_identity(
+        schema_version: u32,
         pack_id: &str,
         source_commit: &str,
         source_date_epoch: u64,
     ) -> EnginePackManifestIdentity {
         EnginePackManifestIdentity {
-            schema_version: 1,
+            schema_version,
             kind: "dronedream-engine-pack".to_string(),
             pack_id: pack_id.to_string(),
             source: EnginePackManifestSource {
@@ -762,8 +775,18 @@ mod tests {
 
     #[test]
     fn engine_pack_updates_are_monotonic_and_never_downgrade() {
-        let old = release_identity(&format!("sha256:{}", "1".repeat(64)), &"a".repeat(40), 100);
-        let new = release_identity(&format!("sha256:{}", "2".repeat(64)), &"b".repeat(40), 200);
+        let old = release_identity(
+            2,
+            &format!("sha256:{}", "1".repeat(64)),
+            &"a".repeat(40),
+            100,
+        );
+        let new = release_identity(
+            2,
+            &format!("sha256:{}", "2".repeat(64)),
+            &"b".repeat(40),
+            200,
+        );
 
         assert!(embedded_update_required(&new, &old).unwrap());
         assert!(!embedded_update_required(&old, &new).unwrap());
@@ -772,13 +795,42 @@ mod tests {
 
     #[test]
     fn engine_pack_updates_fail_closed_on_ambiguous_or_conflicting_identity() {
-        let first = release_identity(&format!("sha256:{}", "1".repeat(64)), &"a".repeat(40), 100);
-        let same_time =
-            release_identity(&format!("sha256:{}", "2".repeat(64)), &"b".repeat(40), 100);
-        let conflicting_source = release_identity(&first.pack_id, &"c".repeat(40), 100);
+        let first = release_identity(
+            2,
+            &format!("sha256:{}", "1".repeat(64)),
+            &"a".repeat(40),
+            100,
+        );
+        let same_time = release_identity(
+            2,
+            &format!("sha256:{}", "2".repeat(64)),
+            &"b".repeat(40),
+            100,
+        );
+        let conflicting_source = release_identity(2, &first.pack_id, &"c".repeat(40), 100);
 
         assert!(embedded_update_required(&first, &same_time).is_err());
         assert!(embedded_update_required(&first, &conflicting_source).is_err());
+    }
+
+    #[test]
+    fn schema_v2_replaces_v1_from_the_same_source() {
+        let source_commit = "a".repeat(40);
+        let legacy = release_identity(
+            1,
+            &format!("sha256:{}", "1".repeat(64)),
+            &source_commit,
+            100,
+        );
+        let current = release_identity(
+            2,
+            &format!("sha256:{}", "2".repeat(64)),
+            &source_commit,
+            100,
+        );
+
+        assert!(embedded_update_required(&current, &legacy).unwrap());
+        assert!(!embedded_update_required(&legacy, &current).unwrap());
     }
 
     #[test]

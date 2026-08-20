@@ -100,10 +100,10 @@ class EnginePackManagerTests(unittest.TestCase):
             1_721_000_000,
             records,
         )
-        manifest.pop("editionProfile")
         manifest["schemaVersion"] = engine_pack.LEGACY_SCHEMA_VERSION
         manifest["packId"] = "sha256:" + engine_pack.legacy_manifest_identity(
             manifest["source"],
+            manifest["editionProfile"],
             manifest["runtimeCompatibility"],
             records,
         )
@@ -148,9 +148,7 @@ class EnginePackManagerTests(unittest.TestCase):
         self.assertTrue((current / "worker/drone_dream_worker/main.py").is_file())
         self.assertEqual(user_data.read_text(encoding="utf-8"), "preserve-me")
         self.assertEqual(receipt["sourceCommit"], "2" * 40)
-        self.assertEqual(
-            receipt["runtimeId"], "c75ae324-c247-50b5-bd74-fa8325e9e616"
-        )
+        self.assertEqual(receipt["runtimeId"], "c75ae324-c247-50b5-bd74-fa8325e9e616")
 
     def test_reinstall_of_same_pack_is_idempotent(self) -> None:
         first = self.install()

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dronedream.local/schemas/engine-pack-manifest.v1.json",
   "title": "DroneDream legacy Engine Pack manifest",
-  "description": "Read-only compatibility contract for Engine Packs created before edition-scoped payload profiles. New packs must use schema v2.",
+  "description": "Read-only compatibility contract for the previously published schema-v1 Engine Pack. New packs must use schema v2.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,6 +11,7 @@
     "packId",
     "engineApiVersion",
     "source",
+    "editionProfile",
     "runtimeCompatibility",
     "files"
   ],
@@ -27,6 +28,94 @@
         "gitCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
         "sourceDateEpoch": {"type": "integer", "minimum": 0}
       }
+    },
+    "editionProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "includesLargeSimulator", "excludedSourcePaths"],
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "enum": ["field-lightweight", "sim-only", "unified-sim-lab"]
+        },
+        "profileVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "profileManifestPath": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+        },
+        "profileManifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "includesLargeSimulator": {"type": "boolean"},
+        "excludedSourcePaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"profileId": {"const": "field-lightweight"}}
+          },
+          "then": {
+            "properties": {
+              "includesLargeSimulator": {"const": false},
+              "excludedSourcePaths": {
+                "const": ["backend/app/simulator", "scripts/simulators"]
+              }
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["profileVersion"]},
+                {"required": ["profileManifestPath"]},
+                {"required": ["profileManifestSha256"]}
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"profileId": {"const": "sim-only"}}
+          },
+          "then": {
+            "required": [
+              "profileVersion",
+              "profileManifestPath",
+              "profileManifestSha256"
+            ],
+            "properties": {
+              "profileVersion": {"const": "1.0.0"},
+              "profileManifestPath": {
+                "const": "distribution/engine-pack-profiles/sim-only.v1.json"
+              },
+              "includesLargeSimulator": {"const": true},
+              "excludedSourcePaths": {
+                "const": ["backend/app/distribution_safety.py"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"profileId": {"const": "unified-sim-lab"}}
+          },
+          "then": {
+            "properties": {
+              "includesLargeSimulator": {"const": true},
+              "excludedSourcePaths": {"const": []}
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["profileVersion"]},
+                {"required": ["profileManifestPath"]},
+                {"required": ["profileManifestSha256"]}
+              ]
+            }
+          }
+        }
+      ]
     },
     "runtimeCompatibility": {
       "type": "object",

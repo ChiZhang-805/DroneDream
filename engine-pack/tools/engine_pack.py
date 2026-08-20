@@ -430,6 +430,7 @@ def manifest_identity(
     return sha256_bytes(
         canonical_json(
             {
+                "schemaVersion": SCHEMA_VERSION,
                 "engineApiVersion": ENGINE_API_VERSION,
                 "source": source,
                 "editionProfile": edition_profile,
@@ -443,14 +444,16 @@ def manifest_identity(
 
 def legacy_manifest_identity(
     source: dict[str, Any],
+    edition_profile: dict[str, Any],
     compatibility: dict[str, Any],
     records: list[dict[str, Any]],
 ) -> str:
     """Reproduce the immutable identity used by schema-v1 Engine Packs.
 
-    Schema v1 predates edition-scoped payload profiles.  Runtime Base keeps
-    this verifier only so it can inspect and atomically replace an already
-    installed legacy pack; newly built packs always use schema v2.
+    Schema v1 already bound the edition-scoped payload profile, but did not
+    bind the schema version itself. Runtime Base keeps this verifier only so
+    it can inspect and atomically replace an installed v1 pack; newly built
+    packs always use schema v2.
     """
 
     return sha256_bytes(
@@ -458,6 +461,7 @@ def legacy_manifest_identity(
             {
                 "engineApiVersion": ENGINE_API_VERSION,
                 "source": source,
+                "editionProfile": edition_profile,
                 "runtimeCompatibility": compatibility,
                 "payloadSha256": payload_identity(records),
                 "files": records,
@@ -647,12 +651,9 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         "runtimeCompatibility",
         "files",
     }
-    if schema_version == SCHEMA_VERSION:
-        expected_fields.add("editionProfile")
+    expected_fields.add("editionProfile")
     if set(manifest) != expected_fields:
-        raise EnginePackError(
-            f"Engine Pack manifest fields do not match schema v{schema_version}"
-        )
+        raise EnginePackError(f"Engine Pack manifest fields do not match schema v{schema_version}")
     if manifest["kind"] != KIND:
         raise EnginePackError("Engine Pack manifest identity is invalid")
     if manifest["engineApiVersion"] != ENGINE_API_VERSION:
@@ -664,51 +665,46 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         raise EnginePackError("Engine Pack source commit is invalid")
     if type(source["sourceDateEpoch"]) is not int or source["sourceDateEpoch"] < 0:
         raise EnginePackError("Engine Pack source timestamp is invalid")
-    edition_profile: dict[str, Any] | None = None
-    profile_id: str | None = None
-    if schema_version == SCHEMA_VERSION:
-        edition_profile = manifest["editionProfile"]
-        if not isinstance(edition_profile, dict) or "profileId" not in edition_profile:
-            raise EnginePackError("Engine Pack edition profile identity is invalid")
-        profile_id = edition_profile["profileId"]
-        if profile_id not in EDITION_PROFILES:
-            raise EnginePackError("Engine Pack edition profile is unsupported")
-        expected_profile_keys = (
-            SIM_PROFILE_MANIFEST_KEYS
-            if profile_id == SIM_EDITION_PROFILE
-            else {"profileId", "includesLargeSimulator", "excludedSourcePaths"}
-        )
-        if set(edition_profile) != expected_profile_keys:
-            raise EnginePackError("Engine Pack edition profile identity is invalid")
-        if type(edition_profile["includesLargeSimulator"]) is not bool:
-            raise EnginePackError("Engine Pack simulator inclusion flag is invalid")
-        excluded_paths = edition_profile["excludedSourcePaths"]
+    edition_profile = manifest["editionProfile"]
+    if not isinstance(edition_profile, dict) or "profileId" not in edition_profile:
+        raise EnginePackError("Engine Pack edition profile identity is invalid")
+    profile_id = edition_profile["profileId"]
+    if profile_id not in EDITION_PROFILES:
+        raise EnginePackError("Engine Pack edition profile is unsupported")
+    expected_profile_keys = (
+        SIM_PROFILE_MANIFEST_KEYS
+        if profile_id == SIM_EDITION_PROFILE
+        else {"profileId", "includesLargeSimulator", "excludedSourcePaths"}
+    )
+    if set(edition_profile) != expected_profile_keys:
+        raise EnginePackError("Engine Pack edition profile identity is invalid")
+    if type(edition_profile["includesLargeSimulator"]) is not bool:
+        raise EnginePackError("Engine Pack simulator inclusion flag is invalid")
+    excluded_paths = edition_profile["excludedSourcePaths"]
+    if (
+        not isinstance(excluded_paths, list)
+        or any(not isinstance(path, str) for path in excluded_paths)
+        or len(excluded_paths) != len(set(excluded_paths))
+    ):
+        raise EnginePackError("Engine Pack excluded source paths are invalid")
+    if profile_id == FIELD_EDITION_PROFILE:
         if (
-            not isinstance(excluded_paths, list)
-            or any(not isinstance(path, str) for path in excluded_paths)
-            or len(excluded_paths) != len(set(excluded_paths))
+            edition_profile["includesLargeSimulator"] is not False
+            or tuple(excluded_paths) != FIELD_EXCLUDED_SOURCE_PATHS
         ):
-            raise EnginePackError("Engine Pack excluded source paths are invalid")
-        if profile_id == FIELD_EDITION_PROFILE:
-            if (
-                edition_profile["includesLargeSimulator"] is not False
-                or tuple(excluded_paths) != FIELD_EXCLUDED_SOURCE_PATHS
-            ):
-                raise EnginePackError(
-                    "Field Engine Pack profile does not exclude simulator payloads"
-                )
-        elif profile_id == SIM_EDITION_PROFILE:
-            if (
-                edition_profile["includesLargeSimulator"] is not True
-                or tuple(excluded_paths) != ("backend/app/distribution_safety.py",)
-                or edition_profile["profileVersion"] != "1.0.0"
-                or edition_profile["profileManifestPath"] != SIM_PROFILE_PATH
-                or not isinstance(edition_profile["profileManifestSha256"], str)
-                or not SHA256_RE.fullmatch(edition_profile["profileManifestSha256"])
-            ):
-                raise EnginePackError("Sim-only Engine Pack profile binding drifted")
-        elif edition_profile["includesLargeSimulator"] is not True or excluded_paths:
-            raise EnginePackError("default Engine Pack profile drifted")
+            raise EnginePackError("Field Engine Pack profile does not exclude simulator payloads")
+    elif profile_id == SIM_EDITION_PROFILE:
+        if (
+            edition_profile["includesLargeSimulator"] is not True
+            or tuple(excluded_paths) != ("backend/app/distribution_safety.py",)
+            or edition_profile["profileVersion"] != "1.0.0"
+            or edition_profile["profileManifestPath"] != SIM_PROFILE_PATH
+            or not isinstance(edition_profile["profileManifestSha256"], str)
+            or not SHA256_RE.fullmatch(edition_profile["profileManifestSha256"])
+        ):
+            raise EnginePackError("Sim-only Engine Pack profile binding drifted")
+    elif edition_profile["includesLargeSimulator"] is not True or excluded_paths:
+        raise EnginePackError("default Engine Pack profile drifted")
     compatibility = manifest["runtimeCompatibility"]
     compatibility_keys = {
         "runtimeProductId",
@@ -778,11 +774,11 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
     if schema_version == LEGACY_SCHEMA_VERSION:
         identity = legacy_manifest_identity(
             manifest["source"],
+            edition_profile,
             manifest["runtimeCompatibility"],
             manifest["files"],
         )
     else:
-        assert edition_profile is not None
         identity = manifest_identity(
             manifest["source"],
             edition_profile,

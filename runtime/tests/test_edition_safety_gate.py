@@ -231,10 +231,10 @@ def test_legacy_engine_pack_is_readable_but_cannot_enter_execution_gate(
     request = request_fixture()
     observation = allow_override(active_observation(tmp_path, request))
     manifest = json.loads(observation.active_engine_pack_manifest_path.read_text(encoding="utf-8"))
-    manifest.pop("editionProfile")
     manifest["schemaVersion"] = 1
     manifest["packId"] = "sha256:" + engine_pack.legacy_manifest_identity(
         manifest["source"],
+        manifest["editionProfile"],
         manifest["runtimeCompatibility"],
         manifest["files"],
     )
@@ -249,10 +249,7 @@ def test_legacy_engine_pack_is_readable_but_cannot_enter_execution_gate(
     result = gate.evaluate_runtime_authorization(request, observation)
 
     assert result.decision == "deny"
-    assert {
-        "runtime.engine-pack.schema-unsupported",
-        "runtime.engine-pack.edition-profile-unsupported",
-    } <= set(result.reason_codes)
+    assert "runtime.engine-pack.schema-unsupported" in result.reason_codes
 
 
 def test_mismatched_active_edition_manifest_is_denied(tmp_path: Path) -> None:
