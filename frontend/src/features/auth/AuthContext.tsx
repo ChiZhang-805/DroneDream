@@ -16,9 +16,10 @@ import {
 } from "../../desktop/bridge";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
 import { ACTIVATE_DESKTOP_AUTH_EVENT } from "./desktopAuthActivation";
-import { setAuthAccessToken } from "./authTokenStore";
+import { getAuthAccessToken, setAuthAccessToken } from "./authTokenStore";
 import {
   appleAuthEnabled,
+  browserAuthConfiguration,
   cloudAuthConfigured,
   googleAuthEnabled,
   supabaseClient,
