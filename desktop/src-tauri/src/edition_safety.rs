@@ -969,8 +969,7 @@ mod tests {
             ),
             _ => panic!("fixture must select an embedded Vehicle Pack manifest"),
         };
-        value["vehicle"]["packManifestSha256"] =
-            Value::String(sha256_hex(vehicle_pack.as_bytes()));
+        value["vehicle"]["packManifestSha256"] = Value::String(sha256_hex(vehicle_pack.as_bytes()));
     }
 
     fn refresh_context(value: &mut Value) {

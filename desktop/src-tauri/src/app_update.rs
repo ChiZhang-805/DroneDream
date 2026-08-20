@@ -24,10 +24,7 @@ fn release_identity(notes: Option<&str>) -> Option<(&str, u64, &str)> {
     for line in notes.lines() {
         if let Some(value) = line.strip_prefix(EDITION_ID_PREFIX) {
             if edition_id.is_some()
-                || !matches!(
-                    value,
-                    "universal" | "sim" | "lab" | "field" | "autonomy"
-                )
+                || !matches!(value, "universal" | "sim" | "lab" | "field" | "autonomy")
             {
                 return None;
             }
