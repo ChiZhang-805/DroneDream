@@ -22,7 +22,13 @@ from typing import Any
 
 RUNTIME_CONTRACT_REGISTRY_PATH = "distribution/runtime-contract-registry.v1.json"
 SIM_EDITION_PROFILE = "sim-only"
-KNOWN_EDITION_PROFILES = {"field-lightweight", SIM_EDITION_PROFILE, "unified-sim-lab"}
+AUTONOMY_EDITION_PROFILE = "autonomy-full"
+KNOWN_EDITION_PROFILES = {
+    "field-lightweight",
+    SIM_EDITION_PROFILE,
+    "unified-sim-lab",
+    AUTONOMY_EDITION_PROFILE,
+}
 BASE_EDITION_PROFILE_KEYS = {
     "profileId",
     "includesLargeSimulator",
@@ -123,6 +129,11 @@ def _validate_engine_profile_identity(
         },
         "unified-sim-lab": {
             "profileId": "unified-sim-lab",
+            "includesLargeSimulator": True,
+            "excludedSourcePaths": [],
+        },
+        AUTONOMY_EDITION_PROFILE: {
+            "profileId": AUTONOMY_EDITION_PROFILE,
             "includesLargeSimulator": True,
             "excludedSourcePaths": [],
         },

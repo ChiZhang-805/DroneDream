@@ -4311,7 +4311,7 @@ body:has(.app-shell-public-demo),
   }
 }
 
-/* Universal-exclusive vehicle modeling and draft Vehicle Pack exchange. */
+/* Product-scoped vehicle modeling and draft Vehicle Pack exchange. */
 .vehicle-studio-page {
   min-height: 100%;
   padding: clamp(1rem, 2vw, 2rem);

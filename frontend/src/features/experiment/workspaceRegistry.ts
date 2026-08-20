@@ -245,7 +245,7 @@ function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorksp
       || (
         typeof candidate.vehicleDraftId === "string"
         && /^[a-zA-Z0-9_-]{8,128}$/u.test(candidate.vehicleDraftId)
-        && candidate.edition === "universal"
+        && (candidate.edition === "universal" || candidate.edition === "autonomy")
         && candidate.assistantArtifactKind === "universal_vehicle_model"
       )
     ) &&
@@ -563,7 +563,7 @@ export function registerExperimentWorkspace(
   if (
     input.vehicleDraftId
     && (
-      input.edition !== "universal"
+      (input.edition !== "universal" && input.edition !== "autonomy")
       || input.assistantArtifactKind !== "universal_vehicle_model"
       || !/^[a-zA-Z0-9_-]{8,128}$/u.test(input.vehicleDraftId)
     )
@@ -690,6 +690,13 @@ export function removeExperimentWorkspace(
 }
 
 export function experimentWorkspacePath(workspace: ExperimentWorkspace): string {
+  if (
+    (workspace.edition === "universal" || workspace.edition === "autonomy")
+    && workspace.assistantArtifactKind === "universal_vehicle_model"
+    && workspace.vehicleDraftId
+  ) {
+    return `/vehicle-studio?draft=${encodeURIComponent(workspace.vehicleDraftId)}`;
+  }
   if (workspace.edition === "field") {
     return `/assistant?experiment=${encodeURIComponent(workspace.id)}`;
   }
@@ -697,12 +704,6 @@ export function experimentWorkspacePath(workspace: ExperimentWorkspace): string 
     return `/assistant?experiment=${encodeURIComponent(workspace.id)}`;
   }
   if (workspace.edition === "universal") {
-    if (
-      workspace.assistantArtifactKind === "universal_vehicle_model"
-      && workspace.vehicleDraftId
-    ) {
-      return `/vehicle-studio?draft=${encodeURIComponent(workspace.vehicleDraftId)}`;
-    }
     if (workspace.source === "assistant" && !hasExperimentDraft(workspace.id)) {
       return `/assistant?experiment=${encodeURIComponent(workspace.id)}`;
     }

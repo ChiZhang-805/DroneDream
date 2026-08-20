@@ -68,7 +68,7 @@
       "branch": "codex/software-autonomy",
       "primaryPurpose": "natural-language-autonomous-mission-workflow",
       "executionDomains": ["simulation", "qualified-real-hardware"],
-      "navigationSections": ["autonomous-tasks", "records"],
+      "navigationSections": ["autonomous-tasks", "workspace", "records"],
       "experimentRole": "mission-workflow-validation",
       "conversationRole": "task-scoped-natural-language-mission-dialogue",
       "autonomyRole": "plan-revise-execute-interrupt-replan-and-verify",

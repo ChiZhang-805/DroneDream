@@ -351,6 +351,27 @@ class EnginePackTests(unittest.TestCase):
                 },
             )
 
+    def test_autonomy_full_profile_builds_and_verifies_the_full_runtime_payload(self) -> None:
+        self.assertEqual(
+            engine_pack.source_paths_for_profile(ROOT, engine_pack.AUTONOMY_EDITION_PROFILE),
+            engine_pack.source_paths_for_profile(ROOT, engine_pack.DEFAULT_EDITION_PROFILE),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            self.build(output, edition_profile=engine_pack.AUTONOMY_EDITION_PROFILE)
+            self.verify(output)
+            manifest = json.loads(
+                (output / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["editionProfile"],
+                {
+                    "profileId": engine_pack.AUTONOMY_EDITION_PROFILE,
+                    "includesLargeSimulator": True,
+                    "excludedSourcePaths": [],
+                },
+            )
+
     def test_sim_only_profile_is_x500_scoped_and_excludes_hardware_contracts(self) -> None:
         files = engine_pack.production_files(
             ROOT,

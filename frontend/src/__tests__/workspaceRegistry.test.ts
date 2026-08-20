@@ -462,6 +462,24 @@ describe("experiment workspace registry", () => {
       .toBe(`/jobs/new?experiment=${simulationWorkspaceId}`);
   });
 
+  it("routes AUTONOMY vehicle drafts to its editable Vehicle Studio", () => {
+    saveWorkspaceDraft("autonomy-vehicle", "Mission aircraft");
+    registerExperimentWorkspace({
+      id: "autonomy-vehicle",
+      ownerId: OWNER_A,
+      edition: "autonomy",
+      name: "Mission aircraft",
+      source: "assistant",
+      assistantArtifactKind: "universal_vehicle_model",
+      vehicleDraftId: "autonomy-draft-42",
+    });
+
+    const workspace = listExperimentWorkspaces(OWNER_A, "autonomy")
+      .find(({ id }) => id === "autonomy-vehicle");
+    expect(workspace && experimentWorkspacePath(workspace))
+      .toBe("/vehicle-studio?draft=autonomy-draft-42");
+  });
+
   it("migrates the legacy unscoped registry into SIM only", () => {
     saveWorkspaceDraft(FIRST_ID, "Legacy SIM experiment");
     window.localStorage.setItem(

@@ -68,6 +68,7 @@ const editions = [
     id: "autonomy",
     routes: [
       ["assistant", "/assistant"],
+      ["vehicle-studio", "/vehicle-studio"],
       ["autonomy-overview", "/autonomy"],
       ["autonomy-aircraft", "/autonomy/aircraft"],
       ["autonomy-maps", "/autonomy/maps"],

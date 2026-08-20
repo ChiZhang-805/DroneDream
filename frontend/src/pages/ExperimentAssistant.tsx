@@ -462,10 +462,11 @@ function numericUniversalVehiclePatch(
   return undefined;
 }
 
-async function saveUniversalVehicleDraft(
+async function saveVehicleDraft(
   ownerId: string,
   result: ExperimentAssistantTurnResponse,
   currentDraftId: string | null,
+  edition: Extract<BrandEditionId, "universal" | "autonomy">,
 ): Promise<VehicleModelDraft> {
   const activeBoundary = activeAssistantTenantContext(ownerId);
   const tenantId = result.orchestration?.tenant_id ?? activeBoundary.tenantId;
@@ -474,10 +475,10 @@ async function saveUniversalVehicleDraft(
     userId: ownerId,
     tenantId,
     organizationId,
-    workspaceId: "console-universal",
-    edition: "universal",
+    workspaceId: `console-${edition}`,
+    edition,
   });
-  const cloudBoundary = vehicleModelBoundaryFor(ownerId, tenantId, organizationId);
+  const cloudBoundary = vehicleModelBoundaryFor(ownerId, tenantId, organizationId, edition);
   let storedModels = loadVehicleModels(localStorageScope);
   if (cloudBoundary) {
     try {
@@ -782,7 +783,7 @@ export function ExperimentAssistant() {
     if (latest?.orchestration?.intent === "mission_autonomy") {
       return "/autonomy?from=tuning-chat";
     }
-    if (editionTheme.id === "universal") {
+    if (editionTheme.id === "universal" || editionTheme.id === "autonomy") {
       return latest?.orchestration?.artifact_kind === "universal_vehicle_model"
         && vehicleDraftId
         ? `/vehicle-studio?draft=${encodeURIComponent(vehicleDraftId)}`
@@ -1232,13 +1233,14 @@ export function ExperimentAssistant() {
       );
       let createdVehicleDraftId: string | null = null;
       if (
-        editionTheme.id === "universal"
+        (editionTheme.id === "universal" || editionTheme.id === "autonomy")
         && result.orchestration?.artifact_kind === "universal_vehicle_model"
       ) {
-        const vehicleDraft = await saveUniversalVehicleDraft(
+        const vehicleDraft = await saveVehicleDraft(
           ownerId,
           result,
           vehicleDraftId,
+          editionTheme.id,
         );
         setVehicleDraftId(vehicleDraft.draftId);
         createdVehicleDraftId = vehicleDraft.draftId;

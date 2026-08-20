@@ -295,6 +295,7 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
 const AUTONOMY_NAV_ITEMS: NavigationItem[] = [
   { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
+  { ...VEHICLE_STUDIO_NAV_ITEM, sectionKey: "app.navSectionWorkspace" },
   { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
 ];
 
@@ -319,6 +320,14 @@ const MODE_LANDING_PATH: Record<UniversalWorkspaceId, string> = {
   lab: "/assistant",
   field: "/assistant",
   autonomy: "/autonomy",
+};
+
+const EDITION_PLATFORM_LABEL: Record<BrandEditionId, TranslationKey> = {
+  universal: "app.platformUniversal",
+  sim: "app.platformSim",
+  lab: "app.platformLab",
+  field: "app.platformField",
+  autonomy: "app.platformAutonomy",
 };
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
@@ -3218,8 +3227,6 @@ function AppShellContent() {
   const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
-  const autonomyLabMode = location.pathname === "/autonomy"
-    || location.pathname.startsWith("/autonomy/");
   const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
     ? BUILD_EDITION
     : launcherMode || location.pathname === "/vehicle-studio"
@@ -4028,7 +4035,7 @@ function AppShellContent() {
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">
-            {EDITION_BRAND_TOKENS[activeThemeEdition].productName} — {t(autonomyLabMode ? "app.autonomyPlatform" : "app.platform")}
+            {EDITION_BRAND_TOKENS[activeThemeEdition].productName} — {t(EDITION_PLATFORM_LABEL[activeThemeEdition])}
           </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">

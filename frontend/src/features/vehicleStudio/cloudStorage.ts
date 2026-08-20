@@ -15,20 +15,21 @@ export interface VehicleModelBoundary {
   tenantId: string;
   organizationId: string | null;
   workspaceId: string;
-  edition: Extract<BrandEditionId, "universal">;
+  edition: Extract<BrandEditionId, "universal" | "autonomy">;
 }
 
 export function vehicleModelBoundaryFor(
   userId: string,
   tenantId: string,
   organizationId: string | null,
+  edition: VehicleModelBoundary["edition"] = "universal",
 ): VehicleModelBoundary | null {
   const boundary: VehicleModelBoundary = {
     userId,
     tenantId,
     organizationId,
-    workspaceId: "console-universal",
-    edition: "universal",
+    workspaceId: `console-${edition}`,
+    edition,
   };
   try {
     cloudBoundary(boundary);
@@ -49,8 +50,10 @@ function cloudBoundary(boundary: VehicleModelBoundary) {
     !UUID_PATTERN.test(boundary.userId)
     || !UUID_PATTERN.test(boundary.tenantId)
     || (boundary.organizationId !== null && !UUID_PATTERN.test(boundary.organizationId))
-    || boundary.workspaceId !== "console-universal"
-    || boundary.edition !== "universal"
+    || !(
+      (boundary.edition === "universal" && boundary.workspaceId === "console-universal")
+      || (boundary.edition === "autonomy" && boundary.workspaceId === "console-autonomy")
+    )
   ) {
     throw new Error("The vehicle-model tenant boundary is invalid.");
   }

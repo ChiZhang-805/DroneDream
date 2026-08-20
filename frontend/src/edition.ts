@@ -19,7 +19,8 @@ export const BUILD_HAS_AUTONOMY_WORKSPACE =
   || __DRONEDREAM_BUILD_EDITION__ === "field"
   || __DRONEDREAM_BUILD_EDITION__ === "autonomy";
 export const BUILD_HAS_VEHICLE_STUDIO =
-  __DRONEDREAM_BUILD_EDITION__ === "universal";
+  __DRONEDREAM_BUILD_EDITION__ === "universal"
+  || __DRONEDREAM_BUILD_EDITION__ === "autonomy";
 
 export function editionHasWorkspace(
   edition: BrandEditionId,
@@ -29,7 +30,7 @@ export function editionHasWorkspace(
 }
 
 export function editionHasVehicleStudio(edition: BrandEditionId): boolean {
-  return edition === "universal";
+  return edition === "universal" || edition === "autonomy";
 }
 
 export function initialWorkspaceMode(

@@ -75,6 +75,11 @@ _UNIFIED_ENGINE_PROFILE: Final[dict[str, Any]] = {
     "includesLargeSimulator": True,
     "excludedSourcePaths": [],
 }
+_AUTONOMY_ENGINE_PROFILE: Final[dict[str, Any]] = {
+    "profileId": "autonomy-full",
+    "includesLargeSimulator": True,
+    "excludedSourcePaths": [],
+}
 _SIM_ENGINE_PROFILE_KEYS: Final[set[str]] = {
     "profileId",
     "profileVersion",
@@ -744,6 +749,7 @@ def _validate_engine_edition_profile(value: object) -> dict[str, Any]:
     expected = {
         "field-lightweight": _FIELD_ENGINE_PROFILE,
         "unified-sim-lab": _UNIFIED_ENGINE_PROFILE,
+        "autonomy-full": _AUTONOMY_ENGINE_PROFILE,
     }.get(profile_id)
     if expected is None or profile != expected:
         raise CompositeObservationCompilationError(

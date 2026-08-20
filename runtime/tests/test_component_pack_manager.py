@@ -178,6 +178,14 @@ def test_manifest_pack_id_binds_exact_ordered_file_records(tmp_path: Path) -> No
         tool.validate_manifest(manifest)
 
 
+def test_autonomy_full_component_pack_profile_is_admitted(tmp_path: Path) -> None:
+    manifest_path, _, _, _ = _contracts(tmp_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["editionProfiles"].append("autonomy-full")
+
+    tool.validate_manifest(manifest)
+
+
 def test_existing_release_is_reverified_before_reactivation(tmp_path: Path) -> None:
     first = _install(tmp_path, 1)
     current = tmp_path / "packs/capability/current"

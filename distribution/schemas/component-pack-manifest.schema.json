@@ -37,7 +37,7 @@
     "editionProfiles": {
       "type": "array",
       "minItems": 1,
-      "maxItems": 3,
+      "maxItems": 4,
       "uniqueItems": true,
       "items": {"enum": ["unified-sim-lab", "sim-only", "field-lightweight", "autonomy-full"]}
     },

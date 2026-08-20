@@ -171,12 +171,13 @@ describe("workspace account entry", () => {
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
       "Autonomy",
+      "Vehicle Studio",
       "Run History",
     ]);
     expect(Array.from(
       container.querySelectorAll<HTMLElement>(".app-nav-section-label"),
       (label) => label.textContent?.trim(),
-    )).toEqual(["Autonomous tasks", "Records"]);
+    )).toEqual(["Autonomous tasks", "Workspace", "Records"]);
 
     router.dispose();
   });
