@@ -43,6 +43,20 @@
       "sha256": "99698f7416808a113a1542f706c446eba8c5673f55fd499a313804bc2f7916a7",
       "sourceCommit": "6f52b2239e45d730b032f331f8ca085975967aa3",
       "publishedAt": "2026-08-12"
+    },
+    {
+      "id": "autonomy",
+      "status": "unavailable",
+      "version": "1.0.0",
+      "fileName": "DroneDream-AUTONOMY_1.0.0_x64-setup.exe",
+      "downloadUrl": null,
+      "checksumUrl": null,
+      "signatureUrl": null,
+      "receiptUrl": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "sourceCommit": null,
+      "publishedAt": null
     }
   ]
 }

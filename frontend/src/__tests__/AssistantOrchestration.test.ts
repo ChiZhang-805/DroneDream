@@ -127,6 +127,42 @@ describe("assistant orchestration client", () => {
     });
   });
 
+  it("accepts an AUTONOMY run and its sealed mission artifact", async () => {
+    const run = completedRun();
+    run.edition = "autonomy";
+    run.workspace_id = "workspace_autonomy_01";
+    run.result_json.artifact_kind = "autonomy_mission_plan";
+    run.result_json.product_link =
+      "/console/assistant?edition=autonomy&experiment=workspace_autonomy_01&artifact=44444444-4444-4444-8444-444444444444";
+    run.result_json.workspace_id = "workspace_autonomy_01";
+    run.result_json.edition = "autonomy";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: run }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const { setAuthAccessToken } = await import("../features/auth/authTokenStore");
+    const { orchestrateAssistantTurn } = await import(
+      "../features/experiment/assistantOrchestration"
+    );
+    setAuthAccessToken("signed-user-token");
+
+    const result = await orchestrateAssistantTurn({
+      edition: "autonomy",
+      workspaceId: "workspace_autonomy_01",
+      idempotencyKey: "assistant:autonomy-turn-001",
+      message: "Plan a qualified inspection mission.",
+      locale: "en",
+      selectedModel: { provider: "openai", model: "gpt-4.1" },
+      currentValues: {},
+      documentContext: null,
+    });
+
+    expect(result.run.edition).toBe("autonomy");
+    expect(result.run.result_json?.artifact_kind).toBe("autonomy_mission_plan");
+  });
+
   it("carries an explicit organization boundary on both write and restore", async () => {
     const organizationId = "44444444-4444-4444-8444-444444444444";
     const fetchMock = vi.spyOn(globalThis, "fetch")

@@ -393,7 +393,8 @@ function parseRun(value: unknown): AssistantOrchestratedRun {
     || typeof value.tenant_id !== "string"
     || (value.organization_id !== null && typeof value.organization_id !== "string")
     || (value.edition !== "universal" && value.edition !== "sim"
-      && value.edition !== "lab" && value.edition !== "field")
+      && value.edition !== "lab" && value.edition !== "field"
+      && value.edition !== "autonomy")
     || typeof value.workspace_id !== "string"
     || !/^[a-zA-Z0-9_-]{8,128}$/u.test(value.workspace_id)
     || typeof value.sequence !== "number"

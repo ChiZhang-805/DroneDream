@@ -3,8 +3,8 @@ import { useState } from "react";
 
 import {
   primaryEditionIds,
+  type EditionAvailabilityId,
   type EditionAvailabilityDocument,
-  type PrimaryEditionId,
 } from "./editionAvailability";
 import { editionBrandAssets } from "./editionBrandAssets";
 
@@ -22,7 +22,7 @@ const copy: Record<Locale, {
   unavailable: string;
   previous: string;
   next: string;
-  editions: Record<PrimaryEditionId, EditionCopy>;
+  editions: Record<EditionAvailabilityId, EditionCopy>;
 }> = {
   en: {
     title: "Choose Your DroneDream Edition",
@@ -79,6 +79,22 @@ const copy: Record<Locale, {
           { src: "/docs/en/tuning-chat.png", alt: "FIELD parameter review page" },
         ],
       },
+      autonomy: {
+        title: "DroneDream · AUTONOMY",
+        features: [
+          "Natural-language mission control",
+          "Structured mission plans",
+          "Multi-model Harness loops",
+          "Runtime plugin composition",
+          "ROS 2 and Gazebo integration",
+          "Evidence-bound safety gates",
+        ],
+        screenshots: [
+          { src: "/docs/en/tuning-chat.png", alt: "AUTONOMY mission conversation" },
+          { src: "/docs/en/flight-setup.png", alt: "AUTONOMY mission setup" },
+          { src: "/docs/en/dashboard.png", alt: "AUTONOMY qualification evidence" },
+        ],
+      },
     },
   },
   "zh-CN": {
@@ -115,6 +131,15 @@ const copy: Record<Locale, {
           { src: "/docs/zh-CN/tuning-chat.png", alt: "FIELD 参数复核页面" },
         ],
       },
+      autonomy: {
+        title: "DroneDream · AUTONOMY",
+        features: ["自然语言任务控制", "结构化任务计划", "多模型 Harness 循环", "运行时插件组合", "ROS 2 与 Gazebo 接入", "证据约束安全门控"],
+        screenshots: [
+          { src: "/docs/zh-CN/tuning-chat.png", alt: "AUTONOMY 任务对话" },
+          { src: "/docs/zh-CN/flight-setup.png", alt: "AUTONOMY 任务设置" },
+          { src: "/docs/zh-CN/dashboard.png", alt: "AUTONOMY 资格证据" },
+        ],
+      },
     },
   },
 };
@@ -124,7 +149,7 @@ function ScreenshotCarousel({
   locale,
   screenshots,
 }: {
-  edition: PrimaryEditionId;
+  edition: EditionAvailabilityId;
   locale: Locale;
   screenshots: EditionCopy["screenshots"];
 }) {
@@ -154,6 +179,10 @@ export function ProductPage({
   locale: Locale;
 }) {
   const text = copy[locale];
+  const visibleEditionIds: EditionAvailabilityId[] = [...primaryEditionIds];
+  if (availability.editions.some((edition) => (
+    edition.id === "autonomy" && edition.status === "published"
+  ))) visibleEditionIds.push("autonomy");
   return (
     <section className="site-product-page" aria-labelledby="site-product-title">
       <div className="site-product-page-shell">
@@ -161,7 +190,7 @@ export function ProductPage({
           <h1 id="site-product-title">{text.title}</h1>
         </header>
         <div className="site-product-page-grid">
-          {primaryEditionIds.map((id) => {
+          {visibleEditionIds.map((id) => {
             const edition = availability.editions.find((candidate) => candidate.id === id);
             if (!edition) return null;
             const editionText = text.editions[id];

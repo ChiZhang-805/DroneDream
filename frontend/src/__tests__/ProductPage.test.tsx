@@ -82,6 +82,39 @@ describe("ProductPage", () => {
     expect(isEditionAvailabilityDocument(availability)).toBe(true);
   });
 
+  it("accepts AUTONOMY availability but keeps it hidden until a release is published", () => {
+    const availability = structuredClone(fallbackEditionAvailability);
+
+    expect(isEditionAvailabilityDocument(availability)).toBe(true);
+    const { rerender } = render(<ProductPage availability={availability} locale="en" />);
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.queryByText("Natural-language mission control")).toBeNull();
+
+    const releaseFamily = "desktop-autonomy-v1.0.0-build-1";
+    const fileName = "DroneDream-Autonomy-1.0.0.exe";
+    availability.editions[3] = {
+      id: "autonomy",
+      status: "published",
+      version: "1.0.0",
+      fileName,
+      downloadUrl: `https://github.com/ChiZhang-805/DroneDream/releases/download/${releaseFamily}/${fileName}`,
+      checksumUrl: `https://github.com/ChiZhang-805/DroneDream/releases/download/${releaseFamily}/${fileName}.sha256`,
+      signatureUrl: `https://github.com/ChiZhang-805/DroneDream/releases/download/${releaseFamily}/${fileName}.sig`,
+      receiptUrl: `https://github.com/ChiZhang-805/DroneDream/releases/download/${releaseFamily}/${fileName}.receipt.json`,
+      sizeBytes: 12_000_000,
+      sha256: "a".repeat(64),
+      sourceCommit: "b".repeat(40),
+      publishedAt: "2026-08-20",
+    };
+
+    expect(isEditionAvailabilityDocument(availability)).toBe(true);
+    rerender(<ProductPage availability={availability} locale="en" />);
+    expect(screen.getAllByRole("article")).toHaveLength(4);
+    expect(screen.getByText("Natural-language mission control")).toBeVisible();
+    expect(screen.getByRole("link", { name: "DroneDream · AUTONOMY Download" }))
+      .toHaveAttribute("href", availability.editions[3].downloadUrl);
+  });
+
   it("authors the Simplified Chinese product surface independently", () => {
     render(<ProductPage availability={fallbackEditionAvailability} locale="zh-CN" />);
 

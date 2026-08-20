@@ -621,6 +621,30 @@ describe("Field desktop bridge", () => {
     await expect(getFieldTuningStatus()).resolves.toEqual(response);
   });
 
+  it("accepts the AUTONOMY hardware-domain identity and runtime profile", async () => {
+    const response = {
+      schemaVersion: 1,
+      kind: "dronedream-field-tuning-status",
+      editionId: "autonomy",
+      executionDomain: "real-hardware",
+      runtimeProfile: "autonomy-full",
+      sourceCommit: "b".repeat(40),
+      enginePackId: `sha256:${"c".repeat(64)}`,
+      contractSha256: "d".repeat(64),
+      simulationSupported: false,
+      modelRole: "proposal-only",
+      harnessRole: "bounded-execution-evidence-and-rollback",
+      demoAvailable: true,
+      hardwareAuthority: false,
+      validatedPackCount: 1,
+      blockers: ["field.device.transport-unavailable", "field.quorum.missing"],
+    };
+    const invoke = vi.fn(async () => response);
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(getFieldTuningStatus()).resolves.toEqual(response);
+  });
+
   it("accepts a content-bound zero-write hardware plan and rejects budget drift", async () => {
     const response = {
       schemaVersion: 1,
