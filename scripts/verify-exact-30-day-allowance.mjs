@@ -8,7 +8,7 @@ const migrationPath = path.join(
   root,
   "supabase",
   "migrations",
-  "20260819010000_use_exact_30_day_allowance_cycles.sql",
+  "20260821010000_use_exact_30_day_allowance_cycles.sql",
 );
 const source = fs.readFileSync(migrationPath, "utf8");
 const executableSource = source
