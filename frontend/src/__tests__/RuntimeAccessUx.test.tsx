@@ -219,7 +219,9 @@ afterEach(() => {
     expect(screen.getByRole("link", { name: "Vehicle Studio" }))
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(8);
+      .querySelectorAll("a")).toHaveLength(9);
+    expect(screen.getByRole("link", { name: "AUTONOMY" }))
+      .not.toHaveClass("runtime-locked");
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);

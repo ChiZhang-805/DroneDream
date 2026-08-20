@@ -13559,3 +13559,190 @@ body {
     line-height: 1.3;
   }
 }
+
+/* Shared AUTONOMY entry used by Universal, SIM, LAB, and FIELD. The dedicated
+   AUTONOMY edition owns the full mission workspace; this surface owns the
+   edition-neutral import and qualification boundary. */
+.autonomy-gateway-page {
+  width: min(1180px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 52px 0 72px;
+}
+
+.autonomy-gateway-header,
+.autonomy-gateway-status,
+.autonomy-connector-row,
+.autonomy-maturity-strip {
+  display: flex;
+  align-items: center;
+}
+
+.autonomy-gateway-header {
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.autonomy-gateway-header p {
+  margin: 0 0 6px;
+  color: var(--accent, #e92754);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.autonomy-gateway-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  letter-spacing: -0.045em;
+}
+
+.autonomy-gateway-header .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.autonomy-gateway-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-block: 1px solid var(--border, #e4e4e7);
+}
+
+.autonomy-gateway-status > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 0 18px;
+  border-right: 1px solid var(--border, #e4e4e7);
+  font-size: 0.88rem;
+}
+
+.autonomy-gateway-status > div:last-child {
+  border-right: 0;
+}
+
+.autonomy-gateway-status svg {
+  width: 18px;
+  color: var(--accent, #e92754);
+}
+
+.autonomy-gateway-error {
+  margin: 24px 0 0;
+  color: #c81e47;
+}
+
+.autonomy-connector-section {
+  margin-top: 34px;
+}
+
+.autonomy-connector-section h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.autonomy-connector-section ul {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border, #e4e4e7);
+  list-style: none;
+}
+
+.autonomy-connector-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.4fr) 1fr 1fr 1fr;
+  gap: 18px;
+  min-height: 66px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border, #e4e4e7);
+  color: var(--muted, #6b7280);
+  font-size: 0.84rem;
+}
+
+.autonomy-connector-name {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.autonomy-connector-name strong {
+  color: var(--text, #171717);
+  font-size: 0.94rem;
+}
+
+.autonomy-connector-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-maturity-strip {
+  justify-content: space-between;
+  margin: 38px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--border, #e4e4e7);
+  list-style: none;
+}
+
+.autonomy-maturity-strip li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--muted, #6b7280);
+  font-size: 0.8rem;
+}
+
+.autonomy-maturity-strip b {
+  color: var(--accent, #e92754);
+}
+
+@media (max-width: 820px) {
+  .autonomy-gateway-page {
+    width: min(100% - 32px, 680px);
+    padding-top: 28px;
+  }
+
+  .autonomy-gateway-status {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .autonomy-gateway-status > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .autonomy-gateway-status > div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border, #e4e4e7);
+  }
+
+  .autonomy-connector-row {
+    grid-template-columns: minmax(170px, 1.4fr) 1fr 1fr;
+  }
+
+  .autonomy-connector-row > span:last-child {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .autonomy-gateway-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .autonomy-connector-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .autonomy-connector-row > span:nth-last-child(-n + 2) {
+    display: none;
+  }
+
+  .autonomy-maturity-strip {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}

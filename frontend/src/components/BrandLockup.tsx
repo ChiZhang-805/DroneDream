@@ -1,3 +1,5 @@
+import autonomyCompactLockup from "../assets/brand/autonomy-lockup-compact.png";
+import autonomyPrimaryLockup from "../assets/brand/autonomy-lockup-primary.png";
 import fieldCompactLockup from "../assets/brand/field-lockup-compact.png";
 import fieldPrimaryLockup from "../assets/brand/field-lockup-primary.png";
 import labCompactLockup from "../assets/brand/lab-lockup-compact.png";
@@ -24,6 +26,10 @@ const LOCKUPS = {
   field: {
     primary: fieldPrimaryLockup,
     compact: fieldCompactLockup,
+  },
+  autonomy: {
+    primary: autonomyPrimaryLockup,
+    compact: autonomyCompactLockup,
   },
 } as const satisfies Record<BrandEditionId, Record<"primary" | "compact", string>>;
 

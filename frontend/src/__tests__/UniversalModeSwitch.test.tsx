@@ -21,6 +21,7 @@ describe("UniversalModeSwitch", () => {
 
   it("fails unknown persisted values back to the SIM workspace", () => {
     expect(parseUniversalMode("unknown")).toBe("sim");
+    expect(parseUniversalMode("autonomy")).toBe("autonomy");
     expect(loadUniversalMode()).toBe("sim");
   });
 
@@ -38,7 +39,7 @@ describe("UniversalModeSwitch", () => {
     expect(document.documentElement.dataset.themeGrantsHardwareAuthority).toBe("false");
   });
 
-  it("offers the Universal modeling surface and three integrated workspaces without granting authority", () => {
+  it("offers Universal and four integrated product workspaces without granting authority", () => {
     const onChange = vi.fn();
     const onOpenUniversal = vi.fn();
     const { container } = render(
@@ -54,14 +55,21 @@ describe("UniversalModeSwitch", () => {
     const region = container.querySelector(".universal-mode-switch");
     expect(region).toHaveAttribute("data-presentation-only", "true");
     expect(region).toHaveAttribute("data-grants-hardware-authority", "false");
-    expect(screen.getAllByRole("option")).toHaveLength(4);
+    expect(screen.getAllByRole("option")).toHaveLength(5);
     expect(screen.getByRole("option", { name: "DroneDream" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "DroneDream · AUTONOMY" }))
+      .toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Workspace mode" })).toHaveValue("universal");
 
     fireEvent.change(screen.getByRole("combobox", { name: "Workspace mode" }), {
       target: { value: "lab" },
     });
     expect(onChange).toHaveBeenCalledWith("lab");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Workspace mode" }), {
+      target: { value: "autonomy" },
+    });
+    expect(onChange).toHaveBeenCalledWith("autonomy");
 
     fireEvent.change(screen.getByRole("combobox", { name: "Workspace mode" }), {
       target: { value: "universal" },

@@ -18,6 +18,7 @@ import {
 import { getDesktopStartupGateSession } from "../desktop/startupGate";
 import { getAuthAccessToken } from "../features/auth/authTokenStore";
 import { publicDemoConsole } from "../features/demo/publicDemo";
+import type { AutonomyAssetConnectorCatalog } from "../features/autonomy/assetConnectors";
 import type {
   ApiEnvelope,
   Artifact,
@@ -440,6 +441,10 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async getAutonomyAssetConnectors(): Promise<AutonomyAssetConnectorCatalog> {
+    return request<AutonomyAssetConnectorCatalog>("/autonomy/asset-connectors");
+  },
+
   async verifyAuthenticatedSession(): Promise<AuthenticatedSessionResponse> {
     return request<AuthenticatedSessionResponse>("/session");
   },
