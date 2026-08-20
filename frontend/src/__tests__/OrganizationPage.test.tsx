@@ -82,7 +82,7 @@ describe("OrganizationPage", () => {
     organizationMock.removeOrganizationMember.mockResolvedValue(snapshot());
   });
 
-  it("renders a compact member directory and four explicit application marks", async () => {
+  it("renders a compact member directory and five explicit application marks", async () => {
     const { container } = render(<OrganizationPage locale="en" accountId="user-owner" />);
 
     expect(await screen.findByRole("heading", { name: "Aerial Systems Lab" })).toBeVisible();
@@ -91,8 +91,8 @@ describe("OrganizationPage", () => {
     const ownerRow = screen.getByText("owner@example.test").closest("tr");
     expect(ownerRow).not.toBeNull();
     expect(within(ownerRow!).getAllByLabelText(
-      /^(Universal|SIM|LAB|FIELD) (not )?licensed$/i,
-    )).toHaveLength(4);
+      /^(Universal|SIM|LAB|FIELD|AUTONOMY) (not )?licensed$/i,
+    )).toHaveLength(5);
     expect(ownerRow?.querySelectorAll(".edition-license-strip .is-active")).toHaveLength(2);
     expect(container.querySelector(".organization-member-table")).toBeVisible();
   });

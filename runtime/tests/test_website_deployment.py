@@ -196,6 +196,10 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
             'ValidateSet("universal", "sim", "lab", "field", "autonomy")',
             release_builder,
         )
+        self.assertIn(
+            'ValidateSet("universal", "sim", "lab", "field", "autonomy")',
+            wrapper,
+        )
         self.assertIn("dronedream-five-edition-build-receipt", release_builder)
         self.assertNotIn("core-four-msvc", release_builder)
         self.assertIn("receipt.sourceCommit", release_builder)

@@ -14,7 +14,7 @@ param(
     [ValidateSet("preserve", "install")]
     [string]$VhostMode = "preserve",
 
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$EditionId = "universal",
 
     [UInt64]$BuildNumber = 0,

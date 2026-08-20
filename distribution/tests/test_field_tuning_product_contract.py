@@ -10,6 +10,7 @@ LAB_MANIFEST = ROOT / "distribution/editions/lab.v1.json"
 LIB_SOURCE = ROOT / "desktop/src-tauri/src/lib.rs"
 BUILD_SOURCE = ROOT / "desktop/src-tauri/build.rs"
 DOMAIN_SOURCE = ROOT / "desktop/src-tauri/src/hardware_domain.rs"
+PLAN_SOURCE = ROOT / "desktop/src-tauri/src/distribution_plan.rs"
 DEVICE_SOURCE = ROOT / "desktop/src-tauri/src/field_device.rs"
 TUNING_SOURCE = ROOT / "desktop/src-tauri/src/field_tuning.rs"
 RECOVERY_SOURCE = ROOT / "desktop/src-tauri/src/field_recovery.rs"
@@ -77,12 +78,16 @@ def test_hardware_domain_identity_is_exact_and_fail_closed() -> None:
     assert '("universal", "unified-sim-lab")' in source
     assert '("lab", "unified-sim-lab")' in source
     assert '("field", "field-lightweight")' in source
+    assert '("autonomy", "autonomy-full")' in source
     assert "Hardware-domain commands are unavailable in this edition" in source
     assert "require_available()?" in TUNING_SOURCE.read_text(encoding="utf-8")
     assert "require_available()?" in RECOVERY_SOURCE.read_text(encoding="utf-8")
     build_source = BUILD_SOURCE.read_text(encoding="utf-8")
-    assert 'matches!(edition_id.as_str(), "universal" | "lab" | "field")' in build_source
+    assert '"universal" | "lab" | "field" | "autonomy"' in build_source
     assert 'matches!(edition_id.as_str(), "universal" | "lab")' in build_source
+    plan_source = PLAN_SOURCE.read_text(encoding="utf-8")
+    assert 'include_str!("../../../distribution/editions/autonomy.v1.json")' in plan_source
+    assert 'matches!(edition_id, "lab" | "field" | "autonomy")' in plan_source
 
 
 def test_device_discovery_is_registry_only_and_never_opens_transport() -> None:

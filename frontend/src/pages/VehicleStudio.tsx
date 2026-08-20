@@ -41,7 +41,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { ChangeEvent, ReactNode } from "react";
 
 import { VehicleModelPreview3D } from "../components/VehicleModelPreview3D";
-import { BUILD_EDITION } from "../edition";
 import { useAuth } from "../features/auth/AuthContext";
 import {
   activeAssistantTenantContext,
@@ -100,15 +99,13 @@ import {
   vehicleModelBoundaryFor,
 } from "../features/vehicleStudio/cloudStorage";
 import { useI18n } from "../i18n/I18nProvider";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
 
 type InspectorTab = "assembly" | "properties" | "analysis" | "delivery";
 type Manipulator = "select" | "move" | "rotate" | "scale";
 type ViewPreset = "isometric" | "top" | "front" | "side";
 type Axis = "x" | "y" | "z";
 const MAX_VEHICLE_PACK_DRAFT_BYTES = 2_500_000;
-const VEHICLE_STUDIO_EDITION = BUILD_EDITION === "autonomy" ? "autonomy" : "universal";
-const VEHICLE_STUDIO_WORKSPACE = `console-${VEHICLE_STUDIO_EDITION}`;
-
 interface AssemblyRow {
   component: VehicleComponentDraft;
   depth: number;
@@ -241,6 +238,9 @@ function VectorFields({ label, value, onChange, step = .01 }: { label: string; v
 export function VehicleStudio() {
   const requestedDraftId = new URLSearchParams(window.location.search).get("draft");
   const { locale } = useI18n();
+  const editionTheme = useEditionTheme();
+  const vehicleStudioEdition = editionTheme.id === "autonomy" ? "autonomy" : "universal";
+  const vehicleStudioWorkspace = `console-${vehicleStudioEdition}`;
   const copy = locale === "zh-CN" ? ZH : EN;
   const { account } = useAuth();
   const ownerId = account?.id ?? "local";
@@ -261,17 +261,17 @@ export function VehicleStudio() {
     userId: ownerId,
     tenantId: tenantContext.tenantId,
     organizationId: tenantContext.organizationId,
-    workspaceId: VEHICLE_STUDIO_WORKSPACE,
-    edition: VEHICLE_STUDIO_EDITION,
-  }), [ownerId, tenantContext.organizationId, tenantContext.tenantId]);
+    workspaceId: vehicleStudioWorkspace,
+    edition: vehicleStudioEdition,
+  }), [ownerId, tenantContext.organizationId, tenantContext.tenantId, vehicleStudioEdition, vehicleStudioWorkspace]);
   const cloudBoundary = useMemo(
     () => vehicleModelBoundaryFor(
       ownerId,
       tenantContext.tenantId,
       tenantContext.organizationId,
-      VEHICLE_STUDIO_EDITION,
+      vehicleStudioEdition,
     ),
-    [ownerId, tenantContext.organizationId, tenantContext.tenantId],
+    [ownerId, tenantContext.organizationId, tenantContext.tenantId, vehicleStudioEdition],
   );
   const [models, setModels] = useState<StoredVehicleModel[]>(() => loadVehicleModels(localStorageScope));
   const [draft, setDraft] = useState<VehicleModelDraft>(() => createMyDroneVehicleModelDraft());
@@ -493,7 +493,7 @@ export function VehicleStudio() {
     setMessage(locale === "zh-CN" ? "已生成可继续手工精修的参数化装配草稿。" : "Generated an editable parametric assembly draft.");
   };
 
-  return <div className="vehicle-studio-page vehicle-studio-v2" data-brand-edition={VEHICLE_STUDIO_EDITION}>
+  return <div className="vehicle-studio-page vehicle-studio-v2" data-brand-edition={vehicleStudioEdition}>
     <header className="vehicle-studio-v2-header">
       <div><span>{copy.eyebrow}</span><h1>{copy.title}</h1><p>{copy.subtitle}</p></div>
       <div className="vehicle-studio-v2-header-actions">

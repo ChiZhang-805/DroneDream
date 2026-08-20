@@ -171,7 +171,10 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
     println!("cargo:rustc-check-cfg=cfg(dronedream_hardware_domain)");
     println!("cargo:rustc-check-cfg=cfg(dronedream_lab)");
     println!("cargo:rustc-check-cfg=cfg(dronedream_field)");
-    if matches!(edition_id.as_str(), "universal" | "lab" | "field") {
+    if matches!(
+        edition_id.as_str(),
+        "universal" | "lab" | "field" | "autonomy"
+    ) {
         println!("cargo:rustc-cfg=dronedream_hardware_domain");
     }
     if matches!(edition_id.as_str(), "universal" | "lab") {

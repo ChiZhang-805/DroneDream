@@ -3229,9 +3229,11 @@ function AppShellContent() {
   const experimentWizardMode = location.pathname === "/jobs/new";
   const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
     ? BUILD_EDITION
-    : launcherMode || location.pathname === "/vehicle-studio"
+    : launcherMode
       ? "universal"
-      : universalMode;
+      : location.pathname === "/vehicle-studio"
+        ? universalMode === "autonomy" ? "autonomy" : "universal"
+        : universalMode;
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
   const launcherRuntimeChecking =

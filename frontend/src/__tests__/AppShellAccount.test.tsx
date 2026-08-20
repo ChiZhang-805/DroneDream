@@ -73,6 +73,18 @@ describe("workspace account entry", () => {
     router.dispose();
   });
 
+  it("keeps AUTONOMY vehicle drafts inside the active AUTONOMY workspace", () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "autonomy");
+    const { router } = renderWorkspace("/vehicle-studio");
+
+    const selector = screen.getByRole("button", { name: "Switch DroneDream edition" });
+    expect(selector).toHaveTextContent("AUTONOMY");
+    expect(document.documentElement).toHaveAttribute("data-brand-edition", "autonomy");
+
+    router.dispose();
+  });
+
   it("shows an honest local profile when cloud auth is not configured", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { router } = renderWorkspace();

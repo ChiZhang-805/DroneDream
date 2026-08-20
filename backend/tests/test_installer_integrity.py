@@ -129,10 +129,20 @@ def _build_frozen_audit(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     )
 
 
-def _candidate(*, version: str = "1.0.1") -> dict[str, Any]:
-    edition_id = "sim"
+def _candidate(
+    *,
+    version: str = "1.0.1",
+    edition_id: str = "sim",
+) -> dict[str, Any]:
     build_number = 805
-    filename = f"DroneDream-Sim-{version}.exe"
+    product_name = {
+        "universal": "DroneDream-Universal",
+        "sim": "DroneDream-Sim",
+        "lab": "DroneDream-Lab",
+        "field": "DroneDream-Field",
+        "autonomy": "DroneDream-Autonomy",
+    }[edition_id]
+    filename = f"{product_name}-{version}.exe"
     release_tag = f"desktop-{edition_id}-v{version}-build-{build_number}"
     sha256 = "c" * 64
     global_url = (
@@ -172,7 +182,7 @@ def _candidate(*, version: str = "1.0.1") -> dict[str, Any]:
             "updatePolicy": "recommended",
             "notes": "\n".join(
                 (
-                    f"DroneDream-Sim {version} for Windows x64.",
+                    f"{product_name} {version} for Windows x64.",
                     f"edition-id: {edition_id}",
                     f"build-number: {build_number}",
                     f"source-commit: {'d' * 40}",
@@ -390,6 +400,20 @@ def test_future_immutable_release_contract_accepts_only_new_exact_signed_bytes(
         "source_commit": "d" * 40,
         "publication_authorized": False,
     }
+
+
+def test_future_immutable_release_accepts_autonomy_product_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    previous = _build_frozen_audit(monkeypatch)
+
+    result = verify_new_immutable_installer_release(
+        previous_audit=previous,
+        candidate=_candidate(edition_id="autonomy"),
+    )
+
+    assert result["edition_id"] == "autonomy"
+    assert result["file_name"] == "DroneDream-Autonomy-1.0.1.exe"
 
 
 def test_future_immutable_release_allows_equal_semver_but_rejects_downgrade(
