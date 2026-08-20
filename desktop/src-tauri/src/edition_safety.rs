@@ -962,6 +962,15 @@ mod tests {
             _ => panic!("fixture edition must select an active edition manifest"),
         };
         value["policy"]["editionManifestSha256"] = Value::String(sha256_hex(manifest.as_bytes()));
+
+        let vehicle_pack = match value.pointer("/vehicle/packId").and_then(Value::as_str) {
+            Some("holybro-s500-v2-pixhawk6c") => include_str!(
+                "../../../distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json"
+            ),
+            _ => panic!("fixture must select an embedded Vehicle Pack manifest"),
+        };
+        value["vehicle"]["packManifestSha256"] =
+            Value::String(sha256_hex(vehicle_pack.as_bytes()));
     }
 
     fn refresh_context(value: &mut Value) {
@@ -1044,7 +1053,11 @@ mod tests {
         observation.test_catalog_override = true;
         let result = evaluate_native_authorization(&value.to_string(), &observation)
             .expect("test-only allow");
-        assert_eq!(result.decision, "allow");
+        assert_eq!(
+            result.decision, "allow",
+            "unexpected reason codes: {:?}",
+            result.reason_codes
+        );
         assert_eq!(result.reason_codes, ["native.contract.allow"]);
         assert_eq!(result.receipt.layer, "native");
     }

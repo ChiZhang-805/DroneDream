@@ -43,7 +43,7 @@
     {
       "payloadPath": "distribution/vehicle-packs/registry.v1.json",
       "sourcePath": "distribution/vehicle-packs/registry.sim-only.v1.json",
-      "sourceSha256": "063c48f8cb1928c29a462ce65287fb69c0bd05f074808e2d8a55c7ca23cda49e"
+      "sourceSha256": "541bfc65c3d92b61574eda39025c1971e6157767dac090befee76b8792bdd6e0"
     }
   ],
   "forbiddenPayloadPaths": [

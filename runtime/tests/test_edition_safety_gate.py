@@ -36,6 +36,7 @@ engine_pack = load_module(
 FIXTURE = contract.bind_test_fixture_to_edition_manifest(
     json.loads(FIXTURE_PATH.read_text(encoding="utf-8")),
     ROOT / "distribution/editions/lab.v1.json",
+    ROOT / "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
 )
 
 

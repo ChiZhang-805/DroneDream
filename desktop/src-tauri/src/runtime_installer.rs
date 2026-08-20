@@ -7420,7 +7420,7 @@ mod tests {
             assert!(path.is_dir());
             paths.insert(path);
         }
-        assert_eq!(paths.len(), 4);
+        assert_eq!(paths.len(), 5);
 
         let error = prepare_diagnostics_directory(&cache, "unknown").unwrap_err();
         assert!(error.contains("not allowed"));

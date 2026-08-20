@@ -40,7 +40,7 @@
   ],
   "integrity": {
     "canonicalization": "RFC8785-JCS",
-    "payloadSha256": "1ea2b7c9d4e71a41add93f2756f6d386b593aedeb61b84c32f1ae56ba300a461",
+    "payloadSha256": "1b7b1abb6a95882ac20f41c4cfa6efa9b1976c050d26caaf433061589710c27b",
     "signature": {"state": "not-issued", "algorithm": "Ed25519", "keyId": null, "detachedSignatureSha256": null}
   },
   "knownGaps": [
