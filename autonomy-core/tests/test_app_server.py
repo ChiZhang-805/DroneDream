@@ -64,6 +64,7 @@ def test_loopback_api_requires_random_session_token(tmp_path):
             store=AppStore(tmp_path),
             token=token,
             custom_model_credential_vault=_MemoryVault(),
+            connector_credential_vault=_MemoryVault(),
         )
     )
 
@@ -81,6 +82,7 @@ def test_attachment_is_bound_to_its_task_thread(tmp_path):
             store=AppStore(tmp_path),
             token=token,
             custom_model_credential_vault=_MemoryVault(),
+            connector_credential_vault=_MemoryVault(),
         )
     )
     headers = {"Authorization": f"Bearer {token}"}
@@ -145,6 +147,7 @@ def test_plugin_api_is_authenticated_transactional_and_versioned(tmp_path):
             store=AppStore(tmp_path),
             token=token,
             custom_model_credential_vault=_MemoryVault(),
+            connector_credential_vault=_MemoryVault(),
         )
     )
 
