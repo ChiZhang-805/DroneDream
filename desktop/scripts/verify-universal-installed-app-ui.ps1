@@ -60,14 +60,14 @@ if ([int]$coexistenceContract.schemaVersion -ne 1 -or
     [string]$coexistenceContract.kind -cne "dronedream-desktop-edition-coexistence") {
     throw "Desktop edition coexistence contract is missing or unsupported."
 }
-$expectedEditionIds = @("universal", "sim", "lab", "field")
+$expectedEditionIds = @("universal", "sim", "lab", "field", "autonomy")
 $actualEditionIds = @($coexistenceContract.editions | ForEach-Object { [string]$_.editionId })
 $editionDiff = @(Compare-Object -ReferenceObject $expectedEditionIds -DifferenceObject $actualEditionIds)
 if ($editionDiff.Count -ne 0 -or $actualEditionIds.Count -ne $expectedEditionIds.Count) {
     throw "Desktop edition coexistence identities drifted."
 }
 $otherEditionContracts = @(
-    $coexistenceContract.editions | Where-Object { [string]$_.editionId -in @("sim", "lab", "field") }
+    $coexistenceContract.editions | Where-Object { [string]$_.editionId -in @("sim", "lab", "field", "autonomy") }
 )
 $matrix = @(
     foreach ($viewport in @(

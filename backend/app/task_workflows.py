@@ -14,7 +14,7 @@ from typing import Final, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-EditionId = Literal["universal", "sim", "lab", "field"]
+EditionId = Literal["universal", "sim", "lab", "field", "autonomy"]
 TaskType = Literal[
     "control_tuning",
     "mission_autonomy",
@@ -137,17 +137,17 @@ TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
     },
     "px4.catalog.validate": {
         "authority": "read",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Validate parameters against the bound firmware and airframe catalog.",
     },
     "optimizer.plan": {
         "authority": "proposal",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Propose a bounded optimization portfolio and budget.",
     },
     "vehicle.inspect": {
         "authority": "read",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Inspect a qualified Vehicle Pack and capability envelope.",
     },
     "vehicle.model_draft": {
@@ -157,19 +157,19 @@ TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
     },
     "map.inspect": {
         "authority": "read",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": (
             "Inspect Map Pack geometry, frame, semantics, confidence, and qualification."
         ),
     },
     "mission.task_graph": {
         "authority": "proposal",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Propose a dependency graph with evidence and recovery per node.",
     },
     "trajectory.plan": {
         "authority": "proposal",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Propose a trajectory for deterministic geometry and dynamics checks.",
     },
     "simulator.compile": {
@@ -207,7 +207,7 @@ TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
     },
     "evidence.record": {
         "authority": "write_evidence",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Declare immutable evidence requirements for a later executor.",
     },
 }

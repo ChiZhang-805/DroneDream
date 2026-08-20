@@ -45,14 +45,14 @@ function decodedJwtRole(value) {
   }
 }
 
-if (!/^(universal|sim|lab|field)$/u.test(editionId)) {
+if (!/^(universal|sim|lab|field|autonomy)$/u.test(editionId)) {
   fail("DRONEDREAM_DESKTOP_EDITION_ID must identify one supported edition");
 }
 if (
   releaseBuild
   && (
     !registeredOAuthClientId.test(oauthClientId)
-    || /^dronedream-desktop-(universal|sim|lab|field)$/u.test(oauthClientId)
+    || /^dronedream-desktop-(universal|sim|lab|field|autonomy)$/u.test(oauthClientId)
   )
 ) {
   fail("release builds require the registered public DRONEDREAM_OAUTH_CLIENT_ID");

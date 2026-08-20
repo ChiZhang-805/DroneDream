@@ -661,7 +661,7 @@ export interface BrowserAuthRequest {
 
 export interface BrowserAuthSession {
   protocolVersion: "desktop-browser-auth-pkce-v1";
-  editionId: "universal" | "sim" | "lab" | "field";
+  editionId: "universal" | "sim" | "lab" | "field" | "autonomy";
   authClientId: string;
   accessToken: string;
   attemptIdHash: string;
@@ -1564,7 +1564,7 @@ function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
   if (record.protocolVersion !== "desktop-browser-auth-pkce-v1") {
     throw new Error("response.protocolVersion is unsupported");
   }
-  if (!(["universal", "sim", "lab", "field"] as unknown[]).includes(record.editionId)) {
+  if (!(["universal", "sim", "lab", "field", "autonomy"] as unknown[]).includes(record.editionId)) {
     throw new Error("response.editionId is unsupported");
   }
   const issuedAt = expectIsoTimestamp(record.issuedAt, "response.issuedAt");

@@ -158,7 +158,11 @@ function isWorkspaceJobId(value: unknown): value is string {
 }
 
 function isBrandEditionId(value: unknown): value is BrandEditionId {
-  return value === "universal" || value === "sim" || value === "lab" || value === "field";
+  return value === "universal"
+    || value === "sim"
+    || value === "lab"
+    || value === "field"
+    || value === "autonomy";
 }
 
 function isAssistantArtifactKind(value: unknown): value is AssistantArtifactKind {

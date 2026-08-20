@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 CONTRACT_PATH = Path("distribution/desktop/edition-browser-auth.v1.json")
-EDITION_IDS = ("universal", "sim", "lab", "field")
+EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
 
 
 class DesktopEditionBrowserAuthError(ValueError):
@@ -217,7 +217,7 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
         "nativeProtocolEnforcementReceiptRequired": True,
         "hostedBrokerReceiptRequired": True,
         "credentialVaultReceiptRequired": True,
-        "fourEditionConcurrencyReceiptRequired": True,
+        "fiveEditionConcurrencyReceiptRequired": True,
         "cancelTimeoutOfflineSwitchAccountReceiptRequired": True,
         "releaseMayUseLegacyDirectTokenLoopback": False,
     }:

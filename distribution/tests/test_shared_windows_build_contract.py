@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "desktop" / "scripts" / "build-windows-llvm.ps1"
 MSVC_SCRIPT = ROOT / "desktop" / "scripts" / "build-windows-msvc.ps1"
-FOUR_EDITION_SCRIPT = ROOT / "desktop" / "scripts" / "build-four-edition-installers.ps1"
+FIVE_EDITION_SCRIPT = ROOT / "desktop" / "scripts" / "build-five-edition-installers.ps1"
 PLANNER_VERIFIER = ROOT / "desktop" / "scripts" / "verify-installer-planner.ps1"
 RUNTIME_MODE_HOOK = ROOT / "desktop" / "src-tauri" / "nsis" / "runtime-mode.nsh"
 INSTALLER_HOOK = ROOT / "desktop" / "src-tauri" / "nsis" / "webview2-health.nsh"
@@ -30,15 +30,15 @@ def _msvc_script() -> str:
     return MSVC_SCRIPT.read_text(encoding="utf-8-sig")
 
 
-def _four_edition_script() -> str:
-    return FOUR_EDITION_SCRIPT.read_text(encoding="utf-8-sig")
+def _five_edition_script() -> str:
+    return FIVE_EDITION_SCRIPT.read_text(encoding="utf-8-sig")
 
 
-def test_four_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs() -> None:
-    script = _four_edition_script()
+def test_five_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs() -> None:
+    script = _five_edition_script()
     for fragment in (
-        '[ValidateSet("all", "universal", "sim", "lab", "field")]',
-        'throw "The four-edition build requires one exact clean source commit."',
+        '[ValidateSet("all", "universal", "sim", "lab", "field", "autonomy")]',
+        'throw "The five-edition build requires one exact clean source commit."',
         '"desktop\\src-tauri\\tauri.universal.conf.json"',
         '"desktop\\src-tauri\\tauri.sim.conf.json"',
         '"desktop\\src-tauri\\tauri.lab.conf.json"',
@@ -126,8 +126,8 @@ def test_shared_msvc_build_is_valid_windows_powershell() -> None:
     assert "msvc-ast-ok" in result.stdout
 
 
-def test_four_edition_wrapper_is_valid_windows_powershell() -> None:
-    script_path = str(FOUR_EDITION_SCRIPT).replace("'", "''")
+def test_five_edition_wrapper_is_valid_windows_powershell() -> None:
+    script_path = str(FIVE_EDITION_SCRIPT).replace("'", "''")
     result = _run_powershell(
         textwrap.dedent(
             f"""
@@ -139,13 +139,13 @@ def test_four_edition_wrapper_is_valid_windows_powershell() -> None:
               $errors | ForEach-Object {{ Write-Error $_.Message }}
               exit 1
             }}
-            Write-Output 'four-edition-ast-ok'
+            Write-Output 'five-edition-ast-ok'
             """
         ),
         cwd=ROOT,
     )
     assert result.returncode == 0, result.stderr
-    assert "four-edition-ast-ok" in result.stdout
+    assert "five-edition-ast-ok" in result.stdout
 
 
 def test_planner_verifier_waits_for_exit_and_retries_only_its_exact_temp_tree() -> None:
@@ -632,7 +632,7 @@ def _detached_fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
         "bundleVersion": "1.0.0",
         "bundleId": bundle_id,
         "state": "attested-offline",
-        "editionScope": ["universal", "sim", "lab", "field"],
+        "editionScope": ["universal", "sim", "lab", "field", "autonomy"],
         "productSource": {"commit": commit, "tree": tree},
         "ownedBase": owned_base.as_posix(),
         "dependencyRoot": bundle_root.as_posix(),
@@ -760,7 +760,7 @@ def test_detached_dependency_contract_accepts_all_editions_without_live_junction
     tmp_path: Path,
 ) -> None:
     manifest_path, manifest = _detached_fixture(tmp_path)
-    for edition in ("universal", "sim", "lab", "field"):
+    for edition in ("universal", "sim", "lab", "field", "autonomy"):
         result = _verify_detached(manifest_path, manifest, edition=edition)
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)

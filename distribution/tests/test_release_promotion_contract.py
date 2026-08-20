@@ -69,7 +69,7 @@ class ReleasePromotionContractTests(unittest.TestCase):
         self,
         document: object,
         *,
-        observed_branch_head: str | None = None,
+        observed_branch_head: str | None = SOURCE_COMMIT,
         observed_metadata_only_paths: list[str] | None = None,
     ) -> dict[str, Any]:
         return distribution_contract.validate_release_promotion_manifest(
@@ -96,7 +96,7 @@ class ReleasePromotionContractTests(unittest.TestCase):
         validated = self.validate(deepcopy(self.fixture))
         self.assertEqual(validated["state"], "planned")
         self.assertEqual(validated["sourceCommit"], SOURCE_COMMIT)
-        self.assertEqual(validated["branchPolicy"]["creationState"], "planned-not-created")
+        self.assertEqual(validated["branchPolicy"]["creationState"], "long-lived-product-branch")
         self.assertEqual(validated["artifact"]["bytes"], 0)
 
     def test_validator_rejects_source_or_common_core_drift(self) -> None:
@@ -168,6 +168,7 @@ class ReleasePromotionContractTests(unittest.TestCase):
             self.validate(document)
         self.validate(
             document,
+            observed_branch_head="a" * 40,
             observed_metadata_only_paths=["distribution/promotions/sim.v1.json"],
         )
         with self.assertRaisesRegex(
@@ -175,6 +176,7 @@ class ReleasePromotionContractTests(unittest.TestCase):
         ):
             self.validate(
                 document,
+                observed_branch_head="a" * 40,
                 observed_metadata_only_paths=["distribution/promotions/other.v1.json"],
             )
         invalid = deepcopy(document)
@@ -182,15 +184,18 @@ class ReleasePromotionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(
             distribution_contract.DistributionContractError, "outside the allowlist"
         ):
-            self.validate(invalid, observed_metadata_only_paths=["backend/app/main.py"])
+            self.validate(
+                invalid,
+                observed_branch_head="a" * 40,
+                observed_metadata_only_paths=["backend/app/main.py"],
+            )
 
-    def test_created_branch_requires_matching_observed_head(self) -> None:
+    def test_long_lived_branch_requires_matching_observed_head(self) -> None:
         document = deepcopy(self.fixture)
-        document["branchPolicy"]["creationState"] = "creation-approved"
         with self.assertRaisesRegex(
             distribution_contract.DistributionContractError, "requires an independently observed"
         ):
-            self.validate(document)
+            self.validate(document, observed_branch_head=None)
         with self.assertRaisesRegex(
             distribution_contract.DistributionContractError, "branch head drifted"
         ):
@@ -234,7 +239,7 @@ class ReleasePromotionContractTests(unittest.TestCase):
         invalid = deepcopy(self.fixture)
         invalid["state"] = "promotable"
         invalid["blockers"] = []
-        invalid["branchPolicy"]["creationState"] = "creation-approved"
+        invalid["branchPolicy"]["creationState"] = "long-lived-product-branch"
         invalid["artifact"]["bytes"] = 1
         invalid["artifact"]["updaterSignatureState"] = "verified"
         with self.assertRaisesRegex(
@@ -258,7 +263,7 @@ class ReleasePromotionContractTests(unittest.TestCase):
         valid["rollback"]["targetArtifactSha256"] = "a" * 64
         self.validate(valid)
 
-    def test_three_edition_set_requires_one_source_and_common_core(self) -> None:
+    def test_four_product_edition_set_requires_one_source_and_common_core(self) -> None:
         promotions = []
         for edition_id in sorted(distribution_contract.EDITION_IDS):
             promotion = deepcopy(self.fixture)

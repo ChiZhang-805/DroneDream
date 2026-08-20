@@ -1,9 +1,11 @@
 import rawCatalog from "./catalog.v1.json";
 
 export const EDITION_IDS = ["sim", "lab", "field"] as const;
+export const VEHICLE_PACK_EDITION_IDS = ["sim", "lab", "field", "autonomy"] as const;
 export const REGION_IDS = ["cn", "global"] as const;
 
 export type EditionId = (typeof EDITION_IDS)[number];
+export type VehiclePackEditionId = (typeof VEHICLE_PACK_EDITION_IDS)[number];
 export type RegionId = (typeof REGION_IDS)[number];
 export type DistributionLocale = "en" | "zh-CN";
 export type DistributionValidationStatus = "validated" | "contract-only" | "planned";
@@ -49,7 +51,7 @@ export interface DistributionVehiclePack {
   manufacturer: string;
   vehicleClass: string;
   supportRegions: RegionId[];
-  supportedEditions: EditionId[];
+  supportedEditions: VehiclePackEditionId[];
   validationStatus: DistributionValidationStatus;
   validationTier: string;
   autopilotFamily: "px4" | "ardupilot" | "crazyflie";
@@ -83,6 +85,7 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const SAFE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EDITION_SET = new Set<string>(EDITION_IDS);
+const VEHICLE_PACK_EDITION_SET = new Set<string>(VEHICLE_PACK_EDITION_IDS);
 const REGION_SET = new Set<string>(REGION_IDS);
 const VALIDATION_STATUS_SET = new Set<string>(["validated", "contract-only", "planned"]);
 const IMPLEMENTATION_STATUS_SET = new Set<string>(["integrated-contract", "contract-only"]);
@@ -323,7 +326,7 @@ function parseVehiclePack(value: unknown, index: number): DistributionVehiclePac
   );
   if (
     supportedEditions.length === 0
-    || supportedEditions.some((edition) => !EDITION_SET.has(edition))
+    || supportedEditions.some((edition) => !VEHICLE_PACK_EDITION_SET.has(edition))
   ) {
     throw new Error(`${label}.supportedEditions contains an unsupported edition`);
   }
@@ -377,7 +380,7 @@ function parseVehiclePack(value: unknown, index: number): DistributionVehiclePac
     manufacturer: requireString(record.manufacturer, `${label}.manufacturer`),
     vehicleClass: requireString(record.vehicleClass, `${label}.vehicleClass`),
     supportRegions: requireRegionIds(record.supportRegions, `${label}.supportRegions`),
-    supportedEditions: supportedEditions as EditionId[],
+    supportedEditions: supportedEditions as VehiclePackEditionId[],
     validationStatus: validationStatus as DistributionValidationStatus,
     validationTier,
     autopilotFamily: autopilotFamily as DistributionVehiclePack["autopilotFamily"],

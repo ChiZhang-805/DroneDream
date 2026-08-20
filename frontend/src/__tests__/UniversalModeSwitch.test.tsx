@@ -56,7 +56,7 @@ describe("UniversalModeSwitch", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(trigger);
-    expect(screen.getAllByRole("menuitemradio")).toHaveLength(4);
+    expect(screen.getAllByRole("menuitemradio")).toHaveLength(5);
     expect(screen.getByRole("menuitemradio", { name: "DroneDream" }))
       .toHaveAttribute("aria-checked", "true");
 
@@ -64,8 +64,12 @@ describe("UniversalModeSwitch", () => {
     expect(onChange).toHaveBeenCalledWith("lab");
 
     fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream · AUTONOMY" }));
+    expect(onChange).toHaveBeenCalledWith("autonomy");
+
+    fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream" }));
-    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledTimes(2);
   });
 
   it("switches back to Universal from an integrated workspace", () => {

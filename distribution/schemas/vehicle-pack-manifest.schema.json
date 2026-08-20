@@ -51,7 +51,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": {"enum": ["sim", "lab", "field"]}
+      "items": {"enum": ["sim", "lab", "field", "autonomy"]}
     },
     "validationStatus": {"enum": ["validated", "contract-only", "planned"]},
     "validationTier": {

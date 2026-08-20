@@ -3,10 +3,6 @@ import type { ReactNode } from "react";
 export const SETTINGS_LOCALES = [
   { id: "en", label: "English", region: "west" },
   { id: "zh-CN", label: "简体中文", region: "east" },
-  { id: "zh-TW", label: "繁體中文", region: "east" },
-  { id: "es", label: "Español", region: "west" },
-  { id: "ja", label: "日本語", region: "east" },
-  { id: "ko", label: "한국어", region: "east" },
 ] as const;
 
 export function SettingsLanguageRegionIcon({

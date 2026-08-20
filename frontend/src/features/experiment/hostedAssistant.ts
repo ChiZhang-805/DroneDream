@@ -42,6 +42,7 @@ const HOSTED_RESPONSE_FORMAT = {
             "simulation_experiment",
             "lab_validation",
             "field_trial_plan",
+            "autonomy_mission_plan",
           ],
         },
         artifact_title: { type: "string", minLength: 1, maxLength: 120 },
@@ -116,6 +117,7 @@ const ARTIFACT_KIND: Record<BrandEditionId, string> = {
   sim: "simulation_experiment",
   lab: "lab_validation",
   field: "field_trial_plan",
+  autonomy: "autonomy_mission_plan",
 };
 
 const EDITION_CONTRACT: Record<BrandEditionId, string> = {
@@ -127,6 +129,8 @@ const EDITION_CONTRACT: Record<BrandEditionId, string> = {
     "Prepare an editable lab-validation experiment draft that can include simulation and qualification planning. Never control hardware or run a trial.",
   field:
     "Prepare a conservative real-device tuning or field-trial plan with explicit operator approval, abort limits, snapshots, and rollback. Never arm, write parameters, control hardware, or run a trial.",
+  autonomy:
+    "Prepare a structured autonomous-mission draft with explicit assumptions, map and vehicle requirements, safety holds, replanning triggers, evidence gates, and user confirmation. Never claim execution or grant hardware authority.",
 };
 
 type HostedAssistantPayload = Readonly<{

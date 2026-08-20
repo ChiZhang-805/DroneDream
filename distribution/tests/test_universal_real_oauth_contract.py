@@ -63,7 +63,7 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
     ):
         assert exact_count in powershell
     assert '@("en", "zh-CN")' in powershell
-    assert '@("universal", "sim", "lab", "field")' in powershell
+    assert '@("universal", "sim", "lab", "field", "autonomy")' in powershell
     assert '"--emulate-viewport=true"' in powershell
     assert '"--authenticated-workspace=true"' in powershell
     assert 'validationSurface -cne "authenticated-workspace"' in powershell

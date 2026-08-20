@@ -33,7 +33,7 @@ class EditionBuildPlannerTests(unittest.TestCase):
         cls.core_hash = planner.common_core_hash(
             ROOT, cls.source_commit, cls.request["commonCorePaths"]
         )
-        cls.release_heads = {edition_id: None for edition_id in planner.EDITION_IDS}
+        cls.release_heads = {edition_id: "a" * 40 for edition_id in planner.EDITION_IDS}
 
     def create(self, request: object | None = None) -> dict[str, object]:
         return planner.create_build_plan(
@@ -64,7 +64,7 @@ class EditionBuildPlannerTests(unittest.TestCase):
         execution = schema["properties"]["execution"]["properties"]
         self.assertTrue(all(item["const"] is False for item in execution.values()))
 
-    def test_plan_has_one_common_source_and_three_unbuilt_editions(self) -> None:
+    def test_plan_has_one_common_source_and_four_unbuilt_editions(self) -> None:
         plan = self.create()
         self.assertEqual(plan["state"], "plan-only")
         self.assertEqual(plan["source"]["commit"], self.source_commit)
@@ -72,7 +72,7 @@ class EditionBuildPlannerTests(unittest.TestCase):
         self.assertEqual(plan["source"]["commonCoreHash"], self.core_hash)
         self.assertEqual(
             {item["editionId"] for item in plan["editions"]},
-            {"sim", "lab", "field"},
+            {"sim", "lab", "field", "autonomy"},
         )
         self.assertTrue(
             all(
@@ -93,8 +93,8 @@ class EditionBuildPlannerTests(unittest.TestCase):
         self.assertTrue(all(value is False for value in plan["execution"].values()))
         self.assertTrue(
             all(
-                item["promotion"]["creationState"] == "planned-not-created"
-                and item["promotion"]["observedBranchHead"] is None
+                item["promotion"]["creationState"] == "long-lived-product-branch"
+                and item["promotion"]["observedBranchHead"] == "a" * 40
                 and item["promotion"]["prOnly"] is True
                 and item["promotion"]["forcePushAllowed"] is False
                 for item in plan["editions"]
@@ -140,7 +140,7 @@ class EditionBuildPlannerTests(unittest.TestCase):
     def test_precombined_bundles_are_alias_plans_not_source_forks(self) -> None:
         plan = self.create()
         editions = {item["editionId"]: item for item in plan["editions"]}
-        self.assertEqual(len(plan["precombinedBundles"]), 3)
+        self.assertEqual(len(plan["precombinedBundles"]), 4)
         for bundle in plan["precombinedBundles"]:
             edition = editions[bundle["editionId"]]
             self.assertEqual(bundle["editionBuildId"], edition["artifact"]["buildId"])
@@ -172,10 +172,10 @@ class EditionBuildPlannerTests(unittest.TestCase):
                 observed_release_heads=deepcopy(self.release_heads),
             )
 
-    def test_existing_release_branch_fails_closed(self) -> None:
+    def test_missing_product_branch_fails_closed(self) -> None:
         heads = deepcopy(self.release_heads)
-        heads["sim"] = "a" * 40
-        with self.assertRaisesRegex(planner.BuildPlanError, "already has a remote head"):
+        heads["sim"] = None
+        with self.assertRaisesRegex(planner.BuildPlanError, "long-lived product branches"):
             planner.create_build_plan(
                 deepcopy(self.request),
                 repo_root=ROOT,

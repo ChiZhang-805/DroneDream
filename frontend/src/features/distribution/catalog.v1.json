@@ -141,7 +141,7 @@
       "manufacturer": "Holybro",
       "vehicleClass": "multicopter-research",
       "supportRegions": ["global"],
-      "supportedEditions": ["sim", "lab", "field"],
+      "supportedEditions": ["sim", "lab", "field", "autonomy"],
       "validationStatus": "contract-only",
       "validationTier": "contract-only",
       "autopilotFamily": "px4",

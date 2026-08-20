@@ -7,7 +7,7 @@
   "manufacturer": "Holybro",
   "vehicleClass": "multicopter-medium",
   "availabilityRegions": ["global"],
-  "supportedEditions": ["lab", "field"],
+  "supportedEditions": ["lab", "field", "autonomy"],
   "validationStatus": "contract-only",
   "validationTier": "contract-only",
   "autopilot": {
@@ -25,7 +25,7 @@
     "validation": {"status": "planned", "sourceIds": [], "artifacts": []}
   },
   "safety": {
-    "capabilityPolicySha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903",
+    "capabilityPolicySha256": "ff15182466b2adf5e5134009096c55a6e110f8af2c247818735facc17874ccc3",
     "frontendIsAuthority": false,
     "hardwareActionsRequireValidatedTier": true,
     "parameterBounds": [

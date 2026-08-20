@@ -439,7 +439,7 @@ export function FieldSettingsDialog({
             </a>
           </div>
           <div className="settings-course-editions">
-            {(["universal", "sim", "lab", "field"] as const).map((edition, index) => (
+            {(["universal", "sim", "lab", "field", "autonomy"] as const).map((edition, index) => (
               <article key={edition}>
                 <BrandLockup edition={edition} />
                 <p>{copy.courseOverview}</p>

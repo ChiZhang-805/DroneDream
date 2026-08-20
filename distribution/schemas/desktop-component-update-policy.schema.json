@@ -96,10 +96,10 @@
           "preservesUserState": {"const": true},
           "editions": {
             "type": "array",
-            "minItems": 4,
-            "maxItems": 4,
+            "minItems": 5,
+            "maxItems": 5,
             "uniqueItems": true,
-            "items": {"enum": ["universal", "sim", "lab", "field"]}
+            "items": {"enum": ["universal", "sim", "lab", "field", "autonomy"]}
           },
           "requires": {
             "type": "array",

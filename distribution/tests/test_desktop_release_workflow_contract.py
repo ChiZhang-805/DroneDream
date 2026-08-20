@@ -54,9 +54,9 @@ def _outputs(path: Path) -> dict[str, str]:
     )
 
 
-def test_workflow_has_four_isolated_release_and_update_channels() -> None:
+def test_workflow_has_five_isolated_release_and_update_channels() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
-    for edition in ("universal", "sim", "lab", "field"):
+    for edition in ("universal", "sim", "lab", "field", "autonomy"):
         assert f'"desktop-{edition}-v*-build-*"' in workflow
     for fragment in (
         "resolve-desktop-edition-release.ps1",
@@ -149,7 +149,7 @@ def test_release_source_inventory_uses_edition_product_identity() -> None:
     assert "edition Tauri config version must match" in policy
 
 
-@pytest.mark.parametrize("edition", ["universal", "sim", "lab", "field"])
+@pytest.mark.parametrize("edition", ["universal", "sim", "lab", "field", "autonomy"])
 def test_resolver_accepts_only_the_current_version_and_commit_count(
     edition: str, tmp_path: Path
 ) -> None:
@@ -189,7 +189,7 @@ def test_resolver_rejects_ambiguous_or_stale_release_tags(
     assert result.returncode != 0
 
 
-@pytest.mark.parametrize("edition", ["universal", "sim", "lab", "field"])
+@pytest.mark.parametrize("edition", ["universal", "sim", "lab", "field", "autonomy"])
 def test_manual_validation_resolves_a_real_unsigned_edition(
     edition: str, tmp_path: Path,
 ) -> None:

@@ -3,7 +3,7 @@ param(
     [string]$ManifestPath,
     [Parameter(Mandatory = $true)]
     [string]$RepoRoot,
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$EditionId,
     [Parameter(Mandatory = $true)]
     [string]$ExpectedSourceCommit,
@@ -156,10 +156,10 @@ if ([int]$manifest.schemaVersion -ne 1 -or
     [string]$manifest.bundleId -cnotmatch '^npm-win32-x64-[0-9a-f]{16}$') {
     throw "The detached dependency manifest identity is unsupported."
 }
-$expectedEditions = @("universal", "sim", "lab", "field")
-if (@($manifest.editionScope).Count -ne 4 -or
+$expectedEditions = @("universal", "sim", "lab", "field", "autonomy")
+if (@($manifest.editionScope).Count -ne 5 -or
     (Compare-Object -CaseSensitive -SyncWindow 0 $expectedEditions @($manifest.editionScope))) {
-    throw "The detached dependency bundle is not scoped to all four exact Editions."
+    throw "The detached dependency bundle is not scoped to all five exact Editions."
 }
 
 Assert-ExactProperties -Value $manifest.productSource -Names @("commit", "tree") -Context "productSource"

@@ -80,6 +80,19 @@
       "updaterMetadataFileName": "latest-field.json",
       "updaterMetadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-channel/latest-field.json",
       "updaterReleaseTagPrefix": "desktop-field-v1.0.0-build-"
+    },
+    {
+      "editionId": "autonomy",
+      "runtimeProfileId": "autonomy-full",
+      "localRuntimeStateNamespace": "io.dronedream.desktop.autonomy/runtime",
+      "diagnosticsRelativePath": "diagnostics/autonomy",
+      "installerProductName": "DroneDream-Autonomy",
+      "publicArtifactFileName": "DroneDream-Autonomy-1.0.0.exe",
+      "tauriBundleInstallerFileName": "DroneDream-Autonomy_1.0.0_x64-setup.exe",
+      "updaterChannelTag": "desktop-autonomy-channel",
+      "updaterMetadataFileName": "latest-autonomy.json",
+      "updaterMetadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-channel/latest-autonomy.json",
+      "updaterReleaseTagPrefix": "desktop-autonomy-v1.0.0-build-"
     }
   ]
 }

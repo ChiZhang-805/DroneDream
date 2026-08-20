@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-Edition = Literal["universal", "sim", "lab", "field"]
+Edition = Literal["universal", "sim", "lab", "field", "autonomy"]
 ExecutionTarget = Literal["simulation", "hitl", "hardware"]
 PerceptionMode = Literal["map", "vision", "fusion"]
 ExecutionAdapter = Literal[

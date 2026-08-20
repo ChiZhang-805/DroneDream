@@ -15,7 +15,7 @@ export const VEHICLE_MODEL_LIMITS = Object.freeze({
 
 export type VehicleClass = "multicopter-small" | "multicopter-medium" | "multicopter-research";
 export type AutopilotFamily = "px4" | "ardupilot" | "crazyflie";
-export type VehiclePackTargetEdition = "sim" | "lab" | "field";
+export type VehiclePackTargetEdition = "sim" | "lab" | "field" | "autonomy";
 export type BodyShape = "box" | "cylinder";
 export type VehicleComponentKind =
   | "fuselage" | "frame" | "arm" | "motor" | "propeller" | "landing-gear"
@@ -701,7 +701,7 @@ export function validateVehicleModel(draft: VehicleModelDraft): VehicleModelVali
   if (draft.sensors.length < 1 || draft.sensors.length > MAX_VEHICLE_SENSORS) issues.push({ field: "sensors", code: "invalid-sensor-count", message: `Use 1 to ${MAX_VEHICLE_SENSORS} sensors` });
   if (new Set(draft.sensors.map((sensor) => sensor.id)).size !== draft.sensors.length) issues.push({ field: "sensors", code: "duplicate-sensor", message: "Sensor identities must be unique" });
   if (!draft.sensors.some((sensor) => sensor.enabled && sensor.type === "imu")) issues.push({ field: "sensors", code: "imu-required", message: "At least one IMU is required" });
-  if (draft.targetEditions.length === 0 || draft.targetEditions.length > 3 || new Set(draft.targetEditions).size !== draft.targetEditions.length) issues.push({ field: "targetEditions", code: "target-required", message: "Select at least one target Edition" });
+  if (draft.targetEditions.length === 0 || draft.targetEditions.length > 4 || new Set(draft.targetEditions).size !== draft.targetEditions.length) issues.push({ field: "targetEditions", code: "target-required", message: "Select one or more unique target Editions" });
   if (draft.targetEditions.includes("field") && draft.autopilot.family === "crazyflie") issues.push({ field: "targetEditions", code: "field-adapter-unavailable", message: "The Crazyflie Field adapter is planned and cannot be exported as compatible" });
   if (!Array.isArray(draft.components) || draft.components.length < 1 || draft.components.length > MAX_VEHICLE_COMPONENTS) issues.push({ field: "components", code: "invalid-component-count", message: `Use 1 to ${MAX_VEHICLE_COMPONENTS} components` });
   const physicalMotorCount = draft.components.filter((component) => component.kind === "motor").length;
@@ -886,7 +886,7 @@ export function createMyDroneVehicleModelDraft(now = new Date()): VehicleModelDr
     ],
     autopilot: { family: "px4", controllerModel: "Pixhawk 6C", firmwareVersion: "v1.16.0" },
     controlTarget: { primary: "position", parameterFamilies: ["MPC_XY", "MPC_Z", "MC_ROLL", "MC_PITCH", "MC_YAW"] },
-    targetEditions: ["sim", "lab", "field"],
+    targetEditions: ["sim", "lab", "field", "autonomy"],
     components,
     constraints: createEngineeringConstraints(components),
     designParameters: { units: "metric", gridM: .005, symmetry: "x" },

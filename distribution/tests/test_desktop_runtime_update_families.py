@@ -27,7 +27,7 @@ def _document() -> dict[str, object]:
 def test_schema_and_contract_are_closed_versioned_inputs() -> None:
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     assert schema["additionalProperties"] is False
-    assert schema["properties"]["editions"]["minItems"] == 4
+    assert schema["properties"]["editions"]["minItems"] == 5
     for name in ("sharedRuntimeBase", "updaterPolicy"):
         nested = schema["properties"][name]
         assert nested["additionalProperties"] is False

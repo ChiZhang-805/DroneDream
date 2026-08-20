@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream-Autonomy",
+  "identifier": "io.dronedream.desktop.autonomy",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream · AUTONOMY",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 390,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "publisher": "DroneDream",
+    "shortDescription": "Natural-language autonomous mission workspace",
+    "longDescription": "DroneDream · AUTONOMY turns natural-language intent into structured, reviewable mission plans and supervises execution through repeated Model + Harness loops, pluginized tools, safety holds, replanning and evidence gates. Simulation is the default execution domain; hardware remains fail-closed until explicitly qualified.",
+    "icon": [
+      "../../brand/generated/autonomy/windows/32x32.png",
+      "../../brand/generated/autonomy/windows/128x128.png",
+      "../../brand/generated/autonomy/windows/128x128@2x.png",
+      "../../brand/generated/autonomy/windows/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "../../brand/generated/autonomy/windows/icon.ico",
+        "uninstallerIcon": "../../brand/generated/autonomy/windows/icon.ico"
+      }
+    },
+    "resources": {
+      "../../distribution/editions/autonomy.v1.json": "distribution/editions/autonomy.v1.json",
+      "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",
+      "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",
+      "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json",
+      "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",
+      "../../distribution/desktop/edition-browser-auth.v1.json": "distribution/desktop/edition-browser-auth.v1.json",
+      "../../distribution/desktop/edition-runtime-update-families.v1.json": "distribution/desktop/edition-runtime-update-families.v1.json",
+      "../../brand/brand-editions.v1.json": "brand/brand-editions.v1.json",
+      "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-channel/latest-autonomy.json"
+      ],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

@@ -86,8 +86,8 @@
     },
     "editions": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 5,
+      "maxItems": 5,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -115,26 +115,26 @@
           "canonicalWindowsIcon"
         ],
         "properties": {
-          "editionId": {"enum": ["universal", "sim", "lab", "field"]},
+          "editionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
           "artifactFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field)-1\\.0\\.0\\.exe$"},
           "installerProductName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field)$"},
           "displayName": {"type": "string", "minLength": 10},
-          "bundleIdentifier": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field)$"},
+          "bundleIdentifier": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field|autonomy)$"},
           "installRoot": {"pattern": "^%LOCALAPPDATA%/DroneDream-(Universal|Sim|Lab|Field)$"},
           "uninstallRegistryKey": {"type": "string", "minLength": 1},
           "productRegistryKey": {"type": "string", "minLength": 1},
           "startMenuFolder": {"type": "string", "minLength": 1},
           "desktopShortcutName": {"type": "string", "minLength": 10},
           "appUserModelId": {"type": "string", "minLength": 1},
-          "updaterChannel": {"enum": ["universal", "sim", "lab", "field"]},
-          "updaterMetadataFileName": {"pattern": "^latest-(universal|sim|lab|field)\\.json$"},
+          "updaterChannel": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
+          "updaterMetadataFileName": {"pattern": "^latest-(universal|sim|lab|field|autonomy)\\.json$"},
           "runtimeProfileId": {"type": "string", "minLength": 1},
-          "authClientId": {"pattern": "^dronedream-desktop-(universal|sim|lab|field)$"},
-          "loopbackPathPrefix": {"pattern": "^/desktop-auth/(universal|sim|lab|field)/$"},
-          "customProtocol": {"pattern": "^dronedream-(universal|sim|lab|field)$"},
-          "credentialVaultNamespace": {"pattern": "^DroneDream/Auth/(universal|sim|lab|field)/v1$"},
+          "authClientId": {"pattern": "^dronedream-desktop-(universal|sim|lab|field|autonomy)$"},
+          "loopbackPathPrefix": {"pattern": "^/desktop-auth/(universal|sim|lab|field|autonomy)/$"},
+          "customProtocol": {"pattern": "^dronedream-(universal|sim|lab|field|autonomy)$"},
+          "credentialVaultNamespace": {"pattern": "^DroneDream/Auth/(universal|sim|lab|field|autonomy)/v1$"},
           "webViewDataNamespace": {"type": "string", "minLength": 1},
-          "brandEditionId": {"enum": ["universal", "sim", "lab", "field"]},
+          "brandEditionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
           "canonicalWindowsIcon": {"type": "string", "minLength": 1}
         }
       }
@@ -144,7 +144,7 @@
       "additionalProperties": false,
       "required": ["installOrderCoverage", "requiredStates", "releaseRequiresExecutedReceipt"],
       "properties": {
-        "installOrderCoverage": {"const": "pairwise-plus-all-four"},
+        "installOrderCoverage": {"const": "pairwise-plus-all-five"},
         "requiredStates": {
           "type": "array",
           "minItems": 5,
@@ -152,10 +152,10 @@
           "uniqueItems": true,
           "items": {
             "enum": [
-              "all-four-installed",
+              "all-five-installed",
               "each-edition-upgraded-in-place",
               "each-edition-uninstalled-alone",
-              "remaining-three-still-launchable",
+              "remaining-four-still-launchable",
               "legacy-detected-without-overwrite"
             ]
           }

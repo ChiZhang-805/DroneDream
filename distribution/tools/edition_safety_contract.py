@@ -670,7 +670,7 @@ def validate_authorization_request(
         raise EditionSafetyContractError("request source commit is invalid")
     _require_sha256(source["enginePackManifestSha256"], "request Engine Pack hash")
     _require_sha256(source["runtimeBaseManifestSha256"], "request Runtime Base hash")
-    if request["editionId"] not in {"sim", "lab", "field"}:
+    if request["editionId"] not in {"sim", "lab", "field", "autonomy"}:
         raise EditionSafetyContractError("request edition is unsupported")
     _require_identifier(request["action"], "request action", dotted=True)
     if request["targetKind"] not in {"installation", "simulation", "hitl", "real-hardware"}:

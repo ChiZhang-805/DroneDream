@@ -224,7 +224,7 @@
         "compositeInventoryHash": {"$ref": "#/$defs/sha256"},
         "policy": {"$ref": "#/$defs/policyBinding"},
         "source": {"$ref": "#/$defs/sourceBinding"},
-        "editionId": {"enum": ["sim", "lab", "field"]},
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
         "action": {"$ref": "#/$defs/dottedIdentifier"},
         "targetKind": {"enum": ["installation", "simulation", "hitl", "real-hardware"]},
         "issuedAt": {"$ref": "#/$defs/timestamp"},

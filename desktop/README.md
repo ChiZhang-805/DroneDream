@@ -218,7 +218,7 @@ npm run dev
 npm run build
 npm run build:msvc
 npm run build:llvm
-npm run build:four
+npm run build:five
 ```
 
 `npm run dev` starts the existing frontend dev server automatically. `npm run
@@ -231,8 +231,8 @@ repository `.vsconfig` toolchain, requires Python 3.11 and Rust
 `1.97.0-x86_64-pc-windows-msvc`, verifies `cl`, `link`, `rc`, and `dumpbin`, and
 checks the produced PE dependency table before accepting the NSIS installer.
 Windows Store Python execution aliases are rejected.
-`npm run build:four` uses this MSVC path to build Universal, SIM, LAB, and FIELD
-from one clean source commit. Use `npm run build:four:llvm` only as the explicit
+`npm run build:five` uses this MSVC path to build Universal, SIM, LAB, FIELD, and
+AUTONOMY from one clean source commit. Use `npm run build:five:llvm` only as the explicit
 portable fallback.
 
 The manual `Desktop installer` GitHub workflow accepts an edition choice and
@@ -261,7 +261,7 @@ desktop version. Pull requests and manual desktop workflow runs retain an
 unsigned verified installer as a 14-day Actions artifact for testing only.
 Pushing an immutable
 `desktop-<edition>-v<version>-build-<git-commit-count>` tag starts the protected
-release path for exactly one of `universal`, `sim`, `lab`, or `field`. The
+release path for exactly one of `universal`, `sim`, `lab`, `field`, or `autonomy`. The
 version must match the Tauri, npm, and Cargo metadata and the build number must
 match the tagged commit count. SignPath manually approves and signs the
 application, NSIS packages those signed bytes, SignPath manually approves and

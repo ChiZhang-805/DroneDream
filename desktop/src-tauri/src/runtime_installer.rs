@@ -2627,7 +2627,10 @@ fn prepare_real_child_directory(
 
 #[cfg(target_os = "windows")]
 fn prepare_diagnostics_directory(cache_root: &Path, edition_id: &str) -> Result<PathBuf, String> {
-    if !matches!(edition_id, "universal" | "sim" | "lab" | "field") {
+    if !matches!(
+        edition_id,
+        "universal" | "sim" | "lab" | "field" | "autonomy"
+    ) {
         return Err("Desktop edition is not allowed to own runtime diagnostics.".to_string());
     }
     let diagnostics_root =
@@ -7411,7 +7414,7 @@ mod tests {
         fs::create_dir(&cache).unwrap();
 
         let mut paths = BTreeSet::new();
-        for edition_id in ["universal", "sim", "lab", "field"] {
+        for edition_id in ["universal", "sim", "lab", "field", "autonomy"] {
             let path = prepare_diagnostics_directory(&cache, edition_id).unwrap();
             assert_eq!(path, cache.join("diagnostics").join(edition_id));
             assert!(path.is_dir());

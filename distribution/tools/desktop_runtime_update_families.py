@@ -8,18 +8,20 @@ from pathlib import Path
 from typing import Any
 
 CONTRACT_PATH = Path("distribution/desktop/edition-runtime-update-families.v1.json")
-EDITION_IDS = ("universal", "sim", "lab", "field")
+EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
 EDITION_LABELS = {
     "universal": "Universal",
     "sim": "Sim",
     "lab": "Lab",
     "field": "Field",
+    "autonomy": "Autonomy",
 }
 RUNTIME_PROFILES = {
     "universal": "unified-sim-lab",
     "sim": "sim-only",
     "lab": "unified-sim-lab",
     "field": "field-lightweight",
+    "autonomy": "autonomy-full",
 }
 
 

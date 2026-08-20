@@ -115,7 +115,7 @@ password, or any signing key in frontend variables or the repository.
 9. Register the four public desktop OAuth clients with their exact edition
    loopback callbacks, enter only the public client IDs as GitHub repository
    variables, and run
-   `desktop/scripts/verify-four-edition-oauth-registration.ps1` before a signed
+   `desktop/scripts/verify-five-edition-oauth-registration.ps1` before a signed
    release. An unsigned validation build may use an explicit unregistered
    placeholder to exercise layout and routing, but it cannot complete a real
    account sign-in with that placeholder.

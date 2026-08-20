@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-public-branch-topology",
+  "topologyVersion": "1.0.0",
+  "requiredBranchCount": 8,
+  "branches": [
+    {"name": "main", "role": "protected-integration", "productId": null},
+    {"name": "codex/software", "role": "long-lived-product", "productId": "universal"},
+    {"name": "codex/software-sim", "role": "long-lived-product", "productId": "sim"},
+    {"name": "codex/software-lab", "role": "long-lived-product", "productId": "lab"},
+    {"name": "codex/software-field", "role": "long-lived-product", "productId": "field"},
+    {"name": "codex/software-autonomy", "role": "long-lived-product", "productId": "autonomy"},
+    {"name": "codex/website", "role": "long-lived-delivery", "productId": "website"},
+    {"name": "codex/technical-report", "role": "long-lived-delivery", "productId": "technical-report"}
+  ],
+  "policy": {
+    "featureBranchesTemporary": true,
+    "deleteFeatureBranchOnlyAfterMerged": true,
+    "forcePushAllowed": false,
+    "commonCoreChangesReturnToMain": true,
+    "sharedProductChangesPropagateThroughPullRequests": true,
+    "privateAutonomyDevelopmentMayRunInParallel": true
+  }
+}

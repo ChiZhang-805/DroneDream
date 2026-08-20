@@ -39,7 +39,7 @@
       "minItems": 1,
       "maxItems": 3,
       "uniqueItems": true,
-      "items": {"enum": ["unified-sim-lab", "sim-only", "field-lightweight"]}
+      "items": {"enum": ["unified-sim-lab", "sim-only", "field-lightweight", "autonomy-full"]}
     },
     "files": {
       "type": "array",

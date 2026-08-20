@@ -109,6 +109,17 @@
       "vehiclePackDownloadEstimateBytes": 33554432,
       "vehiclePackInstalledEstimateBytes": 134217728,
       "artifactFileName": "DroneDream-Field-1.0.0.exe"
+    },
+    {
+      "editionId": "autonomy",
+      "editionManifestPath": "distribution/editions/autonomy.v1.json",
+      "componentIds": ["desktop-core", "engine-pack", "runtime-base-full-simulation"],
+      "vehiclePackManifestPath": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+      "controllerModel": null,
+      "region": "global",
+      "vehiclePackDownloadEstimateBytes": 134217728,
+      "vehiclePackInstalledEstimateBytes": 536870912,
+      "artifactFileName": "DroneDream-Autonomy-1.0.0.exe"
     }
   ],
   "precombinedBundles": [
@@ -135,6 +146,14 @@
       "controllerModel": "Allspark V6C",
       "region": "cn",
       "artifactFileName": "DroneDream-Field-P450-AllsparkV6C-1.0.0.exe"
+    },
+    {
+      "bundleId": "autonomy-x500-reference",
+      "editionId": "autonomy",
+      "vehiclePackId": "px4-gazebo-x500-reference",
+      "controllerModel": null,
+      "region": "global",
+      "artifactFileName": "DroneDream-Autonomy-X500-Reference-1.0.0.exe"
     }
   ]
 }

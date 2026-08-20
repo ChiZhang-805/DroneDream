@@ -221,7 +221,7 @@ async function verifyEditionSwitcher(page, testCase) {
   ));
   assert.deepEqual(
     menuMetrics.map((metric) => metric.edition),
-    ["universal", "sim", "lab", "field"],
+    ["universal", "sim", "lab", "field", "autonomy"],
   );
   const menuMinimumHeight = testCase.viewport.width <= 520 ? 18 : 27;
   assert(

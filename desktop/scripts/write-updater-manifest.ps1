@@ -3,7 +3,7 @@ param(
     [string]$BundleDirectory,
     [string]$Repository = "ChiZhang-805/DroneDream",
     [Parameter(Mandatory = $true)]
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$EditionId,
     [string]$SourceCommit,
     [UInt64]$BuildNumber,

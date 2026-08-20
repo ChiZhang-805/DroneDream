@@ -5,6 +5,7 @@ import fieldLockup from "../../../brand/commercial/field-lockup.png";
 import labLockup from "../../../brand/commercial/lab-lockup.png";
 import simLockup from "../../../brand/commercial/sim-lockup.png";
 import universalLockup from "../../../brand/commercial/universal-lockup.png";
+import autonomyLockup from "../../../brand/commercial/autonomy-lockup.png";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import {
   UNIVERSAL_WORKSPACE_IDS,
@@ -22,12 +23,14 @@ const EDITION_LABELS: Record<BrandEditionId, string> = {
   sim: "DroneDream · SIM",
   lab: "DroneDream · LAB",
   field: "DroneDream · FIELD",
+  autonomy: "DroneDream · AUTONOMY",
 };
 const EDITION_LOCKUPS: Record<BrandEditionId, string> = {
   universal: universalLockup,
   sim: simLockup,
   lab: labLockup,
   field: fieldLockup,
+  autonomy: autonomyLockup,
 };
 
 function EditionBrand({ edition }: { edition: BrandEditionId }) {

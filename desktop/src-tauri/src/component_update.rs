@@ -342,7 +342,7 @@ fn validate_catalog(catalog: &ComponentCatalog, now: DateTime<Utc>) -> Result<()
             || component.edition_profiles.iter().any(|profile| {
                 !matches!(
                     profile.as_str(),
-                    "unified-sim-lab" | "sim-only" | "field-lightweight"
+                    "unified-sim-lab" | "sim-only" | "field-lightweight" | "autonomy-full"
                 )
             })
         {

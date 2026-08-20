@@ -1,6 +1,6 @@
 param(
     [string]$ReleaseTag,
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$ValidationEditionId = "universal",
     [string]$GitHubOutputPath
 )
@@ -21,7 +21,7 @@ $isRelease = -not [string]::IsNullOrWhiteSpace($ReleaseTag)
 if ($isRelease) {
     $match = [regex]::Match(
         $ReleaseTag,
-        '^desktop-(universal|sim|lab|field)-v([0-9]+\.[0-9]+\.[0-9]+)-build-([1-9][0-9]*)$',
+        '^desktop-(universal|sim|lab|field|autonomy)-v([0-9]+\.[0-9]+\.[0-9]+)-build-([1-9][0-9]*)$',
         [Text.RegularExpressions.RegexOptions]::CultureInvariant
     )
     if (-not $match.Success) {

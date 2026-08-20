@@ -29,7 +29,7 @@
       "activationStrategy": "app-restart",
       "rollbackStrategy": "tauri-reinstall-previous",
       "preservesUserState": true,
-      "editions": ["universal", "sim", "lab", "field"],
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
       "requires": []
     },
     {
@@ -42,7 +42,7 @@
       "activationStrategy": "side-by-side-wsl-import",
       "rollbackStrategy": "previous-wsl-registration",
       "preservesUserState": true,
-      "editions": ["universal", "sim", "lab", "field"],
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
       "requires": ["desktop-app"]
     },
     {
@@ -55,7 +55,7 @@
       "activationStrategy": "atomic-symlink",
       "rollbackStrategy": "previous-symlink",
       "preservesUserState": true,
-      "editions": ["universal", "sim", "lab", "field"],
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
       "requires": ["base-runtime"]
     },
     {
@@ -68,7 +68,7 @@
       "activationStrategy": "atomic-symlink",
       "rollbackStrategy": "previous-symlink",
       "preservesUserState": true,
-      "editions": ["universal", "sim", "lab", "field"],
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
       "requires": ["base-runtime", "engine-pack"]
     },
     {
@@ -81,7 +81,7 @@
       "activationStrategy": "atomic-directory-swap",
       "rollbackStrategy": "previous-directory",
       "preservesUserState": true,
-      "editions": ["universal", "sim", "lab", "field"],
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
       "requires": ["base-runtime", "engine-pack"]
     },
     {
@@ -94,7 +94,7 @@
       "activationStrategy": "none",
       "rollbackStrategy": "never-touch",
       "preservesUserState": true,
-      "editions": ["universal", "sim", "lab", "field"],
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
       "requires": []
     }
   ]

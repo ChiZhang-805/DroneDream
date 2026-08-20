@@ -91,8 +91,8 @@
     },
     "editions": {
       "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
+      "minItems": 4,
+      "maxItems": 4,
       "items": {"$ref": "#/$defs/editionPlan"}
     },
     "precombinedBundles": {
@@ -262,9 +262,9 @@
         "rollback"
       ],
       "properties": {
-        "targetBranch": {"pattern": "^codex/release-(sim|lab|field)$"},
-        "creationState": {"const": "planned-not-created"},
-        "observedBranchHead": {"type": "null"},
+        "targetBranch": {"pattern": "^codex/software-(sim|lab|field|autonomy)$"},
+        "creationState": {"const": "long-lived-product-branch"},
+        "observedBranchHead": {"$ref": "#/$defs/commit"},
         "sourceCommit": {"$ref": "#/$defs/commit"},
         "commonCoreCommit": {"$ref": "#/$defs/commit"},
         "commonCoreHash": {"$ref": "#/$defs/sha256"},
@@ -303,7 +303,7 @@
         "blockers"
       ],
       "properties": {
-        "editionId": {"enum": ["sim", "lab", "field"]},
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
         "editionManifest": {"$ref": "#/$defs/fileRef"},
         "commonCoreCommit": {"$ref": "#/$defs/commit"},
         "commonCoreHash": {"$ref": "#/$defs/sha256"},
@@ -334,7 +334,7 @@
       ],
       "properties": {
         "bundleId": {"$ref": "#/$defs/id"},
-        "editionId": {"enum": ["sim", "lab", "field"]},
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
         "editionBuildId": {"$ref": "#/$defs/buildId"},
         "vehiclePackId": {"$ref": "#/$defs/id"},
         "controllerModel": {"$ref": "#/$defs/nullableText"},

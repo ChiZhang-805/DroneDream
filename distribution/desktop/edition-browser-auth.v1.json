@@ -4,7 +4,7 @@
   "contractVersion": "1.0.0",
   "identityBinding": {
     "contractPath": "distribution/desktop/edition-coexistence.v1.json",
-    "contractSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a"
+    "contractSha256": "dd91a81db651228b5b4c6a004882de998548b82351ae8455695b8f397afd3d51"
   },
   "accountAuthority": {
     "provider": "supabase",
@@ -156,14 +156,26 @@
       "customProtocol": "dronedream-field",
       "credentialVaultNamespace": "DroneDream/Auth/field/v1",
       "webViewDataNamespace": "io.dronedream.desktop.field"
+    },
+    {
+      "editionId": "autonomy",
+      "authClientId": "dronedream-desktop-autonomy",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
+      "bundleIdentifier": "io.dronedream.desktop.autonomy",
+      "loopbackPathPrefix": "/desktop-auth/autonomy/",
+      "loopbackPort": 49214,
+      "redirectUri": "http://127.0.0.1:49214/desktop-auth/autonomy/callback",
+      "customProtocol": "dronedream-autonomy",
+      "credentialVaultNamespace": "DroneDream/Auth/autonomy/v1",
+      "webViewDataNamespace": "io.dronedream.desktop.autonomy"
     }
   ],
   "releaseGate": {
     "nativeProtocolEnforcementReceiptRequired": true,
     "hostedBrokerReceiptRequired": true,
     "credentialVaultReceiptRequired": true,
-    "fourEditionConcurrencyReceiptRequired": true,
     "cancelTimeoutOfflineSwitchAccountReceiptRequired": true,
-    "releaseMayUseLegacyDirectTokenLoopback": false
+    "releaseMayUseLegacyDirectTokenLoopback": false,
+    "fiveEditionConcurrencyReceiptRequired": true
   }
 }

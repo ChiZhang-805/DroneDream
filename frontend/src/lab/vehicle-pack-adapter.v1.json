@@ -39,7 +39,7 @@
       "validationStatus": "contract-only",
       "validationTier": "contract-only",
       "productAvailability": "listed-available",
-      "supportedEditions": ["sim", "lab", "field"],
+      "supportedEditions": ["sim", "lab", "field", "autonomy"],
       "autopilotFamily": "px4",
       "controllers": [
         {"vendor": "Holybro", "model": "Pixhawk 6C", "status": "contract-only"},

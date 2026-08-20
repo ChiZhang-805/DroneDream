@@ -34,7 +34,7 @@ def test_schema_and_contract_are_closed_versioned_inputs() -> None:
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["additionalProperties"] is False
     assert schema["properties"]["schemaVersion"]["const"] == 1
-    assert schema["properties"]["editions"]["minItems"] == 4
+    assert schema["properties"]["editions"]["minItems"] == 5
     for name in ("accountAuthority", "sharedResources", "legacyDesktop"):
         nested = schema["properties"][name]
         assert nested["additionalProperties"] is False
@@ -145,15 +145,15 @@ def test_universal_overlay_matches_its_namespaced_install_identity() -> None:
     assert universal["canonicalWindowsIcon"] in overlay_icons
 
 
-def test_state_machine_requires_all_four_upgrade_uninstall_and_legacy_states() -> None:
+def test_state_machine_requires_all_five_upgrade_uninstall_and_legacy_states() -> None:
     document = contract_tool.load_contract(ROOT)
     assert document["stateMachineVerification"] == {
-        "installOrderCoverage": "pairwise-plus-all-four",
+        "installOrderCoverage": "pairwise-plus-all-five",
         "requiredStates": [
-            "all-four-installed",
+            "all-five-installed",
             "each-edition-upgraded-in-place",
             "each-edition-uninstalled-alone",
-            "remaining-three-still-launchable",
+            "remaining-four-still-launchable",
             "legacy-detected-without-overwrite",
         ],
         "releaseRequiresExecutedReceipt": True,

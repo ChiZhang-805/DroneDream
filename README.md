@@ -41,16 +41,23 @@ The Windows application adds guided setup for its isolated WSL2 Runtime, while
 the browser console and public website extend the same visual and product
 language across the rest of the experience.
 
-## 🧩 The project in three focused tracks
+## 🧩 Five products, one shared core
 
-| Track | Purpose | Branch |
+| Product or track | Purpose | Branch |
 | --- | --- | --- |
-| Software | The desktop application, experiment console, backend, worker, Runtime, optimizers, simulator adapters, and evidence system. | [`codex/software`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software) |
+| Universal | Unified modeling, orchestration, and presentation-only switching across SIM, LAB, FIELD, and AUTONOMY. | [`codex/software`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software) |
+| SIM | Simulation-only Model + Harness workflows for PX4 SITL, Gazebo, repeatable experiments, and evidence. | [`codex/software-sim`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-sim) |
+| LAB | Bidirectional simulation and hardware validation, including Sim-to-Real and Real-to-Sim workflows. | [`codex/software-lab`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-lab) |
+| FIELD | Fail-closed real-device discovery, bounded tuning, preflight, operations, and rollback. | [`codex/software-field`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-field) |
+| AUTONOMY | Natural-language missions, structured plans, repeated Model + Harness loops, pluginized tools, safe interruption, and replanning. | `codex/software-autonomy` |
 | Website | The public product story, manuals, pricing, community, download experience, and shared static-release contract for global and mainland delivery. | [`codex/website`](https://github.com/ChiZhang-805/DroneDream/tree/codex/website) |
 | Technical report | The AURORA paper, figures, claim ledger, evidence references, and publication validation pipeline. | [`codex/technical-report`](https://github.com/ChiZhang-805/DroneDream/tree/codex/technical-report) |
 
-These tracks share the DroneDream identity and may consume frozen outputs from
-one another, but each keeps authority over its own deliverables.
+`main` is the protected integration branch. These seven long-lived delivery
+branches plus `main` are the repository's complete eight-branch topology.
+Feature branches are temporary: their reviewed work must be merged before the
+branch is removed. The five applications share one authoritative core while
+each product branch preserves its own capability boundary and release evidence.
 
 ## 🧠 AURORA, the technical core
 

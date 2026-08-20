@@ -1,5 +1,5 @@
 export type WebsiteRelease = {
-  edition?: "universal" | "sim" | "lab" | "field";
+  edition?: "universal" | "sim" | "lab" | "field" | "autonomy";
   buildNumber?: number;
   version: string;
   fileName: string;

@@ -200,7 +200,7 @@ def read_capabilities() -> dict[str, object]:
                     "available": True,
                     "mission_schema": "dronedream.autonomy.mission.v2",
                     "scene_catalog": "dronedream.autonomy.scene-catalog.v1",
-                    "editions": ["universal", "sim", "lab", "field"],
+                    "editions": ["universal", "sim", "lab", "field", "autonomy"],
                     "simulation_adapter": "px4_gazebo_contract",
                     "hardware_authority": False,
                     "validated_signed_vehicle_packs": 0,

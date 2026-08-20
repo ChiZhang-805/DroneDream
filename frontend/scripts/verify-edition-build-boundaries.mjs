@@ -13,8 +13,8 @@ for (let index = 2; index < process.argv.length; index += 2) {
 
 const edition = args.get("edition");
 const dist = args.get("dist");
-if (!edition || !["universal", "sim", "lab", "field"].includes(edition)) {
-  throw new Error("Edition must be universal, sim, lab, or field");
+if (!edition || !["universal", "sim", "lab", "field", "autonomy"].includes(edition)) {
+  throw new Error("Edition must be universal, sim, lab, field, or autonomy");
 }
 if (!dist || !path.isAbsolute(dist) || !fs.statSync(dist).isDirectory()) {
   throw new Error("Dist must be an existing absolute directory");

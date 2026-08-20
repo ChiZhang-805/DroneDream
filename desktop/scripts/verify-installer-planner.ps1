@@ -3,7 +3,7 @@ param(
     [string]$Application,
     [string]$WebViewLoader,
     [string]$ExpectedTarget,
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$EditionId = "universal"
 )
 

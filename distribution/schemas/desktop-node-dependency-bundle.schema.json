@@ -28,7 +28,7 @@
     "bundleId": {"type": "string", "pattern": "^npm-win32-x64-[0-9a-f]{16}$"},
     "state": {"const": "attested-offline"},
     "editionScope": {
-      "const": ["universal", "sim", "lab", "field"]
+      "const": ["universal", "sim", "lab", "field", "autonomy"]
     },
     "productSource": {
       "type": "object",

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Create and validate plan-only Sim/Lab/Field build inventories.
+"""Create and validate plan-only SIM/LAB/FIELD/AUTONOMY build inventories.
 
 This tool never invokes Tauri, NSIS, an installer, Runtime migration, a release
 API, or a release-branch mutation.  It derives a deterministic, source-bound
 plan from reviewed edition and Vehicle Pack contracts and fails closed when
 the source tree, common core, NOTICE closure, controller selection, or remote
-release-channel observations drift.
+long-lived product-branch observations drift.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from typing import Any
 
 import distribution_contract as contract
 
-EDITION_IDS = ("field", "lab", "sim")
+EDITION_IDS = ("autonomy", "field", "lab", "sim")
 CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
 COMPONENT_IDS = {
     "desktop-core",
@@ -205,14 +205,14 @@ def common_core_hash(repo_root: Path, source_commit: str, paths: list[str]) -> s
 
 
 def observe_release_heads(repo_root: Path, remote: str = "origin") -> dict[str, str | None]:
-    refs = [f"refs/heads/codex/release-{edition_id}" for edition_id in EDITION_IDS]
+    refs = [f"refs/heads/codex/software-{edition_id}" for edition_id in EDITION_IDS]
     output = _run_git(repo_root, "ls-remote", "--heads", remote, *refs)
     observed: dict[str, str | None] = {edition_id: None for edition_id in EDITION_IDS}
     for raw_line in output.splitlines():
         fields = raw_line.split()
         if len(fields) != 2 or not COMMIT_RE.fullmatch(fields[0]):
             raise BuildPlanError("remote release-head observation is malformed")
-        prefix = "refs/heads/codex/release-"
+        prefix = "refs/heads/codex/software-"
         if not fields[1].startswith(prefix):
             raise BuildPlanError("remote release-head observation returned an unexpected ref")
         edition_id = fields[1][len(prefix) :]
@@ -316,8 +316,8 @@ def validate_request(request: Any) -> dict[str, Any]:
         raise BuildPlanError("component set is incomplete")
 
     editions = document["editions"]
-    if not isinstance(editions, list) or len(editions) != 3:
-        raise BuildPlanError("build request must define exactly three editions")
+    if not isinstance(editions, list) or len(editions) != 4:
+        raise BuildPlanError("build request must define exactly four product editions")
     edition_ids: set[str] = set()
     artifact_names: set[str] = set()
     for index, raw in enumerate(editions):
@@ -491,10 +491,16 @@ def create_build_plan(
         raise BuildPlanError("observed common-core hash is invalid")
     if set(observed_release_heads) != set(EDITION_IDS):
         raise BuildPlanError("release-head observations are incomplete")
-    existing = {key: value for key, value in observed_release_heads.items() if value is not None}
-    if existing:
+    missing = {key for key, value in observed_release_heads.items() if value is None}
+    malformed = {
+        key
+        for key, value in observed_release_heads.items()
+        if value is not None and not COMMIT_RE.fullmatch(value)
+    }
+    if missing or malformed:
         raise BuildPlanError(
-            f"planned-not-created release channel already has a remote head: {sorted(existing)}"
+            "long-lived product branches are incomplete or malformed: "
+            f"missing={sorted(missing)} malformed={sorted(malformed)}"
         )
 
     editions, edition_shas, packs, pack_shas = _load_contract_inputs(request, repo_root)
@@ -584,7 +590,7 @@ def create_build_plan(
                 "licenseIds": license_ids,
                 "promotion": {
                     "targetBranch": branch,
-                    "creationState": "planned-not-created",
+                    "creationState": "long-lived-product-branch",
                     "observedBranchHead": observed_release_heads[edition_id],
                     "sourceCommit": source_commit,
                     "commonCoreCommit": source_commit,
@@ -643,7 +649,7 @@ def create_build_plan(
         "blockers": [
             "No edition installer or precombined bundle has been built by this plan.",
             "All eight Vehicle Packs remain contract-only or planned; zero are validated.",
-            "Release branches remain absent and cannot be created by this plan.",
+            "Each edition update must be forward-integrated through its long-lived product branch and reviewed pull request.",
             "Artifact-specific license, NOTICE, signature, and rollback evidence is pending.",
         ],
         "productDisplayVersion": "1.0.0",
