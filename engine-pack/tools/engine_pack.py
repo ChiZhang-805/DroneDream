@@ -45,6 +45,7 @@ RUNTIME_DISTRIBUTION_BASE_PATHS = (
     "runtime/THIRD_PARTY_NOTICES.md",
     RUNTIME_CONTRACT_REGISTRY_PATH,
     "distribution/capabilities/core-capabilities.v1.json",
+    "distribution/editions/autonomy.v1.json",
     "distribution/editions/field.v1.json",
     "distribution/editions/lab.v1.json",
     "distribution/editions/sim.v1.json",

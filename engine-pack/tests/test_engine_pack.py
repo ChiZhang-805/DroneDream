@@ -40,6 +40,7 @@ class EnginePackTests(unittest.TestCase):
 
     def test_runtime_distribution_contract_whitelist_is_exact_and_hashed(self) -> None:
         engine_paths = engine_pack.runtime_distribution_paths(ROOT)
+        self.assertIn("distribution/editions/autonomy.v1.json", engine_paths)
         files = engine_pack.production_files(ROOT)
         distribution_files = {path for path, _source in files if path.startswith("distribution/")}
         expected_distribution = {
@@ -217,6 +218,10 @@ class EnginePackTests(unittest.TestCase):
             self.assertIn("payload/backend/app/main.py", names)
             self.assertIn("payload/worker/drone_dream_worker/main.py", names)
             self.assertIn("payload/scripts/simulators/px4_gazebo_runner.py", names)
+            self.assertIn(
+                "payload/distribution/editions/autonomy.v1.json",
+                names,
+            )
             self.assertFalse(any("/tests/" in name for name in names))
             self.assertFalse(any(name.startswith("payload/frontend/") for name in names))
             self.assertEqual(
