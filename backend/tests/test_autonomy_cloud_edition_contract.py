@@ -28,6 +28,10 @@ def test_autonomy_cloud_edition_is_bound_across_storage_rpc_and_routes() -> None
         assert f"alter table public.{table}" in migration
     assert migration.count("'autonomy'") >= 10
     assert "p_edition not in ('universal', 'sim', 'lab', 'field', 'autonomy')" in migration
+    assert "create or replace function public.assistant_complete_run" in migration
+    assert "selected_run.edition = 'autonomy'" in migration
+    assert "'universal_vehicle_model', 'simulation_experiment'" in migration
+    assert "ASSISTANT_ARTIFACT_EDITION_MISMATCH" in migration
     assert (
         'export type AssistantEdition = "universal" | "sim" | "lab" | "field" | "autonomy"'
         in orchestrator
