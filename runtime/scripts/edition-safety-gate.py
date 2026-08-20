@@ -23,6 +23,11 @@ from typing import Any
 RUNTIME_CONTRACT_REGISTRY_PATH = "distribution/runtime-contract-registry.v1.json"
 SIM_EDITION_PROFILE = "sim-only"
 KNOWN_EDITION_PROFILES = {"field-lightweight", SIM_EDITION_PROFILE, "unified-sim-lab"}
+BASE_EDITION_PROFILE_KEYS = {
+    "profileId",
+    "includesLargeSimulator",
+    "excludedSourcePaths",
+}
 SIM_PROFILE_MANIFEST_KEYS = {
     "profileId",
     "profileVersion",
@@ -94,6 +99,36 @@ def _sim_profile_from_manifest(
     if edition_profile != binding:
         raise RuntimeEditionSafetyError("Sim-only Engine Pack profile binding drifted")
     return contract, profile
+
+
+def _validate_engine_profile_identity(
+    active_engine_root: Path,
+    engine_manifest: Mapping[str, Any],
+) -> None:
+    profile = engine_manifest.get("editionProfile")
+    if not isinstance(profile, dict):
+        raise RuntimeEditionSafetyError("Engine Pack edition profile is unavailable")
+    profile_id = profile.get("profileId")
+    if profile_id == SIM_EDITION_PROFILE:
+        if _sim_profile_from_manifest(active_engine_root, engine_manifest) is None:
+            raise RuntimeEditionSafetyError("Sim-only Engine Pack profile is unavailable")
+        return
+    if set(profile) != BASE_EDITION_PROFILE_KEYS:
+        raise RuntimeEditionSafetyError("Engine Pack edition profile fields are invalid")
+    expected = {
+        "field-lightweight": {
+            "profileId": "field-lightweight",
+            "includesLargeSimulator": False,
+            "excludedSourcePaths": ["backend/app/simulator", "scripts/simulators"],
+        },
+        "unified-sim-lab": {
+            "profileId": "unified-sim-lab",
+            "includesLargeSimulator": True,
+            "excludedSourcePaths": [],
+        },
+    }.get(profile_id)
+    if expected is None or profile != expected:
+        raise RuntimeEditionSafetyError("Engine Pack edition profile is unsupported")
 
 
 def _validate_sim_payload_paths(
@@ -314,6 +349,14 @@ def _active_inventory_reasons(
         reasons.append("runtime.engine-pack.signature-unverified")
     if engine_manifest.get("kind") != "dronedream-engine-pack":
         reasons.append("runtime.engine-pack.kind-unsupported")
+    if engine_manifest.get("schemaVersion") != 2:
+        reasons.append("runtime.engine-pack.schema-unsupported")
+    profile_valid = True
+    try:
+        _validate_engine_profile_identity(observed.active_engine_root, engine_manifest)
+    except RuntimeEditionSafetyError:
+        profile_valid = False
+        reasons.append("runtime.engine-pack.edition-profile-unsupported")
     source = engine_manifest.get("source")
     if (
         not isinstance(source, dict)
@@ -338,6 +381,8 @@ def _active_inventory_reasons(
     )
     if any(path.startswith(forbidden_prefixes) for path in records):
         reasons.append("runtime.engine-pack.planned-artifact-present")
+    if not profile_valid:
+        return reasons
     try:
         sim_profile = _sim_profile_from_manifest(observed.active_engine_root, engine_manifest)
         if sim_profile is not None:

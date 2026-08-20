@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 
 import pytest
 
-from app.autonomy.school_map_artifact import school_map_collision_primitives
-from app.autonomy.school_map_mission_validation import model_root_to_world_envelope_center
+from app.autonomy.school_map_artifact import (
+    school_map_collision_primitives,
+    school_map_runtime_collision_primitives,
+)
+from app.autonomy.school_map_mission_validation import (
+    model_root_to_world_envelope_center,
+    vehicle_clearance_to_primitive_m,
+)
 
 RUNNER_PATH = (
     Path(__file__).resolve().parents[2] / "scripts" / "simulators" / "school_map_px4_mission.py"
@@ -40,7 +47,7 @@ def test_designated_landing_pad_contact_is_not_hidden_as_free_flight() -> None:
 
     result = runner._dynamic_safety_clearance(
         [exact, solver_contact],
-        school_map_collision_primitives(),
+        school_map_runtime_collision_primitives(),
         exact,
     )
 
@@ -56,7 +63,7 @@ def test_landing_contact_over_two_millimeters_fails_the_contact_gate() -> None:
 
     result = runner._dynamic_safety_clearance(
         [point],
-        school_map_collision_primitives(),
+        school_map_runtime_collision_primitives(),
         endpoint,
     )
 
@@ -64,9 +71,12 @@ def test_landing_contact_over_two_millimeters_fails_the_contact_gate() -> None:
 
 
 def test_live_clearance_uses_the_same_designated_pad_contact_contract() -> None:
-    primitives = runner.school_map_collision_primitives()
-    exact = runner._route_points()[0]
+    primitives = runner.school_map_runtime_collision_primitives()
+    spawn_model_root = (-42.25, 15.3, 7.487)
+    exact = model_root_to_world_envelope_center(spawn_model_root)
     solver_contact = (exact[0], exact[1], exact[2] - 0.0018)
+
+    assert math.dist(exact, runner._route_points()[0]) > 0.4
 
     result = runner._dynamic_safety_clearance(
         [solver_contact],
@@ -77,6 +87,27 @@ def test_live_clearance_uses_the_same_designated_pad_contact_contract() -> None:
     assert result["unsafe_collision_count"] == 0
     assert result["designated_contact_sample_count"] == 1
     assert result["designated_pad_contact"]["within_solver_tolerance"] is True
+
+
+def test_runtime_safety_uses_the_same_conservative_geometry_exported_to_gazebo() -> None:
+    point = (16.61, 11.86, 1.465)
+    detailed_clearance = min(
+        vehicle_clearance_to_primitive_m(point, primitive)
+        for primitive in school_map_collision_primitives()
+    )
+
+    result = runner._dynamic_safety_clearance(
+        [point],
+        school_map_runtime_collision_primitives(),
+        model_root_to_world_envelope_center((-42.25, 15.3, 7.487)),
+    )
+
+    assert detailed_clearance > 0.56
+    assert result["unsafe_collision_count"] == 1
+    assert result["minimum_clearance_primitive"] == (
+        "cafeteria-1-table-1-1-conservative-furniture-envelope"
+    )
+    assert result["minimum_clearance_m"] == pytest.approx(-0.01)
 
 
 def test_payload_retention_uses_model_root_relative_physical_pose() -> None:

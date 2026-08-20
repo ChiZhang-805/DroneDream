@@ -80,12 +80,16 @@ def test_lower_level_launcher_unexpected_output_is_bounded_and_receipted(
     assert "log_capture_receipt_json" in artifact_types
 
 
-def _write_engine_pack_identity_files(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
+def _write_engine_pack_identity_files(
+    tmp_path: Path,
+    *,
+    manifest_schema_version: int = 1,
+) -> tuple[Path, Path, dict[str, object]]:
     source_commit = "1" * 40
     px4_commit = "2" * 40
     pack_id = f"sha256:{'3' * 64}"
     manifest = {
-        "schemaVersion": 1,
+        "schemaVersion": manifest_schema_version,
         "kind": "dronedream-engine-pack",
         "packId": pack_id,
         "engineApiVersion": 1,
@@ -99,6 +103,11 @@ def _write_engine_pack_identity_files(tmp_path: Path) -> tuple[Path, Path, dict[
             "dependencyLockSha256": "4" * 64,
         },
         "files": [{"path": "backend/app/main.py", "sizeBytes": 1, "sha256": "5" * 64}],
+    }
+    manifest["editionProfile"] = {
+        "profileId": "unified-sim-lab",
+        "includesLargeSimulator": True,
+        "excludedSourcePaths": [],
     }
     manifest_path = tmp_path / "engine-pack-manifest.json"
     manifest_path.write_text(
@@ -137,6 +146,13 @@ def test_runner_binds_engine_pack_manifest_to_activation_state(tmp_path: Path) -
     assert identity["status"] == "verified"
     assert identity["pack_id"] == manifest["packId"]
     assert identity["source_commit"] == manifest["source"]["gitCommit"]
+    assert identity["manifest_schema_version"] == 1
+    assert identity["edition_profile"] == {
+        "status": "verified",
+        "profile_id": "unified-sim-lab",
+        "includes_large_simulator": True,
+        "excluded_source_paths": [],
+    }
     assert (
         identity["manifest_sha256"]
         == runner_module.hashlib.sha256(manifest_path.read_bytes()).hexdigest()
@@ -152,6 +168,38 @@ def test_runner_binds_engine_pack_manifest_to_activation_state(tmp_path: Path) -
         "runtime_id": "runtime-test-id",
         "runtime_version": "0.1.0",
     }
+
+
+def test_runner_accepts_and_reports_scoped_engine_pack_schema_v2(tmp_path: Path) -> None:
+    manifest_path, state_path, _manifest = _write_engine_pack_identity_files(
+        tmp_path,
+        manifest_schema_version=2,
+    )
+
+    identity = runner_module._engine_pack_identity(
+        manifest_path=manifest_path,
+        state_path=state_path,
+    )
+
+    assert identity["manifest_schema_version"] == 2
+    assert identity["edition_profile"] == {
+        "status": "verified",
+        "profile_id": "unified-sim-lab",
+        "includes_large_simulator": True,
+        "excluded_source_paths": [],
+    }
+
+
+def test_runner_rejects_profile_free_synthetic_legacy_schema(tmp_path: Path) -> None:
+    manifest_path, state_path, manifest = _write_engine_pack_identity_files(tmp_path)
+    manifest.pop("editionProfile")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(runner_module.RunnerError, match="legacy Engine Pack manifest fields"):
+        runner_module._engine_pack_identity(
+            manifest_path=manifest_path,
+            state_path=state_path,
+        )
 
 
 def test_runner_discovers_manifest_from_the_real_engine_pack_layout(

@@ -15,7 +15,9 @@ distribution on the developer's Windows machine.
   versions from `pins.env` and `locks/python-requirements.lock`.
 - The desktop-facing manifest contract remains `schemaVersion: 1`, a string
   `version`, a string map containing `backend`, `px4`, and `gazebo`, and the
-  three booleans `px4Sitl`, `gazebo`, and `parameterReadback`.
+  three booleans `px4Sitl`, `gazebo`, and `parameterReadback`. This is the
+  Runtime Base manifest contract; the independently versioned Engine Pack
+  content manifest is currently schema v2.
 - A freshly built image always contains all three smoke booleans as `false`.
   Only `export-rootfs.sh` can place a promoted manifest in a release tar, and
   it accepts only a successful report bound to the same runtime ID and Docker
