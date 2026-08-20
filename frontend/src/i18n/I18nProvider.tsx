@@ -125,6 +125,7 @@ const enTranslations = {
     "settings.model.subscriptionOpenFailed":
       "The subscription page could not be opened in your browser.",
     "settings.model.periodUsage": "Current-period usage",
+    "settings.model.remainingAllowance": "Remaining allowance",
     "settings.model.credits": "credits",
     "settings.model.remaining": "Remaining",
     "settings.model.requests": "Requests",
@@ -1724,6 +1725,7 @@ const zhTranslations = {
     "settings.model.manageSubscription": "管理订阅",
     "settings.model.subscriptionOpenFailed": "无法在浏览器中打开订阅页面。",
     "settings.model.periodUsage": "本周期使用量",
+    "settings.model.remainingAllowance": "剩余额度",
     "settings.model.credits": "额度",
     "settings.model.remaining": "剩余额度",
     "settings.model.requests": "请求次数",
