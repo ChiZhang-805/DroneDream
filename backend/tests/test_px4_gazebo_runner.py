@@ -104,12 +104,11 @@ def _write_engine_pack_identity_files(
         },
         "files": [{"path": "backend/app/main.py", "sizeBytes": 1, "sha256": "5" * 64}],
     }
-    if manifest_schema_version == 2:
-        manifest["editionProfile"] = {
-            "profileId": "unified-sim-lab",
-            "includesLargeSimulator": True,
-            "excludedSourcePaths": [],
-        }
+    manifest["editionProfile"] = {
+        "profileId": "unified-sim-lab",
+        "includesLargeSimulator": True,
+        "excludedSourcePaths": [],
+    }
     manifest_path = tmp_path / "engine-pack-manifest.json"
     manifest_path.write_text(
         json.dumps(manifest, sort_keys=True, separators=(",", ":")),
@@ -149,8 +148,10 @@ def test_runner_binds_engine_pack_manifest_to_activation_state(tmp_path: Path) -
     assert identity["source_commit"] == manifest["source"]["gitCommit"]
     assert identity["manifest_schema_version"] == 1
     assert identity["edition_profile"] == {
-        "status": "legacy-unscoped",
-        "profile_id": None,
+        "status": "verified",
+        "profile_id": "unified-sim-lab",
+        "includes_large_simulator": True,
+        "excluded_source_paths": [],
     }
     assert (
         identity["manifest_sha256"]
@@ -189,13 +190,9 @@ def test_runner_accepts_and_reports_scoped_engine_pack_schema_v2(tmp_path: Path)
     }
 
 
-def test_runner_rejects_edition_profile_hidden_inside_legacy_schema(tmp_path: Path) -> None:
+def test_runner_rejects_profile_free_synthetic_legacy_schema(tmp_path: Path) -> None:
     manifest_path, state_path, manifest = _write_engine_pack_identity_files(tmp_path)
-    manifest["editionProfile"] = {
-        "profileId": "unified-sim-lab",
-        "includesLargeSimulator": True,
-        "excludedSourcePaths": [],
-    }
+    manifest.pop("editionProfile")
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     with pytest.raises(runner_module.RunnerError, match="legacy Engine Pack manifest fields"):

@@ -342,19 +342,16 @@ _ENGINE_PACK_BASE_FIELDS = {
     "packId",
     "engineApiVersion",
     "source",
+    "editionProfile",
     "runtimeCompatibility",
     "files",
 }
 
 
 def _engine_pack_profile_identity(manifest: dict[str, Any], schema_version: int) -> dict[str, Any]:
-    if schema_version == 1:
-        if set(manifest) != _ENGINE_PACK_BASE_FIELDS:
-            raise RunnerError("legacy Engine Pack manifest fields are invalid")
-        return {"status": "legacy-unscoped", "profile_id": None}
-
-    if set(manifest) != {*_ENGINE_PACK_BASE_FIELDS, "editionProfile"}:
-        raise RunnerError("Engine Pack manifest v2 fields are invalid")
+    if set(manifest) != _ENGINE_PACK_BASE_FIELDS:
+        label = "legacy Engine Pack manifest" if schema_version == 1 else "Engine Pack manifest v2"
+        raise RunnerError(f"{label} fields are invalid")
     profile = manifest.get("editionProfile")
     if not isinstance(profile, dict):
         raise RunnerError("Engine Pack editionProfile is invalid")
