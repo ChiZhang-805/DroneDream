@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.auth import get_current_user
+from app.autonomy.asset_connectors import get_asset_connector_catalog
 from app.autonomy.catalog import get_bundled_map_manifest, list_scenes
 from app.autonomy.credentials import (
     QualificationCredentialConflict,
@@ -133,6 +134,15 @@ async def _authorize_compile_request(
         planner_receipt,
         verified_asset_receipt(current_user.id, verification),
     )
+
+
+@router.get("/asset-connectors")
+def read_autonomy_asset_connectors(
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Describe supported external authoring boundaries without launching them."""
+
+    return ok(get_asset_connector_catalog().model_dump(mode="json"))
 
 
 @router.get("/scenes")

@@ -21,6 +21,7 @@ import { publicDemoConsole } from "../features/demo/publicDemo";
 import type {
   ApiEnvelope,
   Artifact,
+  AutonomyAssetConnectorCatalogResponse,
   AutonomyCompileRequest,
   AutonomyCompileResponse,
   AutonomyHarnessInspectRequest,
@@ -452,6 +453,10 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async listAutonomyAssetConnectors(): Promise<AutonomyAssetConnectorCatalogResponse> {
+    return request<AutonomyAssetConnectorCatalogResponse>("/autonomy/asset-connectors");
+  },
+
   async listAutonomyScenes(): Promise<AutonomySceneCatalogResponse> {
     return request<AutonomySceneCatalogResponse>("/autonomy/scenes");
   },

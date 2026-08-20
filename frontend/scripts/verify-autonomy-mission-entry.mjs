@@ -8,6 +8,8 @@ import { createServer } from "vite";
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const outputRoot = path.join(frontendRoot, "node_modules", ".cache", "autonomy-mission-entry");
 const screenshotPath = path.join(outputRoot, "overview-conversation-1440x900.png");
+const aircraftScreenshotPath = path.join(outputRoot, "aircraft-connectors-1440x900.png");
+const mapScreenshotPath = path.join(outputRoot, "map-connectors-1440x900.png");
 const host = "127.0.0.1";
 const port = 5196;
 const origin = `http://${host}:${port}`;
@@ -35,6 +37,24 @@ try {
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
   });
   const page = await context.newPage();
+  await page.route("**/api/v1/autonomy/asset-connectors", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      success: true,
+      data: {
+        schema_version: "dronedream.autonomy.asset-connector-catalog.v1",
+        normalized_format: "ddpkg-v1",
+        imported_code_execution: false,
+        items: [
+          { connector_id: "dronedream.ddpkg", name: "DroneDream Package", source_application: "DroneDream", source_formats: ["ddpkg"], asset_kinds: ["map", "world", "vehicle"], availability: "builtin", execution_boundary: "declarative_parser", enabled: true, output_format: "ddpkg", maximum_import_maturity: "qualified" },
+          { connector_id: "gazebo.sdf", name: "Gazebo SDF", source_application: "Gazebo Sim", source_formats: ["sdf", "world"], asset_kinds: ["map", "world", "vehicle"], availability: "builtin", execution_boundary: "declarative_parser", enabled: true, output_format: "ddpkg", maximum_import_maturity: "simulation_ready" },
+          { connector_id: "blender.phobos", name: "Blender + Phobos", source_application: "Blender", source_formats: ["blend", "smurf"], asset_kinds: ["map", "world", "vehicle"], availability: "companion_required", execution_boundary: "isolated_local_companion", enabled: false, output_format: "ddpkg", maximum_import_maturity: "simulation_ready" },
+        ],
+      },
+      error: null,
+    }),
+  }));
   await page.goto(`${origin}/console/autonomy`, { waitUntil: "networkidle" });
   if (await page.locator(".autonomy-command-hero-icon").count() !== 1) {
     throw new Error("Fresh Overview must preserve the mission hero before the first message.");
@@ -221,6 +241,11 @@ try {
   if (await page.locator(".autonomy-asset-toolbar option").count() !== aircraftOptions + 1) {
     throw new Error("Creating a new aircraft did not preserve the prior saved profile.");
   }
+  if (await page.locator(".autonomy-connector-grid article").count() !== 3
+    || await page.getByText("需要本机配套程序", { exact: true }).count() !== 1) {
+    throw new Error("Aircraft connector catalog did not distinguish the isolated companion.");
+  }
+  await page.screenshot({ path: aircraftScreenshotPath, fullPage: false });
   await page.goto(`${origin}/console/autonomy/maps`, { waitUntil: "networkidle" });
   await page.evaluate(() => {
     document.querySelector(".account-dialog-backdrop")?.remove();
@@ -235,11 +260,15 @@ try {
   if (await page.locator(".autonomy-asset-toolbar option").count() !== mapOptions + 1) {
     throw new Error("Creating a new map did not preserve the prior saved pack.");
   }
+  if (await page.locator(".autonomy-connector-grid article").count() !== 3) {
+    throw new Error("Map connector catalog did not render the common import boundaries.");
+  }
+  await page.screenshot({ path: mapScreenshotPath, fullPage: false });
   await page.goto(`${origin}/console/autonomy/mission`, { waitUntil: "networkidle" });
   if (!page.url().endsWith("/console/autonomy")) {
     throw new Error(`Legacy Mission URL did not redirect to Overview: ${page.url()}`);
   }
-  process.stdout.write(`${JSON.stringify({ navigationLabels, taskNodes: 21, screenshotPath }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ navigationLabels, taskNodes: 21, screenshotPath, aircraftScreenshotPath, mapScreenshotPath }, null, 2)}\n`);
   await context.close();
 } finally {
   await browser?.close();
