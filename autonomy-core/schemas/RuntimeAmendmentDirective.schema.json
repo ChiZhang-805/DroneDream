@@ -1,0 +1,49 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "pattern": "^[a-z][a-z0-9._-]{1,63}$",
+      "title": "Action",
+      "type": "string"
+    },
+    "issue_codes": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Issue Codes",
+      "type": "array"
+    },
+    "parameters": {
+      "additionalProperties": true,
+      "title": "Parameters",
+      "type": "object"
+    },
+    "requires_core_authorization": {
+      "default": true,
+      "title": "Requires Core Authorization",
+      "type": "boolean"
+    },
+    "requires_plan_revision": {
+      "default": true,
+      "title": "Requires Plan Revision",
+      "type": "boolean"
+    },
+    "requires_stable_hold": {
+      "default": true,
+      "title": "Requires Stable Hold",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "dronedream.runtime-amendment-directive.v1",
+      "default": "dronedream.runtime-amendment-directive.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "RuntimeAmendmentDirective",
+  "type": "object"
+}

@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "Vector3": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "z": {
+          "title": "Z",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "title": "Vector3",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Short-lived manual command written only after the app authenticates a grant token.",
+  "properties": {
+    "action": {
+      "enum": [
+        "velocity",
+        "release"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "duration_seconds": {
+      "exclusiveMinimum": 0.0,
+      "maximum": 0.5,
+      "title": "Duration Seconds",
+      "type": "number"
+    },
+    "execution_id": {
+      "pattern": "^execution-[0-9a-f]{32}$",
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "grant_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Grant Sha256",
+      "type": "string"
+    },
+    "issued_at": {
+      "format": "date-time",
+      "title": "Issued At",
+      "type": "string"
+    },
+    "message_id": {
+      "pattern": "^runtime-msg-[0-9a-f]{32}$",
+      "title": "Message Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "dronedream.runtime-operator-control-command.v1",
+      "default": "dronedream.runtime-operator-control-command.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 1,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "velocity_ned_mps": {
+      "$ref": "#/$defs/Vector3"
+    },
+    "yaw_rate_dps": {
+      "maximum": 180.0,
+      "minimum": -180.0,
+      "title": "Yaw Rate Dps",
+      "type": "number"
+    }
+  },
+  "required": [
+    "message_id",
+    "execution_id",
+    "grant_sha256",
+    "sequence",
+    "action",
+    "yaw_rate_dps",
+    "duration_seconds",
+    "issued_at"
+  ],
+  "title": "RuntimeOperatorControlCommand",
+  "type": "object"
+}

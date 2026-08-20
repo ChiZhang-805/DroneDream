@@ -1,0 +1,114 @@
+{
+  "schema_version": "dronedream.portable-online-replan-acceptance.v1",
+  "recorded_at": "2026-08-19T03:02:02Z",
+  "scope": "simulation_only",
+  "run_id": "execution-interrupt-10",
+  "status": "verified",
+  "contract_id": "mission-2c2efe93763440349d2bb0ae",
+  "conversation_id": "user-closed-loop-20260819-002",
+  "mission_id": "mission-cfd5038b029a468ab8931c2e56c22712",
+  "execution_id": "execution-8b867c6ea4fd48c49b4fdc104baf496d",
+  "message_id": "runtime-msg-365549c4f9a348beb31eee73128fb3f8",
+  "assets": {
+    "map": {
+      "asset_id": "dronedream.school-map.v1",
+      "name": "School Map",
+      "bundle_sha256": "4b4a9fc59dc21d48da410fdda2b3d942224c871be07467a95515cc46fd4805db"
+    },
+    "vehicle": {
+      "asset_id": "dronedream.my-drone.v1",
+      "name": "My Drone",
+      "bundle_sha256": "d6e0ca065308dd614a3749f2528692523c09cf2cb05f7ef7fd913831bb848c58"
+    }
+  },
+  "runtime": {
+    "ros_distribution": "jazzy",
+    "simulator": "Gazebo Sim",
+    "autopilot": "PX4 SITL",
+    "offboard_transport": "MAVSDK",
+    "world": "school_map_world",
+    "vehicle": "my_drone"
+  },
+  "model_workflow": {
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "planning_calls": 5,
+    "planning_input_tokens": 11681,
+    "planning_output_tokens": 20037,
+    "planning_latency_ms": 174454,
+    "completion_accepted": true
+  },
+  "initial_plan": {
+    "start_node": "verified-000",
+    "target_node": "verified-032",
+    "return_node": "verified-000",
+    "route_node_count": 65,
+    "minimum_clearance_m": 0.15999999999997438,
+    "intent_critique_accepted": true,
+    "plan_critique_accepted": true
+  },
+  "runtime_amendment": {
+    "user_message": "计划有变，不用再去林荫道了。请先确保无人机稳定悬停，然后从当前位置安全返回三楼办公室起降坪并落地。",
+    "detection_latency_ms": 14,
+    "stabilization_latency_ms": 1099,
+    "hold_position_error_m": 0.0582287425277698,
+    "hold_speed_mps": 0.061525170617499826,
+    "model_latency_ms": 25028,
+    "authorized_action": "hold_for_replan",
+    "replacement_target_node": "verified-000",
+    "replacement_route_node_count": 3,
+    "replacement_schedule_setpoints": 196,
+    "hold_gate_count": 5,
+    "hold_gates_passed": 5,
+    "replacement_gate_count": 9,
+    "replacement_gates_passed": 9,
+    "hash_bound_adoption_verified": true,
+    "lifecycle_resumed_to_executing": true
+  },
+  "measurements": {
+    "gazebo_pose_samples": 3967,
+    "ros_observation_rows": 1537,
+    "minimum_goal_distance_m": 0.045927853493056635,
+    "landing_state": "ON_GROUND",
+    "executor_return_code": 0,
+    "ulog_size_bytes": 20919357
+  },
+  "gates": {
+    "executor_completed": true,
+    "offboard_timing_complete": true,
+    "runtime_pose_samples_present": true,
+    "ros_observations_present": true,
+    "goal_observed": true,
+    "landing_confirmed": true,
+    "no_live_abort": true,
+    "px4_ulog_present": true,
+    "static_route_clearance_bound": true,
+    "runtime_replacement_adopted": true,
+    "completion_model_accepted": true,
+    "task_lifecycle_completed": true
+  },
+  "hashes": {
+    "prepared_mission_file_sha256": "59a8c2f2427e10704f0b1cc245610795059b1229ede167737cf45aad24cbb6b2",
+    "hold_ack_file_sha256": "d14ba3e37e4416cf172f110eaff2d6ce5e5f0ccb7e36be97b86a6e3d28b25af7",
+    "interruption_decision_file_sha256": "4ea966eae74e076e998cec31b7f4dddc39ef2cad47891bc362d6cdb3c7d365b6",
+    "replacement_track_file_sha256": "6a9561e6aabca3f79121e753bdfe3a4ad8ea08d8b44a17d69bbeece92d988ac8",
+    "adoption_receipt_file_sha256": "20f5722ca7b7b32f94bd2f00c2cd3ae47d7fd54afdfbddb2db5d56a238411878",
+    "mission_evidence_file_sha256": "7836ae8aedf5a706bc68928b92d99a4514b4a39be04de6e825f0da669acd33c4",
+    "offboard_timing_file_sha256": "906844ca741f0d2f425af34ccae3c6d09caa8ea87d7714e5c89d739162eda19f",
+    "workflow_result_file_sha256": "25890cfdde43698776fbf95500199ac26a4863ca323df041ba4fff6649a6eef1",
+    "px4_ulog_sha256": "6a29e80f4eaf7d938606ab31da787810c2f9aadb1aba8c4d56a85c16ed86e555",
+    "workflow_evidence_chain_head": "f956cb2752b72ffbf5dd42653435cc175ac37a7f2bde7e8875018db1ca2cc474"
+  },
+  "local_provenance": {
+    "prepared_mission": "artifacts/acceptance/user-closed-loop-20260819/plan-04/prepared-mission.json",
+    "runtime_run": "artifacts/acceptance/user-closed-loop-20260819/execution-interrupt-10",
+    "workflow_result": "artifacts/acceptance/user-closed-loop-20260819/execution-interrupt-10/workflow-result.json",
+    "px4_ulog": "px4_rootfs/log/2026-08-19/03_00_39.ulg",
+    "large_artifacts_committed": false
+  },
+  "limitations": [
+    "This acceptance covers ROS 2, Gazebo Sim, and PX4 SITL, not a physical aircraft.",
+    "A clean DroneDreamRuntime restart remains the reliable recovery for a stale PX4 SITL session that arms but fails the stable takeoff gate.",
+    "Provider latency is nondeterministic, so the code-owned stable hold remains mandatory before any runtime model call."
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "$defs": {
+    "RuntimeCheckpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_id": {
+          "pattern": "^checkpoint-[0-9]{3}$",
+          "title": "Checkpoint Id",
+          "type": "string"
+        },
+        "segment_id": {
+          "pattern": "^segment-[0-9]{3}$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "target_node": {
+          "title": "Target Node",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "track_point_index": {
+          "minimum": 1,
+          "title": "Track Point Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checkpoint_id",
+        "segment_id",
+        "task_id",
+        "track_point_index",
+        "target_node"
+      ],
+      "title": "RuntimeCheckpoint",
+      "type": "object"
+    },
+    "Vector3": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "z": {
+          "title": "Z",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "title": "Vector3",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "battery_percent": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Battery Percent",
+      "type": "number"
+    },
+    "checkpoint": {
+      "$ref": "#/$defs/RuntimeCheckpoint"
+    },
+    "commanded_position_ned_m": {
+      "$ref": "#/$defs/Vector3"
+    },
+    "contract_id": {
+      "title": "Contract Id",
+      "type": "string"
+    },
+    "deterministic_gates": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "maxProperties": 32,
+      "minProperties": 1,
+      "title": "Deterministic Gates",
+      "type": "object"
+    },
+    "observed_position_ned_m": {
+      "$ref": "#/$defs/Vector3"
+    },
+    "observed_velocity_ned_mps": {
+      "$ref": "#/$defs/Vector3"
+    },
+    "position_error_m": {
+      "minimum": 0.0,
+      "title": "Position Error M",
+      "type": "number"
+    },
+    "schema_version": {
+      "const": "dronedream.runtime-checkpoint-request.v1",
+      "default": "dronedream.runtime-checkpoint-request.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "speed_mps": {
+      "minimum": 0.0,
+      "title": "Speed Mps",
+      "type": "number"
+    }
+  },
+  "required": [
+    "contract_id",
+    "checkpoint",
+    "observed_position_ned_m",
+    "observed_velocity_ned_mps",
+    "commanded_position_ned_m",
+    "position_error_m",
+    "speed_mps",
+    "battery_percent",
+    "deterministic_gates"
+  ],
+  "title": "RuntimeCheckpointRequest",
+  "type": "object"
+}

@@ -1,0 +1,176 @@
+{
+  "$defs": {
+    "AttachmentArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "attachment_id": {
+          "pattern": "^attachment-[0-9a-f]{32}$",
+          "title": "Attachment Id",
+          "type": "string"
+        },
+        "content_type": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Content Type",
+          "type": "string"
+        },
+        "decoded_kind": {
+          "enum": [
+            "text",
+            "document",
+            "image",
+            "video",
+            "audio",
+            "rosbag",
+            "point-cloud",
+            "geospatial",
+            "bim",
+            "cad",
+            "binary-metadata"
+          ],
+          "title": "Decoded Kind",
+          "type": "string"
+        },
+        "decoder_plugin_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,119}$",
+          "title": "Decoder Plugin Id",
+          "type": "string"
+        },
+        "display_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "model_input": {
+          "additionalProperties": true,
+          "title": "Model Input",
+          "type": "object"
+        },
+        "schema_version": {
+          "const": "dronedream.attachment-artifact.v1",
+          "default": "dronedream.attachment-artifact.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "size_bytes": {
+          "maximum": 536870912,
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        },
+        "structured_data": {
+          "additionalProperties": true,
+          "title": "Structured Data",
+          "type": "object"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "maxLength": 200000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        }
+      },
+      "required": [
+        "attachment_id",
+        "display_name",
+        "content_type",
+        "size_bytes",
+        "source_sha256",
+        "decoder_plugin_id",
+        "decoded_kind"
+      ],
+      "title": "AttachmentArtifact",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attachments": {
+      "items": {
+        "$ref": "#/$defs/AttachmentArtifact"
+      },
+      "maxItems": 32,
+      "title": "Attachments",
+      "type": "array"
+    },
+    "conversation_id": {
+      "maxLength": 96,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "title": "Conversation Id",
+      "type": "string"
+    },
+    "input_channel": {
+      "default": "text",
+      "enum": [
+        "text",
+        "voice",
+        "camera",
+        "api",
+        "webhook",
+        "scheduled"
+      ],
+      "title": "Input Channel",
+      "type": "string"
+    },
+    "input_metadata": {
+      "additionalProperties": true,
+      "title": "Input Metadata",
+      "type": "object"
+    },
+    "locale": {
+      "default": "zh-CN",
+      "enum": [
+        "zh-CN",
+        "en-US"
+      ],
+      "title": "Locale",
+      "type": "string"
+    },
+    "message": {
+      "maxLength": 4000,
+      "minLength": 3,
+      "title": "Message",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "dronedream.mission-request.v1",
+      "default": "dronedream.mission-request.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "start_entity": {
+      "default": "office launch pad",
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Start Entity",
+      "type": "string"
+    }
+  },
+  "required": [
+    "conversation_id",
+    "message"
+  ],
+  "title": "MissionRequest",
+  "type": "object"
+}

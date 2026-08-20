@@ -1,0 +1,6 @@
+std_msgs/Header header
+string contract_id
+string terminal_state
+int32 executor_return_code
+bool landing_confirmed
+bool safe_to_stop_watchdog

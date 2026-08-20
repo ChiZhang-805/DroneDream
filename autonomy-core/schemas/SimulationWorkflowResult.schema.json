@@ -1,0 +1,917 @@
+{
+  "$defs": {
+    "CompletionAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "dronedream.completion-assessment.v1",
+          "default": "dronedream.completion-assessment.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "accepted"
+      ],
+      "title": "CompletionAssessment",
+      "type": "object"
+    },
+    "ModelCallRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "call_id": {
+          "pattern": "^model-[0-9a-f]{24}$",
+          "title": "Call Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "input_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Tokens"
+        },
+        "latency_ms": {
+          "minimum": 0,
+          "title": "Latency Ms",
+          "type": "integer"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "output_schema": {
+          "title": "Output Schema",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "output_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Tokens"
+        },
+        "previous_response_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Previous Response Id"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "response_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Response Id"
+        },
+        "role": {
+          "enum": [
+            "intent_parser",
+            "intent_critic",
+            "plugin_router",
+            "task_decomposer",
+            "global_planner",
+            "plan_critic",
+            "execution_monitor",
+            "runtime_message_classifier",
+            "completion_verifier",
+            "context_summarizer"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.model-call.v1",
+          "default": "dronedream.model-call.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "role",
+        "attempt",
+        "input_sha256",
+        "output_sha256",
+        "output_schema",
+        "provider",
+        "model",
+        "latency_ms",
+        "created_at"
+      ],
+      "title": "ModelCallRecord",
+      "type": "object"
+    },
+    "PluginHookReceipt": {
+      "additionalProperties": false,
+      "description": "Hash-bound evidence for a non-tool Harness extension invocation.",
+      "properties": {
+        "capability_id": {
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "hook": {
+          "pattern": "^[a-z][a-z0-9._-]{1,95}$",
+          "title": "Hook",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "invocation_id": {
+          "pattern": "^hook-[0-9a-f]{24}$",
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "skipped",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "plugin_package_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Plugin Package Sha256",
+          "type": "string"
+        },
+        "plugin_version": {
+          "title": "Plugin Version",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.plugin-hook-receipt.v1",
+          "default": "dronedream.plugin-hook-receipt.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "slot_id": {
+          "title": "Slot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invocation_id",
+        "plugin_id",
+        "plugin_version",
+        "plugin_package_sha256",
+        "capability_id",
+        "slot_id",
+        "hook",
+        "outcome",
+        "input_sha256",
+        "output_sha256",
+        "created_at"
+      ],
+      "title": "PluginHookReceipt",
+      "type": "object"
+    },
+    "Px4GazeboArtifactBindings": {
+      "additionalProperties": false,
+      "properties": {
+        "clearance_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Clearance Sha256",
+          "type": "string"
+        },
+        "controller_params_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Controller Params Sha256",
+          "type": "string"
+        },
+        "executor_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Executor Sha256",
+          "type": "string"
+        },
+        "px4_ulogs": {
+          "items": {
+            "$ref": "#/$defs/Px4UlogArtifact"
+          },
+          "minItems": 1,
+          "title": "Px4 Ulogs",
+          "type": "array"
+        },
+        "ros_workspace": {
+          "title": "Ros Workspace",
+          "type": "string"
+        },
+        "route_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Route Sha256",
+          "type": "string"
+        },
+        "semantic_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Semantic Sha256",
+          "type": "string"
+        },
+        "track_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Track Sha256",
+          "type": "string"
+        },
+        "vehicle_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Vehicle Sha256",
+          "type": "string"
+        },
+        "world_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "World Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "world_sha256",
+        "semantic_sha256",
+        "vehicle_sha256",
+        "route_sha256",
+        "track_sha256",
+        "clearance_sha256",
+        "controller_params_sha256",
+        "executor_sha256",
+        "px4_ulogs",
+        "ros_workspace"
+      ],
+      "title": "Px4GazeboArtifactBindings",
+      "type": "object"
+    },
+    "Px4GazeboGates": {
+      "additionalProperties": false,
+      "properties": {
+        "executor_completed": {
+          "title": "Executor Completed",
+          "type": "boolean"
+        },
+        "goal_observed": {
+          "title": "Goal Observed",
+          "type": "boolean"
+        },
+        "landing_confirmed": {
+          "title": "Landing Confirmed",
+          "type": "boolean"
+        },
+        "native_terminal_lifecycle_published": {
+          "title": "Native Terminal Lifecycle Published",
+          "type": "boolean"
+        },
+        "no_live_abort": {
+          "title": "No Live Abort",
+          "type": "boolean"
+        },
+        "offboard_timing_complete": {
+          "title": "Offboard Timing Complete",
+          "type": "boolean"
+        },
+        "px4_ulog_present": {
+          "title": "Px4 Ulog Present",
+          "type": "boolean"
+        },
+        "ros_observations_present": {
+          "title": "Ros Observations Present",
+          "type": "boolean"
+        },
+        "runtime_pose_samples_present": {
+          "title": "Runtime Pose Samples Present",
+          "type": "boolean"
+        },
+        "static_route_clearance_bound": {
+          "title": "Static Route Clearance Bound",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "executor_completed",
+        "offboard_timing_complete",
+        "runtime_pose_samples_present",
+        "ros_observations_present",
+        "goal_observed",
+        "landing_confirmed",
+        "native_terminal_lifecycle_published",
+        "no_live_abort",
+        "px4_ulog_present",
+        "static_route_clearance_bound"
+      ],
+      "title": "Px4GazeboGates",
+      "type": "object"
+    },
+    "Px4GazeboMeasurements": {
+      "additionalProperties": false,
+      "properties": {
+        "abort_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Abort Reason"
+        },
+        "executor_return_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Executor Return Code"
+        },
+        "landing_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Landing State"
+        },
+        "minimum_goal_distance_m": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Goal Distance M"
+        },
+        "minimum_tolerated_landing_clearance_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Tolerated Landing Clearance M"
+        },
+        "pose_sample_count": {
+          "minimum": 0,
+          "title": "Pose Sample Count",
+          "type": "integer"
+        },
+        "ros_observation_rows": {
+          "minimum": 0,
+          "title": "Ros Observation Rows",
+          "type": "integer"
+        },
+        "tolerated_landing_contact_samples": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tolerated Landing Contact Samples",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "pose_sample_count",
+        "ros_observation_rows"
+      ],
+      "title": "Px4GazeboMeasurements",
+      "type": "object"
+    },
+    "Px4GazeboRunEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "$ref": "#/$defs/Px4GazeboArtifactBindings"
+        },
+        "gates": {
+          "$ref": "#/$defs/Px4GazeboGates"
+        },
+        "measurements": {
+          "$ref": "#/$defs/Px4GazeboMeasurements"
+        },
+        "schema_version": {
+          "const": "dronedream.generic-px4-gazebo-run.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "vehicle": {
+          "title": "Vehicle",
+          "type": "string"
+        },
+        "world": {
+          "title": "World",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "world",
+        "vehicle",
+        "gates",
+        "measurements",
+        "artifacts"
+      ],
+      "title": "Px4GazeboRunEvidence",
+      "type": "object"
+    },
+    "Px4UlogArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "size_bytes",
+        "sha256"
+      ],
+      "title": "Px4UlogArtifact",
+      "type": "object"
+    },
+    "RuntimeAmendmentDirective": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "pattern": "^[a-z][a-z0-9._-]{1,63}$",
+          "title": "Action",
+          "type": "string"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "requires_core_authorization": {
+          "default": true,
+          "title": "Requires Core Authorization",
+          "type": "boolean"
+        },
+        "requires_plan_revision": {
+          "default": true,
+          "title": "Requires Plan Revision",
+          "type": "boolean"
+        },
+        "requires_stable_hold": {
+          "default": true,
+          "title": "Requires Stable Hold",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "dronedream.runtime-amendment-directive.v1",
+          "default": "dronedream.runtime-amendment-directive.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "RuntimeAmendmentDirective",
+      "type": "object"
+    },
+    "RuntimeAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "accept",
+            "retry",
+            "replan",
+            "hold",
+            "abort"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "repair_hint": {
+          "anyOf": [
+            {
+              "maxLength": 400,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repair Hint"
+        },
+        "schema_version": {
+          "const": "dronedream.runtime-assessment.v1",
+          "default": "dronedream.runtime-assessment.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "RuntimeAssessment",
+      "type": "object"
+    },
+    "RuntimeCheckpointDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "assessment": {
+          "$ref": "#/$defs/RuntimeAssessment"
+        },
+        "continue_authorized": {
+          "title": "Continue Authorized",
+          "type": "boolean"
+        },
+        "model_call": {
+          "$ref": "#/$defs/ModelCallRecord"
+        },
+        "plugin_hook_receipts": {
+          "items": {
+            "$ref": "#/$defs/PluginHookReceipt"
+          },
+          "title": "Plugin Hook Receipts",
+          "type": "array"
+        },
+        "request_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Request Sha256",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.runtime-checkpoint-decision.v1",
+          "default": "dronedream.runtime-checkpoint-decision.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_sha256",
+        "assessment",
+        "model_call",
+        "continue_authorized"
+      ],
+      "title": "RuntimeCheckpointDecision",
+      "type": "object"
+    },
+    "RuntimeInterruptionDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "amendment_directive": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RuntimeAmendmentDirective"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "authorization_gates": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "maxProperties": 32,
+          "minProperties": 1,
+          "title": "Authorization Gates",
+          "type": "object"
+        },
+        "authorized_action": {
+          "enum": [
+            "resume_original",
+            "hold",
+            "hold_for_replan",
+            "apply_command",
+            "land"
+          ],
+          "title": "Authorized Action",
+          "type": "string"
+        },
+        "classification": {
+          "$ref": "#/$defs/RuntimeMessageClassification"
+        },
+        "decision_reason": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Decision Reason",
+          "type": "string"
+        },
+        "hold_ack_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Hold Ack Sha256",
+          "type": "string"
+        },
+        "message_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Message Sha256",
+          "type": "string"
+        },
+        "model_call": {
+          "$ref": "#/$defs/ModelCallRecord"
+        },
+        "plugin_hook_receipts": {
+          "items": {
+            "$ref": "#/$defs/PluginHookReceipt"
+          },
+          "title": "Plugin Hook Receipts",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "dronedream.runtime-interruption-decision.v1",
+          "default": "dronedream.runtime-interruption-decision.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_sha256",
+        "hold_ack_sha256",
+        "classification",
+        "model_call",
+        "authorized_action",
+        "authorization_gates",
+        "decision_reason"
+      ],
+      "title": "RuntimeInterruptionDecision",
+      "type": "object"
+    },
+    "RuntimeMessageClassification": {
+      "additionalProperties": false,
+      "properties": {
+        "message_kind": {
+          "enum": [
+            "emergency_stop",
+            "mission_amendment",
+            "motion_adjustment",
+            "informational"
+          ],
+          "title": "Message Kind",
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        },
+        "requested_action": {
+          "enum": [
+            "land",
+            "replan",
+            "adjust_motion",
+            "resume",
+            "redirect",
+            "set_speed",
+            "pause",
+            "return_home",
+            "safe_land",
+            "set_return_point",
+            "set_coverage",
+            "camera_control",
+            "payload_control",
+            "set_avoidance",
+            "follow_target",
+            "operator_takeover"
+          ],
+          "title": "Requested Action",
+          "type": "string"
+        },
+        "requires_plan_revision": {
+          "title": "Requires Plan Revision",
+          "type": "boolean"
+        },
+        "schema_version": {
+          "const": "dronedream.runtime-message-classification.v1",
+          "default": "dronedream.runtime-message-classification.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "target_entity": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Entity"
+        }
+      },
+      "required": [
+        "message_kind",
+        "requested_action",
+        "requires_plan_revision",
+        "summary"
+      ],
+      "title": "RuntimeMessageClassification",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "checkpoint_decisions": {
+      "items": {
+        "$ref": "#/$defs/RuntimeCheckpointDecision"
+      },
+      "title": "Checkpoint Decisions",
+      "type": "array"
+    },
+    "completion_assessment": {
+      "$ref": "#/$defs/CompletionAssessment"
+    },
+    "completion_model_call": {
+      "$ref": "#/$defs/ModelCallRecord"
+    },
+    "contract_id": {
+      "title": "Contract Id",
+      "type": "string"
+    },
+    "plugin_hook_receipts": {
+      "items": {
+        "$ref": "#/$defs/PluginHookReceipt"
+      },
+      "title": "Plugin Hook Receipts",
+      "type": "array"
+    },
+    "prepared_mission_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Prepared Mission Sha256",
+      "type": "string"
+    },
+    "runtime_evidence": {
+      "$ref": "#/$defs/Px4GazeboRunEvidence"
+    },
+    "runtime_interruption_decisions": {
+      "items": {
+        "$ref": "#/$defs/RuntimeInterruptionDecision"
+      },
+      "title": "Runtime Interruption Decisions",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "dronedream.simulation-workflow-result.v1",
+      "default": "dronedream.simulation-workflow-result.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "verified",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "workflow_evidence_chain_head": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Workflow Evidence Chain Head",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "contract_id",
+    "prepared_mission_sha256",
+    "runtime_evidence",
+    "completion_assessment",
+    "completion_model_call",
+    "workflow_evidence_chain_head"
+  ],
+  "title": "SimulationWorkflowResult",
+  "type": "object"
+}

@@ -1,0 +1,87 @@
+{
+  "schema_version": "dronedream.plugin-system-acceptance.v1",
+  "recorded_at": "2026-08-19T05:03:30.0012845Z",
+  "status": "verified",
+  "scope": "simulation_only",
+  "final_installer": {
+    "path": "artifacts/desktop/DroneDream-AUTONOMY_0.1.0_x64-setup.exe",
+    "sha256": "2504bf11c3503993a6fc131ea4a3beab5d3659931ba9c4600874fb9d2825efa3",
+    "packaged_model_count": 7,
+    "packaged_plugin_count": 9,
+    "qualified_default_map": "dronedream.school-map.v1",
+    "qualified_default_vehicle": "dronedream.my-drone.v1"
+  },
+  "official_mcp_plugin": {
+    "plugin_id": "dronedream.mission-evidence-gate",
+    "version": "1.0.0+1d913880de29",
+    "package_sha256": "b259c85eaa935859ca57695c2b8cba0bca315b1d341446332f26a2aff294aa5f",
+    "tool_id": "mission.evidence-requirements",
+    "tool_output_sha256": "5f971be4e4c1e3245df3db117d73302a5b3423744fffe4a682493be9bd68180a",
+    "lifecycle_cycles": 5,
+    "fault_injection_status": "quarantined",
+    "safety_kernel_health_after_fault": "healthy"
+  },
+  "real_model_planning": {
+    "status": "awaiting_confirmation",
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "contract_id": "mission-3c66571a9fdb492181d6f3f6",
+    "model_calls": 6,
+    "model_roles": [
+      "intent_parser",
+      "intent_critic",
+      "plugin_router",
+      "task_decomposer",
+      "global_planner",
+      "plan_critic"
+    ],
+    "input_tokens": 13993,
+    "output_tokens": 983,
+    "plugin_snapshot_id": "plugin-snapshot-75df52ab1ecd43f0991ca6d2",
+    "plugin_catalog_sha256": "499342d81f1338ac00d0d2fd8ce66209a4700df15c42406acb9e90d12eb0e09e",
+    "plugin_package_sha256": "b259c85eaa935859ca57695c2b8cba0bca315b1d341446332f26a2aff294aa5f",
+    "plugin_output_sha256": "26f1def0aefe54c90af79f86af827b8d5111590104a73c3d1951cdb47df38bb6",
+    "route_node_count": 73,
+    "minimum_clearance_m": 0.15999999999997438,
+    "planning_attempts": 1
+  },
+  "real_ros_gazebo_px4_execution": {
+    "status": "verified",
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "contract_id": "mission-8909b538508b42839b16de15",
+    "native_plugin_host": "runtime.safe-hold",
+    "native_plugin_activated": true,
+    "workflow_sha256": "02131f5aaa72bad93f57e550a5344c13a74a90e2b6f80a6939ec53b4f9e5aff4",
+    "executor_return_code": 0,
+    "landing_state": "ON_GROUND",
+    "pose_sample_count": 42205,
+    "ros_observation_rows": 15563,
+    "minimum_goal_distance_m": 0.040301639872931685,
+    "checkpoint_calls": 2,
+    "checkpoints_authorized": true,
+    "completion_model_accepted": true
+  },
+  "flight_artifact_identity": {
+    "note": "The final packaged-plugin planning run reproduced the exact route, clearance, and PX4 track hashes used by the verified runtime run.",
+    "route_sha256": "78932d92ae5ede0183590cadcfe3e15ce15d85a17ba7b4e86fc36b0f5d32fcfb",
+    "clearance_sha256": "c11cd541ff5ac8a08045c157372ce0d3f98c2b45cf0381580a0812849dabdca9",
+    "track_sha256": "a4b736ae108be5a84b7d67d664daefad03687418e92545cb8cdba1d9cce735ae"
+  },
+  "verification_gates": {
+    "python_tests": 43,
+    "frontend_tests": 3,
+    "ruff": "passed",
+    "typescript": "passed",
+    "frontend_production_build": "passed",
+    "packaged_sidecar_health": "ready",
+    "runtime_resources_hash_checked": true,
+    "ros_pluginlib_probe": "passed",
+    "ros_lifecycle_self_test": "passed"
+  },
+  "limitations": [
+    "This acceptance covers Gazebo and PX4 SITL, not a physical aircraft.",
+    "The configured OpenAI credential returned HTTP 401 during an earlier planning attempt, so the successful online acceptance used DeepSeek.",
+    "Third-party native actuation plugins remain intentionally blocked until a signed certification and installer path exists."
+  ]
+}

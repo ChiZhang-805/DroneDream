@@ -1,0 +1,177 @@
+{
+  "$defs": {
+    "PluginHookReceipt": {
+      "additionalProperties": false,
+      "description": "Hash-bound evidence for a non-tool Harness extension invocation.",
+      "properties": {
+        "capability_id": {
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "hook": {
+          "pattern": "^[a-z][a-z0-9._-]{1,95}$",
+          "title": "Hook",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "invocation_id": {
+          "pattern": "^hook-[0-9a-f]{24}$",
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "skipped",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "plugin_package_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Plugin Package Sha256",
+          "type": "string"
+        },
+        "plugin_version": {
+          "title": "Plugin Version",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.plugin-hook-receipt.v1",
+          "default": "dronedream.plugin-hook-receipt.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "slot_id": {
+          "title": "Slot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invocation_id",
+        "plugin_id",
+        "plugin_version",
+        "plugin_package_sha256",
+        "capability_id",
+        "slot_id",
+        "hook",
+        "outcome",
+        "input_sha256",
+        "output_sha256",
+        "created_at"
+      ],
+      "title": "PluginHookReceipt",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A hash-bound peripheral or flight-policy command issued only from stable hold.",
+  "properties": {
+    "action": {
+      "enum": [
+        "camera_control",
+        "payload_control",
+        "set_avoidance"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "decision_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Decision Sha256",
+      "type": "string"
+    },
+    "deterministic_gates": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "maxProperties": 32,
+      "minProperties": 1,
+      "title": "Deterministic Gates",
+      "type": "object"
+    },
+    "execution_id": {
+      "pattern": "^execution-[0-9a-f]{32}$",
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "hold_ack_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Hold Ack Sha256",
+      "type": "string"
+    },
+    "message_id": {
+      "pattern": "^runtime-msg-[0-9a-f]{32}$",
+      "title": "Message Id",
+      "type": "string"
+    },
+    "message_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Message Sha256",
+      "type": "string"
+    },
+    "parameters": {
+      "additionalProperties": true,
+      "title": "Parameters",
+      "type": "object"
+    },
+    "plugin_hook_receipts": {
+      "items": {
+        "$ref": "#/$defs/PluginHookReceipt"
+      },
+      "title": "Plugin Hook Receipts",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "dronedream.runtime-authorized-command.v1",
+      "default": "dronedream.runtime-authorized-command.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "message_id",
+    "execution_id",
+    "action",
+    "parameters",
+    "message_sha256",
+    "hold_ack_sha256",
+    "decision_sha256",
+    "deterministic_gates",
+    "generated_at"
+  ],
+  "title": "RuntimeAuthorizedCommand",
+  "type": "object"
+}
