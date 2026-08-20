@@ -3140,13 +3140,16 @@ function AppShellContent() {
     if (!ownerId) return;
     let active = true;
     const hydrateTenant = (organizationId: string | null) => {
-      void Promise.all(
+      void Promise.allSettled(
         (["universal", "sim", "lab", "field", "autonomy"] as const).map((edition) =>
           getAssistantWorkspaceIndex(edition, ownerId, organizationId)
         ),
-      ).then((indexes) => {
+      ).then((results) => {
         if (!active) return;
-        hydrateAssistantWorkspaceIndex(ownerId, indexes.flat());
+        const indexes = results.flatMap((result) =>
+          result.status === "fulfilled" ? result.value : []
+        );
+        hydrateAssistantWorkspaceIndex(ownerId, indexes);
       }).catch(() => {
         // The local registry remains usable while the authenticated server
         // index is offline. No workspace from another boundary is adopted.

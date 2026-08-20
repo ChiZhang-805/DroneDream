@@ -320,6 +320,11 @@ function artifactMatchesEdition(
     return result.artifact_kind === "autonomy_mission_plan"
       || result.artifact_kind === "field_task_plan";
   }
+  if (edition === "autonomy") {
+    return result.artifact_kind === "autonomy_mission_plan"
+      || result.artifact_kind === "universal_vehicle_model"
+      || result.artifact_kind === "simulation_experiment";
+  }
   return [
     "autonomy_mission_plan",
     "lab_simulation_experiment",

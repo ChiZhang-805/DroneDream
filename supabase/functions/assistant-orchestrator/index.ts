@@ -9,7 +9,7 @@ declare const EdgeRuntime:
   | undefined;
 
 type JsonRecord = Record<string, unknown>;
-export type AssistantEdition = "universal" | "sim" | "lab" | "field";
+export type AssistantEdition = "universal" | "sim" | "lab" | "field" | "autonomy";
 export type AssistantTaskType =
   | "control_tuning"
   | "mission_autonomy"
@@ -84,6 +84,11 @@ const EDITION_ARTIFACTS: Readonly<Record<AssistantEdition, readonly ArtifactKind
     "lab_real_to_sim_workflow",
   ],
   field: ["autonomy_mission_plan", "field_task_plan"],
+  autonomy: [
+    "autonomy_mission_plan",
+    "universal_vehicle_model",
+    "simulation_experiment",
+  ],
 };
 
 const EDITION_TASK_ARTIFACTS: Readonly<
@@ -115,6 +120,11 @@ const EDITION_TASK_ARTIFACTS: Readonly<
     mission_autonomy: "autonomy_mission_plan",
     field_task: "field_task_plan",
   },
+  autonomy: {
+    mission_autonomy: "autonomy_mission_plan",
+    vehicle_modeling: "universal_vehicle_model",
+    simulation_experiment: "simulation_experiment",
+  },
 };
 
 const EDITION_SYSTEM_PROMPTS: Readonly<Record<AssistantEdition, string>> = {
@@ -139,6 +149,11 @@ const EDITION_SYSTEM_PROMPTS: Readonly<Record<AssistantEdition, string>> = {
     "Create an editable field_task_plan draft only.",
     "Require operator approval, vehicle and firmware identity, parameter snapshot, bounded trial steps, abort limits, telemetry, holdout, and rollback.",
     "Never arm, write parameters, control a vehicle, or claim that a flight ran.",
+  ].join(" "),
+  autonomy: [
+    "Route to exactly one AUTONOMY draft: autonomous mission, vehicle model, or simulation study.",
+    "Keep model assumptions, simulation evidence, deterministic validation, and runtime authority distinct.",
+    "Never claim that a model, simulation, mission, or physical execution already ran.",
   ].join(" "),
 };
 
@@ -366,7 +381,13 @@ async function readJsonBody(request: Request): Promise<JsonRecord> {
 }
 
 function edition(value: unknown): AssistantEdition {
-  if (value === "universal" || value === "sim" || value === "lab" || value === "field") {
+  if (
+    value === "universal"
+    || value === "sim"
+    || value === "lab"
+    || value === "field"
+    || value === "autonomy"
+  ) {
     return value;
   }
   throw new OrchestratorError("INVALID_REQUEST", "edition is invalid.", 400);
@@ -2215,11 +2236,11 @@ export async function handleAssistantOrchestratorRequest(request: Request): Prom
     if (request.method === "POST" && path === "/turns") return await handleTurn(request);
     const runMatch = /^\/runs\/([0-9a-f-]{36})$/iu.exec(path);
     if (request.method === "GET" && runMatch?.[1]) return await handleRun(request, runMatch[1]);
-    const workspaceIndexMatch = /^\/workspaces\/(universal|sim|lab|field)$/u.exec(path);
+    const workspaceIndexMatch = /^\/workspaces\/(universal|sim|lab|field|autonomy)$/u.exec(path);
     if (request.method === "GET" && workspaceIndexMatch?.[1]) {
       return await handleWorkspaceIndex(request, edition(workspaceIndexMatch[1]));
     }
-    const workspaceMatch = /^\/workspaces\/(universal|sim|lab|field)\/([A-Za-z0-9_-]{8,128})$/u.exec(path);
+    const workspaceMatch = /^\/workspaces\/(universal|sim|lab|field|autonomy)\/([A-Za-z0-9_-]{8,128})$/u.exec(path);
     if (request.method === "GET" && workspaceMatch?.[1] && workspaceMatch[2]) {
       return await handleWorkspace(request, edition(workspaceMatch[1]), workspaceId(workspaceMatch[2]));
     }

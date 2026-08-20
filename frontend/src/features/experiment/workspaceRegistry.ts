@@ -191,6 +191,11 @@ function artifactMatchesEdition(
   }
   if (edition === "sim") return artifactKind === "autonomy_mission_plan" || artifactKind === "simulation_experiment";
   if (edition === "field") return artifactKind === "autonomy_mission_plan" || artifactKind === "field_task_plan";
+  if (edition === "autonomy") {
+    return artifactKind === "autonomy_mission_plan"
+      || artifactKind === "universal_vehicle_model"
+      || artifactKind === "simulation_experiment";
+  }
   return artifactKind === "autonomy_mission_plan" || artifactKind.startsWith("lab_");
 }
 
