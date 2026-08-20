@@ -22,6 +22,7 @@ from app.db import SessionLocal, init_db
 from app.desktop_bridge import enforce_desktop_bridge
 from app.response import err
 from app.routers import artifacts as artifacts_router
+from app.routers import autonomy as autonomy_router
 from app.routers import batches as batches_router
 from app.routers import benchmark_campaigns as benchmark_campaigns_router
 from app.routers import capabilities as capabilities_router
@@ -149,6 +150,7 @@ def create_app() -> FastAPI:
     api_v1.include_router(benchmark_campaigns_router.router)
     api_v1.include_router(trials_router.router)
     api_v1.include_router(artifacts_router.router)
+    api_v1.include_router(autonomy_router.router)
     api_v1.include_router(parameter_catalog_router.router)
     api_v1.include_router(capabilities_router.router)
     api_v1.include_router(experiment_assistant_router.router)

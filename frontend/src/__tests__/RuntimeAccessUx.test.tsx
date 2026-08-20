@@ -200,7 +200,9 @@ afterEach(() => {
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(5);
+      .querySelectorAll("a")).toHaveLength(6);
+    expect(screen.getByRole("link", { name: "AUTONOMY" }))
+      .not.toHaveClass("runtime-locked");
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);

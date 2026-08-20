@@ -91,6 +91,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           },
         },
         {
+          path: "autonomy",
+          lazy: async () => {
+            const { AutonomyGateway } = await import("./pages/AutonomyGateway");
+            return { Component: AutonomyGateway };
+          },
+        },
+        {
           path: "admin",
           lazy: async () => {
             const { AdminPage } = await import("./pages/AdminPage");

@@ -100,8 +100,11 @@ def _direct_provider_capacity(
         return None
     try:
         arm_manifest = BenchmarkArmManifestV1.model_validate(arm.manifest_json)
+        provider_execution = arm_manifest.intervention.get("provider_execution")
+        if not isinstance(provider_execution, dict):
+            raise ValueError("provider_execution must be a JSON object")
         provider = BenchmarkProviderExecutionConfigV1.model_validate_json(
-            canonical_json_bytes(arm_manifest.intervention.get("provider_execution"))
+            canonical_json_bytes(provider_execution)
         )
     except ValueError as exc:
         raise BenchmarkCoordinatorError(
