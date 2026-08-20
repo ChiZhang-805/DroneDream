@@ -683,6 +683,7 @@ def _engine_manifest_identity(
     return _sha256_bytes(
         _canonical_compact(
             {
+                "schemaVersion": 2,
                 "engineApiVersion": 1,
                 "source": source,
                 "editionProfile": edition_profile,
