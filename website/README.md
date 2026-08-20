@@ -45,12 +45,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-releas
   -CargoTargetRoot desktop/src-tauri/target
 ```
 
-For the four-edition build handoff:
+For the five-edition build handoff:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File website/scripts/build-release-site.ps1 `
   -EditionId universal `
-  -InstallerHandoffRoot "$env:LOCALAPPDATA/DroneDream/codex-builds/core-four-msvc"
+  -InstallerHandoffRoot "$env:LOCALAPPDATA/DroneDream/codex-builds/core-five-msvc"
 ```
 
 The builder reads the desktop version, verifies the installer checksum, builds

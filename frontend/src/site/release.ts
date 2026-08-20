@@ -43,6 +43,7 @@ const editionProducts = {
   sim: "DroneDream-Sim",
   lab: "DroneDream-Lab",
   field: "DroneDream-Field",
+  autonomy: "DroneDream-Autonomy",
 } as const;
 
 function isAllowedArtifactUrl(

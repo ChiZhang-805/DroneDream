@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$EditionId = "universal",
     [UInt64]$BuildNumber = 0,
     [string]$InstallerHandoffRoot = "",
@@ -50,7 +50,7 @@ if ($InstallerHandoffRoot) {
     $installerCandidates.Add([IO.Path]::GetFullPath((Join-Path $repositoryRoot `
         "desktop\src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis\$bundleInstallerName")))
     $installerCandidates.Add([IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA `
-        "DroneDream\codex-builds\core-four-msvc\$EditionId\$bundleInstallerName")))
+        "DroneDream\codex-builds\core-five-msvc\$EditionId\$bundleInstallerName")))
     if ($env:CARGO_TARGET_DIR) {
         $installerCandidates.Add([IO.Path]::GetFullPath((Join-Path $env:CARGO_TARGET_DIR `
             "x86_64-pc-windows-msvc\release\bundle\nsis\$bundleInstallerName")))
@@ -103,7 +103,7 @@ if ($LASTEXITCODE -ne 0 -or
     throw "The release website requires one exact clean source commit."
 }
 if ([int]$receipt.schemaVersion -ne 1 -or
-    [string]$receipt.kind -cne "dronedream-four-edition-build-receipt" -or
+    [string]$receipt.kind -cne "dronedream-five-edition-build-receipt" -or
     [string]$receipt.editionId -cne $EditionId -or
     [string]$receipt.productName -cne [string]$family.installerProductName -or
     [string]$receipt.version -cne $version -or

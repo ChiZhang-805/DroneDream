@@ -35,6 +35,7 @@ mapfile -t release_metadata < <(node -e '
     sim: "DroneDream-Sim",
     lab: "DroneDream-Lab",
     field: "DroneDream-Field",
+    autonomy: "DroneDream-Autonomy",
   };
   const hasEdition = Object.hasOwn(release, "edition");
   const hasBuildNumber = Object.hasOwn(release, "buildNumber");
