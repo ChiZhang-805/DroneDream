@@ -102,7 +102,7 @@ EDITION_KEYS = {
     "releaseChannel",
     "knownGaps",
 }
-EDITION_IDS = {"sim", "lab", "field"}
+EDITION_IDS = {"sim", "lab", "field", "autonomy"}
 ENFORCEMENT_LAYERS = {"backend", "runtime", "native"}
 CONDITION_LAYERS = ENFORCEMENT_LAYERS | {"operator"}
 TARGET_KINDS = {"installation", "simulation", "hitl", "real-hardware"}
@@ -349,8 +349,7 @@ PROMOTION_ROLLBACK_KEYS = {
     "targetArtifactSha256",
 }
 PROMOTION_BRANCH_CREATION_STATES = {
-    "planned-not-created",
-    "creation-approved",
+    "long-lived-product-branch",
     "existing-protected",
 }
 PROMOTION_METADATA_PREFIXES = (
@@ -800,8 +799,9 @@ def validate_edition_manifest(
     if enabled != expected_enabled or forbidden != expected_forbidden:
         raise DistributionContractError("edition capability lists drifted from policy decisions")
     source_policy = document["sourcePolicy"]
+    expected_product_branch = f"codex/software-{edition_id}"
     if source_policy != {
-        "developmentBranch": "codex/software",
+        "developmentBranch": expected_product_branch,
         "integrationBranch": "main",
         "editionSourceDivergenceAllowed": False,
         "hotfixMustReturnToCore": True,
@@ -809,7 +809,7 @@ def validate_edition_manifest(
     }:
         raise DistributionContractError("edition source policy permits code divergence")
     release_channel = document["releaseChannel"]
-    expected_branch = f"codex/release-{edition_id}"
+    expected_branch = expected_product_branch
     if not isinstance(release_channel, dict):
         raise DistributionContractError("edition.releaseChannel must be an object")
     _require_exact_keys(
@@ -819,7 +819,7 @@ def validate_edition_manifest(
     )
     if (
         release_channel["branch"] != expected_branch
-        or release_channel["creationState"] not in {"planned-not-created", "created-protected"}
+        or release_channel["creationState"] != "long-lived-product-branch"
         or release_channel["promotionManifestRequired"] is not True
         or release_channel["forcePushAllowed"] is not False
     ):
@@ -883,7 +883,9 @@ def load_edition_manifests(paths: list[Path], *, policy_path: Path) -> dict[str,
             raise DistributionContractError(f"duplicate edition id: {edition_id}")
         editions[edition_id] = document
     if set(editions) != EDITION_IDS:
-        raise DistributionContractError("exactly sim, lab, and field editions are required")
+        raise DistributionContractError(
+            "exactly sim, lab, field, and autonomy editions are required"
+        )
     return editions
 
 
@@ -1923,9 +1925,9 @@ def validate_release_promotion_manifest(
     if observed_branch_head is not None:
         if not COMMIT_RE.fullmatch(observed_branch_head) or observed_branch_head != proposed_head:
             raise DistributionContractError("release promotion branch head drifted")
-    elif branch_policy["creationState"] != "planned-not-created":
+    elif branch_policy["creationState"] in PROMOTION_BRANCH_CREATION_STATES:
         raise DistributionContractError(
-            "created release branch requires an independently observed branch head"
+            "long-lived product branch requires an independently observed branch head"
         )
 
     artifact = document["artifact"]
@@ -2033,8 +2035,6 @@ def validate_release_promotion_manifest(
             raise DistributionContractError("promotable release promotion cannot retain blockers")
         if composite["installability"]["state"] != "installable":
             raise DistributionContractError("promotable release requires an installable composite")
-        if branch_policy["creationState"] == "planned-not-created":
-            raise DistributionContractError("promotable release branch cannot remain unapproved")
         if artifact["bytes"] <= 0 or artifact["updaterSignatureState"] != "verified":
             raise DistributionContractError(
                 "promotable release requires a non-empty updater-signed artifact"
@@ -2045,10 +2045,10 @@ def validate_release_promotion_manifest(
 def validate_release_promotion_set(
     promotions: list[dict[str, Any]],
 ) -> None:
-    """Enforce one-source/common-core parity across all three edition channels."""
+    """Enforce one-source/common-core parity across every edition channel."""
 
     if len(promotions) != len(EDITION_IDS):
-        raise DistributionContractError("release promotion set must contain all three editions")
+        raise DistributionContractError("release promotion set must contain all product editions")
     by_edition = {promotion["edition"]["editionId"]: promotion for promotion in promotions}
     if set(by_edition) != EDITION_IDS or len(by_edition) != len(promotions):
         raise DistributionContractError(

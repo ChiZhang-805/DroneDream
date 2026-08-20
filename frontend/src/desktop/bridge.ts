@@ -111,14 +111,14 @@ export interface ComponentInstallResult {
   activated: boolean;
 }
 
-export type HardwareDomainEdition = "lab" | "field";
+export type HardwareDomainEdition = "lab" | "field" | "autonomy";
 
 export interface FieldTuningStatus {
   schemaVersion: 1;
   kind: "dronedream-field-tuning-status";
   editionId: HardwareDomainEdition;
   executionDomain: "real-hardware";
-  runtimeProfile: "unified-sim-lab" | "field-lightweight";
+  runtimeProfile: "unified-sim-lab" | "field-lightweight" | "autonomy-full";
   sourceCommit: string;
   enginePackId: string;
   contractSha256: string;
@@ -661,7 +661,7 @@ export interface BrowserAuthRequest {
 
 export interface BrowserAuthSession {
   protocolVersion: "desktop-browser-auth-pkce-v1";
-  editionId: "universal" | "sim" | "lab" | "field";
+  editionId: "universal" | "sim" | "lab" | "field" | "autonomy";
   authClientId: string;
   accessToken: string;
   attemptIdHash: string;
@@ -1564,7 +1564,7 @@ function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
   if (record.protocolVersion !== "desktop-browser-auth-pkce-v1") {
     throw new Error("response.protocolVersion is unsupported");
   }
-  if (!(["universal", "sim", "lab", "field"] as unknown[]).includes(record.editionId)) {
+  if (!(["universal", "sim", "lab", "field", "autonomy"] as unknown[]).includes(record.editionId)) {
     throw new Error("response.editionId is unsupported");
   }
   const issuedAt = expectIsoTimestamp(record.issuedAt, "response.issuedAt");
@@ -2166,7 +2166,9 @@ function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
   );
   const expectedRuntimeProfile = editionId === "lab"
     ? "unified-sim-lab"
-    : "field-lightweight";
+    : editionId === "autonomy"
+      ? "autonomy-full"
+      : "field-lightweight";
   const status: FieldTuningStatus = {
     schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldTuningStatus.schemaVersion"),
     kind: expectLiteral(
@@ -2664,9 +2666,8 @@ function parseFieldProtocolFrameInspection(
       "dronedream-field-protocol-frame-inspection",
       "fieldProtocolFrameInspection.kind",
     ),
-    editionId: expectLiteral(
+    editionId: expectHardwareDomainEdition(
       record.editionId,
-      "field",
       "fieldProtocolFrameInspection.editionId",
     ),
     adapterId: expectIdentifier(
@@ -2776,9 +2777,8 @@ function parseFieldMavlinkTelemetryProbeReceipt(
       "dronedream-field-mavlink-telemetry-probe-receipt",
       "fieldMavlinkTelemetryProbeReceipt.kind",
     ),
-    editionId: expectLiteral(
+    editionId: expectHardwareDomainEdition(
       record.editionId,
-      "field",
       "fieldMavlinkTelemetryProbeReceipt.editionId",
     ),
     adapterId: expectIdentifier(
@@ -4459,8 +4459,8 @@ function expectHardwareDomainEdition(
   value: unknown,
   path: string,
 ): HardwareDomainEdition {
-  if (value !== "lab" && value !== "field") {
-    throw new Error(`${path} must equal lab or field`);
+  if (value !== "lab" && value !== "field" && value !== "autonomy") {
+    throw new Error(`${path} must equal lab, field, or autonomy`);
   }
   return value;
 }

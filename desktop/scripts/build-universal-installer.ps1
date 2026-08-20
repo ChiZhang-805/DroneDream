@@ -129,7 +129,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $integratedUi.manifest -cne "distribution/universal/integrated-workspaces.v2.json" -or
     $integratedUi.sha256 -cnotmatch "^[0-9a-f]{64}$" -or
     $integratedUi.sourceFileCount -ne 12 -or
-    (@($integratedUi.workspaceModes) -join ",") -cne "sim,lab,field" -or
+    (@($integratedUi.workspaceModes) -join ",") -cne "sim,lab,field,autonomy" -or
     $integratedUi.createsCrossEditionHarnessOrchestrator -ne $false -or
     $integratedUi.presentationOnly -ne $true -or
     $integratedUi.grantsHardwareAuthority -ne $false -or
@@ -184,7 +184,7 @@ $integratedUiManifest = Get-Content -LiteralPath (Join-Path $repoRoot $integrate
     -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($integratedUiManifest.kind -cne "dronedream-universal-integrated-workspaces" -or
     $integratedUiManifest.contractId -cne [string]$integratedUi.contractId -or
-    (@($integratedUiManifest.workspaceModes) -join ",") -cne "sim,lab,field" -or
+    (@($integratedUiManifest.workspaceModes) -join ",") -cne "sim,lab,field,autonomy" -or
     $integratedUiManifest.workspaceSwitchMeaning -cne "presentation-and-module-selection-only" -or
     $integratedUiManifest.createsCrossEditionHarnessOrchestrator -ne $false -or
     $integratedUiManifest.presentationOnly -ne $true -or
@@ -225,7 +225,7 @@ if ($vehicleStudio.ownerEdition -cne "universal" -or
     $vehicleStudio.contract -cne "distribution/universal/vehicle-studio.v1.json" -or
     $vehicleStudio.schema -cne "distribution/schemas/vehicle-pack-draft-envelope.schema.json" -or
     $vehicleStudio.transport -cne "file-based-draft-envelope" -or
-    ($vehicleStudioTargets -join ",") -cne "sim,lab,field" -or
+    ($vehicleStudioTargets -join ",") -cne "sim,lab,field,autonomy" -or
     $vehicleStudio.automaticReceiverInstallation -ne $false -or
     $vehicleStudio.modelHarnessStartsOnExchange -ne $false -or
     $vehicleStudio.grantsSimulationExecution -ne $false -or
@@ -356,7 +356,7 @@ if (-not $Build) {
         providerOAuthClientId = "external-registered-public-config-required"
         enginePackProfile = "unified-sim-lab"
         enginePackPayloadContract = "dronedream-universal-engine-payload/v1"
-        workspaceModes = @("universal", "sim", "lab", "field")
+        workspaceModes = @("universal", "sim", "lab", "field", "autonomy")
         presentationSwitchGrantsAuthority = $false
         validatedVehiclePackCount = 0
         hardwareActionDecision = "deny"
@@ -376,7 +376,7 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PATH -or
 }
 if (-not $env:DRONEDREAM_OAUTH_CLIENT_ID -or
     $env:DRONEDREAM_OAUTH_CLIENT_ID -notmatch '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$' -or
-    $env:DRONEDREAM_OAUTH_CLIENT_ID -match '^dronedream-desktop-(universal|sim|lab|field)$') {
+    $env:DRONEDREAM_OAUTH_CLIENT_ID -match '^dronedream-desktop-(universal|sim|lab|field|autonomy)$') {
     throw "Universal browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID."
 }
 $providerOAuthClientIdSha256 = Get-StringSha256Lower $env:DRONEDREAM_OAUTH_CLIENT_ID
@@ -590,7 +590,7 @@ $buildReceipt = [ordered]@{
         buildPlanningPayloadExcluded = $true
     }
     modeSwitch = [ordered]@{
-        modes = @("universal", "sim", "lab", "field")
+        modes = @("universal", "sim", "lab", "field", "autonomy")
         presentationOnly = $true
         grantsHardwareAuthority = $false
     }

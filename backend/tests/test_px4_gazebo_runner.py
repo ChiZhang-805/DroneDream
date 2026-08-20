@@ -84,6 +84,7 @@ def _write_engine_pack_identity_files(
     tmp_path: Path,
     *,
     manifest_schema_version: int = 1,
+    edition_profile: str = "unified-sim-lab",
 ) -> tuple[Path, Path, dict[str, object]]:
     source_commit = "1" * 40
     px4_commit = "2" * 40
@@ -105,7 +106,7 @@ def _write_engine_pack_identity_files(
         "files": [{"path": "backend/app/main.py", "sizeBytes": 1, "sha256": "5" * 64}],
     }
     manifest["editionProfile"] = {
-        "profileId": "unified-sim-lab",
+        "profileId": edition_profile,
         "includesLargeSimulator": True,
         "excludedSourcePaths": [],
     }
@@ -185,6 +186,26 @@ def test_runner_accepts_and_reports_scoped_engine_pack_schema_v2(tmp_path: Path)
     assert identity["edition_profile"] == {
         "status": "verified",
         "profile_id": "unified-sim-lab",
+        "includes_large_simulator": True,
+        "excluded_source_paths": [],
+    }
+
+
+def test_runner_accepts_autonomy_full_engine_profile(tmp_path: Path) -> None:
+    manifest_path, state_path, _manifest = _write_engine_pack_identity_files(
+        tmp_path,
+        manifest_schema_version=2,
+        edition_profile="autonomy-full",
+    )
+
+    identity = runner_module._engine_pack_identity(
+        manifest_path=manifest_path,
+        state_path=state_path,
+    )
+
+    assert identity["edition_profile"] == {
+        "status": "verified",
+        "profile_id": "autonomy-full",
         "includes_large_simulator": True,
         "excluded_source_paths": [],
     }

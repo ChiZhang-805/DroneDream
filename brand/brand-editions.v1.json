@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "dronedream-edition-brand-system",
-  "brandVersion": "1.1.1",
+  "brandVersion": "1.2.0",
   "masterName": "DroneDream",
   "separator": "·",
   "geometry": {
@@ -51,6 +51,13 @@
       "gradientStops": ["#FFC247", "#FF754B", "#D746A5"],
       "lightSurface": "#FFF8EF",
       "darkSurface": "#28140D"
+    },
+    "autonomy": {
+      "productName": "DroneDream · AUTONOMY",
+      "editionLabel": "AUTONOMY",
+      "gradientStops": ["#FF5B74", "#EC214F", "#97153B"],
+      "lightSurface": "#FFF4F7",
+      "darkSurface": "#250914"
     }
   },
   "safety": {
@@ -134,6 +141,23 @@
         "path": "brand/source/approved/field-large-label-lockup.png",
         "sha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
         "status": "superseded-by-centered-separator-v2"
+      }
+    },
+    "autonomy": {
+      "markPath": "brand/source/approved/autonomy-mark-1024.png",
+      "markSha256": "a67fe1fb2558471806fe19c3eb9423d041a1a5de58a30bfb9893353c00a9f651",
+      "dotLockupPath": "brand/source/approved/autonomy-large-label-centered-lockup.png",
+      "dotLockupSha256": "8f8ce7bc4a8cf1782fe006c05f4798201ac063625bb8d9c98070f61491b84b2b",
+      "dotLockupDimensions": {"width": 3090, "height": 340},
+      "dotLockupStyle": "autonomy-approved-lockup-v1",
+      "separatorTolerancePx": 9,
+      "separatorGeometry": {
+        "wordmarkEndX": 1718,
+        "separatorStartX": 1789,
+        "separatorEndX": 1853,
+        "editionLabelStartX": 1915,
+        "leftGapPx": 70,
+        "rightGapPx": 61
       }
     }
   }

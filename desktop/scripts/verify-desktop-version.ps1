@@ -73,7 +73,7 @@ if ($previewMismatches.Count -ne 0) {
 }
 
 if ($ReleaseTag) {
-    $editionTagPattern = "^desktop-(universal|sim|lab|field)-v$([regex]::Escape($expected))-build-[1-9][0-9]*$"
+    $editionTagPattern = "^desktop-(universal|sim|lab|field|autonomy)-v$([regex]::Escape($expected))-build-[1-9][0-9]*$"
     if ($ReleaseTag -cnotmatch $editionTagPattern) {
         throw "Release tag $ReleaseTag does not match desktop version $expected."
     }

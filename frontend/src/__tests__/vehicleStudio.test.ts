@@ -396,6 +396,13 @@ describe("Universal Vehicle Studio contract", () => {
       workspaceId: "console-universal",
       edition: "universal",
     });
+    expect(vehicleModelBoundaryFor(userId, userId, null, "autonomy")).toEqual({
+      userId,
+      tenantId: userId,
+      organizationId: null,
+      workspaceId: "console-autonomy",
+      edition: "autonomy",
+    });
     expect(vehicleModelBoundaryFor("local", userId, null)).toBeNull();
     expect(vehicleModelBoundaryFor(userId, "another-user", null)).toBeNull();
   });

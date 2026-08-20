@@ -3,7 +3,7 @@ param(
     [string]$CargoTargetDir,
     [string]$DetachedNodeDependencyManifest,
     [string]$ExpectedProductName = "DroneDream",
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$EditionId = "universal",
     [switch]$AllowUnsignedUpdater,
     [switch]$PreserveBundleHistory
@@ -440,7 +440,7 @@ Write-Host "Wrote verified installer checksum to $checksumPath"
 
 [ordered]@{
     schemaVersion = 1
-    kind = "dronedream-four-edition-build-receipt"
+    kind = "dronedream-five-edition-build-receipt"
     editionId = $EditionId
     productName = $ExpectedProductName
     version = [string]$tauriConfig.version

@@ -35,7 +35,7 @@
       "properties": {
         "profileId": {
           "type": "string",
-          "enum": ["field-lightweight", "sim-only", "unified-sim-lab"]
+          "enum": ["field-lightweight", "sim-only", "unified-sim-lab", "autonomy-full"]
         },
         "profileVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
         "profileManifestPath": {
@@ -98,7 +98,7 @@
         },
         {
           "if": {
-            "properties": {"profileId": {"const": "unified-sim-lab"}}
+            "properties": {"profileId": {"enum": ["unified-sim-lab", "autonomy-full"]}}
           },
           "then": {
             "properties": {

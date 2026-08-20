@@ -14,6 +14,7 @@ EDITION_PATHS = [
     DISTRIBUTION / "editions" / "sim.v1.json",
     DISTRIBUTION / "editions" / "lab.v1.json",
     DISTRIBUTION / "editions" / "field.v1.json",
+    DISTRIBUTION / "editions" / "autonomy.v1.json",
 ]
 SCHEMA_PATHS = [
     DISTRIBUTION / "schemas" / "capability-policy.schema.json",
@@ -56,7 +57,7 @@ class EditionCapabilityContractTests(unittest.TestCase):
         digest = distribution_contract.sha256_file(POLICY_PATH)
         self.assertEqual(
             digest,
-            "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903",
+            "ff15182466b2adf5e5134009096c55a6e110f8af2c247818735facc17874ccc3",
         )
         for edition in self.editions.values():
             self.assertEqual(edition["capabilityPolicy"]["sha256"], digest)
@@ -86,7 +87,7 @@ class EditionCapabilityContractTests(unittest.TestCase):
         for capability in self.policy["capabilities"]:
             if "real-hardware" not in capability["targetKinds"]:
                 continue
-            for edition_id in ("lab", "field"):
+            for edition_id in ("lab", "field", "autonomy"):
                 self.assertNotEqual(
                     capability["decisions"][edition_id]["decision"],
                     "allow",
@@ -103,7 +104,7 @@ class EditionCapabilityContractTests(unittest.TestCase):
             "rollback-point-valid",
             "operator-confirmed",
         }
-        for edition_id in ("lab", "field"):
+        for edition_id in ("lab", "field", "autonomy"):
             self.assertEqual(
                 set(capability["decisions"][edition_id]["conditions"]),
                 required,
@@ -129,11 +130,11 @@ class EditionCapabilityContractTests(unittest.TestCase):
             self.assertEqual(edition["validationTier"], "contract-only")
             self.assertGreaterEqual(len(edition["knownGaps"]), 1)
 
-    def test_release_channels_are_planned_not_created_by_contract_commit(self) -> None:
+    def test_release_channels_are_the_eight_branch_product_channels(self) -> None:
         for edition_id, edition in self.editions.items():
             channel = edition["releaseChannel"]
-            self.assertEqual(channel["branch"], f"codex/release-{edition_id}")
-            self.assertEqual(channel["creationState"], "planned-not-created")
+            self.assertEqual(channel["branch"], f"codex/software-{edition_id}")
+            self.assertEqual(channel["creationState"], "long-lived-product-branch")
             self.assertFalse(channel["forcePushAllowed"])
 
     def test_validator_rejects_frontend_authority(self) -> None:

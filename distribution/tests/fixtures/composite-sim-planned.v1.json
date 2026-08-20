@@ -8,7 +8,7 @@
   "edition": {
     "editionId": "sim",
     "editionVersion": "1.0.0",
-    "manifestSha256": "62d63162a3c56252bd038833eccc24fb10cb0832193d8334c5b6588d7131c765"
+    "manifestSha256": "74bf27e5e607c180cc939d0e38b65149ba8c4d6bb455fb4ca78d00a04c53c95b"
   },
   "region": "global",
   "targetArchitecture": "windows-x86_64",
@@ -51,7 +51,7 @@
     {
       "packId": "fixture-x500-contract",
       "packVersion": "1.0.0",
-      "manifestSha256": "85988ee009af413b698af9ad66d2e77fd9f9ce88dfd2657de596b0ccb72ed651",
+      "manifestSha256": "c46bfeb3f9712e230a39204b33c1108de6092236489480f51887d6304cea33c7",
       "payloadSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "artifactSha256": "7777777777777777777777777777777777777777777777777777777777777777",
       "artifactBytes": 0,

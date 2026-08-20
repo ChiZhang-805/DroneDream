@@ -19,7 +19,7 @@ DEFAULT_PACK_ROOT = Path("/opt/dronedream/component-packs")
 DEFAULT_STATE_PATH = Path("/var/lib/dronedream/component-pack-state.json")
 DEFAULT_RUNTIME_MANIFEST = Path("/opt/dronedream/runtime-manifest.json")
 PACK_TYPES = ("capability", "asset")
-PROFILES = ("unified-sim-lab", "sim-only", "field-lightweight")
+PROFILES = ("unified-sim-lab", "sim-only", "field-lightweight", "autonomy-full")
 
 
 class ComponentPackInstallError(RuntimeError):

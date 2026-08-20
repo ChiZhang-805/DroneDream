@@ -353,6 +353,24 @@ const EDITION_ASSISTANT_COPY: Record<BrandEditionId, EditionAssistantCopy> = {
       },
     ],
   },
+  autonomy: {
+    title: "What autonomous mission should we plan?",
+    openDraft: "Open mission workspace",
+    examples: [
+      {
+        title: "Campus Delivery",
+        body: "Plan a safe office-to-campus-gate round trip with explicit map, aircraft, payload, hold, replanning, and return-home requirements.",
+      },
+      {
+        title: "Inspection Mission",
+        body: "Create a structured inspection plan that selects observation points, checks clearance and battery limits, and records acceptance evidence.",
+      },
+      {
+        title: "Live Route Change",
+        body: "Prepare an autonomous mission that enters a safe hold immediately when the operator changes the destination, then validates and adopts a replacement route.",
+      },
+    ],
+  },
 };
 
 const EDITION_ASSISTANT_TITLES: Readonly<
@@ -363,36 +381,42 @@ const EDITION_ASSISTANT_TITLES: Readonly<
     sim: "What flight experiment should we build?",
     lab: "What validation experiment should we build?",
     field: "What real-device task should we prepare?",
+    autonomy: "What autonomous mission should we plan?",
   },
   "zh-CN": {
     universal: "想让 DroneDream 与你设计什么？",
     sim: "想创建怎样的飞行调优实验？",
     lab: "想创建怎样的验证实验？",
     field: "想准备怎样的真机任务？",
+    autonomy: "想规划怎样的自主任务？",
   },
   "zh-TW": {
     universal: "想讓 DroneDream 與你設計什麼？",
     sim: "想建立怎樣的飛行調校實驗？",
     lab: "想建立怎樣的驗證實驗？",
     field: "想準備怎樣的實機任務？",
+    autonomy: "想規劃怎樣的自主任務？",
   },
   es: {
     universal: "¿Qué debería diseñar DroneDream contigo?",
     sim: "¿Qué experimento de vuelo creamos?",
     lab: "¿Qué experimento de validación creamos?",
     field: "¿Qué tarea de vuelo real preparamos?",
+    autonomy: "¿Qué misión autónoma planificamos?",
   },
   ja: {
     universal: "DroneDreamと何を設計しますか？",
     sim: "どんな飛行実験を作りますか？",
     lab: "どんな検証実験を作りますか？",
     field: "どんな実機タスクを準備しますか？",
+    autonomy: "どんな自律ミッションを計画しますか？",
   },
   ko: {
     universal: "DroneDream과 무엇을 설계할까요?",
     sim: "어떤 비행 실험을 만들까요?",
     lab: "어떤 검증 실험을 만들까요?",
     field: "어떤 실기체 작업을 준비할까요?",
+    autonomy: "어떤 자율 임무를 계획할까요?",
   },
 };
 
@@ -438,10 +462,11 @@ function numericUniversalVehiclePatch(
   return undefined;
 }
 
-async function saveUniversalVehicleDraft(
+async function saveVehicleDraft(
   ownerId: string,
   result: ExperimentAssistantTurnResponse,
   currentDraftId: string | null,
+  edition: Extract<BrandEditionId, "universal" | "autonomy">,
 ): Promise<VehicleModelDraft> {
   const activeBoundary = activeAssistantTenantContext(ownerId);
   const tenantId = result.orchestration?.tenant_id ?? activeBoundary.tenantId;
@@ -450,10 +475,10 @@ async function saveUniversalVehicleDraft(
     userId: ownerId,
     tenantId,
     organizationId,
-    workspaceId: "console-universal",
-    edition: "universal",
+    workspaceId: `console-${edition}`,
+    edition,
   });
-  const cloudBoundary = vehicleModelBoundaryFor(ownerId, tenantId, organizationId);
+  const cloudBoundary = vehicleModelBoundaryFor(ownerId, tenantId, organizationId, edition);
   let storedModels = loadVehicleModels(localStorageScope);
   if (cloudBoundary) {
     try {
@@ -758,7 +783,7 @@ export function ExperimentAssistant() {
     if (latest?.orchestration?.intent === "mission_autonomy") {
       return "/autonomy?from=tuning-chat";
     }
-    if (editionTheme.id === "universal") {
+    if (editionTheme.id === "universal" || editionTheme.id === "autonomy") {
       return latest?.orchestration?.artifact_kind === "universal_vehicle_model"
         && vehicleDraftId
         ? `/vehicle-studio?draft=${encodeURIComponent(vehicleDraftId)}`
@@ -1208,13 +1233,14 @@ export function ExperimentAssistant() {
       );
       let createdVehicleDraftId: string | null = null;
       if (
-        editionTheme.id === "universal"
+        (editionTheme.id === "universal" || editionTheme.id === "autonomy")
         && result.orchestration?.artifact_kind === "universal_vehicle_model"
       ) {
-        const vehicleDraft = await saveUniversalVehicleDraft(
+        const vehicleDraft = await saveVehicleDraft(
           ownerId,
           result,
           vehicleDraftId,
+          editionTheme.id,
         );
         setVehicleDraftId(vehicleDraft.draftId);
         createdVehicleDraftId = vehicleDraft.draftId;

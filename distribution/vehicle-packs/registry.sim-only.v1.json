@@ -6,7 +6,7 @@
   "profileId": "sim-only",
   "sourceRegistry": {
     "path": "distribution/vehicle-packs/registry.v1.json",
-    "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7",
+    "sha256": "783b29ec866c2a4766ee10aa6257dae8f41bd4eea2de7c9a736279ea14f2fe4a",
     "registryId": "initial-vehicle-packs",
     "registryVersion": "1.0.0",
     "auditDate": "2026-08-05"
@@ -23,7 +23,7 @@
     {
       "packId": "px4-gazebo-x500-reference",
       "manifestPath": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
-      "manifestSha256": "cb5b9bf431571292024dacbbf8fdf03d1e7f19ae0cac0f614b42c1ee3a0b56c4",
+      "manifestSha256": "2715bcd25f32b47ee192cb219d29ef47a2776397973c15ddeeed01b943b58b89",
       "currentValidationStatus": "contract-only",
       "currentValidationTier": "contract-only",
       "segments": ["simulation-reference", "research"],

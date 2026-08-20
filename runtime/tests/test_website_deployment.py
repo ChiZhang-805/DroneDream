@@ -177,7 +177,14 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         legacy_deploy = self.read("website/scripts/deploy-static.sh")
 
         for script in (pages_builder, wrapper, remote_deploy, legacy_deploy):
-            self.assertIn("DroneDream-Universal", script)
+            for product in (
+                "DroneDream-Universal",
+                "DroneDream-Sim",
+                "DroneDream-Lab",
+                "DroneDream-Field",
+                "DroneDream-Autonomy",
+            ):
+                self.assertIn(product, script)
             self.assertIn("buildNumber", script)
         self.assertIn("x86_64-pc-windows-msvc\\release\\bundle\\nsis", release_builder)
         self.assertNotIn("x86_64-pc-windows-gnullvm", release_builder)
@@ -185,6 +192,16 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("CargoTargetRoot", release_builder)
         self.assertIn("Multiple supported installer handoffs", release_builder)
         self.assertIn("build-receipt.json", release_builder)
+        self.assertIn(
+            'ValidateSet("universal", "sim", "lab", "field", "autonomy")',
+            release_builder,
+        )
+        self.assertIn(
+            'ValidateSet("universal", "sim", "lab", "field", "autonomy")',
+            wrapper,
+        )
+        self.assertIn("dronedream-five-edition-build-receipt", release_builder)
+        self.assertNotIn("core-four-msvc", release_builder)
         self.assertIn("receipt.sourceCommit", release_builder)
         self.assertIn("receipt.sourceTree", release_builder)
         self.assertIn("receipt.buildNumber", release_builder)

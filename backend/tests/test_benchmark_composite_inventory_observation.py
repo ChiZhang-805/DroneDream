@@ -557,6 +557,20 @@ def test_engine_pack_edition_profile_drift_fails_closed(
         _compile(values)
 
 
+def test_autonomy_full_engine_profile_is_supported() -> None:
+    assert _validate_engine_edition_profile(
+        {
+            "profileId": "autonomy-full",
+            "includesLargeSimulator": True,
+            "excludedSourcePaths": [],
+        }
+    ) == {
+        "profileId": "autonomy-full",
+        "includesLargeSimulator": True,
+        "excludedSourcePaths": [],
+    }
+
+
 def test_engine_pack_edition_profile_is_bound_into_pack_identity() -> None:
     values = _fixture()
     manifest = json.loads(values["engine_pack_manifest_bytes"])

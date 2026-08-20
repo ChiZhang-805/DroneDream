@@ -34,6 +34,37 @@ def test_auto_routes_mission_and_keeps_tools_inside_sim_boundary() -> None:
     )
 
 
+def test_autonomy_dispatch_maps_cover_every_exposed_task() -> None:
+    mission = compile_task_workflow(
+        "user-a",
+        request(edition="autonomy", message="Plan a route to collect coffee."),
+    )
+    vehicle = compile_task_workflow(
+        "user-a",
+        request(
+            edition="autonomy",
+            requested_task_type="vehicle_modeling",
+            message="Draft a quadrotor model.",
+        ),
+    )
+    simulation = compile_task_workflow(
+        "user-a",
+        request(
+            edition="autonomy",
+            requested_task_type="simulation_experiment",
+            message="Prepare a Gazebo study.",
+        ),
+    )
+
+    assert mission.task_type == "mission_autonomy"
+    assert mission.artifact_kind == "autonomy_mission_plan"
+    assert vehicle.artifact_kind == "universal_vehicle_model"
+    assert "vehicle.model_draft" in vehicle.eligible_tool_ids
+    assert simulation.artifact_kind == "simulation_experiment"
+    assert simulation.product_path == "/autonomy"
+    assert {"simulator.compile", "simulator.execute"} <= set(simulation.eligible_tool_ids)
+
+
 def test_explicit_disallowed_task_fails_closed_without_hidden_reroute() -> None:
     contract = compile_task_workflow(
         "user-a",

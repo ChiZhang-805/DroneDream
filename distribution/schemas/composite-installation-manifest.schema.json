@@ -34,7 +34,7 @@
       "additionalProperties": false,
       "required": ["editionId", "editionVersion", "manifestSha256"],
       "properties": {
-        "editionId": {"enum": ["sim", "lab", "field"]},
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
         "editionVersion": {"$ref": "#/$defs/semver"},
         "manifestSha256": {"$ref": "#/$defs/sha256"}
       }

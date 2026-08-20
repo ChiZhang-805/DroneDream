@@ -4,7 +4,7 @@ param(
     [string]$LlvmRoot,
     [string]$DetachedNodeDependencyManifest,
     [string]$ExpectedProductName = "DroneDream",
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$EditionId = "universal",
     [switch]$AllowUnsignedUpdater,
     [switch]$PreserveBundleHistory

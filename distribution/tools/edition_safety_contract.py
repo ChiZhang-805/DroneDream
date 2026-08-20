@@ -32,8 +32,9 @@ TIMESTAMP_RE = re.compile(
 def bind_test_fixture_to_edition_manifest(
     fixture_set: Mapping[str, Any],
     edition_manifest_path: Path,
+    vehicle_pack_manifest_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Bind the closed test-only safety fixture to exact active Edition bytes.
+    """Bind the closed test-only safety fixture to exact active catalog bytes.
 
     This helper is deliberately limited to a fixture whose request and every
     evidence issuer are explicitly test-only.  It does not change production
@@ -74,6 +75,21 @@ def bind_test_fixture_to_edition_manifest(
         raise EditionSafetyContractError("edition safety fixture policy is invalid")
     request["editionId"] = edition_id
     policy["editionManifestSha256"] = sha256_file(edition_manifest_path)
+
+    if vehicle_pack_manifest_path is not None:
+        vehicle_pack = load_json(vehicle_pack_manifest_path)
+        if vehicle_pack.get("kind") != "dronedream-vehicle-pack":
+            raise EditionSafetyContractError("active Vehicle Pack manifest kind is invalid")
+        vehicle = request.get("vehicle")
+        if not isinstance(vehicle, dict):
+            raise EditionSafetyContractError("edition safety fixture vehicle is invalid")
+        pack_id = vehicle_pack.get("packId")
+        if pack_id != vehicle.get("packId"):
+            raise EditionSafetyContractError(
+                "active Vehicle Pack manifest identity does not match the fixture"
+            )
+        vehicle["packManifestSha256"] = sha256_file(vehicle_pack_manifest_path)
+
     context_hash = authorization_context_hash(request)
     for receipt in receipts:
         receipt["contextHash"] = context_hash
@@ -670,7 +686,7 @@ def validate_authorization_request(
         raise EditionSafetyContractError("request source commit is invalid")
     _require_sha256(source["enginePackManifestSha256"], "request Engine Pack hash")
     _require_sha256(source["runtimeBaseManifestSha256"], "request Runtime Base hash")
-    if request["editionId"] not in {"sim", "lab", "field"}:
+    if request["editionId"] not in {"sim", "lab", "field", "autonomy"}:
         raise EditionSafetyContractError("request edition is unsupported")
     _require_identifier(request["action"], "request action", dotted=True)
     if request["targetKind"] not in {"installation", "simulation", "hitl", "real-hardware"}:

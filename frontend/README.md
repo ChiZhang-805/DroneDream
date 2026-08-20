@@ -35,7 +35,7 @@ Native screenshot audits may set `VITE_DESKTOP_VISUAL_QA=true` only for an
 unsigned engineering build. That desktop-only mode supplies a local preview
 account and bypasses the runtime route loader so every shared-console surface
 can be inspected in the real WebView without using customer credentials. The
-four-edition build script rejects the flag for signed updater builds and gives
+five-edition build script rejects the flag for signed updater builds and gives
 each QA edition an isolated application identifier so it cannot read or mutate
 the installed product's WebView profile.
 

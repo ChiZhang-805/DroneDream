@@ -1,5 +1,5 @@
 export type WebsiteRelease = {
-  edition?: "universal" | "sim" | "lab" | "field";
+  edition?: "universal" | "sim" | "lab" | "field" | "autonomy";
   buildNumber?: number;
   version: string;
   fileName: string;
@@ -43,6 +43,7 @@ const editionProducts = {
   sim: "DroneDream-Sim",
   lab: "DroneDream-Lab",
   field: "DroneDream-Field",
+  autonomy: "DroneDream-Autonomy",
 } as const;
 
 function isAllowedArtifactUrl(

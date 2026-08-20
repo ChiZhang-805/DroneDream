@@ -39,6 +39,13 @@ const contracts: Record<AssistantEdition, { kind: string; draft: Record<string, 
       abort_limits: {}, telemetry: [], operator_approval: false, rollback: {}, assumptions: [],
     },
   },
+  autonomy: {
+    kind: "simulation_experiment",
+    draft: {
+      scenario: {}, trajectory: {}, objectives: [], metrics: [], constraints: [],
+      budget: {}, seeds: [], assumptions: [],
+    },
+  },
 };
 
 function plan(edition: AssistantEdition): string {

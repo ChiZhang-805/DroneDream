@@ -82,5 +82,5 @@ def test_profile_json_bytes_are_frozen_and_schema_is_closed() -> None:
     assert set(profile) == contract.PROFILE_KEYS
     assert raw.endswith(b"\n") and b"\r" not in raw
     assert contract.sha256_file(profile_path) == (
-        "439265c2df93661a8e9b7df2f75a24996c115cf414065d22e6c960037d71a177"
+        "4a6438a9650378a7f55e985131a8e52c13bc4e3e1ac952060486b5dc2a503fd7"
     )

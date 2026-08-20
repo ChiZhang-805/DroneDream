@@ -7,7 +7,7 @@
   "manufacturer": "Holybro",
   "vehicleClass": "multicopter-research",
   "availabilityRegions": ["global"],
-  "supportedEditions": ["sim", "lab", "field"],
+  "supportedEditions": ["sim", "lab", "field", "autonomy"],
   "validationStatus": "contract-only",
   "validationTier": "contract-only",
   "autopilot": {
@@ -26,7 +26,7 @@
     "validation": {"status": "planned", "sourceIds": [], "artifacts": []}
   },
   "safety": {
-    "capabilityPolicySha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903",
+    "capabilityPolicySha256": "ff15182466b2adf5e5134009096c55a6e110f8af2c247818735facc17874ccc3",
     "frontendIsAuthority": false,
     "hardwareActionsRequireValidatedTier": true,
     "parameterBounds": [
@@ -42,7 +42,7 @@
   ],
   "integrity": {
     "canonicalization": "RFC8785-JCS",
-    "payloadSha256": "f77986951aee063353312b0df61a5527cece0536cfc853c26dba38d2c81c83c5",
+    "payloadSha256": "3a75121f25ee93b2efc7a4206ccfed29c820c24d350ba2264ea1dcee99128e4f",
     "signature": {"state": "not-issued", "algorithm": "Ed25519", "keyId": null, "detachedSignatureSha256": null}
   },
   "knownGaps": [

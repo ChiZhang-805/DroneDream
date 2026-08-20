@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("all", "universal", "sim", "lab", "field")]
+    [ValidateSet("all", "universal", "sim", "lab", "field", "autonomy")]
     [string]$Edition = "all",
     [ValidateSet("msvc", "gnullvm")]
     [string]$Toolchain = "msvc",
@@ -41,10 +41,10 @@ $toolchainContract = if ($Toolchain -ceq "msvc") {
     }
 }
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $outputBase "core-four-$Toolchain"
+    $OutputRoot = Join-Path $outputBase "core-five-$Toolchain"
 }
 if ([string]::IsNullOrWhiteSpace($CargoRoot)) {
-    $CargoRoot = Join-Path $cargoBase "core-four-$Toolchain-cargo"
+    $CargoRoot = Join-Path $cargoBase "core-five-$Toolchain-cargo"
 }
 $outputRootFull = [IO.Path]::GetFullPath($OutputRoot)
 $cargoRootFull = [IO.Path]::GetFullPath($CargoRoot)
@@ -140,7 +140,7 @@ function Get-OAuthClientId {
     if (-not $value) {
         # OAuth client IDs are public application identifiers. Keep an explicit
         # process override for CI, while allowing the reviewed per-user desktop
-        # registration to drive a local four-edition release build.
+        # registration to drive a local five-edition release build.
         $value = [Environment]::GetEnvironmentVariable($editionVariable, "User")
     }
     if (-not $value -and $Edition -ne "all") {
@@ -148,7 +148,7 @@ function Get-OAuthClientId {
     }
     if ([string]::IsNullOrWhiteSpace($value) -or
         $value -notmatch '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$' -or
-        $value -match '^dronedream-desktop-(universal|sim|lab|field)$') {
+        $value -match '^dronedream-desktop-(universal|sim|lab|field|autonomy)$') {
         throw "Set the approved public $editionVariable before building $EditionId."
     }
     return $value
@@ -210,10 +210,10 @@ Assert-StrictChildPath -Path $outputRootFull -Parent $outputBase -Label "OutputR
 Assert-StrictChildPath -Path $cargoRootFull -Parent $cargoBase -Label "CargoRoot"
 
 if (Test-Path -LiteralPath $outputRootFull) {
-    throw "OutputRoot must be absent before a four-edition build: $outputRootFull"
+    throw "OutputRoot must be absent before a five-edition build: $outputRootFull"
 }
 if ((Test-Path -LiteralPath $cargoRootFull) -and -not $ReuseCargoTarget) {
-    throw "CargoRoot must be absent before a four-edition build: $cargoRootFull"
+    throw "CargoRoot must be absent before a five-edition build: $cargoRootFull"
 }
 if ($ReuseCargoTarget) {
     if (-not (Test-Path -LiteralPath $cargoRootFull -PathType Container)) {
@@ -228,7 +228,7 @@ foreach ($name in @("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")) {
     if (-not [string]::IsNullOrWhiteSpace(
         [Environment]::GetEnvironmentVariable($name, "Process")
     )) {
-        throw "Clear custom $name before a four-edition build."
+        throw "Clear custom $name before a five-edition build."
     }
 }
 
@@ -241,7 +241,7 @@ if ($LASTEXITCODE -ne 0 -or
     $sourceTree -cnotmatch '^[0-9a-f]{40}$' -or
     $sourceBuildNumber -cnotmatch '^[1-9][0-9]*$' -or
     $sourceStatus) {
-    throw "The four-edition build requires one exact clean source commit."
+    throw "The five-edition build requires one exact clean source commit."
 }
 
 Import-FrontendPublicBuildEnvironment
@@ -262,7 +262,7 @@ $defaultUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
 if (-not $AllowUnsignedUpdater -and
     -not $env:TAURI_SIGNING_PRIVATE_KEY_PATH -and
     -not (Test-Path -LiteralPath $defaultUpdaterKey -PathType Leaf)) {
-    throw "A local updater signing key is required for the four-edition build."
+    throw "A local updater signing key is required for the five-edition build."
 }
 
 $version = [string](Get-Content -LiteralPath (
@@ -292,6 +292,11 @@ $contracts = [ordered]@{
         config = "desktop\src-tauri\tauri.field.conf.json"
         product = "DroneDream-Field"
         profile = "field-lightweight"
+    }
+    autonomy = [ordered]@{
+        config = "desktop\src-tauri\tauri.autonomy.conf.json"
+        product = "DroneDream-Autonomy"
+        profile = "autonomy-full"
     }
 }
 $editionIds = if ($Edition -eq "all") { @($contracts.Keys) } else { @($Edition) }
@@ -408,7 +413,7 @@ try {
 
         [ordered]@{
             schemaVersion = 1
-            kind = "dronedream-four-edition-build-receipt"
+            kind = "dronedream-five-edition-build-receipt"
             editionId = $editionId
             productName = $contract.product
             version = $version
@@ -439,7 +444,7 @@ try {
     }
 
     $completed = $true
-    Write-Host "Four-edition build handoff: $outputRootFull"
+    Write-Host "Five-edition build handoff: $outputRootFull"
 } finally {
     foreach ($name in $environmentNames) {
         $prior = $priorEnvironment[$name]

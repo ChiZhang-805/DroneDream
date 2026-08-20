@@ -66,6 +66,7 @@ export const EDITION_THEMES = Object.freeze({
   sim: createTheme("sim"),
   lab: createTheme("lab"),
   field: createTheme("field"),
+  autonomy: createTheme("autonomy"),
 }) satisfies Readonly<Record<BrandEditionId, EditionTheme>>;
 
 export function editionTheme(id: BrandEditionId): EditionTheme {

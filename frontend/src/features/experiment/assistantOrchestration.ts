@@ -320,6 +320,11 @@ function artifactMatchesEdition(
     return result.artifact_kind === "autonomy_mission_plan"
       || result.artifact_kind === "field_task_plan";
   }
+  if (edition === "autonomy") {
+    return result.artifact_kind === "autonomy_mission_plan"
+      || result.artifact_kind === "universal_vehicle_model"
+      || result.artifact_kind === "simulation_experiment";
+  }
   return [
     "autonomy_mission_plan",
     "lab_simulation_experiment",
@@ -388,7 +393,8 @@ function parseRun(value: unknown): AssistantOrchestratedRun {
     || typeof value.tenant_id !== "string"
     || (value.organization_id !== null && typeof value.organization_id !== "string")
     || (value.edition !== "universal" && value.edition !== "sim"
-      && value.edition !== "lab" && value.edition !== "field")
+      && value.edition !== "lab" && value.edition !== "field"
+      && value.edition !== "autonomy")
     || typeof value.workspace_id !== "string"
     || !/^[a-zA-Z0-9_-]{8,128}$/u.test(value.workspace_id)
     || typeof value.sequence !== "number"

@@ -83,7 +83,7 @@ fn valid_code(value: &str) -> bool {
 }
 
 fn validate_receipt(receipt: &BrowserAuthAuditReceipt<'_>) -> Result<DateTime<Utc>, String> {
-    if !["universal", "sim", "lab", "field"].contains(&receipt.edition_id)
+    if !["universal", "sim", "lab", "field", "autonomy"].contains(&receipt.edition_id)
         || receipt.auth_client_id != format!("dronedream-desktop-{}", receipt.edition_id)
     {
         return Err("The desktop authentication audit identity is invalid.".to_owned());

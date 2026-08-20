@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -182,6 +183,7 @@ type NavigationItem = {
   requiresRuntime?: boolean;
   externalUrl?: string;
   icon: LucideIcon;
+  sectionKey?: TranslationKey;
 };
 
 const CORE_NAV_ITEMS: NavigationItem[] = [
@@ -223,10 +225,15 @@ const AUTONOMY_NAV_ITEM: NavigationItem = {
 };
 
 const SIM_NAV_ITEMS: NavigationItem[] = [
-  ASSISTANT_NAV_ITEM,
-  { to: "/jobs/new", labelKey: "app.experimentBuilder", icon: SlidersHorizontal },
+  { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
-  DASHBOARD_NAV_ITEM,
+  {
+    to: "/jobs/new",
+    labelKey: "app.experimentBuilder",
+    icon: SlidersHorizontal,
+    sectionKey: "app.navSectionExperiment",
+  },
+  { ...DASHBOARD_NAV_ITEM, sectionKey: "app.navSectionWorkspace" },
   SCENARIOS_NAV_ITEM,
   HISTORY_NAV_ITEM,
 ];
@@ -246,23 +253,29 @@ const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
 ];
 
 const LAB_NAV_ITEMS: NavigationItem[] = [
-  ASSISTANT_NAV_ITEM,
-  { to: "/jobs/new", labelKey: "app.experimentBuilder", icon: SlidersHorizontal },
+  { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
+  {
+    to: "/jobs/new",
+    labelKey: "app.experimentBuilder",
+    icon: SlidersHorizontal,
+    sectionKey: "app.navSectionExperiment",
+  },
   LAB_WORKSPACE_NAV_ITEMS[0],
   LAB_WORKSPACE_NAV_ITEMS[1],
   { to: "/lab/validation", labelKey: "app.labValidation", icon: ShieldCheck },
-  HISTORY_NAV_ITEM,
+  { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
 ];
 
 const FIELD_NAV_ITEMS: NavigationItem[] = [
-  ASSISTANT_NAV_ITEM,
+  { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
   {
     to: "/field/device",
     labelKey: "app.fieldDeviceSetup",
     end: true,
     icon: RadioTower,
+    sectionKey: "app.navSectionOperations",
   },
   {
     to: "/field/tuning",
@@ -276,14 +289,21 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
     end: true,
     icon: ShieldCheck,
   },
-  HISTORY_NAV_ITEM,
+  { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
+];
+
+const AUTONOMY_NAV_ITEMS: NavigationItem[] = [
+  { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
+  AUTONOMY_NAV_ITEM,
+  { ...VEHICLE_STUDIO_NAV_ITEM, sectionKey: "app.navSectionWorkspace" },
+  { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
 ];
 
 const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
   universal: [
-    ASSISTANT_NAV_ITEM,
-    VEHICLE_STUDIO_NAV_ITEM,
+    { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
     AUTONOMY_NAV_ITEM,
+    { ...VEHICLE_STUDIO_NAV_ITEM, sectionKey: "app.navSectionWorkspace" },
     DASHBOARD_NAV_ITEM,
     HISTORY_NAV_ITEM,
     SCENARIOS_NAV_ITEM,
@@ -291,6 +311,7 @@ const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
   sim: SIM_NAV_ITEMS,
   lab: LAB_NAV_ITEMS,
   field: FIELD_NAV_ITEMS,
+  autonomy: AUTONOMY_NAV_ITEMS,
 };
 
 const MODE_LANDING_PATH: Record<UniversalWorkspaceId, string> = {
@@ -298,6 +319,15 @@ const MODE_LANDING_PATH: Record<UniversalWorkspaceId, string> = {
   sim: "/assistant",
   lab: "/assistant",
   field: "/assistant",
+  autonomy: "/autonomy",
+};
+
+const EDITION_PLATFORM_LABEL: Record<BrandEditionId, TranslationKey> = {
+  universal: "app.platformUniversal",
+  sim: "app.platformSim",
+  lab: "app.platformLab",
+  field: "app.platformField",
+  autonomy: "app.platformAutonomy",
 };
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
@@ -570,6 +600,15 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     courseActions: ["설명서 보기", "제품 보기"],
     courseEditions: ["기체 모델링, 반복 가능한 시뮬레이션, 실험실 검증, 현장 전달을 하나의 작업 공간에서 연결합니다. 요구 사항, 매개변수, 승인, 보고서와 버전 기록을 유지하여 모든 판단을 추적·검토·검증할 수 있는 엔지니어링 증거로 만듭니다.", "PX4와 Gazebo에서 시나리오, 매개변수 범위, 예산, 목표와 안전 제약을 명확히 한 반복 연구를 설계합니다. 공통 지표로 후보와 독립 증거를 비교하고 실패를 설명하며 결과를 구조화된 실험 기록으로 보존합니다.", "시뮬레이션 증거와 실제 하드웨어 데이터를 보정, 차이 진단, 통제 시험과 안전 게이트로 연결합니다. Sim-to-Real 및 Real-to-Sim 변경, 승인과 자격 검증을 기록하여 모든 모델 업데이트의 근거와 이력을 유지합니다.", "호환성 확인, 운영자 승인, 텔레메트리 경계, 매개변수 스냅샷, 중단 규칙과 신뢰할 롤백 계획으로 실제 기체 튜닝을 준비합니다. 모든 현장 작업은 실행 전 검토되고 완료 후 안전한 후속 결정을 위한 감사 기록을 남깁니다."],
   },
+};
+
+const AUTONOMY_COURSE_COPY: Readonly<Record<InterfaceLocale, string>> = {
+  en: "Turn natural-language intent into structured mission plans, validate them through repeated Model + Harness loops, and supervise execution with pluginized tools, safety holds, replanning, and evidence gates.",
+  "zh-CN": "把自然语言意图转成结构化任务计划，通过模型与脚手架的多轮循环反复校验，并利用插件化工具、安全悬停、在线换路和证据门监督任务执行。",
+  "zh-TW": "把自然語言意圖轉為結構化任務計畫，透過模型與 Harness 多輪循環驗證，並以外掛工具、安全暫停、重新規劃及證據閘監督執行。",
+  es: "Convierte la intención en lenguaje natural en planes estructurados y supervisa la ejecución con ciclos Model + Harness, herramientas conectables, pausas seguras, replanificación y evidencias.",
+  ja: "自然言語の意図を構造化された任務計画に変換し、Model + Harness の反復、プラグイン式ツール、安全停止、再計画、証拠ゲートで実行を監督します。",
+  ko: "자연어 의도를 구조화된 임무 계획으로 바꾸고 Model + Harness 반복, 플러그인 도구, 안전 정지, 재계획과 증거 게이트로 실행을 감독합니다.",
 };
 
 function AllowanceCardIcon({
@@ -1491,19 +1530,24 @@ function SettingsDialog({
               <ArrowRight aria-hidden="true" />
             </a>
           </div>
-          <div className="settings-course-editions" aria-label={locale === "zh-CN" ? "DroneDream 四款软件" : "DroneDream editions"}>
+          <div className="settings-course-editions" aria-label={locale === "zh-CN" ? "DroneDream 五款软件" : "DroneDream editions"}>
             {([
               ["universal", settingsCopy.courseEditions[0]],
               ["sim", settingsCopy.courseEditions[1]],
               ["lab", settingsCopy.courseEditions[2]],
               ["field", settingsCopy.courseEditions[3]],
+              ["autonomy", AUTONOMY_COURSE_COPY[locale]],
             ] as const).map(([courseEdition, description]) => (
               <article key={courseEdition}>
                 <BrandLockup edition={courseEdition} />
                 <p>{description}</p>
                 <Link
                   className="settings-course-edition-link"
-                  to={courseEdition === "universal" ? "/manual/" : "/product/"}
+                  to={courseEdition === "universal"
+                    ? "/manual/"
+                    : courseEdition === "autonomy"
+                      ? "/autonomy"
+                      : "/product/"}
                   onClick={onClose}
                 >
                   {courseEdition === "universal"
@@ -3105,13 +3149,16 @@ function AppShellContent() {
     if (!ownerId) return;
     let active = true;
     const hydrateTenant = (organizationId: string | null) => {
-      void Promise.all(
-        (["universal", "sim", "lab", "field"] as const).map((edition) =>
+      void Promise.allSettled(
+        (["universal", "sim", "lab", "field", "autonomy"] as const).map((edition) =>
           getAssistantWorkspaceIndex(edition, ownerId, organizationId)
         ),
-      ).then((indexes) => {
+      ).then((results) => {
         if (!active) return;
-        hydrateAssistantWorkspaceIndex(ownerId, indexes.flat());
+        const indexes = results.flatMap((result) =>
+          result.status === "fulfilled" ? result.value : []
+        );
+        hydrateAssistantWorkspaceIndex(ownerId, indexes);
       }).catch(() => {
         // The local registry remains usable while the authenticated server
         // index is offline. No workspace from another boundary is adopted.
@@ -3180,13 +3227,13 @@ function AppShellContent() {
   const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
-  const autonomyLabMode = location.pathname === "/autonomy"
-    || location.pathname.startsWith("/autonomy/");
   const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
     ? BUILD_EDITION
-    : launcherMode || location.pathname === "/vehicle-studio"
+    : launcherMode
       ? "universal"
-      : universalMode;
+      : location.pathname === "/vehicle-studio"
+        ? universalMode === "autonomy" ? "autonomy" : "universal"
+        : universalMode;
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
   const launcherRuntimeChecking =
@@ -3252,7 +3299,9 @@ function AppShellContent() {
       ? SIM_NAV_ITEMS
       : BUILD_EDITION === "lab"
         ? LAB_NAV_ITEMS
-        : FIELD_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio")
+        : BUILD_EDITION === "field"
+          ? FIELD_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio")
+          : AUTONOMY_NAV_ITEMS
     : MODE_NAV_ITEMS[universalMode];
   const sidebarUpdateLabel = updater.status === "available"
     ? updater.error
@@ -3850,10 +3899,8 @@ function AppShellContent() {
             );
 
             const externalUrl = item.externalUrl;
-            if (externalUrl) {
-              return (
+            const linkNode = externalUrl ? (
                 <a
-                  key={item.to}
                   href={externalUrl}
                   target="_blank"
                   rel="noreferrer"
@@ -3864,12 +3911,8 @@ function AppShellContent() {
                 >
                   {itemContent}
                 </a>
-              );
-            }
-
-            return (
+              ) : (
               <NavLink
-                key={item.to}
                 to={destination}
                 end={item.end}
                 title={runtimeLocked ? runtimeNavDescription : undefined}
@@ -3883,6 +3926,17 @@ function AppShellContent() {
               >
                 {itemContent}
               </NavLink>
+            );
+
+            return (
+              <Fragment key={item.to}>
+                {item.sectionKey ? (
+                  <span className="app-nav-section-label">
+                    {t(item.sectionKey)}
+                  </span>
+                ) : null}
+                {linkNode}
+              </Fragment>
             );
           })}
           {!desktopRuntime && adminAccess.status === "allowed" ? (
@@ -3983,7 +4037,7 @@ function AppShellContent() {
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">
-            {EDITION_BRAND_TOKENS[activeThemeEdition].productName} — {t(autonomyLabMode ? "app.autonomyPlatform" : "app.platform")}
+            {EDITION_BRAND_TOKENS[activeThemeEdition].productName} — {t(EDITION_PLATFORM_LABEL[activeThemeEdition])}
           </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">

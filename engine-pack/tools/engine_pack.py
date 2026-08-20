@@ -31,11 +31,13 @@ ENGINE_API_VERSION = 1
 DEFAULT_EDITION_PROFILE = "unified-sim-lab"
 FIELD_EDITION_PROFILE = "field-lightweight"
 SIM_EDITION_PROFILE = "sim-only"
+AUTONOMY_EDITION_PROFILE = "autonomy-full"
 SIM_PROFILE_PATH = "distribution/engine-pack-profiles/sim-only.v1.json"
 EDITION_PROFILES = {
     DEFAULT_EDITION_PROFILE,
     FIELD_EDITION_PROFILE,
     SIM_EDITION_PROFILE,
+    AUTONOMY_EDITION_PROFILE,
 }
 RUNTIME_CONTRACT_REGISTRY_PATH = "distribution/runtime-contract-registry.v1.json"
 RUNTIME_DISTRIBUTION_BASE_PATHS = (
@@ -43,6 +45,7 @@ RUNTIME_DISTRIBUTION_BASE_PATHS = (
     "runtime/THIRD_PARTY_NOTICES.md",
     RUNTIME_CONTRACT_REGISTRY_PATH,
     "distribution/capabilities/core-capabilities.v1.json",
+    "distribution/editions/autonomy.v1.json",
     "distribution/editions/field.v1.json",
     "distribution/editions/lab.v1.json",
     "distribution/editions/sim.v1.json",

@@ -36,6 +36,7 @@ engine_pack = load_module(
 FIXTURE = contract.bind_test_fixture_to_edition_manifest(
     json.loads(FIXTURE_PATH.read_text(encoding="utf-8")),
     ROOT / "distribution/editions/lab.v1.json",
+    ROOT / "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
 )
 
 
@@ -250,6 +251,19 @@ def test_legacy_engine_pack_is_readable_but_cannot_enter_execution_gate(
 
     assert result.decision == "deny"
     assert "runtime.engine-pack.schema-unsupported" in result.reason_codes
+
+
+def test_autonomy_full_engine_profile_is_a_valid_full_runtime_identity(tmp_path: Path) -> None:
+    gate._validate_engine_profile_identity(
+        tmp_path,
+        {
+            "editionProfile": {
+                "profileId": "autonomy-full",
+                "includesLargeSimulator": True,
+                "excludedSourcePaths": [],
+            }
+        },
+    )
 
 
 def test_mismatched_active_edition_manifest_is_denied(tmp_path: Path) -> None:

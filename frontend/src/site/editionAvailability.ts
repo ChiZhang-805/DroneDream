@@ -1,21 +1,25 @@
 export const primaryEditionIds = ["sim", "lab", "field"] as const;
+export const editionAvailabilityIds = [...primaryEditionIds, "autonomy"] as const;
 
 export type PrimaryEditionId = (typeof primaryEditionIds)[number];
+export type EditionAvailabilityId = (typeof editionAvailabilityIds)[number];
 
-export const editionInstallerNames: Record<PrimaryEditionId, string> = {
+export const editionInstallerNames: Record<EditionAvailabilityId, string> = {
   sim: "DroneDream-Sim_1.0.0_x64-setup.exe",
   lab: "DroneDream-Lab_1.0.0_x64-setup.exe",
   field: "DroneDream-Field_1.0.0_x64-setup.exe",
+  autonomy: "DroneDream-AUTONOMY_1.0.0_x64-setup.exe",
 };
 
-const formalEditionInstallerNames: Record<PrimaryEditionId, string> = {
+const formalEditionInstallerNames: Record<EditionAvailabilityId, string> = {
   sim: "DroneDream-Sim-1.0.0.exe",
   lab: "DroneDream-Lab-1.0.0.exe",
   field: "DroneDream-Field-1.0.0.exe",
+  autonomy: "DroneDream-Autonomy-1.0.0.exe",
 };
 
 export type EditionArtifact = {
-  id: PrimaryEditionId;
+  id: EditionAvailabilityId;
   status: "unavailable" | "published";
   version: "1.0.0";
   fileName: string;
@@ -35,7 +39,7 @@ export type EditionAvailabilityDocument = {
   editions: EditionArtifact[];
 };
 
-function unavailableEdition(id: PrimaryEditionId): EditionArtifact {
+function unavailableEdition(id: EditionAvailabilityId): EditionArtifact {
   return {
     id,
     status: "unavailable",
@@ -55,7 +59,7 @@ function unavailableEdition(id: PrimaryEditionId): EditionArtifact {
 export const fallbackEditionAvailability: EditionAvailabilityDocument = {
   schemaVersion: 1,
   generatedAt: "2026-08-11",
-  editions: primaryEditionIds.map(unavailableEdition),
+  editions: editionAvailabilityIds.map(unavailableEdition),
 };
 
 function hasExactKeys(value: Record<string, unknown>, expected: readonly string[]) {
@@ -96,7 +100,10 @@ function releaseFamily(urlValue: string, expectedName: string) {
   }
 }
 
-function isEditionArtifact(value: unknown, expectedId: PrimaryEditionId): value is EditionArtifact {
+function isEditionArtifact(
+  value: unknown,
+  expectedId: EditionAvailabilityId,
+): value is EditionArtifact {
   if (!value || typeof value !== "object") return false;
   const edition = value as Record<string, unknown>;
   if (!hasExactKeys(edition, [
@@ -159,8 +166,8 @@ export function isEditionAvailabilityDocument(
     document.schemaVersion !== 1
     || !isIsoDate(document.generatedAt)
     || !Array.isArray(document.editions)
-    || document.editions.length !== primaryEditionIds.length
+    || document.editions.length !== editionAvailabilityIds.length
   ) return false;
   const editions = document.editions as unknown[];
-  return primaryEditionIds.every((id, index) => isEditionArtifact(editions[index], id));
+  return editionAvailabilityIds.every((id, index) => isEditionArtifact(editions[index], id));
 }

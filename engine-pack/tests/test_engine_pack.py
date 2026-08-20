@@ -40,6 +40,7 @@ class EnginePackTests(unittest.TestCase):
 
     def test_runtime_distribution_contract_whitelist_is_exact_and_hashed(self) -> None:
         engine_paths = engine_pack.runtime_distribution_paths(ROOT)
+        self.assertIn("distribution/editions/autonomy.v1.json", engine_paths)
         files = engine_pack.production_files(ROOT)
         distribution_files = {path for path, _source in files if path.startswith("distribution/")}
         expected_distribution = {
@@ -217,6 +218,10 @@ class EnginePackTests(unittest.TestCase):
             self.assertIn("payload/backend/app/main.py", names)
             self.assertIn("payload/worker/drone_dream_worker/main.py", names)
             self.assertIn("payload/scripts/simulators/px4_gazebo_runner.py", names)
+            self.assertIn(
+                "payload/distribution/editions/autonomy.v1.json",
+                names,
+            )
             self.assertFalse(any("/tests/" in name for name in names))
             self.assertFalse(any(name.startswith("payload/frontend/") for name in names))
             self.assertEqual(
@@ -348,6 +353,27 @@ class EnginePackTests(unittest.TestCase):
                     "profileId": engine_pack.FIELD_EDITION_PROFILE,
                     "includesLargeSimulator": False,
                     "excludedSourcePaths": list(engine_pack.FIELD_EXCLUDED_SOURCE_PATHS),
+                },
+            )
+
+    def test_autonomy_full_profile_builds_and_verifies_the_full_runtime_payload(self) -> None:
+        self.assertEqual(
+            engine_pack.source_paths_for_profile(ROOT, engine_pack.AUTONOMY_EDITION_PROFILE),
+            engine_pack.source_paths_for_profile(ROOT, engine_pack.DEFAULT_EDITION_PROFILE),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            self.build(output, edition_profile=engine_pack.AUTONOMY_EDITION_PROFILE)
+            self.verify(output)
+            manifest = json.loads(
+                (output / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["editionProfile"],
+                {
+                    "profileId": engine_pack.AUTONOMY_EDITION_PROFILE,
+                    "includesLargeSimulator": True,
+                    "excludedSourcePaths": [],
                 },
             )
 

@@ -108,7 +108,7 @@ fn expected_engine_pack_profile(manifest_dir: &std::path::Path, edition_id: &str
     assert!(
         matches!(
             profile,
-            "unified-sim-lab" | "sim-only" | "field-lightweight"
+            "unified-sim-lab" | "sim-only" | "field-lightweight" | "autonomy-full"
         ),
         "desktop Runtime/update family selected an unsupported Engine Pack profile"
     );
@@ -125,7 +125,10 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
         "universal".to_owned()
     });
     assert!(
-        matches!(edition_id.as_str(), "universal" | "sim" | "lab" | "field"),
+        matches!(
+            edition_id.as_str(),
+            "universal" | "sim" | "lab" | "field" | "autonomy"
+        ),
         "DRONEDREAM_DESKTOP_EDITION_ID is not a supported desktop edition"
     );
     let expected_profile = expected_engine_pack_profile(manifest_dir, &edition_id);
@@ -168,7 +171,10 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
     println!("cargo:rustc-check-cfg=cfg(dronedream_hardware_domain)");
     println!("cargo:rustc-check-cfg=cfg(dronedream_lab)");
     println!("cargo:rustc-check-cfg=cfg(dronedream_field)");
-    if matches!(edition_id.as_str(), "universal" | "lab" | "field") {
+    if matches!(
+        edition_id.as_str(),
+        "universal" | "lab" | "field" | "autonomy"
+    ) {
         println!("cargo:rustc-cfg=dronedream_hardware_domain");
     }
     if matches!(edition_id.as_str(), "universal" | "lab") {

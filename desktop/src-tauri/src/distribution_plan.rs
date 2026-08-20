@@ -8,7 +8,7 @@ const CAPABILITY_POLICY_RAW: &str =
     include_str!("../../../distribution/capabilities/core-capabilities.v1.json");
 const VEHICLE_REGISTRY_RAW: &str =
     include_str!("../../../distribution/vehicle-packs/registry.v1.json");
-const EDITION_DOCUMENTS: [(&str, &str); 3] = [
+const EDITION_DOCUMENTS: [(&str, &str); 4] = [
     (
         "sim",
         include_str!("../../../distribution/editions/sim.v1.json"),
@@ -20,6 +20,10 @@ const EDITION_DOCUMENTS: [(&str, &str); 3] = [
     (
         "field",
         include_str!("../../../distribution/editions/field.v1.json"),
+    ),
+    (
+        "autonomy",
+        include_str!("../../../distribution/editions/autonomy.v1.json"),
     ),
 ];
 const VEHICLE_PACK_DOCUMENTS: [(&str, &str); 8] = [
@@ -761,7 +765,7 @@ pub(crate) fn native_safety_catalog_snapshot(
 #[allow(dead_code)]
 pub(crate) fn native_hardware_validated_pack_count() -> Result<usize, String> {
     let edition_id = env!("DRONEDREAM_DESKTOP_EDITION_ID");
-    if !matches!(edition_id, "lab" | "field") {
+    if !matches!(edition_id, "lab" | "field" | "autonomy") {
         return Ok(0);
     }
     let catalog = verify_embedded_catalog()?;
@@ -817,7 +821,7 @@ mod tests {
     #[test]
     fn embedded_catalog_verifies_all_raw_and_canonical_hashes() {
         let catalog = verify_embedded_catalog().expect("embedded distribution catalog must verify");
-        assert_eq!(catalog.editions.len(), 3);
+        assert_eq!(catalog.editions.len(), 4);
         assert_eq!(catalog.vehicle_packs.len(), 8);
         assert_eq!(catalog.policy.raw_sha256.len(), 64);
         assert_eq!(

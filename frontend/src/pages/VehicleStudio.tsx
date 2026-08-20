@@ -99,13 +99,13 @@ import {
   vehicleModelBoundaryFor,
 } from "../features/vehicleStudio/cloudStorage";
 import { useI18n } from "../i18n/I18nProvider";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
 
 type InspectorTab = "assembly" | "properties" | "analysis" | "delivery";
 type Manipulator = "select" | "move" | "rotate" | "scale";
 type ViewPreset = "isometric" | "top" | "front" | "side";
 type Axis = "x" | "y" | "z";
 const MAX_VEHICLE_PACK_DRAFT_BYTES = 2_500_000;
-
 interface AssemblyRow {
   component: VehicleComponentDraft;
   depth: number;
@@ -160,7 +160,7 @@ const CATALOG_GROUPS: Array<{ id: "all" | VehicleCatalogGroup; label: string }> 
 ];
 
 const EN = {
-  eyebrow: "UNIVERSAL / PARAMETRIC VEHICLE DESIGN",
+  eyebrow: "PARAMETRIC VEHICLE DESIGN",
   title: "Vehicle Studio",
   subtitle: "Build the airframe as an assembly, tune every part, then verify mass, balance, clearance, and propulsion margins.",
   library: "Design library",
@@ -182,7 +182,7 @@ const EN = {
 };
 
 const ZH: typeof EN = {
-  eyebrow: "UNIVERSAL 专属 / 参数化无人机设计",
+  eyebrow: "参数化无人机设计",
   title: "无人机建模工作台",
   subtitle: "以装配体方式搭建机体，精调每个部件，并校核质量、重心、间隙和动力裕度。",
   library: "设计库",
@@ -238,6 +238,9 @@ function VectorFields({ label, value, onChange, step = .01 }: { label: string; v
 export function VehicleStudio() {
   const requestedDraftId = new URLSearchParams(window.location.search).get("draft");
   const { locale } = useI18n();
+  const editionTheme = useEditionTheme();
+  const vehicleStudioEdition = editionTheme.id === "autonomy" ? "autonomy" : "universal";
+  const vehicleStudioWorkspace = `console-${vehicleStudioEdition}`;
   const copy = locale === "zh-CN" ? ZH : EN;
   const { account } = useAuth();
   const ownerId = account?.id ?? "local";
@@ -258,12 +261,17 @@ export function VehicleStudio() {
     userId: ownerId,
     tenantId: tenantContext.tenantId,
     organizationId: tenantContext.organizationId,
-    workspaceId: "console-universal",
-    edition: "universal",
-  }), [ownerId, tenantContext.organizationId, tenantContext.tenantId]);
+    workspaceId: vehicleStudioWorkspace,
+    edition: vehicleStudioEdition,
+  }), [ownerId, tenantContext.organizationId, tenantContext.tenantId, vehicleStudioEdition, vehicleStudioWorkspace]);
   const cloudBoundary = useMemo(
-    () => vehicleModelBoundaryFor(ownerId, tenantContext.tenantId, tenantContext.organizationId),
-    [ownerId, tenantContext.organizationId, tenantContext.tenantId],
+    () => vehicleModelBoundaryFor(
+      ownerId,
+      tenantContext.tenantId,
+      tenantContext.organizationId,
+      vehicleStudioEdition,
+    ),
+    [ownerId, tenantContext.organizationId, tenantContext.tenantId, vehicleStudioEdition],
   );
   const [models, setModels] = useState<StoredVehicleModel[]>(() => loadVehicleModels(localStorageScope));
   const [draft, setDraft] = useState<VehicleModelDraft>(() => createMyDroneVehicleModelDraft());
@@ -485,7 +493,7 @@ export function VehicleStudio() {
     setMessage(locale === "zh-CN" ? "已生成可继续手工精修的参数化装配草稿。" : "Generated an editable parametric assembly draft.");
   };
 
-  return <div className="vehicle-studio-page vehicle-studio-v2" data-brand-edition="universal">
+  return <div className="vehicle-studio-page vehicle-studio-v2" data-brand-edition={vehicleStudioEdition}>
     <header className="vehicle-studio-v2-header">
       <div><span>{copy.eyebrow}</span><h1>{copy.title}</h1><p>{copy.subtitle}</p></div>
       <div className="vehicle-studio-v2-header-actions">

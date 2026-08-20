@@ -135,9 +135,9 @@ try {
     }
     Assert-Contract (-not (Test-Path -LiteralPath (Join-Path $bundle "latest.json"))) `
         "A generic latest.json must not alias an edition updater family."
-    Assert-Contract (($metadataPaths | Sort-Object -Unique).Count -eq 4) `
+    Assert-Contract (($metadataPaths | Sort-Object -Unique).Count -eq @($familyContract.editions).Count) `
         "Edition updater metadata filenames collided."
-    Assert-Contract (($downloadUrls | Sort-Object -Unique).Count -eq 4) `
+    Assert-Contract (($downloadUrls | Sort-Object -Unique).Count -eq @($familyContract.editions).Count) `
         "Edition updater download URL families collided."
 } finally {
     if (Test-Path -LiteralPath $temporaryRoot) {
@@ -146,6 +146,7 @@ try {
 }
 
 Write-Host (
-    "Verified display-version 1.0.0, monotonic Build ID, and four isolated " +
+    "Verified display-version 1.0.0, monotonic Build ID, and " +
+    "$(@($familyContract.editions).Count) isolated " +
     "desktop updater URL families."
 )

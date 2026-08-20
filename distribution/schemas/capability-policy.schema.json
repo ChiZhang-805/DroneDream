@@ -122,11 +122,12 @@
         "decisions": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["sim", "lab", "field"],
+          "required": ["sim", "lab", "field", "autonomy"],
           "properties": {
             "sim": {"$ref": "#/$defs/decision"},
             "lab": {"$ref": "#/$defs/decision"},
-            "field": {"$ref": "#/$defs/decision"}
+            "field": {"$ref": "#/$defs/decision"},
+            "autonomy": {"$ref": "#/$defs/decision"}
           }
         }
       }

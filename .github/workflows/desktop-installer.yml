@@ -13,6 +13,7 @@ on:
           - sim
           - lab
           - field
+          - autonomy
   pull_request:
     paths:
       - ".gitattributes"
@@ -43,6 +44,7 @@ on:
       - "desktop-sim-v*-build-*"
       - "desktop-lab-v*-build-*"
       - "desktop-field-v*-build-*"
+      - "desktop-autonomy-v*-build-*"
 
 permissions:
   actions: read
@@ -92,6 +94,7 @@ jobs:
           OAUTH_SIM: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_SIM }}
           OAUTH_LAB: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_LAB }}
           OAUTH_FIELD: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_FIELD }}
+          OAUTH_AUTONOMY: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY }}
         run: |
           $releaseTag = if ($env:GITHUB_REF_TYPE -eq "tag") {
             $env:GITHUB_REF_NAME
@@ -831,7 +834,7 @@ jobs:
             }
             $receipt = [ordered]@{
               schemaVersion = 1
-              kind = "dronedream-four-edition-build-receipt"
+              kind = "dronedream-five-edition-build-receipt"
               editionId = "${{ steps.release.outputs.edition_id }}"
               productName = "${{ steps.release.outputs.product_name }}"
               version = "${{ steps.release.outputs.version }}"
@@ -927,7 +930,7 @@ jobs:
             --arg installer_sha "$installer_sha" \
             --argjson installer_bytes "$installer_bytes" \
             '.schemaVersion == 1 and
-             .kind == "dronedream-four-edition-build-receipt" and
+             .kind == "dronedream-five-edition-build-receipt" and
              .editionId == $edition and
              .productName == $product and
              .version == $version and
@@ -1008,7 +1011,7 @@ jobs:
                 --arg installer_sha "$installer_sha" \
                 --argjson installer_bytes "$installer_bytes" \
                 '.schemaVersion == 1 and
-                 .kind == "dronedream-four-edition-build-receipt" and
+                 .kind == "dronedream-five-edition-build-receipt" and
                  .editionId == $edition and
                  .productName == $product_name and
                  .version == $version and

@@ -29,7 +29,7 @@ def test_browser_auth_contract_and_schema_are_closed_versioned_inputs() -> None:
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["additionalProperties"] is False
     assert schema["properties"]["schemaVersion"]["const"] == 1
-    assert schema["properties"]["editions"]["minItems"] == 4
+    assert schema["properties"]["editions"]["minItems"] == 5
     assert all(
         definition["additionalProperties"] is False
         for definition in schema["$defs"].values()

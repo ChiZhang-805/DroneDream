@@ -1,10 +1,16 @@
 import type { HardwareDomainEdition } from "../desktop/bridge";
 
-export const hardwareDomainEdition: HardwareDomainEdition =
-  (import.meta.env.VITE_DRONEDREAM_EDITION as string | undefined)?.toLowerCase() === "lab"
-    ? "lab"
+const configuredEdition =
+  (import.meta.env.VITE_DRONEDREAM_EDITION as string | undefined)?.toLowerCase();
+
+export const hardwareDomainEdition: HardwareDomainEdition = configuredEdition === "lab"
+  ? "lab"
+  : configuredEdition === "autonomy"
+    ? "autonomy"
     : "field";
 
 export const hardwareDomainRuntimeProfile = hardwareDomainEdition === "lab"
   ? "unified-sim-lab" as const
-  : "field-lightweight" as const;
+  : hardwareDomainEdition === "autonomy"
+    ? "autonomy-full" as const
+    : "field-lightweight" as const;

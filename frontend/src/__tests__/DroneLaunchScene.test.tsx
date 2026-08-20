@@ -6,7 +6,7 @@ import { getDroneStarflightPose } from "../components/droneStarflight";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 
-function renderScene(locale: "en" | "zh-CN", edition: "universal" | "sim" | "lab" | "field" = "universal") {
+function renderScene(locale: "en" | "zh-CN", edition: "universal" | "sim" | "lab" | "field" | "autonomy" = "universal") {
   window.localStorage.setItem("drone-dream:locale", locale);
   return render(
     <I18nProvider>

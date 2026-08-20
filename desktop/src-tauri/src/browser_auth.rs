@@ -32,6 +32,8 @@ const SIM_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/generated/sim/loc
 const LAB_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/generated/lab/lockup-primary.png");
 const FIELD_BRAND_LOCKUP: &[u8] =
     include_bytes!("../../../brand/generated/field/lockup-primary.png");
+const AUTONOMY_BRAND_LOCKUP: &[u8] =
+    include_bytes!("../../../brand/generated/autonomy/lockup-primary.png");
 const OAUTH_AUTHORIZE_URL: &str =
     "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize";
 const OAUTH_TOKEN_URL: &str = "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/token";
@@ -104,6 +106,17 @@ fn desktop_auth_identity(edition_id: &str) -> Result<DesktopAuthIdentity, String
             callback_path: "/desktop-auth/field/callback",
             redirect_uri: "http://127.0.0.1:49213/desktop-auth/field/callback",
             credential_vault_namespace: "DroneDream/Auth/field/v1",
+        }),
+        "autonomy" => Ok(DesktopAuthIdentity {
+            edition_id: "autonomy",
+            auth_client_id: "dronedream-desktop-autonomy",
+            display_name: "DroneDream · AUTONOMY",
+            brand_lockup: AUTONOMY_BRAND_LOCKUP,
+            bundle_identifier: "io.dronedream.desktop.autonomy",
+            callback_port: 49214,
+            callback_path: "/desktop-auth/autonomy/callback",
+            redirect_uri: "http://127.0.0.1:49214/desktop-auth/autonomy/callback",
+            credential_vault_namespace: "DroneDream/Auth/autonomy/v1",
         }),
         _ => Err("The desktop browser sign-in edition is unsupported.".to_owned()),
     }
@@ -1249,7 +1262,7 @@ mod tests {
 
     #[test]
     fn edition_identities_are_unique_and_brand_bound() {
-        let identities = ["universal", "sim", "lab", "field"]
+        let identities = ["universal", "sim", "lab", "field", "autonomy"]
             .map(|edition| desktop_auth_identity(edition).unwrap());
         for (index, identity) in identities.iter().enumerate() {
             assert_eq!(identity.callback_port, 49210 + index as u16);
@@ -1460,7 +1473,7 @@ mod tests {
     #[test]
     fn renders_each_edition_result_without_credentials_or_raw_tokens() {
         for locale in ["en", "zh-CN"] {
-            for edition in ["universal", "sim", "lab", "field"] {
+            for edition in ["universal", "sim", "lab", "field", "autonomy"] {
                 let identity = desktop_auth_identity(edition).unwrap();
                 let page = render_auth_result_page(locale, identity, true, "nonce-123").unwrap();
                 assert!(page.contains(identity.display_name));

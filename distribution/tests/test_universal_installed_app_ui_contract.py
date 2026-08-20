@@ -40,7 +40,7 @@ def test_headed_verifier_has_exact_bounded_execution_contract() -> None:
         'WEBVIEW2_USER_DATA_FOLDER',
         'webview2-profile',
         r'distribution\desktop\edition-coexistence.v1.json',
-        '$expectedEditionIds = @("universal", "sim", "lab", "field")',
+        '$expectedEditionIds = @("universal", "sim", "lab", "field", "autonomy")',
         '$otherEditionContracts',
         'otherEditions = @(',
         'Convert-CoexistenceFilePath',
@@ -65,7 +65,7 @@ def test_headed_verifier_has_exact_bounded_execution_contract() -> None:
 
 def test_headed_verifier_protects_every_non_universal_edition_namespace() -> None:
     script = POWERSHELL.read_text(encoding="utf-8-sig")
-    for edition in ("sim", "lab", "field"):
+    for edition in ("sim", "lab", "field", "autonomy"):
         assert f'"{edition}"' in script
     for protected_surface in (
         "installRoot = Get-DirectoryRecord",

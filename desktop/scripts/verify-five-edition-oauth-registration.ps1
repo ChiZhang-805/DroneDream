@@ -13,6 +13,7 @@ $editions = @(
     [pscustomobject]@{ Id = "sim"; Port = 49211 },
     [pscustomobject]@{ Id = "lab"; Port = 49212 },
     [pscustomobject]@{ Id = "field"; Port = 49213 }
+    [pscustomobject]@{ Id = "autonomy"; Port = 49214 }
 )
 
 Add-Type -AssemblyName System.Net.Http
@@ -76,4 +77,4 @@ if ($failures.Count -gt 0) {
     throw "OAuth registration verification failed: $($failures -join '; ')"
 }
 
-Write-Host "All four desktop OAuth registrations are valid."
+Write-Host "All five desktop OAuth registrations are valid."

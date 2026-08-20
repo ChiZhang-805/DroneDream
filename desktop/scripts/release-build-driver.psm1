@@ -62,7 +62,7 @@ function Resolve-EditionGeneratedFrontendContract {
         [string]$BaseConfigPath,
         [string]$AdditionalConfigPath,
         [Parameter(Mandatory = $true)]
-        [ValidateSet("universal", "sim", "lab", "field")]
+        [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
         [string]$EditionId
     )
 
@@ -125,7 +125,7 @@ function Resolve-EditionGeneratedFrontendContract {
     $frontendDistRelative = $frontendDistFull.Substring($repoPrefix.Length).
         Replace('\', '/')
 
-    # All four desktop editions now use the canonical website-console AppShell
+    # All five desktop editions now use the canonical website-console AppShell
     # and Vite dist. Legacy namespaced outputs remain valid only for the older
     # Sim/Lab overlays; no arbitrary config path is a source-cleanliness
     # exemption.
@@ -134,6 +134,7 @@ function Resolve-EditionGeneratedFrontendContract {
         "sim" { @("frontend/dist", "frontend/sim-dist") }
         "lab" { @("frontend/dist", "frontend/lab-dist") }
         "field" { @("frontend/dist") }
+        "autonomy" { @("frontend/dist") }
     }
     if ($frontendDistRelative -cnotin $allowedRelativePaths) {
         throw (
@@ -158,7 +159,7 @@ function Test-PostBuildSourceStatus {
     )
 
     $allowedPath = $AllowedGeneratedPath.TrimEnd('/').Replace('\', '/')
-    if ($allowedPath -notmatch '^frontend/(?:dist|sim-dist|lab-dist|field-dist)$') {
+    if ($allowedPath -notmatch '^frontend/(?:dist|sim-dist|lab-dist|field-dist|autonomy-dist)$') {
         throw "The generated frontend path is not an approved release-build path."
     }
 

@@ -41,7 +41,7 @@
       "additionalProperties": false,
       "required": ["editionId", "editionManifestSha256", "compositeManifestSha256"],
       "properties": {
-        "editionId": {"enum": ["sim", "lab", "field"]},
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
         "editionManifestSha256": {"$ref": "#/$defs/sha256"},
         "compositeManifestSha256": {"$ref": "#/$defs/sha256"}
       }
@@ -59,9 +59,9 @@
         "forcePushAllowed"
       ],
       "properties": {
-        "targetBranch": {"pattern": "^codex/release-(sim|lab|field)$"},
+        "targetBranch": {"pattern": "^codex/software-(sim|lab|field|autonomy)$"},
         "creationState": {
-          "enum": ["planned-not-created", "creation-approved", "existing-protected"]
+          "enum": ["long-lived-product-branch", "existing-protected"]
         },
         "proposedHeadCommit": {"$ref": "#/$defs/commit"},
         "headClassification": {"enum": ["exact-source", "edition-metadata-only"]},

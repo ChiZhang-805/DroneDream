@@ -7,7 +7,7 @@
   "manufacturer": "Amovlab",
   "vehicleClass": "multicopter-medium",
   "availabilityRegions": ["cn"],
-  "supportedEditions": ["lab", "field"],
+  "supportedEditions": ["lab", "field", "autonomy"],
   "validationStatus": "planned",
   "validationTier": "planned",
   "autopilot": {
@@ -26,7 +26,7 @@
     "validation": {"status": "planned", "sourceIds": [], "artifacts": []}
   },
   "safety": {
-    "capabilityPolicySha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903",
+    "capabilityPolicySha256": "ff15182466b2adf5e5134009096c55a6e110f8af2c247818735facc17874ccc3",
     "frontendIsAuthority": false,
     "hardwareActionsRequireValidatedTier": true,
     "parameterBounds": [
@@ -41,7 +41,7 @@
   ],
   "integrity": {
     "canonicalization": "RFC8785-JCS",
-    "payloadSha256": "2f93ca9e0674ed66797013afc0dc94c7405d20ebc8ac0f90bd1665676ed2f246",
+    "payloadSha256": "752e0a304c7fc2feeb6c82a2e6e2133991b21fd060260e23f84b614c7b086b9f",
     "signature": {"state": "not-issued", "algorithm": "Ed25519", "keyId": null, "detachedSignatureSha256": null}
   },
   "knownGaps": [

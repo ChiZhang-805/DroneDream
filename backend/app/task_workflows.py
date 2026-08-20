@@ -14,7 +14,7 @@ from typing import Final, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-EditionId = Literal["universal", "sim", "lab", "field"]
+EditionId = Literal["universal", "sim", "lab", "field", "autonomy"]
 TaskType = Literal[
     "control_tuning",
     "mission_autonomy",
@@ -122,6 +122,7 @@ EDITION_TASKS: Final[dict[EditionId, frozenset[TaskType]]] = {
         }
     ),
     "field": frozenset({"control_tuning", "mission_autonomy", "field_task"}),
+    "autonomy": frozenset({"mission_autonomy", "vehicle_modeling", "simulation_experiment"}),
 }
 
 TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
@@ -137,49 +138,49 @@ TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
     },
     "px4.catalog.validate": {
         "authority": "read",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Validate parameters against the bound firmware and airframe catalog.",
     },
     "optimizer.plan": {
         "authority": "proposal",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Propose a bounded optimization portfolio and budget.",
     },
     "vehicle.inspect": {
         "authority": "read",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Inspect a qualified Vehicle Pack and capability envelope.",
     },
     "vehicle.model_draft": {
         "authority": "proposal",
-        "editions": ("universal",),
+        "editions": ("universal", "autonomy"),
         "description": "Propose a structured editable vehicle model.",
     },
     "map.inspect": {
         "authority": "read",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": (
             "Inspect Map Pack geometry, frame, semantics, confidence, and qualification."
         ),
     },
     "mission.task_graph": {
         "authority": "proposal",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Propose a dependency graph with evidence and recovery per node.",
     },
     "trajectory.plan": {
         "authority": "proposal",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Propose a trajectory for deterministic geometry and dynamics checks.",
     },
     "simulator.compile": {
         "authority": "simulation",
-        "editions": ("universal", "sim", "lab"),
+        "editions": ("universal", "sim", "lab", "autonomy"),
         "description": "Compile a qualified simulation contract.",
     },
     "simulator.execute": {
         "authority": "simulation",
-        "editions": ("universal", "sim", "lab"),
+        "editions": ("universal", "sim", "lab", "autonomy"),
         "description": "Submit a qualified simulator job; never controls hardware.",
     },
     "calibration.evaluate": {
@@ -207,7 +208,7 @@ TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
     },
     "evidence.record": {
         "authority": "write_evidence",
-        "editions": ("universal", "sim", "lab", "field"),
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Declare immutable evidence requirements for a later executor.",
     },
 }
@@ -410,6 +411,7 @@ def classify_task(message: str, edition: EditionId) -> TaskType:
         "sim": "simulation_experiment",
         "lab": "hardware_validation",
         "field": "field_task",
+        "autonomy": "mission_autonomy",
     }[edition]  # type: ignore[return-value]
 
 
@@ -594,6 +596,7 @@ def _artifact_route(task_type: TaskType, edition: EditionId) -> tuple[str, str]:
             "sim": ("simulation_experiment", "/jobs/new"),
             "lab": ("lab_simulation_experiment", "/jobs/new"),
             "field": ("field_task_plan", "/field"),
+            "autonomy": ("simulation_experiment", "/autonomy"),
         }[edition]
     return {
         "control_tuning": ("tuning_experiment", "/jobs/new"),

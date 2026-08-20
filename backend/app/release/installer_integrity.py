@@ -63,6 +63,7 @@ _DESKTOP_EDITION_PRODUCTS = {
     "sim": "DroneDream-Sim",
     "lab": "DroneDream-Lab",
     "field": "DroneDream-Field",
+    "autonomy": "DroneDream-Autonomy",
 }
 
 
@@ -671,7 +672,7 @@ def verify_new_immutable_installer_release(
     # Edition-scoped releases use a monotonically increasing build number, so
     # independently signed builds may intentionally share the display version.
     # The historical generic installer remains the previous-origin authority;
-    # it must not force all four first edition releases to invent a new SemVer.
+    # it must not force all five product releases to invent a new SemVer.
     if _compare_semver_precedence(version, previous_version) < 0:
         raise ValueError("candidate.version cannot downgrade the audited release")
     if (

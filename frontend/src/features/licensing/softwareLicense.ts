@@ -3,6 +3,7 @@ export const SOFTWARE_EDITION_IDS = [
   "sim",
   "lab",
   "field",
+  "autonomy",
 ] as const;
 
 export type SoftwareEditionId = (typeof SOFTWARE_EDITION_IDS)[number];

@@ -16,7 +16,8 @@ pub(crate) fn require_available() -> Result<(), String> {
     match (env!("DRONEDREAM_DESKTOP_EDITION_ID"), runtime_profile()) {
         ("universal", "unified-sim-lab")
         | ("lab", "unified-sim-lab")
-        | ("field", "field-lightweight") => Ok(()),
+        | ("field", "field-lightweight")
+        | ("autonomy", "autonomy-full") => Ok(()),
         _ => Err("Hardware-domain commands are unavailable in this edition".to_string()),
     }
 }
@@ -27,12 +28,17 @@ mod tests {
 
     #[test]
     fn compiled_identity_is_exact_and_hardware_scoped() {
-        require_available()
-            .expect("Universal, Lab, or Field hardware domain must be compiled explicitly");
-        assert!(matches!(edition_id(), "lab" | "field"));
+        require_available().expect(
+            "Universal, Lab, Field, or AUTONOMY hardware domain must be compiled explicitly",
+        );
+        assert!(matches!(edition_id(), "lab" | "field" | "autonomy"));
         if env!("DRONEDREAM_DESKTOP_EDITION_ID") == "universal" {
             assert_eq!(edition_id(), "field");
             assert_eq!(runtime_profile(), "unified-sim-lab");
+        }
+        if env!("DRONEDREAM_DESKTOP_EDITION_ID") == "autonomy" {
+            assert_eq!(edition_id(), "autonomy");
+            assert_eq!(runtime_profile(), "autonomy-full");
         }
     }
 }

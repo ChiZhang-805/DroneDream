@@ -11,7 +11,7 @@ const outputRoot = path.join(
   frontendRoot,
   "node_modules",
   ".cache",
-  "four-edition-desktop-parity",
+  "five-edition-desktop-parity",
 );
 const viewport = { width: 1440, height: 900 };
 
@@ -61,6 +61,18 @@ const editions = [
       ["device", "/field/device"],
       ["tuning", "/field/tuning"],
       ["operations", "/field/operations"],
+      ["history", "/history"],
+    ],
+  },
+  {
+    id: "autonomy",
+    routes: [
+      ["assistant", "/assistant"],
+      ["vehicle-studio", "/vehicle-studio"],
+      ["autonomy-overview", "/autonomy"],
+      ["autonomy-aircraft", "/autonomy/aircraft"],
+      ["autonomy-maps", "/autonomy/maps"],
+      ["autonomy-live", "/autonomy/live"],
       ["history", "/history"],
     ],
   },

@@ -38,6 +38,7 @@ const TASKS_BY_EDITION: Readonly<Record<BrandEditionId, readonly AssistantTaskTy
     "real_to_sim",
   ],
   field: ["control_tuning", "mission_autonomy", "field_task"],
+  autonomy: ["mission_autonomy", "vehicle_modeling", "simulation_experiment"],
 };
 
 const EN: Record<AssistantTaskType, Omit<AssistantTaskOption, "id">> = {

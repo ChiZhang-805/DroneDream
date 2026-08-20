@@ -57,7 +57,7 @@ class VehicleStudioContractTests(unittest.TestCase):
 
     def test_contract_routes_to_exactly_three_professional_editions(self) -> None:
         self.assertEqual(self.contract["ownerEdition"], "universal")
-        self.assertEqual(self.contract["receivers"], ["sim", "lab", "field"])
+        self.assertEqual(self.contract["receivers"], ["sim", "lab", "field", "autonomy"])
         self.assertEqual(
             self.contract["transport"]["schemaPath"],
             "distribution/schemas/vehicle-pack-draft-envelope.schema.json",

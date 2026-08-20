@@ -23,6 +23,7 @@ FIXTURE = edition_safety_contract.bind_test_fixture_to_edition_manifest(
         )
     ),
     ROOT / "distribution/editions/lab.v1.json",
+    ROOT / "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
 )
 
 

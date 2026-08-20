@@ -78,8 +78,8 @@
     },
     "editions": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 5,
+      "maxItems": 5,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -97,17 +97,19 @@
           "updaterReleaseTagPrefix"
         ],
         "properties": {
-          "editionId": {"enum": ["universal", "sim", "lab", "field"]},
-          "runtimeProfileId": {"enum": ["unified-sim-lab", "sim-only", "field-lightweight"]},
-          "localRuntimeStateNamespace": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field)/runtime$"},
-          "diagnosticsRelativePath": {"pattern": "^diagnostics/(universal|sim|lab|field)$"},
-          "installerProductName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field)$"},
-          "publicArtifactFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field)-1\\.0\\.0\\.exe$"},
-          "tauriBundleInstallerFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field)_1\\.0\\.0_x64-setup\\.exe$"},
-          "updaterChannelTag": {"pattern": "^desktop-(universal|sim|lab|field)-channel$"},
-          "updaterMetadataFileName": {"pattern": "^latest-(universal|sim|lab|field)\\.json$"},
-          "updaterMetadataUrl": {"pattern": "^https://github\\.com/ChiZhang-805/DroneDream/releases/download/desktop-(universal|sim|lab|field)-channel/latest-(universal|sim|lab|field)\\.json$"},
-          "updaterReleaseTagPrefix": {"pattern": "^desktop-(universal|sim|lab|field)-v1\\.0\\.0-build-$"}
+          "editionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
+          "runtimeProfileId": {
+            "enum": ["unified-sim-lab", "sim-only", "field-lightweight", "autonomy-full"]
+          },
+          "localRuntimeStateNamespace": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field|autonomy)/runtime$"},
+          "diagnosticsRelativePath": {"pattern": "^diagnostics/(universal|sim|lab|field|autonomy)$"},
+          "installerProductName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field|Autonomy)$"},
+          "publicArtifactFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field|Autonomy)-1\\.0\\.0\\.exe$"},
+          "tauriBundleInstallerFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field|Autonomy)_1\\.0\\.0_x64-setup\\.exe$"},
+          "updaterChannelTag": {"pattern": "^desktop-(universal|sim|lab|field|autonomy)-channel$"},
+          "updaterMetadataFileName": {"pattern": "^latest-(universal|sim|lab|field|autonomy)\\.json$"},
+          "updaterMetadataUrl": {"pattern": "^https://github\\.com/ChiZhang-805/DroneDream/releases/download/desktop-(universal|sim|lab|field|autonomy)-channel/latest-(universal|sim|lab|field|autonomy)\\.json$"},
+          "updaterReleaseTagPrefix": {"pattern": "^desktop-(universal|sim|lab|field|autonomy)-v1\\.0\\.0-build-$"}
         }
       }
     }

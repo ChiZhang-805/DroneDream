@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-five-product-capability-matrix",
+  "matrixVersion": "1.0.0",
+  "productCount": 5,
+  "sharedEngineeringPatterns": {
+    "autonomyPageInEveryProduct": true,
+    "accountAllowanceAndUpdateShell": true,
+    "structuredInputAndOutput": true,
+    "repeatedModelCalls": true,
+    "iterativeValidationLoops": true,
+    "pluginizedHarnessAndTools": true,
+    "safeInterruptReplanAndEvidenceGates": true,
+    "llmDirectActuationAllowed": false
+  },
+  "products": [
+    {
+      "productId": "universal",
+      "displayName": "DroneDream Universal",
+      "branch": "codex/software",
+      "primaryPurpose": "modeling-and-five-product-orchestration",
+      "executionDomains": ["simulation", "qualified-hardware-orchestration"],
+      "navigationSections": ["autonomous-tasks", "workspace"],
+      "experimentRole": "coordinate-sim-lab-field-evidence",
+      "conversationRole": "cross-product-engineering-assistant",
+      "autonomyRole": "switch-and-orchestrate-autonomous-missions",
+      "hardwareAuthority": "delegated-through-qualified-product-gates"
+    },
+    {
+      "productId": "sim",
+      "displayName": "DroneDream SIM",
+      "branch": "codex/software-sim",
+      "primaryPurpose": "repeatable-simulation-experiments",
+      "executionDomains": ["simulation"],
+      "navigationSections": ["autonomous-tasks", "experiments-validation", "workspace"],
+      "experimentRole": "px4-gazebo-simulation",
+      "conversationRole": "simulation-planning-and-analysis",
+      "autonomyRole": "simulation-first-autonomous-missions",
+      "hardwareAuthority": "none"
+    },
+    {
+      "productId": "lab",
+      "displayName": "DroneDream LAB",
+      "branch": "codex/software-lab",
+      "primaryPurpose": "bidirectional-simulation-and-hardware-validation",
+      "executionDomains": ["simulation", "qualified-hardware-validation"],
+      "navigationSections": ["autonomous-tasks", "experiments-validation", "records"],
+      "experimentRole": "sim-to-real-and-real-to-sim-validation",
+      "conversationRole": "calibration-diagnosis-and-evidence-review",
+      "autonomyRole": "validated-autonomous-mission-transition",
+      "hardwareAuthority": "bounded-by-lab-approval-and-safety-gates"
+    },
+    {
+      "productId": "field",
+      "displayName": "DroneDream FIELD",
+      "branch": "codex/software-field",
+      "primaryPurpose": "safe-real-hardware-operation-and-tuning",
+      "executionDomains": ["qualified-real-hardware"],
+      "navigationSections": ["autonomous-tasks", "field-operations", "records"],
+      "experimentRole": "operator-approved-field-operation",
+      "conversationRole": "field-planning-supervision-and-recovery",
+      "autonomyRole": "hardware-conditioned-autonomous-missions",
+      "hardwareAuthority": "fail-closed-with-operator-approval-and-rollback"
+    },
+    {
+      "productId": "autonomy",
+      "displayName": "DroneDream AUTONOMY",
+      "branch": "codex/software-autonomy",
+      "primaryPurpose": "natural-language-autonomous-mission-workflow",
+      "executionDomains": ["simulation", "qualified-real-hardware"],
+      "navigationSections": ["autonomous-tasks", "workspace", "records"],
+      "experimentRole": "mission-workflow-validation",
+      "conversationRole": "task-scoped-natural-language-mission-dialogue",
+      "autonomyRole": "plan-revise-execute-interrupt-replan-and-verify",
+      "hardwareAuthority": "simulation-first-then-qualified-hardware-gates"
+    }
+  ]
+}

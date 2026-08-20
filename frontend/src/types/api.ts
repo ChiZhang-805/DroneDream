@@ -529,7 +529,7 @@ export interface ExperimentAssistantTurnRequest {
   message_id: string;
   message: string;
   locale: "en" | "zh-CN";
-  edition?: "universal" | "sim" | "lab" | "field";
+  edition?: "universal" | "sim" | "lab" | "field" | "autonomy";
   requested_task_type?: TaskWorkflowRequestedTaskType;
   conversation_summary: string;
   current_values: Record<string, ExperimentAssistantFieldValue>;
@@ -561,7 +561,7 @@ export interface TaskWorkflowContextItem {
 
 export interface TaskWorkflowCompileRequest {
   request_id: string;
-  edition: "universal" | "sim" | "lab" | "field";
+  edition: "universal" | "sim" | "lab" | "field" | "autonomy";
   requested_task_type: TaskWorkflowRequestedTaskType;
   message: string;
   locale: "en" | "zh-CN";
@@ -587,7 +587,7 @@ export interface TaskWorkflowContract {
   contract_id: string;
   owner_binding_sha256: string;
   request_id: string;
-  edition: "universal" | "sim" | "lab" | "field";
+  edition: "universal" | "sim" | "lab" | "field" | "autonomy";
   task_type: TaskWorkflowTaskType;
   routing_source: "explicit" | "auto_detect";
   status: "draft" | "blocked";
@@ -626,7 +626,7 @@ export interface ExperimentAssistantTurnResponse {
     tenant_id: string;
     organization_id: string | null;
     workspace_id: string;
-    edition: "universal" | "sim" | "lab" | "field";
+    edition: "universal" | "sim" | "lab" | "field" | "autonomy";
     artifact_id: string;
     artifact_version: number;
     product_link: string;
@@ -1156,7 +1156,7 @@ export interface JobCompareResponse {
   items: JobCompareItem[];
 }
 
-export type AutonomyEdition = "universal" | "sim" | "lab" | "field";
+export type AutonomyEdition = "universal" | "sim" | "lab" | "field" | "autonomy";
 export type AutonomyExecutionTarget = "simulation" | "hitl" | "hardware";
 export type AutonomyPerceptionMode = "map" | "vision" | "fusion";
 

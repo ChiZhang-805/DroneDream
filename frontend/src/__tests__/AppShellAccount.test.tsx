@@ -20,6 +20,7 @@ function renderWorkspace(initialEntry = "/assistant") {
         element: <AppShell />,
         children: [
           { path: "assistant", element: <div>Assistant workspace</div> },
+          { path: "autonomy", element: <div>Autonomy workspace</div> },
           { path: "vehicle-studio", element: <div>Vehicle Studio workspace</div> },
         ],
       },
@@ -72,6 +73,18 @@ describe("workspace account entry", () => {
     router.dispose();
   });
 
+  it("keeps AUTONOMY vehicle drafts inside the active AUTONOMY workspace", () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "autonomy");
+    const { router } = renderWorkspace("/vehicle-studio");
+
+    const selector = screen.getByRole("button", { name: "Switch DroneDream edition" });
+    expect(selector).toHaveTextContent("AUTONOMY");
+    expect(document.documentElement).toHaveAttribute("data-brand-edition", "autonomy");
+
+    router.dispose();
+  });
+
   it("shows an honest local profile when cloud auth is not configured", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { router } = renderWorkspace();
@@ -112,7 +125,7 @@ describe("workspace account entry", () => {
     router.dispose();
   });
 
-  it("keeps every edition within the agreed five-to-six primary areas", () => {
+  it("keeps every edition within its product-specific primary areas", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     window.localStorage.setItem("dronedream:universal-workspace:v2", "universal");
     const { container, router } = renderWorkspace();
@@ -127,8 +140,8 @@ describe("workspace account entry", () => {
 
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Vehicle Studio",
       "Autonomy",
+      "Vehicle Studio",
       "Dashboard",
       "Run History",
       "Scenarios",
@@ -137,8 +150,8 @@ describe("workspace account entry", () => {
     selectEdition(/DroneDream.*SIM/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Experiment",
       "Autonomy",
+      "Experiment",
       "Dashboard",
       "Scenarios",
       "Run History",
@@ -147,8 +160,8 @@ describe("workspace account entry", () => {
     selectEdition(/DroneDream.*LAB/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Experiment",
       "Autonomy",
+      "Experiment",
       "Lab workspace",
       "Hardware Lab",
       "Evidence Review",
@@ -165,6 +178,18 @@ describe("workspace account entry", () => {
       "Run History",
     ]);
     expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
+
+    selectEdition(/DroneDream.*AUTONOMY/);
+    expect(navigationLabels()).toEqual([
+      "Tuning Chat",
+      "Autonomy",
+      "Vehicle Studio",
+      "Run History",
+    ]);
+    expect(Array.from(
+      container.querySelectorAll<HTMLElement>(".app-nav-section-label"),
+      (label) => label.textContent?.trim(),
+    )).toEqual(["Autonomous tasks", "Workspace", "Records"]);
 
     router.dispose();
   });

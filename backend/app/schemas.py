@@ -461,7 +461,7 @@ class ExperimentAssistantTurnRequest(_Strict):
     message_id: str = Field(min_length=1, max_length=128)
     message: str = Field(min_length=1, max_length=12_000)
     locale: Literal["en", "zh-CN"] = "en"
-    edition: Literal["universal", "sim", "lab", "field"] = "universal"
+    edition: Literal["universal", "sim", "lab", "field", "autonomy"] = "universal"
     requested_task_type: Literal[
         "auto_detect",
         "control_tuning",

@@ -14,7 +14,7 @@ param(
     [ValidateSet("preserve", "install")]
     [string]$VhostMode = "preserve",
 
-    [ValidateSet("universal", "sim", "lab", "field")]
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$EditionId = "universal",
 
     [UInt64]$BuildNumber = 0,
@@ -241,6 +241,7 @@ if ($hasEdition) {
         sim = "DroneDream-Sim"
         lab = "DroneDream-Lab"
         field = "DroneDream-Field"
+        autonomy = "DroneDream-Autonomy"
     }
     $edition = [string]$metadata.edition
     $buildNumber = [long]$metadata.buildNumber

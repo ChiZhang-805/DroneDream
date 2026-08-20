@@ -18,7 +18,7 @@
     {
       "packId": "px4-gazebo-x500-reference",
       "manifestPath": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
-      "manifestSha256": "cb5b9bf431571292024dacbbf8fdf03d1e7f19ae0cac0f614b42c1ee3a0b56c4",
+      "manifestSha256": "2715bcd25f32b47ee192cb219d29ef47a2776397973c15ddeeed01b943b58b89",
       "currentValidationStatus": "contract-only",
       "currentValidationTier": "contract-only",
       "segments": ["simulation-reference", "research"],
@@ -36,7 +36,7 @@
     {
       "packId": "holybro-x500-v2-pixhawk6",
       "manifestPath": "distribution/vehicle-packs/holybro-x500-v2-pixhawk6.v1.json",
-      "manifestSha256": "3fefda5f57f34095b6db979768aced2ba7fb7df8046b1858e8df1ff664225ab3",
+      "manifestSha256": "999bfa256b0fa1faf04366bbc2dea003b919878aa85be9a1a88ad503dae5d5d5",
       "currentValidationStatus": "contract-only",
       "currentValidationTier": "contract-only",
       "segments": ["research"],
@@ -59,7 +59,7 @@
     {
       "packId": "holybro-s500-v2-pixhawk6c",
       "manifestPath": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
-      "manifestSha256": "02ba34bccd6656e6d20e8022a94db1976b9e4a849757e0f9d78927a72883ba0d",
+      "manifestSha256": "8fa0b842329a5b661e2aa9ca5883fdb09ca61154ad232c31f1a430ef05204fd8",
       "currentValidationStatus": "contract-only",
       "currentValidationTier": "contract-only",
       "segments": ["student", "research"],
@@ -82,7 +82,7 @@
     {
       "packId": "holybro-qav250-pixhawk6c-mini",
       "manifestPath": "distribution/vehicle-packs/holybro-qav250-pixhawk6c-mini.v1.json",
-      "manifestSha256": "3cbd02332027078c8426cd68b3a5f5b24d42165fc15f68aa3f7213d324df46b8",
+      "manifestSha256": "20ee57a666d5e90c267a86615d7d5e9caeed7395716ecff737212262f510b702",
       "currentValidationStatus": "contract-only",
       "currentValidationTier": "contract-only",
       "segments": ["student", "racing"],
@@ -100,7 +100,7 @@
     {
       "packId": "holybro-x650-pixhawk6",
       "manifestPath": "distribution/vehicle-packs/holybro-x650-pixhawk6.v1.json",
-      "manifestSha256": "104edd21c05fcd1da2a0c253d9bfb7058ad8ab13aafaa7bfb0e7faa0c7d271ef",
+      "manifestSha256": "ee74d88b4743e29f834db8f19bff6a484c44520d32429efddf071bc7261d722b",
       "currentValidationStatus": "contract-only",
       "currentValidationTier": "contract-only",
       "segments": ["research"],
@@ -118,7 +118,7 @@
     {
       "packId": "amovlab-p450-px4",
       "manifestPath": "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
-      "manifestSha256": "36e8f51915cc1877e38104f2d8ee8725d4a2ea5688a5d71d9b7ab40abbbe7885",
+      "manifestSha256": "0cec7c1296cbb198bbd08f2b7b2efe02fe51524dbb1ce4714f802fba2ce4af58",
       "currentValidationStatus": "planned",
       "currentValidationTier": "planned",
       "segments": ["research"],
@@ -136,7 +136,7 @@
     {
       "packId": "amovlab-mfp450-pixhawk6c",
       "manifestPath": "distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
-      "manifestSha256": "54ce400438520944708899ca71a1608126b96923351c1427ec0773e6f3e8bee2",
+      "manifestSha256": "0d28a6102bc33250104c8eb8bc9f6e24c3a70d41428444b1b04b2497ba669267",
       "currentValidationStatus": "planned",
       "currentValidationTier": "planned",
       "segments": ["student", "research"],
@@ -154,7 +154,7 @@
     {
       "packId": "bitcraze-crazyflie-2-1-plus",
       "manifestPath": "distribution/vehicle-packs/bitcraze-crazyflie-2-1-plus.v1.json",
-      "manifestSha256": "43a39a061f832b40f39aaf9722e6928f5b685e9b1f68f70e08726f14119191cc",
+      "manifestSha256": "8ecda457a7dfdcfc2b5d568df5ff17414ad9e039e3f56e89fe164c4519780ad8",
       "currentValidationStatus": "planned",
       "currentValidationTier": "planned",
       "segments": ["student", "teaching", "research"],

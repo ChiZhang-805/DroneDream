@@ -18,8 +18,8 @@
   },
   "bundle": {
     "publisher": "DroneDream",
-    "shortDescription": "Unified DroneDream workspace for simulation, lab and field workflows",
-    "longDescription": "DroneDream Universal uses one shared core and presentation-only workspace modes. Hardware actions remain unavailable unless installed modules, a validated Vehicle Pack, and native, backend and Runtime policy all authorize the exact action.",
+    "shortDescription": "Unified DroneDream workspace for simulation, lab, field and autonomy workflows",
+    "longDescription": "DroneDream Universal uses one shared core and presentation-only SIM, LAB, FIELD and AUTONOMY workspace modes. Hardware actions remain unavailable unless installed modules, a validated Vehicle Pack, and native, backend and Runtime policy all authorize the exact action.",
     "icon": [
       "../../brand/generated/universal/windows/32x32.png",
       "../../brand/generated/universal/windows/128x128.png",
@@ -38,6 +38,7 @@
       "../../distribution/editions/sim.v1.json": "distribution/editions/sim.v1.json",
       "../../distribution/editions/lab.v1.json": "distribution/editions/lab.v1.json",
       "../../distribution/editions/field.v1.json": "distribution/editions/field.v1.json",
+      "../../distribution/editions/autonomy.v1.json": "distribution/editions/autonomy.v1.json",
       "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",
       "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json",
       "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",

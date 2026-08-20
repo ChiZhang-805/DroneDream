@@ -55,7 +55,7 @@ $uiMatrix = @(
         [ordered]@{ id = "desktop"; width = 1440; height = 900 }
     )) {
         foreach ($locale in @("en", "zh-CN")) {
-            foreach ($edition in @("universal", "sim", "lab", "field")) {
+            foreach ($edition in @("universal", "sim", "lab", "field", "autonomy")) {
                 [ordered]@{
                     id = "$($viewport.id)-$($locale.Replace('-',''))-$edition"
                     width = $viewport.width

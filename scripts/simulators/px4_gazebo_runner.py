@@ -380,6 +380,7 @@ def _engine_pack_profile_identity(manifest: dict[str, Any], schema_version: int)
         "field-lightweight": (False, ["backend/app/simulator", "scripts/simulators"]),
         "sim-only": (True, ["backend/app/distribution_safety.py"]),
         "unified-sim-lab": (True, []),
+        "autonomy-full": (True, []),
     }.get(profile_id)
     if expected is None or (profile["includesLargeSimulator"], excluded_paths) != expected:
         raise RunnerError("Engine Pack editionProfile is unsupported")

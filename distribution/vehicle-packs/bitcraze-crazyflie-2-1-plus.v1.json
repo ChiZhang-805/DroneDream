@@ -7,7 +7,7 @@
   "manufacturer": "Bitcraze",
   "vehicleClass": "multicopter-small",
   "availabilityRegions": ["global"],
-  "supportedEditions": ["lab", "field"],
+  "supportedEditions": ["lab", "field", "autonomy"],
   "validationStatus": "planned",
   "validationTier": "planned",
   "autopilot": {
@@ -25,7 +25,7 @@
     "validation": {"status": "planned", "sourceIds": [], "artifacts": []}
   },
   "safety": {
-    "capabilityPolicySha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903",
+    "capabilityPolicySha256": "ff15182466b2adf5e5134009096c55a6e110f8af2c247818735facc17874ccc3",
     "frontendIsAuthority": false,
     "hardwareActionsRequireValidatedTier": true,
     "parameterBounds": [
@@ -40,7 +40,7 @@
   ],
   "integrity": {
     "canonicalization": "RFC8785-JCS",
-    "payloadSha256": "7161360d5ca264c780b2ebfc9b39222a99b3fd3b7555bec13ff736238ce8cc20",
+    "payloadSha256": "61cacb5a6f75c1b1d8a43c332447cbebdf8d72227034594932152172d69f3f2d",
     "signature": {"state": "not-issued", "algorithm": "Ed25519", "keyId": null, "detachedSignatureSha256": null}
   },
   "knownGaps": [

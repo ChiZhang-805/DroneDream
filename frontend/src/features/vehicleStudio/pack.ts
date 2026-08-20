@@ -399,7 +399,7 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
   if (
     !Array.isArray(value.targetEditions)
     || value.targetEditions.length < 1
-    || value.targetEditions.some((item) => !["sim", "lab", "field"].includes(String(item)))
+    || value.targetEditions.some((item) => !["sim", "lab", "field", "autonomy"].includes(String(item)))
     || new Set(value.targetEditions).size !== value.targetEditions.length
   ) throw new VehiclePackDraftError("Vehicle target Editions are malformed");
   assertComponentShape(value.components);

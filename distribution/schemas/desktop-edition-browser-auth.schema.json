@@ -29,8 +29,8 @@
     "auditReceipt": {"$ref": "#/$defs/auditReceipt"},
     "editions": {
       "type": "array",
-      "minItems": 4,
-      "maxItems": 4,
+      "minItems": 5,
+      "maxItems": 5,
       "items": {"$ref": "#/$defs/edition"}
     },
     "releaseGate": {"$ref": "#/$defs/releaseGate"}
@@ -163,27 +163,27 @@
       "additionalProperties": false,
       "required": ["editionId", "authClientId", "providerClientIdBuildVariable", "bundleIdentifier", "loopbackPathPrefix", "loopbackPort", "redirectUri", "customProtocol", "credentialVaultNamespace", "webViewDataNamespace"],
       "properties": {
-        "editionId": {"enum": ["universal", "sim", "lab", "field"]},
-        "authClientId": {"pattern": "^dronedream-desktop-(universal|sim|lab|field)$"},
+        "editionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
+        "authClientId": {"pattern": "^dronedream-desktop-(universal|sim|lab|field|autonomy)$"},
         "providerClientIdBuildVariable": {"const": "DRONEDREAM_OAUTH_CLIENT_ID"},
-        "bundleIdentifier": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field)$"},
-        "loopbackPathPrefix": {"pattern": "^/desktop-auth/(universal|sim|lab|field)/$"},
+        "bundleIdentifier": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field|autonomy)$"},
+        "loopbackPathPrefix": {"pattern": "^/desktop-auth/(universal|sim|lab|field|autonomy)/$"},
         "loopbackPort": {"type": "integer", "minimum": 49152, "maximum": 65535},
-        "redirectUri": {"pattern": "^http://127\\.0\\.0\\.1:[0-9]+/desktop-auth/(universal|sim|lab|field)/callback$"},
-        "customProtocol": {"pattern": "^dronedream-(universal|sim|lab|field)$"},
-        "credentialVaultNamespace": {"pattern": "^DroneDream/Auth/(universal|sim|lab|field)/v1$"},
-        "webViewDataNamespace": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field)$"}
+        "redirectUri": {"pattern": "^http://127\\.0\\.0\\.1:[0-9]+/desktop-auth/(universal|sim|lab|field|autonomy)/callback$"},
+        "customProtocol": {"pattern": "^dronedream-(universal|sim|lab|field|autonomy)$"},
+        "credentialVaultNamespace": {"pattern": "^DroneDream/Auth/(universal|sim|lab|field|autonomy)/v1$"},
+        "webViewDataNamespace": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field|autonomy)$"}
       }
     },
     "releaseGate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nativeProtocolEnforcementReceiptRequired", "hostedBrokerReceiptRequired", "credentialVaultReceiptRequired", "fourEditionConcurrencyReceiptRequired", "cancelTimeoutOfflineSwitchAccountReceiptRequired", "releaseMayUseLegacyDirectTokenLoopback"],
+      "required": ["nativeProtocolEnforcementReceiptRequired", "hostedBrokerReceiptRequired", "credentialVaultReceiptRequired", "fiveEditionConcurrencyReceiptRequired", "cancelTimeoutOfflineSwitchAccountReceiptRequired", "releaseMayUseLegacyDirectTokenLoopback"],
       "properties": {
         "nativeProtocolEnforcementReceiptRequired": {"const": true},
         "hostedBrokerReceiptRequired": {"const": true},
         "credentialVaultReceiptRequired": {"const": true},
-        "fourEditionConcurrencyReceiptRequired": {"const": true},
+        "fiveEditionConcurrencyReceiptRequired": {"const": true},
         "cancelTimeoutOfflineSwitchAccountReceiptRequired": {"const": true},
         "releaseMayUseLegacyDirectTokenLoopback": {"const": false}
       }

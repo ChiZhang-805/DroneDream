@@ -342,7 +342,7 @@ fn validate_catalog(catalog: &ComponentCatalog, now: DateTime<Utc>) -> Result<()
             || component.edition_profiles.iter().any(|profile| {
                 !matches!(
                     profile.as_str(),
-                    "unified-sim-lab" | "sim-only" | "field-lightweight"
+                    "unified-sim-lab" | "sim-only" | "field-lightweight" | "autonomy-full"
                 )
             })
         {
@@ -997,7 +997,7 @@ mod tests {
                 release_sequence: 9,
                 policy: "recommended".to_string(),
                 pack_id: format!("sha256:{}", "a".repeat(64)),
-                edition_profiles: vec!["unified-sim-lab".to_string()],
+                edition_profiles: vec![env!("DRONEDREAM_EDITION_PROFILE").to_string()],
                 manifest: CatalogArtifact {
                     url: "https://getdronedream.com/releases/component-manifest.json".to_string(),
                     size_bytes: 128,

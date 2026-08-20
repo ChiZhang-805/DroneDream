@@ -15,6 +15,7 @@ import {
   isDesktopRuntime,
   type FieldDeviceDiscoveryReport,
   type FieldParameterSnapshot,
+  type HardwareDomainEdition,
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
@@ -182,12 +183,14 @@ function FieldPageHeading({
   icon: typeof RadioTower;
   title: string;
   body: string;
-  edition: "lab" | "field";
+  edition: HardwareDomainEdition;
 }) {
   return (
     <header className="field-page-heading">
       <div>
-        <span className="field-page-eyebrow"><Icon aria-hidden="true" />{edition === "lab" ? "LAB · HARDWARE" : "FIELD"}</span>
+        <span className="field-page-eyebrow"><Icon aria-hidden="true" />{
+          edition === "lab" ? "LAB · HARDWARE" : edition === "autonomy" ? "AUTONOMY · HARDWARE" : "FIELD"
+        }</span>
         <h1>{title}</h1>
         <p>{body}</p>
       </div>

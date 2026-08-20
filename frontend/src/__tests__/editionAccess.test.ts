@@ -19,8 +19,9 @@ describe("desktop edition ownership", () => {
     expect(editionHasWorkspace("field", "field")).toBe(true);
   });
 
-  it("keeps Vehicle Studio exclusive to Universal", () => {
+  it("keeps Vehicle Studio in the modeling and autonomy products", () => {
     expect(editionHasVehicleStudio("universal")).toBe(true);
+    expect(editionHasVehicleStudio("autonomy")).toBe(true);
     for (const edition of ["sim", "lab", "field"] as const) {
       expect(editionHasVehicleStudio(edition)).toBe(false);
     }

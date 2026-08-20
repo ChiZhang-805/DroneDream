@@ -121,15 +121,38 @@
       "webViewDataNamespace": "io.dronedream.desktop.field",
       "brandEditionId": "field",
       "canonicalWindowsIcon": "brand/generated/field/windows/icon.ico"
+    },
+    {
+      "editionId": "autonomy",
+      "artifactFileName": "DroneDream-Autonomy-1.0.0.exe",
+      "installerProductName": "DroneDream-Autonomy",
+      "displayName": "DroneDream · AUTONOMY",
+      "bundleIdentifier": "io.dronedream.desktop.autonomy",
+      "installRoot": "%LOCALAPPDATA%/DroneDream-Autonomy",
+      "uninstallRegistryKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Autonomy",
+      "productRegistryKey": "HKCU/Software/DroneDream/DroneDream-Autonomy",
+      "startMenuFolder": "DroneDream-Autonomy",
+      "desktopShortcutName": "DroneDream · AUTONOMY",
+      "appUserModelId": "io.dronedream.desktop.autonomy",
+      "updaterChannel": "autonomy",
+      "updaterMetadataFileName": "latest-autonomy.json",
+      "runtimeProfileId": "autonomy-full",
+      "authClientId": "dronedream-desktop-autonomy",
+      "loopbackPathPrefix": "/desktop-auth/autonomy/",
+      "customProtocol": "dronedream-autonomy",
+      "credentialVaultNamespace": "DroneDream/Auth/autonomy/v1",
+      "webViewDataNamespace": "io.dronedream.desktop.autonomy",
+      "brandEditionId": "autonomy",
+      "canonicalWindowsIcon": "brand/generated/autonomy/windows/icon.ico"
     }
   ],
   "stateMachineVerification": {
-    "installOrderCoverage": "pairwise-plus-all-four",
+    "installOrderCoverage": "pairwise-plus-all-five",
     "requiredStates": [
-      "all-four-installed",
+      "all-five-installed",
       "each-edition-upgraded-in-place",
       "each-edition-uninstalled-alone",
-      "remaining-three-still-launchable",
+      "remaining-four-still-launchable",
       "legacy-detected-without-overwrite"
     ],
     "releaseRequiresExecutedReceipt": true

@@ -851,6 +851,7 @@ export function AutonomyLab({
     sim: "SIM",
     lab: "LAB",
     field: "FIELD",
+    autonomy: "AUTONOMY",
   } as const)[edition];
   const activePoints = obstacleInjected ? mission.replanPoints : mission.points;
   const [droneX, droneY] = interpolatePath(activePoints, progress);

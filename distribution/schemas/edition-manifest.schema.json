@@ -27,16 +27,18 @@
   "properties": {
     "schemaVersion": {"const": 1},
     "kind": {"const": "dronedream-edition-manifest"},
-    "editionId": {"enum": ["sim", "lab", "field"]},
+    "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
     "editionVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
     "productDisplayVersion": {"const": "1.0.0"},
     "displayName": {"$ref": "#/$defs/localizedText"},
     "description": {"$ref": "#/$defs/localizedText"},
     "implementationStatus": {"enum": ["integrated-contract", "contract-only"]},
-    "validationTier": {"enum": ["sim-runtime-contract", "contract-only"]},
+    "validationTier": {
+      "enum": ["sim-runtime-contract", "autonomy-runtime-contract", "contract-only"]
+    },
     "artifactBaseName": {
       "type": "string",
-      "pattern": "^DroneDream-(?:Sim|Lab|Field)-1\\.0\\.0\\.exe$"
+      "pattern": "^DroneDream-(?:Sim|Lab|Field|Autonomy)-1\\.0\\.0\\.exe$"
     },
     "capabilityPolicy": {
       "type": "object",
@@ -72,7 +74,9 @@
       "additionalProperties": false,
       "required": ["profileId", "currentAvailability", "includesLargeSimulator"],
       "properties": {
-        "profileId": {"enum": ["full-simulation", "full-lab", "lightweight-hardware"]},
+        "profileId": {
+          "enum": ["full-simulation", "full-lab", "lightweight-hardware", "autonomy-full"]
+        },
         "currentAvailability": {"enum": ["integrated-contract", "contract-only"]},
         "includesLargeSimulator": {"type": "boolean"}
       }
@@ -109,7 +113,14 @@
         "commonCoreHashRequired"
       ],
       "properties": {
-        "developmentBranch": {"const": "codex/software"},
+        "developmentBranch": {
+          "enum": [
+            "codex/software-sim",
+            "codex/software-lab",
+            "codex/software-field",
+            "codex/software-autonomy"
+          ]
+        },
         "integrationBranch": {"const": "main"},
         "editionSourceDivergenceAllowed": {"const": false},
         "hotfixMustReturnToCore": {"const": true},
@@ -121,8 +132,15 @@
       "additionalProperties": false,
       "required": ["branch", "creationState", "promotionManifestRequired", "forcePushAllowed"],
       "properties": {
-        "branch": {"enum": ["codex/release-sim", "codex/release-lab", "codex/release-field"]},
-        "creationState": {"enum": ["planned-not-created", "created-protected"]},
+        "branch": {
+          "enum": [
+            "codex/software-sim",
+            "codex/software-lab",
+            "codex/software-field",
+            "codex/software-autonomy"
+          ]
+        },
+        "creationState": {"const": "long-lived-product-branch"},
         "promotionManifestRequired": {"const": true},
         "forcePushAllowed": {"const": false}
       }

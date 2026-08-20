@@ -17,7 +17,7 @@ COMPONENT_IDS = (
     "user-state",
 )
 UPDATE_ORDER = COMPONENT_IDS[:-1]
-EDITIONS = ("universal", "sim", "lab", "field")
+EDITIONS = ("universal", "sim", "lab", "field", "autonomy")
 
 
 class ComponentUpdatePolicyError(RuntimeError):

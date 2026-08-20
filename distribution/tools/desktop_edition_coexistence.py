@@ -1,4 +1,4 @@
-"""Fail-closed validation for four independently installed desktop editions."""
+"""Fail-closed validation for five independently installed desktop editions."""
 
 from __future__ import annotations
 
@@ -9,18 +9,20 @@ from pathlib import Path
 from typing import Any
 
 CONTRACT_PATH = Path("distribution/desktop/edition-coexistence.v1.json")
-EDITION_IDS = ("universal", "sim", "lab", "field")
+EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
 EDITION_LABELS = {
     "universal": "Universal",
     "sim": "Sim",
     "lab": "Lab",
     "field": "Field",
+    "autonomy": "Autonomy",
 }
 DISPLAY_NAMES = {
     "universal": "DroneDream",
     "sim": "DroneDream · SIM",
     "lab": "DroneDream · LAB",
     "field": "DroneDream · FIELD",
+    "autonomy": "DroneDream · AUTONOMY",
 }
 
 
@@ -203,14 +205,14 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
 
     verification = document["stateMachineVerification"]
     if (
-        verification.get("installOrderCoverage") != "pairwise-plus-all-four"
+        verification.get("installOrderCoverage") != "pairwise-plus-all-five"
         or verification.get("releaseRequiresExecutedReceipt") is not True
         or set(verification.get("requiredStates", []))
         != {
-            "all-four-installed",
+            "all-five-installed",
             "each-edition-upgraded-in-place",
             "each-edition-uninstalled-alone",
-            "remaining-three-still-launchable",
+            "remaining-four-still-launchable",
             "legacy-detected-without-overwrite",
         }
     ):

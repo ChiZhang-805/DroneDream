@@ -2185,6 +2185,20 @@ body:has(.app-shell-public-demo),
   flex: 1;
 }
 
+.app-nav-section-label {
+  display: block;
+  margin: 0.58rem 0.75rem 0.12rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 720;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+}
+
+.app-nav-section-label:first-child {
+  margin-top: 0.08rem;
+}
+
 .app-nav a {
   display: flex;
   align-items: center;
@@ -4297,7 +4311,7 @@ body:has(.app-shell-public-demo),
   }
 }
 
-/* Universal-exclusive vehicle modeling and draft Vehicle Pack exchange. */
+/* Product-scoped vehicle modeling and draft Vehicle Pack exchange. */
 .vehicle-studio-page {
   min-height: 100%;
   padding: clamp(1rem, 2vw, 2rem);
@@ -19856,6 +19870,17 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
     width: 100%;
     flex-direction: column;
     gap: 0;
+  }
+
+  .app-mobile-menu-panel .app-nav-section-label {
+    margin: 0;
+    padding: 0.72rem 1rem 0.3rem;
+    border-top: 1px solid #f0e9f1;
+    background: color-mix(in srgb, var(--bg-elev-2) 62%, #ffffff);
+  }
+
+  .app-mobile-menu-panel .app-nav-section-label:first-child {
+    border-top: 0;
   }
 
   .app-mobile-menu-panel .app-nav a,
