@@ -53,7 +53,7 @@ from app.autonomy.school_map_artifact import (  # noqa: E402
     STRUCTURAL_TOLERANCE_M,
     CollisionPrimitive,
     export_school_map_gazebo_artifact,
-    school_map_collision_primitives,
+    school_map_runtime_collision_primitives,
 )
 from app.autonomy.school_map_mission_validation import (  # noqa: E402
     RouteClearanceResult,
@@ -1001,7 +1001,7 @@ def _prepare_run(
     static_samples = sample_polyline(route, MISSION_SAMPLE_INTERVAL_M)
     static_clearance = validate_route_clearance(
         static_samples,
-        school_map_collision_primitives(),
+        school_map_runtime_collision_primitives(),
         penetration_tolerance_m=STRUCTURAL_TOLERANCE_M,
     )
     if static_clearance.collision_count:
@@ -1157,7 +1157,7 @@ def _evaluate(
     if evaluated_centers:
         dynamic_clearance = _dynamic_safety_clearance(
             evaluated_centers,
-            school_map_collision_primitives(),
+            school_map_runtime_collision_primitives(),
             model_root_to_world_envelope_center(model_root_world),
         )
         pickup_distance, pickup_index = _minimum_point_distance(centers, route[len(route) // 2])
@@ -1363,7 +1363,7 @@ def main(argv: list[str] | None = None) -> int:
     live_abort_reason: str | None = None
     payload_spawn_evidence: dict[str, Any] | None = None
     payload_spawned_at: float | None = None
-    primitives = school_map_collision_primitives()
+    primitives = school_map_runtime_collision_primitives()
     with (
         (run_dir / "gazebo.log").open("w", encoding="utf-8") as gazebo_log,
         (run_dir / "px4.log").open("w", encoding="utf-8") as px4_log,
