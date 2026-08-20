@@ -3,6 +3,7 @@ import {
   Airplay,
   ArrowUp,
   Box,
+  Cable,
   Camera,
   Check,
   ChevronRight,
@@ -111,6 +112,7 @@ import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type {
+  AutonomyAssetConnector,
   AutonomyBundledMapManifest,
   AutonomyCompileAssetContext,
   AutonomyCompileRequest,
@@ -262,6 +264,51 @@ function normalizedAutonomyPath(pathname: string): string {
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return <div className="autonomy-asset-metric"><span>{icon}{label}</span><strong>{value}</strong></div>;
+}
+
+export function AutonomyAssetConnectorPanel({
+  kind,
+  chinese,
+}: {
+  kind: "map" | "vehicle";
+  chinese: boolean;
+}) {
+  const [connectors, setConnectors] = useState<AutonomyAssetConnector[]>([]);
+  const [catalogState, setCatalogState] = useState<"loading" | "ready" | "unavailable">("loading");
+  useEffect(() => {
+    let active = true;
+    void apiClient.listAutonomyAssetConnectors().then((catalog) => {
+      if (!active) return;
+      setConnectors(catalog.items.filter((connector) => connector.asset_kinds.includes(kind)));
+      setCatalogState("ready");
+    }).catch(() => {
+      if (active) setCatalogState("unavailable");
+    });
+    return () => { active = false; };
+  }, [kind]);
+  const status = (connector: AutonomyAssetConnector) => {
+    if (connector.enabled) return chinese ? "内置可用" : "Built in";
+    if (connector.availability === "companion_required") {
+      return chinese ? "需要本机配套程序" : "Companion required";
+    }
+    return chinese ? "需要插件" : "Plugin required";
+  };
+  return (
+    <section className="autonomy-config-card autonomy-connector-panel">
+      <header><Cable aria-hidden="true" /><h2>{chinese ? "外部建模与仿真导入" : "External modeling and simulation imports"}</h2></header>
+      <p>{chinese
+        ? "几何在专业工具中完成；DroneDream 接收标准化资产并验证物理与可飞行性。"
+        : "Author geometry in specialist tools; DroneDream normalizes and qualifies physics and flight readiness."}</p>
+      {catalogState === "loading" ? <span className="autonomy-connector-state">{chinese ? "正在读取连接器" : "Loading connectors"}</span> : null}
+      {catalogState === "unavailable" ? <span className="autonomy-connector-state is-unavailable">{chinese ? "连接桌面运行环境后可用" : "Connect the desktop runtime to continue"}</span> : null}
+      {connectors.length ? <div className="autonomy-connector-grid">{connectors.map((connector) => (
+        <article key={connector.connector_id} data-enabled={connector.enabled}>
+          <span><strong>{connector.name}</strong><small>{connector.source_formats.join(" · ")}</small></span>
+          <em>{status(connector)}</em>
+        </article>
+      ))}</div> : null}
+    </section>
+  );
 }
 
 function AutonomyTemplateIcon({ index }: { index: number }) {
@@ -1584,6 +1631,7 @@ export function AutonomyAircraft() {
   return (
     <form className="autonomy-config-page" onSubmit={save}>
       <div className="autonomy-config-main">
+        <AutonomyAssetConnectorPanel kind="vehicle" chinese={chinese} />
         <section className="autonomy-config-card">
           <header><Navigation2 aria-hidden="true" /><h2>{chinese ? "机型身份" : "Aircraft identity"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存无人机" : "Saved aircraft"} value={workspace.aircraft.id} onChange={(event) => selectAircraft(event.target.value)}>{assetLibrary.aircraft.map((aircraft) => <option value={aircraft.id} key={aircraft.id}>{aircraft.name} · v{aircraft.version}</option>)}</select><button className="btn" type="button" onClick={createAircraft}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div></header>
           <div className="autonomy-form-grid is-four autonomy-identity-grid">
@@ -1684,7 +1732,7 @@ export function AutonomyAircraft() {
         <div className="autonomy-config-summary-actions">
           <button className="btn btn-primary" type="submit" disabled={!valid || form.status !== "draft"} title={validationIssue ?? undefined}><Save aria-hidden="true" />{validationIssue ?? (form.status !== "draft" ? (chinese ? "已验证" : "Qualified") : saved ? (chinese ? "已保存" : "Saved") : (chinese ? "保存机型" : "Save aircraft"))}</button>
           <button className="btn" type="button" disabled={!valid || !saved || qualificationState === "working" || (publicDemoConsole && qualificationState === "unavailable")} title={publicDemoConsole && qualificationState === "unavailable" ? (chinese ? "请在桌面端或私有控制台签发资格凭据" : "Qualify in the desktop or private console") : qualificationState === "blocked" ? qualificationIssues.join(" · ") || undefined : undefined} onClick={() => void qualify()}><ShieldCheck aria-hidden="true" />{qualificationState === "working" ? (chinese ? "正在验证" : "Qualifying") : qualificationState === "blocked" && qualificationIssues.length ? qualificationIssues[0] : qualificationState === "unavailable" && publicDemoConsole ? (chinese ? "请使用桌面端验证" : "Use desktop to qualify") : qualificationState === "unavailable" ? (chinese ? "重新连接后端" : "Retry backend") : (chinese ? "验证 Vehicle Pack" : "Qualify Vehicle Pack")}</button>
-          {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />Vehicle Studio</Link> : null}
+          {edition === "universal" ? <Link className="btn" to="/vehicle-studio"><Wrench aria-hidden="true" />{chinese ? "受约束机型模板" : "Constrained vehicle template"}</Link> : null}
         </div>
       </aside>
     </form>
@@ -1989,6 +2037,7 @@ export function AutonomyMaps() {
   return (
     <form className="autonomy-config-page autonomy-maps-page" onSubmit={save}>
       <div className="autonomy-config-main">
+        <AutonomyAssetConnectorPanel kind="map" chinese={chinese} />
         <section className="autonomy-config-card">
           <header><Layers3 aria-hidden="true" /><h2>{chinese ? "Map Pack" : "Map Pack"}</h2><div className="autonomy-asset-toolbar"><select aria-label={chinese ? "已保存地图" : "Saved maps"} value={workspace.mapPack.id} onChange={(event) => selectMap(event.target.value)}>{assetLibrary.maps.map((mapPack) => <option value={mapPack.id} key={mapPack.id}>{mapPack.name}</option>)}</select><button className="btn" type="button" onClick={createMap}><Plus aria-hidden="true" />{chinese ? "新建" : "New"}</button></div><em className={ready ? "is-ready" : ""}>{ready ? "READY" : "UNQUALIFIED"}</em></header>
           <div className="autonomy-form-grid is-four">

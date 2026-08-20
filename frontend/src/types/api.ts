@@ -1659,6 +1659,37 @@ export interface AutonomySceneCatalogResponse {
   }>;
 }
 
+export type AutonomyAssetKind = "map" | "world" | "vehicle";
+export type AutonomyAssetMaturity =
+  | "visual_only"
+  | "physics_ready"
+  | "simulation_ready"
+  | "flight_ready"
+  | "qualified";
+
+export interface AutonomyAssetConnector {
+  connector_id: string;
+  name: string;
+  source_application: string;
+  source_formats: string[];
+  asset_kinds: AutonomyAssetKind[];
+  availability: "builtin" | "companion_required" | "plugin_required";
+  execution_boundary:
+    | "declarative_parser"
+    | "isolated_local_companion"
+    | "isolated_plugin";
+  enabled: boolean;
+  output_format: "ddpkg";
+  maximum_import_maturity: AutonomyAssetMaturity;
+}
+
+export interface AutonomyAssetConnectorCatalogResponse {
+  schema_version: "dronedream.autonomy.asset-connector-catalog.v1";
+  normalized_format: "ddpkg-v1";
+  imported_code_execution: false;
+  items: AutonomyAssetConnector[];
+}
+
 export type JobsCompareRequest = JobCompareRequest;
 export type JobsCompareResponse = JobCompareResponse;
 
