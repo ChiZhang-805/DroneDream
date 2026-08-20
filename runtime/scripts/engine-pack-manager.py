@@ -460,6 +460,25 @@ def install_pack(
         raise
 
 
+def capability_receipt(tool: ModuleType) -> dict[str, Any]:
+    """Report the immutable manifest contracts understood by this Runtime Base."""
+
+    legacy_schema = getattr(tool, "LEGACY_SCHEMA_VERSION", None)
+    current_schema = getattr(tool, "SCHEMA_VERSION", None)
+    if (
+        type(legacy_schema) is not int
+        or type(current_schema) is not int
+        or legacy_schema >= current_schema
+    ):
+        raise EnginePackInstallError("Engine Pack verifier capabilities are invalid")
+    return {
+        "schemaVersion": 1,
+        "kind": "dronedream-engine-pack-manager-capabilities",
+        "readableManifestSchemaVersions": [legacy_schema, current_schema],
+        "currentManifestSchemaVersion": current_schema,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--descriptor", type=Path)
@@ -469,10 +488,28 @@ def main() -> int:
     parser.add_argument("--state-path", type=Path, default=DEFAULT_STATE_PATH)
     parser.add_argument("--no-services", action="store_true")
     parser.add_argument("--check-idle", action="store_true")
+    parser.add_argument("--capabilities", action="store_true")
     args = parser.parse_args()
     try:
+        if args.capabilities:
+            if (
+                args.descriptor is not None
+                or args.archive is not None
+                or args.no_services
+                or args.check_idle
+            ):
+                raise EnginePackInstallError(
+                    "capability inspection does not accept installation arguments"
+                )
+            print(json.dumps(capability_receipt(load_engine_pack_tool()), sort_keys=True))
+            return 0
         if args.check_idle:
-            if args.descriptor is not None or args.archive is not None or args.no_services:
+            if (
+                args.descriptor is not None
+                or args.archive is not None
+                or args.no_services
+                or args.capabilities
+            ):
                 raise EnginePackInstallError("idle check does not accept installation arguments")
             ensure_no_active_experiments(DEFAULT_DATABASE)
             print(json.dumps({"idle": True}, sort_keys=True))

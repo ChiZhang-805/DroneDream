@@ -20,6 +20,24 @@ SPEC.loader.exec_module(engine_pack)
 
 
 class EnginePackTests(unittest.TestCase):
+    def test_manifest_schema_documents_preserve_v1_and_publish_v2(self) -> None:
+        current = json.loads(
+            (ROOT / "engine-pack/manifest.schema.json").read_text(encoding="utf-8")
+        )
+        legacy = json.loads(
+            (ROOT / "engine-pack/manifest.v1.schema.json").read_text(encoding="utf-8")
+        )
+        capabilities = json.loads(
+            (ROOT / "engine-pack/manager-capabilities.schema.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(current["properties"]["schemaVersion"]["const"], 2)
+        self.assertIn("editionProfile", current["required"])
+        self.assertEqual(legacy["properties"]["schemaVersion"]["const"], 1)
+        self.assertIn("editionProfile", legacy["properties"])
+        self.assertIn("editionProfile", legacy["required"])
+        self.assertEqual(capabilities["properties"]["schemaVersion"]["const"], 1)
+        self.assertIn("currentManifestSchemaVersion", capabilities["required"])
+
     def test_runtime_distribution_contract_whitelist_is_exact_and_hashed(self) -> None:
         engine_paths = engine_pack.runtime_distribution_paths(ROOT)
         files = engine_pack.production_files(ROOT)
@@ -214,6 +232,7 @@ class EnginePackTests(unittest.TestCase):
                 (output / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
             )
             compatibility = manifest["runtimeCompatibility"]
+            self.assertEqual(manifest["schemaVersion"], 2)
             self.assertEqual(
                 manifest["editionProfile"]["profileId"],
                 engine_pack.DEFAULT_EDITION_PROFILE,
@@ -237,7 +256,7 @@ class EnginePackTests(unittest.TestCase):
         pins = engine_pack.read_pins(ROOT / "runtime" / "pins.env")
         record = {"path": "../escape", "sizeBytes": 1, "sha256": "0" * 64}
         manifest = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "kind": engine_pack.KIND,
             "packId": "sha256:" + "0" * 64,
             "engineApiVersion": 1,
@@ -261,6 +280,44 @@ class EnginePackTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(engine_pack.EnginePackError, "unsafe archive member"):
             engine_pack.validate_manifest(manifest)
+
+    def test_legacy_schema_v1_manifest_remains_read_only_verifiable(self) -> None:
+        pins = engine_pack.read_pins(ROOT / "runtime" / "pins.env")
+        source = {"gitCommit": "1" * 40, "sourceDateEpoch": 1}
+        compatibility = {
+            "runtimeProductId": "DroneDreamRuntime",
+            "runtimeVersion": pins["DRONEDREAM_RUNTIME_VERSION"],
+            "pythonVersion": pins["PYTHON_VERSION"],
+            "px4Commit": pins["PX4_GIT_COMMIT"],
+            "gazeboVersion": (f"{pins['GAZEBO_RELEASE']}@{pins['GAZEBO_METAPACKAGE_VERSION']}"),
+            "dependencyLockSha256": engine_pack.sha256_file(
+                ROOT / "runtime" / "locks" / "python-requirements.lock"
+            ),
+        }
+        records = [{"path": "backend/app/main.py", "sizeBytes": 1, "sha256": "0" * 64}]
+        edition_profile = {
+            "profileId": engine_pack.DEFAULT_EDITION_PROFILE,
+            "includesLargeSimulator": True,
+            "excludedSourcePaths": [],
+        }
+        manifest = {
+            "schemaVersion": 1,
+            "kind": engine_pack.KIND,
+            "packId": "sha256:"
+            + engine_pack.legacy_manifest_identity(source, edition_profile, compatibility, records),
+            "engineApiVersion": 1,
+            "source": source,
+            "editionProfile": edition_profile,
+            "runtimeCompatibility": compatibility,
+            "files": records,
+        }
+
+        self.assertEqual(engine_pack.validate_manifest(manifest), manifest)
+
+        invalid_upgrade = json.loads(json.dumps(manifest))
+        invalid_upgrade["schemaVersion"] = 2
+        with self.assertRaisesRegex(engine_pack.EnginePackError, "payload identity"):
+            engine_pack.validate_manifest(invalid_upgrade)
 
     def test_field_profile_excludes_simulator_sources_and_marks_lightweight(self) -> None:
         files = engine_pack.production_files(

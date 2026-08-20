@@ -683,6 +683,7 @@ def _engine_manifest_identity(
     return _sha256_bytes(
         _canonical_compact(
             {
+                "schemaVersion": 2,
                 "engineApiVersion": 1,
                 "source": source,
                 "editionProfile": edition_profile,
@@ -771,7 +772,7 @@ def _validate_engine_manifest(raw: bytes) -> dict[str, Any]:
         raise CompositeObservationCompilationError("Engine Pack manifest is not canonical")
     if (
         type(manifest["schemaVersion"]) is not int
-        or manifest["schemaVersion"] != 1
+        or manifest["schemaVersion"] != 2
         or manifest["kind"] != "dronedream-engine-pack"
         or type(manifest["engineApiVersion"]) is not int
         or manifest["engineApiVersion"] != 1

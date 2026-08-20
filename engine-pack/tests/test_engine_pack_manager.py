@@ -76,15 +76,66 @@ class EnginePackManagerTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def install(self) -> dict[str, object]:
+    def install_from(self, output: Path) -> dict[str, object]:
         return manager.install_pack(
-            descriptor_path=self.output / engine_pack.DESCRIPTOR_FILENAME,
-            archive_path=self.output / engine_pack.ARCHIVE_FILENAME,
+            descriptor_path=output / engine_pack.DESCRIPTOR_FILENAME,
+            archive_path=output / engine_pack.ARCHIVE_FILENAME,
             runtime_manifest_path=self.runtime_manifest,
             engine_root=self.root / "engine",
             state_path=self.root / "state/engine-pack-state.json",
             manage_services=False,
         )
+
+    def install(self) -> dict[str, object]:
+        return self.install_from(self.output)
+
+    def write_legacy_bundle(self) -> Path:
+        output = self.root / "legacy-bundle"
+        output.mkdir()
+        files = engine_pack.production_files(ROOT)
+        records = engine_pack.file_records(files)
+        manifest = engine_pack.build_manifest(
+            ROOT,
+            "1" * 40,
+            1_721_000_000,
+            records,
+        )
+        manifest["schemaVersion"] = engine_pack.LEGACY_SCHEMA_VERSION
+        manifest["packId"] = "sha256:" + engine_pack.legacy_manifest_identity(
+            manifest["source"],
+            manifest["editionProfile"],
+            manifest["runtimeCompatibility"],
+            records,
+        )
+        manifest_bytes = engine_pack.canonical_json(manifest)
+        (output / engine_pack.MANIFEST_FILENAME).write_bytes(manifest_bytes)
+        archive_path = output / engine_pack.ARCHIVE_FILENAME
+        engine_pack.write_archive(
+            archive_path,
+            manifest_bytes,
+            files,
+            manifest["source"]["sourceDateEpoch"],
+        )
+        descriptor = {
+            "schemaVersion": 1,
+            "kind": "dronedream-engine-pack-bundle",
+            "packId": manifest["packId"],
+            "sourceCommit": manifest["source"]["gitCommit"],
+            "archive": {
+                "filename": engine_pack.ARCHIVE_FILENAME,
+                "sizeBytes": archive_path.stat().st_size,
+                "sha256": engine_pack.sha256_file(archive_path),
+            },
+            "manifest": {
+                "filename": engine_pack.MANIFEST_FILENAME,
+                "sizeBytes": len(manifest_bytes),
+                "sha256": engine_pack.sha256_bytes(manifest_bytes),
+            },
+        }
+        (output / engine_pack.DESCRIPTOR_FILENAME).write_bytes(
+            engine_pack.canonical_json(descriptor)
+        )
+        return output
 
     def test_install_activates_versioned_slot_without_touching_user_data(self) -> None:
         user_data = self.root / "state/user-job.json"
@@ -97,9 +148,7 @@ class EnginePackManagerTests(unittest.TestCase):
         self.assertTrue((current / "worker/drone_dream_worker/main.py").is_file())
         self.assertEqual(user_data.read_text(encoding="utf-8"), "preserve-me")
         self.assertEqual(receipt["sourceCommit"], "2" * 40)
-        self.assertEqual(
-            receipt["runtimeId"], "c75ae324-c247-50b5-bd74-fa8325e9e616"
-        )
+        self.assertEqual(receipt["runtimeId"], "c75ae324-c247-50b5-bd74-fa8325e9e616")
 
     def test_reinstall_of_same_pack_is_idempotent(self) -> None:
         first = self.install()
@@ -109,6 +158,51 @@ class EnginePackManagerTests(unittest.TestCase):
         self.assertEqual((self.root / "engine/current").resolve(), first_target)
         self.assertEqual(first["activatedAt"], second["activatedAt"])
         self.assertEqual(first["activatedAt"], "2024-07-26T13:20:00+00:00")
+
+    def test_current_verifier_accepts_a_legacy_v1_bundle(self) -> None:
+        legacy_output = self.write_legacy_bundle()
+
+        descriptor, manifest = engine_pack.verified_bundle(
+            legacy_output / engine_pack.DESCRIPTOR_FILENAME,
+            legacy_output / engine_pack.ARCHIVE_FILENAME,
+        )
+
+        self.assertEqual(descriptor["packId"], manifest["packId"])
+        self.assertEqual(manifest["schemaVersion"], 1)
+
+    @unittest.skipIf(
+        sys.platform == "win32",
+        "Runtime manager uses Linux symlink replacement inside WSL",
+    )
+    def test_current_manager_replaces_a_verified_legacy_v1_pack_with_v2(self) -> None:
+        legacy_output = self.write_legacy_bundle()
+        legacy_receipt = self.install_from(legacy_output)
+        current = self.root / "engine/current"
+        legacy_manifest = json.loads(
+            (current / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
+        )
+        self.assertEqual(legacy_manifest["schemaVersion"], 1)
+
+        current_receipt = self.install()
+        current_manifest = json.loads(
+            (current / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
+        )
+        self.assertEqual(current_manifest["schemaVersion"], 2)
+        self.assertEqual(
+            current_receipt["previousPackId"],
+            legacy_receipt["currentPackId"],
+        )
+
+    def test_manager_capabilities_are_explicit_and_versioned(self) -> None:
+        self.assertEqual(
+            manager.capability_receipt(engine_pack),
+            {
+                "schemaVersion": 1,
+                "kind": "dronedream-engine-pack-manager-capabilities",
+                "readableManifestSchemaVersions": [1, 2],
+                "currentManifestSchemaVersion": 2,
+            },
+        )
 
     def test_incompatible_runtime_is_rejected_before_activation(self) -> None:
         payload = json.loads(self.runtime_manifest.read_text(encoding="utf-8"))

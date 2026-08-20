@@ -25,7 +25,8 @@ ARCHIVE_FILENAME = "DroneDreamEnginePack.tar.gz"
 DESCRIPTOR_FILENAME = "engine-pack-bundle.json"
 MANIFEST_FILENAME = "engine-pack-manifest.json"
 KIND = "dronedream-engine-pack"
-SCHEMA_VERSION = 1
+LEGACY_SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 ENGINE_API_VERSION = 1
 DEFAULT_EDITION_PROFILE = "unified-sim-lab"
 FIELD_EDITION_PROFILE = "field-lightweight"
@@ -429,6 +430,35 @@ def manifest_identity(
     return sha256_bytes(
         canonical_json(
             {
+                "schemaVersion": SCHEMA_VERSION,
+                "engineApiVersion": ENGINE_API_VERSION,
+                "source": source,
+                "editionProfile": edition_profile,
+                "runtimeCompatibility": compatibility,
+                "payloadSha256": payload_identity(records),
+                "files": records,
+            }
+        )
+    )
+
+
+def legacy_manifest_identity(
+    source: dict[str, Any],
+    edition_profile: dict[str, Any],
+    compatibility: dict[str, Any],
+    records: list[dict[str, Any]],
+) -> str:
+    """Reproduce the immutable identity used by schema-v1 Engine Packs.
+
+    Schema v1 already bound the edition-scoped payload profile, but did not
+    bind the schema version itself. Runtime Base keeps this verifier only so
+    it can inspect and atomically replace an installed v1 pack; newly built
+    packs always use schema v2.
+    """
+
+    return sha256_bytes(
+        canonical_json(
+            {
                 "engineApiVersion": ENGINE_API_VERSION,
                 "source": source,
                 "editionProfile": edition_profile,
@@ -606,18 +636,25 @@ def _safe_member_path(name: str) -> PurePosixPath:
 def validate_manifest(manifest: Any) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         raise EnginePackError("Engine Pack manifest is not an object")
-    if set(manifest) != {
+    schema_version = manifest.get("schemaVersion")
+    if type(schema_version) is not int or schema_version not in {
+        LEGACY_SCHEMA_VERSION,
+        SCHEMA_VERSION,
+    }:
+        raise EnginePackError("Engine Pack manifest schemaVersion is unsupported")
+    expected_fields = {
         "schemaVersion",
         "kind",
         "packId",
         "engineApiVersion",
         "source",
-        "editionProfile",
         "runtimeCompatibility",
         "files",
-    }:
-        raise EnginePackError("Engine Pack manifest fields do not match schema v1")
-    if manifest["schemaVersion"] != 1 or manifest["kind"] != KIND:
+    }
+    expected_fields.add("editionProfile")
+    if set(manifest) != expected_fields:
+        raise EnginePackError(f"Engine Pack manifest fields do not match schema v{schema_version}")
+    if manifest["kind"] != KIND:
         raise EnginePackError("Engine Pack manifest identity is invalid")
     if manifest["engineApiVersion"] != ENGINE_API_VERSION:
         raise EnginePackError("Engine Pack API version is unsupported")
@@ -734,12 +771,21 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
             path.startswith("scripts/simulators/") for path in path_set
         ):
             raise EnginePackError("Sim-only Engine Pack lost simulator execution payloads")
-    expected_pack_id = "sha256:" + manifest_identity(
-        manifest["source"],
-        manifest["editionProfile"],
-        manifest["runtimeCompatibility"],
-        manifest["files"],
-    )
+    if schema_version == LEGACY_SCHEMA_VERSION:
+        identity = legacy_manifest_identity(
+            manifest["source"],
+            edition_profile,
+            manifest["runtimeCompatibility"],
+            manifest["files"],
+        )
+    else:
+        identity = manifest_identity(
+            manifest["source"],
+            edition_profile,
+            manifest["runtimeCompatibility"],
+            manifest["files"],
+        )
+    expected_pack_id = "sha256:" + identity
     if manifest["packId"] != expected_pack_id:
         raise EnginePackError("Engine Pack payload identity does not match its file list")
     return manifest
