@@ -34,12 +34,13 @@ describe("desktop OAuth consent page", () => {
     oauthMock.denyAuthorization.mockReset();
   });
 
-  it("accepts only the four exact loopback callbacks", () => {
+  it("accepts only the five exact loopback callbacks", () => {
     const callbacks = [
       "http://127.0.0.1:49210/desktop-auth/universal/callback",
       "http://127.0.0.1:49211/desktop-auth/sim/callback",
       "http://127.0.0.1:49212/desktop-auth/lab/callback",
       "http://127.0.0.1:49213/desktop-auth/field/callback",
+      "http://127.0.0.1:49214/desktop-auth/autonomy/callback",
     ];
     callbacks.forEach((callback) => {
       expect(isAllowedDesktopRedirectUri(callback)).toBe(true);
