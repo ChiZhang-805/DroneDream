@@ -2016,6 +2016,11 @@ def test_gazebo_transport_ip_uses_wsl_default_route(
 ) -> None:
     monkeypatch.delenv("GZ_IP", raising=False)
     monkeypatch.setenv("WSL_DISTRO_NAME", "Ubuntu")
+    monkeypatch.setattr(
+        wrapper.shutil,
+        "which",
+        lambda executable: "/usr/sbin/ip" if executable == "ip" else None,
+    )
 
     def route(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(
