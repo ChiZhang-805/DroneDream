@@ -1011,8 +1011,16 @@ def claim_and_run_one_pending_trial(
             return None
         selected_trial = db.execute(
             select(models.Trial.id, models.Trial.job_id, models.Trial.status)
+            .join(
+                models.CandidateParameterSet,
+                models.CandidateParameterSet.id == models.Trial.candidate_id,
+            )
             .where(models.Trial.job_id == selected_job_id, claim_pool)
             .order_by(
+                case(
+                    (models.CandidateParameterSet.is_baseline.is_(True), 0),
+                    else_=1,
+                ),
                 models.Trial.queued_at.asc().nullsfirst(),
                 models.Trial.created_at.asc(),
                 models.Trial.id.asc(),
