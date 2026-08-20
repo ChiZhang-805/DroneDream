@@ -95,6 +95,10 @@ def test_runtime_resource_hash_tampering_is_rejected(tmp_path):
 def test_runtime_setup_reports_only_completed_evidence_checkpoints(tmp_path, monkeypatch):
     manager = _manager(tmp_path / "store", _runtime_resources(tmp_path / "res"))
     monkeypatch.setattr(
+        "dronedream_agent_app.runtime_manager._wsl_path",
+        lambda path: path.resolve().as_posix(),
+    )
+    monkeypatch.setattr(
         manager,
         "status",
         lambda: {
@@ -200,6 +204,10 @@ def test_execute_keeps_supervisor_files_outside_empty_simulation_run(tmp_path, m
     store.set_thread_state(thread_id, "awaiting_confirmation")
     resources = _runtime_resources(tmp_path / "resources")
     manager = RuntimeManager(store, resources, plugins)
+    monkeypatch.setattr(
+        "dronedream_agent_app.runtime_manager._wsl_path",
+        lambda path: path.resolve().as_posix(),
+    )
     monkeypatch.setattr(manager, "status", lambda: {"provisioned": True})
     monkeypatch.setattr(
         "dronedream_agent_app.runtime_manager.PreparedMission.model_validate_json",

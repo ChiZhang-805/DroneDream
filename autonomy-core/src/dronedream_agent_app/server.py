@@ -56,6 +56,7 @@ def create_app(
     store: AppStore,
     token: str,
     resource_root: Path | None = None,
+    custom_model_credential_vault: CredentialVault | None = None,
     connector_credential_vault: CredentialVault | None = None,
     plugin_isolator_path: Path | None = None,
 ) -> FastAPI:
@@ -68,7 +69,7 @@ def create_app(
         plugin_isolator_path=plugin_isolator_path,
     )
     plugin_marketplace = PluginMarketplaceService(store, plugin_manager)
-    custom_models = CustomModelService(store)
+    custom_models = CustomModelService(store, custom_model_credential_vault)
     connector_credentials = ConnectorCredentialService(store, connector_credential_vault)
     mission_service = MissionService(store, plugin_manager, connector_credentials)
     runtime_manager = RuntimeManager(store, resource_root, plugin_manager)

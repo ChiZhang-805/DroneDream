@@ -59,7 +59,13 @@ def _ui_plugin_bundle(version: str) -> bytes:
 
 def test_loopback_api_requires_random_session_token(tmp_path):
     token = "a" * 64
-    client = TestClient(create_app(store=AppStore(tmp_path), token=token))
+    client = TestClient(
+        create_app(
+            store=AppStore(tmp_path),
+            token=token,
+            custom_model_credential_vault=_MemoryVault(),
+        )
+    )
 
     assert client.get("/health").status_code == 200
     assert client.get("/v1/bootstrap").status_code == 401
@@ -70,7 +76,13 @@ def test_loopback_api_requires_random_session_token(tmp_path):
 
 def test_attachment_is_bound_to_its_task_thread(tmp_path):
     token = "b" * 64
-    client = TestClient(create_app(store=AppStore(tmp_path), token=token))
+    client = TestClient(
+        create_app(
+            store=AppStore(tmp_path),
+            token=token,
+            custom_model_credential_vault=_MemoryVault(),
+        )
+    )
     headers = {"Authorization": f"Bearer {token}"}
     thread = client.post(
         "/v1/threads",
@@ -97,6 +109,7 @@ def test_connector_credential_api_never_returns_secret(tmp_path):
         create_app(
             store=AppStore(tmp_path),
             token=token,
+            custom_model_credential_vault=_MemoryVault(),
             connector_credential_vault=vault,
         )
     )
@@ -127,7 +140,13 @@ def test_connector_credential_api_never_returns_secret(tmp_path):
 def test_plugin_api_is_authenticated_transactional_and_versioned(tmp_path):
     token = "c" * 64
     headers = {"Authorization": f"Bearer {token}"}
-    client = TestClient(create_app(store=AppStore(tmp_path), token=token))
+    client = TestClient(
+        create_app(
+            store=AppStore(tmp_path),
+            token=token,
+            custom_model_credential_vault=_MemoryVault(),
+        )
+    )
 
     assert client.get("/v1/plugins", headers=headers).status_code == 200
     protected = client.post("/v1/plugins/runtime.safe-hold/disable", headers=headers)
