@@ -11,11 +11,13 @@ import pytest
 from app.autonomy.catalog import get_bundled_map_manifest, get_scene, list_scenes
 from app.autonomy.qualification import MapPackQualificationRequest, qualify_map_pack
 from app.autonomy.school_map_artifact import (
+    PHYSICAL_MATERIAL_PROFILES,
     PX4_X500_COLLISION_CENTER_ABOVE_MODEL_ROOT_M,
     PX4_X500_MODEL_ROOT_TO_CONTACT_M,
     ROAD_NETWORK,
     ROUTE_ENDPOINT_TOLERANCE_M,
     SEMANTIC_FLOAT_DECIMAL_PLACES,
+    SEMANTIC_PHYSICAL_MATERIAL,
     STRUCTURAL_TOLERANCE_M,
     TEACHING_OPEN_DOOR_CLEARANCE_M,
     TEACHING_OPEN_DOOR_PAIR_CENTER_X,
@@ -31,6 +33,7 @@ from app.autonomy.school_map_artifact import (
     get_school_map_gazebo_artifact,
     get_school_map_gazebo_summary,
     school_map_collision_primitives,
+    school_map_runtime_collision_primitives,
 )
 
 VEHICLE_COLLISION_RADIUS_M = VEHICLE_COLLISION_DIAMETER_M / 2
@@ -257,6 +260,84 @@ def _sample_reference_route() -> list[tuple[float, float, float]]:
 def test_school_map_exports_parseable_content_addressed_sdf() -> None:
     artifact = get_school_map_gazebo_artifact()
     assert artifact.summary == get_school_map_gazebo_summary()
+
+
+def test_school_map_physical_material_contract_covers_every_collision() -> None:
+    primitives = school_map_collision_primitives()
+    runtime_primitives = school_map_runtime_collision_primitives()
+    semantics = {primitive.semantic for primitive in (*primitives, *runtime_primitives)}
+
+    assert semantics == set(SEMANTIC_PHYSICAL_MATERIAL)
+    assert set(SEMANTIC_PHYSICAL_MATERIAL.values()) <= set(PHYSICAL_MATERIAL_PROFILES)
+    for profile in PHYSICAL_MATERIAL_PROFILES.values():
+        assert profile["density_kg_m3"] > 0
+        assert profile["youngs_modulus_pa"] > 0
+        assert 0 < profile["poisson_ratio"] < 0.5
+        assert profile["characteristic_strength_mpa"] > 0
+        assert 0 < profile["friction_mu"] <= 2
+        assert 0 < profile["friction_mu2"] <= profile["friction_mu"]
+        assert 0 <= profile["restitution"] <= 1
+        assert profile["contact_stiffness_n_m"] > 0
+        assert profile["contact_damping_n_s_m"] > 0
+        assert 0 < profile["visual_opacity"] <= 1
+
+
+def test_runtime_collision_envelopes_contain_every_omitted_detail_solid() -> None:
+    detailed = [
+        primitive
+        for primitive in school_map_collision_primitives()
+        if not isinstance(primitive, MeshPrimitive)
+    ]
+    runtime = school_map_runtime_collision_primitives()
+    runtime_names = {primitive.name for primitive in runtime}
+    envelopes = [
+        primitive for primitive in runtime if primitive.semantic.startswith("conservative-")
+    ]
+
+    def contains(envelope: object, detail: object) -> bool:
+        tolerance = 1e-9
+        if isinstance(envelope, BoxPrimitive) and isinstance(detail, BoxPrimitive):
+            return all(
+                envelope_bounds[0] <= detail_bounds[0] + tolerance
+                and envelope_bounds[1] >= detail_bounds[1] - tolerance
+                for envelope_bounds, detail_bounds in (
+                    (_box_horizontal_bounds_x(envelope), _box_horizontal_bounds_x(detail)),
+                    (_box_horizontal_bounds_y(envelope), _box_horizontal_bounds_y(detail)),
+                    (_bounds(envelope, "z"), _bounds(detail, "z")),
+                )
+            )
+        if isinstance(envelope, SpherePrimitive) and isinstance(detail, SpherePrimitive):
+            return (
+                math.dist(
+                    (envelope.center_x, envelope.center_y, envelope.center_z),
+                    (detail.center_x, detail.center_y, detail.center_z),
+                )
+                + detail.radius_m
+                <= envelope.radius_m + tolerance
+            )
+        return False
+
+    omitted = [primitive for primitive in detailed if primitive.name not in runtime_names]
+    assert len(detailed) == 4023
+    assert len(runtime) == 1535
+    assert len(omitted) == 2788
+    for detail in omitted:
+        assert any(contains(envelope, detail) for envelope in envelopes), detail.name
+
+
+def test_school_map_material_contract_preserves_realtime_rigid_contact() -> None:
+    artifact = get_school_map_gazebo_artifact()
+    semantic = json.loads(artifact.semantic_json)
+    root = ElementTree.fromstring(artifact.model_sdf)
+    collisions = root.findall(".//collision")
+    material_contract = semantic["physical_material_contract"]
+
+    assert len(collisions) == artifact.summary["collision_primitive_count"]
+    assert all(collision.find("surface") is None for collision in collisions)
+    assert material_contract["gazebo_contact_model"] == "dart-default-rigid-contact"
+    assert material_contract["custom_elastic_contact_enabled"] is False
+    assert material_contract["profiles"] == PHYSICAL_MATERIAL_PROFILES
+    assert material_contract["semantic_material_ids"] == SEMANTIC_PHYSICAL_MATERIAL
     root = ElementTree.fromstring(artifact.model_sdf)
     links = root.findall("./model/link")
     collisions = root.findall("./model/link/collision")
