@@ -92,11 +92,6 @@
         "path": "brand/source/approved/sim-large-label-lockup.png",
         "sha256": "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233",
         "status": "superseded-by-centered-separator-v2"
-      },
-      "supersededDotLockup": {
-        "path": "brand/source/approved/sim-dot-lockup.png",
-        "sha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
-        "status": "superseded"
       }
     },
     "lab": {
@@ -118,11 +113,6 @@
         "path": "brand/source/approved/lab-large-label-lockup.png",
         "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
         "status": "superseded-by-centered-separator-v2"
-      },
-      "supersededDotLockup": {
-        "path": "brand/source/approved/lab-dot-lockup.png",
-        "sha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
-        "status": "superseded"
       }
     },
     "field": {
@@ -144,11 +134,6 @@
         "path": "brand/source/approved/field-large-label-lockup.png",
         "sha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
         "status": "superseded-by-centered-separator-v2"
-      },
-      "supersededDotLockup": {
-        "path": "brand/source/approved/field-dot-lockup.png",
-        "sha256": "def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192",
-        "status": "superseded"
       }
     }
   }

@@ -15,6 +15,10 @@ const DESKTOP_REDIRECTS = new Map([
     "http://127.0.0.1:49213/desktop-auth/field/callback",
     { edition: "FIELD", product: "DroneDream FIELD" },
   ],
+  [
+    "http://127.0.0.1:49214/desktop-auth/autonomy/callback",
+    { edition: "AUTONOMY", product: "DroneDream AUTONOMY" },
+  ],
 ] as const);
 
 export function desktopEditionForRedirectUri(value: string) {

@@ -169,8 +169,7 @@
             "dotLockupDimensions",
             "dotLockupStyle",
             "separatorGeometry",
-            "supersededLargeLabelLockup",
-            "supersededDotLockup"
+            "supersededLargeLabelLockup"
           ],
           "properties": {
             "markPath": {
@@ -224,19 +223,6 @@
                 },
                 "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                 "status": {"const": "superseded-by-centered-separator-v2"}
-              }
-            },
-            "supersededDotLockup": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["path", "sha256", "status"],
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "pattern": "^brand/source/approved/(sim|lab|field)-dot-lockup\\.png$"
-                },
-                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-                "status": {"const": "superseded"}
               }
             }
           }
