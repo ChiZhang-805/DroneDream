@@ -218,11 +218,13 @@ afterEach(() => {
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
     const primaryNavigation = screen.getByRole("navigation", { name: "Primary navigation" });
-    expect(primaryNavigation.querySelectorAll("a")).toHaveLength(labEditionEnabled ? 6 : 5);
+    expect(primaryNavigation.querySelectorAll("a")).toHaveLength(labEditionEnabled ? 7 : 6);
     if (labEditionEnabled) {
       expect(screen.getByRole("link", { name: "Lab workspace" }))
         .toHaveAttribute("href", "/lab/setup");
     }
+    expect(screen.getByRole("link", { name: "AUTONOMY" }))
+      .not.toHaveClass("runtime-locked");
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);

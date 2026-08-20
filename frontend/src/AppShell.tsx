@@ -23,6 +23,7 @@ import {
   MapPinned,
   Menu,
   MoreHorizontal,
+  Orbit,
   RadioTower,
   Save,
   Settings,
@@ -135,6 +136,11 @@ const CORE_NAV_ITEMS: NavigationItem[] = [
     end: true,
     requiresRuntime: true,
     icon: BotMessageSquare,
+  },
+  {
+    to: "/autonomy",
+    label: "AUTONOMY",
+    icon: Orbit,
   },
   {
     to: "/dashboard",
