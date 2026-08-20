@@ -1,0 +1,134 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attempt": {
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Attempt",
+      "type": "integer"
+    },
+    "call_id": {
+      "pattern": "^model-[0-9a-f]{24}$",
+      "title": "Call Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "input_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Sha256",
+      "type": "string"
+    },
+    "input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Input Tokens"
+    },
+    "latency_ms": {
+      "minimum": 0,
+      "title": "Latency Ms",
+      "type": "integer"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "output_schema": {
+      "title": "Output Schema",
+      "type": "string"
+    },
+    "output_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Output Sha256",
+      "type": "string"
+    },
+    "output_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Tokens"
+    },
+    "previous_response_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Response Id"
+    },
+    "provider": {
+      "title": "Provider",
+      "type": "string"
+    },
+    "response_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Response Id"
+    },
+    "role": {
+      "enum": [
+        "intent_parser",
+        "intent_critic",
+        "plugin_router",
+        "task_decomposer",
+        "global_planner",
+        "plan_critic",
+        "execution_monitor",
+        "runtime_message_classifier",
+        "completion_verifier",
+        "context_summarizer"
+      ],
+      "title": "Role",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "dronedream.model-call.v1",
+      "default": "dronedream.model-call.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "role",
+    "attempt",
+    "input_sha256",
+    "output_sha256",
+    "output_schema",
+    "provider",
+    "model",
+    "latency_ms",
+    "created_at"
+  ],
+  "title": "ModelCallRecord",
+  "type": "object"
+}

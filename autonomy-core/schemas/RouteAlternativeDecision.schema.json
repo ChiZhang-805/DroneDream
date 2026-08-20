@@ -1,0 +1,58 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "normalized_scores": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Normalized Scores",
+      "type": "object"
+    },
+    "ranked_alternative_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Ranked Alternative Ids",
+      "type": "array"
+    },
+    "rejected_alternatives": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Rejected Alternatives",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "dronedream.route-alternative-decision.v1",
+      "default": "dronedream.route-alternative-decision.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_alternative_id": {
+      "title": "Selected Alternative Id",
+      "type": "string"
+    },
+    "selection_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Selection Reasons",
+      "type": "array"
+    }
+  },
+  "required": [
+    "selected_alternative_id",
+    "ranked_alternative_ids",
+    "normalized_scores",
+    "selection_reasons"
+  ],
+  "title": "RouteAlternativeDecision",
+  "type": "object"
+}

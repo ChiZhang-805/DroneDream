@@ -1,0 +1,2681 @@
+{
+  "$defs": {
+    "ActionDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "maxLength": 120,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "allowed_fallbacks": {
+          "items": {
+            "enum": [
+              "continue",
+              "hold",
+              "return",
+              "land",
+              "abort"
+            ],
+            "type": "string"
+          },
+          "maxItems": 6,
+          "minItems": 1,
+          "title": "Allowed Fallbacks",
+          "type": "array"
+        },
+        "authority": {
+          "default": "plan",
+          "enum": [
+            "plan",
+            "simulate",
+            "control",
+            "actuate"
+          ],
+          "title": "Authority",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "domain_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,119}$",
+          "title": "Domain Id",
+          "type": "string"
+        },
+        "flight_boundary": {
+          "default": "none",
+          "enum": [
+            "none",
+            "takeoff",
+            "landing"
+          ],
+          "title": "Flight Boundary",
+          "type": "string"
+        },
+        "input_schema": {
+          "additionalProperties": true,
+          "title": "Input Schema",
+          "type": "object"
+        },
+        "label": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "movement": {
+          "default": false,
+          "title": "Movement",
+          "type": "boolean"
+        },
+        "payload": {
+          "default": false,
+          "title": "Payload",
+          "type": "boolean"
+        },
+        "required_success_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 24,
+          "minItems": 1,
+          "title": "Required Success Evidence",
+          "type": "array"
+        },
+        "runtime_executor": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runtime Executor"
+        },
+        "schema_version": {
+          "const": "dronedream.action-definition.v1",
+          "default": "dronedream.action-definition.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "simulator_executor": {
+          "maxLength": 160,
+          "minLength": 3,
+          "title": "Simulator Executor",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "domain_id",
+        "label",
+        "description",
+        "required_success_evidence",
+        "allowed_fallbacks",
+        "simulator_executor"
+      ],
+      "title": "ActionDefinition",
+      "type": "object"
+    },
+    "DomainActionCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/ActionDefinition"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Actions",
+          "type": "array"
+        },
+        "catalog_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,119}$",
+          "title": "Catalog Id",
+          "type": "string"
+        },
+        "domain_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Domain Ids",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "dronedream.domain-action-catalog.v1",
+          "default": "dronedream.domain-action-catalog.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "catalog_id",
+        "domain_ids",
+        "actions"
+      ],
+      "title": "DomainActionCatalog",
+      "type": "object"
+    },
+    "EvidenceRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Artifact Sha256",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "event_type": {
+          "maxLength": 96,
+          "minLength": 1,
+          "title": "Event Type",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "title": "Payload",
+          "type": "object"
+        },
+        "previous_record_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Previous Record Sha256",
+          "type": "string"
+        },
+        "record_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Record Sha256",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.evidence-record.v1",
+          "default": "dronedream.evidence-record.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 1,
+          "title": "Sequence",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sequence",
+        "created_at",
+        "event_type",
+        "artifact_sha256",
+        "previous_record_sha256",
+        "record_sha256",
+        "payload"
+      ],
+      "title": "EvidenceRecord",
+      "type": "object"
+    },
+    "FlightPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_id": {
+          "title": "Contract Id",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "dronedream.flight-plan.v1",
+          "default": "dronedream.flight-plan.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "segments": {
+          "items": {
+            "$ref": "#/$defs/PlanSegment"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Segments",
+          "type": "array"
+        },
+        "semantic_plan_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Semantic Plan Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "revision",
+        "contract_id",
+        "segments",
+        "semantic_plan_sha256"
+      ],
+      "title": "FlightPlan",
+      "type": "object"
+    },
+    "GraphRoute": {
+      "additionalProperties": false,
+      "properties": {
+        "all_edges_flight_verified": {
+          "title": "All Edges Flight Verified",
+          "type": "boolean"
+        },
+        "edge_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10000,
+          "title": "Edge Ids",
+          "type": "array"
+        },
+        "goal_node": {
+          "title": "Goal Node",
+          "type": "string"
+        },
+        "node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10000,
+          "minItems": 1,
+          "title": "Node Ids",
+          "type": "array"
+        },
+        "positions_m": {
+          "items": {
+            "$ref": "#/$defs/Vector3"
+          },
+          "maxItems": 10000,
+          "minItems": 1,
+          "title": "Positions M",
+          "type": "array"
+        },
+        "route_length_m": {
+          "minimum": 0.0,
+          "title": "Route Length M",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "dronedream.graph-route.v1",
+          "default": "dronedream.graph-route.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "start_node": {
+          "title": "Start Node",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_node",
+        "goal_node",
+        "node_ids",
+        "edge_ids",
+        "positions_m",
+        "route_length_m",
+        "all_edges_flight_verified"
+      ],
+      "title": "GraphRoute",
+      "type": "object"
+    },
+    "HarnessNodeSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "authority": {
+          "default": "plan",
+          "enum": [
+            "read",
+            "plan",
+            "simulate"
+          ],
+          "title": "Authority",
+          "type": "string"
+        },
+        "cacheable": {
+          "default": false,
+          "title": "Cacheable",
+          "type": "boolean"
+        },
+        "depends_on": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "failure_mode": {
+          "default": "fail-closed",
+          "enum": [
+            "fail-closed",
+            "isolate",
+            "fallback"
+          ],
+          "title": "Failure Mode",
+          "type": "string"
+        },
+        "fallback_handler_id": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fallback Handler Id"
+        },
+        "handler_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,159}$",
+          "title": "Handler Id",
+          "type": "string"
+        },
+        "node_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,119}$",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "node_kind": {
+          "default": "plugin",
+          "enum": [
+            "core",
+            "plugin",
+            "barrier"
+          ],
+          "title": "Node Kind",
+          "type": "string"
+        },
+        "output_key": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Key"
+        },
+        "required_inputs": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Required Inputs",
+          "type": "array"
+        },
+        "retry_limit": {
+          "default": 0,
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Retry Limit",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 30.0,
+          "exclusiveMinimum": 0.0,
+          "maximum": 600.0,
+          "title": "Timeout Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "node_id",
+        "handler_id"
+      ],
+      "title": "HarnessNodeSpec",
+      "type": "object"
+    },
+    "HarnessStageReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "completed_at": {
+          "format": "date-time",
+          "title": "Completed At",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "node_kind": {
+          "enum": [
+            "core",
+            "plugin",
+            "barrier"
+          ],
+          "title": "Node Kind",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "topology_id": {
+          "title": "Topology Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "topology_id",
+        "node_id",
+        "node_kind",
+        "input_sha256",
+        "output_sha256",
+        "completed_at"
+      ],
+      "title": "HarnessStageReceipt",
+      "type": "object"
+    },
+    "HarnessTopology": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum_parallelism": {
+          "default": 4,
+          "maximum": 16,
+          "minimum": 1,
+          "title": "Maximum Parallelism",
+          "type": "integer"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/HarnessNodeSpec"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Nodes",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "dronedream.harness-topology.v1",
+          "default": "dronedream.harness-topology.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "topology_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,119}$",
+          "title": "Topology Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "topology_id",
+        "name",
+        "nodes"
+      ],
+      "title": "HarnessTopology",
+      "type": "object"
+    },
+    "IntentArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "assumptions": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "constraints": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Constraints",
+          "type": "array"
+        },
+        "goal": {
+          "maxLength": 1000,
+          "minLength": 3,
+          "title": "Goal",
+          "type": "string"
+        },
+        "missing_critical_fields": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Missing Critical Fields",
+          "type": "array"
+        },
+        "payload_action": {
+          "maxLength": 120,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Payload Action",
+          "type": "string"
+        },
+        "return_entity": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Return Entity",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.intent.v1",
+          "default": "dronedream.intent.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "start_entity": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Start Entity",
+          "type": "string"
+        },
+        "target_entity": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Target Entity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "goal",
+        "start_entity",
+        "target_entity",
+        "return_entity",
+        "payload_action"
+      ],
+      "title": "IntentArtifact",
+      "type": "object"
+    },
+    "IntentCritique": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "repair_instructions": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Repair Instructions",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "dronedream.intent-critique.v1",
+          "default": "dronedream.intent-critique.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "accepted"
+      ],
+      "title": "IntentCritique",
+      "type": "object"
+    },
+    "MissionContract": {
+      "additionalProperties": false,
+      "properties": {
+        "action_catalog_sha256": {
+          "default": "0000000000000000000000000000000000000000000000000000000000000000",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Action Catalog Sha256",
+          "type": "string"
+        },
+        "authorized_actions": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 3,
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 256,
+          "minItems": 2,
+          "title": "Authorized Actions",
+          "type": "array"
+        },
+        "constraints": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Constraints",
+          "type": "array"
+        },
+        "contract_id": {
+          "pattern": "^mission-[0-9a-f]{24}$",
+          "title": "Contract Id",
+          "type": "string"
+        },
+        "conversation_id": {
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "domain_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Domain Ids",
+          "type": "array"
+        },
+        "goal": {
+          "title": "Goal",
+          "type": "string"
+        },
+        "immutable_safety_rules": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Immutable Safety Rules",
+          "type": "array"
+        },
+        "map_asset_id": {
+          "title": "Map Asset Id",
+          "type": "string"
+        },
+        "map_semantic_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Map Semantic Sha256",
+          "type": "string"
+        },
+        "map_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Map Sha256",
+          "type": "string"
+        },
+        "payload_action": {
+          "maxLength": 120,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Payload Action",
+          "type": "string"
+        },
+        "return_node": {
+          "title": "Return Node",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.mission-contract.v1",
+          "default": "dronedream.mission-contract.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "start_node": {
+          "title": "Start Node",
+          "type": "string"
+        },
+        "target_node": {
+          "title": "Target Node",
+          "type": "string"
+        },
+        "vehicle_asset_id": {
+          "title": "Vehicle Asset Id",
+          "type": "string"
+        },
+        "vehicle_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Vehicle Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_id",
+        "conversation_id",
+        "goal",
+        "start_node",
+        "target_node",
+        "return_node",
+        "payload_action",
+        "map_asset_id",
+        "map_sha256",
+        "map_semantic_sha256",
+        "vehicle_asset_id",
+        "vehicle_sha256",
+        "constraints",
+        "immutable_safety_rules"
+      ],
+      "title": "MissionContract",
+      "type": "object"
+    },
+    "ModelCallRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "call_id": {
+          "pattern": "^model-[0-9a-f]{24}$",
+          "title": "Call Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "input_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Tokens"
+        },
+        "latency_ms": {
+          "minimum": 0,
+          "title": "Latency Ms",
+          "type": "integer"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "output_schema": {
+          "title": "Output Schema",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "output_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Tokens"
+        },
+        "previous_response_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Previous Response Id"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "response_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Response Id"
+        },
+        "role": {
+          "enum": [
+            "intent_parser",
+            "intent_critic",
+            "plugin_router",
+            "task_decomposer",
+            "global_planner",
+            "plan_critic",
+            "execution_monitor",
+            "runtime_message_classifier",
+            "completion_verifier",
+            "context_summarizer"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.model-call.v1",
+          "default": "dronedream.model-call.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "role",
+        "attempt",
+        "input_sha256",
+        "output_sha256",
+        "output_schema",
+        "provider",
+        "model",
+        "latency_ms",
+        "created_at"
+      ],
+      "title": "ModelCallRecord",
+      "type": "object"
+    },
+    "PlanCritique": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "repair_instructions": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Repair Instructions",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "dronedream.plan-critique.v1",
+          "default": "dronedream.plan-critique.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "accepted"
+      ],
+      "title": "PlanCritique",
+      "type": "object"
+    },
+    "PlanSegment": {
+      "additionalProperties": false,
+      "properties": {
+        "from_node": {
+          "title": "From Node",
+          "type": "string"
+        },
+        "minimum_clearance_m": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 100.0,
+          "title": "Minimum Clearance M",
+          "type": "number"
+        },
+        "path": {
+          "items": {
+            "$ref": "#/$defs/RoutePoint"
+          },
+          "maxItems": 1000,
+          "minItems": 2,
+          "title": "Path",
+          "type": "array"
+        },
+        "segment_id": {
+          "pattern": "^segment-[0-9]{3}$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "speed_limit_mps": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 20.0,
+          "title": "Speed Limit Mps",
+          "type": "number"
+        },
+        "success_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Success Evidence",
+          "type": "array"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "to_node": {
+          "title": "To Node",
+          "type": "string"
+        }
+      },
+      "required": [
+        "segment_id",
+        "task_id",
+        "from_node",
+        "to_node",
+        "path",
+        "speed_limit_mps",
+        "minimum_clearance_m",
+        "success_evidence"
+      ],
+      "title": "PlanSegment",
+      "type": "object"
+    },
+    "PluginCapability": {
+      "additionalProperties": false,
+      "properties": {
+        "authority": {
+          "default": "read",
+          "enum": [
+            "read",
+            "plan",
+            "simulate",
+            "control",
+            "actuate"
+          ],
+          "title": "Authority",
+          "type": "string"
+        },
+        "capability_id": {
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "input_schema": {
+          "additionalProperties": true,
+          "title": "Input Schema",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "tool",
+            "model-provider",
+            "runtime-adapter",
+            "map-importer",
+            "vehicle-importer",
+            "planner",
+            "perception",
+            "payload",
+            "voice",
+            "data-service",
+            "evidence",
+            "ui-panel",
+            "workflow-policy",
+            "harness-profile",
+            "workflow-topology",
+            "harness-node",
+            "harness-scheduler",
+            "retry-policy",
+            "timeout-policy",
+            "budget-policy",
+            "fallback-policy",
+            "circuit-breaker",
+            "cache-policy",
+            "event-bus",
+            "observer",
+            "input-channel",
+            "attachment-decoder",
+            "locale-policy",
+            "entity-resolver",
+            "domain-pack",
+            "action-pack",
+            "model-policy",
+            "provider-discovery",
+            "model-router",
+            "consensus-policy",
+            "multimodal-preprocessor",
+            "token-meter",
+            "prompt-pack",
+            "context-strategy",
+            "context-enricher",
+            "context-store",
+            "context-retriever",
+            "context-summarizer",
+            "retention-policy",
+            "structured-decoder",
+            "task-decomposer",
+            "plan-scorer",
+            "plan-optimizer",
+            "plan-validator",
+            "tool-router",
+            "tool-middleware",
+            "tool-execution-policy",
+            "result-fusion",
+            "checkpoint-policy",
+            "anomaly-detector",
+            "runtime-replanner",
+            "scenario-generator",
+            "fault-injector",
+            "evaluator",
+            "evidence-exporter",
+            "notification",
+            "credential-source",
+            "qualification-check",
+            "simulator-adapter",
+            "physics-model",
+            "sensor-model",
+            "environment-model",
+            "clock-policy",
+            "monte-carlo-policy",
+            "runtime-amendment",
+            "telemetry-adapter",
+            "state-estimator",
+            "localization",
+            "controller",
+            "payload-driver",
+            "transport",
+            "trust-provider",
+            "runtime-watchdog"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "Output Schema",
+          "type": "object"
+        },
+        "required_permissions": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "asset.read",
+                  "attachment.read",
+                  "asset.write-staging",
+                  "mission.read",
+                  "mission.write-output",
+                  "network.model-gateway",
+                  "network.external",
+                  "network.local-device",
+                  "process.spawn",
+                  "ros.read",
+                  "ros.write",
+                  "simulator.control",
+                  "vehicle.actuate",
+                  "ui.panel",
+                  "context.read",
+                  "context.write-summary",
+                  "telemetry.read",
+                  "evidence.write",
+                  "configuration.read",
+                  "credential.reference"
+                ],
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Permissions"
+        }
+      },
+      "required": [
+        "capability_id",
+        "kind",
+        "name",
+        "description"
+      ],
+      "title": "PluginCapability",
+      "type": "object"
+    },
+    "PluginDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "optional": {
+          "default": false,
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "version": {
+          "default": "*",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin_id"
+      ],
+      "title": "PluginDependency",
+      "type": "object"
+    },
+    "PluginHookReceipt": {
+      "additionalProperties": false,
+      "description": "Hash-bound evidence for a non-tool Harness extension invocation.",
+      "properties": {
+        "capability_id": {
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "hook": {
+          "pattern": "^[a-z][a-z0-9._-]{1,95}$",
+          "title": "Hook",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "invocation_id": {
+          "pattern": "^hook-[0-9a-f]{24}$",
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "skipped",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "plugin_package_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Plugin Package Sha256",
+          "type": "string"
+        },
+        "plugin_version": {
+          "title": "Plugin Version",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.plugin-hook-receipt.v1",
+          "default": "dronedream.plugin-hook-receipt.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "slot_id": {
+          "title": "Slot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "invocation_id",
+        "plugin_id",
+        "plugin_version",
+        "plugin_package_sha256",
+        "capability_id",
+        "slot_id",
+        "hook",
+        "outcome",
+        "input_sha256",
+        "output_sha256",
+        "created_at"
+      ],
+      "title": "PluginHookReceipt",
+      "type": "object"
+    },
+    "PluginManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "api_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Api Version",
+          "type": "string"
+        },
+        "capabilities": {
+          "items": {
+            "$ref": "#/$defs/PluginCapability"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "configuration_schema": {
+          "additionalProperties": true,
+          "title": "Configuration Schema",
+          "type": "object"
+        },
+        "conflicts": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "default_enabled": {
+          "default": false,
+          "title": "Default Enabled",
+          "type": "boolean"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/PluginDependency"
+          },
+          "maxItems": 32,
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "description": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "disable_allowed": {
+          "default": true,
+          "title": "Disable Allowed",
+          "type": "boolean"
+        },
+        "file_sha256": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 2000,
+          "title": "File Sha256",
+          "type": "object"
+        },
+        "minimum_app_version": {
+          "default": "0.1.0",
+          "title": "Minimum App Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "enum": [
+              "asset.read",
+              "attachment.read",
+              "asset.write-staging",
+              "mission.read",
+              "mission.write-output",
+              "network.model-gateway",
+              "network.external",
+              "network.local-device",
+              "process.spawn",
+              "ros.read",
+              "ros.write",
+              "simulator.control",
+              "vehicle.actuate",
+              "ui.panel",
+              "context.read",
+              "context.write-summary",
+              "telemetry.read",
+              "evidence.write",
+              "configuration.read",
+              "credential.reference"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Permissions",
+          "type": "array"
+        },
+        "placement": {
+          "$ref": "#/$defs/PluginPlacement"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/PluginProvenance"
+        },
+        "publisher": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Publisher",
+          "type": "string"
+        },
+        "removable": {
+          "default": true,
+          "title": "Removable",
+          "type": "boolean"
+        },
+        "resource_policy": {
+          "$ref": "#/$defs/PluginResourcePolicy"
+        },
+        "runtime": {
+          "$ref": "#/$defs/PluginRuntime"
+        },
+        "schema_version": {
+          "const": "dronedream.plugin-manifest.v1",
+          "default": "dronedream.plugin-manifest.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginSignature"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin_id",
+        "name",
+        "version",
+        "description",
+        "publisher",
+        "runtime",
+        "capabilities"
+      ],
+      "title": "PluginManifest",
+      "type": "object"
+    },
+    "PluginPlacement": {
+      "additionalProperties": false,
+      "description": "Stable UI and activation slot occupied by a plugin implementation.",
+      "properties": {
+        "activation_mode": {
+          "default": "multiple",
+          "enum": [
+            "single",
+            "multiple",
+            "pipeline"
+          ],
+          "title": "Activation Mode",
+          "type": "string"
+        },
+        "category_id": {
+          "default": "general",
+          "title": "Category Id",
+          "type": "string"
+        },
+        "category_label": {
+          "default": "\u901a\u7528",
+          "title": "Category Label",
+          "type": "string"
+        },
+        "category_order": {
+          "default": 900,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Category Order",
+          "type": "integer"
+        },
+        "failure_mode": {
+          "default": "isolate",
+          "enum": [
+            "fail-closed",
+            "isolate",
+            "advisory"
+          ],
+          "title": "Failure Mode",
+          "type": "string"
+        },
+        "pipeline_order": {
+          "default": 500,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Pipeline Order",
+          "type": "integer"
+        },
+        "plugin_order": {
+          "default": 900,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Plugin Order",
+          "type": "integer"
+        },
+        "runs_after": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Runs After",
+          "type": "array"
+        },
+        "runs_before": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Runs Before",
+          "type": "array"
+        },
+        "scope": {
+          "default": "general",
+          "enum": [
+            "general",
+            "mission",
+            "runtime",
+            "interface"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "slot_id": {
+          "default": "general.extensions",
+          "title": "Slot Id",
+          "type": "string"
+        },
+        "slot_label": {
+          "default": "\u901a\u7528\u80fd\u529b",
+          "title": "Slot Label",
+          "type": "string"
+        },
+        "slot_order": {
+          "default": 900,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Slot Order",
+          "type": "integer"
+        },
+        "swap_policy": {
+          "default": "next-mission",
+          "enum": [
+            "anytime",
+            "next-mission",
+            "safe-hold",
+            "restart",
+            "certified-update"
+          ],
+          "title": "Swap Policy",
+          "type": "string"
+        }
+      },
+      "title": "PluginPlacement",
+      "type": "object"
+    },
+    "PluginProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "build_system": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build System"
+        },
+        "build_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Timestamp"
+        },
+        "sbom_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sbom Sha256"
+        },
+        "source_commit": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{7,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Commit"
+        },
+        "source_uri": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Uri"
+        },
+        "update_ring": {
+          "default": "stable",
+          "enum": [
+            "stable",
+            "preview",
+            "canary",
+            "pinned"
+          ],
+          "title": "Update Ring",
+          "type": "string"
+        }
+      },
+      "title": "PluginProvenance",
+      "type": "object"
+    },
+    "PluginResourcePolicy": {
+      "additionalProperties": false,
+      "description": "Fail-closed resource envelope applied to executable plugin runtimes.",
+      "properties": {
+        "allowed_network_hosts": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Allowed Network Hosts",
+          "type": "array"
+        },
+        "cpu_time_limit_seconds": {
+          "default": 120,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Cpu Time Limit Seconds",
+          "type": "integer"
+        },
+        "maximum_message_bytes": {
+          "default": 2097152,
+          "maximum": 16777216,
+          "minimum": 4096,
+          "title": "Maximum Message Bytes",
+          "type": "integer"
+        },
+        "memory_limit_mb": {
+          "default": 256,
+          "maximum": 4096,
+          "minimum": 32,
+          "title": "Memory Limit Mb",
+          "type": "integer"
+        },
+        "process_limit": {
+          "default": 4,
+          "maximum": 64,
+          "minimum": 1,
+          "title": "Process Limit",
+          "type": "integer"
+        }
+      },
+      "title": "PluginResourcePolicy",
+      "type": "object"
+    },
+    "PluginRuntime": {
+      "additionalProperties": false,
+      "properties": {
+        "call_timeout_seconds": {
+          "default": 60.0,
+          "exclusiveMinimum": 0.0,
+          "maximum": 600.0,
+          "title": "Call Timeout Seconds",
+          "type": "number"
+        },
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Command",
+          "type": "array"
+        },
+        "entrypoint": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entrypoint"
+        },
+        "kind": {
+          "enum": [
+            "builtin-python",
+            "mcp-stdio",
+            "ros2-node",
+            "model-provider",
+            "ui-declarative"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "protocol_version": {
+          "default": "dronedream.plugin.v1",
+          "maxLength": 80,
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "startup_timeout_seconds": {
+          "default": 15.0,
+          "exclusiveMinimum": 0.0,
+          "maximum": 120.0,
+          "title": "Startup Timeout Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "PluginRuntime",
+      "type": "object"
+    },
+    "PluginSignature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "default": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "publisher_key_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,119}$",
+          "title": "Publisher Key Id",
+          "type": "string"
+        },
+        "signature_base64": {
+          "maxLength": 128,
+          "minLength": 80,
+          "title": "Signature Base64",
+          "type": "string"
+        },
+        "signed_at": {
+          "format": "date-time",
+          "title": "Signed At",
+          "type": "string"
+        },
+        "signed_manifest_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signed Manifest Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "publisher_key_id",
+        "signed_manifest_sha256",
+        "signature_base64",
+        "signed_at"
+      ],
+      "title": "PluginSignature",
+      "type": "object"
+    },
+    "PluginSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "catalog_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Catalog Sha256",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "plugins": {
+          "items": {
+            "$ref": "#/$defs/PluginSnapshotEntry"
+          },
+          "title": "Plugins",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "dronedream.plugin-snapshot.v1",
+          "default": "dronedream.plugin-snapshot.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "pattern": "^plugin-snapshot-[0-9a-f]{24}$",
+          "title": "Snapshot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "catalog_sha256",
+        "plugins",
+        "created_at"
+      ],
+      "title": "PluginSnapshot",
+      "type": "object"
+    },
+    "PluginSnapshotEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle_root": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bundle Root"
+        },
+        "capability_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Capability Ids",
+          "type": "array"
+        },
+        "configuration": {
+          "additionalProperties": true,
+          "title": "Configuration",
+          "type": "object"
+        },
+        "configuration_sha256": {
+          "default": "0000000000000000000000000000000000000000000000000000000000000000",
+          "title": "Configuration Sha256",
+          "type": "string"
+        },
+        "manifest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginManifest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "manifest_sha256": {
+          "title": "Manifest Sha256",
+          "type": "string"
+        },
+        "package_sha256": {
+          "title": "Package Sha256",
+          "type": "string"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin_id",
+        "version",
+        "package_sha256",
+        "manifest_sha256",
+        "capability_ids"
+      ],
+      "title": "PluginSnapshotEntry",
+      "type": "object"
+    },
+    "Px4CoordinateContract": {
+      "additionalProperties": false,
+      "properties": {
+        "collision_center_above_model_root_m": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 5.0,
+          "title": "Collision Center Above Model Root M",
+          "type": "number"
+        },
+        "executor_x": {
+          "const": "PX4 local north physically mapped to Gazebo y / School Map north",
+          "default": "PX4 local north physically mapped to Gazebo y / School Map north",
+          "title": "Executor X",
+          "type": "string"
+        },
+        "executor_y": {
+          "const": "PX4 local east physically mapped to Gazebo x / School Map east",
+          "default": "PX4 local east physically mapped to Gazebo x / School Map east",
+          "title": "Executor Y",
+          "type": "string"
+        },
+        "executor_z": {
+          "const": "PX4 local up",
+          "default": "PX4 local up",
+          "title": "Executor Z",
+          "type": "string"
+        },
+        "model_root_world_enu_m": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Model Root World Enu M",
+          "type": "array"
+        },
+        "source": {
+          "const": "Gazebo ENU vehicle-collision-envelope center",
+          "default": "Gazebo ENU vehicle-collision-envelope center",
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_root_world_enu_m",
+        "collision_center_above_model_root_m"
+      ],
+      "title": "Px4CoordinateContract",
+      "type": "object"
+    },
+    "Px4Track": {
+      "additionalProperties": false,
+      "properties": {
+        "coordinate_contract": {
+          "$ref": "#/$defs/Px4CoordinateContract"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/Px4TrackPoint"
+          },
+          "maxItems": 10000,
+          "minItems": 2,
+          "title": "Points",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "dronedream.school-map-px4-track.v1",
+          "default": "dronedream.school-map-px4-track.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_world_points": {
+          "items": {
+            "$ref": "#/$defs/WorldTrackPoint"
+          },
+          "maxItems": 10000,
+          "minItems": 2,
+          "title": "Source World Points",
+          "type": "array"
+        },
+        "stop_at_waypoints": {
+          "default": true,
+          "title": "Stop At Waypoints",
+          "type": "boolean"
+        },
+        "track_type": {
+          "const": "custom",
+          "default": "custom",
+          "title": "Track Type",
+          "type": "string"
+        },
+        "waypoint_hold_seconds": {
+          "maximum": 30.0,
+          "minimum": 0.0,
+          "title": "Waypoint Hold Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "coordinate_contract",
+        "points",
+        "source_world_points",
+        "waypoint_hold_seconds"
+      ],
+      "title": "Px4Track",
+      "type": "object"
+    },
+    "Px4TrackPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "phase": {
+          "enum": [
+            "launch",
+            "transit",
+            "stairs",
+            "pickup",
+            "return",
+            "land"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "speed_limit_mps": {
+          "exclusiveMinimum": 0.0,
+          "maximum": 20.0,
+          "title": "Speed Limit Mps",
+          "type": "number"
+        },
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "z": {
+          "title": "Z",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z",
+        "phase",
+        "speed_limit_mps"
+      ],
+      "title": "Px4TrackPoint",
+      "type": "object"
+    },
+    "RouteClearanceReport": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "collision_count": {
+          "minimum": 0,
+          "title": "Collision Count",
+          "type": "integer"
+        },
+        "collisions": {
+          "items": {
+            "$ref": "#/$defs/RouteCollision"
+          },
+          "maxItems": 100,
+          "title": "Collisions",
+          "type": "array"
+        },
+        "minimum_clearance_m": {
+          "title": "Minimum Clearance M",
+          "type": "number"
+        },
+        "minimum_clearance_point": {
+          "$ref": "#/$defs/Vector3"
+        },
+        "minimum_clearance_primitive": {
+          "title": "Minimum Clearance Primitive",
+          "type": "string"
+        },
+        "primitive_count": {
+          "minimum": 1,
+          "title": "Primitive Count",
+          "type": "integer"
+        },
+        "route_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Route Sha256",
+          "type": "string"
+        },
+        "sample_count": {
+          "minimum": 1,
+          "title": "Sample Count",
+          "type": "integer"
+        },
+        "sample_interval_m": {
+          "exclusiveMinimum": 0.0,
+          "title": "Sample Interval M",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "dronedream.route-clearance.v1",
+          "default": "dronedream.route-clearance.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "semantic_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Semantic Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "accepted",
+        "route_sha256",
+        "semantic_sha256",
+        "sample_interval_m",
+        "sample_count",
+        "primitive_count",
+        "collision_count",
+        "minimum_clearance_m",
+        "minimum_clearance_point",
+        "minimum_clearance_primitive"
+      ],
+      "title": "RouteClearanceReport",
+      "type": "object"
+    },
+    "RouteCollision": {
+      "additionalProperties": false,
+      "properties": {
+        "clearance_m": {
+          "title": "Clearance M",
+          "type": "number"
+        },
+        "position_m": {
+          "$ref": "#/$defs/Vector3"
+        },
+        "primitive_name": {
+          "title": "Primitive Name",
+          "type": "string"
+        },
+        "sample_index": {
+          "minimum": 0,
+          "title": "Sample Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sample_index",
+        "position_m",
+        "primitive_name",
+        "clearance_m"
+      ],
+      "title": "RouteCollision",
+      "type": "object"
+    },
+    "RoutePoint": {
+      "additionalProperties": false,
+      "properties": {
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "position_m": {
+          "$ref": "#/$defs/Vector3"
+        }
+      },
+      "required": [
+        "node_id",
+        "position_m"
+      ],
+      "title": "RoutePoint",
+      "type": "object"
+    },
+    "RuntimeCheckpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_id": {
+          "pattern": "^checkpoint-[0-9]{3}$",
+          "title": "Checkpoint Id",
+          "type": "string"
+        },
+        "segment_id": {
+          "pattern": "^segment-[0-9]{3}$",
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "target_node": {
+          "title": "Target Node",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "track_point_index": {
+          "minimum": 1,
+          "title": "Track Point Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checkpoint_id",
+        "segment_id",
+        "task_id",
+        "track_point_index",
+        "target_node"
+      ],
+      "title": "RuntimeCheckpoint",
+      "type": "object"
+    },
+    "RuntimeCheckpointContract": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoints": {
+          "items": {
+            "$ref": "#/$defs/RuntimeCheckpoint"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "title": "Checkpoints",
+          "type": "array"
+        },
+        "contract_id": {
+          "title": "Contract Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.runtime-checkpoints.v1",
+          "default": "dronedream.runtime-checkpoints.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_id",
+        "checkpoints"
+      ],
+      "title": "RuntimeCheckpointContract",
+      "type": "object"
+    },
+    "SemanticPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "ordered_targets": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Ordered Targets",
+          "type": "array"
+        },
+        "rationale_summary": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Rationale Summary",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.semantic-plan.v1",
+          "default": "dronedream.semantic-plan.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ordered_targets",
+        "rationale_summary"
+      ],
+      "title": "SemanticPlan",
+      "type": "object"
+    },
+    "TaskGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/TaskNode"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "title": "Nodes",
+          "type": "array"
+        },
+        "revision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "dronedream.task-graph.v1",
+          "default": "dronedream.task-graph.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "TaskGraph",
+      "type": "object"
+    },
+    "TaskNode": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "maxLength": 120,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Action",
+          "type": "string"
+        },
+        "depends_on": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "fallback": {
+          "enum": [
+            "continue",
+            "hold",
+            "return",
+            "land",
+            "abort"
+          ],
+          "title": "Fallback",
+          "type": "string"
+        },
+        "max_retries": {
+          "default": 1,
+          "maximum": 8,
+          "minimum": 0,
+          "title": "Max Retries",
+          "type": "integer"
+        },
+        "success_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Success Evidence",
+          "type": "array"
+        },
+        "target_node": {
+          "title": "Target Node",
+          "type": "string"
+        },
+        "task_id": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "action",
+        "target_node",
+        "success_evidence",
+        "fallback"
+      ],
+      "title": "TaskNode",
+      "type": "object"
+    },
+    "ToolReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "call_id": {
+          "pattern": "^tool-[0-9a-f]{24}$",
+          "title": "Call Id",
+          "type": "string"
+        },
+        "input_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Input Sha256",
+          "type": "string"
+        },
+        "issue_codes": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Issue Codes",
+          "type": "array"
+        },
+        "outcome": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "output": {
+          "additionalProperties": true,
+          "title": "Output",
+          "type": "object"
+        },
+        "output_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Output Sha256",
+          "type": "string"
+        },
+        "plugin_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9._-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plugin Id"
+        },
+        "plugin_package_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plugin Package Sha256"
+        },
+        "schema_version": {
+          "const": "dronedream.tool-receipt.v1",
+          "default": "dronedream.tool-receipt.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "tool_id": {
+          "pattern": "^[a-z][a-z0-9._-]*$",
+          "title": "Tool Id",
+          "type": "string"
+        },
+        "tool_version": {
+          "title": "Tool Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "tool_id",
+        "tool_version",
+        "outcome",
+        "input_sha256",
+        "output_sha256",
+        "output"
+      ],
+      "title": "ToolReceipt",
+      "type": "object"
+    },
+    "Vector3": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "z": {
+          "title": "Z",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "title": "Vector3",
+      "type": "object"
+    },
+    "WorldTrackPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "east_m": {
+          "title": "East M",
+          "type": "number"
+        },
+        "north_m": {
+          "title": "North M",
+          "type": "number"
+        },
+        "up_m": {
+          "title": "Up M",
+          "type": "number"
+        }
+      },
+      "required": [
+        "east_m",
+        "north_m",
+        "up_m"
+      ],
+      "title": "WorldTrackPoint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "$ref": "#/$defs/MissionContract"
+    },
+    "domain_actions": {
+      "$ref": "#/$defs/DomainActionCatalog"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/EvidenceRecord"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "execution_route": {
+      "$ref": "#/$defs/GraphRoute"
+    },
+    "harness_stage_receipts": {
+      "items": {
+        "$ref": "#/$defs/HarnessStageReceipt"
+      },
+      "title": "Harness Stage Receipts",
+      "type": "array"
+    },
+    "harness_topology": {
+      "$ref": "#/$defs/HarnessTopology"
+    },
+    "intent": {
+      "$ref": "#/$defs/IntentArtifact"
+    },
+    "intent_critique": {
+      "$ref": "#/$defs/IntentCritique"
+    },
+    "model_calls": {
+      "items": {
+        "$ref": "#/$defs/ModelCallRecord"
+      },
+      "title": "Model Calls",
+      "type": "array"
+    },
+    "plan": {
+      "$ref": "#/$defs/FlightPlan"
+    },
+    "plan_critique": {
+      "$ref": "#/$defs/PlanCritique"
+    },
+    "planning_attempts": {
+      "minimum": 1,
+      "title": "Planning Attempts",
+      "type": "integer"
+    },
+    "plugin_hook_receipts": {
+      "items": {
+        "$ref": "#/$defs/PluginHookReceipt"
+      },
+      "title": "Plugin Hook Receipts",
+      "type": "array"
+    },
+    "plugin_snapshot": {
+      "$ref": "#/$defs/PluginSnapshot"
+    },
+    "px4_track": {
+      "$ref": "#/$defs/Px4Track"
+    },
+    "route_clearance": {
+      "$ref": "#/$defs/RouteClearanceReport"
+    },
+    "runtime_checkpoints": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RuntimeCheckpointContract"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema_version": {
+      "default": "dronedream.prepared-mission.v2",
+      "enum": [
+        "dronedream.prepared-mission.v1",
+        "dronedream.prepared-mission.v2"
+      ],
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "semantic_plan": {
+      "$ref": "#/$defs/SemanticPlan"
+    },
+    "simulation_capabilities": {
+      "additionalProperties": true,
+      "title": "Simulation Capabilities",
+      "type": "object"
+    },
+    "status": {
+      "const": "awaiting_confirmation",
+      "default": "awaiting_confirmation",
+      "title": "Status",
+      "type": "string"
+    },
+    "task_graph": {
+      "$ref": "#/$defs/TaskGraph"
+    },
+    "tool_receipts": {
+      "items": {
+        "$ref": "#/$defs/ToolReceipt"
+      },
+      "title": "Tool Receipts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "intent",
+    "intent_critique",
+    "contract",
+    "domain_actions",
+    "task_graph",
+    "semantic_plan",
+    "plan",
+    "plan_critique",
+    "execution_route",
+    "route_clearance",
+    "px4_track",
+    "planning_attempts",
+    "model_calls",
+    "plugin_snapshot",
+    "harness_topology",
+    "harness_stage_receipts",
+    "tool_receipts",
+    "evidence"
+  ],
+  "title": "PreparedMission",
+  "type": "object"
+}

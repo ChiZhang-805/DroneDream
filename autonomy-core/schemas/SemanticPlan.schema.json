@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "ordered_targets": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Ordered Targets",
+      "type": "array"
+    },
+    "rationale_summary": {
+      "maxLength": 600,
+      "minLength": 1,
+      "title": "Rationale Summary",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "dronedream.semantic-plan.v1",
+      "default": "dronedream.semantic-plan.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ordered_targets",
+    "rationale_summary"
+  ],
+  "title": "SemanticPlan",
+  "type": "object"
+}

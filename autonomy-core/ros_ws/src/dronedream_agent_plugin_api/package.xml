@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>dronedream_agent_plugin_api</name>
+  <version>0.1.0</version>
+  <description>Certified pluginlib and lifecycle boundary for DroneDream runtime capabilities.</description>
+  <maintainer email="engineering@dronedream.local">DroneDream</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>dronedream_agent_msgs</depend>
+  <depend>lifecycle_msgs</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

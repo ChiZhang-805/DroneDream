@@ -1,0 +1,827 @@
+{
+  "$defs": {
+    "PluginCapability": {
+      "additionalProperties": false,
+      "properties": {
+        "authority": {
+          "default": "read",
+          "enum": [
+            "read",
+            "plan",
+            "simulate",
+            "control",
+            "actuate"
+          ],
+          "title": "Authority",
+          "type": "string"
+        },
+        "capability_id": {
+          "title": "Capability Id",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "input_schema": {
+          "additionalProperties": true,
+          "title": "Input Schema",
+          "type": "object"
+        },
+        "kind": {
+          "enum": [
+            "tool",
+            "model-provider",
+            "runtime-adapter",
+            "map-importer",
+            "vehicle-importer",
+            "planner",
+            "perception",
+            "payload",
+            "voice",
+            "data-service",
+            "evidence",
+            "ui-panel",
+            "workflow-policy",
+            "harness-profile",
+            "workflow-topology",
+            "harness-node",
+            "harness-scheduler",
+            "retry-policy",
+            "timeout-policy",
+            "budget-policy",
+            "fallback-policy",
+            "circuit-breaker",
+            "cache-policy",
+            "event-bus",
+            "observer",
+            "input-channel",
+            "attachment-decoder",
+            "locale-policy",
+            "entity-resolver",
+            "domain-pack",
+            "action-pack",
+            "model-policy",
+            "provider-discovery",
+            "model-router",
+            "consensus-policy",
+            "multimodal-preprocessor",
+            "token-meter",
+            "prompt-pack",
+            "context-strategy",
+            "context-enricher",
+            "context-store",
+            "context-retriever",
+            "context-summarizer",
+            "retention-policy",
+            "structured-decoder",
+            "task-decomposer",
+            "plan-scorer",
+            "plan-optimizer",
+            "plan-validator",
+            "tool-router",
+            "tool-middleware",
+            "tool-execution-policy",
+            "result-fusion",
+            "checkpoint-policy",
+            "anomaly-detector",
+            "runtime-replanner",
+            "scenario-generator",
+            "fault-injector",
+            "evaluator",
+            "evidence-exporter",
+            "notification",
+            "credential-source",
+            "qualification-check",
+            "simulator-adapter",
+            "physics-model",
+            "sensor-model",
+            "environment-model",
+            "clock-policy",
+            "monte-carlo-policy",
+            "runtime-amendment",
+            "telemetry-adapter",
+            "state-estimator",
+            "localization",
+            "controller",
+            "payload-driver",
+            "transport",
+            "trust-provider",
+            "runtime-watchdog"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "Output Schema",
+          "type": "object"
+        },
+        "required_permissions": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "asset.read",
+                  "attachment.read",
+                  "asset.write-staging",
+                  "mission.read",
+                  "mission.write-output",
+                  "network.model-gateway",
+                  "network.external",
+                  "network.local-device",
+                  "process.spawn",
+                  "ros.read",
+                  "ros.write",
+                  "simulator.control",
+                  "vehicle.actuate",
+                  "ui.panel",
+                  "context.read",
+                  "context.write-summary",
+                  "telemetry.read",
+                  "evidence.write",
+                  "configuration.read",
+                  "credential.reference"
+                ],
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Permissions"
+        }
+      },
+      "required": [
+        "capability_id",
+        "kind",
+        "name",
+        "description"
+      ],
+      "title": "PluginCapability",
+      "type": "object"
+    },
+    "PluginDependency": {
+      "additionalProperties": false,
+      "properties": {
+        "optional": {
+          "default": false,
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "version": {
+          "default": "*",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin_id"
+      ],
+      "title": "PluginDependency",
+      "type": "object"
+    },
+    "PluginManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "api_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Api Version",
+          "type": "string"
+        },
+        "capabilities": {
+          "items": {
+            "$ref": "#/$defs/PluginCapability"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "configuration_schema": {
+          "additionalProperties": true,
+          "title": "Configuration Schema",
+          "type": "object"
+        },
+        "conflicts": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "default_enabled": {
+          "default": false,
+          "title": "Default Enabled",
+          "type": "boolean"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/PluginDependency"
+          },
+          "maxItems": 32,
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "description": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "disable_allowed": {
+          "default": true,
+          "title": "Disable Allowed",
+          "type": "boolean"
+        },
+        "file_sha256": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 2000,
+          "title": "File Sha256",
+          "type": "object"
+        },
+        "minimum_app_version": {
+          "default": "0.1.0",
+          "title": "Minimum App Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "enum": [
+              "asset.read",
+              "attachment.read",
+              "asset.write-staging",
+              "mission.read",
+              "mission.write-output",
+              "network.model-gateway",
+              "network.external",
+              "network.local-device",
+              "process.spawn",
+              "ros.read",
+              "ros.write",
+              "simulator.control",
+              "vehicle.actuate",
+              "ui.panel",
+              "context.read",
+              "context.write-summary",
+              "telemetry.read",
+              "evidence.write",
+              "configuration.read",
+              "credential.reference"
+            ],
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Permissions",
+          "type": "array"
+        },
+        "placement": {
+          "$ref": "#/$defs/PluginPlacement"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/PluginProvenance"
+        },
+        "publisher": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Publisher",
+          "type": "string"
+        },
+        "removable": {
+          "default": true,
+          "title": "Removable",
+          "type": "boolean"
+        },
+        "resource_policy": {
+          "$ref": "#/$defs/PluginResourcePolicy"
+        },
+        "runtime": {
+          "$ref": "#/$defs/PluginRuntime"
+        },
+        "schema_version": {
+          "const": "dronedream.plugin-manifest.v1",
+          "default": "dronedream.plugin-manifest.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "signature": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginSignature"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin_id",
+        "name",
+        "version",
+        "description",
+        "publisher",
+        "runtime",
+        "capabilities"
+      ],
+      "title": "PluginManifest",
+      "type": "object"
+    },
+    "PluginPlacement": {
+      "additionalProperties": false,
+      "description": "Stable UI and activation slot occupied by a plugin implementation.",
+      "properties": {
+        "activation_mode": {
+          "default": "multiple",
+          "enum": [
+            "single",
+            "multiple",
+            "pipeline"
+          ],
+          "title": "Activation Mode",
+          "type": "string"
+        },
+        "category_id": {
+          "default": "general",
+          "title": "Category Id",
+          "type": "string"
+        },
+        "category_label": {
+          "default": "\u901a\u7528",
+          "title": "Category Label",
+          "type": "string"
+        },
+        "category_order": {
+          "default": 900,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Category Order",
+          "type": "integer"
+        },
+        "failure_mode": {
+          "default": "isolate",
+          "enum": [
+            "fail-closed",
+            "isolate",
+            "advisory"
+          ],
+          "title": "Failure Mode",
+          "type": "string"
+        },
+        "pipeline_order": {
+          "default": 500,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Pipeline Order",
+          "type": "integer"
+        },
+        "plugin_order": {
+          "default": 900,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Plugin Order",
+          "type": "integer"
+        },
+        "runs_after": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Runs After",
+          "type": "array"
+        },
+        "runs_before": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Runs Before",
+          "type": "array"
+        },
+        "scope": {
+          "default": "general",
+          "enum": [
+            "general",
+            "mission",
+            "runtime",
+            "interface"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "slot_id": {
+          "default": "general.extensions",
+          "title": "Slot Id",
+          "type": "string"
+        },
+        "slot_label": {
+          "default": "\u901a\u7528\u80fd\u529b",
+          "title": "Slot Label",
+          "type": "string"
+        },
+        "slot_order": {
+          "default": 900,
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Slot Order",
+          "type": "integer"
+        },
+        "swap_policy": {
+          "default": "next-mission",
+          "enum": [
+            "anytime",
+            "next-mission",
+            "safe-hold",
+            "restart",
+            "certified-update"
+          ],
+          "title": "Swap Policy",
+          "type": "string"
+        }
+      },
+      "title": "PluginPlacement",
+      "type": "object"
+    },
+    "PluginProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "build_system": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build System"
+        },
+        "build_timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Build Timestamp"
+        },
+        "sbom_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sbom Sha256"
+        },
+        "source_commit": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{7,64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Commit"
+        },
+        "source_uri": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Uri"
+        },
+        "update_ring": {
+          "default": "stable",
+          "enum": [
+            "stable",
+            "preview",
+            "canary",
+            "pinned"
+          ],
+          "title": "Update Ring",
+          "type": "string"
+        }
+      },
+      "title": "PluginProvenance",
+      "type": "object"
+    },
+    "PluginResourcePolicy": {
+      "additionalProperties": false,
+      "description": "Fail-closed resource envelope applied to executable plugin runtimes.",
+      "properties": {
+        "allowed_network_hosts": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Allowed Network Hosts",
+          "type": "array"
+        },
+        "cpu_time_limit_seconds": {
+          "default": 120,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Cpu Time Limit Seconds",
+          "type": "integer"
+        },
+        "maximum_message_bytes": {
+          "default": 2097152,
+          "maximum": 16777216,
+          "minimum": 4096,
+          "title": "Maximum Message Bytes",
+          "type": "integer"
+        },
+        "memory_limit_mb": {
+          "default": 256,
+          "maximum": 4096,
+          "minimum": 32,
+          "title": "Memory Limit Mb",
+          "type": "integer"
+        },
+        "process_limit": {
+          "default": 4,
+          "maximum": 64,
+          "minimum": 1,
+          "title": "Process Limit",
+          "type": "integer"
+        }
+      },
+      "title": "PluginResourcePolicy",
+      "type": "object"
+    },
+    "PluginRuntime": {
+      "additionalProperties": false,
+      "properties": {
+        "call_timeout_seconds": {
+          "default": 60.0,
+          "exclusiveMinimum": 0.0,
+          "maximum": 600.0,
+          "title": "Call Timeout Seconds",
+          "type": "number"
+        },
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "Command",
+          "type": "array"
+        },
+        "entrypoint": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entrypoint"
+        },
+        "kind": {
+          "enum": [
+            "builtin-python",
+            "mcp-stdio",
+            "ros2-node",
+            "model-provider",
+            "ui-declarative"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "protocol_version": {
+          "default": "dronedream.plugin.v1",
+          "maxLength": 80,
+          "title": "Protocol Version",
+          "type": "string"
+        },
+        "startup_timeout_seconds": {
+          "default": 15.0,
+          "exclusiveMinimum": 0.0,
+          "maximum": 120.0,
+          "title": "Startup Timeout Seconds",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "PluginRuntime",
+      "type": "object"
+    },
+    "PluginSignature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "ed25519",
+          "default": "ed25519",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "publisher_key_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,119}$",
+          "title": "Publisher Key Id",
+          "type": "string"
+        },
+        "signature_base64": {
+          "maxLength": 128,
+          "minLength": 80,
+          "title": "Signature Base64",
+          "type": "string"
+        },
+        "signed_at": {
+          "format": "date-time",
+          "title": "Signed At",
+          "type": "string"
+        },
+        "signed_manifest_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Signed Manifest Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "publisher_key_id",
+        "signed_manifest_sha256",
+        "signature_base64",
+        "signed_at"
+      ],
+      "title": "PluginSignature",
+      "type": "object"
+    },
+    "PluginSnapshotEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle_root": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bundle Root"
+        },
+        "capability_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Capability Ids",
+          "type": "array"
+        },
+        "configuration": {
+          "additionalProperties": true,
+          "title": "Configuration",
+          "type": "object"
+        },
+        "configuration_sha256": {
+          "default": "0000000000000000000000000000000000000000000000000000000000000000",
+          "title": "Configuration Sha256",
+          "type": "string"
+        },
+        "manifest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginManifest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "manifest_sha256": {
+          "title": "Manifest Sha256",
+          "type": "string"
+        },
+        "package_sha256": {
+          "title": "Package Sha256",
+          "type": "string"
+        },
+        "plugin_id": {
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin_id",
+        "version",
+        "package_sha256",
+        "manifest_sha256",
+        "capability_ids"
+      ],
+      "title": "PluginSnapshotEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "catalog_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Catalog Sha256",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "plugins": {
+      "items": {
+        "$ref": "#/$defs/PluginSnapshotEntry"
+      },
+      "title": "Plugins",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "dronedream.plugin-snapshot.v1",
+      "default": "dronedream.plugin-snapshot.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "snapshot_id": {
+      "pattern": "^plugin-snapshot-[0-9a-f]{24}$",
+      "title": "Snapshot Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "snapshot_id",
+    "catalog_sha256",
+    "plugins",
+    "created_at"
+  ],
+  "title": "PluginSnapshot",
+  "type": "object"
+}

@@ -1,0 +1,193 @@
+{
+  "$defs": {
+    "PlanRevisionRecord": {
+      "additionalProperties": false,
+      "description": "One replaceable plan inside a stable task thread.",
+      "properties": {
+        "contract_id": {
+          "title": "Contract Id",
+          "type": "string"
+        },
+        "conversation_id": {
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "mission_id": {
+          "pattern": "^mission-[0-9a-f]{32}$",
+          "title": "Mission Id",
+          "type": "string"
+        },
+        "parent_plan_revision_id": {
+          "anyOf": [
+            {
+              "pattern": "^plan-[0-9a-f]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Plan Revision Id"
+        },
+        "plan_revision_id": {
+          "pattern": "^plan-[0-9a-f]{32}$",
+          "title": "Plan Revision Id",
+          "type": "string"
+        },
+        "prepared_mission_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prepared Mission Sha256",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "dronedream.plan-revision.v1",
+          "default": "dronedream.plan-revision.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source_message_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Message Sha256",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "proposed",
+            "superseded",
+            "confirmed",
+            "executing",
+            "completed",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_revision_id",
+        "conversation_id",
+        "mission_id",
+        "revision",
+        "status",
+        "contract_id",
+        "prepared_mission_sha256",
+        "source_message_sha256",
+        "created_at"
+      ],
+      "title": "PlanRevisionRecord",
+      "type": "object"
+    },
+    "TaskThread": {
+      "additionalProperties": false,
+      "description": "Stable identity and lifecycle for one user-visible mission conversation.",
+      "properties": {
+        "active_execution_id": {
+          "anyOf": [
+            {
+              "pattern": "^execution-[0-9a-f]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Active Execution Id"
+        },
+        "conversation_id": {
+          "title": "Conversation Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "current_plan_revision_id": {
+          "anyOf": [
+            {
+              "pattern": "^plan-[0-9a-f]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Plan Revision Id"
+        },
+        "mission_id": {
+          "pattern": "^mission-[0-9a-f]{32}$",
+          "title": "Mission Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "dronedream.task-thread.v1",
+          "default": "dronedream.task-thread.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "planning",
+            "awaiting_confirmation",
+            "executing",
+            "holding",
+            "landing",
+            "completed",
+            "failed"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "conversation_id",
+        "mission_id",
+        "state",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "TaskThread",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Sidecar that avoids changing an already hash-bound PreparedMission schema.",
+  "properties": {
+    "plan_revision": {
+      "$ref": "#/$defs/PlanRevisionRecord"
+    },
+    "schema_version": {
+      "const": "dronedream.mission-lifecycle-binding.v1",
+      "default": "dronedream.mission-lifecycle-binding.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "thread": {
+      "$ref": "#/$defs/TaskThread"
+    }
+  },
+  "required": [
+    "thread",
+    "plan_revision"
+  ],
+  "title": "MissionLifecycleBinding",
+  "type": "object"
+}
