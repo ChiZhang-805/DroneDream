@@ -126,6 +126,7 @@ import {
   completeManagedModelCatalog,
   getManagedModelCatalog,
   getManagedModelUsage,
+  remainingAllowanceRatio,
   managedModelAvailableForAssistant,
   redeemManagedAllowanceResetCard,
   type ManagedAllowanceResetCard,
@@ -1140,16 +1141,9 @@ function SettingsDialog({
     experiencePreferenceState === "loading" ||
     experiencePreferenceState === "saving";
   const remainingCreditRatio = managedUsage
-    ? Math.min(
-        100,
-        Math.max(
-          0,
-          managedUsage.plan.included_ai_credits > 0
-            ? managedUsage.usage.remaining_ai_credits
-              / managedUsage.plan.included_ai_credits
-              * 100
-            : 0,
-        ),
+    ? remainingAllowanceRatio(
+        managedUsage.usage.remaining_ai_credits,
+        managedUsage.plan.included_ai_credits,
       )
     : 0;
   const allowanceResetCards = managedUsage?.allowance_reset_cards;
@@ -1892,7 +1886,7 @@ function SettingsDialog({
             ) : managedUsage ? (
               <>
                 <div className="settings-model-quota-heading">
-                  <span>{locale === "zh-CN" ? "剩余额度" : "Remaining allowance"}</span>
+                  <span>{t("settings.model.remainingAllowance")}</span>
                   <strong>
                     {numberFormatter.format(managedUsage.usage.remaining_ai_credits)}
                     {" / "}
