@@ -192,7 +192,10 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("CargoTargetRoot", release_builder)
         self.assertIn("Multiple supported installer handoffs", release_builder)
         self.assertIn("build-receipt.json", release_builder)
-        self.assertIn('ValidateSet("universal", "sim", "lab", "field", "autonomy")', release_builder)
+        self.assertIn(
+            'ValidateSet("universal", "sim", "lab", "field", "autonomy")',
+            release_builder,
+        )
         self.assertIn("dronedream-five-edition-build-receipt", release_builder)
         self.assertNotIn("core-four-msvc", release_builder)
         self.assertIn("receipt.sourceCommit", release_builder)
