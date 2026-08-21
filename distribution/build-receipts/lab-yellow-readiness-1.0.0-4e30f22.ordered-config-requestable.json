@@ -41,7 +41,7 @@
       },
       "integrated": true
     },
-    "displayName": "DroneDream �� LAB",
+    "displayName": "DroneDream · LAB",
     "grantsHardwareAuthority": false,
     "palette": [
       "#A7E84A",
@@ -85,11 +85,11 @@
   "labManifest": {
     "description": {
       "en": "Unified simulation, HITL, and real-hardware laboratory workflows behind native, runtime, and backend safety fences.",
-      "zh-CN": "ͳһ�ṩ���桢HITL �����ʵ�飬�������������������ͨ�� native��Runtime �������㰲ȫ�š�"
+      "zh-CN": "统一提供仿真、HITL 与真机实验，但所有真机能力都必须通过 native、Runtime 与后端三层安全门。"
     },
     "displayName": {
-      "en": "DroneDream �� LAB",
-      "zh-CN": "DroneDream �� LAB"
+      "en": "DroneDream · LAB",
+      "zh-CN": "DroneDream · LAB"
     },
     "file": {
       "path": "distribution/editions/lab.v1.json",
