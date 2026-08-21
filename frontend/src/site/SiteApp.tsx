@@ -168,7 +168,7 @@ const content = {
         ["Dedicated WSL2", "Runs the DroneDream distribution independently and never reuses or modifies a personal Ubuntu environment."],
         ["Trial isolation", "Assigns each PX4 / Gazebo run its own ports, process group, temporary files, and termination boundary safely."],
         ["Pinned inputs", "Records firmware, model, world, route, parameters, seeds, and environment effects before repeatable execution."],
-        ["Recovery and cleanup", "Exports failure diagnostics, preserves artifacts, and safely removes abandoned processes before the next clean launch."],
+        ["Recovery and cleanup", "Preserves failure diagnostics and artifacts, then clears abandoned processes before a clean restart."],
       ],
       [
         ["Configuration snapshot", "Stores the vehicle, firmware, ranges, optimizer, constraints, and trial budget for every tested candidate."],
@@ -210,7 +210,7 @@ const content = {
     platform: "Platform",
     platformValue: "Windows x64",
     released: "Released",
-    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is published while code signing is being prepared.",
+    footerLine: "Local PX4/Gazebo tuning. Version 1.0.0 is live; code signing is in progress.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
     communityGuidelines: "Community guidelines",

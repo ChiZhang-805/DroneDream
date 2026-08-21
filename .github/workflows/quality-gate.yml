@@ -206,6 +206,8 @@ jobs:
     timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: "0"
+      DRONEDREAM_DESKTOP_EDITION_ID: sim
+      DRONEDREAM_EDITION_PROFILE: sim-only
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

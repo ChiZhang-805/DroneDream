@@ -4,7 +4,6 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend ./
-COPY distribution/editions/field/adapters/catalog.v1.json /app/distribution/editions/field/adapters/catalog.v1.json
 
 ARG VITE_API_BASE_URL=
 ARG VITE_DEMO_AUTH_TOKEN
