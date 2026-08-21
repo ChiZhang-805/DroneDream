@@ -308,9 +308,11 @@ async function verifyCase(browser, testCase) {
     const installText = testCase.locale === "en"
       ? "Install DroneDreamRuntime"
       : "安装 DroneDreamRuntime";
-    const signInText = testCase.locale === "en"
-      ? "Sign in and enter tuning workspace"
-      : "登录并进入调优平台";
+    const signInText = {
+      universal: ["Sign in and enter DroneDream", "登录并进入 DroneDream"],
+      sim: ["Sign in and enter simulation workspace", "登录并进入仿真工作区"],
+      lab: ["Sign in and enter laboratory workspace", "登录并进入实验室工作区"],
+    }[edition][testCase.locale === "en" ? 0 : 1];
     const install = page.getByRole("button", { name: installText });
     const signIn = page.getByRole("button", { name: signInText });
     const startRuntime = page.getByRole("button", { name: /Start Runtime|启动 Runtime/i });

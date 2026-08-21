@@ -8,12 +8,16 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { getInstallerLocale, isDesktopRuntime } from "../desktop/bridge";
+import { BUILD_EDITION } from "../edition";
+import { launcherCopyForEdition } from "./launcherEditionCopy";
 
 // Settings offers six authored locales. Product views that do not yet have an
 // authored dictionary use English rather than pretending that a different
 // language has been translated.
 export type Locale = "en" | "zh-CN";
 export type InterfaceLocale = Locale | "zh-TW" | "es" | "ja" | "ko";
+
+const launcherCopy = launcherCopyForEdition(BUILD_EDITION);
 
 const enTranslations = {
     "app.conversation": "Tuning Chat",
@@ -201,13 +205,13 @@ const enTranslations = {
     "desktop.title": "Desktop environment setup",
     "desktop.subtitle":
       "Check this computer, the dedicated DroneDream runtime, and the steps required before local PX4/Gazebo tuning begins.",
-    "launcher.title.welcome": "Build your autonomous flight workspace",
+    "launcher.title.welcome": launcherCopy.enWelcome,
     "launcher.title.checking": "Checking your simulation environment",
     "launcher.title.downloading": "Downloading your flight environment",
     "launcher.title.preparing": "Preparing your flight environment",
-    "launcher.title.ready": "Your flight lab is ready",
-    "launcher.openWorkspace": "Open tuning workspace",
-    "launcher.signIn": "Sign in and enter tuning workspace",
+    "launcher.title.ready": launcherCopy.enReady,
+    "launcher.openWorkspace": launcherCopy.enOpen,
+    "launcher.signIn": launcherCopy.enSignIn,
     "launcher.browserAuthWaiting": "Waiting for browser sign-in…",
     "launcher.browserAuthAdopting": "Confirming account…",
     "launcher.browserAuthErrorTitle": "Browser sign-in needs attention",
@@ -1803,13 +1807,13 @@ const zhTranslations = {
     "desktop.eyebrow": "本地运行环境",
     "desktop.title": "桌面环境设置",
     "desktop.subtitle": "检查本机、DroneDream 专用运行环境，以及在本地执行 PX4/Gazebo 调优前需要完成的步骤。",
-    "launcher.title.welcome": "构建你的自主飞行工作空间",
+    "launcher.title.welcome": launcherCopy.zhWelcome,
     "launcher.title.checking": "正在检查仿真运行环境",
     "launcher.title.downloading": "正在下载飞行环境",
     "launcher.title.preparing": "正在准备飞行环境",
-    "launcher.title.ready": "你的飞行实验室已经就绪",
-    "launcher.openWorkspace": "进入调优平台",
-    "launcher.signIn": "登录并进入调优平台",
+    "launcher.title.ready": launcherCopy.zhReady,
+    "launcher.openWorkspace": launcherCopy.zhOpen,
+    "launcher.signIn": launcherCopy.zhSignIn,
     "launcher.browserAuthWaiting": "正在等待浏览器登录…",
     "launcher.browserAuthAdopting": "正在确认账户…",
     "launcher.browserAuthErrorTitle": "浏览器登录需要处理",

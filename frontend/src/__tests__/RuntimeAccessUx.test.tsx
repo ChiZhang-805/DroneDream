@@ -391,7 +391,7 @@ afterEach(() => {
     expect(await screen.findByText("The installed runtime is ready."))
       .toBeInTheDocument();
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();

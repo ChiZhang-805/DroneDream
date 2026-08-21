@@ -538,10 +538,10 @@ describe("DesktopSetup", () => {
     expect(screen.queryByText("Validate Windows, virtualization, memory, and disk"))
       .not.toBeInTheDocument();
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }, { timeout: 7_000 })).toBeEnabled();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
@@ -572,9 +572,9 @@ describe("DesktopSetup", () => {
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(screen.getByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
   });
 
@@ -600,10 +600,10 @@ describe("DesktopSetup", () => {
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(screen.getByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }))
       .toBeEnabled();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
   });
 
@@ -641,7 +641,7 @@ describe("DesktopSetup", () => {
     expect(screen.getAllByText(/older than the desktop sign-in protocol/i))
       .toHaveLength(2);
     expect(screen.queryByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .not.toHaveAttribute("aria-valuenow", "100");
@@ -667,7 +667,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     await userEvent.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }));
 
     expect(screen.getByRole("button", { name: "Waiting for browser sign-in…" }))
@@ -692,7 +692,7 @@ describe("DesktopSetup", () => {
     renderPage();
 
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
     expect(invoke).toHaveBeenCalledTimes(2);
 
@@ -723,7 +723,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     const signIn = await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     });
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
@@ -761,7 +761,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     await user.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }));
 
     await waitFor(() => {
@@ -796,7 +796,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     await userEvent.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }));
 
     await waitFor(() => {
@@ -828,7 +828,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     await userEvent.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }));
 
     await waitFor(() => {
@@ -876,12 +876,12 @@ describe("DesktopSetup", () => {
     renderPage();
 
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
     expect(screen.getByTestId("current-route")).toHaveTextContent("/");
 
     await userEvent.click(screen.getByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }));
 
     await waitFor(() => {
@@ -915,7 +915,7 @@ describe("DesktopSetup", () => {
     const update = await screen.findByRole("button", {
       name: "Version 1.0.1 is available. Click to update.",
     });
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "0");
@@ -948,7 +948,7 @@ describe("DesktopSetup", () => {
     renderPage();
 
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
@@ -978,7 +978,7 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("dialog", { name: "Setup needs attention" }))
       .not.toBeInTheDocument();
     expect(screen.getByText("Checking system")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "0");
@@ -1020,7 +1020,7 @@ describe("DesktopSetup", () => {
       expect(screen.getByRole("dialog", { name: "Setup needs attention" }))
         .toBeInTheDocument();
     });
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
   });
 
@@ -2512,7 +2512,7 @@ describe("DesktopSetup", () => {
       .toHaveAttribute("aria-valuenow", "0");
     expect(screen.queryByRole("button", { name: "Repair and restart runtime" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sign in and enter tuning workspace" }))
+    expect(screen.queryByRole("button", { name: "Sign in and enter DroneDream" }))
       .not.toBeInTheDocument();
     expect(invoke).not.toHaveBeenCalledWith("repair_runtime", undefined);
   });
@@ -2545,7 +2545,7 @@ describe("DesktopSetup", () => {
     );
 
     expect(await screen.findByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Sign in and enter tuning workspace" }))
+    expect(await screen.findByRole("button", { name: "Sign in and enter DroneDream" }))
       .toBeEnabled();
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();
@@ -2605,7 +2605,7 @@ describe("DesktopSetup", () => {
       .toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sign in and enter tuning workspace" }))
+    expect(screen.queryByRole("button", { name: "Sign in and enter DroneDream" }))
       .not.toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("start_runtime", undefined);
   });
