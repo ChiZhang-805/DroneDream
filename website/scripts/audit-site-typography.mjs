@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
+import { launchSiteBrowser } from "./playwright-browser.mjs";
 
 const frontendRequire = createRequire(new URL("../../frontend/package.json", import.meta.url));
 const { chromium } = frontendRequire("playwright");
@@ -22,18 +23,7 @@ const width = Number(widthRaw);
 const height = Number(heightRaw);
 const minimumFill = Number(minimumFillRaw);
 const checkTypography = modeRaw === "full";
-const browserOverride = process.env.DRONEDREAM_AUDIT_BROWSER;
-const edgeCandidates = [
-  browserOverride,
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-].filter(Boolean);
-const browserExecutable = edgeCandidates.find(existsSync);
-const browser = await chromium.launch({
-  ...(browserExecutable ? { executablePath: browserExecutable } : {}),
-  headless: true,
-  args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
-});
+const browser = await launchSiteBrowser(chromium);
 const diagnostics = [];
 
 const waitForStableLayout = async (page) => {
