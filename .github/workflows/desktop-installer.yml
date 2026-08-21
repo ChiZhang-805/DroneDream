@@ -39,9 +39,10 @@ jobs:
   windows-nsis:
     name: Windows x64 NSIS
     runs-on: windows-2022
-    # Two SignPath requests require explicit release approval. Keep enough
-    # headroom for review without turning a stalled request into an endless job.
-    timeout-minutes: 90
+    # LAB's full backend evidence suite exceeds 90 minutes on the Windows
+    # runner before frontend, Rust and packaging checks begin. Keep every test
+    # while retaining a finite ceiling for stalled signing or packaging work.
+    timeout-minutes: 150
     env:
       CARGO_BUILD_JOBS: "4"
       # Pull requests may compile with inert placeholders. Formal desktop tags
