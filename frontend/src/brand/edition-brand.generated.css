@@ -35,3 +35,12 @@
   --dd-brand-dark-surface: #28140D;
   --dd-brand-gradient: linear-gradient(110deg, #FFC247, #FF754B 52%, #D746A5);
 }
+
+[data-brand-edition="autonomy"] {
+  --dd-brand-start: #FF5B74;
+  --dd-brand-middle: #EC214F;
+  --dd-brand-end: #97153B;
+  --dd-brand-light-surface: #FFF4F7;
+  --dd-brand-dark-surface: #250914;
+  --dd-brand-gradient: linear-gradient(110deg, #FF5B74, #EC214F 52%, #97153B);
+}

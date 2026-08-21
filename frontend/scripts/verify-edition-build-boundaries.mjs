@@ -13,8 +13,8 @@ for (let index = 2; index < process.argv.length; index += 2) {
 
 const edition = args.get("edition");
 const dist = args.get("dist");
-if (!edition || !["universal", "sim", "lab", "field"].includes(edition)) {
-  throw new Error("Edition must be universal, sim, lab, or field");
+if (!edition || !["universal", "sim", "lab", "field", "autonomy"].includes(edition)) {
+  throw new Error("Edition must be universal, sim, lab, field, or autonomy");
 }
 if (!dist || !path.isAbsolute(dist) || !fs.statSync(dist).isDirectory()) {
   throw new Error("Dist must be an existing absolute directory");
@@ -42,9 +42,11 @@ if (edition === "universal") {
     "LabHardwareWorkspace",
     "FieldApp",
     "VehicleStudio",
+    "AutonomyGateway",
   ]) requireChunk(name);
 } else if (edition === "sim") {
   requireChunk("SimOverview");
+  requireChunk("AutonomyGateway");
   for (const name of [
     "LabSetup",
     "LabHardwareWorkspace",
@@ -54,16 +56,26 @@ if (edition === "universal") {
 } else if (edition === "lab") {
   requireChunk("LabSetup");
   requireChunk("LabHardwareWorkspace");
+  requireChunk("AutonomyGateway");
   forbidChunk("SimOverview");
   forbidChunk("FieldApp");
   forbidChunk("VehicleStudio");
-} else {
+} else if (edition === "field") {
   if (!files.includes("field.html")) {
     throw new Error("Field build is missing field.html");
   }
   for (const name of ["SimOverview", "LabSetup", "VehicleStudio"]) {
     forbidChunk(name);
   }
+} else {
+  requireChunk("AutonomyGateway");
+  for (const name of [
+    "SimOverview",
+    "LabSetup",
+    "LabHardwareWorkspace",
+    "FieldApp",
+    "VehicleStudio",
+  ]) forbidChunk(name);
 }
 
 console.log(JSON.stringify({

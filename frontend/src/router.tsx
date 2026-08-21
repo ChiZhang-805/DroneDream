@@ -97,6 +97,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: FixedScenarios };
           },
         },
+        {
+          path: "autonomy",
+          lazy: async () => {
+            const { AutonomyGateway } = await import("./pages/AutonomyGateway");
+            return { Component: AutonomyGateway };
+          },
+        },
         ...(BUILD_HAS_VEHICLE_STUDIO ? [{
           path: "vehicle-studio",
           lazy: async () => {

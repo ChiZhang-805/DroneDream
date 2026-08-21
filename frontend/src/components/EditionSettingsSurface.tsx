@@ -51,7 +51,7 @@ export function EditionSettingsSurface({
   tabs: readonly SettingsSurfaceTab[];
   title: string;
   children: ReactNode;
-  consumerProfile?: "shared" | "universal" | "sim" | "lab" | "field-lightweight";
+  consumerProfile?: "shared" | "universal" | "sim" | "lab" | "field-lightweight" | "autonomy";
 }) {
   const tabRefs = useRef(new Map<SettingsSurfaceTabId, HTMLButtonElement>());
   const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {

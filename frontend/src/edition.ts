@@ -11,6 +11,7 @@ export const BUILD_HAS_LAB_WORKSPACE =
   || __DRONEDREAM_BUILD_EDITION__ === "lab";
 export const BUILD_HAS_FIELD_WORKSPACE =
   __DRONEDREAM_BUILD_EDITION__ === "universal";
+export const BUILD_HAS_AUTONOMY_WORKSPACE = true;
 export const BUILD_HAS_VEHICLE_STUDIO =
   __DRONEDREAM_BUILD_EDITION__ === "universal";
 
@@ -35,5 +36,6 @@ export function editionLandingPath(edition = BUILD_EDITION): string {
   if (edition === "sim") return "/sim";
   if (edition === "lab") return "/lab";
   if (edition === "field") return "/field";
+  if (edition === "autonomy") return "/autonomy";
   return "/assistant";
 }

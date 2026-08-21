@@ -24,6 +24,7 @@ import {
   Menu,
   Moon,
   MoreHorizontal,
+  Orbit,
   RadioTower,
   Save,
   Settings,
@@ -147,6 +148,11 @@ const CORE_NAV_ITEMS: NavigationItem[] = [
     icon: BotMessageSquare,
   },
   {
+    to: "/autonomy",
+    label: "AUTONOMY",
+    icon: Orbit,
+  },
+  {
     to: "/dashboard",
     labelKey: "app.dashboard",
     end: true,
@@ -202,8 +208,12 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
     end: true,
     icon: RadioTower,
   },
-  ...CORE_NAV_ITEMS.filter((item) => item.to === "/vehicle-studio" || item.externalUrl),
+  ...CORE_NAV_ITEMS.filter((item) => item.to === "/vehicle-studio" || item.to === "/autonomy" || item.externalUrl),
 ];
+
+const AUTONOMY_NAV_ITEMS: NavigationItem[] = CORE_NAV_ITEMS.filter((item) =>
+  item.to === "/assistant" || item.to === "/autonomy" || item.to === "/history"
+);
 
 const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
   sim: SIM_NAV_ITEMS,
@@ -212,12 +222,14 @@ const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
     ...CORE_NAV_ITEMS,
   ],
   field: FIELD_NAV_ITEMS,
+  autonomy: AUTONOMY_NAV_ITEMS,
 };
 
 const MODE_LANDING_PATH: Record<UniversalWorkspaceId, string> = {
   sim: "/sim",
   lab: "/lab",
   field: "/field",
+  autonomy: "/autonomy",
 };
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
@@ -2222,7 +2234,9 @@ function AppShellContent() {
       ? SIM_NAV_ITEMS
       : BUILD_EDITION === "lab"
         ? FIXED_LAB_NAV_ITEMS
-        : FIELD_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio")
+        : BUILD_EDITION === "field"
+          ? FIELD_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio")
+          : AUTONOMY_NAV_ITEMS
     : MODE_NAV_ITEMS[universalMode];
   const sidebarUpdateLabel = updater.status === "available"
     ? updater.error

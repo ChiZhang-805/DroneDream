@@ -125,9 +125,7 @@ def _is_wsl_runtime() -> bool:
     if os.environ.get("WSL_DISTRO_NAME") or os.environ.get("WSL_INTEROP"):
         return True
     try:
-        return "microsoft" in Path("/proc/sys/kernel/osrelease").read_text(
-            encoding="utf-8"
-        ).lower()
+        return "microsoft" in Path("/proc/sys/kernel/osrelease").read_text(encoding="utf-8").lower()
     except OSError:
         return False
 
@@ -139,9 +137,12 @@ def _resolve_gazebo_transport_ip() -> str:
     if not _is_wsl_runtime():
         return "127.0.0.1"
 
+    ip_binary = shutil.which("ip")
+    if ip_binary is None:
+        raise RuntimeError("unable to locate the WSL ip route utility")
     try:
         result = subprocess.run(  # noqa: S603
-            ["ip", "-4", "route", "get", "1.1.1.1"],
+            [ip_binary, "-4", "route", "get", "1.1.1.1"],
             text=True,
             capture_output=True,
             check=False,

@@ -68,9 +68,9 @@
     "editions": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["universal", "sim", "lab", "field"],
+      "required": ["universal", "sim", "lab", "field", "autonomy"],
       "patternProperties": {
-        "^(universal|sim|lab|field)$": {
+        "^(universal|sim|lab|field|autonomy)$": {
           "type": "object",
           "additionalProperties": false,
           "required": ["productName", "editionLabel", "gradientStops", "lightSurface", "darkSurface"],
@@ -156,9 +156,9 @@
     "approvedEditionAssets": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sim", "lab", "field"],
+      "required": ["sim", "lab", "field", "autonomy"],
       "patternProperties": {
-        "^(sim|lab|field)$": {
+        "^(sim|lab|field|autonomy)$": {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -168,19 +168,17 @@
             "dotLockupSha256",
             "dotLockupDimensions",
             "dotLockupStyle",
-            "separatorGeometry",
-            "supersededLargeLabelLockup",
-            "supersededDotLockup"
+            "separatorGeometry"
           ],
           "properties": {
             "markPath": {
               "type": "string",
-              "pattern": "^brand/source/approved/(sim|lab|field)-mark-1024\\.png$"
+              "pattern": "^brand/source/approved/(sim|lab|field|autonomy)-mark-1024\\.png$"
             },
             "markSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "dotLockupPath": {
               "type": "string",
-              "pattern": "^brand/source/approved/(sim|lab|field)-large-label-centered-lockup\\.png$"
+              "pattern": "^brand/source/approved/(sim|lab|field|autonomy)-large-label-centered-lockup\\.png$"
             },
             "dotLockupSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "dotLockupDimensions": {
@@ -188,11 +186,14 @@
               "additionalProperties": false,
               "required": ["width", "height"],
               "properties": {
-                "width": {"type": "integer", "minimum": 2000, "maximum": 3000},
-                "height": {"const": 218}
+                "width": {"type": "integer", "minimum": 2000, "maximum": 3200},
+                "height": {"type": "integer", "minimum": 200, "maximum": 360}
               }
             },
-            "dotLockupStyle": {"const": "large-edition-label-centered-separator-v2"},
+            "dotLockupStyle": {
+              "enum": ["large-edition-label-centered-separator-v2", "autonomy-approved-lockup-v1"]
+            },
+            "separatorTolerancePx": {"type": "integer", "minimum": 0, "maximum": 12},
             "separatorGeometry": {
               "type": "object",
               "additionalProperties": false,
@@ -224,19 +225,6 @@
                 },
                 "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
                 "status": {"const": "superseded-by-centered-separator-v2"}
-              }
-            },
-            "supersededDotLockup": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["path", "sha256", "status"],
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "pattern": "^brand/source/approved/(sim|lab|field)-dot-lockup\\.png$"
-                },
-                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-                "status": {"const": "superseded"}
               }
             }
           }

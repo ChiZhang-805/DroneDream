@@ -95,11 +95,13 @@ describe("workspace account entry", () => {
     const { container, router } = renderWorkspace();
 
     const links = container.querySelectorAll(".app-nav a");
-    expect(links).toHaveLength(5);
+    expect(links).toHaveLength(6);
     expect(screen.getByRole("link", { name: "SIM" }))
       .toHaveAttribute("href", "/sim");
     expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
       .not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "AUTONOMY" }))
+      .toHaveAttribute("href", "/autonomy");
     links.forEach((link) => {
       expect(link.querySelector(".app-nav-entry > svg")).not.toBeNull();
     });
@@ -124,9 +126,11 @@ describe("workspace account entry", () => {
     expect(panel).not.toHaveAttribute("hidden");
     expect(within(panel!).getByRole("button", { name: "Account" }))
       .toHaveTextContent("Local user");
-    expect(within(panel!).getAllByRole("link")).toHaveLength(5);
+    expect(within(panel!).getAllByRole("link")).toHaveLength(6);
     expect(within(panel!).getByRole("link", { name: "SIM" }))
       .toHaveAttribute("href", "/sim");
+    expect(within(panel!).getByRole("link", { name: "AUTONOMY" }))
+      .toHaveAttribute("href", "/autonomy");
 
     fireEvent.click(within(panel!).getByRole("button", { name: "Settings" }));
     expect(panel).toHaveAttribute("hidden");
