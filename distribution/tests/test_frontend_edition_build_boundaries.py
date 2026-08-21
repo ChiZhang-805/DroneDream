@@ -46,7 +46,7 @@ def test_vehicle_studio_is_required_in_its_two_host_editions(
         "FieldApp",
         "UniversalFieldApp",
         "VehicleStudio",
-    ) if edition == "universal" else ("UniversalFieldApp", "VehicleStudio")
+    ) if edition == "universal" else ("VehicleStudio",)
     _write_dist(tmp_path, required)
 
     result = _verify(edition, tmp_path)
@@ -68,7 +68,7 @@ def test_vehicle_studio_host_build_fails_when_chunk_is_missing(
         "LabValidationWorkspace",
         "FieldApp",
         "UniversalFieldApp",
-    ) if edition == "universal" else ("UniversalFieldApp",)
+    ) if edition == "universal" else ()
     _write_dist(tmp_path, required)
 
     result = _verify(edition, tmp_path)
@@ -96,3 +96,12 @@ def test_vehicle_studio_is_forbidden_in_non_host_editions(
 
     assert result.returncode != 0
     assert f"{edition} contains foreign VehicleStudio code" in result.stderr
+
+
+def test_autonomy_rejects_uncompiled_universal_field_workspace(tmp_path: Path) -> None:
+    _write_dist(tmp_path, ("UniversalFieldApp", "VehicleStudio"))
+
+    result = _verify("autonomy", tmp_path)
+
+    assert result.returncode != 0
+    assert "autonomy contains foreign UniversalFieldApp code" in result.stderr
