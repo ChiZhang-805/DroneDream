@@ -251,7 +251,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert vehicle_studio["grantsSimulationExecution"] is False
     assert vehicle_studio["grantsHardwareAuthority"] is False
     assert vehicle_studio["productSourceCommit"] == (
-        "81550b94270ee4e47eed7d520fb8280bd3a8ee7b"
+        "b2fdade2afcfa20e1f117eafabb537aafa6f067f"
     )
     for source_file in vehicle_studio["sourceFiles"]:
         path = ROOT / source_file["path"]
