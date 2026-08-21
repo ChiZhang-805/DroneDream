@@ -31,6 +31,7 @@ import {
   Moon,
   LoaderCircle,
   RotateCcw,
+  Orbit,
   Save,
   Settings,
   ShieldCheck,
@@ -163,6 +164,11 @@ const NAV_ITEMS: {
     end: true,
     requiresRuntime: true,
     icon: BotMessageSquare,
+  },
+  {
+    to: "/autonomy",
+    label: "AUTONOMY",
+    icon: Orbit,
   },
   {
     to: "/dashboard",
