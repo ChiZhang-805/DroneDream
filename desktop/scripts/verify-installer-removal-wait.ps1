@@ -3,6 +3,7 @@ param()
 $ErrorActionPreference = "Stop"
 $waitScript = Join-Path $PSScriptRoot "wait-path-removal.ps1"
 $stopWebViewScript = Join-Path $PSScriptRoot "stop-owned-webview2.ps1"
+$invokeUninstallerScript = Join-Path $PSScriptRoot "invoke-nsis-uninstaller.ps1"
 $workflow = Join-Path $PSScriptRoot "..\..\.github\workflows\desktop-installer.yml"
 
 if (-not (Test-Path -LiteralPath $waitScript -PathType Leaf)) {
@@ -11,11 +12,16 @@ if (-not (Test-Path -LiteralPath $waitScript -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $stopWebViewScript -PathType Leaf)) {
     throw "Owned WebView2 shutdown helper is missing: $stopWebViewScript"
 }
+if (-not (Test-Path -LiteralPath $invokeUninstallerScript -PathType Leaf)) {
+    throw "Deterministic NSIS uninstall helper is missing: $invokeUninstallerScript"
+}
 
 $workflowText = Get-Content -LiteralPath $workflow -Raw
 $stopWebViewCall = "./desktop/scripts/stop-owned-webview2.ps1"
+$invokeUninstallerCall = "./desktop/scripts/invoke-nsis-uninstaller.ps1"
 $waitPathCall = "./desktop/scripts/wait-path-removal.ps1"
 $stopWebViewIndex = $workflowText.IndexOf($stopWebViewCall, [System.StringComparison]::Ordinal)
+$invokeUninstallerIndex = $workflowText.IndexOf($invokeUninstallerCall, [System.StringComparison]::Ordinal)
 $waitPathIndex = $workflowText.IndexOf($waitPathCall, [System.StringComparison]::Ordinal)
 if ($waitPathIndex -lt 0) {
     throw "Desktop installer workflow does not invoke the path-removal wait helper"
@@ -23,8 +29,17 @@ if ($waitPathIndex -lt 0) {
 if ($stopWebViewIndex -lt 0) {
     throw "Desktop installer workflow does not stop app-owned WebView2 processes"
 }
+if ($invokeUninstallerIndex -lt 0) {
+    throw "Desktop installer workflow does not invoke the deterministic NSIS helper"
+}
 if ($stopWebViewIndex -gt $waitPathIndex) {
     throw "Desktop installer workflow must stop app-owned WebView2 before waiting for uninstall"
+}
+if ($stopWebViewIndex -gt $invokeUninstallerIndex) {
+    throw "Desktop installer workflow must stop app-owned WebView2 before uninstall"
+}
+if ($invokeUninstallerIndex -gt $waitPathIndex) {
+    throw "Desktop installer workflow must invoke NSIS before waiting for path removal"
 }
 if ($workflowText -notmatch "-TimeoutSeconds 30") {
     throw "Desktop installer workflow must keep the bounded 30-second removal deadline"
@@ -61,6 +76,22 @@ foreach ($diagnosticContract in @(
         [System.StringComparison]::Ordinal
     )) {
         throw "Installer path-removal helper is missing failure diagnostic: $diagnosticContract"
+    }
+}
+
+$invokeText = Get-Content -LiteralPath $invokeUninstallerScript -Raw
+foreach ($uninstallContract in @(
+    "Copy-Item -LiteralPath",
+    '"_?=$installRootFull"',
+    "-Wait -PassThru",
+    "Uninstaller must be located inside the declared install root",
+    "Refusing to create an uninstaller copy outside the system temp root"
+)) {
+    if (-not $invokeText.Contains(
+        $uninstallContract,
+        [System.StringComparison]::Ordinal
+    )) {
+        throw "Deterministic NSIS helper is missing contract: $uninstallContract"
     }
 }
 

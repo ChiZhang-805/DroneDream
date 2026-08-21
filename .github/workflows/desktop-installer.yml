@@ -620,11 +620,9 @@ jobs:
               -TimeoutSeconds 10 `
               -PollIntervalMilliseconds 250
             if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
-              $uninstallProcess = Start-Process -FilePath $uninstaller `
-                -ArgumentList "/S" -Wait -PassThru
-              if ($uninstallProcess.ExitCode -ne 0) {
-                throw "Silent uninstaller failed with exit code $($uninstallProcess.ExitCode)"
-              }
+              ./desktop/scripts/invoke-nsis-uninstaller.ps1 `
+                -UninstallerPath $uninstaller `
+                -InstallRoot $installDirFull
             }
           }
           ./desktop/scripts/stop-owned-webview2.ps1 `
