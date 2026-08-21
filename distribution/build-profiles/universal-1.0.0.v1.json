@@ -9,7 +9,7 @@
   "enginePackProfileMeaning": "backward-compatible Runtime profile identifier for the full Universal payload",
   "enginePackPayloadContract": {
     "contractId": "dronedream-universal-engine-payload/v1",
-    "requiredEditionIds": ["sim", "lab", "field"],
+    "requiredEditionIds": ["sim", "lab", "field", "autonomy"],
     "requiredVehiclePackRegistry": "distribution/vehicle-packs/registry.v1.json",
     "requiredSafetyPolicy": "distribution/safety/edition-execution-gate.v1.json",
     "forbiddenPathPrefixes": [
@@ -34,7 +34,7 @@
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "1ac2da53237e66723c6f847ab4cf47b71c44a52daa586d0c11418d2bffb07afe"
+        "sha256": "ed21709c565880b08093db60721dcfdea9f77c72d20aab9f1f7fcc0e8057a6ca"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
@@ -50,7 +50,7 @@
       },
       {
         "path": "frontend/src/styles.css",
-        "sha256": "a75feec22077b0ec3240e8f8643e88d9a220de63caa398889a001bba77751122"
+        "sha256": "41636e9ab161f9c9210a76fdcbb8802a29e5163496aaf3aa8bb1afb864ac8798"
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
@@ -85,14 +85,14 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "distribution/universal/integrated-workspaces.v2.json",
-    "sha256": "7808809ed585f5c8aebe708d874d148bb8a57f235279d9234d81e2f1ccd43ebf",
+    "sha256": "c2618c86d82c932e80e53ddffb02411988e61492fc09e78540e01b5f5de3f395",
     "sourceFileCount": 12,
-    "workspaceModes": ["sim", "lab", "field"],
+    "workspaceModes": ["sim", "lab", "field", "autonomy"],
     "createsCrossEditionHarnessOrchestrator": false,
     "presentationOnly": true,
     "grantsHardwareAuthority": false
   },
-  "workspaceModes": ["sim", "lab", "field"],
+  "workspaceModes": ["sim", "lab", "field", "autonomy"],
   "universalExclusiveCapabilities": {
     "vehicleStudio": {
       "ownerEdition": "universal",
@@ -100,7 +100,7 @@
       "productSourceCommit": "81550b94270ee4e47eed7d520fb8280bd3a8ee7b",
       "contract": "distribution/universal/vehicle-studio.v1.json",
       "schema": "distribution/schemas/vehicle-pack-draft-envelope.schema.json",
-      "shareTargets": ["sim", "lab", "field"],
+      "shareTargets": ["sim", "lab", "field", "autonomy"],
       "transport": "file-based-draft-envelope",
       "automaticReceiverInstallation": false,
       "modelHarnessStartsOnExchange": false,
@@ -116,7 +116,7 @@
       {"path": "frontend/src/router.tsx", "sha256": "474330bd706be5d816ba1297717ddcf264dd3ffb6b7eed6329d1ed755a503c30"},
       {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "9e482996699a9a4fd7bc72c72a84c4b29d779745b4852a764ab31a6f074060f0"},
         {"path": "distribution/schemas/vehicle-pack-draft-envelope.schema.json", "sha256": "6f4025c7a62eadbc4467d771c610697840f6cd04f276f6a259a5be8fac82f7d9"},
-        {"path": "distribution/universal/vehicle-studio.v1.json", "sha256": "515f8f9a95a6388793d0a1e0a5f8dd82dbec7e5534c2717fd52c800eb33e6e6b"}
+        {"path": "distribution/universal/vehicle-studio.v1.json", "sha256": "078a10289055e466a54dcfe637cf09482d34f1f967db27f1f027f8fa8e2a4107"}
       ]
     }
   },

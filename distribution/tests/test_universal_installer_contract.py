@@ -144,10 +144,15 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert profile["enginePackProfile"] == "unified-sim-lab"
     payload = profile["enginePackPayloadContract"]
     assert payload["contractId"] == "dronedream-universal-engine-payload/v1"  # type: ignore[index]
-    assert payload["requiredEditionIds"] == ["sim", "lab", "field"]  # type: ignore[index]
+    assert payload["requiredEditionIds"] == [  # type: ignore[index]
+        "sim",
+        "lab",
+        "field",
+        "autonomy",
+    ]
     assert payload["profileIdIsCompatibilityIdentity"] is True  # type: ignore[index]
     assert payload["uiModeNeverGrantsCapability"] is True  # type: ignore[index]
-    assert profile["workspaceModes"] == ["sim", "lab", "field"]
+    assert profile["workspaceModes"] == ["sim", "lab", "field", "autonomy"]
     desktop_contracts = profile["desktopContracts"]
     assert desktop_contracts == {  # type: ignore[comparison-overlap]
         "coexistence": "distribution/desktop/edition-coexistence.v1.json",
@@ -202,7 +207,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "manifest": "distribution/universal/integrated-workspaces.v2.json",
         "sha256": hashlib.sha256(INTEGRATED_WORKSPACES.read_bytes()).hexdigest(),
         "sourceFileCount": 12,
-        "workspaceModes": ["sim", "lab", "field"],
+        "workspaceModes": ["sim", "lab", "field", "autonomy"],
         "createsCrossEditionHarnessOrchestrator": False,
         "presentationOnly": True,
         "grantsHardwareAuthority": False,
@@ -245,7 +250,12 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
             assert actual_blob == source_file["donorBlob"]
     vehicle_studio = profile["universalExclusiveCapabilities"]["vehicleStudio"]
     assert vehicle_studio["ownerEdition"] == "universal"
-    assert vehicle_studio["shareTargets"] == ["sim", "lab", "field"]
+    assert vehicle_studio["shareTargets"] == [
+        "sim",
+        "lab",
+        "field",
+        "autonomy",
+    ]
     assert vehicle_studio["automaticReceiverInstallation"] is False
     assert vehicle_studio["modelHarnessStartsOnExchange"] is False
     assert vehicle_studio["grantsSimulationExecution"] is False

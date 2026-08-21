@@ -13560,8 +13560,8 @@ body {
   }
 }
 
-/* Shared AUTONOMY entry used by Universal, SIM, LAB, and FIELD. The dedicated
-   AUTONOMY edition owns the full mission workspace; this surface owns the
+/* Shared AGENT entry used by Universal, SIM, LAB, and FIELD. The dedicated
+   AGENT edition owns the full mission workspace; this surface owns the
    edition-neutral import and qualification boundary. */
 .autonomy-gateway-page {
   width: min(1180px, calc(100% - 64px));

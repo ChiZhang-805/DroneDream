@@ -100,7 +100,7 @@ describe("workspace account entry", () => {
       .toHaveAttribute("href", "/sim");
     expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
       .not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "AUTONOMY" }))
+    expect(screen.getByRole("link", { name: "AGENT" }))
       .toHaveAttribute("href", "/autonomy");
     links.forEach((link) => {
       expect(link.querySelector(".app-nav-entry > svg")).not.toBeNull();
@@ -129,7 +129,7 @@ describe("workspace account entry", () => {
     expect(within(panel!).getAllByRole("link")).toHaveLength(6);
     expect(within(panel!).getByRole("link", { name: "SIM" }))
       .toHaveAttribute("href", "/sim");
-    expect(within(panel!).getByRole("link", { name: "AUTONOMY" }))
+    expect(within(panel!).getByRole("link", { name: "AGENT" }))
       .toHaveAttribute("href", "/autonomy");
 
     fireEvent.click(within(panel!).getByRole("button", { name: "Settings" }));

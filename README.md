@@ -72,11 +72,12 @@ ignored or outside the repository and must be removed when their owning task
 finishes. Historical source belongs in Git history or a verified external
 recovery archive, never in a second `legacy/`, `repro/`, or copied source root.
 
-## Four desktop editions
+## Five desktop products
 
-All four Windows installers are built from the same commit by
-`desktop/scripts/build-four-edition-installers.ps1`, while product contracts
-keep their capabilities and namespaces isolated:
+The five products share a common core but promote from separate long-lived
+branches so product-specific capabilities, Runtime profiles, installers, and
+release evidence remain isolated. Universal presents the four focused
+workspaces without inheriting hardware authority from any of them:
 
 | Edition | Product role | Native profile |
 | --- | --- | --- |
@@ -84,6 +85,13 @@ keep their capabilities and namespaces isolated:
 | SIM | Simulation-only workspace; it never authorizes physical hardware and requires the Runtime Base plus Engine Pack. | `sim-only` |
 | LAB | Sim-to-Real and Real-to-Sim calibration/evidence workspace with hardware actions kept fail-closed. | `unified-sim-lab` |
 | FIELD | Lightweight standalone real-device shell with no simulator Runtime planner or inherited Runtime installation state. | `field-lightweight` |
+| AGENT | Natural-language mission planning and supervision through structured plans, repeated Model + Harness calls, plugins, safe interruption, replanning, and evidence gates. | `autonomy-full` |
+
+Their long-lived product branches are `codex/software`,
+`codex/software-sim`, `codex/software-lab`, `codex/software-field`, and
+`codex/software-agent`. The internal protocol and storage key for AGENT remains
+`autonomy` so existing API routes, persisted task records, and Runtime contracts
+do not break during the visible product rename.
 
 Build failures, their exact cleanup, and reusable corrections are maintained in
 the single [build and cleanup experience log](docs/BUILD_AND_CLEANUP_EXPERIENCE.md).

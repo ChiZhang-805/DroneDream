@@ -220,7 +220,7 @@ afterEach(() => {
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
       .querySelectorAll("a")).toHaveLength(9);
-    expect(screen.getByRole("link", { name: "AUTONOMY" }))
+    expect(screen.getByRole("link", { name: "AGENT" }))
       .not.toHaveClass("runtime-locked");
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
