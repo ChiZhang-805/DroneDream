@@ -588,7 +588,7 @@ fn persist_download(
 
 fn normalize_method(value: &str) -> Result<String, String> {
     let method = value.trim().to_ascii_uppercase();
-    if matches!(method.as_str(), "GET" | "POST" | "PATCH" | "DELETE") {
+    if matches!(method.as_str(), "GET" | "POST" | "PUT" | "PATCH" | "DELETE") {
         Ok(method)
     } else {
         Err("The desktop API method is not allowed.".to_string())
@@ -687,7 +687,8 @@ mod tests {
         assert!(validate_path("/api/v1/jobs?state=ready").is_ok());
         assert!(validate_path("https://evil.invalid/api/v1/jobs").is_err());
         assert!(validate_path("/api/v1/../health").is_err());
-        assert!(normalize_method("PUT").is_err());
+        assert_eq!(normalize_method("PUT").unwrap(), "PUT");
+        assert!(normalize_method("CONNECT").is_err());
         assert!(normalize_idempotency_key(Some("not-a-uuid")).is_err());
         assert_eq!(
             normalize_idempotency_key(Some("123e4567-e89b-12d3-a456-426614174000")).unwrap(),

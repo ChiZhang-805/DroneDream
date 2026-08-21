@@ -45,6 +45,7 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+pythonpath = [".."]
 
 [tool.ruff]
 line-length = 100
@@ -55,7 +56,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 ignore = ["UP017"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "scripts"]
+known-first-party = ["app", "distribution", "scripts"]
 known-third-party = ["alembic", "sqlalchemy"]
 
 [tool.mypy]

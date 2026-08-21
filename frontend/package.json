@@ -18,6 +18,7 @@
     "test:desktop-browser-auth": "node scripts/verify-desktop-browser-auth.mjs",
     "test:admin-layout": "node scripts/verify-admin-console-layout.mjs",
     "test:software-ui-layout": "node scripts/verify-software-ui-layout.mjs",
+    "test:autonomy-gateway": "node scripts/verify-autonomy-gateway.mjs",
     "test:lab-ui": "vitest run src/lab src/__tests__/BrandLockup.test.tsx src/__tests__/edition.test.ts src/__tests__/router.test.ts",
     "test:lab-ui-layout": "node scripts/verify-lab-ui.mjs",
     "test": "vitest run",
@@ -34,7 +35,7 @@
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "7.18.1",
+    "react-router-dom": "7.18.2",
     "three": "^0.180.0"
   },
   "devDependencies": {
@@ -57,7 +58,7 @@
     "globals": "^17.7.0",
     "jsdom": "^28.1.0",
     "playwright": "^1.61.1",
-    "postcss": "^8.5.22",
+    "postcss": "^8.5.23",
     "typescript": "^5.5.4",
     "vite": "^7.3.6",
     "vitest": "^4.1.10"

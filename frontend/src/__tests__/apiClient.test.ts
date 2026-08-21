@@ -683,6 +683,46 @@ describe("apiClient envelope handling", () => {
     expect(secondRequest).toEqual(firstRequest);
   });
 
+  it("forwards preference updates through the desktop bridge with PUT", async () => {
+    const preferences = {
+      schema_version: "1.0",
+      saved: true,
+      memory_enabled: true,
+      locale: "en",
+      default_template_key: "hover-basics@1",
+      default_track_type: "hover",
+      default_altitude_m: 4,
+      retention_days: 90,
+      stored_content: "allowlisted_preferences_and_verified_structured_job_outcomes_only",
+      updated_at: "2026-08-12T00:00:00Z",
+      deleted_memory_count: 0,
+    };
+    const invoke = vi.fn().mockResolvedValue({
+      status: 200,
+      contentType: "application/json",
+      bodyBase64: btoa(JSON.stringify({ success: true, data: preferences, error: null })),
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(apiClient.updateUserExperiencePreferences({
+      memory_enabled: true,
+      locale: "en",
+      default_template_key: "hover-basics@1",
+      default_track_type: "hover",
+      default_altitude_m: 4,
+    })).resolves.toEqual(preferences);
+
+    expect(invoke).toHaveBeenCalledWith(
+      "desktop_api_request",
+      expect.objectContaining({
+        request: expect.objectContaining({
+          method: "PUT",
+          path: "/api/v1/preferences/experience",
+        }),
+      }),
+    );
+  });
+
   it("reuses an unresolved mutation key after an application restart boundary", async () => {
     const failedInvoke = vi.fn().mockRejectedValue(
       new Error("response channel closed"),

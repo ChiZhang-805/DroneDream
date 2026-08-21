@@ -30,6 +30,7 @@ function modelPlan(overrides: Record<string, unknown> = {}) {
 function mockCatalog() {
   vi.spyOn(cloudModels, "getManagedModelCatalog").mockResolvedValue({
     generated_at: "2026-08-08T00:00:00Z",
+    policy_version: 1,
     models: [MODEL],
   });
   vi.spyOn(cloudModels, "issueManagedModelGrant").mockResolvedValue({

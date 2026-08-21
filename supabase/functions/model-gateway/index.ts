@@ -1,7 +1,20 @@
-import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.110.8";
+import {
+  createClient,
+  type SupabaseClient,
+  type User,
+} from "npm:@supabase/supabase-js@2.110.8";
 
 type JsonRecord = Record<string, unknown>;
 type ModelPurpose = "assistant" | "job";
+export type ManagedProvider = "openai" | "deepseek" | "qwen";
+
+export interface ModelPolicyRow {
+  provider: ManagedProvider;
+  enabled: boolean;
+  assistant_enabled: boolean;
+  job_enabled: boolean;
+  version: number;
+}
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://getdronedream.com",
@@ -71,7 +84,11 @@ function corsHeaders(request: Request): HeadersInit {
   const origin = request.headers.get("Origin");
   if (!origin) return {};
   if (!allowedOrigins().has(origin)) {
-    throw new GatewayError("ORIGIN_NOT_ALLOWED", "The request origin is not allowed.", 403);
+    throw new GatewayError(
+      "ORIGIN_NOT_ALLOWED",
+      "The request origin is not allowed.",
+      403,
+    );
   }
   return {
     "Access-Control-Allow-Origin": origin,
@@ -157,7 +174,11 @@ function bearerToken(request: Request): string {
   const authorization = request.headers.get("Authorization")?.trim() ?? "";
   const match = /^Bearer\s+(.+)$/i.exec(authorization);
   if (!match?.[1]) {
-    throw new GatewayError("AUTHENTICATION_REQUIRED", "A bearer token is required.", 401);
+    throw new GatewayError(
+      "AUTHENTICATION_REQUIRED",
+      "A bearer token is required.",
+      401,
+    );
   }
   return match[1].trim();
 }
@@ -165,11 +186,19 @@ function bearerToken(request: Request): string {
 async function authenticatedUser(request: Request): Promise<User> {
   const token = bearerToken(request);
   if (token.startsWith("ddg_")) {
-    throw new GatewayError("AUTHENTICATION_REQUIRED", "A signed-in account is required.", 401);
+    throw new GatewayError(
+      "AUTHENTICATION_REQUIRED",
+      "A signed-in account is required.",
+      401,
+    );
   }
   const { data, error } = await adminClient().auth.getUser(token);
   if (error || !data.user) {
-    throw new GatewayError("AUTHENTICATION_REQUIRED", "The account session is invalid.", 401);
+    throw new GatewayError(
+      "AUTHENTICATION_REQUIRED",
+      "The account session is invalid.",
+      401,
+    );
   }
   return data.user;
 }
@@ -178,30 +207,119 @@ function endpointPath(request: Request): string {
   const pathname = new URL(request.url).pathname.replace(/\/+$/, "");
   const marker = "/model-gateway";
   const markerIndex = pathname.lastIndexOf(marker);
-  return markerIndex >= 0 ? pathname.slice(markerIndex + marker.length) || "/" : pathname;
+  return markerIndex >= 0
+    ? pathname.slice(markerIndex + marker.length) || "/"
+    : pathname;
 }
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function managedProvider(value: unknown): ManagedProvider {
+  const candidate = typeof value === "string" && value.trim()
+    ? value.trim().toLowerCase()
+    : Deno.env.get("PLATFORM_LLM_PROVIDER")?.trim().toLowerCase() || "openai";
+  if (
+    candidate !== "openai" && candidate !== "deepseek" && candidate !== "qwen"
+  ) {
+    throw new GatewayError("INVALID_REQUEST", "provider is invalid.", 400);
+  }
+  return candidate;
+}
+
+function providerPresentation(provider: ManagedProvider): {
+  display_name: string;
+  model: string;
+} {
+  const displayName = provider === "openai"
+    ? "OpenAI"
+    : provider === "deepseek"
+    ? "DeepSeek"
+    : "Qwen";
+  const prefix = `PLATFORM_${provider.toUpperCase()}`;
+  const globalProvider =
+    Deno.env.get("PLATFORM_LLM_PROVIDER")?.trim().toLowerCase() ||
+    "openai";
+  const configured = Deno.env.get(`${prefix}_MODEL`)?.trim() ||
+    (globalProvider === provider
+      ? Deno.env.get("PLATFORM_LLM_MODEL")?.trim()
+      : "");
+  return {
+    display_name: displayName,
+    model: configured || `${displayName} managed model`,
+  };
+}
+
+export function buildModelCatalog(rows: readonly ModelPolicyRow[]): JsonRecord {
+  const models = rows.map((row) => {
+    if (
+      (row.provider !== "openai" && row.provider !== "deepseek" &&
+        row.provider !== "qwen") ||
+      typeof row.enabled !== "boolean" ||
+      typeof row.assistant_enabled !== "boolean" ||
+      typeof row.job_enabled !== "boolean" ||
+      !Number.isSafeInteger(row.version) ||
+      row.version < 1
+    ) {
+      throw new GatewayError(
+        "MODEL_CATALOG_INVALID",
+        "The model catalog is invalid.",
+        503,
+      );
+    }
+    return {
+      provider: row.provider,
+      ...providerPresentation(row.provider),
+      enabled: row.enabled,
+      assistant_enabled: row.assistant_enabled,
+      job_enabled: row.job_enabled,
+      policy_version: row.version,
+    };
+  });
+  return {
+    generated_at: new Date().toISOString(),
+    policy_version: models.reduce(
+      (version, model) => Math.max(version, model.policy_version),
+      1,
+    ),
+    models,
+  };
+}
+
 async function readJsonBody(request: Request): Promise<JsonRecord> {
   const announcedLength = Number(request.headers.get("Content-Length") ?? "0");
   if (Number.isFinite(announcedLength) && announcedLength > MAX_REQUEST_BYTES) {
-    throw new GatewayError("REQUEST_TOO_LARGE", "The request body is too large.", 413);
+    throw new GatewayError(
+      "REQUEST_TOO_LARGE",
+      "The request body is too large.",
+      413,
+    );
   }
   const raw = await request.text();
   if (new TextEncoder().encode(raw).byteLength > MAX_REQUEST_BYTES) {
-    throw new GatewayError("REQUEST_TOO_LARGE", "The request body is too large.", 413);
+    throw new GatewayError(
+      "REQUEST_TOO_LARGE",
+      "The request body is too large.",
+      413,
+    );
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new GatewayError("INVALID_REQUEST", "The request body must be valid JSON.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "The request body must be valid JSON.",
+      400,
+    );
   }
   if (!isRecord(parsed)) {
-    throw new GatewayError("INVALID_REQUEST", "The request body must be a JSON object.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "The request body must be a JSON object.",
+      400,
+    );
   }
   return parsed;
 }
@@ -229,11 +347,15 @@ function newGrantToken(): string {
 function validScopeReference(value: unknown): string | null {
   if (value == null || value === "") return null;
   if (
-    typeof value !== "string"
-    || value.length > 128
-    || !/^[A-Za-z0-9_.:-]+$/u.test(value)
+    typeof value !== "string" ||
+    value.length > 128 ||
+    !/^[A-Za-z0-9_.:-]+$/u.test(value)
   ) {
-    throw new GatewayError("INVALID_REQUEST", "scope_reference is invalid.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "scope_reference is invalid.",
+      400,
+    );
   }
   return value;
 }
@@ -253,19 +375,43 @@ async function handleUsage(request: Request): Promise<Response> {
   return jsonResponse(request, 200, { data: await usageSnapshot(user.id) });
 }
 
+async function handleModels(request: Request): Promise<Response> {
+  await authenticatedUser(request);
+  const { data, error } = await adminClient()
+    .from("model_provider_policies")
+    .select("provider,enabled,assistant_enabled,job_enabled,version")
+    .order("provider");
+  if (error || !Array.isArray(data)) {
+    throw error ?? new GatewayError(
+      "MODEL_CATALOG_FAILED",
+      "The model catalog is unavailable.",
+      503,
+    );
+  }
+  return jsonResponse(request, 200, {
+    data: buildModelCatalog(data as ModelPolicyRow[]),
+  });
+}
+
 async function handleGrant(request: Request): Promise<Response> {
   const user = await authenticatedUser(request);
   const body = await readJsonBody(request);
   const scope = body.scope;
   if (scope !== "assistant" && scope !== "job") {
-    throw new GatewayError("INVALID_REQUEST", "scope must be assistant or job.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "scope must be assistant or job.",
+      400,
+    );
   }
+  const provider = managedProvider(body.provider);
   const token = newGrantToken();
   const tokenHash = await sha256Hex(token);
   const { data, error } = await adminClient().rpc("model_gateway_issue_grant", {
     p_user_id: user.id,
     p_token_sha256: tokenHash,
     p_scope: scope,
+    p_provider: provider,
     p_scope_reference: validScopeReference(body.scope_reference),
   });
   if (error || !isRecord(data)) {
@@ -281,48 +427,90 @@ async function handleGrant(request: Request): Promise<Response> {
       scope,
       expires_at: data.expires_at,
       max_calls: data.max_calls,
-      gateway_base_url: requestUrl.toString().replace(/\/chat\/completions$/u, ""),
-      managed_model: Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim() || "DroneDream Managed",
+      gateway_base_url: requestUrl.toString().replace(
+        /\/chat\/completions$/u,
+        "",
+      ),
+      managed_model: providerPresentation(provider).model,
       usage: await usageSnapshot(user.id),
     },
   });
 }
 
 function validateMessages(value: unknown): JsonRecord[] {
-  if (!Array.isArray(value) || value.length < 1 || value.length > MAX_MESSAGES) {
-    throw new GatewayError("INVALID_REQUEST", "messages must be a non-empty bounded array.", 400);
+  if (
+    !Array.isArray(value) || value.length < 1 || value.length > MAX_MESSAGES
+  ) {
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "messages must be a non-empty bounded array.",
+      400,
+    );
   }
   let contentBytes = 0;
   const messages = value.map((item) => {
     if (!isRecord(item)) {
-      throw new GatewayError("INVALID_REQUEST", "Each message must be an object.", 400);
+      throw new GatewayError(
+        "INVALID_REQUEST",
+        "Each message must be an object.",
+        400,
+      );
     }
     if (!["system", "user", "assistant"].includes(String(item.role))) {
-      throw new GatewayError("INVALID_REQUEST", "A message role is not allowed.", 400);
+      throw new GatewayError(
+        "INVALID_REQUEST",
+        "A message role is not allowed.",
+        400,
+      );
     }
     if (typeof item.content !== "string") {
-      throw new GatewayError("INVALID_REQUEST", "Message content must be text.", 400);
+      throw new GatewayError(
+        "INVALID_REQUEST",
+        "Message content must be text.",
+        400,
+      );
     }
     contentBytes += new TextEncoder().encode(item.content).byteLength;
     return { role: item.role, content: item.content };
   });
   if (contentBytes > MAX_MESSAGE_CONTENT_BYTES) {
-    throw new GatewayError("MODEL_PROMPT_TOO_LARGE", "The model prompt is too large.", 413);
+    throw new GatewayError(
+      "MODEL_PROMPT_TOO_LARGE",
+      "The model prompt is too large.",
+      413,
+    );
   }
   return messages;
 }
 
 function idempotencyKey(request: Request): string {
-  const raw = request.headers.get("Idempotency-Key")?.trim() || crypto.randomUUID();
+  const raw = request.headers.get("Idempotency-Key")?.trim() ||
+    crypto.randomUUID();
   if (raw.length < 8 || raw.length > 128 || !/^[A-Za-z0-9_.:-]+$/u.test(raw)) {
-    throw new GatewayError("INVALID_IDEMPOTENCY_KEY", "Idempotency-Key is invalid.", 400);
+    throw new GatewayError(
+      "INVALID_IDEMPOTENCY_KEY",
+      "Idempotency-Key is invalid.",
+      400,
+    );
   }
   return raw;
 }
 
-function providerConfiguration() {
-  const baseUrl = (Deno.env.get("PLATFORM_LLM_BASE_URL")?.trim()
-    || "https://api.openai.com/v1").replace(/\/+$/u, "");
+function providerConfiguration(provider: ManagedProvider) {
+  const prefix = `PLATFORM_${provider.toUpperCase()}`;
+  const globalProvider =
+    Deno.env.get("PLATFORM_LLM_PROVIDER")?.trim().toLowerCase() ||
+    "openai";
+  const globalFallback = (name: string): string =>
+    globalProvider === provider ? Deno.env.get(name)?.trim() || "" : "";
+  const defaultBaseUrl = {
+    openai: "https://api.openai.com/v1",
+    deepseek: "https://api.deepseek.com/v1",
+    qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  }[provider];
+  const baseUrl = (Deno.env.get(`${prefix}_BASE_URL`)?.trim() ||
+    globalFallback("PLATFORM_LLM_BASE_URL") ||
+    defaultBaseUrl).replace(/\/+$/u, "");
   const parsed = new URL(baseUrl);
   if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
     throw new GatewayError(
@@ -331,11 +519,22 @@ function providerConfiguration() {
       503,
     );
   }
+  const apiKey = Deno.env.get(`${prefix}_API_KEY`)?.trim() ||
+    globalFallback("PLATFORM_LLM_API_KEY");
+  const model = Deno.env.get(`${prefix}_MODEL`)?.trim() ||
+    globalFallback("PLATFORM_LLM_MODEL");
+  if (!apiKey || !model) {
+    throw new GatewayError(
+      "SERVICE_NOT_CONFIGURED",
+      `The ${provider} managed model is missing required server configuration.`,
+      503,
+    );
+  }
   return {
-    apiKey: requiredEnv("PLATFORM_LLM_API_KEY"),
+    apiKey,
     baseUrl,
-    model: requiredEnv("PLATFORM_LLM_MODEL"),
-    provider: Deno.env.get("PLATFORM_LLM_PROVIDER")?.trim() || "openai",
+    model,
+    provider,
     maxOutputTokens: positiveIntegerEnv(
       "PLATFORM_LLM_MAX_OUTPUT_TOKENS",
       2_048,
@@ -358,7 +557,9 @@ function providerConfiguration() {
 }
 
 function integerUsage(value: unknown): number | null {
-  return Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null;
+  return Number.isSafeInteger(value) && Number(value) >= 0
+    ? Number(value)
+    : null;
 }
 
 async function failReservation(requestId: string, code: string): Promise<void> {
@@ -366,45 +567,60 @@ async function failReservation(requestId: string, code: string): Promise<void> {
     p_request_id: requestId,
     p_error_code: code,
   });
-  if (error) console.error("failed to release model reservation", requestId, error);
+  if (error) {
+    console.error("failed to release model reservation", requestId, error);
+  }
 }
 
 async function handleChatCompletions(request: Request): Promise<Response> {
   const grant = bearerToken(request);
   if (!grant.startsWith("ddg_") || grant.length < 40 || grant.length > 128) {
-    throw new GatewayError("MODEL_GRANT_INVALID", "The managed-model grant is invalid.", 401);
+    throw new GatewayError(
+      "MODEL_GRANT_INVALID",
+      "The managed-model grant is invalid.",
+      401,
+    );
   }
   const body = await readJsonBody(request);
   const messages = validateMessages(body.messages);
   const responseFormat = body.response_format;
   if (responseFormat != null && !isRecord(responseFormat)) {
-    throw new GatewayError("INVALID_REQUEST", "response_format must be an object.", 400);
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "response_format must be an object.",
+      400,
+    );
   }
-  const config = providerConfiguration();
   const requestKey = idempotencyKey(request);
   const requestId = crypto.randomUUID();
   const tokenHash = await sha256Hex(grant);
   const { data: grantRecord, error: grantLookupError } = await adminClient()
     .from("model_gateway_grants")
-    .select("scope")
+    .select("scope,provider")
     .eq("token_sha256", tokenHash)
     .maybeSingle();
   if (
-    grantLookupError
-    || !isRecord(grantRecord)
-    || (grantRecord.scope !== "assistant" && grantRecord.scope !== "job")
+    grantLookupError ||
+    !isRecord(grantRecord) ||
+    (grantRecord.scope !== "assistant" && grantRecord.scope !== "job")
   ) {
-    throw new GatewayError("MODEL_GRANT_INVALID", "The managed-model grant is invalid.", 401);
+    throw new GatewayError(
+      "MODEL_GRANT_INVALID",
+      "The managed-model grant is invalid.",
+      401,
+    );
   }
   const purpose = grantRecord.scope as ModelPurpose;
+  const provider = managedProvider(grantRecord.provider);
+  const config = providerConfiguration(provider);
   const serializedPromptBytes = new TextEncoder().encode(JSON.stringify({
     messages,
     response_format: responseFormat ?? null,
   })).byteLength;
   // UTF-8 bytes are a conservative upper bound for byte-level model tokens.
   // Output is reserved at its configured maximum and weighted by policy.
-  const reservedCredits = serializedPromptBytes
-    + config.maxOutputTokens * config.outputCreditWeight;
+  const reservedCredits = serializedPromptBytes +
+    config.maxOutputTokens * config.outputCreditWeight;
   const { data: reservation, error: reserveError } = await adminClient().rpc(
     "model_usage_reserve",
     {
@@ -463,7 +679,10 @@ async function handleChatCompletions(request: Request): Promise<Response> {
 
   const providerText = await providerResponse.text();
   if (!providerResponse.ok) {
-    await failReservation(requestId, `PROVIDER_HTTP_${providerResponse.status}`);
+    await failReservation(
+      requestId,
+      `PROVIDER_HTTP_${providerResponse.status}`,
+    );
     console.error("managed model provider HTTP error", providerResponse.status);
     throw new GatewayError(
       "MODEL_PROVIDER_FAILED",
@@ -475,7 +694,9 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   let providerJson: JsonRecord;
   try {
     const parsed: unknown = JSON.parse(providerText);
-    if (!isRecord(parsed)) throw new Error("provider response is not an object");
+    if (!isRecord(parsed)) {
+      throw new Error("provider response is not an object");
+    }
     providerJson = parsed;
   } catch {
     await failReservation(requestId, "PROVIDER_RESPONSE_INVALID");
@@ -490,9 +711,9 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   const inputTokens = integerUsage(usage?.prompt_tokens);
   const outputTokens = integerUsage(usage?.completion_tokens);
   const totalTokens = integerUsage(usage?.total_tokens);
-  const hasActualUsage = inputTokens !== null
-    && outputTokens !== null
-    && totalTokens === inputTokens + outputTokens;
+  const hasActualUsage = inputTokens !== null &&
+    outputTokens !== null &&
+    totalTokens === inputTokens + outputTokens;
   const consumedCredits = hasActualUsage
     ? inputTokens + outputTokens * config.outputCreditWeight
     : reservedCredits;
@@ -503,11 +724,16 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     p_output_tokens: hasActualUsage ? outputTokens : null,
     p_total_tokens: hasActualUsage ? totalTokens : null,
     p_usage_estimated: !hasActualUsage,
-    p_provider_request_id:
-      typeof providerJson.id === "string" ? providerJson.id : null,
+    p_provider_request_id: typeof providerJson.id === "string"
+      ? providerJson.id
+      : null,
   });
   if (settleError) {
-    console.error("managed model usage settlement failed", requestId, settleError);
+    console.error(
+      "managed model usage settlement failed",
+      requestId,
+      settleError,
+    );
     throw new GatewayError(
       "MODEL_USAGE_SETTLEMENT_FAILED",
       "The model response was produced but its allowance receipt could not be sealed.",
@@ -517,8 +743,12 @@ async function handleChatCompletions(request: Request): Promise<Response> {
 
   // The managed service deliberately exposes a stable DroneDream alias rather
   // than leaking or coupling clients to the upstream provider/model choice.
-  providerJson.model = Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim()
-    || "DroneDream Managed";
+  providerJson.model =
+    Deno.env.get(`PLATFORM_${provider.toUpperCase()}_MODEL_ALIAS`)?.trim() ||
+    (Deno.env.get("PLATFORM_LLM_PROVIDER")?.trim().toLowerCase() === provider
+      ? Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim()
+      : "") ||
+    providerPresentation(provider).display_name;
   delete providerJson.system_fingerprint;
   return new Response(JSON.stringify(providerJson), {
     status: 200,
@@ -532,7 +762,9 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   });
 }
 
-Deno.serve(async (request: Request) => {
+export async function handleModelGatewayRequest(
+  request: Request,
+): Promise<Response> {
   try {
     const cors = corsHeaders(request);
     if (request.method === "OPTIONS") {
@@ -542,6 +774,9 @@ Deno.serve(async (request: Request) => {
     if (request.method === "GET" && path === "/usage") {
       return await handleUsage(request);
     }
+    if (request.method === "GET" && path === "/models") {
+      return await handleModels(request);
+    }
     if (request.method === "POST" && path === "/grants") {
       return await handleGrant(request);
     }
@@ -549,9 +784,16 @@ Deno.serve(async (request: Request) => {
       return await handleChatCompletions(request);
     }
     return jsonResponse(request, 404, {
-      error: { code: "NOT_FOUND", message: "The model-gateway route was not found." },
+      error: {
+        code: "NOT_FOUND",
+        message: "The model-gateway route was not found.",
+      },
     });
   } catch (error) {
     return errorResponse(request, error);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve((request) => handleModelGatewayRequest(request));
+}

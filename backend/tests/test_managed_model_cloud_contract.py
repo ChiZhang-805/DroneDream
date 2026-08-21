@@ -75,7 +75,8 @@ def test_gateway_uses_hashed_scoped_grants_and_atomic_reservations() -> None:
     assert "max_calls integer not null check (max_calls between 1 and 256)" in migration
     assert "grant_calls := 256;" in migration
     assert "grant: token" in gateway
-    assert 'requiredEnv("PLATFORM_LLM_API_KEY")' in gateway
+    assert 'Deno.env.get(`${prefix}_API_KEY`)' in gateway
+    assert 'globalFallback("PLATFORM_LLM_API_KEY")' in gateway
     assert 'Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")' in gateway
     assert "providerJson.model =" in gateway
     assert "delete providerJson.system_fingerprint" in gateway
