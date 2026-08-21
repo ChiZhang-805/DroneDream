@@ -29,6 +29,24 @@ if ($stopWebViewIndex -gt $waitPathIndex) {
 if ($workflowText -notmatch "-TimeoutSeconds 30") {
     throw "Desktop installer workflow must keep the bounded 30-second removal deadline"
 }
+if ($workflowText -notmatch "-RootProcessId") {
+    throw "Desktop installer workflow must stop WebView2 descendants of the launched app"
+}
+
+$stopWebViewText = Get-Content -LiteralPath $stopWebViewScript -Raw
+foreach ($requiredContract in @(
+    "RootProcessId",
+    "ParentProcessId",
+    "QuiescencePolls",
+    "quietPolls"
+)) {
+    if (-not $stopWebViewText.Contains(
+        $requiredContract,
+        [System.StringComparison]::Ordinal
+    )) {
+        throw "Owned WebView2 shutdown helper is missing $requiredContract handling"
+    }
+}
 
 $unusedProfile = Join-Path ([System.IO.Path]::GetTempPath()) (
     "dronedream-webview-unused-{0}" -f [Guid]::NewGuid().ToString("N")

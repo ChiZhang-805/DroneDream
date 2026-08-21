@@ -613,6 +613,9 @@ jobs:
             # uninstaller so they cannot retain binaries under the install root.
             ./desktop/scripts/stop-owned-webview2.ps1 `
               -ProfilePath $appDataRoot `
+              -RootProcessId $(
+                if ($null -ne $appProcess) { $appProcess.Id } else { 0 }
+              ) `
               -TimeoutSeconds 10 `
               -PollIntervalMilliseconds 250
             if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
