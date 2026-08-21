@@ -75,9 +75,11 @@ describe("DroneDream public website", () => {
       "href",
       "https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md",
     );
-    expect(screen.getByText(
-      /Version 1\.0\.0 is published while code signing is being prepared\./i,
-    )).toBeVisible();
+    expect(
+      screen.getByText(
+        /Local PX4\/Gazebo tuning\. Version 1\.0\.0 is live; code signing is in progress\./i,
+      ),
+    ).toBeVisible();
     expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/pricing/");
     expect(screen.getByRole("link", { name: "Workflow" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
