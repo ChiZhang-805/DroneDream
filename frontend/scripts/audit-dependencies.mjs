@@ -35,9 +35,9 @@ if (configuredRscPackages.length > 0) {
 
 const routerVersion =
   packageLock.packages?.["node_modules/react-router"]?.version ?? "";
-if (routerVersion !== "7.18.1") {
+if (routerVersion !== "7.18.2") {
   throw new Error(
-    `Expected the reviewed React Router SPA version 7.18.1, found ${routerVersion || "none"}`,
+    `Expected the reviewed React Router SPA version 7.18.2, found ${routerVersion || "none"}`,
   );
 }
 

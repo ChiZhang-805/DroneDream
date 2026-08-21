@@ -30,6 +30,15 @@ export interface ManagedModelUsageTotals {
   credit_policy_version: number;
 }
 
+export function remainingAllowanceRatio(
+  remainingCredits: number,
+  includedCredits: number,
+): number {
+  if (!Number.isFinite(remainingCredits) || !Number.isFinite(includedCredits)) return 0;
+  if (includedCredits <= 0) return 0;
+  return Math.min(100, Math.max(0, remainingCredits / includedCredits * 100));
+}
+
 export interface ManagedModelUsageRequest {
   request_id: string;
   purpose: ManagedModelGrantScope;
@@ -79,6 +88,7 @@ export interface ManagedModelCatalogEntry {
 
 export interface ManagedModelCatalog {
   generated_at: string;
+  policy_version: number;
   models: ManagedModelCatalogEntry[];
 }
 
