@@ -44,6 +44,8 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: "4"
+      DRONEDREAM_DESKTOP_EDITION_ID: field
+      DRONEDREAM_EDITION_PROFILE: field-lightweight
       # Pull requests may compile with inert placeholders. Formal desktop tags
       # are rejected below unless the repository variables contain the real
       # public Supabase project configuration.

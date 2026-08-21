@@ -1319,14 +1319,16 @@ mod tests {
         assert_eq!(response.id_token.as_deref(), Some("identity-token"));
         assert_eq!(response.token_type, "bearer");
         assert_eq!(response.expires_in, 3600);
-        assert!(serde_json::from_value::<OAuthTokenResponse>(serde_json::json!({
-            "accessToken": "access-token",
-            "refreshToken": "refresh-token",
-            "idToken": "identity-token",
-            "tokenType": "bearer",
-            "expiresIn": 3600
-        }))
-        .is_err());
+        assert!(
+            serde_json::from_value::<OAuthTokenResponse>(serde_json::json!({
+                "accessToken": "access-token",
+                "refreshToken": "refresh-token",
+                "idToken": "identity-token",
+                "tokenType": "bearer",
+                "expiresIn": 3600
+            }))
+            .is_err()
+        );
     }
 
     #[test]
