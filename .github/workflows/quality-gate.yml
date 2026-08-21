@@ -4,9 +4,19 @@ on:
   pull_request:
     branches:
       - main
+      - codex/software
+      - codex/software-sim
+      - codex/software-lab
+      - codex/software-field
+      - codex/software-autonomy
   push:
     branches:
       - main
+      - codex/software
+      - codex/software-sim
+      - codex/software-lab
+      - codex/software-field
+      - codex/software-autonomy
   workflow_dispatch:
 
 permissions:
