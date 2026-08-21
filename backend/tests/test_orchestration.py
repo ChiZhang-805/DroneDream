@@ -652,6 +652,48 @@ def test_claim_and_run_one_pending_trial_completes(orchestration_ctx):
         assert event_types.count("trial_completed") == 1
 
 
+def test_pending_trial_claim_prioritizes_baseline_when_queue_order_ties(
+    orchestration_ctx,
+) -> None:
+    ctx = orchestration_ctx
+    job_id = _create_queued_job(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        ctx["job_manager"].start_queued_jobs(db)
+
+    tied_at = datetime(2026, 8, 21, tzinfo=timezone.utc)
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        baseline_id = job.baseline_candidate_id
+        assert baseline_id is not None
+        baseline_trials = sorted(
+            (trial for trial in job.trials if trial.candidate_id == baseline_id),
+            key=lambda trial: trial.id,
+        )
+        optimizer_trials = sorted(
+            (trial for trial in job.trials if trial.candidate_id != baseline_id),
+            key=lambda trial: trial.id,
+        )
+        for index, trial in enumerate(baseline_trials):
+            trial.id = f"z-baseline-{index}"
+            trial.queued_at = tied_at
+            trial.created_at = tied_at
+        for index, trial in enumerate(optimizer_trials):
+            trial.id = f"a-optimizer-{index}"
+            trial.queued_at = tied_at
+            trial.created_at = tied_at
+        db.commit()
+        baseline_trial_ids = {trial.id for trial in baseline_trials}
+
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "baseline-priority-worker",
+        )
+
+    assert claimed in baseline_trial_ids
+
+
 def _create_sealed_screening_job(ctx: dict[str, object]) -> str:
     schemas = ctx["schemas"]
     db_module = ctx["db_module"]

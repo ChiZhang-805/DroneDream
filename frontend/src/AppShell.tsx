@@ -98,6 +98,7 @@ import {
   CloudModelAccessError,
   getManagedModelCatalog,
   getManagedModelUsage,
+  remainingAllowanceRatio,
   type ManagedModelCatalogEntry,
   type ManagedModelUsageSnapshot,
 } from "./features/settings/cloudModelAccess";
@@ -696,17 +697,10 @@ function SettingsDialog({
     experiencePreferenceState === "blocked" ||
     experiencePreferenceState === "loading" ||
     experiencePreferenceState === "saving";
-  const creditRatio = managedUsage
-    ? Math.min(
-        100,
-        Math.max(
-          0,
-          managedUsage.plan.included_ai_credits > 0
-            ? managedUsage.usage.consumed_ai_credits
-              / managedUsage.plan.included_ai_credits
-              * 100
-            : 0,
-        ),
+  const remainingCreditRatio = managedUsage
+    ? remainingAllowanceRatio(
+        managedUsage.usage.remaining_ai_credits,
+        managedUsage.plan.included_ai_credits,
       )
     : 0;
   const [activeSettingsTab, setActiveSettingsTab] =
@@ -1077,9 +1071,9 @@ function SettingsDialog({
             ) : managedUsage ? (
               <>
                 <div className="settings-model-quota-heading">
-                  <span>{t("settings.model.periodUsage")}</span>
+                  <span>{t("settings.model.remainingAllowance")}</span>
                   <strong>
-                    {numberFormatter.format(managedUsage.usage.consumed_ai_credits)}
+                    {numberFormatter.format(managedUsage.usage.remaining_ai_credits)}
                     {" / "}
                     {numberFormatter.format(managedUsage.plan.included_ai_credits)}
                     {" "}
@@ -1091,9 +1085,9 @@ function SettingsDialog({
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={managedUsage.plan.included_ai_credits}
-                  aria-valuenow={managedUsage.usage.consumed_ai_credits}
+                  aria-valuenow={managedUsage.usage.remaining_ai_credits}
                 >
-                  <span style={{ width: `${creditRatio}%` }} />
+                  <span style={{ width: `${remainingCreditRatio}%` }} />
                 </div>
                 <div className="settings-model-usage-grid">
                   <div>
