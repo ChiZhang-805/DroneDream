@@ -110,7 +110,7 @@ fn desktop_auth_identity(edition_id: &str) -> Result<DesktopAuthIdentity, String
         "autonomy" => Ok(DesktopAuthIdentity {
             edition_id: "autonomy",
             auth_client_id: "dronedream-desktop-autonomy",
-            display_name: "DroneDream · AUTONOMY",
+            display_name: "DroneDream · AGENT",
             brand_lockup: AUTONOMY_BRAND_LOCKUP,
             bundle_identifier: "io.dronedream.desktop.autonomy",
             callback_port: 49214,

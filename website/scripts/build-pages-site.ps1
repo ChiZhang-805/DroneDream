@@ -25,7 +25,7 @@ $editionProducts = @{
     sim = "DroneDream-Sim"
     lab = "DroneDream-Lab"
     field = "DroneDream-Field"
-    autonomy = "DroneDream-Autonomy"
+    autonomy = "DroneDream-Agent"
 }
 
 if ($hasEdition -xor $hasBuildNumber) {

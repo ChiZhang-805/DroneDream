@@ -188,7 +188,7 @@ signature. Authenticode may honestly remain `not-signed` for the current
 closed-beta policy.
 
 The fixture is synthetic, planned, and contains no installer. It does not
-authorize direct branch mutation. SIM, LAB, FIELD, and AUTONOMY promote through
+authorize direct branch mutation. SIM, LAB, FIELD, and AGENT promote through
 their protected long-lived product branches only after complete artifact
 evidence and explicit governance approval.
 
@@ -215,7 +215,7 @@ rollback policy, and the four independently observed product-branch heads.
 The planner deliberately has no output-file or build option. It writes a JSON
 plan to stdout only after confirming that the source tree is clean and that
 `codex/software-sim`, `codex/software-lab`, `codex/software-field`, and
-`codex/software-autonomy` exist on the observed remote with valid heads. It never runs Tauri, NSIS, Runtime migration,
+`codex/software-agent` exist on the observed remote with valid heads. It never runs Tauri, NSIS, Runtime migration,
 PX4, Gazebo, an installer, a release API, or a branch mutation. Every generated
 edition and precombined bundle therefore remains `planned-not-built`, with
 `sha256=null` and `bytes=null`.

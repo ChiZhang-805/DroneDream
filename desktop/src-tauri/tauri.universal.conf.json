@@ -18,8 +18,8 @@
   },
   "bundle": {
     "publisher": "DroneDream",
-    "shortDescription": "Unified DroneDream workspace for simulation, lab, field and autonomy workflows",
-    "longDescription": "DroneDream Universal uses one shared core and presentation-only SIM, LAB, FIELD and AUTONOMY workspace modes. Hardware actions remain unavailable unless installed modules, a validated Vehicle Pack, and native, backend and Runtime policy all authorize the exact action.",
+    "shortDescription": "Unified DroneDream workspace for SIM, LAB, FIELD and AGENT workflows",
+    "longDescription": "DroneDream Universal uses one shared core and presentation-only SIM, LAB, FIELD and AGENT workspace modes. Hardware actions remain unavailable unless installed modules, a validated Vehicle Pack, and native, backend and Runtime policy all authorize the exact action.",
     "icon": [
       "../../brand/generated/universal/windows/32x32.png",
       "../../brand/generated/universal/windows/128x128.png",

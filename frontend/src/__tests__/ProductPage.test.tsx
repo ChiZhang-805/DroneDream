@@ -91,7 +91,7 @@ describe("ProductPage", () => {
     expect(screen.queryByText("Natural-language mission control")).toBeNull();
 
     const releaseFamily = "desktop-autonomy-v1.0.0-build-1";
-    const fileName = "DroneDream-Autonomy-1.0.0.exe";
+    const fileName = "DroneDream-Agent-1.0.0.exe";
     availability.editions[3] = {
       id: "autonomy",
       status: "published",
@@ -111,7 +111,7 @@ describe("ProductPage", () => {
     rerender(<ProductPage availability={availability} locale="en" />);
     expect(screen.getAllByRole("article")).toHaveLength(4);
     expect(screen.getByText("Natural-language mission control")).toBeVisible();
-    expect(screen.getByRole("link", { name: "DroneDream · AUTONOMY Download" }))
+    expect(screen.getByRole("link", { name: "DroneDream · AGENT Download" }))
       .toHaveAttribute("href", availability.editions[3].downloadUrl);
   });
 

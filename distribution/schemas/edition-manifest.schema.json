@@ -38,7 +38,7 @@
     },
     "artifactBaseName": {
       "type": "string",
-      "pattern": "^DroneDream-(?:Sim|Lab|Field|Autonomy)-1\\.0\\.0\\.exe$"
+      "pattern": "^DroneDream-(?:Sim|Lab|Field|Agent)-1\\.0\\.0\\.exe$"
     },
     "capabilityPolicy": {
       "type": "object",
@@ -118,7 +118,7 @@
             "codex/software-sim",
             "codex/software-lab",
             "codex/software-field",
-            "codex/software-autonomy"
+            "codex/software-agent"
           ]
         },
         "integrationBranch": {"const": "main"},
@@ -137,7 +137,7 @@
             "codex/software-sim",
             "codex/software-lab",
             "codex/software-field",
-            "codex/software-autonomy"
+            "codex/software-agent"
           ]
         },
         "creationState": {"const": "long-lived-product-branch"},

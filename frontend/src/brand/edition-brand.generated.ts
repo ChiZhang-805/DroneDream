@@ -47,8 +47,8 @@ export const EDITION_BRAND_TOKENS = {
     "darkSurface": "#28140D"
   },
   "autonomy": {
-    "productName": "DroneDream · AUTONOMY",
-    "editionLabel": "AUTONOMY",
+    "productName": "DroneDream · AGENT",
+    "editionLabel": "AGENT",
     "gradientStops": [
       "#FF5B74",
       "#EC214F",

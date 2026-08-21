@@ -295,7 +295,7 @@ $contracts = [ordered]@{
     }
     autonomy = [ordered]@{
         config = "desktop\src-tauri\tauri.autonomy.conf.json"
-        product = "DroneDream-Autonomy"
+        product = "DroneDream-Agent"
         profile = "autonomy-full"
     }
 }

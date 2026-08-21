@@ -364,9 +364,9 @@ describe("DroneDream public website", () => {
     const autonomyRelease = {
       ...editionRelease,
       edition: "autonomy" as const,
-      fileName: "DroneDream-Autonomy-1.0.0.exe",
-      downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-805/DroneDream-Autonomy-1.0.0.exe",
-      checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-805/DroneDream-Autonomy-1.0.0.exe.sha256",
+      fileName: "DroneDream-Agent-1.0.0.exe",
+      downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-805/DroneDream-Agent-1.0.0.exe",
+      checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-805/DroneDream-Agent-1.0.0.exe.sha256",
     };
     expect(isWebsiteRelease(autonomyRelease)).toBe(true);
     expect(isWebsiteRelease({

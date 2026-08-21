@@ -1,9 +1,23 @@
 {
   "kind": "dronedream-commercial-brand-assets",
-  "assetCount": 10,
+  "assetCount": 12,
   "naturalWidthLockups": true,
   "compactLockupsAllowed": false,
   "assets": [
+    {
+      "path": "autonomy-lockup.png",
+      "width": 2718,
+      "height": 218,
+      "sha256": "6d86d5a1a7d29f861a87acf51937f7c33eb2a4c6681479e2b121ccf403373ffb",
+      "background": "transparent"
+    },
+    {
+      "path": "autonomy-mark.png",
+      "width": 1024,
+      "height": 1024,
+      "sha256": "675188a785e56e2e1d81fb42627de18cca460018f83ee12baa389ef7b4e1d72e",
+      "background": "transparent"
+    },
     {
       "path": "field-lockup.png",
       "width": 2865,

@@ -11,7 +11,7 @@ const EDITIONS: ReadonlyArray<{ id: SoftwareEditionId; label: string; mark: stri
   { id: "sim", label: "SIM", mark: simMark },
   { id: "lab", label: "LAB", mark: labMark },
   { id: "field", label: "FIELD", mark: fieldMark },
-  { id: "autonomy", label: "AUTONOMY", mark: autonomyMark },
+  { id: "autonomy", label: "AGENT", mark: autonomyMark },
 ];
 
 export function EditionLicenseStrip({

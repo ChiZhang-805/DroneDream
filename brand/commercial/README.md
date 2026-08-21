@@ -1,10 +1,10 @@
 # DroneDream commercial brand assets
 
 This is the only application- and website-facing PNG directory for the
-DroneDream brand. It contains exactly ten commercial images:
+DroneDream brand. It contains the commercial images for all five products:
 
-- four transparent edition marks;
-- four transparent, natural-width edition lockups;
+- five transparent edition marks;
+- five transparent, natural-width edition lockups;
 - one white-canvas Universal mark;
 - one white-canvas Universal lockup.
 
@@ -26,9 +26,11 @@ python scripts/build-commercial-brand-assets.py --check
 ```
 
 Windows ICO, favicon, and installer-frame derivatives are packaging assets,
-not members of this ten-image commercial PNG set.
+not members of this twelve-image commercial PNG set.
 
-The source marks, font license, packaging derivatives, and build script remain
-outside this folder because they are required by the four Windows executable
-builds. The natural-width lockups in this directory are the frozen commercial
-masters. Runtime UI code must import PNGs only from this directory.
+The fifth product keeps the stable internal `autonomy` asset key while its
+visible lockup is `DroneDream · AGENT`. The source marks, font license,
+packaging derivatives, and build script remain outside this folder because
+they are required by the five Windows executable builds. The natural-width
+lockups in this directory are the frozen commercial masters. Runtime UI code
+must import PNGs only from this directory.

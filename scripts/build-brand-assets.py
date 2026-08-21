@@ -65,7 +65,7 @@ def load_contract() -> dict[str, Any]:
     if (
         contract.get("schemaVersion") != 1
         or contract.get("kind") != "dronedream-edition-brand-system"
-        or contract.get("brandVersion") != "1.2.0"
+        or contract.get("brandVersion") != "1.3.0"
         or tuple(contract.get("editions", {})) != EDITION_IDS
         or contract.get("separator") != "\u00b7"
         or contract.get("safety") != {"presentationOnly": True, "grantsHardwareAuthority": False}
@@ -73,7 +73,7 @@ def load_contract() -> dict[str, Any]:
         raise BrandBuildError("brand contract identity or safety boundary drifted")
     for edition_id, expected_label in zip(
         EDITION_IDS,
-        (None, "SIM", "LAB", "FIELD", "AUTONOMY"),
+        (None, "SIM", "LAB", "FIELD", "AGENT"),
         strict=True,
     ):
         edition = contract["editions"][edition_id]

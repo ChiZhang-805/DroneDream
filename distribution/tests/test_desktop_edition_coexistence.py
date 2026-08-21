@@ -42,9 +42,9 @@ def test_schema_and_contract_are_closed_versioned_inputs() -> None:
         assert set(_document()[name]) == set(nested["properties"])
     assert contract_tool.load_contract(ROOT)["contractVersion"] == "1.0.0"
     edition_schema = schema["properties"]["editions"]["items"]["properties"]
-    assert "Autonomy" in edition_schema["artifactFileName"]["pattern"]
-    assert "Autonomy" in edition_schema["installerProductName"]["pattern"]
-    assert "Autonomy" in edition_schema["installRoot"]["pattern"]
+    assert "Agent" in edition_schema["artifactFileName"]["pattern"]
+    assert "Agent" in edition_schema["installerProductName"]["pattern"]
+    assert "Agent" in edition_schema["installRoot"]["pattern"]
 
 
 def test_edition_separator_is_the_canonical_middle_dot_codepoint() -> None:
