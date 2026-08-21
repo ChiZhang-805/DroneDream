@@ -43,6 +43,9 @@ if (-not $temporaryRootFull.StartsWith(
 }
 
 $temporaryUninstaller = Join-Path $temporaryRootFull "uninstall-runner.exe"
+$diagnosticTrace = Join-Path (
+    [System.IO.Path]::GetTempPath()
+) "dronedream-drone-dream-desktop-uninstall-trace.log"
 $uninstallProcess = $null
 
 try {
@@ -54,6 +57,21 @@ try {
     $uninstallProcess = Start-Process -FilePath $temporaryUninstaller `
         -ArgumentList @("/S", "_?=$installRootFull") -Wait -PassThru
     if ($uninstallProcess.ExitCode -ne 0) {
+        if (Test-Path -LiteralPath $diagnosticTrace -PathType Leaf) {
+            Write-Host "NSIS uninstall lifecycle trace:"
+            Get-Content -LiteralPath $diagnosticTrace | ForEach-Object {
+                Write-Host "  $_"
+            }
+        }
+        $remainingEntries = @(
+            Get-ChildItem -LiteralPath $installRootFull -Force `
+                -ErrorAction SilentlyContinue |
+                Select-Object -ExpandProperty Name
+        )
+        Write-Host (
+            "Install-root entries after failed uninstall: {0}" -f
+            ($remainingEntries -join ", ")
+        )
         throw "Silent NSIS uninstaller failed with exit code $($uninstallProcess.ExitCode)"
     }
 }
@@ -66,6 +84,9 @@ finally {
     # The resolved path was proven to be a GUID child of the system temp root.
     if (Test-Path -LiteralPath $temporaryRootFull) {
         Remove-Item -LiteralPath $temporaryRootFull -Recurse -Force
+    }
+    if (Test-Path -LiteralPath $diagnosticTrace -PathType Leaf) {
+        Remove-Item -LiteralPath $diagnosticTrace -Force
     }
 }
 

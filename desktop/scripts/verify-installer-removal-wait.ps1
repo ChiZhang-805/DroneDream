@@ -84,6 +84,9 @@ foreach ($uninstallContract in @(
     "Copy-Item -LiteralPath",
     '"_?=$installRootFull"',
     "-Wait -PassThru",
+    "NSIS uninstall lifecycle trace:",
+    "Install-root entries after failed uninstall:",
+    "dronedream-drone-dream-desktop-uninstall-trace.log",
     "Uninstaller must be located inside the declared install root",
     "Refusing to create an uninstaller copy outside the system temp root"
 )) {
@@ -92,6 +95,23 @@ foreach ($uninstallContract in @(
         [System.StringComparison]::Ordinal
     )) {
         throw "Deterministic NSIS helper is missing contract: $uninstallContract"
+    }
+}
+
+$templatePath = Join-Path $PSScriptRoot "..\src-tauri\nsis\installer.nsi"
+$templateText = Get-Content -LiteralPath $templatePath -Raw
+foreach ($processContract in @(
+    "!macro DRONEDREAM_CHECK_IF_APP_IS_RUNNING",
+    'process-attempt=$R4 kill=$R0 find=$R5',
+    '${If} $R4 < 4',
+    "process-check=complete",
+    "uninstall-section=complete"
+)) {
+    if (-not $templateText.Contains(
+        $processContract,
+        [System.StringComparison]::Ordinal
+    )) {
+        throw "NSIS template is missing bounded process contract: $processContract"
     }
 }
 
