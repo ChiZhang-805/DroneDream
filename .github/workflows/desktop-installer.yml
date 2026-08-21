@@ -48,7 +48,6 @@ jobs:
       DRONEDREAM_EDITION_PROFILE: field-lightweight
       DRONEDREAM_RELEASE_SOURCE_COMMIT: ${{ github.sha }}
       DRONEDREAM_OAUTH_CLIENT_ID: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_FIELD || '3140bbe2-5f0e-4699-8a9b-295d4030f853' }}
-      VITE_DRONEDREAM_EDITION: field
       # Pull requests may compile with inert placeholders. Formal desktop tags
       # are rejected below unless the repository variables contain the real
       # public Supabase project configuration.
@@ -210,6 +209,8 @@ jobs:
 
       - name: Build DroneDream application or unsigned test installer
         shell: pwsh
+        env:
+          VITE_DRONEDREAM_EDITION: field
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
           $releaseBuild = $env:GITHUB_REF -like "refs/tags/desktop-field-v*-build-*"

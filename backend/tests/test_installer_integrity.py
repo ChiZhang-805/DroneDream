@@ -489,6 +489,10 @@ def test_field_installer_workflow_uses_one_exact_edition_identity_end_to_end() -
         assert fragment in workflow
 
     assert workflow.count("--config src-tauri/tauri.field.conf.json") == 3
+    assert workflow.count("VITE_DRONEDREAM_EDITION: field") == 1
+    assert workflow.index("VITE_DRONEDREAM_EDITION: field") > workflow.index(
+        "- name: Build DroneDream application or unsigned test installer"
+    )
     assert "refs/tags/desktop-v" not in workflow
     assert "bundle/nsis/latest.json" not in workflow
     assert "dist/latest.json" not in workflow
