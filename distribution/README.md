@@ -215,7 +215,7 @@ rollback policy, and the four independently observed product-branch heads.
 The planner deliberately has no output-file or build option. It writes a JSON
 plan to stdout only after confirming that the source tree is clean and that
 `codex/software-sim`, `codex/software-lab`, `codex/software-field`, and
-`codex/software-autonomy` exist on the observed remote with valid heads. It never runs Tauri, NSIS, Runtime migration,
+`codex/software-agent` exist on the observed remote with valid heads. It never runs Tauri, NSIS, Runtime migration,
 PX4, Gazebo, an installer, a release API, or a branch mutation. Every generated
 edition and precombined bundle therefore remains `planned-not-built`, with
 `sha256=null` and `bytes=null`.

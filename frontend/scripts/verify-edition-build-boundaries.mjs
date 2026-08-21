@@ -67,9 +67,12 @@ if (edition === "universal") {
 } else if (edition === "lab") {
   for (const name of labChunks) requireChunk(name);
   for (const name of ["FieldApp", "UniversalFieldApp", "VehicleStudio"]) forbidChunk(name);
-} else {
+} else if (edition === "field") {
   requireChunk("UniversalFieldApp");
   for (const name of [...labChunks, "FieldApp", "VehicleStudio"]) forbidChunk(name);
+} else {
+  requireChunk("VehicleStudio");
+  for (const name of [...labChunks, "FieldApp", "UniversalFieldApp"]) forbidChunk(name);
 }
 
 console.log(JSON.stringify({
@@ -77,6 +80,9 @@ console.log(JSON.stringify({
   kind: "dronedream-edition-frontend-boundary",
   edition,
   fileCount: files.length,
-  vehicleStudioExclusive: edition === "universal" ? ownsChunk("VehicleStudio") : true,
+  vehicleStudioHosts: ["universal", "autonomy"],
+  vehicleStudioBoundarySatisfied: ["universal", "autonomy"].includes(edition)
+    ? ownsChunk("VehicleStudio")
+    : !ownsChunk("VehicleStudio"),
   result: "pass",
 }));

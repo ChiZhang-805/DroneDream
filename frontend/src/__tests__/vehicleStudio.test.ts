@@ -53,7 +53,7 @@ function memoryStorage() {
   };
 }
 
-describe("Universal Vehicle Studio contract", () => {
+describe("Product-scoped Vehicle Studio contract", () => {
   it("renders independently authored Chinese modeling and option copy", () => {
     window.localStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "zh-CN");

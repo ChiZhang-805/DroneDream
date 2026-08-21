@@ -79,7 +79,7 @@ $browserAuth = Get-Content -LiteralPath $browserAuthPath -Raw -Encoding UTF8 | C
 $runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $sharedUi = $profile.sharedUiContract
 $integratedUi = $profile.integratedWorkspaceUiContract
-$vehicleStudio = $profile.universalExclusiveCapabilities.vehicleStudio
+$vehicleStudio = $profile.productScopedCapabilities.vehicleStudio
 $toolchainContract = if ($Toolchain -ceq "msvc") {
     [ordered]@{
         builder = "desktop\scripts\build-windows-msvc.ps1"
@@ -191,9 +191,12 @@ if ($integratedUiManifest.kind -cne "dronedream-universal-integrated-workspaces"
     $integratedUiManifest.grantsHardwareAuthority -ne $false -or
     $integratedUiManifest.validatedVehiclePackCount -ne 0 -or
     $integratedUiManifest.hardwareActionDecision -cne "deny" -or
-    $integratedUiManifest.universalExclusiveCapability.id -cne "vehicle-studio" -or
-    $integratedUiManifest.universalExclusiveCapability.route -cne "/vehicle-studio" -or
-    $integratedUiManifest.universalExclusiveCapability.grantsHardwareAuthority -ne $false) {
+    $integratedUiManifest.productScopedCapability.id -cne "vehicle-studio" -or
+    $integratedUiManifest.productScopedCapability.route -cne "/vehicle-studio" -or
+    (@($integratedUiManifest.productScopedCapability.hostEditions) -join ",") -cne "universal,autonomy" -or
+    $integratedUiManifest.productScopedCapability.editionBoundStorage -ne $true -or
+    $integratedUiManifest.productScopedCapability.theme -cne "edition-bound" -or
+    $integratedUiManifest.productScopedCapability.grantsHardwareAuthority -ne $false) {
     throw "Universal integrated workspace identity or authority policy drifted."
 }
 $integratedUiSourceRefs = @()
@@ -220,7 +223,9 @@ if ($integratedUiSourceRefs.Count -ne [int]$integratedUi.sourceFileCount) {
     throw "Universal integrated workspace contract source count drifted."
 }
 $vehicleStudioTargets = @($vehicleStudio.shareTargets)
-if ($vehicleStudio.ownerEdition -cne "universal" -or
+$vehicleStudioHosts = @($vehicleStudio.hostEditions)
+if (($vehicleStudioHosts -join ",") -cne "universal,autonomy" -or
+    $vehicleStudio.editionBoundStorage -ne $true -or
     $vehicleStudio.productSourceCommit -cnotmatch "^[0-9a-f]{40}$" -or
     $vehicleStudio.contract -cne "distribution/universal/vehicle-studio.v1.json" -or
     $vehicleStudio.schema -cne "distribution/schemas/vehicle-pack-draft-envelope.schema.json" -or
@@ -230,23 +235,23 @@ if ($vehicleStudio.ownerEdition -cne "universal" -or
     $vehicleStudio.modelHarnessStartsOnExchange -ne $false -or
     $vehicleStudio.grantsSimulationExecution -ne $false -or
     $vehicleStudio.grantsHardwareAuthority -ne $false) {
-    throw "Universal Vehicle Studio identity or safety policy drifted."
+    throw "Product-scoped Vehicle Studio identity or safety policy drifted."
 }
 Invoke-GitText @("merge-base", "--is-ancestor", [string]$vehicleStudio.productSourceCommit, $sourceCommit) | Out-Null
 $vehicleStudioSourceRefs = @()
 foreach ($expectedRef in @($vehicleStudio.sourceFiles)) {
     if ($expectedRef.path -cnotmatch "^(frontend/src/|distribution/(schemas|universal)/)" -or
         $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$") {
-        throw "Universal Vehicle Studio source binding is malformed."
+        throw "Product-scoped Vehicle Studio source binding is malformed."
     }
     $actualRef = New-RepoFileRef ([string]$expectedRef.path)
     if ($actualRef.sha256 -cne [string]$expectedRef.sha256) {
-        throw "Universal Vehicle Studio source binding drifted: $($expectedRef.path)"
+        throw "Product-scoped Vehicle Studio source binding drifted: $($expectedRef.path)"
     }
     $vehicleStudioSourceRefs += $actualRef
 }
 if ($vehicleStudioSourceRefs.Count -ne 10) {
-    throw "Universal Vehicle Studio contract must bind exactly ten source files."
+    throw "Product-scoped Vehicle Studio contract must bind exactly ten source files."
 }
 $coexistenceMatches = @($coexistence.editions | Where-Object { $_.editionId -ceq "universal" })
 $browserAuthMatches = @($browserAuth.editions | Where-Object { $_.editionId -ceq "universal" })
@@ -342,6 +347,8 @@ if (-not $Build) {
             grantsHardwareAuthority = $false
         }
         vehicleStudio = [ordered]@{
+            hostEditions = $vehicleStudioHosts
+            editionBoundStorage = $true
             productSourceCommit = [string]$vehicleStudio.productSourceCommit
             contract = New-RepoFileRef ([string]$vehicleStudio.contract)
             schema = New-RepoFileRef ([string]$vehicleStudio.schema)
@@ -559,6 +566,8 @@ $buildReceipt = [ordered]@{
         grantsHardwareAuthority = $false
     }
     vehicleStudio = [ordered]@{
+        hostEditions = $vehicleStudioHosts
+        editionBoundStorage = $true
         productSourceCommit = [string]$vehicleStudio.productSourceCommit
         contract = New-RepoFileRef ([string]$vehicleStudio.contract)
         schema = New-RepoFileRef ([string]$vehicleStudio.schema)

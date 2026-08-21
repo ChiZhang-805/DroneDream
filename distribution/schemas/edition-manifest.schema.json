@@ -118,7 +118,7 @@
             "codex/software-sim",
             "codex/software-lab",
             "codex/software-field",
-            "codex/software-autonomy"
+            "codex/software-agent"
           ]
         },
         "integrationBranch": {"const": "main"},
@@ -137,7 +137,7 @@
             "codex/software-sim",
             "codex/software-lab",
             "codex/software-field",
-            "codex/software-autonomy"
+            "codex/software-agent"
           ]
         },
         "creationState": {"const": "long-lived-product-branch"},

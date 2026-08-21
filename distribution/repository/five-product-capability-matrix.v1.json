@@ -65,7 +65,7 @@
     {
       "productId": "autonomy",
       "displayName": "DroneDream AUTONOMY",
-      "branch": "codex/software-autonomy",
+      "branch": "codex/software-agent",
       "primaryPurpose": "natural-language-autonomous-mission-workflow",
       "executionDomains": ["simulation", "qualified-real-hardware"],
       "navigationSections": ["autonomous-tasks", "workspace", "records"],

@@ -49,7 +49,7 @@ language across the rest of the experience.
 | SIM | Simulation-only Model + Harness workflows for PX4 SITL, Gazebo, repeatable experiments, and evidence. | [`codex/software-sim`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-sim) |
 | LAB | Bidirectional simulation and hardware validation, including Sim-to-Real and Real-to-Sim workflows. | [`codex/software-lab`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-lab) |
 | FIELD | Fail-closed real-device discovery, bounded tuning, preflight, operations, and rollback. | [`codex/software-field`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-field) |
-| AUTONOMY | Natural-language missions, structured plans, repeated Model + Harness loops, pluginized tools, safe interruption, and replanning. | `codex/software-autonomy` |
+| AGENT | Natural-language missions, structured plans, repeated Model + Harness loops, pluginized tools, safe interruption, and replanning. | `codex/software-agent` |
 | Website | The public product story, manuals, pricing, community, download experience, and shared static-release contract for global and mainland delivery. | [`codex/website`](https://github.com/ChiZhang-805/DroneDream/tree/codex/website) |
 | Technical report | The AURORA paper, figures, claim ledger, evidence references, and publication validation pipeline. | [`codex/technical-report`](https://github.com/ChiZhang-805/DroneDream/tree/codex/technical-report) |
 

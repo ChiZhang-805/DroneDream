@@ -2,6 +2,7 @@ param(
     [string]$ReleaseTag,
     [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$ValidationEditionId = "universal",
+    [string]$PullRequestBaseBranch,
     [string]$GitHubOutputPath
 )
 
@@ -34,9 +35,26 @@ if ($isRelease) {
         throw "Desktop release tag version $tagVersion does not match product version $version."
     }
 } else {
-    # Pull requests exercise one real edition without acquiring release
-    # authority or publishing into any updater channel.
-    $editionId = $ValidationEditionId
+    # Pull requests exercise the real edition owned by their target product
+    # branch. Manual runs have no base branch and retain the explicit edition
+    # selector. Keeping the mapping here makes the workflow and local tests use
+    # one source of truth instead of five independently maintained identities.
+    if ([string]::IsNullOrWhiteSpace($PullRequestBaseBranch)) {
+        $editionId = $ValidationEditionId
+    } else {
+        $editionByBranch = @{
+            "main" = "universal"
+            "codex/software" = "universal"
+            "codex/software-sim" = "sim"
+            "codex/software-lab" = "lab"
+            "codex/software-field" = "field"
+            "codex/software-agent" = "autonomy"
+        }
+        if (-not $editionByBranch.ContainsKey($PullRequestBaseBranch)) {
+            throw "Desktop pull request target branch does not own a product edition: $PullRequestBaseBranch"
+        }
+        $editionId = [string]$editionByBranch[$PullRequestBaseBranch]
+    }
     $buildNumberText = (& git -C $repoRoot rev-list --count HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $buildNumberText -notmatch '^[1-9][0-9]*$') {
         throw "Unable to resolve the validation build number."

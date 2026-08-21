@@ -103,6 +103,13 @@ EDITION_KEYS = {
     "knownGaps",
 }
 EDITION_IDS = {"sim", "lab", "field", "autonomy"}
+EDITION_BRANCHES = {
+    "sim": "codex/software-sim",
+    "lab": "codex/software-lab",
+    "field": "codex/software-field",
+    # Protocol and storage retain `autonomy`; the visible product channel is AGENT.
+    "autonomy": "codex/software-agent",
+}
 ENFORCEMENT_LAYERS = {"backend", "runtime", "native"}
 CONDITION_LAYERS = ENFORCEMENT_LAYERS | {"operator"}
 TARGET_KINDS = {"installation", "simulation", "hitl", "real-hardware"}
@@ -799,7 +806,7 @@ def validate_edition_manifest(
     if enabled != expected_enabled or forbidden != expected_forbidden:
         raise DistributionContractError("edition capability lists drifted from policy decisions")
     source_policy = document["sourcePolicy"]
-    expected_product_branch = f"codex/software-{edition_id}"
+    expected_product_branch = EDITION_BRANCHES[edition_id]
     if source_policy != {
         "developmentBranch": expected_product_branch,
         "integrationBranch": "main",

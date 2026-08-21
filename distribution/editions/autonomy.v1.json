@@ -71,14 +71,14 @@
     "receiptCompatibilityFailClosed": true
   },
   "sourcePolicy": {
-    "developmentBranch": "codex/software-autonomy",
+    "developmentBranch": "codex/software-agent",
     "integrationBranch": "main",
     "editionSourceDivergenceAllowed": false,
     "hotfixMustReturnToCore": true,
     "commonCoreHashRequired": true
   },
   "releaseChannel": {
-    "branch": "codex/software-autonomy",
+    "branch": "codex/software-agent",
     "creationState": "long-lived-product-branch",
     "promotionManifestRequired": true,
     "forcePushAllowed": false

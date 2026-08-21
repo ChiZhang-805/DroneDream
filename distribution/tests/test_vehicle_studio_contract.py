@@ -55,8 +55,9 @@ class VehicleStudioContractTests(unittest.TestCase):
             self.contract["authority"]["hardwareUseRequiresSignedValidationEvidence"]
         )
 
-    def test_contract_routes_to_exactly_three_professional_editions(self) -> None:
-        self.assertEqual(self.contract["ownerEdition"], "universal")
+    def test_contract_hosts_the_editor_in_two_products_and_routes_to_receivers(self) -> None:
+        self.assertEqual(self.contract["hostEditions"], ["universal", "autonomy"])
+        self.assertTrue(self.contract["editionBoundStorage"])
         self.assertEqual(self.contract["receivers"], ["sim", "lab", "field", "autonomy"])
         self.assertEqual(
             self.contract["transport"]["schemaPath"],

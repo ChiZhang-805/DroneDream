@@ -10,10 +10,12 @@
   "grantsHardwareAuthority": false,
   "validatedVehiclePackCount": 0,
   "hardwareActionDecision": "deny",
-  "universalExclusiveCapability": {
+  "productScopedCapability": {
     "id": "vehicle-studio",
     "route": "/vehicle-studio",
-    "theme": "universal",
+    "hostEditions": ["universal", "autonomy"],
+    "editionBoundStorage": true,
+    "theme": "edition-bound",
     "shareTargets": ["sim", "lab", "field", "autonomy"],
     "automaticReceiverInstallation": false,
     "startsModelHarnessOnExchange": false,
@@ -91,21 +93,21 @@
     },
     {
       "path": "frontend/src/pages/ExperimentAssistant.tsx",
-      "sha256": "095558451c64f7e4863bf4648f4b6d3c4523ff9f50629902dddf5f1df50e3c66",
+      "sha256": "dbe9d6d43d71779852ce17bd7d0bd3fb791c5383e01fe4205221a5e87a99a2ab",
       "donorEdition": "lab",
       "donorBlob": "c0bcfc6042582014a35e28ce2ff1f01bde3f44ad",
       "integration": "semantic-active-universal-workspace-theme"
     },
     {
       "path": "frontend/src/styles.css",
-      "sha256": "63dbd6238d17ca619b3bf5158dd0230bcba6110d16a56f4b73eeb3011f9732af",
+      "sha256": "f7c519f89d5af766e31ba6cf1f85a65004f1169d1eba0d3ceb83b448f7625d8e",
       "donorEdition": "lab",
       "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
       "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
     },
     {
       "path": "frontend/src/field/FieldApp.tsx",
-      "sha256": "63bfacac56584424962a2579270d7a4ea718e822f6f80ddd861eb7169eb6a6b6",
+      "sha256": "1cb5b7d0048e09038e728ce4a65166a9133e326847ca375aa1cf7496cf59fb54",
       "donorEdition": "field",
       "donorBlob": "5c4e3f01f16d831cdf0d995904c5b8b0a9b11c0d",
       "integration": "semantic-universal-shared-locale-adapter"
