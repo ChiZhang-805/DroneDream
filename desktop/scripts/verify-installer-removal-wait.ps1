@@ -38,7 +38,9 @@ foreach ($requiredContract in @(
     "RootProcessId",
     "ParentProcessId",
     "QuiescencePolls",
-    "quietPolls"
+    "quietPolls",
+    "InstallRoot",
+    "ExecutablePath"
 )) {
     if (-not $stopWebViewText.Contains(
         $requiredContract,
@@ -48,12 +50,26 @@ foreach ($requiredContract in @(
     }
 }
 
+$waitText = Get-Content -LiteralPath $waitScript -Raw
+foreach ($diagnosticContract in @(
+    "Remaining uninstall path inventory",
+    "Processes referencing uninstall path",
+    "Get-CimInstance Win32_Process"
+)) {
+    if (-not $waitText.Contains(
+        $diagnosticContract,
+        [System.StringComparison]::Ordinal
+    )) {
+        throw "Installer path-removal helper is missing failure diagnostic: $diagnosticContract"
+    }
+}
+
 $unusedProfile = Join-Path ([System.IO.Path]::GetTempPath()) (
     "dronedream-webview-unused-{0}" -f [Guid]::NewGuid().ToString("N")
 )
 & $stopWebViewScript `
     -ProfilePath $unusedProfile `
-    -TimeoutSeconds 1 `
+    -TimeoutSeconds 5 `
     -PollIntervalMilliseconds 50
 
 $missingPath = Join-Path ([System.IO.Path]::GetTempPath()) (

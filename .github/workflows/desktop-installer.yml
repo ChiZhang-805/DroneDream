@@ -616,6 +616,7 @@ jobs:
               -RootProcessId $(
                 if ($null -ne $appProcess) { $appProcess.Id } else { 0 }
               ) `
+              -InstallRoot $installDirFull `
               -TimeoutSeconds 10 `
               -PollIntervalMilliseconds 250
             if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
@@ -626,6 +627,14 @@ jobs:
               }
             }
           }
+          ./desktop/scripts/stop-owned-webview2.ps1 `
+            -ProfilePath $appDataRoot `
+            -RootProcessId $(
+              if ($null -ne $appProcess) { $appProcess.Id } else { 0 }
+            ) `
+            -InstallRoot $installDirFull `
+            -TimeoutSeconds 10 `
+            -PollIntervalMilliseconds 250
           ./desktop/scripts/wait-path-removal.ps1 `
             -LiteralPath $installDirFull `
             -TimeoutSeconds 30 `
@@ -638,6 +647,7 @@ jobs:
           # the runner-only application-data cleanup below.
           ./desktop/scripts/stop-owned-webview2.ps1 `
             -ProfilePath $appDataRoot `
+            -InstallRoot $installDirFull `
             -TimeoutSeconds 10 `
             -PollIntervalMilliseconds 250
           $cleanupError = $null

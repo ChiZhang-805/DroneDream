@@ -13,7 +13,9 @@ param(
     [int]$RootProcessId = 0,
 
     [ValidateRange(2, 20)]
-    [int]$QuiescencePolls = 4
+    [int]$QuiescencePolls = 4,
+
+    [string]$InstallRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,11 +25,41 @@ $profileToken = Split-Path -Leaf $profilePathFull
 if ([string]::IsNullOrWhiteSpace($profileToken)) {
     throw "ProfilePath must identify an application-owned profile directory"
 }
+$installRootFull = if ([string]::IsNullOrWhiteSpace($InstallRoot)) {
+    ""
+}
+else {
+    [System.IO.Path]::GetFullPath($InstallRoot).TrimEnd("\", "/")
+}
+$installRootPrefix = if ($installRootFull) {
+    $installRootFull + [System.IO.Path]::DirectorySeparatorChar
+}
+else {
+    ""
+}
 
-function Get-OwnedWebView2Processes {
-    $webViewProcesses = @(
+function Test-PathOwnedByInstallRoot {
+    param([string]$Candidate)
+
+    if (-not $installRootPrefix -or [string]::IsNullOrWhiteSpace($Candidate)) {
+        return $false
+    }
+
+    try {
+        $candidateFull = [System.IO.Path]::GetFullPath($Candidate)
+        return $candidateFull.StartsWith(
+            $installRootPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-OwnedDesktopProcesses {
+    $processes = @(
         Get-CimInstance Win32_Process `
-            -Filter "Name = 'msedgewebview2.exe'" `
             -ErrorAction SilentlyContinue
     )
 
@@ -36,7 +68,7 @@ function Get-OwnedWebView2Processes {
         [void]$descendantIds.Add($RootProcessId)
         do {
             $foundDescendant = $false
-            foreach ($process in $webViewProcesses) {
+            foreach ($process in $processes) {
                 if (
                     $descendantIds.Contains([int]$process.ParentProcessId) -and
                     $descendantIds.Add([int]$process.ProcessId)
@@ -47,11 +79,17 @@ function Get-OwnedWebView2Processes {
         } while ($foundDescendant)
     }
 
-    $webViewProcesses | Where-Object {
+    $processes | Where-Object {
+        if ([int]$_.ProcessId -eq $PID) {
+            return $false
+        }
+
         (
             $RootProcessId -gt 0 -and
             $descendantIds.Contains([int]$_.ProcessId)
-        ) -or ($_.CommandLine -and (
+        ) -or (Test-PathOwnedByInstallRoot $_.ExecutablePath) -or (
+            $_.Name -ieq "msedgewebview2.exe" -and
+            $_.CommandLine -and (
             $_.CommandLine.Contains(
                 $profilePathFull,
                 [System.StringComparison]::OrdinalIgnoreCase
@@ -67,7 +105,7 @@ function Get-OwnedWebView2Processes {
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 $quietPolls = 0
 do {
-    $ownedProcesses = @(Get-OwnedWebView2Processes)
+    $ownedProcesses = @(Get-OwnedDesktopProcesses)
     if ($ownedProcesses.Count -eq 0) {
         $quietPolls += 1
         if ($quietPolls -ge $QuiescencePolls) {
@@ -78,6 +116,12 @@ do {
         $quietPolls = 0
 
         foreach ($ownedProcess in $ownedProcesses) {
+            Write-Host (
+                "Stopping owned desktop child: pid={0} parent={1} name={2}" -f
+                $ownedProcess.ProcessId,
+                $ownedProcess.ParentProcessId,
+                $ownedProcess.Name
+            )
             Stop-Process `
                 -Id $ownedProcess.ProcessId `
                 -Force `
@@ -87,17 +131,19 @@ do {
     Start-Sleep -Milliseconds $PollIntervalMilliseconds
 } while ([DateTime]::UtcNow -lt $deadline)
 
-$remainingProcesses = @(Get-OwnedWebView2Processes)
+$remainingProcesses = @(Get-OwnedDesktopProcesses)
 if ($remainingProcesses.Count -gt 0) {
     $remainingIds = ($remainingProcesses.ProcessId | Sort-Object) -join ", "
     throw (
-        "Timed out after $TimeoutSeconds seconds stopping WebView2 processes " +
-        "owned by profile '$profilePathFull' or process ${RootProcessId}: " +
+        "Timed out after $TimeoutSeconds seconds stopping owned desktop processes " +
+        "owned by profile '$profilePathFull', install root '$installRootFull', " +
+        "or process ${RootProcessId}: " +
         $remainingIds
     )
 }
 
 throw (
-    "Timed out after $TimeoutSeconds seconds waiting for WebView2 quiescence " +
-    "for profile '$profilePathFull' or process $RootProcessId"
+    "Timed out after $TimeoutSeconds seconds waiting for owned desktop process quiescence " +
+    "for profile '$profilePathFull', install root '$installRootFull', " +
+    "or process $RootProcessId"
 )
