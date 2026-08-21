@@ -23,7 +23,7 @@ const EDITION_LABELS: Record<BrandEditionId, string> = {
   sim: "DroneDream · SIM",
   lab: "DroneDream · LAB",
   field: "DroneDream · FIELD",
-  autonomy: "DroneDream · AUTONOMY",
+  autonomy: "DroneDream · AGENT",
 };
 const EDITION_LOCKUPS: Record<BrandEditionId, string> = {
   universal: universalLockup,

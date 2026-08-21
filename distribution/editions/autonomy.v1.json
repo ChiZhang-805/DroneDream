@@ -5,8 +5,8 @@
   "editionVersion": "1.0.0",
   "productDisplayVersion": "1.0.0",
   "displayName": {
-    "en": "DroneDream Autonomy",
-    "zh-CN": "DroneDream 自主任务版"
+    "en": "DroneDream · AGENT",
+    "zh-CN": "DroneDream · AGENT"
   },
   "description": {
     "en": "A natural-language autonomous mission workspace with structured planning, model-and-harness loops, pluginized tools, runtime holds, replanning, and evidence-gated simulation or hardware adoption.",
@@ -14,7 +14,7 @@
   },
   "implementationStatus": "integrated-contract",
   "validationTier": "autonomy-runtime-contract",
-  "artifactBaseName": "DroneDream-Autonomy-1.0.0.exe",
+  "artifactBaseName": "DroneDream-Agent-1.0.0.exe",
   "capabilityPolicy": {
     "policyId": "core-capabilities",
     "policyVersion": "1.0.0",
@@ -71,14 +71,14 @@
     "receiptCompatibilityFailClosed": true
   },
   "sourcePolicy": {
-    "developmentBranch": "codex/software-autonomy",
+    "developmentBranch": "codex/software-agent",
     "integrationBranch": "main",
     "editionSourceDivergenceAllowed": false,
     "hotfixMustReturnToCore": true,
     "commonCoreHashRequired": true
   },
   "releaseChannel": {
-    "branch": "codex/software-autonomy",
+    "branch": "codex/software-agent",
     "creationState": "long-lived-product-branch",
     "promotionManifestRequired": true,
     "forcePushAllowed": false

@@ -91,7 +91,7 @@ describe("OrganizationPage", () => {
     const ownerRow = screen.getByText("owner@example.test").closest("tr");
     expect(ownerRow).not.toBeNull();
     expect(within(ownerRow!).getAllByLabelText(
-      /^(Universal|SIM|LAB|FIELD|AUTONOMY) (not )?licensed$/i,
+      /^(Universal|SIM|LAB|FIELD|AGENT) (not )?licensed$/i,
     )).toHaveLength(5);
     expect(ownerRow?.querySelectorAll(".edition-license-strip .is-active")).toHaveLength(2);
     expect(container.querySelector(".organization-member-table")).toBeVisible();

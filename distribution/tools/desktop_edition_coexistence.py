@@ -15,14 +15,14 @@ EDITION_LABELS = {
     "sim": "Sim",
     "lab": "Lab",
     "field": "Field",
-    "autonomy": "Autonomy",
+    "autonomy": "Agent",
 }
 DISPLAY_NAMES = {
     "universal": "DroneDream",
     "sim": "DroneDream · SIM",
     "lab": "DroneDream · LAB",
     "field": "DroneDream · FIELD",
-    "autonomy": "DroneDream · AUTONOMY",
+    "autonomy": "DroneDream · AGENT",
 }
 
 

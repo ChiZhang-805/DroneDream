@@ -94,7 +94,7 @@ jobs:
           OAUTH_SIM: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_SIM }}
           OAUTH_LAB: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_LAB }}
           OAUTH_FIELD: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_FIELD }}
-          OAUTH_AUTONOMY: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY }}
+          OAUTH_AUTONOMY: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_AGENT || vars.DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY }}
         run: |
           $releaseTag = if ($env:GITHUB_REF_TYPE -eq "tag") {
             $env:GITHUB_REF_NAME

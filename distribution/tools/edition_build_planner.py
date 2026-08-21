@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create and validate plan-only SIM/LAB/FIELD/AUTONOMY build inventories.
+"""Create and validate plan-only SIM/LAB/FIELD/AGENT build inventories.
 
 This tool never invokes Tauri, NSIS, an installer, Runtime migration, a release
 API, or a release-branch mutation.  It derives a deterministic, source-bound
@@ -22,6 +22,13 @@ from typing import Any
 import distribution_contract as contract
 
 EDITION_IDS = ("autonomy", "field", "lab", "sim")
+EDITION_BRANCHES = {edition_id: contract.EDITION_BRANCHES[edition_id] for edition_id in EDITION_IDS}
+EDITION_LABELS = {
+    "autonomy": "Agent",
+    "field": "Field",
+    "lab": "Lab",
+    "sim": "Sim",
+}
 CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
 COMPONENT_IDS = {
     "desktop-core",
@@ -205,17 +212,21 @@ def common_core_hash(repo_root: Path, source_commit: str, paths: list[str]) -> s
 
 
 def observe_release_heads(repo_root: Path, remote: str = "origin") -> dict[str, str | None]:
-    refs = [f"refs/heads/codex/software-{edition_id}" for edition_id in EDITION_IDS]
+    refs = [f"refs/heads/{EDITION_BRANCHES[edition_id]}" for edition_id in EDITION_IDS]
     output = _run_git(repo_root, "ls-remote", "--heads", remote, *refs)
     observed: dict[str, str | None] = {edition_id: None for edition_id in EDITION_IDS}
     for raw_line in output.splitlines():
         fields = raw_line.split()
         if len(fields) != 2 or not COMMIT_RE.fullmatch(fields[0]):
             raise BuildPlanError("remote release-head observation is malformed")
-        prefix = "refs/heads/codex/software-"
-        if not fields[1].startswith(prefix):
+        branch = fields[1].removeprefix("refs/heads/")
+        branch_to_edition = {
+            edition_branch: edition_id
+            for edition_id, edition_branch in EDITION_BRANCHES.items()
+        }
+        if branch not in branch_to_edition:
             raise BuildPlanError("remote release-head observation returned an unexpected ref")
-        edition_id = fields[1][len(prefix) :]
+        edition_id = branch_to_edition[branch]
         if edition_id not in observed or observed[edition_id] is not None:
             raise BuildPlanError("remote release-head observation is duplicated or unknown")
         observed[edition_id] = fields[0]
@@ -351,7 +362,7 @@ def validate_request(request: Any) -> dict[str, Any]:
         _positive_or_zero(item["vehiclePackInstalledEstimateBytes"], "Vehicle Pack installed")
         if item["vehiclePackInstalledEstimateBytes"] < item["vehiclePackDownloadEstimateBytes"]:
             raise BuildPlanError("Vehicle Pack installed estimate is too small")
-        expected_name = f"DroneDream-{edition_id.title()}-1.0.0.exe"
+        expected_name = f"DroneDream-{EDITION_LABELS[edition_id]}-1.0.0.exe"
         if item["artifactFileName"] != expected_name or expected_name in artifact_names:
             raise BuildPlanError("edition artifact filename drifted or duplicated")
         artifact_names.add(expected_name)

@@ -17,7 +17,7 @@ const DESKTOP_REDIRECTS = new Map([
   ],
   [
     "http://127.0.0.1:49214/desktop-auth/autonomy/callback",
-    { edition: "AUTONOMY", product: "DroneDream AUTONOMY" },
+    { edition: "AGENT", product: "DroneDream · AGENT" },
   ],
 ] as const);
 

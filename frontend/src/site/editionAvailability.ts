@@ -8,14 +8,14 @@ export const editionInstallerNames: Record<EditionAvailabilityId, string> = {
   sim: "DroneDream-Sim_1.0.0_x64-setup.exe",
   lab: "DroneDream-Lab_1.0.0_x64-setup.exe",
   field: "DroneDream-Field_1.0.0_x64-setup.exe",
-  autonomy: "DroneDream-AUTONOMY_1.0.0_x64-setup.exe",
+  autonomy: "DroneDream-Agent_1.0.0_x64-setup.exe",
 };
 
 const formalEditionInstallerNames: Record<EditionAvailabilityId, string> = {
   sim: "DroneDream-Sim-1.0.0.exe",
   lab: "DroneDream-Lab-1.0.0.exe",
   field: "DroneDream-Field-1.0.0.exe",
-  autonomy: "DroneDream-Autonomy-1.0.0.exe",
+  autonomy: "DroneDream-Agent-1.0.0.exe",
 };
 
 export type EditionArtifact = {

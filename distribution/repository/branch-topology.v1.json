@@ -9,7 +9,7 @@
     {"name": "codex/software-sim", "role": "long-lived-product", "productId": "sim"},
     {"name": "codex/software-lab", "role": "long-lived-product", "productId": "lab"},
     {"name": "codex/software-field", "role": "long-lived-product", "productId": "field"},
-    {"name": "codex/software-autonomy", "role": "long-lived-product", "productId": "autonomy"},
+    {"name": "codex/software-agent", "role": "long-lived-product", "productId": "autonomy"},
     {"name": "codex/website", "role": "long-lived-delivery", "productId": "website"},
     {"name": "codex/technical-report", "role": "long-lived-delivery", "productId": "technical-report"}
   ],

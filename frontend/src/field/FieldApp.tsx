@@ -189,7 +189,7 @@ function FieldPageHeading({
     <header className="field-page-heading">
       <div>
         <span className="field-page-eyebrow"><Icon aria-hidden="true" />{
-          edition === "lab" ? "LAB · HARDWARE" : edition === "autonomy" ? "AUTONOMY · HARDWARE" : "FIELD"
+          edition === "lab" ? "LAB · HARDWARE" : edition === "autonomy" ? "AGENT · HARDWARE" : "FIELD"
         }</span>
         <h1>{title}</h1>
         <p>{body}</p>

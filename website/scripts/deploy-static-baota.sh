@@ -349,7 +349,7 @@ products = {
     "sim": "DroneDream-Sim",
     "lab": "DroneDream-Lab",
     "field": "DroneDream-Field",
-    "autonomy": "DroneDream-Autonomy",
+    "autonomy": "DroneDream-Agent",
 }
 has_edition = "edition" in data
 has_build = "buildNumber" in data

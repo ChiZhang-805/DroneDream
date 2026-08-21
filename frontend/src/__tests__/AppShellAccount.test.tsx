@@ -79,7 +79,7 @@ describe("workspace account entry", () => {
     const { router } = renderWorkspace("/vehicle-studio");
 
     const selector = screen.getByRole("button", { name: "Switch DroneDream edition" });
-    expect(selector).toHaveTextContent("AUTONOMY");
+    expect(selector).toHaveTextContent("AGENT");
     expect(document.documentElement).toHaveAttribute("data-brand-edition", "autonomy");
 
     router.dispose();
@@ -179,7 +179,7 @@ describe("workspace account entry", () => {
     ]);
     expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
 
-    selectEdition(/DroneDream.*AUTONOMY/);
+    selectEdition(/DroneDream.*AGENT/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
       "Autonomy",

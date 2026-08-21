@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DroneDream-Autonomy",
+  "productName": "DroneDream-Agent",
   "identifier": "io.dronedream.desktop.autonomy",
   "app": {
     "windows": [
       {
         "label": "main",
-        "title": "DroneDream · AUTONOMY",
+        "title": "DroneDream · AGENT",
         "width": 1440,
         "height": 900,
         "minWidth": 390,
@@ -19,7 +19,7 @@
   "bundle": {
     "publisher": "DroneDream",
     "shortDescription": "Natural-language autonomous mission workspace",
-    "longDescription": "DroneDream · AUTONOMY turns natural-language intent into structured, reviewable mission plans and supervises execution through repeated Model + Harness loops, pluginized tools, safety holds, replanning and evidence gates. Simulation is the default execution domain; hardware remains fail-closed until explicitly qualified.",
+    "longDescription": "DroneDream · AGENT turns natural-language intent into structured, reviewable mission plans and supervises execution through repeated Model + Harness loops, pluginized tools, safety holds, replanning and evidence gates. Simulation is the default execution domain; hardware remains fail-closed until explicitly qualified.",
     "icon": [
       "../../brand/generated/autonomy/windows/32x32.png",
       "../../brand/generated/autonomy/windows/128x128.png",
