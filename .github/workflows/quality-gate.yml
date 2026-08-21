@@ -164,7 +164,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check \
             --requirement runtime/locks/release-tools-requirements.lock \
-            "ruff==0.15.21" "pip-audit==2.10.1"
+            "ruff==0.15.21" "pip-audit==2.10.1" "pytest==9.1.1"
 
       - name: Audit locked Python dependencies
         run: |
