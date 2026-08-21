@@ -79,6 +79,7 @@ class RuntimeManifestContractTests(unittest.TestCase):
         workflows = (
             ROOT / ".github" / "workflows" / "runtime-contract.yml",
             ROOT / ".github" / "workflows" / "quality-gate.yml",
+            ROOT / ".github" / "workflows" / "runtime-release.yml",
         )
         for workflow in workflows:
             content = workflow.read_text(encoding="utf-8")
