@@ -2419,6 +2419,20 @@ html[lang="zh-CN"] .site-hero h1 {
     width: calc(100% + clamp(4rem, 10vw, 12rem));
     margin-inline: calc(clamp(2rem, 5vw, 6rem) * -1);
   }
+
+  /*
+   * Keep the bilingual copy contract stable across Windows and Linux font
+   * metrics. These component-level margins avoid per-sentence padding and
+   * leave enough room for the same copy to wrap identically in CI.
+   */
+  .dd-site[data-locale="en"] .site-capability-entry p { max-width: 47ch; }
+  .dd-site[data-locale="zh-CN"] .site-capability-entry p { max-width: 33ch; }
+  .site-capability-summary { font-size: .9rem; }
+  .dd-site[data-locale="en"] .site-phase-copy p {
+    width: 98%;
+    margin-right: auto;
+    margin-left: auto;
+  }
 }
 
 @media (min-width: 781px) and (max-width: 1440px) {

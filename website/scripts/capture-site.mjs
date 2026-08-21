@@ -1,7 +1,8 @@
-import { existsSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
+import { launchSiteBrowser } from "./playwright-browser.mjs";
 
 const frontendRequire = createRequire(new URL("../../frontend/package.json", import.meta.url));
 const { chromium } = frontendRequire("playwright");
@@ -27,13 +28,6 @@ if (!Number.isFinite(width) || !Number.isFinite(height) || width < 320 || height
   throw new Error("Invalid viewport dimensions.");
 }
 
-const edgeCandidates = [
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-];
-const edge = edgeCandidates.find(existsSync);
-if (!edge) throw new Error("Microsoft Edge was not found.");
-
 const diagnostics = [];
 const isOptionalPreviewManifest = (value) => value.includes("/downloads/latest.json");
 const isBenignStaticAbort = (request) =>
@@ -42,11 +36,7 @@ const isBenignStaticAbort = (request) =>
     request.url().endsWith("/drone-favicon.png") ||
     request.url().includes("/assets/128x128-")
   );
-const browser = await chromium.launch({
-  executablePath: edge,
-  headless: true,
-  args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--disable-gpu"],
-});
+const browser = await launchSiteBrowser(chromium, { disableGpu: true });
 
 try {
   const page = await browser.newPage({ viewport: { width, height } });
