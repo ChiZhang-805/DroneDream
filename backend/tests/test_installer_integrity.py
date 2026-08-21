@@ -448,3 +448,16 @@ def test_desktop_workflow_bounds_pr_concurrency_and_artifact_retention() -> None
     assert 'tags:\n      - "desktop-v*"' in workflow
     assert "workflow_dispatch:" in workflow
     assert "pull_request:" in workflow
+
+
+def test_field_lightweight_workflow_skips_unavailable_runtime_planner_smoke() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    workflow = (repository_root / ".github" / "workflows" / "desktop-installer.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "DRONEDREAM_EDITION_PROFILE: field-lightweight" in workflow
+    assert 'if ($env:DRONEDREAM_EDITION_PROFILE -eq "field-lightweight") {' in workflow
+    assert 'Write-Host "Skipped Runtime installer planner smoke for field-lightweight."' in workflow
+    assert workflow.count("./desktop/scripts/verify-installer-planner.ps1") == 1
+    assert "} else {" in workflow

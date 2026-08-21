@@ -325,14 +325,18 @@ jobs:
           ./desktop/scripts/verify-webview2-installer.ps1 `
             -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
 
-      - name: Verify installer locales and extracted planner
+      - name: Verify installer locales and edition planner contract
         shell: pwsh
         run: |
           ./desktop/scripts/verify-installer-path-guard.ps1
           ./desktop/scripts/verify-installer-locales.ps1 `
             -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
-          ./desktop/scripts/verify-installer-planner.ps1 `
-            -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+          if ($env:DRONEDREAM_EDITION_PROFILE -eq "field-lightweight") {
+            Write-Host "Skipped Runtime installer planner smoke for field-lightweight."
+          } else {
+            ./desktop/scripts/verify-installer-planner.ps1 `
+              -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+          }
 
       - name: Upload unsigned installer for SignPath
         if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
