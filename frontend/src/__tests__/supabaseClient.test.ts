@@ -4,15 +4,16 @@ import { editionAuthStorageKey } from "../features/auth/supabaseClient";
 
 describe("desktop Supabase session namespace", () => {
   it("uses a distinct versioned WebView storage key for every edition", () => {
-    const keys = ["universal", "sim", "lab", "field"]
+    const keys = ["universal", "sim", "lab", "field", "autonomy"]
       .map((edition) => editionAuthStorageKey(edition));
 
-    expect(new Set(keys).size).toBe(4);
+    expect(new Set(keys).size).toBe(5);
     expect(keys).toEqual([
       "dronedream-desktop-auth:universal:v1",
       "dronedream-desktop-auth:sim:v1",
       "dronedream-desktop-auth:lab:v1",
       "dronedream-desktop-auth:field:v1",
+      "dronedream-desktop-auth:autonomy:v1",
     ]);
   });
 

@@ -12,7 +12,10 @@ const desktopRuntime = isDesktopRuntime();
 
 export function editionAuthStorageKey(editionId: string | undefined): string | null {
   const normalized = editionId?.trim().toLowerCase();
-  if (!normalized || !["universal", "sim", "lab", "field"].includes(normalized)) {
+  if (
+    !normalized
+    || !["universal", "sim", "lab", "field", "autonomy"].includes(normalized)
+  ) {
     return null;
   }
   return `dronedream-desktop-auth:${normalized}:v1`;
