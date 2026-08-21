@@ -100,6 +100,29 @@ class RuntimeManifestContractTests(unittest.TestCase):
         self.assertEqual(backend["project"]["version"], pins["BACKEND_VERSION"])
         self.assertEqual(worker["project"]["version"], pins["WORKER_VERSION"])
 
+    def test_runtime_test_entrypoints_use_the_pinned_pytest_contract(self) -> None:
+        workflows = (
+            ROOT / ".github" / "workflows" / "runtime-contract.yml",
+            ROOT / ".github" / "workflows" / "quality-gate.yml",
+        )
+        for workflow in workflows:
+            content = workflow.read_text(encoding="utf-8")
+            with self.subTest(workflow=workflow.name):
+                self.assertIn('"pytest==9.1.1"', content)
+                self.assertIn("python -m pytest runtime/tests -q", content)
+                self.assertNotIn("unittest discover -s runtime/tests", content)
+
+        check_script_path = ROOT / "scripts" / "check-runtime.sh"
+        if check_script_path.exists():
+            check_script = check_script_path.read_text(encoding="utf-8")
+            self.assertIn("pytest==9.1.1", check_script)
+            self.assertIn('"$RUNTIME_PYTHON" -m pytest runtime/tests -q', check_script)
+            self.assertNotIn("unittest discover -s runtime/tests", check_script)
+
+        readme = (RUNTIME / "README.md").read_text(encoding="utf-8")
+        self.assertIn("python -m pytest runtime/tests -q", readme)
+        self.assertNotIn("unittest discover -s runtime/tests", readme)
+
     def test_promotion_is_atomic_and_requires_every_real_check(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
