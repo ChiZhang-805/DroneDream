@@ -150,7 +150,7 @@ const CORE_NAV_ITEMS: NavigationItem[] = [
   },
   {
     to: "/autonomy",
-    label: "AUTONOMY",
+    label: "AGENT",
     icon: Orbit,
   },
   {

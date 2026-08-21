@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "brand" / "brand-editions.v1.json"
@@ -73,22 +73,22 @@ APPROVED_HASHES = {
         ),
     },
     "autonomy": {
-        "markPath": "brand/source/approved/autonomy-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/autonomy-large-label-centered-lockup.png",
-        "markSha256": "a67fe1fb2558471806fe19c3eb9423d041a1a5de58a30bfb9893353c00a9f651",
+        "markPath": "brand/source/approved/agent-mark-1024.png",
+        "dotLockupPath": "brand/source/approved/agent-large-label-centered-lockup.png",
+        "markSha256": "675188a785e56e2e1d81fb42627de18cca460018f83ee12baa389ef7b4e1d72e",
         "dotLockupSha256": (
-            "8f8ce7bc4a8cf1782fe006c05f4798201ac063625bb8d9c98070f61491b84b2b"
+            "6d86d5a1a7d29f861a87acf51937f7c33eb2a4c6681479e2b121ccf403373ffb"
         ),
-        "dotLockupDimensions": {"width": 3090, "height": 340},
-        "dotLockupStyle": "autonomy-approved-lockup-v1",
-        "separatorTolerancePx": 9,
+        "dotLockupDimensions": {"width": 2718, "height": 218},
+        "dotLockupStyle": "agent-large-label-centered-separator-v2",
+        "separatorTolerancePx": 0,
         "separatorGeometry": {
-            "wordmarkEndX": 1718,
-            "separatorStartX": 1789,
-            "separatorEndX": 1853,
-            "editionLabelStartX": 1915,
-            "leftGapPx": 70,
-            "rightGapPx": 61,
+            "wordmarkEndX": 1748,
+            "separatorStartX": 1807,
+            "separatorEndX": 1858,
+            "editionLabelStartX": 1917,
+            "leftGapPx": 58,
+            "rightGapPx": 58,
         },
     },
 }
@@ -98,7 +98,7 @@ CANONICAL_ICO_HASHES = {
     "sim": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
     "lab": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1",
     "field": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",
-    "autonomy": "a8a1eb24801bf3ab07503e0c669f0ef6b6c5cf71af1fd160c8e3806324c0a138",
+    "autonomy": "92335d9b4d3b480d519d495b12130a2d1c2b5ed88d12f72e7da712e11e846e7e",
 }
 
 
@@ -116,7 +116,7 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
     contract = load_json(CONTRACT_PATH)
     schema = load_json(SCHEMA_PATH)
 
-    assert contract["brandVersion"] == "1.2.0"
+    assert contract["brandVersion"] == "1.3.0"
     assert contract["separator"] == "\u00b7"
     assert schema["properties"]["separator"]["const"] == "\u00b7"
     assert contract["safety"] == {
@@ -230,12 +230,50 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
             "gradientStops": ["#FFC247", "#FF754B", "#D746A5"],
         },
         "autonomy": {
-            "productName": "DroneDream · AUTONOMY",
+            "productName": "DroneDream · AGENT",
             "gradientStops": ["#FF5B74", "#EC214F", "#97153B"],
         },
     }
     for edition_id in EDITION_IDS[1:]:
         assert contract["editions"][edition_id]["productName"].split()[1] == "\u00b7"
+
+
+def test_edition_labels_keep_one_visible_size_ratio() -> None:
+    contract = load_json(CONTRACT_PATH)
+    visible_ratios = []
+    for descriptor in contract["approvedEditionAssets"].values():
+        geometry = descriptor["separatorGeometry"]
+        with Image.open(ROOT / descriptor["dotLockupPath"]) as source:
+            alpha = source.convert("RGBA").getchannel("A")
+            wordmark = alpha.crop(
+                (0, 0, geometry["wordmarkEndX"] + 1, source.height)
+            ).getbbox()
+            edition_label = alpha.crop(
+                (geometry["editionLabelStartX"], 0, source.width, source.height)
+            ).getbbox()
+        assert wordmark is not None
+        assert edition_label is not None
+        visible_ratios.append(
+            (edition_label[3] - edition_label[1]) / (wordmark[3] - wordmark[1])
+        )
+    assert max(visible_ratios) - min(visible_ratios) <= 0.005
+
+
+def test_edition_wordmark_prefixes_are_pixel_identical() -> None:
+    """Keep every DroneDream letter at one exact size, baseline, and spacing."""
+    contract = load_json(CONTRACT_PATH)
+    reference_alpha = None
+    for edition_id, descriptor in contract["approvedEditionAssets"].items():
+        geometry = descriptor["separatorGeometry"]
+        with Image.open(ROOT / descriptor["dotLockupPath"]) as source:
+            prefix_alpha = source.convert("RGBA").getchannel("A").crop(
+                (0, 0, geometry["wordmarkEndX"] + 1, source.height)
+            )
+        if reference_alpha is None:
+            reference_alpha = prefix_alpha
+            continue
+        assert prefix_alpha.size == reference_alpha.size, edition_id
+        assert ImageChops.difference(prefix_alpha, reference_alpha).getbbox() is None, edition_id
 
 
 def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
@@ -249,7 +287,7 @@ def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
     assert manifest["presentationOnly"] is True
     assert manifest["grantsHardwareAuthority"] is False
     assert manifest["conceptAssetsAreReleaseAssets"] is False
-    assert manifest["brandVersion"] == "1.2.0"
+    assert manifest["brandVersion"] == "1.3.0"
     assert manifest["largeLabelApproval"] == {
         "canonicalSources": True,
         "reviewPreviewPath": (

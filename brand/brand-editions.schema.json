@@ -173,12 +173,12 @@
           "properties": {
             "markPath": {
               "type": "string",
-              "pattern": "^brand/source/approved/(sim|lab|field|autonomy)-mark-1024\\.png$"
+              "pattern": "^brand/source/approved/(sim|lab|field|autonomy|agent)-mark-1024\\.png$"
             },
             "markSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "dotLockupPath": {
               "type": "string",
-              "pattern": "^brand/source/approved/(sim|lab|field|autonomy)-large-label-centered-lockup\\.png$"
+              "pattern": "^brand/source/approved/(sim|lab|field|autonomy|agent)-large-label-centered-lockup\\.png$"
             },
             "dotLockupSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "dotLockupDimensions": {
@@ -191,7 +191,11 @@
               }
             },
             "dotLockupStyle": {
-              "enum": ["large-edition-label-centered-separator-v2", "autonomy-approved-lockup-v1"]
+              "enum": [
+                "large-edition-label-centered-separator-v2",
+                "autonomy-approved-lockup-v1",
+                "agent-large-label-centered-separator-v2"
+              ]
             },
             "separatorTolerancePx": {"type": "integer", "minimum": 0, "maximum": 12},
             "separatorGeometry": {
@@ -221,10 +225,15 @@
               "properties": {
                 "path": {
                   "type": "string",
-                  "pattern": "^brand/source/approved/(sim|lab|field)-large-label-lockup\\.png$"
+                  "pattern": "^brand/source/approved/((sim|lab|field)-large-label-lockup|autonomy-large-label-centered-lockup)\\.png$"
                 },
                 "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-                "status": {"const": "superseded-by-centered-separator-v2"}
+                "status": {
+                  "enum": [
+                    "superseded-by-centered-separator-v2",
+                    "superseded-by-agent-product-rename"
+                  ]
+                }
               }
             }
           }

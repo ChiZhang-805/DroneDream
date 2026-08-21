@@ -3,7 +3,7 @@
   "kind": "dronedream-universal-vehicle-studio-contract",
   "contractVersion": "1.0.0",
   "ownerEdition": "universal",
-  "purpose": "Create versioned custom drone models and exchange integrity-bound Vehicle Pack drafts with SIM, LAB, and FIELD.",
+  "purpose": "Create versioned custom drone models and exchange integrity-bound Vehicle Pack drafts with SIM, LAB, FIELD, and AGENT.",
   "transport": {
     "mediaType": "application/vnd.dronedream.vehicle-pack-draft+json",
     "fileSuffix": ".ddvp.json",
@@ -11,7 +11,7 @@
     "canonicalization": "dronedream-sorted-json-v1",
     "integrityAlgorithm": "SHA-256"
   },
-  "receivers": ["sim", "lab", "field"],
+  "receivers": ["sim", "lab", "field", "autonomy"],
   "requiredReceiverSequence": [
     "parse-closed-schema",
     "verify-envelope-and-artifact-hashes",

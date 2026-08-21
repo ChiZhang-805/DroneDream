@@ -8,7 +8,7 @@ on:
       - codex/software-sim
       - codex/software-lab
       - codex/software-field
-      - codex/software-autonomy
+      - codex/software-agent
   push:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
       - codex/software-sim
       - codex/software-lab
       - codex/software-field
-      - codex/software-autonomy
+      - codex/software-agent
   workflow_dispatch:
 
 permissions:

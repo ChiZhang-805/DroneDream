@@ -57,7 +57,7 @@ describe("UniversalModeSwitch", () => {
     expect(region).toHaveAttribute("data-grants-hardware-authority", "false");
     expect(screen.getAllByRole("option")).toHaveLength(5);
     expect(screen.getByRole("option", { name: "DroneDream" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "DroneDream · AUTONOMY" }))
+    expect(screen.getByRole("option", { name: "DroneDream · AGENT" }))
       .toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Workspace mode" })).toHaveValue("universal");
 

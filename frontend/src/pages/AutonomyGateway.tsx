@@ -103,7 +103,7 @@ export function AutonomyGateway() {
     <main className="autonomy-gateway-page">
       <header className="autonomy-gateway-header">
         <div>
-          <p>AUTONOMY</p>
+          <p>AGENT</p>
           <h1>{chinese ? "自主任务" : "Autonomous tasks"}</h1>
         </div>
         <Link className="button button-primary" to="/assistant?workspace=autonomy">
@@ -145,4 +145,3 @@ export function AutonomyGateway() {
     </main>
   );
 }
-
