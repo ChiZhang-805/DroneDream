@@ -444,8 +444,8 @@ def test_desktop_workflow_bounds_pr_concurrency_and_artifact_retention() -> None
         "(github.event_name == 'workflow_dispatch' && 14 || 30) }}"
     )
     assert workflow.count(retention) == 1
-    assert 'name: DroneDream-Windows-x64' in workflow
-    assert 'tags:\n      - "desktop-v*"' in workflow
+    assert 'name: DroneDream-field-Windows-x64' in workflow
+    assert 'tags:\n      - "desktop-field-v*-build-*"' in workflow
     assert "workflow_dispatch:" in workflow
     assert "pull_request:" in workflow
 
@@ -461,3 +461,38 @@ def test_field_lightweight_workflow_skips_unavailable_runtime_planner_smoke() ->
     assert 'Write-Host "Skipped Runtime installer planner smoke for field-lightweight."' in workflow
     assert workflow.count("./desktop/scripts/verify-installer-planner.ps1") == 1
     assert "} else {" in workflow
+
+
+def test_field_installer_workflow_uses_one_exact_edition_identity_end_to_end() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    workflow = (repository_root / ".github" / "workflows" / "desktop-installer.yml").read_text(
+        encoding="utf-8"
+    )
+
+    required_fragments = (
+        '"desktop-field-v*-build-*"',
+        "--config src-tauri/tauri.field.conf.json",
+        "DroneDream-Field_${{ steps.release-version.outputs.version }}_x64-setup.exe",
+        '"DroneDream-Field_${version}_x64-setup.exe"',
+        '"DroneDream-Field-${version}.exe"',
+        '--edition-config "desktop/src-tauri/tauri.field.conf.json"',
+        "invoke-tauri-updater-signer.ps1",
+        "-EditionId field",
+        '"io.dronedream.desktop.field"',
+        'MainWindowTitle -ceq "DroneDream · FIELD"',
+        'MainWindowTitle -cne "DroneDream · FIELD"',
+        '"latest-field.json"',
+        'productName == "DroneDream-Field"',
+        "desktop/release-dist/*",
+    )
+    for fragment in required_fragments:
+        assert fragment in workflow
+
+    assert workflow.count("--config src-tauri/tauri.field.conf.json") == 3
+    assert "refs/tags/desktop-v" not in workflow
+    assert "bundle/nsis/latest.json" not in workflow
+    assert "dist/latest.json" not in workflow
+    assert 'Join-Path $env:LOCALAPPDATA "io.dronedream.desktop"' not in workflow
+    assert 'MainWindowTitle -ceq "DroneDream"' not in workflow
+    assert 'MainWindowTitle -cne "DroneDream"' not in workflow
+    assert "--password=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)" not in workflow

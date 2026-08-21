@@ -72,8 +72,28 @@ if ($previewMismatches.Count -ne 0) {
     throw "Localized desktop version labels disagree with $expected`: $previewVersions"
 }
 
-if ($ReleaseTag -and $ReleaseTag -cne "desktop-v$expected") {
-    throw "Release tag $ReleaseTag does not match desktop version $expected."
+if ($ReleaseTag) {
+    $releaseMatch = [regex]::Match(
+        $ReleaseTag,
+        "^desktop-field-v$([regex]::Escape($expected))-build-([1-9][0-9]*)$",
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant
+    )
+    if (-not $releaseMatch.Success) {
+        throw (
+            "FIELD release tag $ReleaseTag must match " +
+            "desktop-field-v$expected-build-<positive commit count>."
+        )
+    }
+    $commitCount = (& git -C $repoRoot rev-list --count HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $commitCount -notmatch '^[1-9][0-9]*$') {
+        throw "Unable to resolve the FIELD release source commit count."
+    }
+    if ($releaseMatch.Groups[1].Value -cne $commitCount) {
+        throw (
+            "FIELD release tag build $($releaseMatch.Groups[1].Value) " +
+            "does not match source commit count $commitCount."
+        )
+    }
 }
 
 Write-Host "Desktop versions verified: $expected"
