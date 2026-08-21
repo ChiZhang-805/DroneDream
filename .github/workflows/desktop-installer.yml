@@ -115,6 +115,7 @@ jobs:
           $contract = ./desktop/scripts/resolve-desktop-edition-release.ps1 `
             -ReleaseTag $releaseTag `
             -ValidationEditionId "${{ inputs.edition || 'universal' }}" `
+            -PullRequestBaseBranch $env:GITHUB_BASE_REF `
             -GitHubOutputPath $env:GITHUB_OUTPUT
           $oauthName = "OAUTH_$($contract.editionId.ToUpperInvariant())"
           $oauthClientId = [Environment]::GetEnvironmentVariable($oauthName)

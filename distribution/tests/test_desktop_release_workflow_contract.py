@@ -21,7 +21,10 @@ def _powershell() -> Path:
 
 
 def _run_resolver(
-    tag: str, output: Path, validation_edition: str = "universal"
+    tag: str,
+    output: Path,
+    validation_edition: str = "universal",
+    pull_request_base_branch: str = "",
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
@@ -36,6 +39,8 @@ def _run_resolver(
             tag,
             "-ValidationEditionId",
             validation_edition,
+            "-PullRequestBaseBranch",
+            pull_request_base_branch,
             "-GitHubOutputPath",
             str(output),
         ],
@@ -67,6 +72,7 @@ def test_workflow_has_five_isolated_release_and_update_channels() -> None:
         '"+refs/heads/main:refs/remotes/origin/main"',
         "Formal desktop release tags must point to a commit already merged into main.",
         '-ValidationEditionId "${{ inputs.edition || \'universal\' }}"',
+        "-PullRequestBaseBranch $env:GITHUB_BASE_REF",
         '"DRONEDREAM_RELEASE_SOURCE_COMMIT=$env:GITHUB_SHA"',
         '"DRONEDREAM_RELEASE_BUILD_NUMBER=$($contract.buildNumber)"',
         "--edition-config \"${{ steps.release.outputs.config_path }}\"",
@@ -200,3 +206,41 @@ def test_manual_validation_resolves_a_real_unsigned_edition(
     assert values["is_release"] == "false"
     assert values["edition_id"] == edition
     assert values["config_path"] == f"desktop/src-tauri/tauri.{edition}.conf.json"
+
+
+@pytest.mark.parametrize(
+    ("base_branch", "edition"),
+    [
+        ("main", "universal"),
+        ("codex/software", "universal"),
+        ("codex/software-sim", "sim"),
+        ("codex/software-lab", "lab"),
+        ("codex/software-field", "field"),
+        ("codex/software-agent", "autonomy"),
+    ],
+)
+def test_pull_request_target_branch_selects_its_owned_edition(
+    base_branch: str, edition: str, tmp_path: Path,
+) -> None:
+    output = tmp_path / f"{edition}.txt"
+    result = _run_resolver(
+        "",
+        output,
+        validation_edition="field",
+        pull_request_base_branch=base_branch,
+    )
+    assert result.returncode == 0, result.stderr
+    values = _outputs(output)
+    assert values["is_release"] == "false"
+    assert values["edition_id"] == edition
+    assert values["config_path"] == f"desktop/src-tauri/tauri.{edition}.conf.json"
+
+
+def test_pull_request_rejects_a_branch_without_product_ownership(tmp_path: Path) -> None:
+    result = _run_resolver(
+        "",
+        tmp_path / "invalid-branch.txt",
+        pull_request_base_branch="codex/website",
+    )
+    assert result.returncode != 0
+    assert "does not own a product edition" in result.stderr
