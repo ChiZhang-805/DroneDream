@@ -603,6 +603,13 @@ jobs:
                 throw "Installed application did not stop before uninstall"
               }
             }
+            # The Tauri parent can exit before its WebView2 children. Stop only
+            # children owned by this application's profile before launching the
+            # uninstaller so they cannot retain binaries under the install root.
+            ./desktop/scripts/stop-owned-webview2.ps1 `
+              -ProfilePath $appDataRoot `
+              -TimeoutSeconds 10 `
+              -PollIntervalMilliseconds 250
             if (Test-Path -LiteralPath $uninstaller -PathType Leaf) {
               $uninstallProcess = Start-Process -FilePath $uninstaller `
                 -ArgumentList "/S" -Wait -PassThru
@@ -619,28 +626,12 @@ jobs:
             throw "Ordinary uninstall erased app diagnostic state without explicit consent"
           }
 
-          # WebView2 may keep its BrowserMetrics file open briefly after the
-          # Tauri parent exits. Stop only WebView2 children that reference this
-          # app-owned profile, then retry the runner-only cleanup. The lifecycle
-          # assertions above remain strict; an ephemeral metrics-file lock must
-          # not turn a successful install/uninstall validation into a product
-          # failure.
-          $appDataToken = Split-Path -Leaf $appDataRoot
-          @(
-            Get-CimInstance Win32_Process `
-              -Filter "Name = 'msedgewebview2.exe'" `
-              -ErrorAction SilentlyContinue
-          ) |
-            Where-Object {
-              $_.CommandLine -and $_.CommandLine.Contains(
-                $appDataToken,
-                [System.StringComparison]::OrdinalIgnoreCase
-              )
-            } |
-            ForEach-Object {
-              Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-            }
-
+          # A second bounded pass handles a child spawned during shutdown before
+          # the runner-only application-data cleanup below.
+          ./desktop/scripts/stop-owned-webview2.ps1 `
+            -ProfilePath $appDataRoot `
+            -TimeoutSeconds 10 `
+            -PollIntervalMilliseconds 250
           $cleanupError = $null
           foreach ($cleanupAttempt in 1..6) {
             try {
