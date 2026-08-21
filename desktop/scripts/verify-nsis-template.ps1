@@ -62,6 +62,14 @@ if (([regex]::Matches($upstream, [regex]::Escape($identityAnchor))).Count -ne 1)
 }
 $upstream = $upstream.Replace($identityAnchor, "")
 
+$processLifecyclePattern =
+    '(?s)\n!define DRONEDREAM_UNINSTALL_TRACE_FILE .*?!macroend\n\n(?=Name "\$\{DRONEDREAM_DISPLAYNAME\}")'
+$processLifecycleMatches = [regex]::Matches($upstream, $processLifecyclePattern)
+if ($processLifecycleMatches.Count -ne 1) {
+    throw "DroneDream bounded uninstall process lifecycle anchor is missing or duplicated"
+}
+$upstream = [regex]::Replace($upstream, $processLifecyclePattern, "`n", 1)
+
 function Restore-TemplateSubstitution {
     param(
         [Parameter(Mandatory = $true)][string]$Text,
@@ -80,7 +88,8 @@ $substitutions = @(
     @{ Modified = 'Name "${DRONEDREAM_DISPLAYNAME}"'; Original = 'Name "${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = 'VIAddVersionKey "ProductName" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'VIAddVersionKey "ProductName" "${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = 'VIAddVersionKey "FileDescription" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'VIAddVersionKey "FileDescription" "${PRODUCTNAME}"'; Count = 1 },
-    @{ Modified = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"'; Original = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"'; Count = 2 },
+    @{ Modified = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"'; Original = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"'; Count = 1 },
+    @{ Modified = '!insertmacro DRONEDREAM_CHECK_IF_APP_IS_RUNNING "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"'; Original = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = '"Open with ${DRONEDREAM_DISPLAYNAME}"'; Original = '"Open with ${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = '"$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"'; Original = '"$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"'; Count = 3 },
@@ -93,6 +102,40 @@ foreach ($substitution in $substitutions) {
         -Modified $substitution.Modified `
         -Original $substitution.Original `
         -ExpectedCount $substitution.Count
+}
+
+foreach ($traceAnchor in @(
+    '  Delete "${DRONEDREAM_UNINSTALL_TRACE_FILE}"',
+    '  !insertmacro DRONEDREAM_UNINSTALL_TRACE "on-init=begin"',
+    '  !insertmacro DRONEDREAM_UNINSTALL_TRACE "on-init=language-ready"',
+    '  !insertmacro DRONEDREAM_UNINSTALL_TRACE "on-init=complete"',
+    '  !insertmacro DRONEDREAM_UNINSTALL_TRACE "uninstall-section=begin"',
+    '    !insertmacro DRONEDREAM_UNINSTALL_TRACE "preuninstall-hook=begin"',
+    '    !insertmacro DRONEDREAM_UNINSTALL_TRACE "preuninstall-hook=complete"',
+    '  !insertmacro DRONEDREAM_UNINSTALL_TRACE "process-check=begin"',
+    '  !insertmacro DRONEDREAM_UNINSTALL_TRACE "uninstall-section=complete"'
+)) {
+    $traceAnchorWithNewline = "$traceAnchor`n"
+    if (([regex]::Matches($upstream, [regex]::Escape($traceAnchorWithNewline))).Count -ne 1) {
+        throw "DroneDream uninstall trace anchor is missing or duplicated: $traceAnchor"
+    }
+    $upstream = $upstream.Replace($traceAnchorWithNewline, "")
+}
+$traceSpacingAnchors = @(
+    @(
+        "Section Uninstall`n`n`n  !ifmacrodef NSIS_HOOK_PREUNINSTALL",
+        "Section Uninstall`n`n  !ifmacrodef NSIS_HOOK_PREUNINSTALL"
+    ),
+    @(
+        "  !endif`n`n`n  ; Auto close if passive mode or updating",
+        "  !endif`n`n  ; Auto close if passive mode or updating"
+    )
+)
+foreach ($traceSpacingAnchor in $traceSpacingAnchors) {
+    if (([regex]::Matches($upstream, [regex]::Escape($traceSpacingAnchor[0]))).Count -ne 1) {
+        throw "DroneDream uninstall trace spacing anchor is missing or duplicated"
+    }
+    $upstream = $upstream.Replace($traceSpacingAnchor[0], $traceSpacingAnchor[1])
 }
 
 $startMenuIdentityAnchor = "  !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT`n" +

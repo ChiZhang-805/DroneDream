@@ -75,9 +75,11 @@ describe("DroneDream public website", () => {
       "href",
       "https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md",
     );
-    expect(screen.getByText(
-      /Version 1\.0\.0 is published while code signing is being prepared\./i,
-    )).toBeVisible();
+    expect(
+      screen.getByText(
+        /Local PX4\/Gazebo tuning\. Version 1\.0\.0 is live; code signing is in progress\./i,
+      ),
+    ).toBeVisible();
     expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/pricing/");
     expect(screen.getByRole("link", { name: "Workflow" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
@@ -91,7 +93,7 @@ describe("DroneDream public website", () => {
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "Choose the next candidate" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Choose the next trial" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Full manual" })).toHaveAttribute("href", "/manual/");
     expectContentLinksToUseIcons(container);
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(

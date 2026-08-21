@@ -18,6 +18,7 @@ import {
 import { getDesktopStartupGateSession } from "../desktop/startupGate";
 import { getAuthAccessToken } from "../features/auth/authTokenStore";
 import { publicDemoConsole } from "../features/demo/publicDemo";
+import type { AutonomyAssetConnectorCatalog } from "../features/autonomy/assetConnectors";
 import type {
   ApiEnvelope,
   Artifact,
@@ -398,14 +399,14 @@ async function transportRequest(
   }
 
   const method = (init?.method ?? "GET").toUpperCase();
-  if (!["GET", "POST", "PATCH", "DELETE"].includes(method)) {
+  if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) {
     throw new Error(`Unsupported desktop API method: ${method}`);
   }
   if (init?.body != null && typeof init.body !== "string") {
     throw new Error("Desktop API request bodies must be JSON strings.");
   }
   const bridged = await desktopApiRequest({
-    method: method as "GET" | "POST" | "PATCH" | "DELETE",
+    method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: `/api/v1${path}`,
     body: (init?.body as string | undefined) ?? null,
     accessToken: currentAccessToken(),
@@ -433,6 +434,10 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  async getAutonomyAssetConnectors(): Promise<AutonomyAssetConnectorCatalog> {
+    return request<AutonomyAssetConnectorCatalog>("/autonomy/asset-connectors");
+  },
+
   async verifyAuthenticatedSession(): Promise<AuthenticatedSessionResponse> {
     return request<AuthenticatedSessionResponse>("/session");
   },

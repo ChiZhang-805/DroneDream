@@ -87,6 +87,93 @@ Var NoShortcutMode
 Var WixMode
 Var OldMainBinaryName
 
+!define DRONEDREAM_UNINSTALL_TRACE_FILE "$TEMP\dronedream-${MAINBINARYNAME}-uninstall-trace.log"
+
+; Keep a small, local lifecycle trace for unattended uninstall diagnostics. The
+; helper that launches the real copied uninstaller prints and removes this file,
+; so failures identify the exact NSIS phase instead of collapsing to exit code 2.
+!macro DRONEDREAM_UNINSTALL_TRACE message
+  Push $R8
+  FileOpen $R8 "${DRONEDREAM_UNINSTALL_TRACE_FILE}" a
+  FileWrite $R8 "${message}$\r$\n"
+  FileClose $R8
+  Pop $R8
+!macroend
+
+; Tauri's upstream process macro trusts the return code of a single kill call.
+; Windows can report a transient kill failure while a process is already
+; terminating, causing a silent uninstaller to Abort even though no app remains.
+; Re-query the real process state after each bounded attempt and only abort when
+; the current user's process is still observable after every retry.
+!macro DRONEDREAM_CHECK_IF_APP_IS_RUNNING executableName productName
+  !define DroneDreamProcessCheckID ${__LINE__}
+  nsis_tauri_utils::StrReplace "$(appRunning)" "{{product_name}}" "${productName}"
+  Pop $R1
+  nsis_tauri_utils::StrReplace "$(appRunningOkKill)" "{{product_name}}" "${productName}"
+  Pop $R2
+  nsis_tauri_utils::StrReplace "$(failedToKillApp)" "{{product_name}}" "${productName}"
+  Pop $R3
+
+  !if "${INSTALLMODE}" == "currentUser"
+    nsis_tauri_utils::FindProcessCurrentUser "${executableName}"
+  !else
+    nsis_tauri_utils::FindProcess "${executableName}"
+  !endif
+  Pop $R0
+  !insertmacro DRONEDREAM_UNINSTALL_TRACE "process-initial-find=$R0"
+  ${If} $R0 = 0
+    IfSilent dronedream_kill_${DroneDreamProcessCheckID} 0
+    ${IfThen} $PassiveMode != 1 ${|} MessageBox MB_OKCANCEL $R2 IDOK dronedream_kill_${DroneDreamProcessCheckID} IDCANCEL dronedream_cancel_${DroneDreamProcessCheckID} ${|}
+
+    dronedream_kill_${DroneDreamProcessCheckID}:
+      StrCpy $R4 0
+    dronedream_kill_retry_${DroneDreamProcessCheckID}:
+      IntOp $R4 $R4 + 1
+      !if "${INSTALLMODE}" == "currentUser"
+        nsis_tauri_utils::KillProcessCurrentUser "${executableName}"
+      !else
+        nsis_tauri_utils::KillProcess "${executableName}"
+      !endif
+      Pop $R0
+      Sleep 500
+      !if "${INSTALLMODE}" == "currentUser"
+        nsis_tauri_utils::FindProcessCurrentUser "${executableName}"
+      !else
+        nsis_tauri_utils::FindProcess "${executableName}"
+      !endif
+      Pop $R5
+      !insertmacro DRONEDREAM_UNINSTALL_TRACE "process-attempt=$R4 kill=$R0 find=$R5"
+      ${If} $R5 != 0
+        Goto dronedream_process_done_${DroneDreamProcessCheckID}
+      ${EndIf}
+      ${If} $R4 < 4
+        Goto dronedream_kill_retry_${DroneDreamProcessCheckID}
+      ${EndIf}
+
+      IfSilent dronedream_silent_failure_${DroneDreamProcessCheckID} dronedream_ui_failure_${DroneDreamProcessCheckID}
+      dronedream_silent_failure_${DroneDreamProcessCheckID}:
+        System::Call 'kernel32::AttachConsole(i -1)i.r0'
+        ${If} $0 != 0
+          System::Call 'kernel32::GetStdHandle(i -11)i.r0'
+          System::call 'kernel32::SetConsoleTextAttribute(i r0, i 0x0004)'
+          FileWrite $0 "$R1$\n"
+        ${EndIf}
+        !insertmacro DRONEDREAM_UNINSTALL_TRACE "process-check=abort-silent"
+        Abort
+      dronedream_ui_failure_${DroneDreamProcessCheckID}:
+        !insertmacro DRONEDREAM_UNINSTALL_TRACE "process-check=abort-ui"
+        Abort $R3
+
+    dronedream_cancel_${DroneDreamProcessCheckID}:
+      !insertmacro DRONEDREAM_UNINSTALL_TRACE "process-check=cancelled"
+      Abort $R1
+  ${EndIf}
+
+  dronedream_process_done_${DroneDreamProcessCheckID}:
+    !insertmacro DRONEDREAM_UNINSTALL_TRACE "process-check=complete"
+    !undef DroneDreamProcessCheckID
+!macroend
+
 Name "${DRONEDREAM_DISPLAYNAME}"
 BrandingText "${COPYRIGHT}"
 OutFile "${OUTFILE}"
@@ -793,6 +880,8 @@ Function .onInstSuccess
 FunctionEnd
 
 Function un.onInit
+  Delete "${DRONEDREAM_UNINSTALL_TRACE_FILE}"
+  !insertmacro DRONEDREAM_UNINSTALL_TRACE "on-init=begin"
   !insertmacro SetContext
 
   !if "${INSTALLMODE}" == "both"
@@ -800,6 +889,7 @@ Function un.onInit
   !endif
 
   !insertmacro MUI_UNGETLANGUAGE
+  !insertmacro DRONEDREAM_UNINSTALL_TRACE "on-init=language-ready"
 
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
@@ -810,15 +900,21 @@ Function un.onInit
   ${IfNot} ${Errors}
     StrCpy $UpdateMode 1
   ${EndIf}
+  !insertmacro DRONEDREAM_UNINSTALL_TRACE "on-init=complete"
 FunctionEnd
 
 Section Uninstall
 
+  !insertmacro DRONEDREAM_UNINSTALL_TRACE "uninstall-section=begin"
+
   !ifmacrodef NSIS_HOOK_PREUNINSTALL
+    !insertmacro DRONEDREAM_UNINSTALL_TRACE "preuninstall-hook=begin"
     !insertmacro NSIS_HOOK_PREUNINSTALL
+    !insertmacro DRONEDREAM_UNINSTALL_TRACE "preuninstall-hook=complete"
   !endif
 
-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"
+  !insertmacro DRONEDREAM_UNINSTALL_TRACE "process-check=begin"
+  !insertmacro DRONEDREAM_CHECK_IF_APP_IS_RUNNING "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"
 
   ; Delete the app directory and its content from disk
   ; Copy main executable
@@ -934,6 +1030,8 @@ Section Uninstall
   !ifmacrodef NSIS_HOOK_POSTUNINSTALL
     !insertmacro NSIS_HOOK_POSTUNINSTALL
   !endif
+
+  !insertmacro DRONEDREAM_UNINSTALL_TRACE "uninstall-section=complete"
 
   ; Auto close if passive mode or updating
   ${If} $PassiveMode = 1

@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { launchSiteBrowser } from "./playwright-browser.mjs";
 
 const frontendRequire = createRequire(new URL("../../frontend/package.json", import.meta.url));
 const { chromium } = frontendRequire("playwright");
@@ -12,18 +12,7 @@ if (!url) {
 
 const width = Number.parseInt(widthRaw, 10);
 const height = Number.parseInt(heightRaw, 10);
-const edgeCandidates = [
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-];
-const executablePath = edgeCandidates.find(existsSync);
-if (!executablePath) throw new Error("Microsoft Edge was not found.");
-
-const browser = await chromium.launch({
-  executablePath,
-  headless: true,
-  args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--disable-gpu"],
-});
+const browser = await launchSiteBrowser(chromium, { disableGpu: true });
 
 try {
   const page = await browser.newPage({ viewport: { width, height } });

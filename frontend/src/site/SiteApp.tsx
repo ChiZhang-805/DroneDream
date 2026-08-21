@@ -81,7 +81,7 @@ const content = {
     productEyebrow: "ONE CONTINUOUS WORKFLOW",
     productTitle: "From question to defensible result.",
     productBody:
-      "Parameters, simulations, decisions, and reports stay together in one reproducible experiment.",
+      "Keep parameters, simulations, decisions, and reports in one reproducible study.",
     demoPhases: [
       {
         label: "01 · Define",
@@ -98,14 +98,14 @@ const content = {
       },
       {
         label: "02 · Search",
-        title: "Choose the next candidate",
+        title: "Choose the next trial",
         body: [
           "Read history, failed trials, and new feedback.",
           "Keep bounds, coupling, and feasibility active.",
           "Let Bayesian, trust-region, evolution compete.",
           "Spend budget where the model still learns.",
           "Propose candidates with clear information value.",
-          "Turn gain guessing into disciplined, evidence-led search.",
+          "Turn gain guesses into evidence-led search.",
         ],
         status: "Candidate 24 / 60",
       },
@@ -113,12 +113,12 @@ const content = {
         label: "03 · Verify",
         title: "Compare the evidence",
         body: [
-          "Check feasibility, error, overshoot, and settling.",
-          "Compare repeats, robustness, and Pareto trade-offs.",
+          "Check feasibility, error, overshoot, and settle time.",
+          "Compare repeats, robustness, and Pareto fronts.",
           "Reject winners that break hidden constraints.",
-          "Keep logs, metrics, seeds, and snapshots together.",
+          "Keep logs, metrics, seeds, and snapshots linked.",
           "Preserve evidence for accepted control settings.",
-          "Make every result auditable by the entire flight team.",
+          "Make every result auditable by the flight team.",
         ],
         status: "Acceptance passed",
       },
@@ -138,9 +138,9 @@ const content = {
     capabilitiesEyebrow: "BUILT FOR ITERATION",
     capabilitiesTitle: "A local flight lab, not a parameter form.",
     capabilities: [
-      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore only the control surface your experiment needs, leaving unrelated dimensions untouched."], "sliders"],
-      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain before ranking the final winner under the same independent validation suite."], "orbit"],
-      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Resume, diagnose, and clean failed simulations before the next isolated trial begins safely."], "shield"],
+      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore the needed control surface; leave unrelated dimensions safely untouched."], "sliders"],
+      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain under the same independent suite before ranking the final winner."], "orbit"],
+      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Diagnose and clean failed simulations before the next isolated trial begins safely."], "shield"],
       ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce every decision from evidence together with its complete experiment history."], "report"],
     ],
     capabilityOpen: "Open details for",
@@ -168,7 +168,7 @@ const content = {
         ["Dedicated WSL2", "Runs the DroneDream distribution independently and never reuses or modifies a personal Ubuntu environment."],
         ["Trial isolation", "Assigns each PX4 / Gazebo run its own ports, process group, temporary files, and termination boundary safely."],
         ["Pinned inputs", "Records firmware, model, world, route, parameters, seeds, and environment effects before repeatable execution."],
-        ["Recovery and cleanup", "Exports failure diagnostics, preserves artifacts, and safely removes abandoned processes before the next clean launch."],
+        ["Recovery and cleanup", "Preserves failure diagnostics and artifacts, then clears abandoned processes before a clean restart."],
       ],
       [
         ["Configuration snapshot", "Stores the vehicle, firmware, ranges, optimizer, constraints, and trial budget for every tested candidate."],
@@ -210,7 +210,7 @@ const content = {
     platform: "Platform",
     platformValue: "Windows x64",
     released: "Released",
-    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is published while code signing is being prepared.",
+    footerLine: "Local PX4/Gazebo tuning. Version 1.0.0 is live; code signing is in progress.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
     communityGuidelines: "Community guidelines",

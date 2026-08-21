@@ -4,6 +4,7 @@ mod browser_auth_audit;
 mod browser_auth_vault;
 #[cfg(not(dronedream_field))]
 mod desktop_api_bridge;
+#[cfg_attr(dronedream_field, allow(dead_code))]
 mod distribution_plan;
 mod edition_safety;
 #[cfg(not(dronedream_field))]
@@ -28,6 +29,7 @@ mod preferences;
 #[cfg(not(dronedream_field))]
 mod prerequisites;
 #[cfg(target_os = "windows")]
+#[cfg_attr(dronedream_field, allow(dead_code))]
 mod process;
 #[cfg(not(dronedream_field))]
 mod runtime;
@@ -41,6 +43,7 @@ mod webview2_preflight;
 
 use tauri::Manager;
 
+#[cfg(not(dronedream_field))]
 pub(crate) const MINIMUM_WINDOWS_BUILD: u32 = 19041;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

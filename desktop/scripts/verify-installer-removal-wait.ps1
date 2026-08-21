@@ -1,0 +1,171 @@
+param()
+
+$ErrorActionPreference = "Stop"
+$waitScript = Join-Path $PSScriptRoot "wait-path-removal.ps1"
+$stopWebViewScript = Join-Path $PSScriptRoot "stop-owned-webview2.ps1"
+$invokeUninstallerScript = Join-Path $PSScriptRoot "invoke-nsis-uninstaller.ps1"
+$workflow = Join-Path $PSScriptRoot "..\..\.github\workflows\desktop-installer.yml"
+
+if (-not (Test-Path -LiteralPath $waitScript -PathType Leaf)) {
+    throw "Installer path-removal wait helper is missing: $waitScript"
+}
+if (-not (Test-Path -LiteralPath $stopWebViewScript -PathType Leaf)) {
+    throw "Owned WebView2 shutdown helper is missing: $stopWebViewScript"
+}
+if (-not (Test-Path -LiteralPath $invokeUninstallerScript -PathType Leaf)) {
+    throw "Deterministic NSIS uninstall helper is missing: $invokeUninstallerScript"
+}
+
+$workflowText = Get-Content -LiteralPath $workflow -Raw
+$stopWebViewCall = "./desktop/scripts/stop-owned-webview2.ps1"
+$invokeUninstallerCall = "./desktop/scripts/invoke-nsis-uninstaller.ps1"
+$waitPathCall = "./desktop/scripts/wait-path-removal.ps1"
+$stopWebViewIndex = $workflowText.IndexOf($stopWebViewCall, [System.StringComparison]::Ordinal)
+$invokeUninstallerIndex = $workflowText.IndexOf($invokeUninstallerCall, [System.StringComparison]::Ordinal)
+$waitPathIndex = $workflowText.IndexOf($waitPathCall, [System.StringComparison]::Ordinal)
+if ($waitPathIndex -lt 0) {
+    throw "Desktop installer workflow does not invoke the path-removal wait helper"
+}
+if ($stopWebViewIndex -lt 0) {
+    throw "Desktop installer workflow does not stop app-owned WebView2 processes"
+}
+if ($invokeUninstallerIndex -lt 0) {
+    throw "Desktop installer workflow does not invoke the deterministic NSIS helper"
+}
+if ($stopWebViewIndex -gt $waitPathIndex) {
+    throw "Desktop installer workflow must stop app-owned WebView2 before waiting for uninstall"
+}
+if ($stopWebViewIndex -gt $invokeUninstallerIndex) {
+    throw "Desktop installer workflow must stop app-owned WebView2 before uninstall"
+}
+if ($invokeUninstallerIndex -gt $waitPathIndex) {
+    throw "Desktop installer workflow must invoke NSIS before waiting for path removal"
+}
+if ($workflowText -notmatch "-TimeoutSeconds 30") {
+    throw "Desktop installer workflow must keep the bounded 30-second removal deadline"
+}
+if ($workflowText -notmatch "-RootProcessId") {
+    throw "Desktop installer workflow must stop WebView2 descendants of the launched app"
+}
+
+$stopWebViewText = Get-Content -LiteralPath $stopWebViewScript -Raw
+foreach ($requiredContract in @(
+    "RootProcessId",
+    "ParentProcessId",
+    "QuiescencePolls",
+    "quietPolls",
+    "InstallRoot",
+    "ExecutablePath"
+)) {
+    if (-not $stopWebViewText.Contains(
+        $requiredContract,
+        [System.StringComparison]::Ordinal
+    )) {
+        throw "Owned WebView2 shutdown helper is missing $requiredContract handling"
+    }
+}
+
+$waitText = Get-Content -LiteralPath $waitScript -Raw
+foreach ($diagnosticContract in @(
+    "Remaining uninstall path inventory",
+    "Processes referencing uninstall path",
+    "Get-CimInstance Win32_Process"
+)) {
+    if (-not $waitText.Contains(
+        $diagnosticContract,
+        [System.StringComparison]::Ordinal
+    )) {
+        throw "Installer path-removal helper is missing failure diagnostic: $diagnosticContract"
+    }
+}
+
+$invokeText = Get-Content -LiteralPath $invokeUninstallerScript -Raw
+foreach ($uninstallContract in @(
+    "Copy-Item -LiteralPath",
+    '"_?=$installRootFull"',
+    "-Wait -PassThru",
+    "NSIS uninstall lifecycle trace:",
+    "Install-root entries after failed uninstall:",
+    "dronedream-drone-dream-desktop-uninstall-trace.log",
+    "Uninstaller must be located inside the declared install root",
+    "Refusing to create an uninstaller copy outside the system temp root"
+)) {
+    if (-not $invokeText.Contains(
+        $uninstallContract,
+        [System.StringComparison]::Ordinal
+    )) {
+        throw "Deterministic NSIS helper is missing contract: $uninstallContract"
+    }
+}
+
+$templatePath = Join-Path $PSScriptRoot "..\src-tauri\nsis\installer.nsi"
+$templateText = Get-Content -LiteralPath $templatePath -Raw
+foreach ($processContract in @(
+    "!macro DRONEDREAM_CHECK_IF_APP_IS_RUNNING",
+    'process-attempt=$R4 kill=$R0 find=$R5',
+    '${If} $R4 < 4',
+    "process-check=complete",
+    "uninstall-section=complete"
+)) {
+    if (-not $templateText.Contains(
+        $processContract,
+        [System.StringComparison]::Ordinal
+    )) {
+        throw "NSIS template is missing bounded process contract: $processContract"
+    }
+}
+
+$unusedProfile = Join-Path ([System.IO.Path]::GetTempPath()) (
+    "dronedream-webview-unused-{0}" -f [Guid]::NewGuid().ToString("N")
+)
+& $stopWebViewScript `
+    -ProfilePath $unusedProfile `
+    -TimeoutSeconds 5 `
+    -PollIntervalMilliseconds 50
+
+$missingPath = Join-Path ([System.IO.Path]::GetTempPath()) (
+    "dronedream-removal-missing-{0}" -f [Guid]::NewGuid().ToString("N")
+)
+& $waitScript -LiteralPath $missingPath -TimeoutSeconds 1 -PollIntervalMilliseconds 10
+
+$delayedPath = Join-Path ([System.IO.Path]::GetTempPath()) (
+    "dronedream-removal-delayed-{0}.tmp" -f [Guid]::NewGuid().ToString("N")
+)
+Set-Content -LiteralPath $delayedPath -Value "pending"
+$removalJob = Start-Job -ScriptBlock {
+    param($PathToRemove)
+    Start-Sleep -Milliseconds 500
+    Remove-Item -LiteralPath $PathToRemove -Force
+} -ArgumentList $delayedPath
+
+try {
+    & $waitScript -LiteralPath $delayedPath -TimeoutSeconds 15 -PollIntervalMilliseconds 50
+    Wait-Job -Job $removalJob -Timeout 5 | Out-Null
+    Receive-Job -Job $removalJob -ErrorAction Stop | Out-Null
+}
+finally {
+    Remove-Job -Job $removalJob -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $delayedPath -Force -ErrorAction SilentlyContinue
+}
+
+$persistentPath = Join-Path ([System.IO.Path]::GetTempPath()) (
+    "dronedream-removal-persistent-{0}.tmp" -f [Guid]::NewGuid().ToString("N")
+)
+Set-Content -LiteralPath $persistentPath -Value "still-present"
+$timedOut = $false
+
+try {
+    & $waitScript -LiteralPath $persistentPath -TimeoutSeconds 1 -PollIntervalMilliseconds 25
+}
+catch {
+    $timedOut = $_.Exception.Message -match "Timed out after 1 seconds"
+}
+finally {
+    Remove-Item -LiteralPath $persistentPath -Force -ErrorAction SilentlyContinue
+}
+
+if (-not $timedOut) {
+    throw "Path-removal wait helper did not fail closed for a persistent path"
+}
+
+Write-Host "Installer path-removal wait contract verified."
