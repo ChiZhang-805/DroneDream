@@ -13,7 +13,6 @@ from app.distribution_safety import (
     BackendTrustedContext,
     evaluate_backend_authorization,
 )
-from distribution.tools import edition_safety_contract
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = json.loads(
