@@ -7,13 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from distribution.tools import edition_safety_contract
 
 from app.distribution_safety import (
     BackendDistributionSafetyError,
     BackendTrustedContext,
     evaluate_backend_authorization,
 )
+from distribution.tools import edition_safety_contract
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = edition_safety_contract.bind_test_fixture_to_edition_manifest(
