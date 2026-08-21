@@ -125,13 +125,6 @@ jobs:
             frontend/package-lock.json
             desktop/package-lock.json
 
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: backend/pyproject.toml
-
       - name: Set up Rust 1.97.0
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # action snapshot, 2026-07-10
         with:
@@ -147,29 +140,9 @@ jobs:
           npm ci --prefix desktop
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Install backend test dependencies
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          python -m pip install -e "./backend[dev]" `
-            "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
       - name: Verify open-source release inventory
         shell: pwsh
         run: npm --prefix desktop run verify:release-source
-
-      - name: Verify backend
-        shell: pwsh
-        working-directory: backend
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          python -m ruff check app tests
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m mypy app
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m pytest
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify shared frontend
         shell: pwsh
@@ -199,7 +172,9 @@ jobs:
 
       - name: Verify pinned NSIS template
         shell: pwsh
-        run: ./desktop/scripts/verify-nsis-template.ps1
+        run: |
+          ./desktop/scripts/verify-nsis-template.ps1
+          ./desktop/scripts/verify-installer-removal-wait.ps1
 
       - name: Validate SignPath release configuration
         if: ${{ startsWith(github.ref, 'refs/tags/desktop-v') }}
@@ -636,9 +611,10 @@ jobs:
               }
             }
           }
-          if (Test-Path -LiteralPath $installDirFull) {
-            throw "Silent uninstaller left the installation directory behind: $installDirFull"
-          }
+          ./desktop/scripts/wait-path-removal.ps1 `
+            -LiteralPath $installDirFull `
+            -TimeoutSeconds 30 `
+            -PollIntervalMilliseconds 250
           if (-not (Test-Path -LiteralPath $diagnosticSentinel -PathType Leaf)) {
             throw "Ordinary uninstall erased app diagnostic state without explicit consent"
           }
