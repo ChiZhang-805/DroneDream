@@ -156,7 +156,7 @@ real simulator.
 3. Run the static contract tests locally:
 
    ```bash
-   python -m unittest discover -s runtime/tests -v
+   python -m pytest runtime/tests -q
    python runtime/tools/runtime_manifest.py validate-config \
      --pins runtime/pins.env \
      --python-lock runtime/locks/python-requirements.lock
