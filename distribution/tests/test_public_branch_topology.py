@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 TOPOLOGY = ROOT / "distribution" / "repository" / "branch-topology.v1.json"
 SCHEMA = ROOT / "distribution" / "schemas" / "public-branch-topology.schema.json"
@@ -15,7 +14,7 @@ EXPECTED = {
     "codex/software-sim": ("long-lived-product", "sim"),
     "codex/software-lab": ("long-lived-product", "lab"),
     "codex/software-field": ("long-lived-product", "field"),
-    "codex/software-autonomy": ("long-lived-product", "autonomy"),
+    "codex/software-agent": ("long-lived-product", "autonomy"),
     "codex/website": ("long-lived-delivery", "website"),
     "codex/technical-report": ("long-lived-delivery", "technical-report"),
 }

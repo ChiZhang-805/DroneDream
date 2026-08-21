@@ -36,7 +36,7 @@
         "properties": {
           "productId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
           "displayName": {"type": "string", "minLength": 1},
-          "branch": {"enum": ["codex/software", "codex/software-sim", "codex/software-lab", "codex/software-field", "codex/software-autonomy"]},
+          "branch": {"enum": ["codex/software", "codex/software-sim", "codex/software-lab", "codex/software-field", "codex/software-agent"]},
           "primaryPurpose": {"type": "string", "minLength": 1},
           "executionDomains": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
           "navigationSections": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},

@@ -133,7 +133,10 @@ class EditionCapabilityContractTests(unittest.TestCase):
     def test_release_channels_are_the_eight_branch_product_channels(self) -> None:
         for edition_id, edition in self.editions.items():
             channel = edition["releaseChannel"]
-            self.assertEqual(channel["branch"], f"codex/software-{edition_id}")
+            self.assertEqual(
+                channel["branch"],
+                distribution_contract.EDITION_BRANCHES[edition_id],
+            )
             self.assertEqual(channel["creationState"], "long-lived-product-branch")
             self.assertFalse(channel["forcePushAllowed"])
 

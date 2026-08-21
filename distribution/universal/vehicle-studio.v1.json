@@ -1,9 +1,10 @@
 {
   "schemaVersion": 1,
-  "kind": "dronedream-universal-vehicle-studio-contract",
+  "kind": "dronedream-product-scoped-vehicle-studio-contract",
   "contractVersion": "1.0.0",
-  "ownerEdition": "universal",
-  "purpose": "Create versioned custom drone models and exchange integrity-bound Vehicle Pack drafts with SIM, LAB, FIELD, and AUTONOMY.",
+  "hostEditions": ["universal", "autonomy"],
+  "editionBoundStorage": true,
+  "purpose": "Prepare versioned custom drone model drafts in Universal or AGENT and exchange integrity-bound Vehicle Pack drafts with SIM, LAB, FIELD, and AGENT.",
   "transport": {
     "mediaType": "application/vnd.dronedream.vehicle-pack-draft+json",
     "fileSuffix": ".ddvp.json",

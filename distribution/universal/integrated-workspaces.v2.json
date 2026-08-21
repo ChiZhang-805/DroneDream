@@ -10,10 +10,12 @@
   "grantsHardwareAuthority": false,
   "validatedVehiclePackCount": 0,
   "hardwareActionDecision": "deny",
-  "universalExclusiveCapability": {
+  "productScopedCapability": {
     "id": "vehicle-studio",
     "route": "/vehicle-studio",
-    "theme": "universal",
+    "hostEditions": ["universal", "autonomy"],
+    "editionBoundStorage": true,
+    "theme": "edition-bound",
     "shareTargets": ["sim", "lab", "field", "autonomy"],
     "automaticReceiverInstallation": false,
     "startsModelHarnessOnExchange": false,
