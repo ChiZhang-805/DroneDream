@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const harnessMocks = vi.hoisted(() => ({
@@ -18,8 +19,11 @@ vi.mock("@xyflow/react", () => ({
   MarkerType: { ArrowClosed: "arrow" },
   MiniMap: () => null,
   Position: { Left: "left", Right: "right" },
-  ReactFlow: ({ nodes }: { nodes: Array<{ id: string; data: { node: { title_zh: string } } }> }) => (
-    <div data-testid="harness-canvas">{nodes.map((node) => <span key={node.id}>{node.data.node.title_zh}</span>)}</div>
+  ReactFlow: ({ nodes, onNodeContextMenu }: {
+    nodes: Array<{ id: string; data: { item: { title_zh: string } } }>;
+    onNodeContextMenu?: (event: ReactMouseEvent, node: unknown) => void;
+  }) => (
+    <div data-testid="harness-canvas">{nodes.map((node) => <button type="button" key={node.id} onContextMenu={(event) => onNodeContextMenu?.(event, node)}>{node.data.item.title_zh}</button>)}</div>
   ),
   applyEdgeChanges: (_changes: unknown, values: unknown) => values,
   applyNodeChanges: (_changes: unknown, values: unknown) => values,
@@ -34,6 +38,7 @@ vi.mock("../features/autonomy/agentCore", () => ({
   getAgentCoreHarnessState: harnessMocks.state,
   listAgentCoreHarnessReceipts: vi.fn(),
   redoAgentCoreHarness: vi.fn(),
+  setAgentCorePlugin: vi.fn(),
   undoAgentCoreHarness: vi.fn(),
 }));
 
@@ -89,16 +94,84 @@ describe("visual Harness composer", () => {
       topology_templates: [{ topology_id: candidate.topology_id, name: candidate.name, node_count: 1, maximum_parallelism: 4, metadata: {} }],
       plugins: [],
       profiles: [{ profile_id: candidate.profile_id, name: "均衡", description: "", enabled: true, health: "healthy", trust_status: "builtin" }],
+      composition_items: [{
+        schema_version: "dronedream.harness-composition-item.v1",
+        item_id: "composition.phase.intake",
+        level: 1,
+        parent_item_id: null,
+        kind: "phase",
+        granularity: "large",
+        title: "Task intake",
+        title_zh: "任务接入",
+        description: "",
+        description_zh: "",
+        color_token: "amber",
+        icon: "inbox",
+        order: 0,
+        member_node_ids: [node.node_id],
+        plugin_slot_ids: [],
+        child_item_ids: ["composition.stage.mission.request-ingest"],
+        enterable: true,
+        replaceable: false,
+        protected: true,
+        scope: "phase",
+      }, {
+        schema_version: "dronedream.harness-composition-item.v1",
+        item_id: "composition.stage.mission.request-ingest",
+        level: 2,
+        parent_item_id: "composition.phase.intake",
+        kind: "stage",
+        granularity: "medium",
+        title: "Request ingest",
+        title_zh: "接收任务",
+        description: "",
+        description_zh: "",
+        color_token: "amber",
+        icon: "input",
+        order: 0,
+        member_node_ids: [node.node_id],
+        plugin_slot_ids: [],
+        child_item_ids: ["composition.policy.mission.request-ingest.timeout"],
+        enterable: true,
+        replaceable: false,
+        protected: true,
+        scope: "node",
+      }, {
+        schema_version: "dronedream.harness-composition-item.v1",
+        item_id: "composition.policy.mission.request-ingest.timeout",
+        level: 3,
+        parent_item_id: "composition.stage.mission.request-ingest",
+        kind: "policy",
+        granularity: "small",
+        title: "Timeout",
+        title_zh: "超时",
+        description: "",
+        description_zh: "",
+        color_token: "amber",
+        icon: "clock",
+        order: 0,
+        member_node_ids: [node.node_id],
+        plugin_slot_ids: [],
+        child_item_ids: [],
+        enterable: false,
+        replaceable: true,
+        protected: false,
+        scope: "node",
+      }],
       context_commands: { protected_node: ["inspect", "dry_run"] },
     });
     harnessMocks.state.mockResolvedValue({ active: revision, current: revision, can_undo: true, can_redo: false });
 
     render(<MemoryRouter initialEntries={["/autonomy/plugins/harness"]}><AutonomyHarness /></MemoryRouter>);
 
-    expect(await screen.findByText("接收任务")).toBeVisible();
+    expect(await screen.findByText("任务接入")).toBeVisible();
     expect(screen.getByRole("link", { name: "插件库" })).toHaveAttribute("href", "/autonomy/plugins");
-    expect(screen.getByRole("link", { name: "管理开关" })).toHaveAttribute("href", "/autonomy/plugins");
+    expect(screen.getByRole("link", { name: "管理全部插件开关" })).toHaveAttribute("href", "/autonomy/plugins");
     expect(screen.getByText("R4")).toBeVisible();
     expect(screen.getByText("已激活")).toBeVisible();
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: "任务接入" }));
+    fireEvent.click(screen.getAllByRole("button", { name: /进入下一级/ }).at(-1)!);
+    expect(await screen.findByRole("button", { name: "接收任务" })).toBeVisible();
   });
 });

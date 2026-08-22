@@ -237,9 +237,36 @@ export interface AgentCoreHarnessCatalog {
     trust_status: string;
     version: string;
     package_sha256: string;
+    granularity: "large" | "small";
+    composition_level: 1 | 3;
+    owner_item_ids: string[];
   }>;
   profiles: AgentCoreHarnessProfile[];
+  composition_items: AgentCoreHarnessCompositionItem[];
   context_commands: Record<string, string[]>;
+}
+
+export interface AgentCoreHarnessCompositionItem {
+  schema_version: "dronedream.harness-composition-item.v1";
+  item_id: string;
+  level: 1 | 2 | 3;
+  parent_item_id: string | null;
+  kind: "phase" | "stage" | "plugin-slot" | "policy";
+  granularity: "large" | "medium" | "small";
+  title: string;
+  title_zh: string;
+  description: string;
+  description_zh: string;
+  color_token: "amber" | "green" | "blue" | "red" | "violet" | "cyan" | string;
+  icon: string;
+  order: number;
+  member_node_ids: string[];
+  plugin_slot_ids: string[];
+  child_item_ids: string[];
+  enterable: boolean;
+  replaceable: boolean;
+  protected: boolean;
+  scope: "workflow" | "phase" | "node";
 }
 
 export interface AgentCoreHarnessProfile {

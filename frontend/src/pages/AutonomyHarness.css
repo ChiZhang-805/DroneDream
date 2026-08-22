@@ -966,3 +966,442 @@
   .harness-canvas-loading svg { animation: none; }
   .harness-puzzle-shape path { transition: none; }
 }
+
+/* Three-level, game-like puzzle composer. */
+.harness-editor-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.harness-editor-workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.harness-level-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  padding: 6px 20px;
+  border-bottom: 1px solid var(--harness-line);
+  background: #fff;
+  gap: 18px;
+}
+
+.harness-level-bar nav,
+.harness-level-bar nav > span,
+.harness-level-bar p {
+  display: flex;
+  align-items: center;
+}
+
+.harness-level-bar nav {
+  min-width: 0;
+  gap: 3px;
+}
+
+.harness-level-bar button {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #73686e;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.harness-level-bar button:hover,
+.harness-level-bar button.is-current {
+  background: #fff0f4;
+  color: #b6163f;
+}
+
+.harness-level-bar nav svg,
+.harness-level-bar p svg {
+  width: 14px;
+  height: 14px;
+}
+
+.harness-level-bar nav > span > svg {
+  color: #aaa0a5;
+}
+
+.harness-level-bar p {
+  margin: 0;
+  color: #897d83;
+  font-size: 11px;
+  white-space: nowrap;
+  gap: 6px;
+}
+
+.harness-level-guide {
+  margin-top: 12px;
+  padding: 12px 2px 16px;
+  border-bottom: 1px solid var(--harness-line);
+}
+
+.harness-level-guide strong {
+  color: #b51640;
+  font-size: 12px;
+}
+
+.harness-level-guide p {
+  margin: 6px 0 0;
+  color: var(--harness-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.harness-puzzle-node.level-1 {
+  width: 280px;
+  height: 140px;
+}
+
+.harness-puzzle-node.level-2 {
+  width: 250px;
+  height: 114px;
+}
+
+.harness-puzzle-node.level-3 {
+  width: 198px;
+  height: 92px;
+}
+
+.harness-puzzle-node {
+  cursor: grab;
+  filter: drop-shadow(0 7px 13px color-mix(in srgb, var(--piece-color) 24%, transparent));
+  transform-origin: center;
+}
+
+.harness-puzzle-node:active {
+  cursor: grabbing;
+}
+
+.harness-puzzle-node .harness-puzzle-shape path {
+  fill: color-mix(in srgb, var(--piece-color) 88%, white);
+  stroke: color-mix(in srgb, var(--piece-color) 76%, #2f2230);
+  stroke-width: 1.6px;
+}
+
+.harness-puzzle-node.is-selected .harness-puzzle-shape path {
+  fill: var(--piece-color);
+  stroke: #fff;
+  stroke-width: 3px;
+}
+
+.harness-puzzle-node.has-issue .harness-puzzle-shape path {
+  fill: #e35b36;
+  stroke: #8e2710;
+}
+
+.harness-puzzle-node .harness-puzzle-content {
+  inset: 24px 30px 36px 30px;
+  color: #fff;
+}
+
+.harness-puzzle-node.level-2 .harness-puzzle-content {
+  inset: 19px 25px 31px 25px;
+}
+
+.harness-puzzle-node.level-3 .harness-puzzle-content {
+  inset: 15px 21px 25px 21px;
+  grid-template-columns: 26px minmax(0, 1fr) 14px;
+  gap: 7px;
+}
+
+.harness-puzzle-node .harness-puzzle-content > span {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.harness-puzzle-node.level-3 .harness-puzzle-content > span {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+}
+
+.harness-puzzle-node.level-3 .harness-puzzle-content > span svg {
+  width: 14px;
+}
+
+.harness-puzzle-node .harness-puzzle-content strong {
+  color: #fff;
+  font-size: 14px;
+  text-shadow: 0 1px 2px rgba(39, 24, 31, 0.18);
+}
+
+.harness-puzzle-node.level-1 .harness-puzzle-content strong {
+  font-size: 16px;
+}
+
+.harness-puzzle-node.level-3 .harness-puzzle-content strong {
+  font-size: 12px;
+}
+
+.harness-puzzle-node .harness-puzzle-content small {
+  color: rgba(255, 255, 255, 0.82);
+  font-family: inherit;
+  font-size: 9px;
+}
+
+.harness-node-enter,
+.harness-node-lock {
+  width: 16px;
+  color: #fff;
+}
+
+.harness-puzzle-node footer {
+  right: 31px;
+  bottom: 17px;
+  left: 31px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 9px;
+}
+
+.harness-puzzle-node.level-2 footer {
+  right: 26px;
+  bottom: 13px;
+  left: 26px;
+}
+
+.harness-puzzle-node.level-3 footer {
+  right: 23px;
+  bottom: 10px;
+  left: 23px;
+  font-size: 8px;
+}
+
+.harness-puzzle-node footer svg,
+.harness-puzzle-node.has-issue footer svg {
+  color: #fff;
+}
+
+.harness-puzzle-node.is-focus {
+  filter: drop-shadow(0 10px 22px color-mix(in srgb, var(--piece-color) 34%, transparent));
+}
+
+.harness-puzzle-node.is-focus .harness-puzzle-shape path {
+  stroke-width: 3px;
+}
+
+.harness-puzzle-node.is-drop-preview {
+  pointer-events: none;
+  opacity: 0.34;
+  filter: saturate(0.65) drop-shadow(0 4px 8px rgba(50, 35, 41, 0.08));
+}
+
+.harness-canvas .react-flow__node:not(.dragging) {
+  transition: transform 190ms cubic-bezier(.2, .85, .25, 1);
+}
+
+.harness-canvas .react-flow__node.dragging {
+  z-index: 12 !important;
+}
+
+.harness-canvas .react-flow__node.dragging .harness-puzzle-node {
+  filter: drop-shadow(0 18px 24px color-mix(in srgb, var(--piece-color) 34%, transparent));
+  transform: scale(1.065) rotate(-0.5deg);
+}
+
+.harness-canvas .react-flow__edge-path {
+  stroke: #a9979e;
+  stroke-width: 2.2px;
+}
+
+.harness-canvas .react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5 5;
+}
+
+.harness-plugin-pieces {
+  display: grid;
+  margin-top: 12px;
+  gap: 15px;
+}
+
+.harness-plugin-pieces section {
+  display: grid;
+  gap: 5px;
+}
+
+.harness-plugin-pieces h3,
+.harness-slot-options h3 {
+  margin: 0 0 3px;
+  color: #71666c;
+  font-size: 11px;
+}
+
+.harness-plugin-pieces button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid #eadfe3;
+  border-radius: 8px;
+  background: #fff;
+  color: #554a50;
+  text-align: left;
+  cursor: grab;
+  gap: 7px;
+}
+
+.harness-plugin-pieces button:hover,
+.harness-plugin-pieces button.is-enabled {
+  border-color: #e65b7d;
+  background: #fff2f5;
+}
+
+.harness-plugin-pieces button > svg {
+  width: 17px;
+  color: #bd1942;
+}
+
+.harness-plugin-pieces button span,
+.harness-plugin-pieces button strong,
+.harness-plugin-pieces button small {
+  display: block;
+  min-width: 0;
+}
+
+.harness-plugin-pieces button strong,
+.harness-plugin-pieces button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harness-plugin-pieces button strong {
+  font-size: 10px;
+}
+
+.harness-plugin-pieces button small {
+  margin-top: 2px;
+  color: #8b7f85;
+  font-size: 9px;
+}
+
+.harness-enter-level {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  margin-bottom: 14px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #f2345f, #bb1242);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  gap: 6px;
+}
+
+.harness-enter-level svg {
+  width: 16px;
+}
+
+.harness-check-label {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.harness-check-label input {
+  width: 16px;
+  height: 16px;
+}
+
+.harness-slot-options {
+  display: grid;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--harness-line);
+  gap: 5px;
+}
+
+.harness-slot-options button {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 16px;
+  align-items: center;
+  min-height: 38px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #f8f5f6;
+  color: #554a50;
+  text-align: left;
+  gap: 7px;
+}
+
+.harness-slot-options button.is-active {
+  border-color: #e65b7d;
+  background: #fff0f4;
+  color: #a9143a;
+}
+
+.harness-slot-options button > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #bbb0b5;
+}
+
+.harness-slot-options button.is-active > span {
+  background: #e52050;
+}
+
+.harness-slot-options button strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harness-slot-options button svg {
+  width: 14px;
+}
+
+.harness-slot-options p {
+  margin: 5px 0 0;
+  color: #8a7d83;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.harness-context-menu a {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 9px;
+  border-radius: 5px;
+  color: var(--harness-ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.harness-context-menu a:hover {
+  background: #f5f1f3;
+}
+
+.harness-context-menu button:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ae153c;
+  font-weight: 700;
+}
+
+.harness-context-menu button:first-child svg {
+  width: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .harness-canvas .react-flow__node:not(.dragging) { transition: none; }
+  .harness-canvas .react-flow__node.dragging .harness-puzzle-node { transform: none; }
+}
