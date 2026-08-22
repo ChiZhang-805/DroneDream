@@ -156,6 +156,11 @@ describe("environment-aware routing", () => {
       expect(route?.lazy, path).toEqual(expect.any(Function));
       expect(route?.element, path).toBeUndefined();
     }
+    const autonomy = children.find((route) => route.path === "autonomy");
+    expect(autonomy?.children?.find((route) => route.path === "plugins")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(autonomy?.children?.find((route) => route.path === "plugins/harness")?.lazy)
+      .toEqual(expect.any(Function));
     expect(children.find((route) => route.path === "ece498")).toBeUndefined();
 
     router.dispose();

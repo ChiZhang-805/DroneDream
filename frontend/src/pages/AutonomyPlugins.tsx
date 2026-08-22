@@ -18,6 +18,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NavLink } from "react-router-dom";
 
 import {
   AgentCoreRequestError,
@@ -305,7 +306,13 @@ export function AutonomyPlugins() {
   return (
     <section className="agent-plugin-page">
       <header className="agent-plugin-page-header">
-        <h1>{chinese ? "插件" : "Plugins"}</h1>
+        <div className="agent-plugin-heading">
+          <h1>{chinese ? "插件" : "Plugins"}</h1>
+          <nav aria-label={chinese ? "插件页面" : "Plugin pages"}>
+            <NavLink end to="/autonomy/plugins">{chinese ? "插件库" : "Plugin library"}</NavLink>
+            <NavLink to="/autonomy/plugins/harness">Harness</NavLink>
+          </nav>
+        </div>
         <div>
           <label className="agent-plugin-search">
             <Search aria-hidden="true" />

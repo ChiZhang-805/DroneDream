@@ -90,6 +90,197 @@ export interface AgentCorePluginMarketplaceCatalog {
   errors: Array<{ source_id: string; issue_code: string }>;
 }
 
+export type AgentCoreHarnessNodeKind =
+  | "input"
+  | "output"
+  | "model_call"
+  | "tool_call"
+  | "transform"
+  | "branch"
+  | "join"
+  | "safety_barrier"
+  | "bounded_loop"
+  | "human_approval"
+  | "composite"
+  | "stage";
+
+export interface AgentCoreHarnessPort {
+  port_id: string;
+  schema_ref: string;
+  required: boolean;
+  cardinality: "one" | "many" | "stream" | "event";
+  confidentiality: "public" | "task" | "sensitive" | "secret";
+  maximum_connections: number;
+}
+
+export interface AgentCoreHarnessNodePolicy {
+  timeout_seconds: number;
+  retry_limit: number;
+  failure_mode: "fail-closed" | "isolate" | "fallback";
+  fallback_handler_id: string | null;
+  cacheable: boolean;
+  authority: "read" | "plan" | "simulate";
+  maximum_model_calls: number | null;
+  maximum_tool_calls: number | null;
+}
+
+export interface AgentCoreHarnessNode {
+  node_id: string;
+  descriptor_id: string;
+  title: string;
+  title_zh: string;
+  node_kind: AgentCoreHarnessNodeKind;
+  handler_id: string;
+  runtime_node_kind: "core" | "plugin" | "barrier";
+  required_inputs: string[];
+  output_key: string | null;
+  input_ports: AgentCoreHarnessPort[];
+  output_ports: AgentCoreHarnessPort[];
+  policy: AgentCoreHarnessNodePolicy;
+  capabilities: {
+    removable: boolean;
+    replaceable: boolean;
+    branchable: boolean;
+    wrappable_in_loop: boolean;
+    protected: boolean;
+    allowed_operations: string[];
+  };
+  category: string;
+  icon: string;
+}
+
+export type AgentCoreHarnessNodeDescriptor = Omit<AgentCoreHarnessNode, "node_id"> & {
+  schema_version: string;
+};
+
+export interface AgentCoreHarnessEdge {
+  schema_version: "dronedream.harness-edge-binding.v1";
+  edge_id: string;
+  source: { node_id: string; port_id: string };
+  target: { node_id: string; port_id: string };
+  schema_ref: string;
+  transform_plugin_id: string | null;
+  binding_mode: "direct" | "control" | "transform";
+}
+
+export interface AgentCoreHarnessCandidate {
+  schema_version: "dronedream.harness-topology-candidate.v2";
+  topology_id: string;
+  name: string;
+  profile_id: string;
+  base_revision: number;
+  nodes: AgentCoreHarnessNode[];
+  edges: AgentCoreHarnessEdge[];
+  loops: Array<Record<string, unknown>>;
+  maximum_parallelism: number;
+  layout: {
+    positions: Record<string, { x: number; y: number; pinned: boolean }>;
+    viewport: { x: number; y: number; zoom: number };
+    collapsed_node_ids: string[];
+    selected_node_id: string | null;
+  };
+  metadata: Record<string, unknown>;
+}
+
+export interface AgentCoreHarnessValidation {
+  valid: boolean;
+  issues: Array<{
+    code: string;
+    message: string;
+    node_id: string | null;
+    port_id: string | null;
+    edge_id: string | null;
+    severity: "error" | "warning";
+  }>;
+  semantic_sha256: string | null;
+  layout_sha256: string | null;
+  compiled_topology: Record<string, unknown> | null;
+}
+
+export interface AgentCoreHarnessRevision {
+  revision: number;
+  parent_revision: number | null;
+  state: "candidate" | "active" | "applies_next_run" | "rejected" | "frozen";
+  candidate: AgentCoreHarnessCandidate;
+  validation: AgentCoreHarnessValidation;
+  created_at: string;
+  activated_at: string | null;
+  applies_next_run: boolean;
+}
+
+export interface AgentCoreHarnessState {
+  active: AgentCoreHarnessRevision;
+  current: AgentCoreHarnessRevision;
+  can_undo: boolean;
+  can_redo: boolean;
+}
+
+export interface AgentCoreHarnessCatalog {
+  schema_version: "dronedream.harness-catalog.v1";
+  node_descriptors: AgentCoreHarnessNodeDescriptor[];
+  topology_templates: Array<{
+    topology_id: string;
+    name: string;
+    node_count: number;
+    maximum_parallelism: number;
+    metadata: Record<string, unknown>;
+  }>;
+  plugins: Array<{
+    plugin_id: string;
+    name: string;
+    description: string;
+    slot_id: string;
+    slot_label: string;
+    activation_mode: string;
+    enabled: boolean;
+    health: string;
+    trust_status: string;
+    version: string;
+    package_sha256: string;
+  }>;
+  profiles: AgentCoreHarnessProfile[];
+  context_commands: Record<string, string[]>;
+}
+
+export interface AgentCoreHarnessProfile {
+  profile_id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  health: string;
+  trust_status: string;
+}
+
+export type AgentCoreHarnessOperation = {
+  schema_version: "dronedream.harness-edit-operation.v1";
+  client_operation_id: string;
+  base_revision: number;
+  operation:
+    | "add_node"
+    | "remove_node"
+    | "connect"
+    | "disconnect"
+    | "move_node"
+    | "update_layout"
+    | "update_node"
+    | "apply_profile"
+    | "apply_template";
+  payload: Record<string, unknown>;
+};
+
+export interface AgentCoreHarnessDryRun {
+  valid: boolean;
+  validation: AgentCoreHarnessValidation;
+  layers: string[][];
+  node_count: number;
+  edge_count: number;
+  protected_node_count: number;
+  projected_model_nodes: string[];
+  projected_tool_nodes: string[];
+  external_calls_executed: 0;
+  note: string;
+}
+
 export type AgentCoreAssetKind = "map" | "world" | "vehicle";
 export type AgentCoreAssetImportState =
   | "created"
@@ -982,6 +1173,57 @@ export function cancelAgentCoreAssetQualificationJob(jobId: string): Promise<Age
 
 export function listAgentCorePlugins(): Promise<AgentCorePluginEntry[]> {
   return requestJson<AgentCorePluginEntry[]>("/v1/plugins");
+}
+
+export function getAgentCoreHarnessCatalog(): Promise<AgentCoreHarnessCatalog> {
+  return requestJson("/v1/harness/catalog");
+}
+
+export function getAgentCoreHarnessProfiles(): Promise<AgentCoreHarnessProfile[]> {
+  return requestJson("/v1/harness/profiles");
+}
+
+export function getAgentCoreHarnessState(): Promise<AgentCoreHarnessState> {
+  return requestJson("/v1/harness/topologies/current");
+}
+
+export function editAgentCoreHarness(
+  operation: AgentCoreHarnessOperation,
+): Promise<{ revision: AgentCoreHarnessRevision; receipt: Record<string, unknown> }> {
+  return requestJson("/v1/harness/topologies/current", { method: "PATCH", body: operation });
+}
+
+export function undoAgentCoreHarness(
+  baseRevision: number,
+): Promise<{ revision: AgentCoreHarnessRevision; receipt: Record<string, unknown> }> {
+  return requestJson("/v1/harness/topologies/undo", {
+    method: "POST",
+    body: { base_revision: baseRevision },
+  });
+}
+
+export function redoAgentCoreHarness(
+  baseRevision: number,
+): Promise<{ revision: AgentCoreHarnessRevision; receipt: Record<string, unknown> }> {
+  return requestJson("/v1/harness/topologies/redo", {
+    method: "POST",
+    body: { base_revision: baseRevision },
+  });
+}
+
+export function dryRunAgentCoreHarness(
+  candidate?: AgentCoreHarnessCandidate,
+): Promise<AgentCoreHarnessDryRun> {
+  return requestJson("/v1/harness/topologies/dry-run", {
+    method: "POST",
+    body: candidate,
+  });
+}
+
+export function listAgentCoreHarnessReceipts(
+  limit = 100,
+): Promise<Array<Record<string, unknown>>> {
+  return requestJson(`/v1/harness/receipts?limit=${Math.max(1, Math.min(limit, 500))}`);
 }
 
 export function setAgentCorePlugin(pluginId: string, enabled: boolean): Promise<unknown> {
