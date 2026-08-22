@@ -399,8 +399,16 @@ async function usageSnapshot(userId: string): Promise<JsonRecord> {
   if (cardsError || !Array.isArray(cards)) {
     throw cardsError ?? new Error("RESET_CARD_SNAPSHOT_INVALID");
   }
+  const { data: dailyUsage, error: dailyUsageError } = await adminClient().rpc(
+    "model_usage_daily_history",
+    { p_user_id: userId, p_days: 365 },
+  );
+  if (dailyUsageError || !Array.isArray(dailyUsage)) {
+    throw dailyUsageError ?? new Error("MODEL_USAGE_HISTORY_INVALID");
+  }
   return {
     ...data,
+    daily_usage: dailyUsage,
     allowance_reset_cards: cards.map((card) => ({
       id: card.card_id,
       number: card.card_number,

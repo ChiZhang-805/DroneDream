@@ -208,7 +208,7 @@ python distribution/tools/distribution_contract.py promotion `
 `build-planning/e4-request.v1.json` is the reviewed input to the deterministic
 plan-only coordinator in `tools/edition_build_planner.py`. The planner binds
 one clean product source and one Git-derived common-core hash to the SIM, LAB,
-FIELD, and AUTONOMY edition manifests, exact component contracts, selected Vehicle Pack
+FIELD, and AGENT edition manifests, exact component contracts, selected Vehicle Pack
 manifests/controllers, resource ceilings, NOTICE inputs, artifact names,
 rollback policy, and the four independently observed product-branch heads.
 

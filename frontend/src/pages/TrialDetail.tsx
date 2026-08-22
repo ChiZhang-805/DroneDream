@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient, ApiClientError } from "../api/client";
+import { apiClient } from "../api/client";
 import { SectionCard } from "../components/SectionCard";
 import { MetricCard } from "../components/MetricCard";
 import { StatusBadge } from "../components/StatusBadge";
@@ -16,7 +16,7 @@ import {
 } from "../components/TrajectoryReplay";
 import { GazeboLivePanel } from "../components/GazeboLivePanel";
 import { selectReplayArtifactsForTrial } from "../components/trajectoryReplayUtils";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 
 const ACTIVE_TRIAL_POLL_INTERVAL_MS = 4000;
 
@@ -25,7 +25,7 @@ function isActiveTrialStatus(status: TrialStatus): boolean {
 }
 
 export function TrialDetail() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { trialId } = useParams<{ trialId: string }>();
   const safeId = trialId ?? "";
   const queryClient = useQueryClient();
@@ -81,9 +81,10 @@ export function TrialDetail() {
       <ErrorState
         title={t("trial.notFound")}
         description={
-          trialQuery.error instanceof ApiClientError
-            ? trialQuery.error.message
-            : t("trial.notFoundBody")
+          localeSafeError(trialQuery.error, locale, {
+            zh: t("trial.notFoundBody"),
+            en: t("trial.notFoundBody"),
+          })
         }
         action={
           <Link to="/" className="btn">
@@ -99,9 +100,10 @@ export function TrialDetail() {
   const replayArtifacts = selectReplayArtifactsForTrial(artifacts, trial.id);
   const artifactsError = artifactsQuery.isError
     ? (
-        artifactsQuery.error instanceof ApiClientError
-          ? artifactsQuery.error.message
-          : t("artifacts.loadFailedDescription")
+        localeSafeError(artifactsQuery.error, locale, {
+          zh: t("artifacts.loadFailedDescription"),
+          en: t("artifacts.loadFailedDescription"),
+        })
       )
     : null;
 

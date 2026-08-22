@@ -56,6 +56,15 @@ export interface ManagedModelUsageRequest {
   settled_at: string | null;
 }
 
+export interface ManagedModelUsageDay {
+  date: string;
+  consumed_ai_credits: number;
+  request_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+}
+
 export interface ManagedAllowanceResetCard {
   id: string;
   number: string;
@@ -78,6 +87,7 @@ export interface ManagedModelUsageSnapshot {
   };
   usage: ManagedModelUsageTotals;
   recent_requests: ManagedModelUsageRequest[];
+  daily_usage?: ManagedModelUsageDay[];
   allowance_reset_cards?: ManagedAllowanceResetCard[];
 }
 

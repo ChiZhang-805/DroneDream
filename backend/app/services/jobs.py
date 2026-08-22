@@ -119,6 +119,28 @@ def _validate_real_cli_scenario_effect_contract(req: schemas.JobCreateRequest) -
                 ) from exc
 
 
+def _validate_operator_simulator_backend(
+    req: schemas.JobCreateRequest,
+    *,
+    allow_internal_test_backend: bool = False,
+) -> None:
+    """Keep synthetic adapters behind the explicit regression-test boundary."""
+
+    if req.simulator_backend != "mock":
+        return
+    if allow_internal_test_backend:
+        return
+    app_env = get_settings().app_env.strip().lower()
+    if app_env in {"test", "testing"}:
+        return
+    raise JobServiceError(
+        "SIMULATOR_BACKEND_TEST_ONLY",
+        "The deterministic mock simulator is available only to the regression-test suite; "
+        "operator jobs must use the configured real PX4/Gazebo runtime.",
+        http_status=422,
+    )
+
+
 def _expected_control_version(
     *,
     resource_kind: str,
@@ -405,7 +427,12 @@ def _create_job_from_config(
     continuation_root_job_id: str | None = None,
     holdout_policy_version: str = "legacy-visible-v0",
     holdout_contract: dict[str, object] | None = None,
+    allow_internal_test_backend: bool = False,
 ) -> models.Job:
+    _validate_operator_simulator_backend(
+        req,
+        allow_internal_test_backend=allow_internal_test_backend,
+    )
     _validate_real_cli_scenario_effect_contract(req)
     try:
         outcome_contract = compile_outcome_contract(
@@ -567,9 +594,7 @@ def _create_job_from_config(
                 "provider_turn_cap": req.provider_turn_cap,
                 "provider_request_cap": req.provider_request_cap,
                 "provider_max_retries": req.provider_max_retries,
-                "continue_exploration_preregistered": (
-                    req.continue_exploration_after_qualified
-                ),
+                "continue_exploration_preregistered": (req.continue_exploration_after_qualified),
                 "continuation_parent_job_id": continuation_parent_job_id,
                 "continuation_root_job_id": continuation_root_job_id,
                 "holdout_policy_version": holdout_policy_version,
@@ -908,12 +933,7 @@ def _independent_continuation_suite(
             http_status=409,
         )
     source_suite = schemas.ScenarioSuiteConfig(**source.scenario_suite_json)
-    used_seeds = {
-        seed
-        for case in source_suite.cases
-        if case.enabled
-        for seed in case.seeds
-    }
+    used_seeds = {seed for case in source_suite.cases if case.enabled for seed in case.seeds}
     child_cases: list[schemas.ScenarioCaseConfig] = []
     derivations: list[dict[str, object]] = []
     enabled_holdout_count = 0
@@ -1195,9 +1215,7 @@ def continue_exploration(
         parent,
         candidate=incumbent,
     )
-    scenario_trial_count = sum(
-        len(case.seeds) for case in child_suite.cases if case.enabled
-    )
+    scenario_trial_count = sum(len(case.seeds) for case in child_suite.cases if case.enabled)
     minimum_trial_cap = scenario_trial_count * 2
     if request.budget.additional_trial_cap < minimum_trial_cap:
         raise JobServiceError(
@@ -1211,9 +1229,7 @@ def continue_exploration(
     fresh_openai, fresh_llm = _continuation_provider_config(parent, request)
     suffix = " (continue exploration)"
     display_name = (
-        f"{parent.display_name[: 255 - len(suffix)]}{suffix}"
-        if parent.display_name
-        else None
+        f"{parent.display_name[: 255 - len(suffix)]}{suffix}" if parent.display_name else None
     )
     child_request = schemas.JobCreateRequest(
         track_type=parent.track_type,  # type: ignore[arg-type]
@@ -1325,9 +1341,7 @@ def continue_exploration(
             "first_qualified_receipt_id": parent.first_qualified_freeze.id,
             "budget": request.budget.model_dump(mode="json"),
             "holdout_contract_sha256": holdout_contract["contract_sha256"],
-            "fresh_child_credential_binding": (
-                fresh_openai is not None or fresh_llm is not None
-            ),
+            "fresh_child_credential_binding": (fresh_openai is not None or fresh_llm is not None),
         },
     )
     if commit:
@@ -2174,9 +2188,7 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         provider_requests_succeeded=job.provider_requests_succeeded,
         first_qualified_candidate_id=job.first_qualified_candidate_id,
         first_qualified_freeze_receipt_id=(
-            job.first_qualified_freeze.id
-            if job.first_qualified_freeze is not None
-            else None
+            job.first_qualified_freeze.id if job.first_qualified_freeze is not None else None
         ),
         first_qualified_at=job.first_qualified_at,
         continue_exploration_requested=job.continue_exploration_requested,
@@ -2348,10 +2360,7 @@ def compare_jobs(
             verified_real_winner = True
         validated_best = bool(
             job.best_candidate_id
-            and (
-                job.simulator_backend_requested != "real_cli"
-                or verified_real_winner
-            )
+            and (job.simulator_backend_requested != "real_cli" or verified_real_winner)
         )
         if job.status != "COMPLETED":
             baseline_metrics = None

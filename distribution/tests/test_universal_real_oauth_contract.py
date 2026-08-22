@@ -53,7 +53,7 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
     observer = OBSERVER.read_text(encoding="utf-8")
 
     assert "[switch]$RunAuthenticatedUiMatrix" in powershell
-    assert 'Authenticated UI matrix is unavailable in Runtime diagnosis mode.' in powershell
+    assert "Authenticated UI matrix is unavailable in Runtime diagnosis mode." in powershell
     for exact_count in (
         "authenticatedUiCases = if ($RunAuthenticatedUiMatrix)",
         "languageSelections = if ($RunAuthenticatedUiMatrix)",
@@ -69,7 +69,7 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
     assert 'validationSurface -cne "authenticated-workspace"' in powershell
     assert "languageSelectionCount -ne 1" in powershell
     assert "workspaceScreenshotSha256" in powershell
-    assert 'Start-Process -FilePath (Get-Command node).Source' in powershell
+    assert "Start-Process -FilePath (Get-Command node).Source" in powershell
     assert 'stage -ceq "authenticated-ui-ready"' in powershell
     assert 'Write-AtomicText $postAuthSignalPath "complete"' in powershell
     assert 'Write-AtomicText $postAuthSignalPath "abort"' in powershell
@@ -82,32 +82,32 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
         callback_recheck,
     )
     assert helper_call < callback_recheck < helper_failure
-    assert 'process.exit' not in powershell
+    assert "process.exit" not in powershell
 
     ready = observer.index('await persist("authenticated-ui-ready")')
     signal = observer.index("await waitForPostAuthUiSignal()", ready)
     logout = observer.index('await persist("local-logout-attempted")', signal)
     assert ready < signal < logout
     assert 'decision === "complete" || decision === "abort"' in observer
-    assert 'Post-auth UI observation failed closed' in observer
+    assert "Post-auth UI observation failed closed" in observer
 
 
 def test_authenticated_observer_settlement_uses_the_durable_terminal_checkpoint() -> None:
     powershell = POWERSHELL.read_text(encoding="utf-8")
     settlement = powershell.index(
-        'Wait-Until { $oauthObserverProcess.Refresh(); $oauthObserverProcess.HasExited } 60'
+        "Wait-Until { $oauthObserverProcess.Refresh(); $oauthObserverProcess.HasExited } 60"
     )
     checkpoint = powershell.index(
-        'Import-ObserverCheckpoint $observerPath $counts $receipt', settlement
+        "Import-ObserverCheckpoint $observerPath $counts $receipt", settlement
     )
     terminal = powershell.index(
         '[string]$settledObservation.terminalState -cne "passed"', checkpoint
     )
     dispose = powershell.index(
-        '$oauthObserverProcess.Dispose(); $oauthObserverProcess = $null', terminal
+        "$oauthObserverProcess.Dispose(); $oauthObserverProcess = $null", terminal
     )
     assert settlement < checkpoint < terminal < dispose
-    assert '$oauthObserverProcess.ExitCode -ne 0' not in powershell
+    assert "$oauthObserverProcess.ExitCode -ne 0" not in powershell
 
 
 def test_authenticated_app_close_handles_the_existing_exit_guard_once() -> None:
@@ -146,14 +146,14 @@ def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
         in observer
     )
     for route in (
-        'universal: "/vehicle-studio"',
+        'universal: "/assistant"',
         'sim: "/assistant"',
         'lab: "/lab"',
         'field: "/field"',
     ):
         assert route in observer
     for surface in (
-        'universal: ".vehicle-studio-page"',
+        'universal: ".experiment-assistant-page"',
         'sim: ".experiment-assistant-page"',
         'lab: ".lab-page"',
         'field: ".field-app"',
@@ -168,20 +168,17 @@ def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
     assert "assert.equal(await workspaceModeSelector.inputValue(), edition)" in observer
     assert "async function assertAuthenticatedAccountSurface(page)" in observer
     assert 'menuPanel.locator(".app-account-button:visible")' in observer
-    assert 'data-theme-grants-hardware-authority' in observer
+    assert "data-theme-grants-hardware-authority" in observer
     assert (
-        'validationSurface: authenticatedWorkspace '
-        '? "authenticated-workspace" : "pre-auth-launcher"'
-        in observer
+        "validationSurface: authenticatedWorkspace "
+        '? "authenticated-workspace" : "pre-auth-launcher"' in observer
     )
-    assert 'languageSelectionCount: 1' in observer
+    assert "languageSelectionCount: 1" in observer
 
     browser_scope = observer.index("const browser = await chromium.connectOverCDP")
     viewport = observer.index("if (emulateViewport)", browser_scope)
     authenticated = observer.index("if (authenticatedWorkspace)", viewport)
-    selector = observer.index(
-        "await visibleWorkspaceModeSelector(page)", authenticated
-    )
+    selector = observer.index("await visibleWorkspaceModeSelector(page)", authenticated)
     assert browser_scope < viewport < authenticated < selector
 
 
@@ -205,10 +202,10 @@ def test_runtime_prerequisite_is_existing_start_only_and_physics_stays_off() -> 
 
 def test_observer_is_bounded_and_never_owns_or_logs_the_external_browser() -> None:
     text = OBSERVER.read_text(encoding="utf-8")
-    assert 'chromium.connectOverCDP(cdpEndpoint)' in text
+    assert "chromium.connectOverCDP(cdpEndpoint)" in text
     assert "browser.close()" in text
     assert "await browser.close" not in text
-    assert 'counts.runtimeStart, 1' in text
+    assert "counts.runtimeStart, 1" in text
     assert "counts.loginButton += 1" in text
     assert "counts.oauthTransaction += 1" in text
     assert "counts.localLogout += 1" in text
@@ -257,10 +254,9 @@ def test_attempts_are_durable_before_side_effects_and_runtime_failure_is_bounded
     assert "function Import-ObserverCheckpoint" in powershell
     finally_block = powershell.index("finally {", powershell.index("$observerArguments = @("))
     assert (
-        powershell.index("Import-ObserverCheckpoint $observerPath", finally_block)
-        > finally_block
+        powershell.index("Import-ObserverCheckpoint $observerPath", finally_block) > finally_block
     )
-    assert 'rawRuntimeErrorRecorded = $false' in powershell
+    assert "rawRuntimeErrorRecorded = $false" in powershell
 
     app_close_increment = powershell.index("$counts.appClose++")
     app_close_checkpoint = powershell.index('Save-ExecutionCheckpoint "app-close-attempted"')
@@ -271,7 +267,7 @@ def test_attempts_are_durable_before_side_effects_and_runtime_failure_is_bounded
 def test_native_runtime_maintenance_preserves_machine_failure_code() -> None:
     text = RUNTIME_INSTALLER.read_text(encoding="utf-8")
     assert "fn runtime_maintenance_error_for_ipc" in text
-    assert '.map_err(runtime_maintenance_error_for_ipc)?' in text
+    assert ".map_err(runtime_maintenance_error_for_ipc)?" in text
     assert 'format!("{}: {}", error.code, error.message)' in text
     assert "runtime_maintenance_ipc_error_preserves_bounded_machine_code" in text
 
@@ -281,22 +277,21 @@ def test_runtime_diagnosis_mode_is_frozen_and_cannot_consume_oauth() -> None:
     observer = OBSERVER.read_text(encoding="utf-8")
 
     assert '[ValidateSet("oauth", "runtime-diagnosis")]' in powershell
-    assert 'mode = $Mode' in powershell
+    assert "mode = $Mode" in powershell
     assert (
-        "[bool]$frozenPlan.runAuthenticatedUiMatrix -ne "
-        "[bool]$RunAuthenticatedUiMatrix"
+        "[bool]$frozenPlan.runAuthenticatedUiMatrix -ne [bool]$RunAuthenticatedUiMatrix"
     ) in powershell
-    assert 'executionAllowed = (-not $runtimeDiagnosisOnly)' in powershell
-    assert 'loginButton = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
-    assert 'oauthTransaction = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
-    assert 'callback = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
-    assert 'authorizationCodeExchange = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
-    assert 'browserAction = 0' in powershell
-    assert 'localLogout = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
-    assert 'Runtime diagnosis attempted a forbidden browser authentication action.' in powershell
+    assert "executionAllowed = (-not $runtimeDiagnosisOnly)" in powershell
+    assert "loginButton = if ($runtimeDiagnosisOnly) { 0 } else { 1 }" in powershell
+    assert "oauthTransaction = if ($runtimeDiagnosisOnly) { 0 } else { 1 }" in powershell
+    assert "callback = if ($runtimeDiagnosisOnly) { 0 } else { 1 }" in powershell
+    assert "authorizationCodeExchange = if ($runtimeDiagnosisOnly) { 0 } else { 1 }" in powershell
+    assert "browserAction = 0" in powershell
+    assert "localLogout = if ($runtimeDiagnosisOnly) { 0 } else { 1 }" in powershell
+    assert "Runtime diagnosis attempted a forbidden browser authentication action." in powershell
 
     assert 'const runtimeDiagnosisOnly = mode === "runtime-diagnosis"' in observer
-    assert 'evidence.diagnosisComplete = true' in observer
+    assert "evidence.diagnosisComplete = true" in observer
     diagnosis_branch = observer.index("if (runtimeDiagnosisOnly)")
     completed = observer.index('await persist("runtime-diagnosis-completed")', diagnosis_branch)
     oauth_attempt = observer.index('await persist("oauth-attempted")', completed)
@@ -317,9 +312,9 @@ def test_receipt_uses_allowlisted_native_audit_hashes_and_local_logout() -> None
     assert "credentialsRecorded = $false" in text
     assert "authorization code" not in text.lower()
     assert "async function visibleAccountButton(page)" in observer
-    assert '.app-mobile-menu-button:visible' in observer
-    assert '.app-mobile-menu-panel.is-open:visible' in observer
-    assert 'const accountButton = await visibleAccountButton(page)' in observer
+    assert ".app-mobile-menu-button:visible" in observer
+    assert ".app-mobile-menu-panel.is-open:visible" in observer
+    assert "const accountButton = await visibleAccountButton(page)" in observer
     logout_attempt = observer.index('await persist("local-logout-attempted")')
     failed_matrix_assertion = observer.index(
         'assert.equal(postAuthUiDecision, "complete", "Post-auth UI observation failed closed")'

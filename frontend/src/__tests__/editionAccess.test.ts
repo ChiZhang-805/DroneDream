@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { editionHasWorkspace } from "../edition";
+import { assistantArtifactMatchesEdition } from "../features/experiment/assistantProductPolicy";
 import {
-  editionHasVehicleStudio,
-  editionHasWorkspace,
-} from "../edition";
+  assistantTaskIsAllowed,
+  assistantTaskOptions,
+} from "../features/experiment/assistantTaskRouter";
 
 describe("desktop edition ownership", () => {
   it("makes Universal the only three-workspace product", () => {
@@ -19,11 +21,21 @@ describe("desktop edition ownership", () => {
     expect(editionHasWorkspace("field", "field")).toBe(true);
   });
 
-  it("keeps Vehicle Studio in the modeling and autonomy products", () => {
-    expect(editionHasVehicleStudio("universal")).toBe(true);
-    expect(editionHasVehicleStudio("autonomy")).toBe(true);
-    for (const edition of ["sim", "lab", "field"] as const) {
-      expect(editionHasVehicleStudio(edition)).toBe(false);
-    }
+  it("gives AGENT an external-asset workflow while retaining legacy history", () => {
+    expect(assistantTaskOptions("autonomy", "en").map(({ id }) => id)).toEqual([
+      "mission_autonomy",
+      "asset_import_qualification",
+      "simulation_experiment",
+    ]);
+    expect(assistantTaskIsAllowed("autonomy", "asset_import_qualification")).toBe(true);
+    expect(assistantArtifactMatchesEdition("autonomy", "external_asset_qualification_plan"))
+      .toBe(true);
+    expect(assistantArtifactMatchesEdition("autonomy", "universal_vehicle_model"))
+      .toBe(false);
+    expect(assistantArtifactMatchesEdition(
+      "autonomy",
+      "universal_vehicle_model",
+      { legacyRead: true },
+    )).toBe(true);
   });
 });

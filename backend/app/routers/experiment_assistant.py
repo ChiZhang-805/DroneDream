@@ -20,6 +20,35 @@ from app.task_workflows import (
 
 router = APIRouter(prefix="/experiment-assistant", tags=["experiment-assistant"])
 
+_TASK_LABELS_ZH = {
+    "control_tuning": "控制器调优",
+    "mission_autonomy": "自主任务",
+    "asset_import_qualification": "资产导入与资格认证",
+    "simulation_experiment": "仿真实验",
+    "cross_edition_workflow": "跨版本工作流",
+    "hardware_validation": "硬件验证",
+    "calibration": "校准",
+    "sim_to_real": "仿真到真机",
+    "real_to_sim": "真机到仿真",
+    "field_task": "真机任务",
+}
+
+
+def _localized_workflow_blocker(code: str, *, chinese: bool) -> str:
+    if not chinese:
+        return code
+    if code.endswith(".denied") and code.startswith("edition."):
+        return f"当前软件版本不支持此任务（{code}）"
+    if code.endswith(".unknown") and code.startswith("tool."):
+        return f"请求了未知工具（{code}）"
+    if code.endswith(".edition-denied") and code.startswith("tool."):
+        return f"当前软件版本不能使用该工具（{code}）"
+    if code == "edition.sim.hardware-authority.denied":
+        return "SIM 不允许直接获得硬件控制权限"
+    if code == "hardware.live-authorization.receipt-required":
+        return "进入真机环节前需要当前操作员的明确授权回执"
+    return f"工作流被安全策略阻止（{code}）"
+
 
 @router.post("/turn")
 async def compile_turn(
@@ -58,9 +87,12 @@ async def compile_turn(
     if workflow.task_type != "control_tuning":
         step_summary = " → ".join(step.title for step in workflow.steps)
         if request.locale == "zh-CN":
-            summary = f"已生成 {workflow.task_type} 工作流：{step_summary}"
+            task_label = _TASK_LABELS_ZH.get(workflow.task_type, workflow.task_type)
+            summary = f"已生成{task_label}工作流：{step_summary}"
             if workflow.blockers:
-                summary += f"。当前阻塞：{'；'.join(workflow.blockers)}"
+                summary += "。当前阻塞：" + "；".join(
+                    _localized_workflow_blocker(code, chinese=True) for code in workflow.blockers
+                )
         else:
             summary = f"Compiled {workflow.task_type} workflow: {step_summary}"
             if workflow.blockers:

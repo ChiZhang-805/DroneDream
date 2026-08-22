@@ -5,7 +5,7 @@ import { SectionCard } from "./SectionCard";
 import { Alert } from "./Alert";
 import { Loading, Empty } from "./States";
 import type { ReplayArtifacts } from "./trajectoryReplayUtils";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import {
   extractPoints,
   extractReferencePoints,
@@ -31,21 +31,13 @@ const SPEEDS = [0.5, 1, 2, 4] as const;
 
 type ReplayViewMode = "2d" | "3d";
 
-function statusTextForError(error: unknown, fallback: string): string {
-  if (error instanceof ApiClientError) {
-    return `${error.message} (${error.code})`;
-  }
-  if (error instanceof Error) return error.message;
-  return fallback;
-}
-
 export function TrajectoryReplay({
   title,
   artifacts,
   meta,
   artifactLoadError,
 }: TrajectoryReplayProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [actualPoints, setActualPoints] = useState<ReplayPoint[] | null>(null);
   const [referencePoints, setReferencePoints] = useState<ReplayPoint[]>([]);
   const [referenceUnavailable, setReferenceUnavailable] = useState(false);
@@ -108,7 +100,12 @@ export function TrajectoryReplay({
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(statusTextForError(loadError, t("trajectory.errorFallback")));
+          const safeError = localeSafeError(loadError, locale, {
+            zh: t("trajectory.errorFallback"),
+            en: t("trajectory.errorFallback"),
+          });
+          const code = loadError instanceof ApiClientError ? loadError.code : null;
+          setError(code && !safeError.includes(code) ? `${safeError} (${code})` : safeError);
           setActualPoints([]);
         }
       }
@@ -119,7 +116,7 @@ export function TrajectoryReplay({
     return () => {
       cancelled = true;
     };
-  }, [artifacts.reference, primaryArtifact, t]);
+  }, [artifacts.reference, locale, primaryArtifact, t]);
 
   useEffect(() => {
     if (!isPlaying || !actualPoints || actualPoints.length <= 1) {

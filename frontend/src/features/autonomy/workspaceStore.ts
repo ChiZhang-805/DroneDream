@@ -34,6 +34,51 @@ export interface AutonomyVector3 {
   z: number;
 }
 
+export interface AutonomyAgentCoreSimulationTarget {
+  targetId: string;
+  simulator: "gazebo-classic" | "gazebo-harmonic" | "isaac-sim" | "webots" | "other";
+  simulatorVersion: string;
+  rosDistribution: string | null;
+  autopilot: "px4" | "ardupilot" | "none" | "other";
+  entrypoint: string;
+}
+
+export interface AutonomyAgentCoreVehicleContract {
+  schemaVersion: 1;
+  assetId: string;
+  contentSha256: string;
+  coordinateFrame: "base_link_frd";
+  dryMassKg: number;
+  maximumTakeoffMassKg: number;
+  bodyRadiusM: number;
+  bodyHeightM: number;
+  maximumSpeedMps: number;
+  maximumAccelerationMps2: number;
+  qualifiedRangeM: number;
+  reserveBatteryPercent: number;
+  maximumPickupPayloadKg: number;
+  sensors: string[];
+  vehicleClass: "multirotor" | "fixed_wing" | "vtol" | "ground" | "other" | "unknown";
+  simulationTargets: AutonomyAgentCoreSimulationTarget[];
+}
+
+export interface AutonomyAgentCoreMapContract {
+  schemaVersion: 1;
+  assetId: string;
+  contentSha256: string;
+  coordinateFrame: "ENU";
+  nodeCount: number;
+  edgeCount: number;
+  namedEntityCount: number;
+  navigationBoundsM: {
+    minimum: AutonomyVector3;
+    maximum: AutonomyVector3;
+    span: AutonomyVector3;
+  };
+  semanticLayers: string[];
+  simulationTargets: AutonomyAgentCoreSimulationTarget[];
+}
+
 export interface AutonomySensorMount {
   id: string;
   kind: AutonomySensorKind;
@@ -52,6 +97,9 @@ export interface AutonomyAircraftProfile {
   status: "draft" | "validated-unsigned" | "signed";
   qualificationReceiptId: string | null;
   qualificationContentHash: string | null;
+  agentCoreAssetId?: string | null;
+  agentCoreContentSha256?: string | null;
+  agentCoreRuntimeContract?: AutonomyAgentCoreVehicleContract | null;
   name: string;
   manufacturer: string;
   airframe: string;
@@ -109,6 +157,14 @@ export const AUTONOMY_AIRCRAFT_LIMITS = {
 const MASS_COMPARISON_TOLERANCE_KG = 1e-9;
 
 export function autonomyAircraftRadiusM(aircraft: AutonomyAircraftProfile): number {
+  const coreContract = aircraft.agentCoreRuntimeContract;
+  if (
+    coreContract
+    && coreContract.assetId === aircraft.agentCoreAssetId
+    && coreContract.contentSha256 === aircraft.agentCoreContentSha256
+  ) {
+    return coreContract.bodyRadiusM;
+  }
   const isOfficialMyDroneGeometry = aircraft.id === MY_DRONE_CONTRACT.id
     && aircraft.version === 1
     && Math.abs(aircraft.bodyLengthM - 0.36) <= 1e-12
@@ -125,6 +181,8 @@ export function autonomyAircraftRadiusM(aircraft: AutonomyAircraftProfile): numb
 }
 
 export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile): boolean {
+  const agentCoreQualificationValid = isAutonomyAircraftAssetQualified(aircraft);
+  if (agentCoreQualificationValid) return true;
   const within = (value: number, key: keyof typeof AUTONOMY_AIRCRAFT_LIMITS) => {
     const limit = AUTONOMY_AIRCRAFT_LIMITS[key];
     return Number.isFinite(value) && value >= limit.min && value <= limit.max;
@@ -170,6 +228,20 @@ export function isAutonomyAircraftProfileValid(aircraft: AutonomyAircraftProfile
     ));
 }
 
+export function isAutonomyAircraftAssetQualified(aircraft: AutonomyAircraftProfile): boolean {
+  const runtimeContract = aircraft.agentCoreRuntimeContract;
+  return aircraft.status !== "draft"
+    && typeof aircraft.agentCoreAssetId === "string"
+    && aircraft.agentCoreAssetId.length >= 3
+    && typeof aircraft.agentCoreContentSha256 === "string"
+    && /^[0-9a-f]{64}$/u.test(aircraft.agentCoreContentSha256)
+    && aircraft.qualificationContentHash === aircraft.agentCoreContentSha256
+    && runtimeContract?.assetId === aircraft.agentCoreAssetId
+    && runtimeContract.contentSha256 === aircraft.agentCoreContentSha256
+    && typeof aircraft.qualificationReceiptId === "string"
+    && /^asset-qualification-[0-9a-f]{24}$/u.test(aircraft.qualificationReceiptId);
+}
+
 export interface AutonomyMapSourceFile {
   name: string;
   bytes: number;
@@ -189,6 +261,9 @@ export interface AutonomyMapPack {
   status: "draft" | "assets-admitted" | "qualified";
   contentHash: string | null;
   qualificationReceiptId: string | null;
+  agentCoreAssetId?: string | null;
+  agentCoreContentSha256?: string | null;
+  agentCoreRuntimeContract?: AutonomyAgentCoreMapContract | null;
   name: string;
   representation: MapRepresentation;
   coordinateFrame: "ENU" | "NED" | "WGS84" | "building-local";
@@ -247,6 +322,8 @@ export interface AutonomyMissionDraft {
     accessMode: "platform" | "byok";
     provider: string;
     model: string;
+    agentCoreProfileId?: string | null;
+    agentCoreSelectionId?: string | null;
   };
   planningBrief: string;
   planningRunId: string | null;
@@ -265,11 +342,16 @@ export interface AutonomyConversationMessage {
   content: string;
   createdAt: string;
   planContractId: string | null;
+  attachments?: Array<{
+    name: string;
+    contentType: string;
+    byteSize: number;
+  }>;
 }
 
 export interface AutonomyMissionPlanSnapshot {
   schemaVersion: 1;
-  source: "backend" | "local-preview";
+  source: "backend" | "local-preview" | "agent-core";
   contractId: string;
   sceneId: string;
   sceneName: string;
@@ -295,10 +377,10 @@ export interface AutonomyMissionPlanSnapshot {
     verticalTravelM: number;
     estimatedDurationS: number;
     minimumClearanceM: number;
-    launchMassKg: number;
-    postPickupMassKg: number;
-    postPickupThrustToWeight: number;
-    brakingDistanceM: number;
+    launchMassKg: number | null;
+    postPickupMassKg: number | null;
+    postPickupThrustToWeight: number | null;
+    brakingDistanceM: number | null;
   };
   immutableSafetyRules: string[];
   compiledAt: string;
@@ -353,6 +435,171 @@ function boundedVector(
     x: boundedNumber(candidate.x, fallback.x, minimum, maximum),
     y: boundedNumber(candidate.y, fallback.y, minimum, maximum),
     z: boundedNumber(candidate.z, fallback.z, minimum, maximum),
+  };
+}
+
+function runtimeContractVector(value: unknown): AutonomyVector3 | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Partial<AutonomyVector3>;
+  if (
+    typeof candidate.x !== "number" || !Number.isFinite(candidate.x)
+    || typeof candidate.y !== "number" || !Number.isFinite(candidate.y)
+    || typeof candidate.z !== "number" || !Number.isFinite(candidate.z)
+  ) return null;
+  return { x: candidate.x, y: candidate.y, z: candidate.z };
+}
+
+function normalizeAgentCoreSimulationTargets(value: unknown): AutonomyAgentCoreSimulationTarget[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 32) return null;
+  const simulators = new Set<AutonomyAgentCoreSimulationTarget["simulator"]>([
+    "gazebo-classic", "gazebo-harmonic", "isaac-sim", "webots", "other",
+  ]);
+  const autopilots = new Set<AutonomyAgentCoreSimulationTarget["autopilot"]>([
+    "px4", "ardupilot", "none", "other",
+  ]);
+  const normalized: AutonomyAgentCoreSimulationTarget[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") return null;
+    const target = item as Partial<AutonomyAgentCoreSimulationTarget>;
+    const targetId = typeof target.targetId === "string" ? target.targetId.trim().slice(0, 120) : "";
+    const simulatorVersion = typeof target.simulatorVersion === "string"
+      ? target.simulatorVersion.trim().slice(0, 80)
+      : "";
+    const entrypoint = typeof target.entrypoint === "string" ? target.entrypoint.trim().slice(0, 500) : "";
+    const unsafeEntrypoint = entrypoint.startsWith("/")
+      || /^[a-z]:/iu.test(entrypoint)
+      || entrypoint.includes("\\")
+      || entrypoint.split("/").some((segment) => segment === ".." || segment === "");
+    if (
+      !targetId || !simulatorVersion || !entrypoint || unsafeEntrypoint
+      || !simulators.has(target.simulator as AutonomyAgentCoreSimulationTarget["simulator"])
+      || !autopilots.has(target.autopilot as AutonomyAgentCoreSimulationTarget["autopilot"])
+      || (target.rosDistribution !== null && typeof target.rosDistribution !== "string")
+    ) return null;
+    normalized.push({
+      targetId,
+      simulator: target.simulator as AutonomyAgentCoreSimulationTarget["simulator"],
+      simulatorVersion,
+      rosDistribution: typeof target.rosDistribution === "string"
+        ? target.rosDistribution.trim().slice(0, 80) || null
+        : null,
+      autopilot: target.autopilot as AutonomyAgentCoreSimulationTarget["autopilot"],
+      entrypoint,
+    });
+  }
+  return normalized;
+}
+
+function normalizeAgentCoreVehicleContract(
+  value: unknown,
+  expectedAssetId: string | null,
+  expectedContentSha256: string | null,
+): AutonomyAgentCoreVehicleContract | null {
+  if (!value || typeof value !== "object" || !expectedAssetId || !expectedContentSha256) return null;
+  const contract = value as Partial<AutonomyAgentCoreVehicleContract>;
+  const finitePositive = (item: unknown): item is number => (
+    typeof item === "number" && Number.isFinite(item) && item > 0
+  );
+  const simulationTargets = normalizeAgentCoreSimulationTargets(contract.simulationTargets);
+  const vehicleClasses = new Set<AutonomyAgentCoreVehicleContract["vehicleClass"]>([
+    "multirotor", "fixed_wing", "vtol", "ground", "other", "unknown",
+  ]);
+  if (
+    contract.schemaVersion !== 1
+    || contract.assetId !== expectedAssetId
+    || contract.contentSha256 !== expectedContentSha256
+    || contract.coordinateFrame !== "base_link_frd"
+    || !finitePositive(contract.dryMassKg)
+    || !finitePositive(contract.maximumTakeoffMassKg)
+    || !finitePositive(contract.bodyRadiusM)
+    || !finitePositive(contract.bodyHeightM)
+    || !finitePositive(contract.maximumSpeedMps)
+    || !finitePositive(contract.maximumAccelerationMps2)
+    || !finitePositive(contract.qualifiedRangeM)
+    || typeof contract.reserveBatteryPercent !== "number"
+    || !Number.isFinite(contract.reserveBatteryPercent)
+    || contract.reserveBatteryPercent < 0
+    || contract.reserveBatteryPercent > 100
+    || typeof contract.maximumPickupPayloadKg !== "number"
+    || !Number.isFinite(contract.maximumPickupPayloadKg)
+    || contract.maximumPickupPayloadKg < 0
+    || contract.maximumTakeoffMassKg < contract.dryMassKg + contract.maximumPickupPayloadKg
+    || !Array.isArray(contract.sensors)
+    || !simulationTargets
+    || !vehicleClasses.has(contract.vehicleClass as AutonomyAgentCoreVehicleContract["vehicleClass"])
+  ) return null;
+  return {
+    schemaVersion: 1,
+    assetId: expectedAssetId,
+    contentSha256: expectedContentSha256,
+    coordinateFrame: "base_link_frd",
+    dryMassKg: contract.dryMassKg,
+    maximumTakeoffMassKg: contract.maximumTakeoffMassKg,
+    bodyRadiusM: contract.bodyRadiusM,
+    bodyHeightM: contract.bodyHeightM,
+    maximumSpeedMps: contract.maximumSpeedMps,
+    maximumAccelerationMps2: contract.maximumAccelerationMps2,
+    qualifiedRangeM: contract.qualifiedRangeM,
+    reserveBatteryPercent: contract.reserveBatteryPercent,
+    maximumPickupPayloadKg: contract.maximumPickupPayloadKg,
+    sensors: [...new Set(contract.sensors.filter((sensor): sensor is string => (
+      typeof sensor === "string" && sensor.trim().length > 0
+    )).map((sensor) => sensor.trim().slice(0, 80)))].slice(0, 128),
+    vehicleClass: contract.vehicleClass as AutonomyAgentCoreVehicleContract["vehicleClass"],
+    simulationTargets,
+  };
+}
+
+function normalizeAgentCoreMapContract(
+  value: unknown,
+  expectedAssetId: string | null,
+  expectedContentSha256: string | null,
+): AutonomyAgentCoreMapContract | null {
+  if (!value || typeof value !== "object" || !expectedAssetId || !expectedContentSha256) return null;
+  const contract = value as Partial<AutonomyAgentCoreMapContract>;
+  const bounds = contract.navigationBoundsM && typeof contract.navigationBoundsM === "object"
+    ? contract.navigationBoundsM as Partial<AutonomyAgentCoreMapContract["navigationBoundsM"]>
+    : {};
+  const minimum = runtimeContractVector(bounds.minimum);
+  const maximum = runtimeContractVector(bounds.maximum);
+  const span = runtimeContractVector(bounds.span);
+  const simulationTargets = normalizeAgentCoreSimulationTargets(contract.simulationTargets);
+  const finiteCount = (item: unknown, allowZero = true) => (
+    typeof item === "number"
+    && Number.isInteger(item)
+    && item >= (allowZero ? 0 : 1)
+    && item <= 100_000_000
+  );
+  const tolerance = 1e-6;
+  if (
+    contract.schemaVersion !== 1
+    || contract.assetId !== expectedAssetId
+    || contract.contentSha256 !== expectedContentSha256
+    || contract.coordinateFrame !== "ENU"
+    || !finiteCount(contract.nodeCount, false)
+    || !finiteCount(contract.edgeCount)
+    || !finiteCount(contract.namedEntityCount)
+    || !minimum || !maximum || !span
+    || minimum.x > maximum.x || minimum.y > maximum.y || minimum.z > maximum.z
+    || Math.abs(span.x - (maximum.x - minimum.x)) > tolerance
+    || Math.abs(span.y - (maximum.y - minimum.y)) > tolerance
+    || Math.abs(span.z - (maximum.z - minimum.z)) > tolerance
+    || !Array.isArray(contract.semanticLayers)
+    || !simulationTargets
+  ) return null;
+  return {
+    schemaVersion: 1,
+    assetId: expectedAssetId,
+    contentSha256: expectedContentSha256,
+    coordinateFrame: "ENU",
+    nodeCount: contract.nodeCount as number,
+    edgeCount: contract.edgeCount as number,
+    namedEntityCount: contract.namedEntityCount as number,
+    navigationBoundsM: { minimum, maximum, span },
+    semanticLayers: [...new Set(contract.semanticLayers.filter((layer): layer is string => (
+      typeof layer === "string" && layer.trim().length > 0
+    )).map((layer) => layer.trim().slice(0, 120)))].slice(0, 512),
+    simulationTargets,
   };
 }
 
@@ -452,7 +699,11 @@ function normalizeMissionPlan(value: unknown): AutonomyMissionPlanSnapshot | nul
     : null;
   return {
     schemaVersion: 1,
-    source: plan.source === "backend" ? "backend" : "local-preview",
+    source: plan.source === "backend"
+      ? "backend"
+      : plan.source === "agent-core"
+        ? "agent-core"
+        : "local-preview",
     contractId: boundedText(plan.contractId, "mission-contract", 160),
     sceneId: boundedText(plan.sceneId, "unbound-scene", 96),
     sceneName: boundedText(plan.sceneName, "Unbound environment", 160),
@@ -475,10 +726,10 @@ function normalizeMissionPlan(value: unknown): AutonomyMissionPlanSnapshot | nul
       verticalTravelM: boundedNumber(metrics.verticalTravelM, 0, 0, 1_000_000),
       estimatedDurationS: boundedNumber(metrics.estimatedDurationS, 0, 0, 10_000_000),
       minimumClearanceM: boundedNumber(metrics.minimumClearanceM, 0, 0, 10_000),
-      launchMassKg: boundedNumber(metrics.launchMassKg, 0, 0, 100_000),
-      postPickupMassKg: boundedNumber(metrics.postPickupMassKg, 0, 0, 100_000),
-      postPickupThrustToWeight: boundedNumber(metrics.postPickupThrustToWeight, 0, 0, 1_000),
-      brakingDistanceM: boundedNumber(metrics.brakingDistanceM, 0, 0, 100_000),
+      launchMassKg: metrics.launchMassKg === null ? null : boundedNumber(metrics.launchMassKg, 0, 0, 100_000),
+      postPickupMassKg: metrics.postPickupMassKg === null ? null : boundedNumber(metrics.postPickupMassKg, 0, 0, 100_000),
+      postPickupThrustToWeight: metrics.postPickupThrustToWeight === null ? null : boundedNumber(metrics.postPickupThrustToWeight, 0, 0, 1_000),
+      brakingDistanceM: metrics.brakingDistanceM === null ? null : boundedNumber(metrics.brakingDistanceM, 0, 0, 100_000),
     },
     immutableSafetyRules: boundedTextList(plan.immutableSafetyRules, 24, 320),
     compiledAt: boundedText(plan.compiledAt, new Date().toISOString(), 40),
@@ -504,6 +755,9 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       status: "draft",
       qualificationReceiptId: null,
       qualificationContentHash: null,
+      agentCoreAssetId: "dronedream.my-drone.v1",
+      agentCoreContentSha256: null,
+      agentCoreRuntimeContract: null,
       name: MY_DRONE_CONTRACT.name,
       manufacturer: MY_DRONE_CONTRACT.manufacturer,
       airframe: MY_DRONE_CONTRACT.referenceAirframe,
@@ -548,6 +802,9 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       status: "draft",
       contentHash: null,
       qualificationReceiptId: null,
+      agentCoreAssetId: "dronedream.school-map.v1",
+      agentCoreContentSha256: null,
+      agentCoreRuntimeContract: null,
       name: "School Map",
       representation: "hybrid-3d",
       coordinateFrame: "ENU",
@@ -707,6 +964,21 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     && /^[0-9a-f]{64}$/u.test(aircraft.qualificationContentHash)
     ? aircraft.qualificationContentHash
     : null;
+  const normalizedAgentCoreAircraftHash = typeof aircraft.agentCoreContentSha256 === "string"
+    && /^[0-9a-f]{64}$/u.test(aircraft.agentCoreContentSha256)
+    ? aircraft.agentCoreContentSha256
+    : null;
+  const normalizedAgentCoreAircraftId = typeof aircraft.agentCoreAssetId === "string"
+    ? boundedText(aircraft.agentCoreAssetId, "", 160) || null
+    : null;
+  const hasAgentCoreAircraftBinding = Boolean(
+    normalizedAgentCoreAircraftId && normalizedAgentCoreAircraftId.length >= 3,
+  );
+  const normalizedAgentCoreAircraftContract = normalizeAgentCoreVehicleContract(
+    aircraft.agentCoreRuntimeContract,
+    normalizedAgentCoreAircraftId,
+    normalizedAgentCoreAircraftHash,
+  );
   const hasFabricatedBundledAircraftReceipt = typeof aircraft.qualificationReceiptId === "string"
     && aircraft.qualificationReceiptId.startsWith("bundled-public-");
   const qualificationContractMigrated = autopilotWasInferred
@@ -720,7 +992,13 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     || String(aircraft.computePlatform).trim().toLowerCase() === "custom"
     || hasFabricatedBundledAircraftReceipt
     || ((aircraft.status === "validated-unsigned" || aircraft.status === "signed")
-      && !normalizedQualificationContentHash);
+      && !normalizedQualificationContentHash)
+    || (hasAgentCoreAircraftBinding
+      && normalizedQualificationContentHash !== normalizedAgentCoreAircraftHash)
+    || (hasAgentCoreAircraftBinding && !normalizedAgentCoreAircraftContract)
+    || (hasAgentCoreAircraftBinding
+      && (typeof aircraft.qualificationReceiptId !== "string"
+        || !/^asset-qualification-[0-9a-f]{24}$/u.test(aircraft.qualificationReceiptId)));
   const normalizedAircraft: AutonomyAircraftProfile = {
     ...fallback.aircraft,
     schemaVersion: 2,
@@ -735,6 +1013,9 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     qualificationContentHash: qualificationContractMigrated
       ? null
       : normalizedQualificationContentHash,
+    agentCoreAssetId: normalizedAgentCoreAircraftId ?? fallback.aircraft.agentCoreAssetId,
+    agentCoreContentSha256: normalizedAgentCoreAircraftHash,
+    agentCoreRuntimeContract: normalizedAgentCoreAircraftContract,
     name: boundedText(aircraft.name, fallback.aircraft.name),
     manufacturer: String(aircraft.manufacturer).trim().toLowerCase() === "custom"
       ? "Self-built"
@@ -780,6 +1061,24 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     && !mapPack.qualificationReceiptId.startsWith("bundled-public-")
     ? mapPack.qualificationReceiptId.slice(0, 160)
     : null;
+  const normalizedAgentCoreMapHash = typeof mapPack.agentCoreContentSha256 === "string"
+    && /^[0-9a-f]{64}$/u.test(mapPack.agentCoreContentSha256)
+    ? mapPack.agentCoreContentSha256
+    : null;
+  const normalizedAgentCoreMapId = typeof mapPack.agentCoreAssetId === "string"
+    ? boundedText(mapPack.agentCoreAssetId, "", 160) || null
+    : null;
+  const hasAgentCoreMapBinding = Boolean(normalizedAgentCoreMapId && normalizedAgentCoreMapId.length >= 3);
+  const normalizedAgentCoreMapContract = normalizeAgentCoreMapContract(
+    mapPack.agentCoreRuntimeContract,
+    normalizedAgentCoreMapId,
+    normalizedAgentCoreMapHash,
+  );
+  const agentCoreMapQualificationValid = hasAgentCoreMapBinding
+    && normalizedAgentCoreMapHash === normalizedMapContentHash
+    && Boolean(normalizedAgentCoreMapContract)
+    && typeof normalizedMapReceiptId === "string"
+    && /^asset-qualification-[0-9a-f]{24}$/u.test(normalizedMapReceiptId);
   const storedCompilerSceneId = COMPILED_SCENE_SET.has(mapPack.compilerSceneId as AutonomyCompiledSceneId)
     ? mapPack.compilerSceneId as AutonomyCompiledSceneId
     : null;
@@ -797,7 +1096,8 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     && mapPack.version === 1
     && Boolean(normalizedMapContentHash)
     && Boolean(normalizedMapReceiptId)
-    && !legacyBundledSceneMigrated;
+    && !legacyBundledSceneMigrated
+    && (agentCoreMapQualificationValid || storedCompilerSceneId !== null);
   const normalizedMap: AutonomyMapPack = {
     ...fallback.mapPack,
     schemaVersion: 2,
@@ -805,15 +1105,18 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     // A map is a mutable named workspace asset. Saving replaces that asset;
     // users never accumulate v2/v3 copies in the map editor.
     version: 1,
-    status: normalizedSourceFiles.length
-      ? (normalizedSourceFiles.every((file) => file.admission === "admitted") ? "assets-admitted" : "draft")
-      : (mapQualificationCredentialValid
-          && mapPack.calibrated === true
-          && normalizedCompilerSceneId !== null
-        ? "qualified"
-        : "draft"),
+    status: mapQualificationCredentialValid
+      && mapPack.calibrated === true
+      && (agentCoreMapQualificationValid || normalizedCompilerSceneId !== null)
+      ? "qualified"
+      : normalizedSourceFiles.length
+        ? (normalizedSourceFiles.every((file) => file.admission === "admitted") ? "assets-admitted" : "draft")
+        : "draft",
     contentHash: mapQualificationCredentialValid ? normalizedMapContentHash : null,
     qualificationReceiptId: mapQualificationCredentialValid ? normalizedMapReceiptId : null,
+    agentCoreAssetId: normalizedAgentCoreMapId ?? fallback.mapPack.agentCoreAssetId,
+    agentCoreContentSha256: normalizedAgentCoreMapHash,
+    agentCoreRuntimeContract: normalizedAgentCoreMapContract,
     name: normalizedCompilerSceneId === CANONICAL_SCHOOL_SCENE_ID
       ? fallback.mapPack.name
       : boundedText(mapPack.name, fallback.mapPack.name),
@@ -826,7 +1129,9 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       ? fallback.mapPack.floorCount
       : Math.round(boundedNumber(mapPack.floorCount, fallback.mapPack.floorCount, 1, 500)),
     liveUpdates: legacyBundledSceneMigrated ? fallback.mapPack.liveUpdates : liveUpdates,
-    calibrated: !importedMapAwaitingIngestion && mapPack.calibrated === true,
+    calibrated: agentCoreMapQualificationValid
+      ? true
+      : !importedMapAwaitingIngestion && mapPack.calibrated === true,
     compilerSceneId: normalizedCompilerSceneId,
     semanticLayers: legacyBundledSceneMigrated
       ? fallback.mapPack.semanticLayers
@@ -865,6 +1170,14 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
             accessMode: mission.planningModel.accessMode === "byok" ? "byok" : "platform",
             provider: boundedText(mission.planningModel.provider, fallback.mission.planningModel.provider, 80),
             model: boundedText(mission.planningModel.model, fallback.mission.planningModel.model, 160),
+            agentCoreProfileId: typeof mission.planningModel.agentCoreProfileId === "string"
+                && /^cmp-[a-f0-9]{24}$/u.test(mission.planningModel.agentCoreProfileId)
+              ? mission.planningModel.agentCoreProfileId
+              : null,
+            agentCoreSelectionId: typeof mission.planningModel.agentCoreSelectionId === "string"
+                && /^custom:cmp-[a-f0-9]{24}$/u.test(mission.planningModel.agentCoreSelectionId)
+              ? mission.planningModel.agentCoreSelectionId
+              : null,
           }
         : fallback.mission.planningModel,
       planningBrief: boundedText(mission.planningBrief, fallback.mission.planningBrief, 4_000),
@@ -888,6 +1201,18 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
           planContractId: typeof message.planContractId === "string"
             ? boundedText(message.planContractId, "", 160) || null
             : null,
+          attachments: Array.isArray(message.attachments)
+            ? message.attachments.filter((attachment) => Boolean(
+              attachment
+              && typeof attachment === "object"
+              && typeof attachment.name === "string"
+              && typeof attachment.byteSize === "number",
+            )).slice(0, 8).map((attachment) => ({
+              name: boundedText(attachment.name, "attachment", 240),
+              contentType: boundedText(attachment.contentType, "application/octet-stream", 160),
+              byteSize: Math.round(boundedNumber(attachment.byteSize, 0, 0, 25 * 1024 * 1024)),
+            }))
+            : [],
         }))
         : [],
       aircraftProfileId: normalizedAircraft.id,

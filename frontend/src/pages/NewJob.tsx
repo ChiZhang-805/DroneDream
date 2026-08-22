@@ -354,6 +354,9 @@ const SIMULATOR_BACKEND_HINT_KEYS: Record<SimulatorBackend, TranslationKey> = {
   real_cli: "wizard.hint.backend.realCli",
   mock: "wizard.hint.backend.mock",
 };
+const USER_SIMULATOR_BACKENDS: readonly SimulatorBackend[] = import.meta.env.MODE === "test"
+  ? SIMULATOR_BACKENDS
+  : ["real_cli"];
 
 function selectedHint(
   keys: Record<string, TranslationKey>,
@@ -2702,7 +2705,7 @@ export function NewJob() {
               <div className="constraint-input-column">
                 <div className="form-grid constraints-grid">
                   <Field label={t("wizard.field.simulatorBackend")} required htmlFor="simulator_backend" error={errors.simulator_backend} hint={t(SIMULATOR_BACKEND_HINT_KEYS[form.simulator_backend])}>
-                    <select id="simulator_backend" value={form.simulator_backend} onChange={(event) => update("simulator_backend", event.target.value as SimulatorBackend)}>{SIMULATOR_BACKENDS.map((backend) => <option key={backend} value={backend}>{t(backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")}</option>)}</select>
+                    <select id="simulator_backend" value={form.simulator_backend} onChange={(event) => update("simulator_backend", event.target.value as SimulatorBackend)}>{USER_SIMULATOR_BACKENDS.map((backend) => <option key={backend} value={backend}>{t(backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")}</option>)}</select>
                   </Field>
                   <Field
                     label={t("wizard.optimizerStrategy")}

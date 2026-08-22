@@ -32,11 +32,13 @@ const origin = `http://${host}:${port}`;
 const mobileMenuOnly = Boolean(args.get("--mobile-menu-only"));
 const fixedScenariosOnly = Boolean(args.get("--fixed-scenarios-only"));
 const settingsOnly = Boolean(args.get("--settings-only"));
+const fixedAgent = Boolean(args.get("--fixed-agent"));
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
+if (fixedAgent) process.env.VITE_DRONEDREAM_EDITION = "autonomy";
 
-const cases = [
+const universalCases = [
   { id: "desktop-en", locale: "en", edition: "universal", viewport: { width: 1440, height: 1000 } },
   { id: "desktop-zh", locale: "zh-CN", edition: "field", viewport: { width: 1440, height: 1000 } },
   ...(settingsOnly ? [
@@ -47,17 +49,29 @@ const cases = [
   { id: "tablet-zh", locale: "zh-CN", edition: "sim", viewport: { width: 760, height: 900 } },
   { id: "mobile-en", locale: "en", edition: "universal", viewport: { width: 390, height: 844 } },
   { id: "mobile-zh", locale: "zh-CN", edition: "field", viewport: { width: 390, height: 844 } },
-].filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
+];
+const fixedAgentCases = [
+  { id: "desktop-agent-en", locale: "en", edition: "autonomy", viewport: { width: 1440, height: 1000 } },
+  { id: "desktop-agent-zh", locale: "zh-CN", edition: "autonomy", viewport: { width: 1440, height: 1000 } },
+  { id: "tablet-agent-en", locale: "en", edition: "autonomy", viewport: { width: 760, height: 900 } },
+  { id: "tablet-agent-zh", locale: "zh-CN", edition: "autonomy", viewport: { width: 760, height: 900 } },
+  { id: "mobile-agent-en", locale: "en", edition: "autonomy", viewport: { width: 390, height: 844 } },
+  { id: "mobile-agent-zh", locale: "zh-CN", edition: "autonomy", viewport: { width: 390, height: 844 } },
+];
+const cases = (fixedAgent ? fixedAgentCases : universalCases)
+  .filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
 const canonicalThemeColors = Object.freeze({
   universal: ["#FF5574", "#6A4CFF", "#E657D1"],
   sim: ["#00D9FF", "#2671FF", "#744CFF"],
   lab: ["#A7E84A", "#20C77A", "#087E69"],
   field: ["#FFC247", "#FF754B", "#D746A5"],
+  autonomy: ["#FF5B74", "#EC214F", "#97153B"],
 });
 const fixedScenarioOnlyCases = [
   {
     id: "tablet-fixed-scenarios-en",
     locale: "en",
+    edition: "sim",
     viewport: { width: 760, height: 900 },
   },
 ];
@@ -141,6 +155,10 @@ async function openAccountCropper(page, avatarBytes) {
       await page.locator(".app-mobile-menu-button").click();
     }
     await accountButton.click();
+    const accountMenu = page.locator(".account-menu-popover");
+    if (await accountMenu.isVisible()) {
+      await accountMenu.locator(".account-menu-profile").click();
+    }
   }
   await account.waitFor();
   await account.locator('input[type="file"]').setInputFiles({
@@ -235,17 +253,25 @@ async function verifyEditionSwitcher(page, testCase) {
 }
 
 async function verifySettings(page, testCase) {
+  // Universal is the container build, while its active workspace is one of the
+  // five product surfaces. These cases deliberately open Universal on SIM, so
+  // the visual theme must follow SIM without misreporting the build as SIM.
+  const expectedActiveEdition = fixedAgent
+    ? "autonomy"
+    : testCase.edition === "universal"
+      ? "sim"
+      : testCase.edition;
   const settingsViewport = testCase.viewport.width === 1440
     ? { width: 1440, height: 900 }
     : testCase.viewport.width === 390
       ? { width: 390, height: 700 }
       : testCase.viewport;
   await page.setViewportSize(settingsViewport);
-  const settingsSurface = testCase.edition === "universal"
-    ? "/vehicle-studio"
+  const settingsSurface = fixedAgent
+    ? "/autonomy"
     : "/assistant";
   await page.goto(`${origin}${settingsSurface}?docsPreview=1`, { waitUntil: "networkidle" });
-  const editionSwitcher = await verifyEditionSwitcher(page, testCase);
+  const editionSwitcher = fixedAgent ? null : await verifyEditionSwitcher(page, testCase);
   const themeBinding = await page.locator("html").evaluate((element) => {
     const style = getComputedStyle(element);
     return {
@@ -259,12 +285,12 @@ async function verifySettings(page, testCase) {
       ],
     };
   });
-  assert.equal(themeBinding.edition, testCase.edition);
+  assert.equal(themeBinding.edition, expectedActiveEdition);
   assert.equal(themeBinding.presentationOnly, "true");
   assert.equal(themeBinding.grantsHardwareAuthority, "false");
-  assert.deepEqual(themeBinding.colors, canonicalThemeColors[testCase.edition]);
-  let assistantModelImage = null;
-  if (testCase.edition !== "universal") {
+  assert.deepEqual(themeBinding.colors, canonicalThemeColors[expectedActiveEdition]);
+  let assistantModelImage;
+  {
     const assistantModel = page.locator(".assistant-model-button");
     await assistantModel.waitFor();
     await assistantModel.click();
@@ -286,8 +312,10 @@ async function verifySettings(page, testCase) {
     assert.equal(await modelMenu.locator(".model-provider-logo-openai").count(), 3);
     assert.equal(await modelMenu.locator(".model-provider-logo-deepseek").count(), 2);
     assert.equal(await modelMenu.locator(".model-provider-logo-kimi").count(), 2);
-    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: "Default" }).count(), 1);
-    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: "Custom" }).count(), 1);
+    const defaultGroupLabel = testCase.locale === "en" ? "Default" : "默认";
+    const customGroupLabel = testCase.locale === "en" ? "Custom" : "自定义";
+    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: defaultGroupLabel }).count(), 1);
+    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: customGroupLabel }).count(), 1);
     const measureSelectedModel = async () => assistantModel.evaluate((element) => {
       const logo = element.querySelector(".model-provider-logo");
       const label = element.querySelector(":scope > span");
@@ -328,8 +356,6 @@ async function verifySettings(page, testCase) {
     await assistantModel.scrollIntoViewIfNeeded();
     assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
     await assistantModel.click();
-  } else {
-    await page.locator(".vehicle-studio-page").waitFor();
   }
   if (testCase.viewport.width <= 520) {
     await page.locator(".app-mobile-menu-button").click();
@@ -478,9 +504,16 @@ async function verifySettings(page, testCase) {
     testCase.edition === "field" ? "rgb(58, 33, 23)" : "rgb(37, 27, 40)",
   );
   const manage = usage.locator(".settings-model-plan-row .btn");
+  const usageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
   const resetCards = usage.locator(".settings-reset-card-trigger");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
+  await page.keyboard.press("Tab");
+  assert(await usageRange.evaluate((element) => element === document.activeElement));
+  await page.keyboard.press("ArrowRight");
+  const nextUsageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
+  assert.equal(await nextUsageRange.textContent(), testCase.locale === "zh-CN" ? "30 天" : "30 days");
+  assert(await nextUsageRange.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("Tab");
   assert(await resetCards.evaluate((element) => element === document.activeElement));
   for (let step = 0; step < 4; step += 1) {
@@ -499,7 +532,7 @@ async function verifySettings(page, testCase) {
     settingsViewport,
     panelMeasurements,
     panelImages,
-    keyboardFocusOrder: "manage-subscription -> refresh-usage",
+    keyboardFocusOrder: "manage-subscription -> usage-range -> reset-card -> refresh-usage",
     assistantModelImage,
     image,
   };
@@ -1418,9 +1451,10 @@ try {
   if (!failure && !mobileMenuOnly && !settingsOnly) {
     for (const testCase of fixedScenarioOnlyCases) {
       const context = await browser.newContext({ viewport: testCase.viewport });
-      await context.addInitScript((locale) => {
+      await context.addInitScript(({ locale, workspace }) => {
         window.localStorage.setItem("drone-dream:locale", locale);
-      }, testCase.locale);
+        window.localStorage.setItem("dronedream:universal-workspace:v2", workspace);
+      }, { locale: testCase.locale, workspace: testCase.edition });
       await context.route("**/api/v1/**", (route) => route.fulfill({
         status: 503,
         contentType: "application/json",

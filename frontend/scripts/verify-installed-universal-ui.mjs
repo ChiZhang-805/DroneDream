@@ -154,7 +154,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   if (authenticatedWorkspace) {
     await assertAuthenticatedAccountSurface(page);
     const workspaceRoute = {
-      universal: "/vehicle-studio",
+      universal: "/assistant",
       sim: "/assistant",
       lab: "/lab",
       field: "/field",
@@ -164,7 +164,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     await page.waitForURL((url) => url.hash === `#${workspaceRoute}`);
     assert.equal(await workspaceModeSelector.inputValue(), edition);
     const workspaceSelector = {
-      universal: ".vehicle-studio-page",
+      universal: ".experiment-assistant-page",
       sim: ".experiment-assistant-page",
       lab: ".lab-page",
       field: ".field-app",

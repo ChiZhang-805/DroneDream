@@ -122,7 +122,7 @@ const ARTIFACT_KIND: Record<BrandEditionId, string> = {
 
 const EDITION_CONTRACT: Record<BrandEditionId, string> = {
   universal:
-    "Prepare an editable 3D vehicle, digital prototype, or cross-edition SIM/LAB/FIELD workflow draft. Never claim that a model was built, simulated, validated, or flown.",
+    "Prepare an external asset import and qualification plan, simulation study, or cross-edition SIM/LAB/FIELD workflow draft. Never claim that an asset was imported, simulated, validated, or flown without sealed evidence.",
   sim:
     "Prepare an editable simulation experiment draft. You may populate the bounded experiment fields in the schema, but never run a simulation.",
   lab:

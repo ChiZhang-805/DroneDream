@@ -41,45 +41,6 @@ describe("cloud model access client", () => {
     vi.unstubAllEnvs();
   });
 
-  it("keeps all seven managed choices visible when provider policy rows are partial", async () => {
-    const { cloud } = await loadCloudAccess();
-    const completed = cloud.completeManagedModelCatalog([
-      {
-        provider: "kimi",
-        display_name: "Kimi K2.6",
-        model: "kimi-k2.6",
-        enabled: true,
-        assistant_enabled: true,
-        job_enabled: true,
-        policy_version: 7,
-      },
-      {
-        provider: "kimi",
-        display_name: "Kimi K3",
-        model: "kimi-k3",
-        enabled: true,
-        assistant_enabled: true,
-        job_enabled: true,
-        policy_version: 7,
-      },
-    ]);
-
-    expect(completed).toHaveLength(7);
-    expect(completed.map((model) => model.display_name)).toEqual([
-      "GPT 4.1",
-      "GPT 5.1",
-      "GPT 5.4",
-      "DeepSeek V4 Flash",
-      "DeepSeek V4 Pro",
-      "Kimi K2.6",
-      "Kimi K3",
-    ]);
-    expect(completed.filter(cloud.managedModelAvailableForAssistant))
-      .toHaveLength(2);
-    expect(completed.find((model) => model.model === "gpt-4.1"))
-      .toMatchObject({ enabled: false, assistant_enabled: false });
-  });
-
   it("requires a signed-in account before requesting platform usage", async () => {
     const { cloud, auth } = await loadCloudAccess();
     auth.setAuthAccessToken(null);

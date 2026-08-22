@@ -1,5 +1,3 @@
-import type { BrandEditionId } from "../brand/edition-brand.generated";
-
 export type LauncherEditionCopy = {
   enWelcome: string;
   enReady: string;
@@ -10,6 +8,13 @@ export type LauncherEditionCopy = {
   zhOpen: string;
   zhSignIn: string;
 };
+
+export type LauncherEditionId =
+  | "universal"
+  | "sim"
+  | "lab"
+  | "field"
+  | "autonomy";
 
 const launcherCopyByEdition = {
   universal: {
@@ -62,10 +67,10 @@ const launcherCopyByEdition = {
     zhOpen: "进入自主任务工作区",
     zhSignIn: "登录并进入自主任务工作区",
   },
-} satisfies Record<BrandEditionId, LauncherEditionCopy>;
+} satisfies Record<LauncherEditionId, LauncherEditionCopy>;
 
 export function launcherCopyForEdition(
-  edition: BrandEditionId,
+  edition: LauncherEditionId,
 ): LauncherEditionCopy {
   return launcherCopyByEdition[edition];
 }

@@ -463,6 +463,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("The selected profile photo could not be saved.");
     }
 
+    if (docsPreview) {
+      cacheAvatarForUser(currentAccount.id, avatarDataUrl);
+      setAccount((current) =>
+        current ? { ...current, avatarUrl: avatarDataUrl } : current,
+      );
+      return;
+    }
+
     const configuration = browserAuthConfiguration();
     if (!configuration) {
       throw new Error("Cloud account access is not configured for this build.");
@@ -557,7 +565,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccount((current) =>
       current ? { ...current, avatarUrl: nextAvatarUrl } : current,
     );
-  }, [account, adoptUser]);
+  }, [account, adoptUser, docsPreview]);
 
   const signOut = useCallback(async () => {
     let vaultClearFailed = false;

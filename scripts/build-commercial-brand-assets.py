@@ -16,7 +16,6 @@ from pathlib import Path
 
 from PIL import Image
 
-
 ROOT = Path(__file__).resolve().parents[1]
 COMMERCIAL_DIR = ROOT / "brand" / "commercial"
 MANIFEST_PATH = COMMERCIAL_DIR / "manifest.json"
@@ -86,7 +85,11 @@ def main() -> int:
     expected = {COMMERCIAL_DIR / name: payload for name, payload in payloads.items()}
     expected[MANIFEST_PATH] = manifest_bytes
     if args.check:
-        drifted = [path for path, payload in expected.items() if not path.is_file() or path.read_bytes() != payload]
+        drifted = [
+            path
+            for path, payload in expected.items()
+            if not path.is_file() or path.read_bytes() != payload
+        ]
         if drifted:
             for path in drifted:
                 print(f"DRIFT: {path.relative_to(ROOT)}")

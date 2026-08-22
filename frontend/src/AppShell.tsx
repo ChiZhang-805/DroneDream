@@ -14,7 +14,6 @@ import {
   ArrowRight,
   Bell,
   BotMessageSquare,
-  Box,
   BrainCircuit,
   Camera,
   ChevronRight,
@@ -28,12 +27,12 @@ import {
   ImagePlus,
   LayoutDashboard,
   LogIn,
+  LogOut,
   MailCheck,
   MapPinned,
   Menu,
   Moon,
   MonitorCog,
-  MoreHorizontal,
   Navigation2,
   RadioTower,
   RefreshCcw,
@@ -61,6 +60,7 @@ import {
 } from "./components/AvatarCropDialog";
 import { BrandLockup } from "./components/BrandLockup";
 import { AssistantModelPicker } from "./components/AssistantModelPicker";
+import { CustomModelSettingsPanel } from "./components/CustomModelSettingsPanel";
 import {
   EditionSettingsPanel,
   EditionSettingsSurface,
@@ -115,13 +115,8 @@ import {
   turnstileSiteKey,
 } from "./features/auth/supabaseClient";
 import { useModelAccess } from "./features/settings/ModelAccessContext";
-import {
-  modelProviderLabel,
-  type ModelProvider,
-} from "./features/settings/ModelAccessContext";
 import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
 import {
-  CloudModelAccessError,
   DEFAULT_MANAGED_MODEL_CATALOG,
   completeManagedModelCatalog,
   getManagedModelCatalog,
@@ -131,6 +126,7 @@ import {
   redeemManagedAllowanceResetCard,
   type ManagedAllowanceResetCard,
   type ManagedModelCatalogEntry,
+  type ManagedModelUsageDay,
   type ManagedModelUsageSnapshot,
 } from "./features/settings/cloudModelAccess";
 import {
@@ -152,7 +148,7 @@ import {
   setActiveAssistantTenantContext,
 } from "./features/experiment/workspaceRegistry";
 import { getAssistantWorkspaceIndex } from "./features/experiment/assistantOrchestration";
-import { useI18n } from "./i18n/I18nProvider";
+import { localeSafeError, useI18n } from "./i18n/I18nProvider";
 import type { InterfaceLocale, TranslationKey } from "./i18n/I18nProvider";
 import type {
   Job,
@@ -207,18 +203,12 @@ const CORE_NAV_ITEMS: NavigationItem[] = [
     labelKey: "app.fixedScenarios",
     icon: MapPinned,
   },
-  {
-    to: "/vehicle-studio",
-    labelKey: "app.vehicleStudio",
-    icon: Box,
-  },
 ];
 
 const ASSISTANT_NAV_ITEM = CORE_NAV_ITEMS[0];
 const DASHBOARD_NAV_ITEM = CORE_NAV_ITEMS[1];
 const HISTORY_NAV_ITEM = CORE_NAV_ITEMS[2];
 const SCENARIOS_NAV_ITEM = CORE_NAV_ITEMS[3];
-const VEHICLE_STUDIO_NAV_ITEM = CORE_NAV_ITEMS[4];
 const AUTONOMY_NAV_ITEM: NavigationItem = {
   to: "/autonomy",
   labelKey: "app.autonomyLab",
@@ -296,7 +286,6 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
 const AUTONOMY_NAV_ITEMS: NavigationItem[] = [
   { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
-  { ...VEHICLE_STUDIO_NAV_ITEM, sectionKey: "app.navSectionWorkspace" },
   { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
 ];
 
@@ -304,7 +293,6 @@ const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
   universal: [
     { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
     AUTONOMY_NAV_ITEM,
-    { ...VEHICLE_STUDIO_NAV_ITEM, sectionKey: "app.navSectionWorkspace" },
     DASHBOARD_NAV_ITEM,
     HISTORY_NAV_ITEM,
     SCENARIOS_NAV_ITEM,
@@ -363,6 +351,19 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
     credit_policy_version: 1,
   },
   recent_requests: [],
+  daily_usage: Array.from({ length: 365 }, (_, index) => {
+    const current = new Date(Date.UTC(2025, 7, 23 + index));
+    const active = index % 9 !== 0;
+    const consumed = active ? ((index * 37) % 96) + 4 : 0;
+    return {
+      date: current.toISOString().slice(0, 10),
+      consumed_ai_credits: consumed,
+      request_count: active ? (index % 6) + 1 : 0,
+      input_tokens: consumed * 160,
+      output_tokens: consumed * 48,
+      total_tokens: consumed * 208,
+    };
+  }),
   allowance_reset_cards: [
     {
       id: "preview-reset-full",
@@ -529,87 +530,11 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     courseActions: ["阅读说明书", "查看产品"],
     courseEditions: ["在统一工作区中完成无人机机型建模、可重复仿真实验、实验室验证和现场交付。需求、参数、审批、报告与版本记录始终关联，并把每次判断沉淀为可追踪、可复核、可验收的完整无人机工程证据链。", "围绕 PX4 与 Gazebo 设计可重复的飞行研究，明确场景、参数边界、试验预算、优化目标和安全约束。统一比较候选方案与留出证据，解释失败原因，并把每次仿真结果保存为可继续审查的结构化实验记录。", "贯通仿真证据与真实硬件采集数据，完成标定、差异诊断、受控试验和安全门检查。持续记录 Sim-to-Real 与 Real-to-Sim 更新、审批和资格验证，让每次模型变化都有可靠依据并可以回溯。", "通过兼容性检查、操作员审批、遥测边界、参数快照、中止规则和可靠回滚方案准备真机调优。所有现场任务在执行前都可复核，执行后形成可审计记录，为下一轮安全决策提供完整依据。"],
   },
-  "zh-TW": {
-    title: "設定",
-    tabs: ["一般", "記憶", "模型", "執行環境"],
-    language: "語言",
-    interface: "介面",
-    notifications: "通知",
-    appearance: ["深色", "淺色", "跟隨系統", "自訂"],
-    notificationLabels: ["允許通知", "實驗與任務完成", "AI 回覆完成", "產品更新", "需要審批", "額度或重置卡即將到期", "安全與登入提醒", "裝置或執行環境狀態"],
-    memoryTitle: "記憶",
-    memoryEnabled: ["記憶已關閉", "記憶已開啟"],
-    crossSession: "跨工作階段記憶",
-    memoryScopes: ["對話偏好", "實驗預設值", "裝置與機型", "指標與限制", "安全與審批", "工作流程與工具", "報告與交付"],
-    memoryDefaults: ["預設機型", "預設最佳化目標", "預設安全設定", "預設單位制", "預設報告格式"],
-    courseOverview: "課程結合大型語言模型推理、控制與航太工程工具，DroneDream 將這些能力落實為可規劃、可執行、可複核、可驗收的無人機工程流程。",
-    courseOpen: "開啟課程",
-    courseActions: ["閱讀說明書", "查看產品"],
-    courseEditions: ["在統一工作區完成無人機機型建模、可重複模擬、實驗室驗證與現場交付。需求、參數、審批、報告及版本記錄持續關聯，讓每次工程判斷都成為可追蹤、可複核、可驗收的完整證據鏈。", "圍繞 PX4 與 Gazebo 建立可重複飛行研究，明確場景、參數邊界、預算、目標與安全限制。統一比較候選與留出證據、解釋失敗原因，並把每次模擬保存為可延續審查的結構化實驗記錄。", "串聯模擬證據與真實硬體採集資料，完成校準、差異診斷、受控試驗及安全門檢查。持續記錄 Sim-to-Real、Real-to-Sim 更新、審批與資格驗證，使每次模型變化都有可靠依據。", "透過相容性檢查、操作員審批、遙測邊界、參數快照、中止規則和可靠回復方案準備實機調校。所有現場任務執行前皆可複核，完成後形成可稽核記錄以支援安全決策。"],
-  },
-  es: {
-    title: "Ajustes",
-    tabs: ["General", "Memoria", "Modelos", "Entorno"],
-    language: "Idioma",
-    interface: "Interfaz",
-    notifications: "Notificaciones",
-    appearance: ["Oscuro", "Claro", "Sistema", "Personalizar"],
-    notificationLabels: ["Permitir notificaciones", "Experimento o tarea completada", "Respuesta de IA completada", "Actualizaciones del producto", "Aprobación requerida", "Créditos o tarjeta por vencer", "Seguridad e inicio de sesión", "Estado del dispositivo o entorno"],
-    memoryTitle: "Memoria",
-    memoryEnabled: ["Memoria desactivada", "Memoria activada"],
-    crossSession: "Memoria entre sesiones",
-    memoryScopes: ["Preferencias de chat", "Valores del experimento", "Dispositivo y vehículo", "Métricas y límites", "Seguridad y aprobaciones", "Flujo y herramientas", "Informes y entrega"],
-    memoryDefaults: ["Vehículo predeterminado", "Objetivo predeterminado", "Perfil de seguridad", "Unidades predeterminadas", "Formato del informe"],
-    courseOverview: "El curso une razonamiento con modelos, control y herramientas de ingeniería aeroespacial; DroneDream lo convierte en flujos UAV prácticos, planificables, revisables y verificables.",
-    courseOpen: "Abrir curso",
-    courseActions: ["Leer manual", "Ver producto"],
-    courseEditions: ["Modela vehículos, diseña simulaciones repetibles y coordina validaciones de laboratorio y campo en un solo espacio. Requisitos, parámetros, revisiones, informes y versiones permanecen unidos para crear una evidencia técnica trazable, verificable y lista para entregar.", "Construye estudios PX4 y Gazebo reproducibles con escenarios, límites, presupuestos, objetivos y restricciones definidos. Compara candidatos con métricas comunes, conserva pruebas independientes, explica fallos y convierte cada resultado en un experimento estructurado y revisable.", "Conecta evidencia simulada con datos del hardware mediante calibración, diagnóstico, ensayos controlados y puertas de seguridad. Registra cambios Sim-to-Real y Real-to-Sim, aprobaciones y calificación para que cada actualización tenga fundamento y trazabilidad.", "Prepara ajustes de dispositivos reales con compatibilidad, aprobación del operador, límites de telemetría, instantáneas, reglas de aborto y reversión fiable. Cada tarea se revisa antes de ejecutar y genera un registro auditable para decisiones posteriores seguras."],
-  },
-  ja: {
-    title: "設定",
-    tabs: ["一般", "メモリ", "モデル", "実行環境"],
-    language: "言語",
-    interface: "表示",
-    notifications: "通知",
-    appearance: ["ダーク", "ライト", "システム", "カスタム"],
-    notificationLabels: ["通知を許可", "実験・タスク完了", "AI 応答完了", "製品アップデート", "承認が必要", "利用枠・カード期限", "セキュリティとログイン", "デバイス・実行環境の状態"],
-    memoryTitle: "メモリ",
-    memoryEnabled: ["メモリ オフ", "メモリ オン"],
-    crossSession: "セッション間メモリ",
-    memoryScopes: ["チャット設定", "実験の既定値", "デバイスと機体", "指標と制約", "安全と承認", "ワークフローとツール", "レポートと納品"],
-    memoryDefaults: ["既定の機体", "既定の最適化目標", "既定の安全設定", "既定の単位", "既定のレポート形式"],
-    courseOverview: "本講義はモデル推論、制御、航空宇宙工学ツールを結び、DroneDream で計画・実行・レビュー・検証できる実践的な UAV 工程へ展開します。",
-    courseOpen: "講義を開く",
-    courseActions: ["説明書を読む", "製品を見る"],
-    courseEditions: ["機体モデル、再現可能なシミュレーション、ラボ検証、現場での納品を一つの作業空間で統合します。要件、パラメータ、承認、レポート、版履歴を結び、すべての判断を追跡・レビュー・検証できる工学証拠として残します。", "PX4 と Gazebo を用いて、シナリオ、パラメータ範囲、予算、目的、安全制約を明確にした再現可能な研究を設計します。候補と独立証拠を共通指標で比較し、失敗を説明し、結果を構造化された実験記録として保存します。", "シミュレーション証拠と実機データを、校正、差異診断、制御試験、安全ゲートで接続します。Sim-to-Real と Real-to-Sim の更新、承認、適格性確認を継続して記録し、各モデル変更の根拠と履歴を保ちます。", "互換性確認、操作者承認、テレメトリ境界、パラメータスナップショット、中止条件、確実な復元計画で実機調整を準備します。現場タスクは実行前にレビューでき、完了後は安全な判断に使える監査記録を残します。"],
-  },
-  ko: {
-    title: "설정",
-    tabs: ["일반", "메모리", "모델", "실행 환경"],
-    language: "언어",
-    interface: "화면",
-    notifications: "알림",
-    appearance: ["다크", "라이트", "시스템", "사용자 지정"],
-    notificationLabels: ["알림 허용", "실험 및 작업 완료", "AI 응답 완료", "제품 업데이트", "승인 필요", "할당량 또는 카드 만료", "보안 및 로그인", "장치 또는 런타임 상태"],
-    memoryTitle: "메모리",
-    memoryEnabled: ["메모리 꺼짐", "메모리 켜짐"],
-    crossSession: "세션 간 메모리",
-    memoryScopes: ["대화 기본 설정", "실험 기본값", "장치 및 기체", "지표 및 제약", "안전 및 승인", "워크플로 및 도구", "보고서 및 전달"],
-    memoryDefaults: ["기본 기체", "기본 최적화 목표", "기본 안전 설정", "기본 단위", "기본 보고서 형식"],
-    courseOverview: "이 과정은 모델 추론, 제어, 항공우주 공학 도구를 결합하고 DroneDream에서 계획·실행·검토·검증 가능한 실용적인 UAV 작업 흐름으로 구현합니다.",
-    courseOpen: "강의 열기",
-    courseActions: ["설명서 보기", "제품 보기"],
-    courseEditions: ["기체 모델링, 반복 가능한 시뮬레이션, 실험실 검증, 현장 전달을 하나의 작업 공간에서 연결합니다. 요구 사항, 매개변수, 승인, 보고서와 버전 기록을 유지하여 모든 판단을 추적·검토·검증할 수 있는 엔지니어링 증거로 만듭니다.", "PX4와 Gazebo에서 시나리오, 매개변수 범위, 예산, 목표와 안전 제약을 명확히 한 반복 연구를 설계합니다. 공통 지표로 후보와 독립 증거를 비교하고 실패를 설명하며 결과를 구조화된 실험 기록으로 보존합니다.", "시뮬레이션 증거와 실제 하드웨어 데이터를 보정, 차이 진단, 통제 시험과 안전 게이트로 연결합니다. Sim-to-Real 및 Real-to-Sim 변경, 승인과 자격 검증을 기록하여 모든 모델 업데이트의 근거와 이력을 유지합니다.", "호환성 확인, 운영자 승인, 텔레메트리 경계, 매개변수 스냅샷, 중단 규칙과 신뢰할 롤백 계획으로 실제 기체 튜닝을 준비합니다. 모든 현장 작업은 실행 전 검토되고 완료 후 안전한 후속 결정을 위한 감사 기록을 남깁니다."],
-  },
 };
 
 const AUTONOMY_COURSE_COPY: Readonly<Record<InterfaceLocale, string>> = {
   en: "Turn natural-language intent into structured mission plans, validate them through repeated Model + Harness loops, and supervise execution with pluginized tools, safety holds, replanning, and evidence gates.",
   "zh-CN": "把自然语言意图转成结构化任务计划，通过模型与脚手架的多轮循环反复校验，并利用插件化工具、安全悬停、在线换路和证据门监督任务执行。",
-  "zh-TW": "把自然語言意圖轉為結構化任務計畫，透過模型與 Harness 多輪循環驗證，並以外掛工具、安全暫停、重新規劃及證據閘監督執行。",
-  es: "Convierte la intención en lenguaje natural en planes estructurados y supervisa la ejecución con ciclos Model + Harness, herramientas conectables, pausas seguras, replanificación y evidencias.",
-  ja: "自然言語の意図を構造化された任務計画に変換し、Model + Harness の反復、プラグイン式ツール、安全停止、再計画、証拠ゲートで実行を監督します。",
-  ko: "자연어 의도를 구조화된 임무 계획으로 바꾸고 Model + Harness 반복, 플러그인 도구, 안전 정지, 재계획과 증거 게이트로 실행을 감독합니다.",
 };
 
 function AllowanceCardIcon({
@@ -631,6 +556,116 @@ function AllowanceCardIcon({
     >
       <Icon />
     </span>
+  );
+}
+
+function AllowanceUsageHistory({
+  days,
+  locale,
+}: {
+  days: ManagedModelUsageDay[];
+  locale: "en" | "zh-CN";
+}) {
+  const [range, setRange] = useState<7 | 30 | 365>(7);
+  const copy = locale === "zh-CN"
+    ? {
+        title: "用量记录",
+        description: "按实际完成的模型调用统计",
+        sevenDays: "7 天",
+        thirtyDays: "30 天",
+        oneYear: "一年",
+        credits: "额度",
+        tokens: "Tokens",
+        requests: "调用",
+        empty: "该时段暂无用量",
+        chart: "模型用量图",
+      }
+    : {
+        title: "Usage history",
+        description: "Completed model calls only",
+        sevenDays: "7 days",
+        thirtyDays: "30 days",
+        oneYear: "1 year",
+        credits: "Credits",
+        tokens: "Tokens",
+        requests: "Requests",
+        empty: "No usage in this period",
+        chart: "Model usage chart",
+      };
+  const visibleDays = days.slice(-range);
+  const number = new Intl.NumberFormat(locale);
+  const date = new Intl.DateTimeFormat(locale, range === 365
+    ? { year: "numeric", month: "2-digit", day: "2-digit" }
+    : { month: "2-digit", day: "2-digit" });
+  const maxCredits = Math.max(0, ...visibleDays.map((day) => day.consumed_ai_credits));
+  const tooltip = (day: ManagedModelUsageDay) => [
+    date.format(new Date(`${day.date}T00:00:00Z`)),
+    `${copy.credits}: ${number.format(day.consumed_ai_credits)}`,
+    `${copy.tokens}: ${number.format(day.total_tokens)}`,
+    `${copy.requests}: ${number.format(day.request_count)}`,
+  ].join(" · ");
+  const hasUsage = visibleDays.some((day) => day.consumed_ai_credits > 0);
+
+  return (
+    <section className="settings-allowance-history">
+      <header>
+        <div><h4>{copy.title}</h4><p>{copy.description}</p></div>
+        <div className="settings-allowance-range" role="tablist" aria-label={copy.title}>
+          {([[7, copy.sevenDays], [30, copy.thirtyDays], [365, copy.oneYear]] as const)
+            .map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={range === value}
+                tabIndex={range === value ? 0 : -1}
+                className={range === value ? "is-selected" : undefined}
+                onClick={() => setRange(value)}
+                onKeyDown={(event) => {
+                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                  const tabs = Array.from(
+                    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [],
+                  );
+                  if (tabs.length === 0) return;
+                  const currentIndex = tabs.indexOf(event.currentTarget);
+                  const nextIndex = event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? tabs.length - 1
+                      : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+                  event.preventDefault();
+                  const nextValue = Number(tabs[nextIndex]?.dataset.range) as 7 | 30 | 365;
+                  setRange(nextValue);
+                  tabs[nextIndex]?.focus();
+                }}
+                data-range={value}
+              >{label}</button>
+            ))}
+        </div>
+      </header>
+      {visibleDays.length === 0 ? (
+        <p className="settings-allowance-empty">{copy.empty}</p>
+      ) : range === 365 ? (
+        <div className="settings-allowance-heatmap" role="img" aria-label={copy.chart} data-testid="settings-allowance-chart">
+          {visibleDays.map((day) => {
+            const intensity = maxCredits <= 0
+              ? 0
+              : Math.max(1, Math.min(4, Math.ceil((day.consumed_ai_credits / maxCredits) * 4)));
+            return <i key={day.date} data-intensity={intensity} title={tooltip(day)} aria-hidden="true" />;
+          })}
+        </div>
+      ) : (
+        <div className={`settings-allowance-bars${range === 30 ? " is-30" : ""}`} role="img" aria-label={copy.chart} data-testid="settings-allowance-chart">
+          {visibleDays.map((day) => (
+            <span key={day.date} title={tooltip(day)} aria-hidden="true">
+              <i style={{ height: maxCredits > 0 ? `${Math.max(2, (day.consumed_ai_credits / maxCredits) * 100)}%` : "2px" }} />
+              <small>{date.format(new Date(`${day.date}T00:00:00Z`))}</small>
+            </span>
+          ))}
+        </div>
+      )}
+      {!hasUsage && visibleDays.length > 0 ? <p className="settings-allowance-empty">{copy.empty}</p> : null}
+    </section>
   );
 }
 
@@ -797,12 +832,14 @@ function SettingsDialog({
   access,
   closeRef,
   edition,
+  initialTab,
   onClose,
   onOpenExternal,
 }: {
   access: DesktopRuntimeAccess;
   closeRef: RefObject<HTMLButtonElement>;
   edition: BrandEditionId;
+  initialTab: SettingsSurfaceTabId;
   onClose: () => void;
   onOpenExternal: (event: MouseEvent<HTMLAnchorElement>, url: string) => void;
 }) {
@@ -814,15 +851,8 @@ function SettingsDialog({
   const auth = useAuth();
   const {
     settings: modelAccess,
-    profiles: modelProfiles,
-    activeProfileId,
-    selectProfile,
-    addProfile,
-    removeActiveProfile,
     selectAccessMode,
     selectManagedModel,
-    selectProvider,
-    updateSettings,
   } = useModelAccess();
   const docsPreview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).has("docsPreview");
@@ -945,13 +975,12 @@ function SettingsDialog({
       setManagedUsageState("ready");
     } catch (error) {
       setManagedUsageState("error");
-      setManagedUsageError(
-        error instanceof CloudModelAccessError
-          ? error.message
-          : t("settings.model.usageUnavailable"),
-      );
+      setManagedUsageError(localeSafeError(error, locale, {
+        zh: "模型用量暂不可用。",
+        en: t("settings.model.usageUnavailable"),
+      }));
     }
-  }, [auth.account, docsPreview, modelAccess.accessMode, t]);
+  }, [auth.account, docsPreview, locale, modelAccess.accessMode, t]);
   useEffect(() => {
     void refreshManagedUsage();
   }, [refreshManagedUsage]);
@@ -1178,58 +1207,6 @@ function SettingsDialog({
       cancel: "取消",
       refresh: "刷新用量",
     },
-    "zh-TW": {
-      cards: "額度重設卡",
-      ready: "準備使用",
-      full: "全額恢復",
-      fullCard: "全額恢復卡",
-      empty: "暫無可用額度卡",
-      expires: "有效期至",
-      use: "使用重設卡",
-      using: "使用中…",
-      confirm: "確認兌換",
-      cancel: "取消",
-      refresh: "重新整理用量",
-    },
-    es: {
-      cards: "Tarjetas de recarga",
-      ready: "Lista para usar",
-      full: "Recarga completa",
-      fullCard: "Tarjeta de recarga completa",
-      empty: "No hay tarjetas disponibles",
-      expires: "Vence",
-      use: "Usar tarjeta",
-      using: "Aplicando…",
-      confirm: "Confirmar",
-      cancel: "Cancelar",
-      refresh: "Actualizar uso",
-    },
-    ja: {
-      cards: "リセットカード",
-      ready: "使用準備完了",
-      full: "全額回復",
-      fullCard: "全額回復カード",
-      empty: "利用可能なカードなし",
-      expires: "有効期限",
-      use: "カードを使用",
-      using: "使用中…",
-      confirm: "確認",
-      cancel: "キャンセル",
-      refresh: "使用量を更新",
-    },
-    ko: {
-      cards: "충전 카드",
-      ready: "사용 가능",
-      full: "전체 충전",
-      fullCard: "전체 충전 카드",
-      empty: "사용 가능한 카드 없음",
-      expires: "만료",
-      use: "카드 사용",
-      using: "사용 중…",
-      confirm: "확인",
-      cancel: "취소",
-      refresh: "사용량 새로고침",
-    },
   }[interfaceLocale];
   useEffect(() => {
     if (!allowanceResetCards || allowanceResetCards.length === 0) {
@@ -1282,15 +1259,14 @@ function SettingsDialog({
       );
     } catch (error) {
       setAllowanceResetState("error");
-      setAllowanceResetMessage(
-        error instanceof CloudModelAccessError
-          ? error.message
-          : locale === "zh-CN" ? "重置卡暂时无法使用。" : "The reset card could not be redeemed.",
-      );
+      setAllowanceResetMessage(localeSafeError(error, locale, {
+        zh: "重置卡暂时无法使用。",
+        en: "The reset card could not be redeemed.",
+      }));
     }
   };
   const [activeSettingsTab, setActiveSettingsTab] =
-    useState<SettingsSurfaceTabId>("general");
+    useState<SettingsSurfaceTabId>(initialTab);
   const settingsTabs: readonly SettingsSurfaceTab[] = [
     { id: "general", label: settingsCopy.tabs[0] },
     { id: "memory", label: settingsCopy.tabs[1] },
@@ -1849,6 +1825,11 @@ function SettingsDialog({
               <span>{locale === "zh-CN" ? "包含的模型" : "Included model"}</span>
               <AssistantModelPicker
                 ariaLabel={locale === "zh-CN" ? "包含的模型" : "Included model"}
+                chooseModelLabel={locale === "zh-CN" ? "选择模型" : "Choose model"}
+                defaultGroupLabel={locale === "zh-CN" ? "默认" : "Default"}
+                customGroupLabel={locale === "zh-CN" ? "自定义" : "Custom"}
+                addCustomModelLabel={locale === "zh-CN" ? "添加自定义模型" : "Add custom model"}
+                temporarilyUnavailableLabel={locale === "zh-CN" ? "暂时不可用" : "Temporarily unavailable"}
                 defaultModels={managedModels}
                 customProfiles={[]}
                 selectedDefault={managedModels.find((model) =>
@@ -1922,6 +1903,10 @@ function SettingsDialog({
                     <strong>{numberFormatter.format(managedUsage.usage.output_tokens)}</strong>
                   </div>
                 </div>
+                <AllowanceUsageHistory
+                  days={managedUsage.daily_usage ?? []}
+                  locale={locale === "zh-CN" ? "zh-CN" : "en"}
+                />
                 <div className="settings-model-reset-row">
                   <div className="settings-model-reset-summary">
                     <span>{allowanceResetCopy.cards}</span>
@@ -2053,90 +2038,7 @@ function SettingsDialog({
             </div>
           </div>
         ) : (
-          <>
-            <div className="settings-model-profile-row">
-              <label htmlFor="settings_model_profile">
-                <span>{t("settings.model.profile")}</span>
-                <select
-                  id="settings_model_profile"
-                  value={activeProfileId}
-                  onChange={(event) => selectProfile(event.target.value)}
-                >
-                  {modelProfiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {modelProviderLabel(profile.provider)} ·{" "}
-                      {profile.model || t("wizard.field.backendDefault")}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                className="btn"
-                onClick={addProfile}
-                disabled={modelProfiles.length >= 12}
-              >
-                {t("settings.model.addProfile")}
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={removeActiveProfile}
-                disabled={modelProfiles.length <= 1}
-              >
-                {t("settings.model.removeProfile")}
-              </button>
-            </div>
-            <div className="settings-model-grid">
-              <label htmlFor="settings_model_provider">
-                <span>{t("wizard.field.llmProvider")}</span>
-                <select
-                  id="settings_model_provider"
-                  value={modelAccess.provider}
-                  onChange={(event) => selectProvider(event.target.value as ModelProvider)}
-                >
-                  <option value="openai">OpenAI</option>
-                  <option value="qwen">Qwen</option>
-                  <option value="deepseek">DeepSeek</option>
-                  <option value="kimi">Kimi</option>
-                  <option value="custom">{t("wizard.llm.customProvider")}</option>
-                </select>
-              </label>
-              <label htmlFor="settings_model_name">
-                <span>{t("wizard.field.llmModel")}</span>
-                <input
-                  id="settings_model_name"
-                  value={modelAccess.model}
-                  maxLength={128}
-                  onChange={(event) => updateSettings({ model: event.target.value })}
-                  placeholder={t("wizard.field.backendDefault")}
-                />
-              </label>
-              <label className="settings-model-wide" htmlFor="settings_model_api_key">
-                <span>{t("wizard.field.llmApiKey")}</span>
-                <input
-                  id="settings_model_api_key"
-                  type="password"
-                  autoComplete="off"
-                  value={modelAccess.apiKey}
-                  maxLength={512}
-                  onChange={(event) => updateSettings({ apiKey: event.target.value })}
-                  placeholder={t("settings.model.apiKeyPlaceholder")}
-                />
-              </label>
-              <label className="settings-model-wide" htmlFor="settings_model_base_url">
-                <span>{t("wizard.field.llmBaseUrl")}</span>
-                <input
-                  id="settings_model_base_url"
-                  type="url"
-                  value={modelAccess.baseUrl}
-                  maxLength={2048}
-                  onChange={(event) => updateSettings({ baseUrl: event.target.value })}
-                  placeholder="https://…/v1"
-                />
-              </label>
-            </div>
-          </>
+          <CustomModelSettingsPanel locale={locale} edition={edition} />
         )}
         </section>
       </EditionSettingsPanel>
@@ -2324,6 +2226,12 @@ const ACCOUNT_COPY = {
     localUser: "Local user",
     localWorkspace: "Local workspace",
     cloudWorkspace: "Cloud workspace",
+    editProfile: "Edit profile",
+    remainingAllowance: "Remaining allowance",
+    allowanceUnavailable: "Unavailable",
+    loadingAllowance: "Loading…",
+    settings: "Settings",
+    signOutFailed: "Sign out failed. Try again.",
   },
   "zh-CN": {
     title: "DroneDream 账号",
@@ -2395,6 +2303,12 @@ const ACCOUNT_COPY = {
     localUser: "本地用户",
     localWorkspace: "本地工作区",
     cloudWorkspace: "云端工作区",
+    editProfile: "编辑账户",
+    remainingAllowance: "剩余额度",
+    allowanceUnavailable: "暂不可用",
+    loadingAllowance: "读取中…",
+    settings: "设置",
+    signOutFailed: "退出登录失败，请重试。",
   },
 } as const;
 
@@ -2445,6 +2359,104 @@ function AccountAvatar({
         <CircleUserRound strokeWidth={1.75} />
       )}
     </span>
+  );
+}
+
+function AccountMenuPopover({
+  menuRef,
+  onClose,
+  onOpenProfile,
+  onOpenAllowance,
+  onOpenSettings,
+}: {
+  menuRef: RefObject<HTMLDivElement>;
+  onClose: () => void;
+  onOpenProfile: () => void;
+  onOpenAllowance: () => void;
+  onOpenSettings: () => void;
+}) {
+  const auth = useAuth();
+  const { interfaceLocale } = useI18n();
+  const accountLocale = interfaceLocale === "en" ? "en" : "zh-CN";
+  const copy = ACCOUNT_COPY[accountLocale];
+  const [usage, setUsage] = useState<ManagedModelUsageSnapshot | null>(null);
+  const [usageState, setUsageState] = useState<"loading" | "ready" | "error">("loading");
+  const [signOutPending, setSignOutPending] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
+  const formatter = new Intl.NumberFormat(accountLocale === "zh-CN" ? "zh-CN" : "en");
+
+  useEffect(() => {
+    let active = true;
+    setUsageState("loading");
+    void getManagedModelUsage()
+      .then((snapshot) => {
+        if (!active) return;
+        setUsage(snapshot);
+        setUsageState("ready");
+      })
+      .catch(() => {
+        if (!active) return;
+        setUsage(null);
+        setUsageState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const ratio = usage
+    ? remainingAllowanceRatio(
+        usage.usage.remaining_ai_credits,
+        usage.plan.included_ai_credits,
+      )
+    : 0;
+
+  const signOut = async () => {
+    setSignOutPending(true);
+    setSignOutError(false);
+    try {
+      await auth.signOut();
+      onClose();
+    } catch {
+      setSignOutError(true);
+      setSignOutPending(false);
+    }
+  };
+
+  return (
+    <div ref={menuRef} className="account-menu-popover" role="menu" aria-label={copy.account}>
+      <button type="button" className="account-menu-profile" role="menuitem" onClick={onOpenProfile}>
+        <AccountAvatar account={auth.account} className="account-menu-avatar" />
+        <span>
+          <strong>{auth.account?.displayName ?? copy.localUser}</strong>
+          <small>{usage?.plan.name ?? copy.editProfile}</small>
+        </span>
+      </button>
+      <button type="button" className="account-menu-allowance" role="menuitem" onClick={onOpenAllowance}>
+        <span className="account-menu-row-heading">
+          <span><Gauge aria-hidden="true" strokeWidth={1.8} />{copy.remainingAllowance}</span>
+          <strong>
+            {usageState === "loading"
+              ? copy.loadingAllowance
+              : usage
+                ? formatter.format(usage.usage.remaining_ai_credits)
+                : copy.allowanceUnavailable}
+          </strong>
+        </span>
+        <span className="account-menu-allowance-track" role="progressbar" aria-valuemin={0} aria-valuemax={usage?.plan.included_ai_credits ?? 0} aria-valuenow={usage?.usage.remaining_ai_credits ?? 0}>
+          <i style={{ width: `${ratio}%` }} />
+        </span>
+      </button>
+      <button type="button" className="account-menu-row" role="menuitem" onClick={onOpenSettings}>
+        <Settings aria-hidden="true" strokeWidth={1.8} />
+        <span>{copy.settings}</span>
+      </button>
+      <button type="button" className="account-menu-row" role="menuitem" disabled={signOutPending} onClick={() => void signOut()}>
+        <LogOut aria-hidden="true" strokeWidth={1.8} />
+        <span>{copy.signOut}</span>
+      </button>
+      {signOutError ? <p role="alert">{copy.signOutFailed}</p> : null}
+    </div>
   );
 }
 
@@ -2569,9 +2581,10 @@ export function AccountDialog({
     try {
       await action();
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "Account request failed.",
-      );
+      setError(localeSafeError(reason, locale, {
+        zh: "账户请求失败。",
+        en: "Account request failed.",
+      }));
     } finally {
       setPending(false);
     }
@@ -2659,9 +2672,10 @@ export function AccountDialog({
         returnFocus: cameraButtonRef.current,
       });
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : copy.cropFailed,
-      );
+      setError(localeSafeError(reason, locale, {
+        zh: copy.cropFailed,
+        en: copy.cropFailed,
+      }));
     } finally {
       if (mountedRef.current) setPending(false);
     }
@@ -2680,9 +2694,10 @@ export function AccountDialog({
       await auth.updateAvatar(avatar);
       closeAvatarCrop();
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : copy.cropFailed,
-      );
+      setError(localeSafeError(reason, locale, {
+        zh: copy.cropFailed,
+        en: copy.cropFailed,
+      }));
       throw reason;
     } finally {
       if (mountedRef.current) setPending(false);
@@ -2750,10 +2765,19 @@ export function AccountDialog({
       ) : auth.account ? (
         <div className="account-profile-wrap">
           <div className="account-profile">
-            <AccountAvatar
-              account={auth.account}
-              className="account-avatar"
-            />
+            <button
+              type="button"
+              className="account-avatar-change-button"
+              aria-label={copy.choosePhoto}
+              title={copy.choosePhoto}
+              disabled={pending}
+              onClick={() => avatarInputRef.current?.click()}
+            >
+              <AccountAvatar
+                account={auth.account}
+                className="account-avatar"
+              />
+            </button>
             <div>
               <strong>{auth.account.displayName}</strong>
               <span>{auth.account.email}</span>
@@ -3194,6 +3218,8 @@ function AppShellContent() {
     () => false,
   );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] =
+    useState<SettingsSurfaceTabId>("general");
   const [universalMode, setUniversalMode] = useState(() => {
     const requestedEdition = new URLSearchParams(location.search).get("edition");
     return initialWorkspaceMode(
@@ -3205,12 +3231,14 @@ function AppShellContent() {
     );
   });
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
   const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const accountCloseRef = useRef<HTMLButtonElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
@@ -3225,9 +3253,7 @@ function AppShellContent() {
     ? BUILD_EDITION
     : launcherMode
       ? "universal"
-      : location.pathname === "/vehicle-studio"
-        ? universalMode === "autonomy" ? "autonomy" : "universal"
-        : universalMode;
+      : universalMode;
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
   const launcherRuntimeChecking =
@@ -3294,7 +3320,7 @@ function AppShellContent() {
       : BUILD_EDITION === "lab"
         ? LAB_NAV_ITEMS
         : BUILD_EDITION === "field"
-          ? FIELD_NAV_ITEMS.filter((item) => item.to !== "/vehicle-studio")
+          ? FIELD_NAV_ITEMS
           : AUTONOMY_NAV_ITEMS
     : MODE_NAV_ITEMS[universalMode];
   const sidebarUpdateLabel = updater.status === "available"
@@ -3384,8 +3410,14 @@ function AppShellContent() {
     ) {
       setDesktopStartupGateState("blocked", {
         accountId: auth.account?.id ?? null,
-        error: updater.error ??
-          `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
+        error: updater.error
+          ? localeSafeError(updater.error, locale, {
+              zh: "必须先完成 DroneDream 更新，才能进入工作区。",
+              en: "The DroneDream update must be installed before entering the workspace.",
+            })
+          : locale === "zh-CN"
+            ? `必须先安装 DroneDream ${updater.availableVersion ?? "更新"}，才能进入工作区。`
+            : `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the workspace.`,
       });
       return;
     }
@@ -3402,7 +3434,9 @@ function AppShellContent() {
     if (runtimeAccess.status !== "ready") {
       setDesktopStartupGateState("blocked", {
         accountId: auth.account?.id ?? null,
-        error: "The local runtime has not passed its startup checks.",
+        error: locale === "zh-CN"
+          ? "本地运行环境尚未通过启动检查。"
+          : "The local runtime has not passed its startup checks.",
       });
       return;
     }
@@ -3411,7 +3445,9 @@ function AppShellContent() {
         approveDesktopStartupGateWithoutCloudAuth();
       } else {
         setDesktopStartupGateState("blocked", {
-          error: "Account authentication is not configured in this desktop build.",
+          error: locale === "zh-CN"
+            ? "此桌面版本尚未配置账户认证。"
+            : "Account authentication is not configured in this desktop build.",
         });
       }
       return;
@@ -3431,6 +3467,7 @@ function AppShellContent() {
     auth.loading,
     desktopRuntime,
     launcherMode,
+    locale,
     runtimeAccess.isChecking,
     runtimeAccess.lastFullCheckAt,
     runtimeAccess.status,
@@ -3442,6 +3479,7 @@ function AppShellContent() {
 
   const closeSettings = useCallback(() => {
     setLauncherSettingsOpen(false);
+    setSettingsInitialTab("general");
     // The trigger is inert while the modal is open. Restore focus on the next
     // frame, after the dialog effect has removed inert from the app shell.
     requestAnimationFrame(() => {
@@ -3449,6 +3487,26 @@ function AppShellContent() {
       else launcherSettingsButtonRef.current?.focus();
     });
   }, [mobileNavigationEnabled]);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return undefined;
+    const closeOnOutside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (accountButtonRef.current?.contains(target) || accountMenuRef.current?.contains(target)) return;
+      setAccountMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setAccountMenuOpen(false);
+      accountButtonRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accountMenuOpen]);
 
   const closeAccount = useCallback(() => {
     if (accountRequired) return;
@@ -3493,6 +3551,7 @@ function AppShellContent() {
     if (launcherMode) return;
     const openAccountDialog = () => {
       setLauncherSettingsOpen(false);
+      setAccountMenuOpen(false);
       setAccountOpen(true);
     };
     window.addEventListener(OPEN_ACCOUNT_DIALOG_EVENT, openAccountDialog);
@@ -3780,7 +3839,7 @@ function AppShellContent() {
               type="button"
               className="launcher-settings-button"
               aria-label={t("app.settings")}
-              aria-haspopup="dialog"
+              aria-haspopup={auth.account ? "menu" : "dialog"}
               aria-expanded={launcherSettingsOpen}
               onClick={() => setLauncherSettingsOpen(true)}
             >
@@ -3801,6 +3860,7 @@ function AppShellContent() {
               access={runtimeAccess}
               closeRef={launcherSettingsCloseRef}
               edition={activeThemeEdition}
+              initialTab={settingsInitialTab}
               onClose={closeSettings}
               onOpenExternal={openExternalNavigation}
             />
@@ -3952,17 +4012,46 @@ function AppShellContent() {
             edition={activeThemeEdition}
           />
           <div className="app-sidebar-footer">
+            {accountMenuOpen && auth.account ? (
+              <AccountMenuPopover
+                menuRef={accountMenuRef}
+                onClose={() => setAccountMenuOpen(false)}
+                onOpenProfile={() => {
+                  setAccountMenuOpen(false);
+                  setAccountOpen(true);
+                }}
+                onOpenAllowance={() => {
+                  setAccountMenuOpen(false);
+                  setSettingsInitialTab("model");
+                  setLauncherSettingsOpen(true);
+                }}
+                onOpenSettings={() => {
+                  setAccountMenuOpen(false);
+                  setSettingsInitialTab("general");
+                  setLauncherSettingsOpen(true);
+                }}
+              />
+            ) : null}
             <button
               ref={accountButtonRef}
               type="button"
               className="app-account-button"
               aria-label={accountCopy.account}
-              aria-haspopup="dialog"
-              aria-expanded={accountDialogOpen}
+              aria-haspopup={mobileNavigationEnabled ? "dialog" : "menu"}
+              aria-expanded={accountMenuOpen || accountDialogOpen}
               onClick={() => {
                 setMobileMenuOpen(false);
                 setLauncherSettingsOpen(false);
-                setAccountOpen(true);
+                if (auth.account) {
+                  if (mobileNavigationEnabled) {
+                    setAccountMenuOpen(false);
+                    setAccountOpen(true);
+                  } else {
+                    setAccountMenuOpen((open) => !open);
+                  }
+                } else {
+                  setAccountOpen(true);
+                }
               }}
             >
               <AccountAvatar
@@ -3991,23 +4080,7 @@ function AppShellContent() {
               >
                 <Download aria-hidden="true" strokeWidth={2} />
               </button>
-            ) : (
-              <button
-                type="button"
-                className="app-account-trailing-button app-account-more-button"
-                aria-label={t("app.accountOptions")}
-                title={t("app.accountOptions")}
-                aria-haspopup="dialog"
-                aria-expanded={accountDialogOpen}
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setLauncherSettingsOpen(false);
-                  setAccountOpen(true);
-                }}
-              >
-                <MoreHorizontal aria-hidden="true" strokeWidth={1.8} />
-              </button>
-            )}
+            ) : null}
           </div>
           {mobileNavigationEnabled ? (
             <button
@@ -4062,6 +4135,7 @@ function AppShellContent() {
               access={runtimeAccess}
               closeRef={launcherSettingsCloseRef}
               edition={activeThemeEdition}
+              initialTab={settingsInitialTab}
               onClose={closeSettings}
               onOpenExternal={openExternalNavigation}
             />

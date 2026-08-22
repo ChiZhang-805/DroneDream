@@ -721,7 +721,7 @@ class Job(Base):
 
     # Phase 8: backend/auto-tuning configuration.
     simulator_backend_requested: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="mock"
+        String(32), nullable=False, default="real_cli"
     )
     optimizer_strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="heuristic")
     max_iterations: Mapped[int] = mapped_column(Integer, nullable=False, default=5)

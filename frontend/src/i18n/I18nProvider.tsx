@@ -11,11 +11,11 @@ import { getInstallerLocale, isDesktopRuntime } from "../desktop/bridge";
 import { BUILD_EDITION } from "../edition";
 import { launcherCopyForEdition } from "./launcherEditionCopy";
 
-// Settings offers six authored locales. Product views that do not yet have an
-// authored dictionary use English rather than pretending that a different
-// language has been translated.
+// The desktop product intentionally exposes exactly two independently authored
+// interfaces. Keeping this type closed prevents a partially translated locale
+// from leaking English or Chinese fragments into the selected interface.
 export type Locale = "en" | "zh-CN";
-export type InterfaceLocale = Locale | "zh-TW" | "es" | "ja" | "ko";
+export type InterfaceLocale = Locale;
 
 const launcherCopy = launcherCopyForEdition(BUILD_EDITION);
 
@@ -25,8 +25,7 @@ const enTranslations = {
     "app.newExperiment": "Experiment",
     "app.history": "Run History",
     "app.fixedScenarios": "Scenarios",
-    "app.autonomyLab": "Autonomy",
-    "app.vehicleStudio": "Vehicle Studio",
+    "app.autonomyLab": "Agent",
     "app.experimentBuilder": "Experiment",
     "app.labValidation": "Evidence Review",
     "app.fieldDeviceSetup": "Device & Vehicle",
@@ -1636,8 +1635,7 @@ const zhTranslations = {
     "app.newExperiment": "调优实验",
     "app.history": "历史报告",
     "app.fixedScenarios": "场景",
-    "app.autonomyLab": "自主飞行",
-    "app.vehicleStudio": "无人机建模",
+    "app.autonomyLab": "任务智能体",
     "app.experimentBuilder": "实验",
     "app.labValidation": "验证与证据",
     "app.fieldDeviceSetup": "设备与机型",
@@ -3179,62 +3177,34 @@ const translations = {
   "zh-CN": zhTranslations,
 } as const;
 
-const interfaceTranslationOverrides: Readonly<Record<Exclude<InterfaceLocale, Locale>, Partial<Record<TranslationKey, string>>>> = {
-  "zh-TW": {
-    "app.conversation": "調校對話", "app.dashboard": "任務總覽", "app.newExperiment": "調校實驗",
-    "app.history": "歷史報告", "app.fixedScenarios": "場景", "app.autonomyLab": "自主飛行", "app.vehicleStudio": "無人機建模",
-    "app.experimentBuilder": "實驗", "app.labValidation": "驗證與證據", "app.fieldDeviceSetup": "裝置與機型",
-    "app.fieldTuning": "調校計畫", "app.fieldSafety": "安全與回復", "app.labWorkspace": "實驗室工作區",
-    "app.hardwareLab": "實機實驗室", "app.fieldWorkspace": "現場工作區", "app.platform": "無人機控制參數自動調校平台", "app.autonomyPlatform": "無人機自主飛行模擬平台",
-    "app.primaryNav": "主導覽", "app.navSectionAutonomy": "自主任務", "app.navSectionExperiment": "實驗與驗證",
-    "app.navSectionWorkspace": "工作區", "app.navSectionOperations": "現場執行", "app.navSectionRecords": "記錄",
-    "app.openMenu": "開啟導覽選單", "app.closeMenu": "關閉導覽選單",
-    "app.language": "語言", "app.settings": "設定", "app.settingsTitle": "設定", "app.closeSettings": "關閉設定",
-    "app.interfaceLanguage": "介面語言", "app.dismiss": "關閉提示", "app.accountOptions": "帳戶選項",
-    "app.author": "作者", "app.contact": "聯絡方式", "app.skipToContent": "跳至主要內容",
-  },
-  es: {
-    "app.conversation": "Chat de ajuste", "app.dashboard": "Panel", "app.newExperiment": "Experimento",
-    "app.history": "Historial", "app.fixedScenarios": "Escenarios", "app.autonomyLab": "Vuelo autónomo", "app.vehicleStudio": "Modelado UAV",
-    "app.experimentBuilder": "Experimento", "app.labValidation": "Validación", "app.fieldDeviceSetup": "Equipo y vehículo",
-    "app.fieldTuning": "Plan de ajuste", "app.fieldSafety": "Seguridad", "app.labWorkspace": "Laboratorio",
-    "app.hardwareLab": "Prueba física", "app.fieldWorkspace": "Operación de campo", "app.platform": "Plataforma de ajuste automático UAV", "app.autonomyPlatform": "Simulación de vuelo autónomo",
-    "app.primaryNav": "Navegación principal", "app.navSectionAutonomy": "Tareas autónomas", "app.navSectionExperiment": "Experimentos y validación",
-    "app.navSectionWorkspace": "Espacio de trabajo", "app.navSectionOperations": "Operaciones de campo", "app.navSectionRecords": "Registros",
-    "app.openMenu": "Abrir navegación", "app.closeMenu": "Cerrar navegación",
-    "app.language": "Idioma", "app.settings": "Ajustes", "app.settingsTitle": "Ajustes", "app.closeSettings": "Cerrar ajustes",
-    "app.interfaceLanguage": "Idioma de interfaz", "app.dismiss": "Cerrar", "app.accountOptions": "Opciones de cuenta",
-    "app.author": "Autor", "app.contact": "Contacto", "app.skipToContent": "Ir al contenido",
-  },
-  ja: {
-    "app.conversation": "調整チャット", "app.dashboard": "ダッシュボード", "app.newExperiment": "実験",
-    "app.history": "実行履歴", "app.fixedScenarios": "シナリオ", "app.autonomyLab": "自律飛行", "app.vehicleStudio": "機体モデリング",
-    "app.experimentBuilder": "実験", "app.labValidation": "検証記録", "app.fieldDeviceSetup": "デバイスと機体",
-    "app.fieldTuning": "調整計画", "app.fieldSafety": "安全と復元", "app.labWorkspace": "ラボ作業",
-    "app.hardwareLab": "実機検証", "app.fieldWorkspace": "フィールド ワークスペース", "app.platform": "UAV 制御パラメータ自動調整プラットフォーム", "app.autonomyPlatform": "自律飛行シミュレーション",
-    "app.primaryNav": "メイン ナビゲーション", "app.navSectionAutonomy": "自律タスク", "app.navSectionExperiment": "実験と検証",
-    "app.navSectionWorkspace": "ワークスペース", "app.navSectionOperations": "現場運用", "app.navSectionRecords": "記録",
-    "app.openMenu": "ナビゲーションを開く", "app.closeMenu": "ナビゲーションを閉じる",
-    "app.language": "言語", "app.settings": "設定", "app.settingsTitle": "設定", "app.closeSettings": "設定を閉じる",
-    "app.interfaceLanguage": "表示言語", "app.dismiss": "閉じる", "app.accountOptions": "アカウント オプション",
-    "app.author": "作成者", "app.contact": "連絡先", "app.skipToContent": "本文へ移動",
-  },
-  ko: {
-    "app.conversation": "튜닝 대화", "app.dashboard": "대시보드", "app.newExperiment": "실험",
-    "app.history": "실행 기록", "app.fixedScenarios": "시나리오", "app.autonomyLab": "자율 비행", "app.vehicleStudio": "기체 모델링",
-    "app.experimentBuilder": "실험", "app.labValidation": "검증 기록", "app.fieldDeviceSetup": "장치 및 기체",
-    "app.fieldTuning": "튜닝 계획", "app.fieldSafety": "안전 및 복구", "app.labWorkspace": "랩 작업",
-    "app.hardwareLab": "실기체 검증", "app.fieldWorkspace": "현장 작업 공간", "app.platform": "UAV 제어 파라미터 자동 튜닝 플랫폼", "app.autonomyPlatform": "자율 비행 시뮬레이션",
-    "app.primaryNav": "기본 탐색", "app.navSectionAutonomy": "자율 작업", "app.navSectionExperiment": "실험 및 검증",
-    "app.navSectionWorkspace": "작업 공간", "app.navSectionOperations": "현장 운영", "app.navSectionRecords": "기록",
-    "app.openMenu": "탐색 메뉴 열기", "app.closeMenu": "탐색 메뉴 닫기",
-    "app.language": "언어", "app.settings": "설정", "app.settingsTitle": "설정", "app.closeSettings": "설정 닫기",
-    "app.interfaceLanguage": "인터페이스 언어", "app.dismiss": "닫기", "app.accountOptions": "계정 옵션",
-    "app.author": "작성자", "app.contact": "연락처", "app.skipToContent": "본문으로 이동",
-  },
-};
-
 export type TranslationParams = Record<string, string | number>;
+
+const HAN_PATTERN = /\p{Script=Han}/u;
+
+/**
+ * Keep dynamic backend/runtime errors inside the language selected by the
+ * user. Technical identifiers remain visible because they are useful for
+ * support, while prose from the other locale is replaced by authored copy.
+ */
+export function localeSafeError(
+  value: unknown,
+  locale: Locale,
+  fallback: { zh: string; en: string },
+): string {
+  const raw = value instanceof Error ? value.message : String(value ?? "");
+  const normalized = raw.trim();
+  const english = locale === "en";
+  const localizedFallback = english ? fallback.en : fallback.zh;
+  if (!normalized) return localizedFallback;
+
+  const technicalCode = /^[A-Z0-9_.:-]+$/u.test(normalized);
+  if (english) {
+    if (HAN_PATTERN.test(normalized)) return localizedFallback;
+    return technicalCode ? `${localizedFallback} (${normalized})` : normalized;
+  }
+  if (HAN_PATTERN.test(normalized)) return normalized;
+  return technicalCode ? `${localizedFallback}（${normalized}）` : localizedFallback;
+}
 
 interface I18nValue {
   locale: Locale;
@@ -3244,12 +3214,7 @@ interface I18nValue {
 }
 
 function translate(locale: InterfaceLocale, key: TranslationKey, params?: TranslationParams): string {
-  const baseTemplate = locale === "zh-CN"
-    ? translations["zh-CN"][key]
-    : translations.en[key];
-  const template = locale === "en" || locale === "zh-CN"
-    ? String(baseTemplate)
-    : String(interfaceTranslationOverrides[locale][key] ?? baseTemplate);
+  const template = String(translations[locale][key]);
   if (!params) return template;
   return Object.entries(params).reduce<string>(
     (result, [name, value]) => result.replaceAll(`{{${name}}}`, String(value)),
@@ -3268,9 +3233,8 @@ function initialLocale(): InterfaceLocale {
   if (typeof window === "undefined") return "en";
   try {
     const saved = window.localStorage.getItem("drone-dream:locale");
-    if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) {
-      return saved as InterfaceLocale;
-    }
+    if (saved === "en" || saved === "zh-CN") return saved;
+    if (saved !== null) window.localStorage.setItem("drone-dream:locale", "en");
   } catch {
     // Language preference storage is optional; the app must still start when
     // browser or WebView policy denies access to localStorage.
@@ -3286,7 +3250,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     if (!isDesktopRuntime()) return;
     try {
       const saved = window.localStorage.getItem("drone-dream:locale");
-        if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) return;
+      if (saved === "en" || saved === "zh-CN") return;
     } catch {
       // The installer preference is still safe to use in memory.
     }
@@ -3297,7 +3261,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         try {
           const saved = window.localStorage.getItem("drone-dream:locale");
-          if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) return;
+          if (saved === "en" || saved === "zh-CN") return;
         } catch {
           // Apply the installer language without persistence.
         }

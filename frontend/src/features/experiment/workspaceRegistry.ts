@@ -1,6 +1,13 @@
 import { hasExperimentDraft } from "./draftStorage";
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
 import type { AssistantWorkspaceIndexEntry } from "./assistantOrchestration";
+import {
+  assistantArtifactMatchesEdition,
+  isAssistantArtifactKind,
+  type AssistantArtifactKind,
+} from "./assistantProductPolicy";
+
+export type { AssistantArtifactKind } from "./assistantProductPolicy";
 
 const WORKSPACE_REGISTRY_PREFIX = "drone-dream:experiment-workspaces:v3:";
 const V2_WORKSPACE_REGISTRY_PREFIX = "drone-dream:experiment-workspaces:v2:";
@@ -12,18 +19,6 @@ export const EXPERIMENT_WORKSPACES_CHANGED_EVENT =
 
 export type ExperimentWorkspaceSource = "manual" | "assistant";
 export type ExperimentWorkspaceStatus = "draft" | "created";
-export type AssistantArtifactKind =
-  | "autonomy_mission_plan"
-  | "universal_vehicle_model"
-  | "universal_simulation_experiment"
-  | "universal_cross_edition_workflow"
-  | "simulation_experiment"
-  | "lab_simulation_experiment"
-  | "lab_hardware_validation"
-  | "lab_calibration_workflow"
-  | "lab_sim_to_real_workflow"
-  | "lab_real_to_sim_workflow"
-  | "field_task_plan";
 
 export interface ExperimentWorkspace {
   id: string;
@@ -165,40 +160,6 @@ function isBrandEditionId(value: unknown): value is BrandEditionId {
     || value === "autonomy";
 }
 
-function isAssistantArtifactKind(value: unknown): value is AssistantArtifactKind {
-  return value === "autonomy_mission_plan"
-    || value === "universal_vehicle_model"
-    || value === "universal_simulation_experiment"
-    || value === "universal_cross_edition_workflow"
-    || value === "simulation_experiment"
-    || value === "lab_simulation_experiment"
-    || value === "lab_hardware_validation"
-    || value === "lab_calibration_workflow"
-    || value === "lab_sim_to_real_workflow"
-    || value === "lab_real_to_sim_workflow"
-    || value === "field_task_plan";
-}
-
-function artifactMatchesEdition(
-  edition: BrandEditionId,
-  artifactKind: AssistantArtifactKind,
-): boolean {
-  if (edition === "universal") {
-    return artifactKind === "autonomy_mission_plan"
-      || artifactKind === "universal_vehicle_model"
-      || artifactKind === "universal_simulation_experiment"
-      || artifactKind === "universal_cross_edition_workflow";
-  }
-  if (edition === "sim") return artifactKind === "autonomy_mission_plan" || artifactKind === "simulation_experiment";
-  if (edition === "field") return artifactKind === "autonomy_mission_plan" || artifactKind === "field_task_plan";
-  if (edition === "autonomy") {
-    return artifactKind === "autonomy_mission_plan"
-      || artifactKind === "universal_vehicle_model"
-      || artifactKind === "simulation_experiment";
-  }
-  return artifactKind === "autonomy_mission_plan" || artifactKind.startsWith("lab_");
-}
-
 function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorkspace {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const candidate = value as Record<string, unknown>;
@@ -236,7 +197,11 @@ function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorksp
       || candidate.assistantArtifactKind === null
       || (
         isAssistantArtifactKind(candidate.assistantArtifactKind)
-        && artifactMatchesEdition(candidate.edition, candidate.assistantArtifactKind)
+        && assistantArtifactMatchesEdition(
+          candidate.edition,
+          candidate.assistantArtifactKind,
+          { legacyRead: true },
+        )
       )
     ) &&
     (
@@ -527,8 +492,9 @@ export function reorderExperimentWorkspace(
   );
 }
 
-export function registerExperimentWorkspace(
+function registerExperimentWorkspaceWithPolicy(
   input: RegisterWorkspaceInput,
+  allowLegacyVehicleModel: boolean,
 ): ExperimentWorkspace {
   const ownerId = normalizeOwnerId(input.ownerId);
   const registry = readRegistry(ownerId);
@@ -554,18 +520,34 @@ export function registerExperimentWorkspace(
   ) {
     throw new Error("Experiment workspaces cannot move between tenants.");
   }
+  const artifactKind = input.assistantArtifactKind === undefined
+    ? existing?.assistantArtifactKind ?? null
+    : input.assistantArtifactKind;
+  const preservesExistingLegacyArtifact = Boolean(
+    existing
+    && (existing.edition === "universal" || existing.edition === "autonomy")
+    && existing.assistantArtifactKind === "universal_vehicle_model"
+    && input.assistantArtifactKind === undefined,
+  );
+  const legacyRead = allowLegacyVehicleModel || preservesExistingLegacyArtifact;
   if (
-    input.assistantArtifactKind
-    && !artifactMatchesEdition(input.edition, input.assistantArtifactKind)
+    artifactKind
+    && !assistantArtifactMatchesEdition(input.edition, artifactKind, { legacyRead })
   ) {
     throw new Error("Assistant artifacts cannot move between editions.");
   }
+  const vehicleDraftId = input.vehicleDraftId === undefined
+    ? existing?.vehicleDraftId ?? null
+    : input.vehicleDraftId;
   if (
-    input.vehicleDraftId
+    vehicleDraftId
     && (
-      (input.edition !== "universal" && input.edition !== "autonomy")
-      || input.assistantArtifactKind !== "universal_vehicle_model"
-      || !/^[a-zA-Z0-9_-]{8,128}$/u.test(input.vehicleDraftId)
+      !(
+        input.edition === "universal"
+        || (input.edition === "autonomy" && legacyRead)
+      )
+      || artifactKind !== "universal_vehicle_model"
+      || !/^[a-zA-Z0-9_-]{8,128}$/u.test(vehicleDraftId)
     )
   ) {
     throw new Error("The vehicle draft link is invalid for this workspace.");
@@ -590,12 +572,8 @@ export function registerExperimentWorkspace(
     jobId: existing?.jobId ?? null,
     pinned: existing?.pinned ?? false,
     archived: existing?.archived ?? false,
-    assistantArtifactKind: input.assistantArtifactKind === undefined
-      ? existing?.assistantArtifactKind ?? null
-      : input.assistantArtifactKind,
-    vehicleDraftId: input.vehicleDraftId === undefined
-      ? existing?.vehicleDraftId ?? null
-      : input.vehicleDraftId,
+    assistantArtifactKind: artifactKind,
+    vehicleDraftId,
     order: existing?.order ?? firstOrder - 1,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
@@ -605,6 +583,12 @@ export function registerExperimentWorkspace(
     ...registry.items.filter((item) => item.id !== input.id),
   ]);
   return workspace;
+}
+
+export function registerExperimentWorkspace(
+  input: RegisterWorkspaceInput,
+): ExperimentWorkspace {
+  return registerExperimentWorkspaceWithPolicy(input, false);
 }
 
 export function hydrateAssistantWorkspaceIndex(
@@ -622,7 +606,7 @@ export function hydrateAssistantWorkspaceIndex(
     ) {
       continue;
     }
-    const workspace = registerExperimentWorkspace({
+    const workspace = registerExperimentWorkspaceWithPolicy({
       id: entry.workspace_id,
       ownerId: normalizedOwnerId,
       tenantId: entry.tenant_id,
@@ -634,7 +618,7 @@ export function hydrateAssistantWorkspaceIndex(
       completedSteps: [0],
       assistantArtifactKind: entry.latest_artifact.artifact_kind,
       vehicleDraftId: null,
-    });
+    }, true);
     updateExperimentWorkspace(normalizedOwnerId, workspace.id, {
       status: "created",
       archived: entry.status === "archived" || entry.latest_artifact.status === "archived",
@@ -691,11 +675,18 @@ export function removeExperimentWorkspace(
 
 export function experimentWorkspacePath(workspace: ExperimentWorkspace): string {
   if (
+    workspace.assistantArtifactKind === "external_asset_qualification_plan"
+  ) {
+    return "/autonomy";
+  }
+  if (
     (workspace.edition === "universal" || workspace.edition === "autonomy")
     && workspace.assistantArtifactKind === "universal_vehicle_model"
-    && workspace.vehicleDraftId
   ) {
-    return `/vehicle-studio?draft=${encodeURIComponent(workspace.vehicleDraftId)}`;
+    // Universal and AGENT no longer expose the general-purpose Vehicle Studio.
+    // Preserve legacy task records, but route them to the qualified external
+    // aircraft import repository instead of a build-time unavailable editor.
+    return "/autonomy/aircraft";
   }
   if (workspace.edition === "field") {
     return `/assistant?experiment=${encodeURIComponent(workspace.id)}`;

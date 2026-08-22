@@ -4,7 +4,10 @@ import pytest
 
 from app.autonomy.models import (
     AutonomyCompileRequest,
+    RuntimeInterruptionRequest,
     RuntimeObservation,
+    RuntimeOperatorCommand,
+    RuntimeReplanApplyRequest,
     RuntimeSessionCreateRequest,
     Vector3,
 )
@@ -119,6 +122,23 @@ def test_runtime_profile_never_grants_hitl_or_hardware_authority() -> None:
     assert not any(
         component.actuator_authority for component in hardware.runtime_profile.components
     )
+
+
+def test_compile_locale_is_bound_to_contract_hash_and_structured_output() -> None:
+    english_request = mission()
+    chinese_request = english_request.model_copy(update={"locale": "zh-CN"})
+
+    english = compile_autonomy_mission(english_request)
+    chinese = compile_autonomy_mission(chinese_request)
+
+    assert english.contract.locale == "en"
+    assert chinese.contract.locale == "zh-CN"
+    assert english.contract.contract_id != chinese.contract.contract_id
+    assert english.contract.steps[0].label != chinese.contract.steps[0].label
+    assert "飞" in chinese.contract.steps[0].label
+    assert "模型" in chinese.contract.immutable_safety_rules[0]
+    assert chinese.contract.task_graph.change_reason == "已完成编译"
+    assert any("验证" in node.label for node in chinese.contract.task_graph.nodes)
 
 
 def test_compiler_expands_each_motion_into_perception_plan_qualification_and_evidence() -> None:
@@ -281,6 +301,194 @@ def test_runtime_session_is_idempotent_owner_scoped_and_replay_safe() -> None:
     with pytest.raises(AutonomyRuntimeError) as hidden:
         registry.get("user-b", created.session_id)
     assert hidden.value.status_code == 404
+
+
+def test_operator_message_holds_immediately_before_interpretation_and_is_idempotent() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-interruption",
+        ),
+    )
+    active = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(1, 100, mission_progress=0.35),
+    )
+    request = RuntimeInterruptionRequest(
+        client_request_id="interrupt-request-001",
+        instruction="The destination changed. Go to the guard booth instead.",
+    )
+
+    held = registry.interrupt("user-a", created.session_id, request)
+    repeated = registry.interrupt("user-a", created.session_id, request)
+
+    assert repeated == held
+    assert held.phase == "holding"
+    assert held.decision.codes == ["operator.interruption-hold"]
+    assert held.task_graph.active_node_ids == []
+    assert held.task_graph.revision == active.task_graph.revision + 1
+    assert held.interruption is not None
+    assert held.interruption.state == "holding_pending_interpretation"
+    assert held.interruption.snapshot_position_m == Vector3(x=1.0, y=2.0, z=1.5)
+    assert held.interruption.expected_task_graph_revision == held.task_graph.revision
+    assert held.interruption.instruction_sha256 != request.instruction
+    assert request.instruction not in held.model_dump_json()
+
+    still_held = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(2, 200, mission_progress=0.5),
+    )
+    assert still_held.phase == "holding"
+    assert still_held.task_graph.revision == held.task_graph.revision
+    assert still_held.decision.codes == ["operator.interruption-pending"]
+
+    with pytest.raises(AutonomyRuntimeError) as pending:
+        registry.command(
+            "user-a",
+            created.session_id,
+            RuntimeOperatorCommand(action="resume", reason="Continue the held mission."),
+        )
+    assert pending.value.code == "AUTONOMY_RUNTIME_REPLAN_PENDING"
+
+
+def test_operator_message_cannot_cancel_a_safety_landing() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-safety-landing",
+        ),
+    )
+    landing_observation = observation(1, 100, mission_progress=0.45).model_copy(
+        update={"geofence_ok": False},
+    )
+    landing = registry.observe("user-a", created.session_id, landing_observation)
+    assert landing.phase == "landing"
+    assert landing.decision.action == "land"
+
+    with pytest.raises(AutonomyRuntimeError) as locked:
+        registry.interrupt(
+            "user-a",
+            created.session_id,
+            RuntimeInterruptionRequest(
+                client_request_id="interrupt-request-during-landing",
+                instruction="Change the destination while landing.",
+            ),
+        )
+
+    assert locked.value.code == "AUTONOMY_INTERRUPTION_LANDING_LOCKED"
+    still_landing = registry.get("user-a", created.session_id)
+    assert still_landing.phase == "landing"
+    assert still_landing.interruption is None
+
+
+def test_runtime_replan_rejects_stale_or_cross_scene_changes() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-stale-replan",
+        ),
+    )
+    registry.observe("user-a", created.session_id, observation(1, 100))
+    held = registry.interrupt(
+        "user-a",
+        created.session_id,
+        RuntimeInterruptionRequest(
+            client_request_id="interrupt-request-stale",
+            instruction="Change the route.",
+        ),
+    )
+    assert held.interruption is not None
+    revised = mission().model_copy(
+        update={"natural_language": "Fly to the alternate gate and land at the goal."}
+    )
+
+    with pytest.raises(AutonomyRuntimeError) as stale:
+        registry.apply_replan(
+            "user-a",
+            created.session_id,
+            RuntimeReplanApplyRequest(
+                interruption_id=held.interruption.interruption_id,
+                expected_task_graph_revision=held.task_graph.revision + 1,
+                client_request_id="runtime-replan-stale-001",
+                operator_confirmed=True,
+                mission=revised,
+            ),
+        )
+    assert stale.value.code == "AUTONOMY_REPLAN_STALE_REVISION"
+
+    with pytest.raises(AutonomyRuntimeError) as scene_changed:
+        registry.apply_replan(
+            "user-a",
+            created.session_id,
+            RuntimeReplanApplyRequest(
+                interruption_id=held.interruption.interruption_id,
+                expected_task_graph_revision=held.task_graph.revision,
+                client_request_id="runtime-replan-scene-001",
+                operator_confirmed=True,
+                mission=revised.model_copy(update={"scene_id": "service-corridor-dock"}),
+            ),
+        )
+    assert scene_changed.value.code == "AUTONOMY_REPLAN_SCENE_CHANGED"
+
+
+def test_runtime_replan_atomically_replaces_the_held_graph() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-valid-replan",
+        ),
+    )
+    registry.observe("user-a", created.session_id, observation(1, 100))
+    held = registry.interrupt(
+        "user-a",
+        created.session_id,
+        RuntimeInterruptionRequest(
+            client_request_id="interrupt-request-valid",
+            instruction="Use the alternate gate and then land.",
+        ),
+    )
+    assert held.interruption is not None
+    request = RuntimeReplanApplyRequest(
+        interruption_id=held.interruption.interruption_id,
+        expected_task_graph_revision=held.task_graph.revision,
+        client_request_id="runtime-replan-valid-001",
+        operator_confirmed=True,
+        mission=mission().model_copy(
+            update={"natural_language": "Fly to the alternate gate and land at the goal."}
+        ),
+    )
+
+    replanned = registry.apply_replan("user-a", created.session_id, request)
+    repeated = registry.apply_replan("user-a", created.session_id, request)
+
+    assert repeated == replanned
+    assert replanned.contract_id != held.contract_id
+    assert replanned.phase == "replanning"
+    assert replanned.mission_revision == 2
+    assert replanned.task_graph.revision == held.task_graph.revision + 1
+    assert len(replanned.task_graph.active_node_ids) == 1
+    assert "takeoff" not in replanned.task_graph.active_node_ids[0]
+    assert not replanned.task_graph.active_node_ids[0].startswith("preflight-")
+    assert all(
+        node.status == "completed"
+        for node in replanned.task_graph.nodes
+        if node.task_id.startswith("preflight-") or "-takeoff-" in node.task_id
+    )
+    assert replanned.decision.codes == ["operator.replan-applied"]
+    assert replanned.interruption is not None
+    assert replanned.interruption.state == "applied"
+    assert replanned.interruption.interruption_id == held.interruption.interruption_id
+    assert replanned.decision_events[-1].code == "operator.replan-applied"
 
 
 def test_safety_supervisor_escalates_and_terminal_sessions_stop() -> None:

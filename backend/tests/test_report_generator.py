@@ -526,11 +526,11 @@ def test_ensure_job_artifacts_is_idempotent(ctx):
         second = rg.ensure_job_artifacts(db, job=job, report_body=report_body, best=best)
         db.commit()
 
-        assert len(first) == 4
+        assert len(first) == 5
         assert second == []
 
         rows = db.query(models.Artifact).filter(models.Artifact.owner_id == job.id).all()
-        assert len(rows) == 4
+        assert len(rows) == 5
 
 
 def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, monkeypatch):

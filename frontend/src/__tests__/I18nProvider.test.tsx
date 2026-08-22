@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { I18nProvider, useI18n } from "../i18n/I18nProvider";
+import { I18nProvider, localeSafeError, useI18n } from "../i18n/I18nProvider";
 
 function LanguageProbe() {
   const { locale, setLocale, t } = useI18n();
@@ -24,7 +24,7 @@ function InterfaceLanguageProbe() {
     <div>
       <span data-testid="interface-locale">{interfaceLocale}</span>
       <span data-testid="settings-label">{t("app.settings")}</span>
-      {(["en", "zh-CN", "zh-TW", "es", "ja", "ko"] as const).map((next) => (
+      {(["en", "zh-CN"] as const).map((next) => (
         <button key={next} type="button" onClick={() => setLocale(next)}>{next}</button>
       ))}
     </div>
@@ -40,6 +40,16 @@ describe("I18nProvider", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete window.__TAURI__;
+  });
+
+  it("keeps dynamic error prose inside the selected interface language", () => {
+    const fallback = { zh: "运行环境暂时不可用。", en: "The runtime is unavailable." };
+    expect(localeSafeError(new Error("Backend unavailable"), "zh-CN", fallback)).toBe(fallback.zh);
+    expect(localeSafeError(new Error("后端暂时不可用"), "en", fallback)).toBe(fallback.en);
+    expect(localeSafeError("RUNTIME_NOT_READY", "zh-CN", fallback))
+      .toBe("运行环境暂时不可用。（RUNTIME_NOT_READY）");
+    expect(localeSafeError("RUNTIME_NOT_READY", "en", fallback))
+      .toBe("The runtime is unavailable. (RUNTIME_NOT_READY)");
   });
 
   it("switches the core product language and persists the choice", () => {
@@ -133,10 +143,6 @@ describe("I18nProvider", () => {
   it.each([
     ["en", "Settings"],
     ["zh-CN", "设置"],
-    ["zh-TW", "設定"],
-    ["es", "Ajustes"],
-    ["ja", "設定"],
-    ["ko", "설정"],
   ] as const)("renders and persists the %s console interface", (next, expected) => {
     render(
       <I18nProvider>
@@ -149,5 +155,19 @@ describe("I18nProvider", () => {
     expect(screen.getByTestId("settings-label")).toHaveTextContent(expected);
     expect(window.localStorage.getItem("drone-dream:locale")).toBe(next);
     expect(document.documentElement.lang).toBe(next);
+  });
+
+  it("migrates a legacy partial locale to the complete English interface", () => {
+    window.localStorage.setItem("drone-dream:locale", "ja");
+    render(
+      <I18nProvider>
+        <InterfaceLanguageProbe />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByTestId("interface-locale")).toHaveTextContent("en");
+    expect(screen.getByTestId("settings-label")).toHaveTextContent("Settings");
+    expect(window.localStorage.getItem("drone-dream:locale")).toBe("en");
+    expect(document.documentElement.lang).toBe("en");
   });
 });

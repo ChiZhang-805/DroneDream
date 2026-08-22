@@ -11,6 +11,7 @@ import {
   type SchoolMapFloor,
   type SchoolMapMissionId,
 } from "./schoolMapScene";
+import { useI18n } from "../../i18n/I18nProvider";
 
 type MissionId = SchoolMapMissionId;
 
@@ -58,8 +59,9 @@ function createPerson() {
   return group;
 }
 
-function floorLabel(floor: SchoolMapFloor) {
-  return floor === "all" ? "ALL" : `L${floor}`;
+function floorLabel(floor: SchoolMapFloor, chinese: boolean) {
+  if (floor === "all") return chinese ? "全部" : "ALL";
+  return chinese ? `${floor} 层` : `L${floor}`;
 }
 
 export function AutonomyWorld3D({
@@ -72,6 +74,8 @@ export function AutonomyWorld3D({
   mapName,
   vehicleEnvelopeCenterWorldEnuM = null,
 }: AutonomyWorld3DProps) {
+  const { locale } = useI18n();
+  const chinese = locale === "zh-CN";
   const mountRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef(progress);
   const vehicleEnvelopeCenterRef = useRef(vehicleEnvelopeCenterWorldEnuM);
@@ -269,25 +273,31 @@ export function AutonomyWorld3D({
       data-min-road-width-m={SCHOOL_MAP_CONTRACT.simulation.minimumRoadWidthM}
       data-open-door-clearance-m={SCHOOL_MAP_CONTRACT.simulation.minimumOpenDoorClearanceM}
     >
-      <div ref={mountRef} className="autonomy-world-3d-canvas" aria-label={`${mapName} interactive semantic 3D campus`} />
+      <div ref={mountRef} className="autonomy-world-3d-canvas" aria-label={chinese ? `${mapName}交互式语义三维校园` : `${mapName} interactive semantic 3D campus`} />
       <div className="autonomy-world-3d-toolbar">
-        <span><i />SCHOOL MAP</span>
-        <span>{perception === "fusion" ? "MAP + LIVE FUSION" : perception === "vision" ? "LIVE LOCAL SLAM" : "PRIOR MAP"}</span>
-        <small>Drag to orbit · Wheel to zoom</small>
+        <span><i />{chinese ? "校园地图" : "SCHOOL MAP"}</span>
+        <span>{perception === "fusion"
+          ? chinese ? "地图与实时感知融合" : "MAP + LIVE FUSION"
+          : perception === "vision"
+            ? chinese ? "实时局部 SLAM" : "LIVE LOCAL SLAM"
+            : chinese ? "先验地图" : "PRIOR MAP"}</span>
+        <small>{chinese ? "拖动旋转 · 滚轮缩放" : "Drag to orbit · Wheel to zoom"}</small>
       </div>
-      <div className="autonomy-world-3d-inspector" aria-label="School Map view controls">
+      <div className="autonomy-world-3d-inspector" aria-label={chinese ? "校园地图视图控制" : "School Map view controls"}>
         <button type="button" className={xRay ? "is-active" : ""} onClick={() => setXRay((current) => !current)} aria-pressed={xRay}>
           {xRay ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
-          {xRay ? "Solid" : "X-ray"}
+          {xRay ? chinese ? "实体" : "Solid" : chinese ? "透视" : "X-ray"}
         </button>
         <span aria-hidden="true"><Layers3 /></span>
         {(["all", 1, 2, 3] as SchoolMapFloor[]).map((item) => (
           <button type="button" key={item} className={floor === item ? "is-active" : ""} onClick={() => setFloor(item)} aria-pressed={floor === item}>
-            {item === "all" ? <Building2 aria-hidden="true" /> : null}{floorLabel(item)}
+            {item === "all" ? <Building2 aria-hidden="true" /> : null}{floorLabel(item, chinese)}
           </button>
         ))}
       </div>
-      {webglError ? <div className="autonomy-world-3d-error">WebGL is unavailable. The mission contract remains visible, but the 3D campus cannot be rendered on this device.</div> : null}
+      {webglError ? <div className="autonomy-world-3d-error">{chinese
+        ? "当前设备无法使用 WebGL。任务合同仍可查看，但无法渲染三维校园。"
+        : "WebGL is unavailable. The mission contract remains visible, but the 3D campus cannot be rendered on this device."}</div> : null}
     </div>
   );
 }

@@ -2,7 +2,8 @@
 
 All trial-level simulation work goes through :class:`SimulatorAdapter`. The
 worker never hardcodes simulator logic; it asks :func:`get_simulator_adapter`
-for the concrete backend (mock by default, real stub for future PX4/Gazebo).
+for the concrete backend. Product execution defaults to the external
+PX4/Gazebo-capable CLI bridge; the deterministic adapter is test-only policy.
 
 Public surface:
 
@@ -10,8 +11,9 @@ Public surface:
 * :class:`TrialContext` — all inputs to one trial.
 * :class:`TrialResult`, :class:`TrialMetricsPayload`,
   :class:`ArtifactMetadata`, :class:`TrialFailure` — adapter return shapes.
-* :class:`MockSimulatorAdapter` — deterministic MVP backend.
-* :class:`RealSimulatorAdapterStub` — placeholder for future integration.
+* :class:`MockSimulatorAdapter` — deterministic internal test backend.
+* :class:`RealCliSimulatorAdapter` — structured external PX4/Gazebo bridge.
+* :class:`RealSimulatorAdapterStub` — internal failure-path test adapter.
 * :func:`get_simulator_adapter` — env-var controlled factory.
 """
 

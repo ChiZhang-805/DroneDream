@@ -11,7 +11,7 @@ import { DataTable, type Column } from "../components/DataTable";
 import { Loading, ErrorState } from "../components/States";
 import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
 import { useDesktopRuntimeAccess } from "../desktop/access";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 import type { Job } from "../types/api";
 import { formatDateTime } from "../utils/format";
@@ -86,7 +86,7 @@ function buildJobColumns(t: Translator): Column<Job>[] {
 export function Dashboard() {
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuthOrLocal();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const accountBoundary = auth.configured
     ? auth.account?.id ?? "signed-out"
     : "local";
@@ -165,9 +165,10 @@ export function Dashboard() {
       ) : jobsQuery.isError ? (
         <ErrorState
           description={
-            jobsQuery.error instanceof ApiClientError
-              ? jobsQuery.error.message
-              : t("dashboard.loadFailed")
+            localeSafeError(jobsQuery.error, locale, {
+              zh: t("dashboard.loadFailed"),
+              en: t("dashboard.loadFailed"),
+            })
           }
           action={
             <button

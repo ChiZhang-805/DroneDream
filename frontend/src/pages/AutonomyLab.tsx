@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowUp,
   BadgeCheck,
   BrainCircuit,
   Camera,
@@ -22,18 +23,24 @@ import {
   Weight,
   Waypoints,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { apiClient } from "../api/client";
 import { BUILD_EDITION, EDITION_IS_FIXED } from "../edition";
 import { createLocalAutonomyPreview } from "../features/autonomy/missionAutonomy";
 import { autonomyHarnessRequest } from "../features/autonomy/missionHarness";
+import {
+  autonomyMapPackQualified,
+  planAutonomyMission,
+  type AutonomyPlanningModel,
+} from "../features/autonomy/autonomyPlanning";
 import { AutonomyWorld3D } from "../features/autonomy/AutonomyWorld3D";
 import {
   autonomyAircraftRadiusM,
-  isAutonomyAircraftProfileValid,
+  isAutonomyAircraftAssetQualified,
   type AutonomyAircraftProfile,
+  type AutonomyConversationMessage,
   type AutonomyEvidenceRecord,
   type AutonomyWorkspaceState,
 } from "../features/autonomy/workspaceStore";
@@ -46,7 +53,7 @@ import {
   loadUniversalMode,
   UNIVERSAL_WORKSPACE_CHANGED_EVENT,
 } from "../features/distribution/universalMode";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import type { InterfaceLocale } from "../i18n/I18nProvider";
 import type {
   AutonomyCompileRequest,
@@ -149,6 +156,13 @@ interface AutonomyCopy {
   checkpoint: string;
   confidence: string;
   eventLog: string;
+  runtimeInstruction: string;
+  runtimeInstructionPlaceholder: string;
+  runtimeHolding: string;
+  runtimePlanning: string;
+  runtimeApplied: string;
+  runtimeReplanFailed: string;
+  sendRuntimeInstruction: string;
   events: {
     ready: string;
     planned: string;
@@ -160,10 +174,10 @@ interface AutonomyCopy {
 }
 
 const EN_COPY: AutonomyCopy = {
-  kicker: "MISSION AUTONOMY",
-  title: "Mission Autonomy",
+  kicker: "MODEL + HARNESS AGENT",
+  title: "Mission Agent",
   subtitle: "Describe a mission in ordinary language. DroneDream compiles a bounded task contract, validates terrain, payload and dynamics, then qualifies it for simulation before any hardware handoff.",
-  simulationOnly: "SHARED AUTONOMY CORE",
+  simulationOnly: "SHARED AGENT CORE",
   independent: "Language intent · deterministic safety kernel",
   commandTitle: "Natural-language mission",
   commandHelp: "The model may structure intent, but it never emits actuator commands. Every result passes the same geometric and physical checks.",
@@ -240,7 +254,7 @@ const EN_COPY: AutonomyCopy = {
   completed: "Mission complete",
   ready: "Ready to plan",
   replanning: "Local safety repair",
-  brain: "Autonomy brain",
+  brain: "Agent brain",
   brainSubtitle: "A slow semantic planner sets intent; a fast geometric loop keeps every command safe and flyable.",
   brainStages: ["Perceive", "Understand", "Plan", "Track", "Replan"],
   telemetry: "Live flight state",
@@ -258,6 +272,13 @@ const EN_COPY: AutonomyCopy = {
   checkpoint: "Next checkpoint",
   confidence: "Scene confidence",
   eventLog: "Decision trace",
+  runtimeInstruction: "Update the active mission",
+  runtimeInstructionPlaceholder: "Tell the aircraft what changed…",
+  runtimeHolding: "Aircraft is holding at a safe setpoint while the update is interpreted.",
+  runtimePlanning: "Validating a replacement task graph…",
+  runtimeApplied: "Replacement task graph accepted. Flight resumed from the held position.",
+  runtimeReplanFailed: "The aircraft remains safely held because the replacement plan was not accepted.",
+  sendRuntimeInstruction: "Send mission update",
   events: {
     ready: "Mission loaded. Waiting for a trajectory.",
     planned: "Safe corridor and smooth trajectory generated.",
@@ -269,10 +290,10 @@ const EN_COPY: AutonomyCopy = {
 };
 
 const ZH_COPY: AutonomyCopy = {
-  kicker: "任务级自主飞行",
-  title: "智能任务飞行",
+  kicker: "模型 + 脚手架智能体",
+  title: "任务智能体",
   subtitle: "用自然语言描述任务，由 DroneDream 编译受约束任务合同，检查地形、载荷与动力学；真机移交前必须先通过同一合同的仿真资格验证。",
-  simulationOnly: "四版本共享自主核心",
+  simulationOnly: "五款软件共享智能体核心",
   independent: "语言理解 · 确定性安全内核",
   commandTitle: "自然语言任务",
   commandHelp: "模型只负责把意图结构化，不直接输出电机或姿态指令；几何与物理安全检查不可绕过。",
@@ -281,8 +302,8 @@ const ZH_COPY: AutonomyCopy = {
   compileFailed: "权威后端未批准本次请求。请检查运行时连接和任务输入后重试。",
   mapUnavailable: "地图包尚未验证。请先完成校准并绑定已验证的编译场景。",
   aircraftUnavailable: "机型包络超出编译器合同。请检查质量、推力、电量预留和规划半径。",
-  intentSource: "来自 Tuning Chat 的任务意图",
-  editInChat: "返回 Tuning Chat 修改",
+  intentSource: "来自任务对话的任务意图",
+  editInChat: "返回任务对话修改",
   executionTarget: "执行目标",
   targets: { simulation: "仿真", hitl: "半实物 HITL", hardware: "真机" },
   targetHelp: {
@@ -349,7 +370,7 @@ const ZH_COPY: AutonomyCopy = {
   completed: "任务完成",
   ready: "等待规划",
   replanning: "局部安全修正",
-  brain: "自主飞行大脑",
+  brain: "任务智能体大脑",
   brainSubtitle: "低频语义规划负责理解任务，高频几何安全环保证每条指令都安全、可飞。",
   brainStages: ["感知", "理解", "规划", "跟踪", "重规划"],
   telemetry: "实时飞行状态",
@@ -367,6 +388,13 @@ const ZH_COPY: AutonomyCopy = {
   checkpoint: "下一检查点",
   confidence: "场景置信度",
   eventLog: "决策记录",
+  runtimeInstruction: "调整正在执行的任务",
+  runtimeInstructionPlaceholder: "告诉无人机现场发生了什么变化…",
+  runtimeHolding: "无人机已停在安全设定点，正在理解新的要求。",
+  runtimePlanning: "正在验证新的任务图…",
+  runtimeApplied: "新的任务图已通过验证，无人机从悬停位置继续执行。",
+  runtimeReplanFailed: "新计划未通过验证，无人机将继续安全悬停。",
+  sendRuntimeInstruction: "发送任务调整",
   events: {
     ready: "任务已载入，等待生成航迹。",
     planned: "安全走廊与平滑航迹已生成。",
@@ -377,15 +405,9 @@ const ZH_COPY: AutonomyCopy = {
   },
 };
 
-const COPY_BY_LOCALE: Partial<Record<InterfaceLocale, AutonomyCopy>> = {
+const COPY_BY_LOCALE: Readonly<Record<InterfaceLocale, AutonomyCopy>> = {
   en: EN_COPY,
   "zh-CN": ZH_COPY,
-  "zh-TW": {
-    ...ZH_COPY,
-    title: "自主飛行",
-    subtitle: "只給無人機終點、攝影機畫面或一張地圖，由它生成可飛航跡、平穩執行，並在環境變化時即時重規劃。",
-    independent: "獨立於控制參數調校",
-  },
 };
 
 const BASE_MISSIONS: Readonly<Record<MissionId, Omit<MissionPreset, "name" | "description" | "objective">>> = {
@@ -574,6 +596,7 @@ function previewRuntimeTaskGraph(
   progress: number,
   dynamicEntityActive: boolean,
   obstacleInjected: boolean,
+  chinese: boolean,
 ): AutonomyTaskGraph {
   const nodes = source.nodes.map((node) => ({ ...node, depends_on: [...node.depends_on], completion_evidence: [...node.completion_evidence] }));
   const completedCount = Math.min(nodes.length - 1, Math.floor(progress * nodes.length));
@@ -584,7 +607,9 @@ function previewRuntimeTaskGraph(
     const anchor = [...nodes].reverse().find((node) => node.status === "completed")?.task_id ?? nodes[0].task_id;
     nodes.push({
       task_id: "runtime-hold-person-017",
-      label: "Protect the safety envelope around tracked person person-017",
+      label: chinese
+        ? "保护已跟踪行人 person-017 周围的安全包络"
+        : "Protect the safety envelope around tracked person person-017",
       status: dynamicEntityActive ? "active" : "completed",
       depends_on: [anchor],
       executor: "mission_executive",
@@ -592,13 +617,17 @@ function previewRuntimeTaskGraph(
       max_retries: 0,
       timeout_s: 120,
       fallback: "land",
-      expected_output: "Clearance restored or a bounded alternative corridor selected",
+      expected_output: chinese
+        ? "恢复安全净空，或选定有边界的备用走廊"
+        : "Clearance restored or a bounded alternative corridor selected",
       completion_evidence: ["entity.track", "entity.range", "safety.decision"],
       inserted_by: "runtime",
     });
     nodes.push({
       task_id: "runtime-replan-person-017",
-      label: "Repair the local corridor around person-017 and rejoin the mission graph",
+      label: chinese
+        ? "绕过 person-017 修复局部走廊并重新接入任务图"
+        : "Repair the local corridor around person-017 and rejoin the mission graph",
       status: dynamicEntityActive ? "blocked" : "completed",
       depends_on: ["runtime-hold-person-017"],
       executor: "local_planner",
@@ -606,7 +635,9 @@ function previewRuntimeTaskGraph(
       max_retries: 3,
       timeout_s: 20,
       fallback: "hold",
-      expected_output: "A collision-checked trajectory revision inside the approved corridor",
+      expected_output: chinese
+        ? "在已批准走廊内生成通过碰撞检查的航迹修订"
+        : "A collision-checked trajectory revision inside the approved corridor",
       completion_evidence: ["trajectory.revision", "clearance.minimum", "planner.receipt"],
       inserted_by: "runtime",
     });
@@ -617,13 +648,112 @@ function previewRuntimeTaskGraph(
     nodes,
     active_node_ids: nodes.filter((node) => node.status === "active").map((node) => node.task_id),
     change_reason: dynamicEntityActive
-      ? "dynamic person inserted a safety hold and recovery branch"
+      ? (chinese ? "动态行人触发安全悬停与恢复分支" : "dynamic person inserted a safety hold and recovery branch")
       : obstacleInjected
-        ? "local corridor repaired; mission graph resumed"
+        ? (chinese ? "局部走廊已修复，任务图恢复执行" : "local corridor repaired; mission graph resumed")
         : progress > 0
-          ? "mission progress advanced compiler tasks"
+          ? (chinese ? "任务进度已推进编译任务" : "mission progress advanced compiler tasks")
           : source.change_reason,
   };
+}
+
+type TaskNode = AutonomyTaskGraph["nodes"][number];
+
+const TASK_STATUS_LABELS: Record<TaskNode["status"], readonly [string, string]> = {
+  pending: ["Pending", "等待中"],
+  ready: ["Ready", "已就绪"],
+  active: ["Active", "执行中"],
+  blocked: ["Blocked", "已阻止"],
+  completed: ["Completed", "已完成"],
+  failed: ["Failed", "失败"],
+  skipped: ["Skipped", "已跳过"],
+};
+
+const EXECUTOR_LABELS: Record<TaskNode["executor"], readonly [string, string]> = {
+  language_model: ["Language model", "语言模型"],
+  mission_executive: ["Mission executive", "任务执行器"],
+  perception: ["Perception", "感知系统"],
+  global_planner: ["Global planner", "全局规划器"],
+  local_planner: ["Local planner", "局部规划器"],
+  payload_controller: ["Payload controller", "载荷控制器"],
+  px4_bridge: ["PX4 bridge", "PX4 桥接器"],
+  operator: ["Operator", "操作员"],
+};
+
+const RISK_LABELS: Record<TaskNode["risk"], readonly [string, string]> = {
+  low: ["Low", "低风险"],
+  medium: ["Medium", "中风险"],
+  high: ["High", "高风险"],
+  critical: ["Critical", "关键风险"],
+};
+
+const FALLBACK_LABELS: Record<TaskNode["fallback"], readonly [string, string]> = {
+  continue: ["Continue", "继续"],
+  hold: ["Hold", "悬停"],
+  land: ["Land", "降落"],
+  abort: ["Abort", "中止"],
+};
+
+const STREAM_KIND_LABELS: Record<string, readonly [string, string]> = {
+  rgb: ["RGB", "彩色图像"],
+  depth: ["Depth", "深度图像"],
+  stereo: ["Stereo", "双目视觉"],
+  thermal: ["Thermal", "热成像"],
+  lidar: ["LiDAR", "激光雷达"],
+  vio: ["VIO", "视觉惯性里程计"],
+  slam: ["SLAM", "同步定位与建图"],
+  map: ["Map", "地图"],
+};
+
+const ENTITY_KIND_LABELS: Record<string, readonly [string, string]> = {
+  person: ["Person", "行人"],
+  vehicle: ["Vehicle", "车辆"],
+  animal: ["Animal", "动物"],
+  obstacle: ["Obstacle", "障碍物"],
+  unknown: ["Unknown", "未知实体"],
+};
+
+const ADAPTER_LABELS: Record<string, readonly [string, string]> = {
+  px4_gazebo_contract: ["PX4/Gazebo contract", "PX4/Gazebo 执行合同"],
+  hitl_contract: ["HITL contract", "半实物仿真合同"],
+  hardware_contract: ["Hardware contract", "真机执行合同"],
+};
+
+const RUNTIME_PHASE_LABELS: Record<string, readonly [string, string]> = {
+  ready: ["Ready", "已就绪"],
+  starting: ["Starting", "正在启动"],
+  running: ["Running", "正在运行"],
+  takeoff: ["Takeoff", "正在起飞"],
+  navigating: ["Navigating", "正在导航"],
+  pickup: ["Pickup", "正在取物"],
+  replanning: ["Replanning", "正在重规划"],
+  returning: ["Returning", "正在返航"],
+  landing: ["Landing", "正在降落"],
+  holding: ["Holding", "正在悬停"],
+  completed: ["Completed", "已完成"],
+  verified: ["Verified", "已验证"],
+  failed: ["Failed", "失败"],
+  aborting: ["Aborting", "正在中止"],
+  aborted: ["Aborted", "已中止"],
+};
+
+const BLOCKER_LABELS: Record<string, readonly [string, string]> = {
+  "vehicle-pack.registry.zero-validated-signed-packs": ["No validated signed Vehicle Pack is bound", "尚未绑定已验证且已签名的机型包"],
+  "simulation-qualification.missing": ["Simulation qualification is missing", "缺少仿真资格认证"],
+  "vehicle-pack.receipt.missing": ["Vehicle Pack receipt is missing", "缺少机型包回执"],
+  "operator.confirmation.missing": ["Operator confirmation is missing", "缺少操作员确认"],
+  "localization.not-ready": ["Localization is not ready", "定位尚未就绪"],
+  "command-link.not-ready": ["Command link is not ready", "指令链路尚未就绪"],
+  "geofence.not-ready": ["Geofence is not ready", "地理围栏尚未就绪"],
+  "battery.not-ready": ["Battery state is not ready", "电池状态尚未就绪"],
+  "edition.sim.forbids-hardware-and-hitl": ["SIM does not permit hardware or HITL execution", "SIM 不允许真机或半实物执行"],
+  "trajectory.not-feasible": ["Trajectory is not feasible", "航迹不可执行"],
+  "runtime.execution-adapter.not-bound": ["Runtime execution adapter is not bound", "尚未绑定运行时执行适配器"],
+};
+
+function localizedLabel(labels: readonly [string, string] | undefined, fallback: string, chinese: boolean) {
+  if (!labels) return fallback;
+  return chinese ? labels[1] : labels[0];
 }
 
 function embeddedTaskGraphNodes(graph: AutonomyTaskGraph): AutonomyTaskGraph["nodes"] {
@@ -664,15 +794,21 @@ function embeddedTaskGraphNodes(graph: AutonomyTaskGraph): AutonomyTaskGraph["no
 export function AutonomyLab({
   embedded = false,
   onRunCompleted,
+  onWorkspaceChange,
+  planningModel = null,
+  accountId = null,
   workspace,
 }: {
   embedded?: boolean;
   onRunCompleted?: (record: AutonomyEvidenceRecord) => void;
+  onWorkspaceChange?: (workspace: AutonomyWorkspaceState) => void;
+  planningModel?: AutonomyPlanningModel | null;
+  accountId?: string | null;
   workspace?: AutonomyWorkspaceState;
 } = {}) {
   const { interfaceLocale } = useI18n();
   const copy = COPY_BY_LOCALE[interfaceLocale] ?? EN_COPY;
-  const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
+  const chinese = interfaceLocale === "zh-CN";
   const workspaceMissionId = missionForWorkspace(workspace);
   const workspaceVehicleKey = workspace
     ? [
@@ -718,6 +854,9 @@ export function AutonomyLab({
   const [dynamicEntityActive, setDynamicEntityActive] = useState(false);
   const [runtimeSession, setRuntimeSession] = useState<AutonomyRuntimeSession | null>(null);
   const [simulationExecution, setSimulationExecution] = useState<AutonomySimulationExecution | null>(null);
+  const [runtimeInstruction, setRuntimeInstruction] = useState("");
+  const [runtimeReplanning, setRuntimeReplanning] = useState(false);
+  const [runtimeReplanError, setRuntimeReplanError] = useState<string | null>(null);
   const runtimeSessionRef = useRef<AutonomyRuntimeSession | null>(null);
   const simulationExecutionRef = useRef<AutonomySimulationExecution | null>(null);
   runtimeSessionRef.current = runtimeSession;
@@ -729,6 +868,7 @@ export function AutonomyLab({
   const dynamicEntityTimer = useRef<number | null>(null);
   const previewRunId = useRef<string | null>(null);
   const workspaceBindingApplied = useRef<string | null>(null);
+  const runtimeWorkspaceUpdateIntent = useRef<string | null>(null);
   const dronePositionRef = useRef<Point>([0, 0]);
   const [events, setEvents] = useState(() => [{ time: eventTime(), text: copy.events.ready }]);
   const [taskGraphView, setTaskGraphView] = useState<"summary" | "engineering">("summary");
@@ -770,7 +910,13 @@ export function AutonomyLab({
       consumeAutonomyHandoff();
       return;
     }
-    setCommand(workspace.mission.intent);
+    if (
+      !runtimeSessionRef.current
+      || runtimeSessionRef.current.terminal
+      || workspace.mission.intent !== runtimeWorkspaceUpdateIntent.current
+    ) {
+      setCommand(workspace.mission.intent);
+    }
     setMissionId(missionForWorkspace(workspace));
     setPerception(perceptionForWorkspace(workspace));
     setPickupPayloadKg(vehicleForAircraft(workspace.aircraft).pickup_payload_kg);
@@ -802,20 +948,15 @@ export function AutonomyLab({
   const mission = missions.find(({ id }) => id === missionId) ?? missions[0];
   const hasWorkspace = workspace !== undefined;
   const workspaceCompilerSceneId = workspace?.mapPack.compilerSceneId;
-  const workspaceMapQualified = Boolean(workspace)
-    && workspace?.mapPack.status === "qualified"
-    && workspace.mapPack.calibrated
-    && Boolean(workspaceCompilerSceneId)
-    && Boolean(workspace.mapPack.contentHash)
-    && Boolean(workspace.mapPack.qualificationReceiptId);
+  const workspaceMapQualified = workspace
+    ? autonomyMapPackQualified(workspace.mapPack)
+    : false;
   const workspaceAircraftQualified = workspace
-    ? isAutonomyAircraftProfileValid(workspace.aircraft)
-      && ["validated-unsigned", "signed"].includes(workspace.aircraft.status)
-      && Boolean(workspace.aircraft.qualificationReceiptId)
-      && Boolean(workspace.aircraft.qualificationContentHash)
+    ? isAutonomyAircraftAssetQualified(workspace.aircraft)
     : false;
   const compileRequest = useMemo<AutonomyCompileRequest>(() => ({
     edition,
+    locale: chinese ? "zh-CN" : "en",
     execution_target: target,
     natural_language: command.trim() || promptForMission(missionId, chinese),
     scene_id: workspaceCompilerSceneId ?? (hasWorkspace ? "" : SCENE_ID_BY_MISSION[missionId]),
@@ -840,8 +981,14 @@ export function AutonomyLab({
   );
   const qualification = compileResult ?? provisionalResult;
   const localTaskGraph = useMemo(
-    () => previewRuntimeTaskGraph(qualification.contract.task_graph, progress, dynamicEntityActive, obstacleInjected),
-    [dynamicEntityActive, obstacleInjected, progress, qualification.contract.task_graph],
+    () => previewRuntimeTaskGraph(
+      qualification.contract.task_graph,
+      progress,
+      dynamicEntityActive,
+      obstacleInjected,
+      chinese,
+    ),
+    [chinese, dynamicEntityActive, obstacleInjected, progress, qualification.contract.task_graph],
   );
   const activeTaskGraph = runtimeSession?.task_graph ?? localTaskGraph;
   const activeEntities = runtimeSession?.perceived_entities
@@ -851,7 +998,7 @@ export function AutonomyLab({
     sim: "SIM",
     lab: "LAB",
     field: "FIELD",
-    autonomy: "AUTONOMY",
+    autonomy: "AGENT",
   } as const)[edition];
   const activePoints = obstacleInjected ? mission.replanPoints : mission.points;
   const [droneX, droneY] = interpolatePath(activePoints, progress);
@@ -911,6 +1058,16 @@ export function AutonomyLab({
       if (cancelled) return;
       setSimulationExecution(latest);
       setProgress(latest.progress);
+      try {
+        const liveRuntime = await apiClient.getAutonomyRuntimeSession(latest.runtime_session_id);
+        if (!cancelled) {
+          setRuntimeSession(liveRuntime);
+          setPaused(liveRuntime.phase === "holding");
+        }
+      } catch {
+        // The execution stream remains authoritative for motion telemetry. A
+        // transient runtime read failure is retried on the next polling cycle.
+      }
       if (latest.state === "verified" && !simulationTerminalHandled.current) {
         simulationTerminalHandled.current = true;
         setRunning(false);
@@ -961,7 +1118,7 @@ export function AutonomyLab({
         ?? simulationExecution?.mission_evidence_sha256
         ?? "preview-only-no-signed-evidence-chain",
       observationCount: runtimeSession?.observation_count ?? Number(simulationExecution?.mission_evidence?.pose_sample_count ?? 0),
-      missionIntent: command,
+      missionIntent: workspace?.mission.intent ?? command,
       aircraftName: workspace?.aircraft.name ?? "Default preview aircraft",
       mapName: workspace?.mapPack.name ?? qualification.scene.name,
       aircraftVersion: workspace?.aircraft.version ?? 1,
@@ -972,7 +1129,7 @@ export function AutonomyLab({
         ? new Set(runtimeSession.decision_events.flatMap((event) => event.entity_ids)).size
         : (obstacleInjected ? 1 : 0),
     });
-  }, [activeTaskGraph.revision, command, complete, events.length, obstacleInjected, onRunCompleted, qualification.contract.contract_id, qualification.scene.name, runtimeSession, simulationExecution, target, workspace?.aircraft.name, workspace?.aircraft.version, workspace?.mapPack.name, workspace?.mapPack.version]);
+  }, [activeTaskGraph.revision, command, complete, events.length, obstacleInjected, onRunCompleted, qualification.contract.contract_id, qualification.scene.name, runtimeSession, simulationExecution, target, workspace?.aircraft.name, workspace?.aircraft.version, workspace?.mapPack.name, workspace?.mapPack.version, workspace?.mission.intent]);
 
   useEffect(() => {
     stopActiveSimulation("Autonomy mission contract changed while the simulation was active.");
@@ -995,6 +1152,7 @@ export function AutonomyLab({
     simulationTerminalHandled.current = false;
     evidenceReported.current = false;
     previewRunId.current = null;
+    runtimeWorkspaceUpdateIntent.current = null;
   }, [compileRequest, stopActiveSimulation]);
 
   const appendEvent = (text: string) => {
@@ -1180,12 +1338,169 @@ export function AutonomyLab({
     setDynamicEntityActive(false);
     setRuntimeSession(null);
     setSimulationExecution(null);
+    setRuntimeInstruction("");
+    setRuntimeReplanning(false);
+    setRuntimeReplanError(null);
     runtimeRequestId.current = null;
     simulationExecutionRequestId.current = null;
     simulationTerminalHandled.current = false;
     evidenceReported.current = false;
     previewRunId.current = null;
     setEvents([{ time: eventTime(), text: planned ? copy.events.planned : copy.events.ready }]);
+  };
+
+  const submitRuntimeInstruction = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const instruction = runtimeInstruction.trim();
+    const activeRuntime = runtimeSessionRef.current;
+    if (
+      publicDemoConsole
+      || !instruction
+      || instruction.length > 2_000
+      || !activeRuntime
+      || activeRuntime.terminal
+      || !workspace
+      || !onWorkspaceChange
+      || runtimeReplanning
+    ) return;
+
+    setRuntimeReplanning(true);
+    setRuntimeReplanError(null);
+    const interruptionRequestId = crypto.randomUUID();
+    try {
+      // Flight-affecting messages always enter a safe hold before any model or
+      // harness call. The language-model latency therefore cannot let the old
+      // task graph continue into a pickup, wall, doorway, or landing transition.
+      const held = await apiClient.interruptAutonomyRuntimeSession(
+        activeRuntime.session_id,
+        { client_request_id: interruptionRequestId, instruction },
+      );
+      const interruption = held.interruption;
+      if (!interruption || interruption.state !== "holding_pending_interpretation") {
+        throw new Error("Runtime did not return a verifiable interruption receipt.");
+      }
+      setRuntimeSession(held);
+      setPaused(true);
+      appendEvent(copy.runtimeHolding);
+
+      if (!planningModel) {
+        throw new Error("No planning model is bound to this task conversation.");
+      }
+      const turnId = crypto.randomUUID();
+      const conversationId = workspace.mission.conversationId ?? workspace.mission.id;
+      const prefix = chinese ? "\n执行中调整：" : "\nIn-flight update: ";
+      const revisedIntent = `${workspace.mission.intent.slice(
+        0,
+        Math.max(0, 2_000 - prefix.length - instruction.length),
+      )}${prefix}${instruction}`;
+      const submittedAt = new Date().toISOString();
+      const userMessage: AutonomyConversationMessage = {
+        id: `user-${turnId}`,
+        role: "user",
+        content: instruction,
+        createdAt: submittedAt,
+        planContractId: null,
+      };
+      const pendingWorkspace: AutonomyWorkspaceState = {
+        ...workspace,
+        mission: {
+          ...workspace.mission,
+          intent: revisedIntent,
+          conversationId,
+          messages: [...workspace.mission.messages, userMessage].slice(-100),
+          updatedAt: submittedAt,
+        },
+      };
+      runtimeWorkspaceUpdateIntent.current = revisedIntent;
+      onWorkspaceChange(pendingWorkspace);
+      appendEvent(copy.runtimePlanning);
+
+      const planning = await planAutonomyMission({
+        edition,
+        workspace: pendingWorkspace,
+        intent: revisedIntent,
+        instruction,
+        conversationId,
+        turnId,
+        chinese,
+        selectedModel: planningModel,
+        accountId,
+        publicDemo: false,
+        requestPurpose: "runtime_replan",
+        runtimeContext: {
+          schema_version: "dronedream.autonomy.runtime-replan-context.v1",
+          session_id: held.session_id,
+          contract_id: held.contract_id,
+          phase: held.phase,
+          mission_revision: held.mission_revision,
+          task_graph_revision: held.task_graph.revision,
+          task_graph: held.task_graph,
+          interruption,
+          simulation_execution: simulationExecutionRef.current
+            ? {
+                execution_id: simulationExecutionRef.current.execution_id,
+                state: simulationExecutionRef.current.state,
+                phase: simulationExecutionRef.current.phase,
+                progress: simulationExecutionRef.current.progress,
+                vehicle_envelope_center_world_enu_m:
+                  simulationExecutionRef.current.vehicle_envelope_center_world_enu_m,
+                vehicle_speed_m_s: simulationExecutionRef.current.vehicle_speed_m_s,
+                payload_attached: simulationExecutionRef.current.payload_attached,
+              }
+            : null,
+        },
+      });
+      if (!planning.compileRequest || !planning.compileResult || !planning.compiledPlan) {
+        throw new Error("The replacement plan did not pass the planning and compilation gates.");
+      }
+      const applied = await apiClient.applyAutonomyRuntimeReplan(
+        held.session_id,
+        {
+          interruption_id: interruption.interruption_id,
+          expected_task_graph_revision: interruption.expected_task_graph_revision,
+          client_request_id: crypto.randomUUID(),
+          operator_confirmed: true,
+          mission: planning.compileRequest,
+        },
+      );
+      const updatedAt = new Date().toISOString();
+      const assistantMessage: AutonomyConversationMessage = {
+        id: `assistant-${turnId}`,
+        role: "assistant",
+        content: planning.planningBrief || copy.runtimeApplied,
+        createdAt: updatedAt,
+        planContractId: planning.compiledPlan.contractId,
+      };
+      onWorkspaceChange({
+        ...pendingWorkspace,
+        mission: {
+          ...pendingWorkspace.mission,
+          planningModel,
+          planningBrief: planning.planningBrief,
+          planningRunId: planning.planningRunId,
+          messages: [...pendingWorkspace.mission.messages, assistantMessage].slice(-100),
+          compiledPlan: planning.compiledPlan,
+          updatedAt,
+        },
+      });
+      authorizedCompileRequest.current = planning.compileRequest;
+      setCompileResult(planning.compileResult);
+      setCompileSource("backend");
+      setPlanned(true);
+      setRuntimeSession(applied);
+      setPaused(false);
+      setRuntimeInstruction("");
+      appendEvent(copy.runtimeApplied);
+    } catch (reason) {
+      setPaused(true);
+      setRuntimeReplanError(localeSafeError(reason, chinese ? "zh-CN" : "en", {
+        zh: copy.runtimeReplanFailed,
+        en: copy.runtimeReplanFailed,
+      }));
+      appendEvent(copy.runtimeReplanFailed);
+    } finally {
+      setRuntimeReplanning(false);
+    }
   };
 
   const injectObstacle = () => {
@@ -1282,7 +1597,11 @@ export function AutonomyLab({
             <div><dt><ShieldCheck aria-hidden="true" />{copy.thrustMargin}</dt><dd>{qualification.metrics.post_pickup_thrust_to_weight.toFixed(2)}</dd></div>
             <div className={qualification.execution_policy.can_execute ? "is-ready" : "is-denied"}>
               <dt>{qualification.execution_policy.can_execute ? <BadgeCheck aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}{qualification.execution_policy.can_execute ? copy.feasible : copy.blocked}</dt>
-              <dd>{qualification.execution_policy.adapter.replaceAll("_", " ")}</dd>
+              <dd>{localizedLabel(
+                ADAPTER_LABELS[qualification.execution_policy.adapter],
+                qualification.execution_policy.adapter,
+                chinese,
+              )}</dd>
             </div>
           </dl>
         </div>
@@ -1383,7 +1702,9 @@ export function AutonomyLab({
               <div><Camera aria-hidden="true" /><span>{copy.cameraFeed}</span><i /></div>
               <div className="autonomy-camera-scene">
                 <span className="autonomy-camera-horizon" />
-                <span className="autonomy-camera-box"><small>{perception === "map" ? "MAP + GPS" : "SENSOR NOT INSTALLED"}</small></span>
+                <span className="autonomy-camera-box"><small>{perception === "map"
+                  ? (chinese ? "地图 + GPS" : "MAP + GPS")
+                  : (chinese ? "传感器未安装" : "SENSOR NOT INSTALLED")}</small></span>
                 <span className="autonomy-camera-depth" />
               </div>
             </div>
@@ -1406,15 +1727,47 @@ export function AutonomyLab({
             </button>
             <div className="autonomy-progress"><span><i style={{ width: `${Math.round(progress * 100)}%` }} /></span><strong>{Math.round(progress * 100)}%</strong></div>
           </div>
+          {embedded && runtimeSession && !runtimeSession.terminal ? (
+            <form className="autonomy-runtime-composer" onSubmit={(event) => void submitRuntimeInstruction(event)}>
+              <div>
+                <strong>{copy.runtimeInstruction}</strong>
+                <span>{runtimeReplanning
+                  ? copy.runtimePlanning
+                  : runtimeSession.phase === "holding"
+                    ? copy.runtimeHolding
+                    : copy.running}</span>
+              </div>
+              <label>
+                <textarea
+                  value={runtimeInstruction}
+                  maxLength={2_000}
+                  rows={1}
+                  disabled={runtimeReplanning}
+                  placeholder={copy.runtimeInstructionPlaceholder}
+                  aria-label={copy.runtimeInstruction}
+                  onChange={(event) => setRuntimeInstruction(event.target.value)}
+                />
+                <button
+                  type="submit"
+                  aria-label={copy.sendRuntimeInstruction}
+                  title={copy.sendRuntimeInstruction}
+                  disabled={runtimeReplanning || !runtimeInstruction.trim()}
+                >
+                  {runtimeReplanning ? <RefreshCcw className="is-spinning" aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
+                </button>
+              </label>
+              {runtimeReplanError ? <p role="alert">{runtimeReplanError}</p> : null}
+            </form>
+          ) : null}
         </section>
 
         <aside className="autonomy-panel autonomy-brain-panel">
           <div className="autonomy-panel-heading">
             <div><BrainCircuit aria-hidden="true" /><span>{copy.brain}</span></div>
-            <span className="autonomy-brain-rate">20 Hz PX4 setpoints</span>
+            <span className="autonomy-brain-rate">{chinese ? "20 Hz PX4 设定点" : "20 Hz PX4 setpoints"}</span>
           </div>
           {!embedded ? <div className="autonomy-task-graph-heading">
-            <span>GRAPH R{activeTaskGraph.revision} · {activeTaskGraph.change_reason}</span>
+            <span>{chinese ? "任务图" : "GRAPH"} R{activeTaskGraph.revision} · {activeTaskGraph.change_reason}</span>
             <button type="button" onClick={() => setTaskGraphView((current) => current === "summary" ? "engineering" : "summary")}>
               {taskGraphView === "summary" ? (chinese ? "工程详情" : "Engineering") : (chinese ? "简洁视图" : "Summary")}
             </button>
@@ -1425,8 +1778,12 @@ export function AutonomyLab({
                 <span>{node.status === "completed" ? <Check aria-hidden="true" /> : activeTaskGraph.nodes.findIndex((candidate) => candidate.task_id === node.task_id) + 1}</span>
                 <div>
                   <strong>{node.label}</strong>
-                  <small>{embedded ? node.status.toUpperCase() : `${node.status.toUpperCase()} · ${node.executor.replaceAll("_", " ")}`}</small>
-                  {taskGraphView === "engineering" ? <em>{node.risk.toUpperCase()} · {node.timeout_s}s · {node.max_retries} {chinese ? "次重试" : "retries"} · {node.fallback.toUpperCase()}</em> : null}
+                  <small>{embedded
+                    ? localizedLabel(TASK_STATUS_LABELS[node.status], node.status, chinese)
+                    : `${localizedLabel(TASK_STATUS_LABELS[node.status], node.status, chinese)} · ${localizedLabel(EXECUTOR_LABELS[node.executor], node.executor, chinese)}`}</small>
+                  {taskGraphView === "engineering" ? <em>
+                    {localizedLabel(RISK_LABELS[node.risk], node.risk, chinese)} · {node.timeout_s}s · {node.max_retries} {chinese ? "次重试" : "retries"} · {localizedLabel(FALLBACK_LABELS[node.fallback], node.fallback, chinese)}
+                  </em> : null}
                 </div>
               </li>
             ))}
@@ -1435,11 +1792,11 @@ export function AutonomyLab({
           <div className="autonomy-live-perception">
             <header><h2><Radar aria-hidden="true" />{chinese ? "实时感知" : "Live perception"}</h2><span>{activeEntities.length} {chinese ? "个跟踪实体" : "tracked"}</span></header>
             <div className="autonomy-stream-health">
-              {(runtimeSession?.stream_health ?? (publicDemoConsole ? simulatedStreamHealth() : [])).map((stream) => <span key={stream.stream_id} data-status={stream.status}><i />{stream.kind.toUpperCase()}{!embedded ? <small>{stream.rate_hz} Hz · {stream.latency_ms} ms</small> : null}</span>)}
+              {(runtimeSession?.stream_health ?? (publicDemoConsole ? simulatedStreamHealth() : [])).map((stream) => <span key={stream.stream_id} data-status={stream.status}><i />{localizedLabel(STREAM_KIND_LABELS[stream.kind], stream.kind, chinese)}{!embedded ? <small>{stream.rate_hz} Hz · {stream.latency_ms} ms</small> : null}</span>)}
             </div>
             {!embedded ? activeEntities.map((entity) => <article key={entity.track_id}>
               <Radar aria-hidden="true" />
-              <span><strong>{entity.kind.toUpperCase()} · {entity.track_id}</strong><small>{Math.round(entity.confidence * 100)}% · {entity.source_stream} · {entity.velocity_mps.y.toFixed(2)} m/s</small></span>
+              <span><strong>{localizedLabel(ENTITY_KIND_LABELS[entity.kind], entity.kind, chinese)} · {entity.track_id}</strong><small>{Math.round(entity.confidence * 100)}% · {entity.source_stream} · {entity.velocity_mps.y.toFixed(2)} m/s</small></span>
               <em>{entity.safety_radius_m.toFixed(1)} m</em>
             </article>) : null}
           </div>
@@ -1462,9 +1819,9 @@ export function AutonomyLab({
             </ul>
             {!embedded ? <code className="autonomy-runtime-receipt">
               {simulationExecution
-                ? `${simulationExecution.phase.toUpperCase()} · ${simulationExecution.execution_id.slice(0, 20)} · ${simulationExecution.planner_artifact_sha256.slice(0, 12)}`
+                ? `${localizedLabel(RUNTIME_PHASE_LABELS[simulationExecution.phase], simulationExecution.phase, chinese)} · ${simulationExecution.execution_id.slice(0, 20)} · ${simulationExecution.planner_artifact_sha256.slice(0, 12)}`
                 : runtimeSession
-                  ? `${runtimeSession.phase.toUpperCase()} · ${runtimeSession.session_id.slice(0, 18)} · ${runtimeSession.evidence_chain_head.slice(0, 12)}`
+                  ? `${localizedLabel(RUNTIME_PHASE_LABELS[runtimeSession.phase], runtimeSession.phase, chinese)} · ${runtimeSession.session_id.slice(0, 18)} · ${runtimeSession.evidence_chain_head.slice(0, 12)}`
                 : copy.runtimeAwaiting}
             </code> : null}
           </div>
@@ -1487,7 +1844,7 @@ export function AutonomyLab({
               <span>{copy.signedPacks}</span><strong>{qualification.execution_policy.validated_signed_pack_count}</strong>
             </div>
             {qualification.execution_policy.blockers.length ? (
-              <ul>{qualification.execution_policy.blockers.slice(0, embedded ? 2 : 4).map((blocker) => <li key={blocker}>{blocker.replaceAll(".", " · ")}</li>)}</ul>
+              <ul>{qualification.execution_policy.blockers.slice(0, embedded ? 2 : 4).map((blocker) => <li key={blocker}>{localizedLabel(BLOCKER_LABELS[blocker], blocker, chinese)}</li>)}</ul>
             ) : <p>{copy.noBlockers}</p>}
           </div>
 

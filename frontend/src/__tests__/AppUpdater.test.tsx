@@ -133,7 +133,7 @@ describe("workspace sidebar version module", () => {
     expect(document.querySelector(".app-version-pill")).toBeNull();
     expect(screen.getByRole("button", { name: "Account" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Update DroneDream" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Account options" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
 
     router.dispose();
   });
@@ -195,7 +195,7 @@ describe("workspace sidebar version module", () => {
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    expect(screen.getByRole("button", { name: "Account options" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Retry DroneDream update" })).toBeNull();
 
     router.dispose();
@@ -212,7 +212,7 @@ describe("workspace sidebar version module", () => {
     const { router } = renderDashboard();
 
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
-    expect(screen.getByRole("dialog", { name: "DroneDream account" })).toBeVisible();
+    expect(screen.getByRole("menu", { name: "Account" })).toBeVisible();
     expect(updaterState.current.installAvailableUpdate).not.toHaveBeenCalled();
 
     router.dispose();

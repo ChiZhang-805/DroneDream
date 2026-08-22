@@ -209,8 +209,6 @@ afterEach(() => {
     expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
-      .not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
       .querySelectorAll("a")).toHaveLength(7);
     expect(listJobs).not.toHaveBeenCalled();

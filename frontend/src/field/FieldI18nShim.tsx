@@ -22,6 +22,7 @@ const COPY = {
 } as const;
 
 type FieldLaunchTranslationKey = keyof typeof COPY.en;
+const HAN_PATTERN = /\p{Script=Han}/u;
 
 export { FieldLocaleProvider as I18nProvider };
 
@@ -35,4 +36,29 @@ export function useI18n() {
     setLocale,
     t: (key: FieldLaunchTranslationKey) => COPY[locale][key],
   };
+}
+
+// FIELD is built as an intentionally small standalone bundle and aliases the
+// full console I18n provider to this file. Keep the shared error-localization
+// contract available here as well so hardware diagnostics never leak Chinese
+// into the English UI (or arbitrary English prose into the Chinese UI).
+// eslint-disable-next-line react-refresh/only-export-components
+export function localeSafeError(
+  value: unknown,
+  locale: "en" | "zh-CN",
+  fallback: { zh: string; en: string },
+): string {
+  const raw = value instanceof Error ? value.message : String(value ?? "");
+  const normalized = raw.trim();
+  const english = locale === "en";
+  const localizedFallback = english ? fallback.en : fallback.zh;
+  if (!normalized) return localizedFallback;
+
+  const technicalCode = /^[A-Z0-9_.:-]+$/u.test(normalized);
+  if (english) {
+    if (HAN_PATTERN.test(normalized)) return localizedFallback;
+    return technicalCode ? `${localizedFallback} (${normalized})` : normalized;
+  }
+  if (HAN_PATTERN.test(normalized)) return normalized;
+  return technicalCode ? `${localizedFallback}（${normalized}）` : localizedFallback;
 }

@@ -9,7 +9,10 @@ const viewports = [
   { name: "mobile", width: 390, height: 844 },
 ];
 const page = await browser.newPage({ viewport: viewports[0] });
-const locales = ["en", "zh-CN", "zh-TW", "es", "ja", "ko"];
+// The desktop product deliberately exposes two complete, independently
+// authored interface languages. Keep the visual matrix aligned with that
+// product contract instead of probing retired partial translations.
+const locales = ["en", "zh-CN"];
 const failures = [];
 const textFailures = [];
 const behaviorFailures = [];
@@ -89,7 +92,7 @@ try {
   }));
   if (customizeMetrics.scrollHeight > customizeMetrics.clientHeight + 1
     || customizeMetrics.scrollWidth > customizeMetrics.clientWidth + 1) {
-    failures.push({ locale: "ko", tabIndex: "customize", metrics: customizeMetrics });
+    failures.push({ locale: "zh-CN", tabIndex: "customize", metrics: customizeMetrics });
   }
 
   await page.locator(".launcher-settings-tabs button").first().click();

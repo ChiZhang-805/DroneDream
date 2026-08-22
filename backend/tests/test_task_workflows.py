@@ -34,17 +34,17 @@ def test_auto_routes_mission_and_keeps_tools_inside_sim_boundary() -> None:
     )
 
 
-def test_autonomy_dispatch_maps_cover_every_exposed_task() -> None:
+def test_agent_dispatch_maps_cover_mission_asset_and_simulation_tasks() -> None:
     mission = compile_task_workflow(
         "user-a",
         request(edition="autonomy", message="Plan a route to collect coffee."),
     )
-    vehicle = compile_task_workflow(
+    asset = compile_task_workflow(
         "user-a",
         request(
             edition="autonomy",
-            requested_task_type="vehicle_modeling",
-            message="Draft a quadrotor model.",
+            requested_task_type="asset_import_qualification",
+            message="Qualify an imported quadrotor SDF for ROS 2, Gazebo, and PX4.",
         ),
     )
     simulation = compile_task_workflow(
@@ -58,8 +58,14 @@ def test_autonomy_dispatch_maps_cover_every_exposed_task() -> None:
 
     assert mission.task_type == "mission_autonomy"
     assert mission.artifact_kind == "autonomy_mission_plan"
-    assert vehicle.artifact_kind == "universal_vehicle_model"
-    assert "vehicle.model_draft" in vehicle.eligible_tool_ids
+    assert asset.status == "draft"
+    assert asset.artifact_kind == "external_asset_qualification_plan"
+    assert asset.product_path == "/autonomy"
+    assert {
+        "asset.source.inspect",
+        "asset.package.normalize",
+        "asset.qualification.plan",
+    } <= set(asset.eligible_tool_ids)
     assert simulation.artifact_kind == "simulation_experiment"
     assert simulation.product_path == "/autonomy"
     assert {"simulator.compile", "simulator.execute"} <= set(simulation.eligible_tool_ids)
@@ -91,6 +97,18 @@ def test_owner_binding_and_contract_identity_are_isolated() -> None:
     assert left.owner_binding_sha256 != right.owner_binding_sha256
     assert left.contract_id != right.contract_id
     assert left.contract_sha256 != right.contract_sha256
+
+
+def test_workflow_language_is_bound_into_contract_and_step_copy() -> None:
+    english = compile_task_workflow("user-a", request(locale="en"))
+    chinese = compile_task_workflow("user-a", request(locale="zh-CN"))
+
+    assert english.locale == "en"
+    assert chinese.locale == "zh-CN"
+    assert english.contract_sha256 != chinese.contract_sha256
+    assert english.steps[0].title == "Classify the request and extract only explicit constraints"
+    assert chinese.steps[0].title == "识别任务类型，并仅提取用户明确给出的约束"
+    assert chinese.steps[-1].title == "记录结果、偏差、失败信息与可回放证据"
 
 
 def test_prompt_injection_is_hashed_as_data_not_promoted_to_tools() -> None:
@@ -129,10 +147,10 @@ def test_assistant_route_compiles_non_tuning_workflow_without_provider(
         "/api/v1/experiment-assistant/turn",
         json={
             "message_id": "workflow-turn-0001",
-            "message": "Build an editable quadrotor model with a camera payload.",
+            "message": "Import and qualify a Blender quadrotor asset with a camera payload.",
             "locale": "en",
             "edition": "universal",
-            "requested_task_type": "vehicle_modeling",
+            "requested_task_type": "asset_import_qualification",
             "conversation_summary": "",
             "current_values": {},
             "explicit_field_ids": [],
@@ -145,9 +163,37 @@ def test_assistant_route_compiles_non_tuning_workflow_without_provider(
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["provider"] == "dronedream-workflow-compiler"
-    assert data["orchestration"]["intent"] == "vehicle_modeling"
-    assert data["orchestration"]["artifact_kind"] == "universal_vehicle_model"
+    assert data["orchestration"]["intent"] == "asset_import_qualification"
+    assert data["orchestration"]["artifact_kind"] == "external_asset_qualification_plan"
     assert data["orchestration"]["artifact_payload"]["owner_binding_sha256"]
+
+
+def test_agent_assistant_route_compiles_external_asset_qualification_without_provider(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/api/v1/experiment-assistant/turn",
+        json={
+            "message_id": "workflow-turn-agent-asset",
+            "message": "Import and qualify a URDF quadrotor.",
+            "locale": "en",
+            "edition": "autonomy",
+            "requested_task_type": "asset_import_qualification",
+            "conversation_summary": "",
+            "current_values": {},
+            "explicit_field_ids": [],
+            "current_parameters": [],
+            "document_context": None,
+            "llm": None,
+        },
+    )
+
+    assert response.status_code == 200
+    orchestration = response.json()["data"]["orchestration"]
+    assert orchestration["artifact_payload"]["status"] == "draft"
+    assert orchestration["artifact_kind"] == "external_asset_qualification_plan"
+    assert "asset.qualification.plan" in orchestration["artifact_payload"]["eligible_tool_ids"]
+    assert {step["status"] for step in orchestration["workflow"]} == {"completed"}
 
 
 def test_assistant_route_requires_model_access_only_for_control_tuning(

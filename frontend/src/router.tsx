@@ -13,7 +13,6 @@ import {
   BUILD_HAS_FIELD_WORKSPACE,
   BUILD_HAS_LAB_WORKSPACE,
   BUILD_HAS_SIM_WORKSPACE,
-  BUILD_HAS_VEHICLE_STUDIO,
   editionLandingPath,
 } from "./edition";
 
@@ -123,6 +122,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
               },
             },
             {
+              path: "plugins",
+              lazy: async () => {
+                const { AutonomyPlugins } = await import("./pages/AutonomyPlugins");
+                return { Component: AutonomyPlugins };
+              },
+            },
+            {
               path: "mission",
               lazy: async () => {
                 const { AutonomyMissionRedirect } = await import("./pages/AutonomyPlatform");
@@ -145,13 +151,12 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             },
           ],
         },
-        ...(BUILD_HAS_VEHICLE_STUDIO ? [{
+        {
           path: "vehicle-studio",
-          lazy: async () => {
-            const { VehicleStudio } = await import("./pages/VehicleStudio");
-            return { Component: VehicleStudio };
-          },
-        }] : []),
+          // Preserve old bookmarks without loading the retired modeler. Legacy
+          // drafts remain readable through the qualified aircraft repository.
+          element: <Navigate to="/autonomy/aircraft?source=legacy-vehicle-studio" replace />,
+        },
         {
           path: "admin",
           lazy: async () => {

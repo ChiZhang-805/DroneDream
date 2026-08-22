@@ -586,6 +586,7 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
                 db,
                 user=user,
                 req=request,
+                allow_internal_test_backend=True,
             )
             job_id = job.id
             db.commit()

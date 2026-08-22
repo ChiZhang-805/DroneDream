@@ -44,27 +44,27 @@ def test_five_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
         '"desktop\\src-tauri\\tauri.lab.conf.json"',
         '"desktop\\src-tauri\\tauri.field.conf.json"',
         '"DRONEDREAM_OAUTH_CLIENT_ID_$($EditionId.ToUpperInvariant())"',
-        'Remove-Item Env:\\RUSTFLAGS -ErrorAction SilentlyContinue',
-        'Remove-Item Env:\\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue',
+        "Remove-Item Env:\\RUSTFLAGS -ErrorAction SilentlyContinue",
+        "Remove-Item Env:\\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue",
         '"DRONEDREAM_RELEASE_SOURCE_COMMIT"',
-        '& git -C $repoRoot clean -fdx -- @paths',
-        'Refusing to delete a reparse-point root',
-        'Refusing to delete a tree containing reparse points',
-        'The source tree changed after the $editionId build.',
-        '[IO.Path]::GetFileName($builtInstaller)',
-        'build-receipt.json',
-        'buildNumber = [UInt64]$sourceBuildNumber',
+        "& git -C $repoRoot clean -fdx -- @paths",
+        "Refusing to delete a reparse-point root",
+        "Refusing to delete a tree containing reparse points",
+        "The source tree changed after the $editionId build.",
+        "[IO.Path]::GetFileName($builtInstaller)",
+        "build-receipt.json",
+        "buildNumber = [UInt64]$sourceBuildNumber",
         '[ValidateSet("msvc", "gnullvm")]',
         'targetTriple = "x86_64-pc-windows-msvc"',
         'compilerFamily = "msvc"',
-        'System32\\WindowsPowerShell\\v1.0\\Modules',
-        'function Get-ProcessEnvironmentSnapshot',
-        'function Restore-ProcessEnvironmentSnapshot',
-        '$editionEnvironment = Get-ProcessEnvironmentSnapshot',
-        'Restore-ProcessEnvironmentSnapshot -Snapshot $editionEnvironment',
-        'VsDevCmd mutates dozens of process-scoped variables.',
+        "System32\\WindowsPowerShell\\v1.0\\Modules",
+        "function Get-ProcessEnvironmentSnapshot",
+        "function Restore-ProcessEnvironmentSnapshot",
+        "$editionEnvironment = Get-ProcessEnvironmentSnapshot",
+        "Restore-ProcessEnvironmentSnapshot -Snapshot $editionEnvironment",
+        "VsDevCmd mutates dozens of process-scoped variables.",
         '[Environment]::GetEnvironmentVariable($name, "User")',
-        'These VITE values are public browser application identifiers',
+        "These VITE values are public browser application identifiers",
     ):
         assert fragment in script
     assert 'Join-Path $editionOutput "$($contract.product)-${version}.exe"' not in script
@@ -73,35 +73,35 @@ def test_five_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
 def test_shared_msvc_build_is_pinned_native_and_fail_closed() -> None:
     script = _msvc_script()
     for fragment in (
-        '1.97.0-x86_64-pc-windows-msvc',
-        'stable-x86_64-pc-windows-msvc',
+        "1.97.0-x86_64-pc-windows-msvc",
+        "stable-x86_64-pc-windows-msvc",
         '$requiredRustVersion = "1.97.0"',
-        'x86_64-pc-windows-msvc',
-        'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
-        'VsDevCmd.bat',
-        'buildNumber = [UInt64]$releaseBuildNumber',
-        'sourceTree = $releaseSourceTree',
-        'desktopVisualQa = $desktopVisualQa',
+        "x86_64-pc-windows-msvc",
+        "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+        "VsDevCmd.bat",
+        "buildNumber = [UInt64]$releaseBuildNumber",
+        "sourceTree = $releaseSourceTree",
+        "desktopVisualQa = $desktopVisualQa",
         'targetTriple = "x86_64-pc-windows-msvc"',
         '"cl.exe", "link.exe", "rc.exe", "dumpbin.exe"',
-        'dumpbin.exe /dependents $application',
-        'The desktop release source must be an exact clean Git commit.',
-        'invoke-tauri-updater-signer.ps1',
-        'Refusing to prune installer artifacts outside the MSVC NSIS bundle directory.',
-        'Resolve-EditionGeneratedFrontendContract',
-        'Test-PostBuildSourceStatus',
-        'System32\\WindowsPowerShell\\v1.0\\Modules',
-        'Programs\\Python\\Python311\\python.exe',
+        "dumpbin.exe /dependents $application",
+        "The desktop release source must be an exact clean Git commit.",
+        "invoke-tauri-updater-signer.ps1",
+        "Refusing to prune installer artifacts outside the MSVC NSIS bundle directory.",
+        "Resolve-EditionGeneratedFrontendContract",
+        "Test-PostBuildSourceStatus",
+        "System32\\WindowsPowerShell\\v1.0\\Modules",
+        "Programs\\Python\\Python311\\python.exe",
         "'^Python 3\\.11\\.[0-9]+$'",
         "Could not clear the stale updater-signature slot",
         "Unsigned builds require an empty updater-signature slot",
     ):
         assert fragment in script
     assert script.index("[IO.File]::Delete($expectedUpdaterSignature)") < script.index(
-        'Invoke-CheckedNativeCommand `'
+        "Invoke-CheckedNativeCommand `"
     )
-    assert 'tauri.llvm.conf.json' not in script
-    assert 'WebView2Loader.dll' not in script
+    assert "tauri.llvm.conf.json" not in script
+    assert "WebView2Loader.dll" not in script
 
 
 def test_shared_msvc_build_is_valid_windows_powershell() -> None:
@@ -152,15 +152,15 @@ def test_planner_verifier_waits_for_exit_and_retries_only_its_exact_temp_tree() 
     script = PLANNER_VERIFIER.read_text(encoding="utf-8-sig")
     for fragment in (
         "function Remove-PlannerSmokeSandbox",
-        '$process.WaitForExit()',
-        '$process.StandardOutput.ReadToEndAsync()',
-        '$process.StandardError.ReadToEndAsync()',
+        "$process.WaitForExit()",
+        "$process.StandardOutput.ReadToEndAsync()",
+        "$process.StandardError.ReadToEndAsync()",
         '[string]$EditionId = "universal"',
         '"--clear-installer-handoff"',
-        'The FIELD app-only command unexpectedly created a Runtime plan.',
+        "The FIELD app-only command unexpectedly created a Runtime plan.",
         'StartsWith("DroneDream-Planner-Smoke-"',
         "Refusing to remove a reparse-point planner smoke directory",
-        '[int]$MaximumAttempts = 40',
+        "[int]$MaximumAttempts = 40",
         "Start-Sleep -Milliseconds $RetryDelayMilliseconds",
     ):
         assert fragment in script
@@ -196,24 +196,26 @@ def test_field_installer_is_app_only_and_never_advertises_runtime_protocol() -> 
     assert runtime_mode.index(field_guard) < runtime_mode.index(page)
     assert '!if "${DRONEDREAM_EDITION_ID}" == "field"' in installer_hook
     assert (
-        'DeleteRegValue SHCTX "${MANUPRODUCTKEY}" '
-        '"DroneDreamRuntimeOperationProtocol"'
+        'DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"'
     ) in installer_hook
 
 
 def _run_powershell(script: str, *, cwd: Path) -> subprocess.CompletedProcess[str]:
     utf8_script = (
         "[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false); "
-        "$OutputEncoding = [Console]::OutputEncoding; "
-        + script
+        "$OutputEncoding = [Console]::OutputEncoding; " + script
     )
-    system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    system_root = Path(os.environ.get("SYSTEMROOT", r"C:\Windows"))
     powershell = system_root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
     env = os.environ.copy()
     env["PSModulePath"] = os.pathsep.join(
         (
             str(Path.home() / "Documents" / "WindowsPowerShell" / "Modules"),
-            str(Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "WindowsPowerShell" / "Modules"),
+            str(
+                Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"))
+                / "WindowsPowerShell"
+                / "Modules"
+            ),
             str(system_root / "System32" / "WindowsPowerShell" / "v1.0" / "Modules"),
         )
     )
@@ -255,7 +257,7 @@ def test_shared_llvm_build_exposes_edition_safe_inputs_without_changing_defaults
         "Detached release sources require an exact attested Node dependency manifest.",
         "verify-detached-node-dependencies.ps1",
         '$env:npm_config_offline = "true"',
-        'System32\\WindowsPowerShell\\v1.0\\Modules',
+        "System32\\WindowsPowerShell\\v1.0\\Modules",
     ):
         assert fragment in script
 
@@ -285,7 +287,7 @@ def test_shared_llvm_build_keeps_signing_and_source_guards_fail_closed() -> None
     ):
         assert fragment in script
     assert script.index("[IO.File]::Delete($expectedUpdaterSignature)") < script.index(
-        'Invoke-CheckedNativeCommand `'
+        "Invoke-CheckedNativeCommand `"
     )
 
 
@@ -375,9 +377,7 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
         assert result.returncode == 0, result.stderr
         payload = json.loads(result.stdout)
         expected_path = (
-            "frontend/dist"
-            if edition in {"universal", "field"}
-            else f"frontend/{edition}-dist"
+            "frontend/dist" if edition in {"universal", "field"} else f"frontend/{edition}-dist"
         )
         assert payload["relativePath"] == expected_path
 

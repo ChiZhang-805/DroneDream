@@ -11,8 +11,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { useVoiceInput } from "../features/experiment/useVoiceInput";
+import { localeSafeError } from "../i18n/I18nProvider";
 import {
-  CloudModelAccessError,
   completeManagedModelChat,
   completeManagedModelCatalog,
   DEFAULT_MANAGED_MODEL_CATALOG,
@@ -69,6 +69,7 @@ const COPY = {
     voiceUnavailable: "Voice input is unavailable. Continue typing.",
     plan: "Experiment plan",
     conversation: "Chat",
+    chatting: "Chatting",
     objective: "Objective",
     profile: "Test profile",
     trials: "Trial budget",
@@ -109,6 +110,7 @@ const COPY = {
     voiceUnavailable: "当前无法使用语音输入，请继续打字。",
     plan: "实验方案",
     conversation: "对话",
+    chatting: "对话进行中",
     objective: "调优目标",
     profile: "测试类型",
     trials: "试验预算",
@@ -258,9 +260,8 @@ function fieldSystemPrompt(locale: FieldLocale, pack: string, controller: string
   ].join("\n");
 }
 
-function assistantError(error: unknown, fallback: string): string {
-  if (error instanceof CloudModelAccessError) return error.message;
-  return error instanceof Error ? error.message : fallback;
+function assistantError(error: unknown, locale: FieldLocale, fallback: string): string {
+  return localeSafeError(error, locale, { zh: fallback, en: fallback });
 }
 
 export function FieldAssistantWorkspace({
@@ -362,7 +363,7 @@ export function FieldAssistantWorkspace({
         { id: messageId(), role: "assistant", content: nextPlan.summary },
       ]);
     } catch (reason) {
-      setError(assistantError(reason, copy.requestFailed));
+      setError(assistantError(reason, locale, copy.requestFailed));
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -417,7 +418,7 @@ export function FieldAssistantWorkspace({
         aria-labelledby="field-assistant-chat-tab field-assistant-title"
       >
         <header className="field-assistant-toolbar">
-          <span><Bot aria-hidden="true" />CHATTING</span>
+          <span><Bot aria-hidden="true" />{copy.chatting}</span>
           <button type="button" className="field-icon-command" title={copy.clear} aria-label={copy.clear} onClick={clear}>
             <RotateCcw aria-hidden="true" />
           </button>

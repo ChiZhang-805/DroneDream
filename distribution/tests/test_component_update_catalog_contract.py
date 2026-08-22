@@ -5,7 +5,6 @@ import hashlib
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "distribution/schemas/component-update-catalog.schema.json"
 KEYRING_PATH = ROOT / "distribution/desktop/component-release-public-keys.json"

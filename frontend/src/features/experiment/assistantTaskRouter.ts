@@ -4,7 +4,7 @@ import type { InterfaceLocale } from "../../i18n/I18nProvider";
 export type AssistantTaskType =
   | "control_tuning"
   | "mission_autonomy"
-  | "vehicle_modeling"
+  | "asset_import_qualification"
   | "simulation_experiment"
   | "cross_edition_workflow"
   | "hardware_validation"
@@ -23,28 +23,29 @@ const TASKS_BY_EDITION: Readonly<Record<BrandEditionId, readonly AssistantTaskTy
   universal: [
     "control_tuning",
     "mission_autonomy",
-    "vehicle_modeling",
+    "asset_import_qualification",
     "simulation_experiment",
     "cross_edition_workflow",
   ],
-  sim: ["control_tuning", "mission_autonomy", "simulation_experiment"],
+  sim: ["control_tuning", "mission_autonomy", "asset_import_qualification", "simulation_experiment"],
   lab: [
     "control_tuning",
     "mission_autonomy",
+    "asset_import_qualification",
     "simulation_experiment",
     "hardware_validation",
     "calibration",
     "sim_to_real",
     "real_to_sim",
   ],
-  field: ["control_tuning", "mission_autonomy", "field_task"],
-  autonomy: ["mission_autonomy", "vehicle_modeling", "simulation_experiment"],
+  field: ["control_tuning", "mission_autonomy", "asset_import_qualification", "field_task"],
+  autonomy: ["mission_autonomy", "asset_import_qualification", "simulation_experiment"],
 };
 
 const EN: Record<AssistantTaskType, Omit<AssistantTaskOption, "id">> = {
   control_tuning: { label: "Control tuning", description: "Tune PX4 parameters against bounded evidence." },
   mission_autonomy: { label: "Autonomous mission", description: "Plan, simulate, monitor, and safely replan a route." },
-  vehicle_modeling: { label: "Vehicle modeling", description: "Create an editable airframe and component draft." },
+  asset_import_qualification: { label: "Asset import & qualification", description: "Normalize an external map, world, or aircraft package and plan its ROS 2, Gazebo, and PX4 qualification." },
   simulation_experiment: { label: "Simulation study", description: "Build a repeatable PX4 and Gazebo experiment." },
   cross_edition_workflow: { label: "Cross-edition workflow", description: "Connect SIM, LAB, and FIELD with qualification gates." },
   hardware_validation: { label: "Hardware validation", description: "Prepare a bounded bench or captured-vehicle validation." },
@@ -57,7 +58,7 @@ const EN: Record<AssistantTaskType, Omit<AssistantTaskOption, "id">> = {
 const ZH: Record<AssistantTaskType, Omit<AssistantTaskOption, "id">> = {
   control_tuning: { label: "控制参数调优", description: "依据受约束证据调优 PX4 参数。" },
   mission_autonomy: { label: "自主飞行任务", description: "规划、仿真、监控并安全地实时重规划航线。" },
-  vehicle_modeling: { label: "无人机建模", description: "创建可继续编辑的机架与组件模型草稿。" },
+  asset_import_qualification: { label: "资产导入与资格认证", description: "规范化外部地图、世界或无人机资产，并规划 ROS 2、Gazebo 与 PX4 资格认证。" },
   simulation_experiment: { label: "仿真实验", description: "创建可复现的 PX4 与 Gazebo 实验。" },
   cross_edition_workflow: { label: "跨版本工作流", description: "通过资格门连接 SIM、LAB 与 FIELD。" },
   hardware_validation: { label: "真机验证", description: "准备受约束的台架或实测数据验证流程。" },
@@ -71,7 +72,7 @@ export function assistantTaskOptions(
   edition: BrandEditionId,
   locale: InterfaceLocale,
 ): AssistantTaskOption[] {
-  const copy = locale === "zh-CN" || locale === "zh-TW" ? ZH : EN;
+  const copy = locale === "zh-CN" ? ZH : EN;
   return TASKS_BY_EDITION[edition].map((id) => ({ id, ...copy[id] }));
 }
 

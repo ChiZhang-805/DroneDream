@@ -413,9 +413,9 @@ export function FieldSettingsDialog({
               <div className="settings-memory-grid">
                 <label><span>{copy.defaults[0]}</span><input value="My Drone" readOnly disabled={!memoryEnabled} /></label>
                 <label><span>{copy.defaults[1]}</span><input value="School Map" readOnly disabled={!memoryEnabled} /></label>
-                <label><span>{copy.defaults[2]}</span><select defaultValue="strict" disabled={!memoryEnabled}><option value="strict">Strict</option></select></label>
-                <label><span>{copy.defaults[3]}</span><select defaultValue="metric" disabled={!memoryEnabled}><option value="metric">Metric</option></select></label>
-                <label><span>{copy.defaults[4]}</span><select defaultValue="evidence" disabled={!memoryEnabled}><option value="evidence">Evidence</option></select></label>
+                <label><span>{copy.defaults[2]}</span><select defaultValue="strict" disabled={!memoryEnabled}><option value="strict">{locale === "zh-CN" ? "严格" : "Strict"}</option></select></label>
+                <label><span>{copy.defaults[3]}</span><select defaultValue="metric" disabled={!memoryEnabled}><option value="metric">{locale === "zh-CN" ? "公制" : "Metric"}</option></select></label>
+                <label><span>{copy.defaults[4]}</span><select defaultValue="evidence" disabled={!memoryEnabled}><option value="evidence">{locale === "zh-CN" ? "证据包" : "Evidence"}</option></select></label>
               </div>
             </div>
           </div>

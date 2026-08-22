@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FieldLocaleProvider } from "../field/FieldLocaleProvider";
 
@@ -66,11 +66,26 @@ import { FieldRoot } from "../field/FieldRoot";
 
 async function finishLoading(): Promise<void> {
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(1_100);
+    await vi.advanceTimersByTimeAsync(5_000);
   });
 }
 
 describe("FieldRoot", () => {
+  beforeEach(() => {
+    document.documentElement.dataset.brandEdition = "field";
+    document.documentElement.style.setProperty("--dd-brand-start", "#ff9f3f");
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => ({
+      getExtension: () => ({ loseContext: vi.fn() }),
+    }) as unknown as RenderingContext);
+  });
+
+  afterEach(() => {
+    delete document.documentElement.dataset.brandEdition;
+    document.documentElement.style.removeProperty("--dd-brand-start");
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   it("loads the shared 3D launch scene to 100 percent before offering entry", async () => {
     vi.useFakeTimers();
     const { container } = render(

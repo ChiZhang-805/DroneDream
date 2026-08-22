@@ -13,7 +13,7 @@ export type AssistantEdition = "universal" | "sim" | "lab" | "field" | "autonomy
 export type AssistantTaskType =
   | "control_tuning"
   | "mission_autonomy"
-  | "vehicle_modeling"
+  | "asset_import_qualification"
   | "simulation_experiment"
   | "cross_edition_workflow"
   | "hardware_validation"
@@ -24,6 +24,7 @@ export type AssistantTaskType =
 type ManagedProvider = "openai" | "deepseek" | "kimi";
 type ArtifactKind =
   | "autonomy_mission_plan"
+  | "external_asset_qualification_plan"
   | "universal_vehicle_model"
   | "universal_simulation_experiment"
   | "universal_cross_edition_workflow"
@@ -70,23 +71,24 @@ const MANAGED_MODELS: Readonly<Record<ManagedProvider, readonly string[]>> = {
 const EDITION_ARTIFACTS: Readonly<Record<AssistantEdition, readonly ArtifactKind[]>> = {
   universal: [
     "autonomy_mission_plan",
-    "universal_vehicle_model",
+    "external_asset_qualification_plan",
     "universal_simulation_experiment",
     "universal_cross_edition_workflow",
   ],
-  sim: ["autonomy_mission_plan", "simulation_experiment"],
+  sim: ["autonomy_mission_plan", "external_asset_qualification_plan", "simulation_experiment"],
   lab: [
     "autonomy_mission_plan",
+    "external_asset_qualification_plan",
     "lab_simulation_experiment",
     "lab_hardware_validation",
     "lab_calibration_workflow",
     "lab_sim_to_real_workflow",
     "lab_real_to_sim_workflow",
   ],
-  field: ["autonomy_mission_plan", "field_task_plan"],
+  field: ["autonomy_mission_plan", "external_asset_qualification_plan", "field_task_plan"],
   autonomy: [
     "autonomy_mission_plan",
-    "universal_vehicle_model",
+    "external_asset_qualification_plan",
     "simulation_experiment",
   ],
 };
@@ -97,18 +99,20 @@ const EDITION_TASK_ARTIFACTS: Readonly<
   universal: {
     control_tuning: "universal_simulation_experiment",
     mission_autonomy: "autonomy_mission_plan",
-    vehicle_modeling: "universal_vehicle_model",
+    asset_import_qualification: "external_asset_qualification_plan",
     simulation_experiment: "universal_simulation_experiment",
     cross_edition_workflow: "universal_cross_edition_workflow",
   },
   sim: {
     control_tuning: "simulation_experiment",
     mission_autonomy: "autonomy_mission_plan",
+    asset_import_qualification: "external_asset_qualification_plan",
     simulation_experiment: "simulation_experiment",
   },
   lab: {
     control_tuning: "lab_simulation_experiment",
     mission_autonomy: "autonomy_mission_plan",
+    asset_import_qualification: "external_asset_qualification_plan",
     simulation_experiment: "lab_simulation_experiment",
     hardware_validation: "lab_hardware_validation",
     calibration: "lab_calibration_workflow",
@@ -118,11 +122,12 @@ const EDITION_TASK_ARTIFACTS: Readonly<
   field: {
     control_tuning: "field_task_plan",
     mission_autonomy: "autonomy_mission_plan",
+    asset_import_qualification: "external_asset_qualification_plan",
     field_task: "field_task_plan",
   },
   autonomy: {
     mission_autonomy: "autonomy_mission_plan",
-    vehicle_modeling: "universal_vehicle_model",
+    asset_import_qualification: "external_asset_qualification_plan",
     simulation_experiment: "simulation_experiment",
   },
 };
@@ -130,7 +135,7 @@ const EDITION_TASK_ARTIFACTS: Readonly<
 const EDITION_SYSTEM_PROMPTS: Readonly<Record<AssistantEdition, string>> = {
   universal: [
     "Route the request to exactly one Universal capability.",
-    "Use universal_vehicle_model for an editable drone geometry/component/model draft.",
+    "Use external_asset_qualification_plan for a source-bound map, world, or aircraft import and qualification plan.",
     "Use universal_simulation_experiment for a reviewable simulation experiment draft.",
     "Use universal_cross_edition_workflow only when the requested deliverable crosses SIM, LAB, or FIELD boundaries.",
     "Never claim that modeling, simulation, validation, or flight already ran.",
@@ -151,7 +156,7 @@ const EDITION_SYSTEM_PROMPTS: Readonly<Record<AssistantEdition, string>> = {
     "Never arm, write parameters, control a vehicle, or claim that a flight ran.",
   ].join(" "),
   autonomy: [
-    "Route to exactly one AUTONOMY draft: autonomous mission, vehicle model, or simulation study.",
+    "Route to exactly one AGENT draft: autonomous mission, external asset qualification, or simulation study.",
     "Keep model assumptions, simulation evidence, deterministic validation, and runtime authority distinct.",
     "Never claim that a model, simulation, mission, or physical execution already ran.",
   ].join(" "),
@@ -769,13 +774,14 @@ function plannerPrompt(
       questions: ["only essential missing facts, at most 4"],
     },
     edition_contracts: {
-      universal_vehicle_model: {
+      external_asset_qualification_plan: {
         shape: {
-          vehicle_type: "non-empty string",
-          geometry: "object",
-          propulsion: "object",
-          mass_properties: "object",
-          sensors: "array",
+          asset_kind: "map, world, aircraft, or mixed",
+          source: "object with source tool, format, identity, and hashes",
+          normalization: "object with units, frames, transforms, and package target",
+          runtime_bindings: "object with ROS 2, Gazebo, and PX4 targets",
+          required_evidence: "array",
+          qualification_gates: "array",
           assumptions: "array",
         },
       },
@@ -946,7 +952,7 @@ async function loadBoundedConsoleMemory(
 }
 
 function memoryScopeForArtifact(kind: ArtifactKind): ConsoleMemoryScope {
-  if (kind === "universal_vehicle_model") return "device_vehicle";
+  if (kind === "universal_vehicle_model" || kind === "external_asset_qualification_plan") return "device_vehicle";
   if (kind === "field_task_plan" || kind === "lab_hardware_validation") return "safety_approvals";
   if (kind.includes("workflow")) return "workflow_tools";
   return "experiment_defaults";
@@ -1073,6 +1079,11 @@ function validateEditionDraft(kind: ArtifactKind, draft: JsonRecord): void {
       records: ["asset_bindings", "task_graph", "repair", "safety_policy"],
       arrays: ["grounded_entities", "tool_requests", "tool_receipts", "assumptions", "blockers"],
       texts: ["schema_version", "status", "goal"], booleans: [],
+    },
+    external_asset_qualification_plan: {
+      records: ["source", "normalization", "runtime_bindings"],
+      arrays: ["required_evidence", "qualification_gates", "assumptions"],
+      texts: ["asset_kind"], booleans: [],
     },
     universal_vehicle_model: {
       records: ["geometry", "propulsion", "mass_properties"],

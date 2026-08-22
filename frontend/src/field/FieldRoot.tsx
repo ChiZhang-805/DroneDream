@@ -169,15 +169,66 @@ export function FieldRoot() {
   const { locale, setLocale } = useFieldLocale();
   const [entered, setEntered] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [fieldWorkspaceLoaded, setFieldWorkspaceLoaded] = useState(false);
-  const progress = fieldWorkspaceLoaded ? 100 : 0;
+  const [progress, setProgress] = useState(0);
   useEffect(() => {
     let active = true;
-    const fontsReady = "fonts" in document
-      ? document.fonts.ready.catch(() => undefined)
-      : Promise.resolve();
-    void Promise.all([fontsReady, import("./FieldApp")]).then(() => {
-      if (active) setFieldWorkspaceLoaded(true);
+    const minimumStageDurationMs = 600;
+    const wait = (milliseconds: number) => new Promise<void>((resolve) => {
+      window.setTimeout(resolve, milliseconds);
+    });
+    const nextFrame = () => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+    const advance = async (percent: number, check: () => Promise<void> | void) => {
+      const startedAt = performance.now();
+      await check();
+      await wait(Math.max(0, minimumStageDurationMs - (performance.now() - startedAt)));
+      if (!active) throw new DOMException("Field readiness cancelled", "AbortError");
+      setProgress(percent);
+    };
+    const run = async () => {
+      setProgress(0);
+      await advance(8, async () => {
+        await nextFrame();
+        await nextFrame();
+      });
+      await advance(20, async () => {
+        if ("fonts" in document) await document.fonts.ready;
+      });
+      let loadedModule: typeof import("./FieldApp") | null = null;
+      await advance(38, async () => {
+        loadedModule = await import("./FieldApp");
+      });
+      await advance(54, () => {
+        if (!loadedModule || typeof loadedModule.FieldApp !== "function") {
+          throw new Error("FIELD_WORKSPACE_MODULE_INVALID");
+        }
+      });
+      await advance(68, () => {
+        if (document.documentElement.dataset.brandEdition !== "field") {
+          throw new Error("FIELD_BRAND_CONTRACT_MISSING");
+        }
+      });
+      await advance(80, () => {
+        const style = getComputedStyle(document.documentElement);
+        if (!style.getPropertyValue("--dd-brand-start").trim()) {
+          throw new Error("FIELD_THEME_CONTRACT_MISSING");
+        }
+      });
+      await advance(91, () => {
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+        if (!context) throw new Error("FIELD_3D_RUNTIME_UNAVAILABLE");
+        context.getExtension("WEBGL_lose_context")?.loseContext();
+      });
+      await advance(100, nextFrame);
+    };
+    void run().catch((reason: unknown) => {
+      if (active && !(reason instanceof DOMException && reason.name === "AbortError")) {
+        // Readiness fails closed at 0%. The launcher never reveals a sign-in
+        // action until every product, localization, theme and 3D gate passes.
+        setProgress(0);
+      }
     });
     return () => {
       active = false;

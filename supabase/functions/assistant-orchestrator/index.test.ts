@@ -8,13 +8,14 @@ import {
 
 const contracts: Record<AssistantEdition, { kind: string; draft: Record<string, unknown> }> = {
   universal: {
-    kind: "universal_vehicle_model",
+    kind: "external_asset_qualification_plan",
     draft: {
-      vehicle_type: "quadrotor",
-      geometry: {},
-      propulsion: {},
-      mass_properties: {},
-      sensors: [],
+      asset_kind: "aircraft",
+      source: {},
+      normalization: {},
+      runtime_bindings: {},
+      required_evidence: [],
+      qualification_gates: [],
       assumptions: [],
     },
   },
@@ -295,7 +296,7 @@ Deno.test("requires the model repair counter to match the server-owned attempt",
 
 Deno.test("requires auto-routing to return an edition-valid task type", () => {
   const value = JSON.parse(plan("field"));
-  value.intent = "vehicle_modeling";
+  value.intent = "cross_edition_workflow";
   assertThrows(() => parseAssistantPlan(JSON.stringify(value), "field", null));
 });
 

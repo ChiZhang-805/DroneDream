@@ -29,7 +29,7 @@ mod tests {
     #[test]
     fn compiled_identity_is_exact_and_hardware_scoped() {
         require_available().expect(
-            "Universal, Lab, Field, or AUTONOMY hardware domain must be compiled explicitly",
+            "Universal, Lab, Field, or AGENT hardware domain must be compiled explicitly",
         );
         assert!(matches!(edition_id(), "lab" | "field" | "autonomy"));
         if env!("DRONEDREAM_DESKTOP_EDITION_ID") == "universal" {

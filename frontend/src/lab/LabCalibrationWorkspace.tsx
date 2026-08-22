@@ -14,13 +14,12 @@ import {
   X,
 } from "lucide-react";
 
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import {
   evaluateLabCalibrationCycle,
   isDesktopRuntime,
 } from "../desktop/bridge";
 import {
-  LabCalibrationInputError,
   analyzeLabCalibration,
   parseLabCalibrationInput,
   serializeLabCalibrationDraftReceipt,
@@ -55,6 +54,8 @@ const COPY = {
     noInput: "No cycle evidence bound",
     noInputBody: "The Harness is idle. Model requests, experiments, provider calls, and hardware actions remain at zero.",
     rejected: "Evidence rejected",
+    inspectFailed: "The evidence could not be inspected.",
+    exportFailed: "The draft receipt could not be generated.",
     workflow: "Job progression",
     gap: "Sim-real gap",
     aggregate: "Aggregate gap",
@@ -65,6 +66,9 @@ const COPY = {
     export: "Export draft receipt",
     openSim: "Open simulation optimization",
     draftOnly: "DRAFT · NOT QUALIFIED",
+    job: "Job",
+    cycle: "Cycle",
+    vehiclePack: "Vehicle Pack",
     qualification: "Qualification",
     qualificationBody: "Independent holdout and a validated Vehicle Pack are required before trusted evidence can be issued.",
     safety: "Imported evidence and exported drafts never grant hardware authority.",
@@ -97,7 +101,7 @@ const COPY = {
   },
   "zh-CN": {
     title: "双向校准闭环",
-    subtitle: "同一份证据绑定作业将候选参数从仿真带入真实观测，再完成模型修正、重仿真、独立 holdout 与资格判定。",
+    subtitle: "同一份证据绑定作业将候选参数从仿真带入真实观测，再完成模型修正、重仿真、独立留出验证与资格判定。",
     model: "Model",
     modelState: "仅提出建议",
     harness: "Harness",
@@ -117,8 +121,10 @@ const COPY = {
     import: "导入已绑定循环证据",
     reset: "重置分析",
     noInput: "尚未绑定循环证据",
-    noInputBody: "Harness 当前空闲；Model 请求、实验、provider 调用和真机动作次数均为零。",
+    noInputBody: "Harness 当前空闲；Model 请求、实验、模型服务商调用和真机动作次数均为零。",
     rejected: "证据已拒绝",
+    inspectFailed: "无法检查导入的证据。",
+    exportFailed: "无法生成草稿回执。",
     workflow: "作业进程",
     gap: "仿真与真实差距",
     aggregate: "综合差距",
@@ -126,11 +132,14 @@ const COPY = {
     recommendations: "模型修正输入",
     sim: "仿真",
     real: "真实",
-    export: "导出草稿 receipt",
+    export: "导出草稿回执",
     openSim: "打开仿真优化",
     draftOnly: "草稿 · 尚未取得资格",
+    job: "作业",
+    cycle: "循环",
+    vehiclePack: "机型包",
     qualification: "资格判定",
-    qualificationBody: "签发可信证据前必须通过独立 holdout，并使用已验证的 Vehicle Pack。",
+    qualificationBody: "签发可信证据前必须通过独立留出验证，并使用已验证的机型包。",
     safety: "导入证据与导出草稿均不会授予真机权限。",
     status: { complete: "完成", ready: "就绪", pending: "等待", blocked: "阻断" },
     metrics: {
@@ -146,16 +155,16 @@ const COPY = {
       "sim-real-gap-analysis": "差距分析",
       "real-sim-model-calibration": "模型校准",
       resimulation: "重新仿真",
-      "independent-holdout": "独立 holdout",
+      "independent-holdout": "独立留出验证",
       "qualification-and-evidence": "资格证据",
       "field-handoff": "FIELD 交接",
     },
     actions: {
       "revise-model-and-resimulate": "修正模型，在冻结预算内提出下一组候选参数并重新仿真。",
-      "await-independent-holdout": "冻结校准模型，完成独立 holdout 后再进行资格判定。",
+      "await-independent-holdout": "冻结校准模型，完成独立留出验证后再进行资格判定。",
     },
     reasons: {
-      "zero-validated-vehicle-packs": "拒绝：已验证 Vehicle Pack 数量为零",
+      "zero-validated-vehicle-packs": "拒绝：已验证机型包数量为零",
       "gap-outside-tolerance": "拒绝：仿真与真实差距超出容限",
     },
   },
@@ -189,9 +198,10 @@ export function LabCalibrationWorkspace() {
       setError(null);
     } catch (caught) {
       setInput(null);
-      setError(caught instanceof LabCalibrationInputError
-        ? caught.message
-        : "The evidence could not be inspected.");
+      setError(localeSafeError(caught, locale, {
+        zh: COPY["zh-CN"].inspectFailed,
+        en: COPY.en.inspectFailed,
+      }));
     }
   }
 
@@ -230,7 +240,10 @@ export function LabCalibrationWorkspace() {
         });
         source = `${JSON.stringify(receipt, null, 2)}\n`;
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : copy.rejected);
+        setError(localeSafeError(caught, locale, {
+          zh: COPY["zh-CN"].exportFailed,
+          en: COPY.en.exportFailed,
+        }));
         return;
       }
     } else {
@@ -317,9 +330,9 @@ export function LabCalibrationWorkspace() {
       ) : (
         <>
           <div className="lab-calibration-identity">
-            <span><small>Job</small><strong>{input.jobId}</strong></span>
-            <span><small>Cycle</small><strong>{input.cycleOrdinal}</strong></span>
-            <span><small>Vehicle Pack</small><strong>{input.vehiclePackId}</strong></span>
+            <span><small>{copy.job}</small><strong>{input.jobId}</strong></span>
+            <span><small>{copy.cycle}</small><strong>{input.cycleOrdinal}</strong></span>
+            <span><small>{copy.vehiclePack}</small><strong>{input.vehiclePackId}</strong></span>
             <span><small>{copy.draftOnly}</small><strong>{input.sourceKind}</strong></span>
           </div>
 

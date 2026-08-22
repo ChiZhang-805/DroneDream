@@ -59,6 +59,131 @@ def test_external_abort_contract_rejects_missing_world_pause_state(tmp_path: Pat
         executor._read_external_abort_request(abort_path)
 
 
+def _runtime_control_payload(
+    *,
+    revision: int,
+    action: str,
+    route: list[dict[str, float]] | None = None,
+) -> dict[str, object]:
+    return {
+        "schema_version": "dronedream.autonomy.runtime-control.v1",
+        "revision": revision,
+        "action": action,
+        "runtime_session_id": "runtime-0123456789abcdef01234567",
+        "mission_revision": 2 if action == "replace_route" else 1,
+        "contract_id": "contract-runtime-test",
+        "issued_at": "2026-08-21T00:00:00Z",
+        "reason_codes": ["operator.interruption-hold"],
+        "route": route,
+    }
+
+
+@pytest.mark.parametrize("action", ["hold", "resume"])
+def test_runtime_control_reader_accepts_route_free_hold_and_resume(
+    tmp_path: Path,
+    action: str,
+) -> None:
+    path = _write_json(
+        tmp_path / "runtime_control.request.json",
+        _runtime_control_payload(revision=1, action=action),
+    )
+
+    request = executor._read_runtime_control_request(path)
+
+    assert request.revision == 1
+    assert request.action == action
+    assert request.route is None
+
+
+def test_runtime_control_reader_accepts_a_bounded_replacement_route(tmp_path: Path) -> None:
+    route = [
+        {"x": 1.0, "y": 2.0, "z": 3.0, "speed_limit_mps": 0.6},
+        {"x": 2.0, "y": 2.5, "z": 3.0, "speed_limit_mps": 0.8},
+    ]
+    path = _write_json(
+        tmp_path / "runtime_control.request.json",
+        _runtime_control_payload(revision=2, action="replace_route", route=route),
+    )
+
+    request = executor._read_runtime_control_request(path)
+
+    assert request.action == "replace_route"
+    assert request.route == [
+        executor.TrackPoint(1.0, 2.0, 3.0, 0.6),
+        executor.TrackPoint(2.0, 2.5, 3.0, 0.8),
+    ]
+
+
+@pytest.mark.parametrize(
+    "override, expected_error",
+    [
+        ({"revision": True}, "runtime control revision is invalid"),
+        ({"action": "teleport"}, "runtime control action is invalid"),
+        ({"contract_id": "short"}, "runtime control contract id is invalid"),
+        ({"action": "hold", "route": []}, "must not include a route"),
+        ({"action": "replace_route", "route": []}, "replacement route is invalid"),
+        (
+            {
+                "action": "replace_route",
+                "route": [
+                    {"x": 0.0, "y": 0.0, "z": 1.0},
+                    {"x": float("nan"), "y": 0.0, "z": 1.0},
+                ],
+            },
+            "must be a finite number",
+        ),
+    ],
+)
+def test_runtime_control_reader_rejects_invalid_or_unsafe_requests(
+    tmp_path: Path,
+    override: dict[str, object],
+    expected_error: str,
+) -> None:
+    payload = _runtime_control_payload(revision=1, action="hold")
+    payload.update(override)
+    path = _write_json(tmp_path / "runtime_control.request.json", payload)
+
+    with pytest.raises(RuntimeError, match=expected_error):
+        executor._read_runtime_control_request(path)
+
+
+def test_runtime_control_reader_rejects_oversized_requests(tmp_path: Path) -> None:
+    path = tmp_path / "runtime_control.request.json"
+    path.write_text("x" * (executor.MAX_RUNTIME_CONTROL_BYTES + 1), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="runtime control request is oversized"):
+        executor._read_runtime_control_request(path)
+
+
+def test_runtime_replan_schedule_starts_at_the_held_setpoint_and_respects_bounds() -> None:
+    current = executor.Setpoint(1.0, -2.0, -3.0, 15.0)
+    route = [
+        executor.TrackPoint(1.0, -2.0, 3.0, 0.5),
+        executor.TrackPoint(2.0, -1.0, 3.0, 0.5),
+    ]
+    params = executor.ControllerParams(1.0, 0.2, 0.05, 0.5, 0.4, 0.5)
+    rate_hz = 20.0
+
+    schedule = executor._runtime_replan_schedule(current, route, params, rate_hz)
+
+    assert schedule[0].north_m == pytest.approx(current.north_m)
+    assert schedule[0].east_m == pytest.approx(current.east_m)
+    assert schedule[0].down_m == pytest.approx(current.down_m)
+    assert schedule[-1].north_m == pytest.approx(2.0)
+    assert schedule[-1].east_m == pytest.approx(-1.0)
+    assert schedule[-1].down_m == pytest.approx(-3.0)
+    assert (
+        max(
+            math.dist(
+                (first.north_m, first.east_m, first.down_m),
+                (second.north_m, second.east_m, second.down_m),
+            )
+            for first, second in zip(schedule, schedule[1:], strict=False)
+        )
+        <= params.vel_limit / rate_hz + 1e-6
+    )
+
+
 def test_executor_honors_preexisting_abort_before_connecting_or_commanding(
     tmp_path: Path,
 ) -> None:
@@ -1168,6 +1293,91 @@ def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
     timing = json.loads(timing_path.read_text(encoding="utf-8"))
     assert timing["time_base"] == "executor_relative_seconds"
     assert timing["track_start_t"] <= timing["track_end_t"]
+
+
+def test_executor_holds_the_current_setpoint_then_splices_a_runtime_route(
+    tmp_path: Path,
+) -> None:
+    runtime_control_path = tmp_path / "runtime_control.request.json"
+
+    class RuntimeControlClient(executor.FakeOffboardClient):
+        def __init__(self) -> None:
+            super().__init__()
+            self.hold_anchor: executor.Setpoint | None = None
+            self.hold_setpoints: list[executor.Setpoint] = []
+            self.replacement_written = False
+
+        async def set_position_ned(self, setpoint: executor.Setpoint) -> None:
+            await super().set_position_ned(setpoint)
+            if not self.offboard_started:
+                return
+            if self.hold_anchor is None:
+                if setpoint != schedule[0]:
+                    return
+                self.hold_anchor = setpoint
+                _write_json(
+                    runtime_control_path,
+                    _runtime_control_payload(revision=1, action="hold"),
+                )
+                return
+            if self.replacement_written:
+                return
+            self.hold_setpoints.append(setpoint)
+            if len(self.hold_setpoints) >= 3:
+                _write_json(
+                    runtime_control_path,
+                    _runtime_control_payload(
+                        revision=2,
+                        action="replace_route",
+                        route=[
+                            {"x": 0.0, "y": 0.0, "z": 0.01, "speed_limit_mps": 0.4},
+                            {"x": 0.4, "y": 0.2, "z": 0.01, "speed_limit_mps": 0.4},
+                        ],
+                    ),
+                )
+                self.replacement_written = True
+
+    client = RuntimeControlClient()
+    schedule = [
+        executor.Setpoint(0.0, 0.0, -0.01, 0.0),
+        executor.Setpoint(0.1, 0.0, -0.01, 0.0),
+        executor.Setpoint(0.2, 0.0, -0.01, 0.0),
+    ]
+    timing_path = tmp_path / "offboard_timing.json"
+    params = executor.ControllerParams(1.0, 0.2, 0.05, 0.4, 0.4, 0.5)
+
+    asyncio.run(
+        executor.run_executor(
+            client,
+            schedule,
+            connection="udp://:14540",
+            takeoff_timeout_seconds=1.0,
+            takeoff_climb_rate_m_s=executor.MAX_TAKEOFF_CLIMB_RATE_M_S,
+            track_timeout_seconds=5.0,
+            rate_hz=100.0,
+            land_after=True,
+            log_path=tmp_path / "offboard.log",
+            timing_path=timing_path,
+            runtime_control_file=runtime_control_path,
+            controller_params=params,
+        )
+    )
+
+    assert client.hold_anchor is not None
+    assert len(client.hold_setpoints) >= 3
+    assert all(point == client.hold_anchor for point in client.hold_setpoints[:3])
+    assert client.setpoints[-1].north_m == pytest.approx(0.4)
+    assert client.setpoints[-1].east_m == pytest.approx(0.2)
+    assert client.setpoints[-1].down_m == pytest.approx(-0.01)
+    assert client.landed is True
+    assert client.closed is True
+    acknowledgement = json.loads(
+        (tmp_path / "runtime_control.ack.json").read_text(encoding="utf-8")
+    )
+    assert acknowledgement["revision"] == 2
+    assert acknowledgement["state"] == "route_replaced"
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert [event["action"] for event in timing["runtime_controls"]] == ["replace_route"]
 
 
 @pytest.mark.parametrize(

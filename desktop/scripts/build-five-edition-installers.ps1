@@ -91,7 +91,9 @@ function Remove-GeneratedSourceOutputs {
         "frontend/field-dist",
         "frontend/tsconfig.tsbuildinfo",
         "desktop/src-tauri/gen",
-        "desktop/src-tauri/target/llvm-bundle"
+        "desktop/src-tauri/target/llvm-bundle",
+        "desktop/src-tauri/binaries",
+        "desktop/src-tauri/agent-core-resources"
     )
     & git -C $repoRoot clean -fdx -- @paths | Out-Host
     if ($LASTEXITCODE -ne 0) {
@@ -135,13 +137,29 @@ function Restore-ProcessEnvironmentSnapshot {
 
 function Get-OAuthClientId {
     param([Parameter(Mandatory = $true)][string]$EditionId)
-    $editionVariable = "DRONEDREAM_OAUTH_CLIENT_ID_$($EditionId.ToUpperInvariant())"
-    $value = [Environment]::GetEnvironmentVariable($editionVariable, "Process")
-    if (-not $value) {
-        # OAuth client IDs are public application identifiers. Keep an explicit
-        # process override for CI, while allowing the reviewed per-user desktop
-        # registration to drive a local five-edition release build.
-        $value = [Environment]::GetEnvironmentVariable($editionVariable, "User")
+    $editionVariables = if ($EditionId -eq "autonomy") {
+        # AGENT is the product-facing name. AUTONOMY remains a read-only legacy
+        # alias so existing developer machines and provider registrations do not
+        # need to be changed in lockstep with the visible rename.
+        @("DRONEDREAM_OAUTH_CLIENT_ID_AGENT", "DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY")
+    } else {
+        @("DRONEDREAM_OAUTH_CLIENT_ID_$($EditionId.ToUpperInvariant())")
+    }
+    $value = $null
+    foreach ($environmentTarget in @("Process", "User")) {
+        foreach ($editionVariable in $editionVariables) {
+            $candidate = [Environment]::GetEnvironmentVariable(
+                $editionVariable,
+                $environmentTarget
+            )
+            if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+                $value = $candidate
+                break
+            }
+        }
+        if ($value) {
+            break
+        }
     }
     if (-not $value -and $Edition -ne "all") {
         $value = [Environment]::GetEnvironmentVariable("DRONEDREAM_OAUTH_CLIENT_ID", "Process")
@@ -149,7 +167,7 @@ function Get-OAuthClientId {
     if ([string]::IsNullOrWhiteSpace($value) -or
         $value -notmatch '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$' -or
         $value -match '^dronedream-desktop-(universal|sim|lab|field|autonomy)$') {
-        throw "Set the approved public $editionVariable before building $EditionId."
+        throw "Set an approved public OAuth client ID in $($editionVariables -join ' or ') before building $EditionId."
     }
     return $value
 }
@@ -347,6 +365,12 @@ try {
             # inherited custom flags so both release chains remain deterministic.
             Remove-Item Env:\RUSTFLAGS -ErrorAction SilentlyContinue
             Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+
+            & (Join-Path $repoRoot "desktop\scripts\stage-agent-core.ps1") `
+                -TargetTriple $toolchainContract.targetTriple
+            if ($LASTEXITCODE -ne 0) {
+                throw "AGENT Core staging failed for $editionId."
+            }
 
             & (Join-Path $repoRoot $toolchainContract.builder) `
                 -AdditionalConfigPath $configPath `

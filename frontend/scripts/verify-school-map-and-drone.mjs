@@ -132,18 +132,17 @@ try {
     });
   }
 
-  await page.goto(`${origin}/console/vehicle-studio`, { waitUntil: "networkidle" });
+  await page.goto(`${origin}/console/autonomy/aircraft`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);
-  await page.locator(".vehicle-viewport-stage canvas").waitFor({ state: "visible" });
-  await page.waitForTimeout(1200);
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}my-drone-vehicle-studio-1600x1000.png`), fullPage: false });
+  await page.locator(".autonomy-config-page").waitFor({ state: "visible" });
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}my-drone-qualified-repository-1600x1000.png`), fullPage: false });
   const vehicleText = await page.locator("body").innerText();
   const inputValues = await page.locator("input").evaluateAll((elements) => elements.map((element) => element.value));
-  if (!vehicleText.includes("My Drone") && !inputValues.includes("My Drone")) throw new Error(`Vehicle Studio did not open My Drone. Inputs: ${inputValues.join(" | ")}`);
-  if (await page.getByText("Jetson Orin NX compute enclosure", { exact: true }).count() !== 0) throw new Error("My Drone still exposes a Jetson module that is absent from the qualified PX4/Gazebo contract.");
-  if (await page.getByText("Front RGB-D perception module", { exact: true }).count() !== 0) throw new Error("My Drone still exposes an RGB-D module that is absent from the qualified PX4/Gazebo contract.");
-  if (await page.getByText("M10 GNSS and compass mast", { exact: true }).count() < 1) throw new Error("My Drone is missing its qualified GNSS component.");
-  if (!vehicleText.includes("2.06 kg")) throw new Error("Vehicle Studio does not display the qualified My Drone dry mass.");
+  if (!vehicleText.includes("My Drone") && !inputValues.includes("My Drone")) throw new Error(`Aircraft repository did not open My Drone. Inputs: ${inputValues.join(" | ")}`);
+  if (await page.locator('.autonomy-asset-toolbar button').count() !== 0) throw new Error("Aircraft repository must not expose an in-product model creator.");
+  if (await page.locator('.autonomy-connector-import-actions button').count() < 3) throw new Error("Aircraft repository is missing external import actions.");
+  if (await page.locator('.autonomy-form-grid input:not([readonly])').count() !== 0) throw new Error("Qualified aircraft identity must remain read-only.");
+  if (!vehicleText.includes("External asset import")) throw new Error("Aircraft repository no longer exposes its external-modeling import boundary.");
 
   await page.goto(`${origin}/console/assistant`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);
@@ -207,33 +206,28 @@ try {
   if (await contextPopover.getByText("5 environment", { exact: true }).count() !== 0) throw new Error("The retired 5 environment map is still visible.");
   if (await contextPopover.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Mission Context must expose exactly one School Map entry.");
   if (await contextPopover.locator('input[name="autonomy-map"]:checked').count() !== 0) throw new Error("Opening Mission Context must not silently replace a custom map binding.");
-  await contextPopover.locator('input[name="autonomy-map"][value="map-school"]').check();
-  if (await contextPopover.locator('input[name="autonomy-map"]:checked').getAttribute("value") !== "map-school") throw new Error("School Map was not selected after an explicit user choice.");
+  if (!await contextPopover.locator('input[name="autonomy-map"][value="map-school"]').isDisabled()) throw new Error("An unqualified School Map must not be selectable.");
   const reboundMapId = await page.evaluate(() => {
     const stored = window.localStorage.getItem("dronedream:autonomy-workspace:v2:local:universal");
     return stored ? JSON.parse(stored).mapPack?.id : null;
   });
-  if (reboundMapId !== "map-school") throw new Error(`Mission Context did not persist the School Map binding: ${reboundMapId}.`);
+  if (reboundMapId !== "map-legacy-5-environment") throw new Error(`Mission Context silently replaced the user's unqualified map binding: ${reboundMapId}.`);
   await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`), fullPage: false });
 
   await page.goto(`${origin}/console/autonomy/maps`, { waitUntil: "networkidle" });
   await clearBlockingDialog(page);
   const savedMapLabels = await page.locator('select[aria-label="Saved maps"] option').allTextContents();
   if (savedMapLabels.some((label) => /\s·\sv\d+$/iu.test(label))) throw new Error(`Map revision suffix returned: ${savedMapLabels.join(" | ")}`);
-  const mapName = page.getByLabel("Map name", { exact: true });
-  if (await mapName.inputValue() !== "School Map") throw new Error("The canonical bundled map name changed.");
-  if (await mapName.getAttribute("readonly") === null) throw new Error("The canonical School Map name must be immutable in the editor.");
-  const fixedScale = page.getByLabel("Confirm the bundled scene's fixed scale and ENU frame", { exact: true });
-  await fixedScale.uncheck();
-  await fixedScale.check();
-  await page.getByRole("button", { name: "Save Map Pack", exact: true }).click();
-  const persistedMap = await page.evaluate(() => {
-    const stored = window.localStorage.getItem("dronedream:autonomy-workspace:v2:local:universal");
-    return stored ? JSON.parse(stored).mapPack : null;
-  });
-  if (persistedMap?.id !== "map-school" || persistedMap?.name !== "School Map" || persistedMap?.version !== 1) {
-    throw new Error(`Map save did not replace School Map in place: ${JSON.stringify(persistedMap)}`);
+  if (savedMapLabels.length !== 1 || savedMapLabels[0] !== "No qualified map bound") {
+    throw new Error(`The offline repository must not present an unqualified map as selectable: ${savedMapLabels.join(" | ")}`);
   }
+  if (await page.locator('.autonomy-asset-toolbar button').count() !== 0) throw new Error("Map repository must not expose an in-product map creator.");
+  if (await page.locator('.autonomy-connector-import-actions button').count() < 3) throw new Error("Map repository is missing external import actions.");
+  if (await page.locator('.autonomy-form-grid input').count() !== 0) throw new Error("An unqualified map must not expose an editable in-product model form.");
+  if (await page.getByText("Import a map or world asset from an external modeling tool, then complete paired real-simulation qualification.", { exact: true }).count() !== 1) {
+    throw new Error("The map repository must explain the external-import and real-simulation qualification boundary.");
+  }
+  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}map-repository-unqualified-boundary-1600x1000.png`), fullPage: false });
 
   process.stdout.write(`${JSON.stringify({
     screenshots: [
@@ -248,9 +242,10 @@ try {
       path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-1-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-2-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-3-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}my-drone-vehicle-studio-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}my-drone-qualified-repository-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`),
       path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`),
+      path.join(outputRoot, `${screenshotPrefix}map-repository-unqualified-boundary-1600x1000.png`),
     ],
   }, null, 2)}\n`);
   await context.close();

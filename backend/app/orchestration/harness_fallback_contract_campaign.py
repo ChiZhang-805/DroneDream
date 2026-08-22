@@ -32,15 +32,9 @@ from app.orchestration.harness_outcome_campaign import (
 )
 from app.services import jobs as job_services
 
-HARNESS_FALLBACK_CONTRACT_LEGACY_SCHEMA_VERSION = (
-    "dronedream.harness-fallback-contract-campaign/v2"
-)
-HARNESS_FALLBACK_CONTRACT_SCHEMA_VERSION = (
-    "dronedream.harness-fallback-contract-campaign/v3"
-)
-HARNESS_FALLBACK_CONTRACT_EVIDENCE_CLASS = (
-    "synthetic_mock_multi_tool_fallback_campaign"
-)
+HARNESS_FALLBACK_CONTRACT_LEGACY_SCHEMA_VERSION = "dronedream.harness-fallback-contract-campaign/v2"
+HARNESS_FALLBACK_CONTRACT_SCHEMA_VERSION = "dronedream.harness-fallback-contract-campaign/v3"
+HARNESS_FALLBACK_CONTRACT_EVIDENCE_CLASS = "synthetic_mock_multi_tool_fallback_campaign"
 HARNESS_FALLBACK_CONTRACT_LABEL = "SYNTHETIC_MOCK"
 HARNESS_FALLBACK_CONTRACT_CLAIM_BOUNDARY = (
     "Outcome-level deterministic integration check on MockSimulatorAdapter. "
@@ -109,23 +103,15 @@ def _fallback_trace(job: models.Job) -> dict[str, Any]:
         row = rows.setdefault(raw_generation, {"generation": raw_generation})
         if event.event_type == "harness_budget_plan_fallback":
             compiled = payload.get("compiled_plan")
-            raw_calls = (
-                compiled.get("calls") if isinstance(compiled, dict) else None
-            )
+            raw_calls = compiled.get("calls") if isinstance(compiled, dict) else None
             calls = raw_calls if isinstance(raw_calls, list) else []
             row["budget_plan_fallback"] = {
                 "reason": payload.get("reason"),
                 "source": payload.get("source"),
                 "compiled_plan_sha256": payload.get("compiled_plan_sha256"),
-                "projected_candidate_count": payload.get(
-                    "projected_candidate_count"
-                ),
-                "projected_trial_upper_bound": payload.get(
-                    "projected_trial_upper_bound"
-                ),
-                "tool_ids": [
-                    call.get("tool_id") for call in calls if isinstance(call, dict)
-                ],
+                "projected_candidate_count": payload.get("projected_candidate_count"),
+                "projected_trial_upper_bound": payload.get("projected_trial_upper_bound"),
+                "tool_ids": [call.get("tool_id") for call in calls if isinstance(call, dict)],
             }
         elif event.event_type == "harness_plan_revision_fallback":
             row["plan_revision_fallback"] = {
@@ -138,9 +124,7 @@ def _fallback_trace(job: models.Job) -> dict[str, Any]:
                 "decision_source": payload.get("decision_source"),
                 "revision_source": payload.get("revision_source"),
                 "fallback_reason": payload.get("fallback_reason"),
-                "revision_fallback_reason": payload.get(
-                    "revision_fallback_reason"
-                ),
+                "revision_fallback_reason": payload.get("revision_fallback_reason"),
                 "provider_call_count": payload.get("provider_call_count"),
                 "planned_candidates": payload.get("planned_candidates"),
                 "dispatched_candidates": payload.get("dispatched_candidates"),
@@ -176,6 +160,7 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
                 db,
                 user=user,
                 req=_job_request(seed_block),
+                allow_internal_test_backend=True,
             )
             job_id = job.id
             db.commit()
@@ -192,9 +177,7 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
 
     network_calls = network_measurement.attempt_count
     if network_calls:
-        raise ValueError(
-            f"fallback campaign arm attempted {network_calls} network connection(s)"
-        )
+        raise ValueError(f"fallback campaign arm attempted {network_calls} network connection(s)")
     provider_calls = client.calls if client is not None else 0
     return {
         "arm": arm,
@@ -205,8 +188,7 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
         "fallback_trace": trace,
         "outcome_sha256": _sha256(outcome),
         "component_sha256": {
-            component: _sha256(outcome[component])
-            for component in _OUTCOME_COMPONENTS
+            component: _sha256(outcome[component]) for component in _OUTCOME_COMPONENTS
         },
         "outcome": outcome,
     }
@@ -226,9 +208,7 @@ def _verify_arm_trace(arm: dict[str, Any]) -> None:
     arm_name = arm.get("arm")
     if not isinstance(arm_name, str):
         raise ValueError("fallback campaign arm name is invalid")
-    plan_reason, revision_reason, provider_calls_per_generation = _expected_reasons(
-        arm_name
-    )
+    plan_reason, revision_reason, provider_calls_per_generation = _expected_reasons(arm_name)
     trace = arm.get("fallback_trace")
     rows = trace.get("generation_rows") if isinstance(trace, dict) else None
     if not isinstance(rows, list) or len(rows) != HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS:
@@ -259,10 +239,8 @@ def _verify_arm_trace(arm: dict[str, Any]) -> None:
             or execution.get("revision_source") != "deterministic_fallback"
             or execution.get("fallback_reason") != plan_reason
             or execution.get("revision_fallback_reason") != revision_reason
-            or execution.get("provider_call_count")
-            != provider_calls_per_generation
-            or execution.get("planned_candidates")
-            != execution.get("dispatched_candidates")
+            or execution.get("provider_call_count") != provider_calls_per_generation
+            or execution.get("planned_candidates") != execution.get("dispatched_candidates")
             or execution.get("dispatched_candidates", 0) < 1
             or not isinstance(execution.get("tool_calls"), list)
             or len(execution["tool_calls"]) != 1
@@ -301,9 +279,7 @@ def build_harness_fallback_contract_campaign() -> dict[str, Any]:
         for arm_name in HARNESS_FALLBACK_CONTRACT_ARMS[1:]:
             arm = by_name[arm_name]
             component_matches = {
-                component: (
-                    arm["outcome"][component] == reference["outcome"][component]
-                )
+                component: (arm["outcome"][component] == reference["outcome"][component])
                 for component in _OUTCOME_COMPONENTS
             }
             exact_match = arm["outcome"] == reference["outcome"]
@@ -444,9 +420,7 @@ def verify_harness_fallback_contract_campaign(payload: object) -> dict[str, Any]
         ):
             raise ValueError("Harness fallback contract block identity is invalid")
         raw_arms = block["arms"]
-        by_name = {
-            str(arm.get("arm")): arm for arm in raw_arms if isinstance(arm, dict)
-        }
+        by_name = {str(arm.get("arm")): arm for arm in raw_arms if isinstance(arm, dict)}
         if tuple(by_name) != HARNESS_FALLBACK_CONTRACT_ARMS:
             raise ValueError("Harness fallback contract arm order or set drifted")
         for arm in raw_arms:
@@ -472,9 +446,7 @@ def verify_harness_fallback_contract_campaign(payload: object) -> dict[str, Any]
         for arm_name in HARNESS_FALLBACK_CONTRACT_ARMS[1:]:
             arm = by_name[arm_name]
             matches = {
-                component: (
-                    arm["outcome"][component] == reference["outcome"][component]
-                )
+                component: (arm["outcome"][component] == reference["outcome"][component])
                 for component in _OUTCOME_COMPONENTS
             }
             recomputed_comparisons.append(
@@ -492,10 +464,7 @@ def verify_harness_fallback_contract_campaign(payload: object) -> dict[str, Any]
             )
     if artifact.get("comparison_rows") != recomputed_comparisons or not all(
         row["exact_outcome_match"] is True
-        and all(
-            row[f"{component}_match"] is True
-            for component in _OUTCOME_COMPONENTS
-        )
+        and all(row[f"{component}_match"] is True for component in _OUTCOME_COMPONENTS)
         for row in recomputed_comparisons
     ):
         raise ValueError("Harness fallback contract outcomes are not equivalent")

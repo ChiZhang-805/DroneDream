@@ -1305,20 +1305,14 @@ def test_direct_experimental_dispatch_rejects_outcome_contract_drift_before_writ
         )
         trial_count = len(
             list(
-                db.scalars(
-                    select(ctx["models"].Trial).where(
-                        ctx["models"].Trial.job_id == job.id
-                    )
-                )
+                db.scalars(select(ctx["models"].Trial).where(ctx["models"].Trial.job_id == job.id))
             )
         )
         job.min_pass_rate = 0.731
         monkeypatch.setattr(
             job_manager,
             "propose_experimental_generation",
-            lambda **_kwargs: pytest.fail(
-                "proposal generation ran after outcome-contract drift"
-            ),
+            lambda **_kwargs: pytest.fail("proposal generation ran after outcome-contract drift"),
         )
 
         with pytest.raises(OutcomeContractDriftError, match="no longer matches"):
@@ -1340,9 +1334,7 @@ def test_direct_experimental_dispatch_rejects_outcome_contract_drift_before_writ
             len(
                 list(
                     db.scalars(
-                        select(ctx["models"].Trial).where(
-                            ctx["models"].Trial.job_id == job.id
-                        )
+                        select(ctx["models"].Trial).where(ctx["models"].Trial.job_id == job.id)
                     )
                 )
             )
@@ -1986,7 +1978,7 @@ def test_real_cli_optimizer_requires_explicit_px4_parameters(
 
     with pytest.raises(
         ValueError,
-        match="requires an explicit PX4 parameter_space",
+        match="requires a non-empty PX4 parameter_space",
     ):
         schemas.JobCreateRequest(
             simulator_backend="real_cli",

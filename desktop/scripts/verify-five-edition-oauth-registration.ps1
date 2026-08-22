@@ -9,11 +9,18 @@ $authorizationEndpoint = "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth
 $authorizationUiHost = "getdronedream.com"
 $authorizationUiPath = "/oauth/consent"
 $editions = @(
-    [pscustomobject]@{ Id = "universal"; Port = 49210 },
-    [pscustomobject]@{ Id = "sim"; Port = 49211 },
-    [pscustomobject]@{ Id = "lab"; Port = 49212 },
-    [pscustomobject]@{ Id = "field"; Port = 49213 }
-    [pscustomobject]@{ Id = "autonomy"; Port = 49214 }
+    [pscustomobject]@{ Id = "universal"; Port = 49210; Variables = @("DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL") },
+    [pscustomobject]@{ Id = "sim"; Port = 49211; Variables = @("DRONEDREAM_OAUTH_CLIENT_ID_SIM") },
+    [pscustomobject]@{ Id = "lab"; Port = 49212; Variables = @("DRONEDREAM_OAUTH_CLIENT_ID_LAB") },
+    [pscustomobject]@{ Id = "field"; Port = 49213; Variables = @("DRONEDREAM_OAUTH_CLIENT_ID_FIELD") },
+    [pscustomobject]@{
+        Id = "autonomy"
+        Port = 49214
+        Variables = @(
+            "DRONEDREAM_OAUTH_CLIENT_ID_AGENT",
+            "DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY"
+        )
+    }
 )
 
 Add-Type -AssemblyName System.Net.Http
@@ -24,10 +31,16 @@ $failures = [Collections.Generic.List[string]]::new()
 
 try {
     foreach ($edition in $editions) {
-        $variable = "DRONEDREAM_OAUTH_CLIENT_ID_$($edition.Id.ToUpperInvariant())"
-        $clientId = [Environment]::GetEnvironmentVariable($variable, $EnvironmentTarget)
+        $clientId = $null
+        foreach ($variable in $edition.Variables) {
+            $candidate = [Environment]::GetEnvironmentVariable($variable, $EnvironmentTarget)
+            if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+                $clientId = $candidate
+                break
+            }
+        }
         if ($clientId -notmatch '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$') {
-            $failures.Add("$($edition.Id): the configured client ID is not provider-issued")
+            $failures.Add("$($edition.Id): no provider-issued client ID was found in $($edition.Variables -join ' or ')")
             continue
         }
 

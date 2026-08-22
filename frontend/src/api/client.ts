@@ -26,7 +26,9 @@ import type {
   AutonomyCompileResponse,
   AutonomyHarnessInspectRequest,
   AutonomyHarnessInspectResponse,
+  AutonomyRuntimeInterruptionRequest,
   AutonomyRuntimeObservation,
+  AutonomyRuntimeReplanApplyRequest,
   AutonomyRuntimeSession,
   AutonomySimulationExecution,
   AutonomyMapAssetAdmissionReceipt,
@@ -539,6 +541,26 @@ export const apiClient = {
     return request<AutonomyRuntimeSession>(
       `/autonomy/runtime/sessions/${encodeURIComponent(sessionId)}/observations`,
       { method: "POST", body: JSON.stringify(observation) },
+    );
+  },
+
+  async interruptAutonomyRuntimeSession(
+    sessionId: string,
+    interruption: AutonomyRuntimeInterruptionRequest,
+  ): Promise<AutonomyRuntimeSession> {
+    return request<AutonomyRuntimeSession>(
+      `/autonomy/runtime/sessions/${encodeURIComponent(sessionId)}/interruptions`,
+      { method: "POST", body: JSON.stringify(interruption) },
+    );
+  },
+
+  async applyAutonomyRuntimeReplan(
+    sessionId: string,
+    replan: AutonomyRuntimeReplanApplyRequest,
+  ): Promise<AutonomyRuntimeSession> {
+    return request<AutonomyRuntimeSession>(
+      `/autonomy/runtime/sessions/${encodeURIComponent(sessionId)}/replans`,
+      { method: "POST", body: JSON.stringify(replan) },
     );
   },
 

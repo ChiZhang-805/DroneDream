@@ -29,7 +29,7 @@ import {
 } from "../features/admin/adminConsole";
 import { EditionLicenseStrip } from "../components/EditionLicenseStrip";
 import { useModalFocus } from "../hooks/useModalFocus";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 
 type AdminTab = "overview" | "models" | "users" | "community";
 
@@ -374,11 +374,11 @@ function formatPercent(value: number | null): string {
   return value === null ? "—" : `${value.toFixed(1)}%`;
 }
 
-function safeError(error: unknown, fallback: string): string {
+function safeError(error: unknown, locale: "en" | "zh-CN", fallback: string): string {
   if (error instanceof AdminConsoleError && [401, 403].includes(error.status)) {
     return fallback;
   }
-  return error instanceof Error ? error.message : fallback;
+  return localeSafeError(error, locale, { zh: fallback, en: fallback });
 }
 
 function translatedLabel(
@@ -613,7 +613,7 @@ export function AdminPage() {
       setAudit(nextAudit.items);
     } catch (caught) {
       if (sequence !== loadSequenceRef.current) return;
-      setError(safeError(caught, copy.unavailableTitle));
+      setError(safeError(caught, locale, copy.unavailableTitle));
     } finally {
       if (sequence === loadSequenceRef.current) setLoading(false);
     }
@@ -625,6 +625,7 @@ export function AdminPage() {
     canReadUsers,
     canViewMetrics,
     copy.unavailableTitle,
+    locale,
     range,
     submittedUserSearch,
     topicPage,
@@ -770,7 +771,7 @@ export function AdminPage() {
         model.provider === updated.provider ? updated : model
       ));
     } catch (caught) {
-      setError(safeError(caught, copy.modelSaveFailed));
+      setError(safeError(caught, locale, copy.modelSaveFailed));
     } finally {
       setSavingProvider(null);
     }
@@ -812,7 +813,7 @@ export function AdminPage() {
       setUserExportMessage(`${copy.exportStarted} ${exported.file_name}${count}`);
     } catch (caught) {
       if (sequence !== exportSequenceRef.current) return;
-      setError(safeError(caught, copy.exportFailed));
+      setError(safeError(caught, locale, copy.exportFailed));
     } finally {
       if (sequence === exportSequenceRef.current) setExportingUsers(false);
     }
@@ -835,7 +836,7 @@ export function AdminPage() {
       const refreshedAudit = await listAdminAudit(1);
       setAudit(refreshedAudit.items);
     } catch (caught) {
-      setError(safeError(caught, copy.moderationFailed));
+      setError(safeError(caught, locale, copy.moderationFailed));
     } finally {
       setModerating(false);
     }
@@ -861,7 +862,7 @@ export function AdminPage() {
         setAudit(refreshedAudit.items);
       }
     } catch (caught) {
-      setError(safeError(caught, copy.deleteAccountFailed));
+      setError(safeError(caught, locale, copy.deleteAccountFailed));
     } finally {
       setDeletingUser(false);
     }

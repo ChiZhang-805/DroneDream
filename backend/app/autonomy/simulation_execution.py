@@ -25,8 +25,10 @@ from app.autonomy.credentials import (
     fixed_adapter_vehicle_identity_sha256,
 )
 from app.autonomy.models import (
+    AutonomyCompileRequest,
     AutonomyPlannerAction,
     AutonomyPlannerTaskGraph,
+    RuntimeSession,
     SimulationExecutionStartRequest,
     SimulationExecutionStatus,
     Vector3,
@@ -39,7 +41,7 @@ from app.autonomy.px4_x500_vehicle import (
 from app.autonomy.qualification import VehiclePackQualificationRequest
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry, runtime_sessions
 from app.autonomy.school_map_artifact import VEHICLE_COLLISION_DIAMETER_M
-from app.autonomy.service import school_mission_profile
+from app.autonomy.service import compile_autonomy_mission, school_mission_profile
 
 MAX_EXECUTIONS = 32
 MAX_JSON_EVIDENCE_BYTES = 4 * 1024 * 1024
@@ -191,6 +193,10 @@ class _ExecutionRecord:
     stdout: IO[str]
     stderr: IO[str]
     status: SimulationExecutionStatus
+    runtime_control_revision: int = 0
+    applied_mission_revision: int = 1
+    last_runtime_action: str | None = None
+    latest_transport_position: Vector3 | None = None
 
 
 class SimulationExecutionRegistry:
@@ -219,6 +225,8 @@ class SimulationExecutionRegistry:
             "vehicle": "My Drone",
             "mission_profile": "school-map-office-takeout-roundtrip-v1",
             "physical_transport_bound": available,
+            "runtime_hold_transport_bound": available,
+            "runtime_replan_transport_bound": available,
             "ros2_bound": False,
             "operator_confirmation_required": True,
             "model_planner_binding_required": True,
@@ -515,7 +523,19 @@ class SimulationExecutionRegistry:
         with self._lock:
             record = self._owned(owner_id, execution_id)
             self._refresh_live(record)
-            return record.status.model_copy(deep=True)
+            status = record.status.model_copy(deep=True)
+            position = (
+                record.latest_transport_position.model_copy(deep=True)
+                if record.latest_transport_position is not None
+                else None
+            )
+        if position is not None:
+            self._runtime_sessions.update_transport_position(
+                record.owner_id,
+                record.status.runtime_session_id,
+                position,
+            )
+        return status
 
     def abort(self, owner_id: str, execution_id: str, reason: str) -> SimulationExecutionStatus:
         with self._lock:
@@ -560,6 +580,86 @@ class SimulationExecutionRegistry:
             }
         )
 
+    def _write_runtime_control(
+        self,
+        record: _ExecutionRecord,
+        *,
+        action: str,
+        runtime_session: RuntimeSession,
+        route: list[dict[str, object]] | None = None,
+    ) -> None:
+        record.runtime_control_revision += 1
+        control_path = record.run_dir / "runtime_control.request.json"
+        pending_path = (
+            record.run_dir.parent / f".{record.status.execution_id}.runtime-control.pending"
+        )
+        runtime = runtime_session
+        payload: dict[str, object] = {
+            "schema_version": "dronedream.autonomy.runtime-control.v1",
+            "revision": record.runtime_control_revision,
+            "action": action,
+            "runtime_session_id": runtime.session_id,
+            "mission_revision": runtime.mission_revision,
+            "contract_id": runtime.contract_id,
+            "issued_at": _now().isoformat(),
+            "reason_codes": runtime.decision.codes[:8],
+            "route": route,
+        }
+        try:
+            pending_path.write_text(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+            pending_path.replace(control_path)
+        finally:
+            with suppress(OSError):
+                pending_path.unlink(missing_ok=True)
+        record.last_runtime_action = action
+        record.status = record.status.model_copy(
+            update={
+                "contract_id": runtime.contract_id,
+                "updated_at": _now(),
+                "phase": "holding" if action == "hold" else "replanning",
+            }
+        )
+
+    @staticmethod
+    def _runtime_replan_route(
+        runtime: RuntimeSession,
+        mission: AutonomyCompileRequest,
+    ) -> list[dict[str, object]]:
+        compiled = compile_autonomy_mission(mission)
+        route = [
+            {
+                "x": point.x,
+                "y": point.y,
+                "z": point.z,
+                "phase": point.phase,
+                "speed_limit_mps": point.speed_limit_mps,
+            }
+            for point in compiled.trajectory
+            if point.phase != "launch"
+        ]
+        interruption = runtime.interruption
+        if interruption is not None and interruption.snapshot_position_m is not None:
+            snapshot = interruption.snapshot_position_m
+            route.insert(
+                0,
+                {
+                    "x": snapshot.x,
+                    "y": snapshot.y,
+                    "z": snapshot.z,
+                    "phase": "transit",
+                    "speed_limit_mps": mission.vehicle.max_speed_mps,
+                },
+            )
+        if len(route) < 2:
+            raise AutonomyRuntimeError(
+                "SIMULATION_REPLAN_ROUTE_EMPTY",
+                "The authorized runtime revision did not produce a flyable remaining route.",
+            )
+        return route
+
     def _sync_runtime_control(self, record: _ExecutionRecord) -> None:
         try:
             runtime = self._runtime_sessions.get(
@@ -572,10 +672,47 @@ class SimulationExecutionRegistry:
         else:
             runtime_phase = runtime.phase
             runtime_reason = ",".join(runtime.decision.codes[:4])
-        if runtime_phase not in {"holding", "landing", "aborted", "missing"}:
-            return
         with self._lock:
             if record.process.poll() is not None or record.status.state == "aborting":
+                return
+            if runtime_phase == "holding":
+                if record.last_runtime_action != "hold":
+                    self._write_runtime_control(
+                        record,
+                        action="hold",
+                        runtime_session=runtime,
+                    )
+                return
+            if (
+                runtime_phase == "replanning"
+                and runtime.mission_revision > record.applied_mission_revision
+                and runtime.interruption is not None
+                and runtime.interruption.state == "applied"
+            ):
+                _session, request, _planner, _assets = self._runtime_sessions.execution_binding(
+                    record.owner_id,
+                    record.status.runtime_session_id,
+                )
+                route = self._runtime_replan_route(runtime, request.mission)
+                self._write_runtime_control(
+                    record,
+                    action="replace_route",
+                    runtime_session=runtime,
+                    route=route,
+                )
+                record.applied_mission_revision = runtime.mission_revision
+                return
+            if (
+                runtime_phase not in {"landing", "aborted", "missing"}
+                and record.last_runtime_action == "hold"
+            ):
+                self._write_runtime_control(
+                    record,
+                    action="resume",
+                    runtime_session=runtime,
+                )
+                return
+            if runtime_phase not in {"landing", "aborted", "missing"}:
                 return
             status_reason = f"runtime_session_{runtime_phase}: {runtime_reason}"[:240]
             self._request_abort(
@@ -590,6 +727,8 @@ class SimulationExecutionRegistry:
             return
         root = live.get("vehicle_model_root_world_enu_m")
         center = live.get("vehicle_envelope_center_world_enu_m")
+        center_vector = self._vector(center)
+        record.latest_transport_position = center_vector
         aborting = record.status.state == "aborting"
         record.status = record.status.model_copy(
             update={
@@ -598,7 +737,7 @@ class SimulationExecutionRegistry:
                 "progress": self._bounded_progress(live.get("progress")),
                 "phase": str(live.get("phase", "running"))[:80],
                 "vehicle_model_root_world_enu_m": self._vector(root),
-                "vehicle_envelope_center_world_enu_m": self._vector(center),
+                "vehicle_envelope_center_world_enu_m": center_vector,
                 "vehicle_speed_m_s": self._bounded_speed(live.get("vehicle_speed_m_s")),
                 "payload_spawned": live.get("payload_spawned") is True,
                 "payload_attached": live.get("payload_attached") is True,
@@ -652,6 +791,19 @@ class SimulationExecutionRegistry:
                 return_code = record.process.wait(timeout=RUNTIME_CONTROL_POLL_SECONDS)
                 break
             except (subprocess.TimeoutExpired, TimeoutError):
+                with self._lock:
+                    self._refresh_live(record)
+                    position = (
+                        record.latest_transport_position.model_copy(deep=True)
+                        if record.latest_transport_position is not None
+                        else None
+                    )
+                if position is not None:
+                    self._runtime_sessions.update_transport_position(
+                        record.owner_id,
+                        record.status.runtime_session_id,
+                        position,
+                    )
                 self._sync_runtime_control(record)
         record.stdout.close()
         record.stderr.close()

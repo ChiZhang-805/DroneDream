@@ -4,9 +4,9 @@ The worker process calls :func:`run_forever`, which repeatedly:
 
 1. Claims any newly-QUEUED jobs and dispatches their baseline + optimizer
    trials (see :mod:`app.orchestration.job_manager`).
-2. Runs at most one PENDING trial per iteration via the configured
-   :class:`app.simulator.base.SimulatorAdapter` (deterministic mock by
-   default).
+2. Runs at most one PENDING trial per iteration via the configured real
+   :class:`app.simulator.base.SimulatorAdapter`; deterministic adapters are
+   confined to regression-test environments.
 3. Finalizes any RUNNING/AGGREGATING jobs whose trials are all terminal
    (aggregate per-candidate scores, select the winner, persist the
    ``JobReport``, transition the job to ``COMPLETED`` or ``FAILED``).
@@ -110,9 +110,7 @@ def run_forever(
     if max_iterations == 0:
         return 0
 
-    if worker_id is not None and (
-        not isinstance(worker_id, str) or not worker_id.strip()
-    ):
+    if worker_id is not None and (not isinstance(worker_id, str) or not worker_id.strip()):
         raise ValueError("worker_id must be a non-empty string when provided")
     wid = worker_id.strip() if worker_id is not None else _default_worker_id()
     _install_signal_handlers()

@@ -20,6 +20,10 @@
     "publisher": "DroneDream",
     "shortDescription": "Unified DroneDream workspace for SIM, LAB, FIELD and AGENT workflows",
     "longDescription": "DroneDream Universal uses one shared core and presentation-only SIM, LAB, FIELD and AGENT workspace modes. Hardware actions remain unavailable unless installed modules, a validated Vehicle Pack, and native, backend and Runtime policy all authorize the exact action.",
+    "externalBin": [
+      "binaries/dronedream-autonomy-core",
+      "binaries/dronedream-plugin-isolator"
+    ],
     "icon": [
       "../../brand/generated/universal/windows/32x32.png",
       "../../brand/generated/universal/windows/128x128.png",
@@ -33,6 +37,11 @@
       }
     },
     "resources": {
+      "agent-core-resources/runtime": "agent-core/runtime",
+      "agent-core-resources/official-plugins": "agent-core/official-plugins",
+      "agent-core-resources/default-assets": "agent-core/default-assets",
+      "agent-core-resources/agent-core-stage.json": "agent-core/agent-core-stage.json",
+      "agent-core-resources/dronedream-plugin-isolator.exe": "agent-core/dronedream-plugin-isolator.exe",
       "../../distribution/build-profiles/universal-1.0.0.v1.json": "distribution/universal-build-profile.v1.json",
       "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",
       "../../distribution/editions/sim.v1.json": "distribution/editions/sim.v1.json",

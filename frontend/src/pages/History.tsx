@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient, ApiClientError } from "../api/client";
+import { apiClient } from "../api/client";
 import type {
   Job,
   JobStatus,
@@ -25,7 +25,7 @@ import { type Column } from "../components/DataTable";
 import { Loading, ErrorState } from "../components/States";
 import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
 import { useDesktopRuntimeAccess } from "../desktop/access";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 import { formatDateTime } from "../utils/format";
 import { openAppSettings } from "../appSettings";
@@ -105,7 +105,7 @@ export function History() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const runtimeAccess = useDesktopRuntimeAccess();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
   const [trackFilter, setTrackFilter] = useState<TrackType | "ALL">("ALL");
   const [objectiveFilter, setObjectiveFilter] = useState<
@@ -181,7 +181,10 @@ export function History() {
       setEditingId(null);
       await query.refetch();
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : t("history.saveFailed"));
+      setSaveError(localeSafeError(e, locale, {
+        zh: t("history.saveFailed"),
+        en: t("history.saveFailed"),
+      }));
     } finally {
       savingNameIdsRef.current.delete(job.id);
     }
@@ -230,7 +233,10 @@ export function History() {
       await query.refetch();
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : t("history.deleteFailed"));
+      setDeleteError(localeSafeError(e, locale, {
+        zh: t("history.deleteFailed"),
+        en: t("history.deleteFailed"),
+      }));
     } finally {
       deletingRef.current = false;
       setIsDeleting(false);
@@ -401,9 +407,10 @@ export function History() {
         ) : query.isError ? (
           <ErrorState
             description={
-              query.error instanceof ApiClientError
-                ? query.error.message
-                : t("history.loadFailed")
+              localeSafeError(query.error, locale, {
+                zh: t("history.loadFailed"),
+                en: t("history.loadFailed"),
+              })
             }
             action={
               <button

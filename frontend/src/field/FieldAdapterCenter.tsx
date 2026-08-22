@@ -25,6 +25,7 @@ import {
   type FieldMavlinkTelemetryProbeReceipt,
   type FieldProtocolFrameInspection,
 } from "../desktop/bridge";
+import { localeSafeError } from "../i18n/I18nProvider";
 import type { FieldLocale } from "./catalog";
 import { hardwareDomainEdition } from "./hardwareDomain";
 
@@ -194,11 +195,14 @@ export function FieldAdapterCenter({
     try {
       setCatalog(await getFieldAdapterCatalog());
     } catch (reason) {
-      setError(`${copy.loadError} ${reason instanceof Error ? reason.message : String(reason)}`);
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].loadError,
+        en: COPY.en.loadError,
+      }));
     } finally {
       setLoading(false);
     }
-  }, [copy.loadError, desktop]);
+  }, [desktop, locale]);
 
   useEffect(() => {
     void loadCatalog();
@@ -215,11 +219,14 @@ export function FieldAdapterCenter({
       });
       setCatalog(await getFieldAdapterCatalog());
     } catch (reason) {
-      setError(`${copy.installError} ${reason instanceof Error ? reason.message : String(reason)}`);
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].installError,
+        en: COPY.en.installError,
+      }));
     } finally {
       setBusyAdapterId(null);
     }
-  }, [copy.installError, desktop]);
+  }, [desktop, locale]);
 
   const installedCount = useMemo(
     () => catalog.entries.filter((entry) => entry.installed).length,
@@ -250,7 +257,10 @@ export function FieldAdapterCenter({
       }
       setCatalog(await getFieldAdapterCatalog());
     } catch (reason) {
-      setError(`${copy.installError} ${reason instanceof Error ? reason.message : String(reason)}`);
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].installError,
+        en: COPY.en.installError,
+      }));
       try {
         setCatalog(await getFieldAdapterCatalog());
       } catch {
@@ -259,7 +269,7 @@ export function FieldAdapterCenter({
     } finally {
       setBusyAdapterId(null);
     }
-  }, [busyAdapterId, copy.installError, desktop, pendingManagedAdapters]);
+  }, [busyAdapterId, desktop, locale, pendingManagedAdapters]);
   const installedMavlinkAdapters = useMemo(
     () => catalog.entries.filter((entry) => (
       entry.installed
@@ -303,13 +313,20 @@ export function FieldAdapterCenter({
         deviceObservationId: `offline-frame:${result.frameSha256.slice(0, 32)}`,
       });
     } catch (reason) {
-      setInspectorError(
-        `${copy.inspectorError} ${reason instanceof Error ? reason.message : String(reason)}`,
-      );
+      setInspectorError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].inspectorError,
+        en: COPY.en.inspectorError,
+      }));
     } finally {
       setInspectorBusy(false);
     }
-  }, [copy.inspectorError, desktop, frameBase64, onReadOnlyEvidence, selectedInspectorAdapter]);
+  }, [
+    desktop,
+    frameBase64,
+    locale,
+    onReadOnlyEvidence,
+    selectedInspectorAdapter,
+  ]);
 
   const probeTelemetry = useCallback(async () => {
     if (
@@ -338,17 +355,18 @@ export function FieldAdapterCenter({
         deviceObservationId: result.observationId,
       });
     } catch (reason) {
-      setTelemetryError(
-        `${copy.telemetryError} ${reason instanceof Error ? reason.message : String(reason)}`,
-      );
+      setTelemetryError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].telemetryError,
+        en: COPY.en.telemetryError,
+      }));
     } finally {
       setTelemetryBusy(false);
       setReadOnlyConfirmed(false);
     }
   }, [
     baudRate,
-    copy.telemetryError,
     desktop,
+    locale,
     onReadOnlyEvidence,
     readOnlyConfirmed,
     selectedDevice,

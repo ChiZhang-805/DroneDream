@@ -26,6 +26,10 @@
       "../../brand/generated/autonomy/windows/128x128@2x.png",
       "../../brand/generated/autonomy/windows/icon.ico"
     ],
+    "externalBin": [
+      "binaries/dronedream-autonomy-core",
+      "binaries/dronedream-plugin-isolator"
+    ],
     "windows": {
       "nsis": {
         "installerIcon": "../../brand/generated/autonomy/windows/icon.ico",
@@ -33,6 +37,11 @@
       }
     },
     "resources": {
+      "agent-core-resources/runtime": "agent-core/runtime",
+      "agent-core-resources/official-plugins": "agent-core/official-plugins",
+      "agent-core-resources/default-assets": "agent-core/default-assets",
+      "agent-core-resources/agent-core-stage.json": "agent-core/agent-core-stage.json",
+      "agent-core-resources/dronedream-plugin-isolator.exe": "agent-core/dronedream-plugin-isolator.exe",
       "../../distribution/editions/autonomy.v1.json": "distribution/editions/autonomy.v1.json",
       "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",
       "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",

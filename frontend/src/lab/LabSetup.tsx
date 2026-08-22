@@ -16,9 +16,8 @@ import {
   XCircle,
 } from "lucide-react";
 
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import {
-  LabEvidencePreviewError,
   parseLabEvidencePreview,
   type LabEvidencePreview,
 } from "./evidencePreview";
@@ -297,11 +296,10 @@ export function LabSetup({
       setEvidenceError(null);
     } catch (error) {
       setEvidence(null);
-      setEvidenceError(
-        error instanceof LabEvidencePreviewError
-          ? error.message
-          : "The evidence file could not be inspected.",
-      );
+      setEvidenceError(localeSafeError(error, locale, {
+        zh: "无法检查此证据文件。",
+        en: "The evidence file could not be inspected.",
+      }));
     }
   }
 

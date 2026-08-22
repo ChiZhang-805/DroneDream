@@ -19,6 +19,7 @@ import {
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
+import { localeSafeError } from "../i18n/I18nProvider";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
 import {
   FieldAdapterCenter,
@@ -62,6 +63,7 @@ const COPY = {
     },
     scan: "Discover",
     scanning: "Scanning",
+    scanFailed: "Device discovery failed.",
     scanUnavailableField: "Available in the installed Field app",
     scanUnavailableLab: "Available in the installed Lab app",
     source: "Source",
@@ -87,6 +89,12 @@ const COPY = {
       "firmware-drift": "Firmware drift",
       "recognized-unvalidated": "Unvalidated",
     },
+    catalogStatus: {
+      validated: "Validated",
+      "contract-only": "Contract only",
+      planned: "Planned",
+      "integrated-contract": "Integrated contract",
+    },
   },
   "zh-CN": {
     skip: "跳到工作区",
@@ -111,6 +119,7 @@ const COPY = {
     },
     scan: "发现设备",
     scanning: "正在扫描",
+    scanFailed: "设备发现失败。",
     scanUnavailableField: "仅在已安装的 Field 应用中可用",
     scanUnavailableLab: "仅在已安装的 Lab 应用中可用",
     source: "来源",
@@ -135,6 +144,12 @@ const COPY = {
       "unknown-device": "未知设备",
       "firmware-drift": "固件漂移",
       "recognized-unvalidated": "未验证",
+    },
+    catalogStatus: {
+      validated: "已验证",
+      "contract-only": "仅完成接口约定",
+      planned: "计划中",
+      "integrated-contract": "接口已集成",
     },
   },
 } as const;
@@ -268,11 +283,14 @@ function FieldWorkspace({
     try {
       setDeviceReport(await discoverFieldDevices());
     } catch (error) {
-      setDeviceScanError(error instanceof Error ? error.message : String(error));
+      setDeviceScanError(localeSafeError(error, locale, {
+        zh: COPY["zh-CN"].scanFailed,
+        en: COPY.en.scanFailed,
+      }));
     } finally {
       setDeviceScanBusy(false);
     }
-  }, []);
+  }, [locale]);
 
   const renderDevicePage = () => {
     const [title, body] = copy.page.device;
@@ -338,7 +356,7 @@ function FieldWorkspace({
         </section>
         <section className="field-compact-panel field-registry-panel">
           <header><strong>{copy.registry}</strong><span>{FIELD_CATALOG.vehiclePacks.length}</span></header>
-          <div className="field-table-scroll"><table aria-label={copy.registry}><thead><tr><th>{copy.pack}</th><th>{copy.controller}</th><th>{copy.tier}</th><th>{copy.adapter}</th></tr></thead><tbody>{FIELD_CATALOG.vehiclePacks.map((pack) => <tr key={pack.packId}><td><strong>{pack.displayName[locale]}</strong><small>{pack.manufacturer}</small></td><td>{pack.controllers.map((controller) => controller.model).join(", ")}</td><td><span className="field-status-pill">{pack.validationTier}</span></td><td>{pack.adapterStatus}</td></tr>)}</tbody></table></div>
+          <div className="field-table-scroll"><table aria-label={copy.registry}><thead><tr><th>{copy.pack}</th><th>{copy.controller}</th><th>{copy.tier}</th><th>{copy.adapter}</th></tr></thead><tbody>{FIELD_CATALOG.vehiclePacks.map((pack) => <tr key={pack.packId}><td><strong>{pack.displayName[locale]}</strong><small>{pack.manufacturer}</small></td><td>{pack.controllers.map((controller) => controller.model).join(", ")}</td><td><span className="field-status-pill">{copy.catalogStatus[pack.validationTier as keyof typeof copy.catalogStatus] ?? pack.validationTier}</span></td><td>{copy.catalogStatus[pack.adapterStatus as keyof typeof copy.catalogStatus] ?? pack.adapterStatus}</td></tr>)}</tbody></table></div>
         </section>
       </div>
     );

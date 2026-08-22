@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient, ApiClientError } from "../api/client";
+import { apiClient } from "../api/client";
 import type {
   ContinueExplorationBudget,
   ContinueExplorationRequest,
@@ -28,7 +28,7 @@ import {
   optimizerStrategyLabel,
 } from "../features/experiment/optimizerStrategies";
 import { optimizerUsesModelAccess } from "../types/api";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import { issueManagedModelGrant } from "../features/settings/cloudModelAccess";
 
 // Polling interval for active jobs. The frontend only polls; all state
@@ -158,7 +158,7 @@ function buildTrialColumns(
 }
 
 export function JobDetail() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -387,9 +387,10 @@ export function JobDetail() {
       <ErrorState
         title={t("jobDetail.loadFailed")}
         description={
-          jobQuery.error instanceof ApiClientError
-            ? jobQuery.error.message
-            : t("jobDetail.notFound")
+          localeSafeError(jobQuery.error, locale, {
+            zh: t("jobDetail.notFound"),
+            en: t("jobDetail.notFound"),
+          })
         }
         action={<Link to="/history" className="btn">{t("jobDetail.backHistory")}</Link>}
       />
@@ -409,9 +410,10 @@ export function JobDetail() {
   ) ?? bestCandidateTrials[0];
   const artifactsError = artifactsQuery.isError
     ? (
-        artifactsQuery.error instanceof ApiClientError
-          ? artifactsQuery.error.message
-          : t("artifacts.loadFailedDescription")
+        localeSafeError(artifactsQuery.error, locale, {
+          zh: t("artifacts.loadFailedDescription"),
+          en: t("artifacts.loadFailedDescription"),
+        })
       )
     : null;
   const pdfArtifact = artifacts.find(
@@ -591,16 +593,18 @@ export function JobDetail() {
       ) : null}
       {rerunMutation.isError ? (
         <Alert tone="danger" title={t("jobDetail.rerunFailed")}>
-          {rerunMutation.error instanceof ApiClientError
-            ? rerunMutation.error.message
-            : t("jobDetail.rerunFailedBody")}
+          {localeSafeError(rerunMutation.error, locale, {
+            zh: t("jobDetail.rerunFailedBody"),
+            en: t("jobDetail.rerunFailedBody"),
+          })}
         </Alert>
       ) : null}
       {cancelMutation.isError ? (
         <Alert tone="danger" title={t("jobDetail.cancelFailed")}>
-          {cancelMutation.error instanceof ApiClientError
-            ? cancelMutation.error.message
-            : t("jobDetail.cancelFailedBody")}
+          {localeSafeError(cancelMutation.error, locale, {
+            zh: t("jobDetail.cancelFailedBody"),
+            en: t("jobDetail.cancelFailedBody"),
+          })}
         </Alert>
       ) : null}
       <JobSummaryCard job={job} />
@@ -664,9 +668,10 @@ export function JobDetail() {
 
       {reportEnabled && reportQuery.isError && job.status === "COMPLETED" ? (
         <Alert tone="danger" title={t("jobDetail.reportUnavailable")}>
-          {reportQuery.error instanceof ApiClientError
-            ? reportQuery.error.message
-            : t("jobDetail.reportUnavailableBody")}
+          {localeSafeError(reportQuery.error, locale, {
+            zh: t("jobDetail.reportUnavailableBody"),
+            en: t("jobDetail.reportUnavailableBody"),
+          })}
         </Alert>
       ) : null}
 
@@ -704,9 +709,10 @@ export function JobDetail() {
         ) : trialsQuery.isError ? (
           <ErrorState
             description={
-              trialsQuery.error instanceof ApiClientError
-                ? trialsQuery.error.message
-                : t("jobDetail.trialsLoadFailed")
+              localeSafeError(trialsQuery.error, locale, {
+                zh: t("jobDetail.trialsLoadFailed"),
+                en: t("jobDetail.trialsLoadFailed"),
+              })
             }
           />
         ) : (
@@ -818,9 +824,10 @@ export function JobDetail() {
             {continuationError ? <p className="form-error" role="alert">{continuationError}</p> : null}
             {continuationMutation.isError ? (
               <p className="form-error" role="alert">
-                {continuationMutation.error instanceof ApiClientError
-                  ? continuationMutation.error.message
-                  : t("jobDetail.continuation.failed")}
+                {localeSafeError(continuationMutation.error, locale, {
+                  zh: t("jobDetail.continuation.failed"),
+                  en: t("jobDetail.continuation.failed"),
+                })}
               </p>
             ) : null}
             <div className="confirm-dialog-actions">

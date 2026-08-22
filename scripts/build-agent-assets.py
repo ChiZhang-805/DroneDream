@@ -10,7 +10,9 @@ from PIL import Image
 
 REPO = Path(__file__).resolve().parents[1]
 BRAND_BUILDER_PATH = REPO / "scripts" / "build-brand-assets.py"
-_builder_spec = importlib.util.spec_from_file_location("dronedream_brand_builder", BRAND_BUILDER_PATH)
+_builder_spec = importlib.util.spec_from_file_location(
+    "dronedream_brand_builder", BRAND_BUILDER_PATH
+)
 if _builder_spec is None or _builder_spec.loader is None:
     raise RuntimeError("could not load the canonical brand builder")
 _brand_builder = importlib.util.module_from_spec(_builder_spec)
@@ -108,12 +110,13 @@ def main() -> None:
     }
     if args.check:
         drifted = [
-            path for path, payload in outputs.items() if not path.is_file() or path.read_bytes() != payload
+            path
+            for path, payload in outputs.items()
+            if not path.is_file() or path.read_bytes() != payload
         ]
         if drifted:
             raise AgentBrandError(
-                "checked-in AGENT assets are stale: "
-                + ", ".join(path.name for path in drifted)
+                "checked-in AGENT assets are stale: " + ", ".join(path.name for path in drifted)
             )
         for path, payload in outputs.items():
             print(f"Verified {path.relative_to(REPO).as_posix()} ({sha256(payload)})")
@@ -121,8 +124,7 @@ def main() -> None:
     for path, payload in outputs.items():
         path.write_bytes(payload)
         print(
-            f"Wrote {path.relative_to(REPO).as_posix()} "
-            f"({len(payload)} bytes, {sha256(payload)})"
+            f"Wrote {path.relative_to(REPO).as_posix()} ({len(payload)} bytes, {sha256(payload)})"
         )
 
 

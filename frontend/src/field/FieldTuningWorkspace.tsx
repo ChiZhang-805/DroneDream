@@ -29,6 +29,7 @@ import {
   type FieldTuningDemoReceipt,
   type FieldTuningStatus,
 } from "../desktop/bridge";
+import { localeSafeError } from "../i18n/I18nProvider";
 import type { FieldLocale } from "./catalog";
 import {
   fieldBrowserHardwareDenial,
@@ -96,6 +97,11 @@ const COPY = {
     hardwareStillDenied: "This result does not write parameters or grant hardware authority.",
     history: "Persisted job history",
     noHistory: "No persisted Harness jobs yet.",
+    statusLoadFailed: "The native tuning contract could not be loaded.",
+    historyLoadFailed: "Harness job history could not be loaded.",
+    evidenceFailed: "The recorded evidence could not be analyzed.",
+    demoFailed: "The safe tuning demonstration failed.",
+    gateFailed: "The hardware gate could not be evaluated.",
   },
   "zh-CN": {
     title: "真机自主调参",
@@ -156,6 +162,11 @@ const COPY = {
     hardwareStillDenied: "该结果不会写入参数，也不会授予真机权限。",
     history: "已保存作业历史",
     noHistory: "尚无已保存的 Harness 作业。",
+    statusLoadFailed: "无法加载原生调参合同。",
+    historyLoadFailed: "无法加载 Harness 作业历史。",
+    evidenceFailed: "无法分析真机记录证据。",
+    demoFailed: "安全调参演示执行失败。",
+    gateFailed: "无法评估真机安全门。",
   },
 } as const;
 
@@ -202,11 +213,17 @@ export function FieldTuningWorkspace({
         setStatus(next);
         setStatusSource("native");
       })
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
+      .catch((reason: unknown) => setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].statusLoadFailed,
+        en: COPY.en.statusLoadFailed,
+      })));
     void listFieldHarnessJobs()
       .then(setJobHistory)
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
-  }, []);
+      .catch((reason: unknown) => setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].historyLoadFailed,
+        en: COPY.en.historyLoadFailed,
+      })));
+  }, [locale]);
 
   const createEvidenceTemplate = () => {
     if (!snapshot) {
@@ -260,7 +277,10 @@ export function FieldTuningWorkspace({
       setHarnessReceipt(next);
       setJobHistory(await listFieldHarnessJobs());
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].evidenceFailed,
+        en: COPY.en.evidenceFailed,
+      }));
     } finally {
       setBusy(false);
     }
@@ -284,7 +304,10 @@ export function FieldTuningWorkspace({
           : runFieldBrowserFixture(request),
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].demoFailed,
+        en: COPY.en.demoFailed,
+      }));
     } finally {
       setBusy(false);
     }
@@ -309,7 +332,10 @@ export function FieldTuningWorkspace({
           : fieldBrowserHardwareDenial(),
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].gateFailed,
+        en: COPY.en.gateFailed,
+      }));
     }
   };
 

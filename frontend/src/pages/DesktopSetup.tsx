@@ -65,7 +65,7 @@ import {
   subscribeDesktopStartupGate,
 } from "../desktop/startupGate";
 import { useAppUpdaterState } from "../desktop/updaterContext";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 
 const DroneLaunchScene = lazy(async () => {
@@ -474,20 +474,20 @@ export function DesktopSetup() {
       !installerHandoffState.discardResult.discarded),
   );
   const launcherErrorDetails = [
-    ...state.issues.map((issue) => `${issue.command}: ${issue.message}`),
-    installState.commandError,
+    ...state.issues.map((issue) => `${issue.command}: ${localeSafeError(issue.message, locale, { zh: "环境检查失败。", en: "Environment check failed." })}`),
+    installState.commandError ? localizedDesktopDiagnostic(installState.commandError, locale, { zh: "运行环境安装命令失败。", en: "Runtime installation command failed." }) : null,
     installState.snapshot?.error
-      ? `${installState.snapshot.error.code}: ${installState.snapshot.error.message}`
+      ? `${installState.snapshot.error.code}: ${localeSafeError(installState.snapshot.error.message, locale, { zh: "运行环境安装失败。", en: "Runtime installation failed." })}`
       : null,
-    installerHandoffState.commandError,
+    installerHandoffState.commandError ? localizedDesktopDiagnostic(installerHandoffState.commandError, locale, { zh: "安装器交接检查失败。", en: "Installer handoff check failed." }) : null,
     installerHandoffState.result?.disposition === "invalid"
-      ? installerHandoffState.result.message ?? t("desktop.installerChoiceInvalidHint")
+      ? localeSafeError(installerHandoffState.result.message, locale, { zh: t("desktop.installerChoiceInvalidHint"), en: t("desktop.installerChoiceInvalidHint") })
       : null,
     installerHandoffState.intent?.status === "invalid"
-      ? installerHandoffState.intent.message ?? t("desktop.installerChoiceInvalidHint")
+      ? localeSafeError(installerHandoffState.intent.message, locale, { zh: t("desktop.installerChoiceInvalidHint"), en: t("desktop.installerChoiceInvalidHint") })
       : null,
     state.plan && (!state.plan.canInstall || state.plan.blockers.length > 0)
-      ? state.plan.blockers.join("\n") || t("desktop.planBlocked")
+      ? state.plan.blockers.map((blocker) => localeSafeError(blocker, locale, { zh: t("desktop.planBlocked"), en: t("desktop.planBlocked") })).join("\n") || t("desktop.planBlocked")
       : null,
     showInstallPlanner &&
       !state.planLoading &&
@@ -596,8 +596,14 @@ export function DesktopSetup() {
     ) {
       setDesktopStartupGateState("blocked", {
         accountId: signedInAccount?.id ?? null,
-        error: updater.error ??
-          `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
+        error: updater.error
+          ? localeSafeError(updater.error, locale, {
+              zh: "必须先完成 DroneDream 更新，才能进入工作区。",
+              en: "The DroneDream update must be installed before entering the workspace.",
+            })
+          : locale === "zh-CN"
+            ? `必须先安装 DroneDream ${updater.availableVersion ?? "更新"}，才能进入工作区。`
+            : `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the workspace.`,
         failureCode: "updateRequired",
       });
       return;
@@ -608,6 +614,7 @@ export function DesktopSetup() {
     browserAuthCompletedForLaunch,
     desktopAvailable,
     localChecksReady,
+    locale,
     signedInAccount,
     updater.availableVersion,
     updater.error,
@@ -1625,7 +1632,7 @@ export function DesktopSetup() {
           {state.issues.length > 0 ? (
             <ul>
               {state.issues.map((issue) => (
-                <li key={issue.source}>{issue.command}: {issue.message}</li>
+                <li key={issue.source}>{issue.command}: {localeSafeError(issue.message, locale, { zh: "环境检查失败。", en: "Environment check failed." })}</li>
               ))}
             </ul>
           ) : null}
@@ -1788,7 +1795,7 @@ export function DesktopSetup() {
               <ul className="desktop-diagnostic-list">
                 {state.issues.map((issue) => (
                   <li key={issue.source}>
-                    <code>{issue.command}: {issue.message}</code>
+                    <code>{issue.command}: {localeSafeError(issue.message, locale, { zh: "环境检查失败。", en: "Environment check failed." })}</code>
                   </li>
                 ))}
               </ul>
@@ -1908,7 +1915,7 @@ function InstallerHandoffNotice({
   onRetry: () => void;
   onDiscard: () => void;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   if (state.checking) {
     if (quietSuccess) {
       return <span className="sr-only">{t("desktop.installerChoiceChecking")}</span>;
@@ -1957,9 +1964,10 @@ function InstallerHandoffNotice({
           : "desktop.autoInstallAlreadyStarted")}
       >
         <p>
-          {state.discardResult.message ?? t(state.autoStartUncertain
-            ? "desktop.autoInstallCancelNotConfirmedHint"
-            : "desktop.autoInstallAlreadyStartedHint")}
+          {localeSafeError(state.discardResult.message, locale, {
+            zh: t(state.autoStartUncertain ? "desktop.autoInstallCancelNotConfirmedHint" : "desktop.autoInstallAlreadyStartedHint"),
+            en: t(state.autoStartUncertain ? "desktop.autoInstallCancelNotConfirmedHint" : "desktop.autoInstallAlreadyStartedHint"),
+          })}
         </p>
         {state.autoStartUncertain ? (
           <button type="button" className="btn" onClick={onRetry}>
@@ -1972,7 +1980,7 @@ function InstallerHandoffNotice({
   if (state.commandError) {
     return (
       <Alert tone="warning" title={t("desktop.installerChoiceFailed")}>
-        <p><code>{state.commandError}</code></p>
+        <p><code>{localizedDesktopDiagnostic(state.commandError, locale, { zh: "安装器选择检查失败。", en: "Installer choice check failed." })}</code></p>
         <button type="button" className="btn" onClick={onRetry}>
           {t("desktop.retryInstallerCheck")}
         </button>
@@ -2102,7 +2110,7 @@ function InstallerPlanFallback({
   onRetry: () => void;
   onDiscard: () => void;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   return (
     <SectionCard
       title={t("desktop.installerFallbackTitle")}
@@ -2117,7 +2125,7 @@ function InstallerPlanFallback({
         <ul className="desktop-diagnostic-list">
           {issues.map((issue) => (
             <li key={issue.source}>
-              <code>{issue.command}: {issue.message}</code>
+              <code>{issue.command}: {localeSafeError(issue.message, locale, { zh: "无法生成精确安装计划。", en: "The exact installation plan could not be generated." })}</code>
             </li>
           ))}
         </ul>
@@ -2880,7 +2888,7 @@ function RuntimeInstallControls({
   onCancel: () => void;
   onDiscardAutomatic: () => void;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const phase = snapshot?.phase ?? "idle";
   const active = isActiveInstall(snapshot);
   const planCanInstall = Boolean(
@@ -3004,7 +3012,7 @@ function RuntimeInstallControls({
           ) : null}
           {snapshot?.error ? (
             <Alert tone="warning" title={t("desktop.installFailed")}>
-              <p><code>{snapshot.error.code}</code>: {snapshot.error.message}</p>
+              <p><code>{snapshot.error.code}</code>: {localeSafeError(snapshot.error.message, locale, { zh: "运行环境安装失败。", en: "Runtime installation failed." })}</p>
               <p>
                 {snapshot.error.retryable || snapshot.resumable
                   ? t("desktop.retryAvailable")
@@ -3014,7 +3022,7 @@ function RuntimeInstallControls({
           ) : null}
           {commandError ? (
             <Alert tone="warning" title={t("desktop.installCommandFailed")}>
-              <code>{commandError}</code>
+              <code>{localizedDesktopDiagnostic(commandError, locale, { zh: "运行环境安装命令失败。", en: "Runtime installation command failed." })}</code>
             </Alert>
           ) : null}
         </>
@@ -3237,4 +3245,15 @@ function errorMessage(error: unknown): string {
   } catch {
     return "Unknown desktop command error";
   }
+}
+
+function localizedDesktopDiagnostic(
+  value: unknown,
+  locale: "en" | "zh-CN",
+  fallback: { zh: string; en: string },
+): string {
+  const raw = value instanceof Error ? value.message : String(value ?? "");
+  const command = raw.match(/^([a-z][a-z0-9_.-]+):/iu)?.[1];
+  const safe = localeSafeError(raw, locale, fallback);
+  return command && !safe.includes(command) ? `${safe} (${command})` : safe;
 }

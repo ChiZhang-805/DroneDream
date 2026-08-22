@@ -264,6 +264,7 @@ describe("autonomy mission harness", () => {
   it("keeps every public mission preset grounded in School Map", () => {
     const request: AutonomyCompileRequest = {
       edition: "sim",
+      locale: "en",
       execution_target: "simulation",
       natural_language: "Use the selected School Map mission preset.",
       scene_id: "school-campus-v1",
@@ -302,6 +303,7 @@ describe("autonomy mission harness", () => {
   it("uses the same stair-traversal action in local and backend School Map contracts", () => {
     const request: AutonomyCompileRequest = {
       edition: "sim",
+      locale: "en",
       execution_target: "simulation",
       natural_language: "Descend both switchback stairs and land in the lobby.",
       scene_id: "school-campus-v1",

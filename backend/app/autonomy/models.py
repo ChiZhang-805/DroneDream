@@ -9,6 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Edition = Literal["universal", "sim", "lab", "field", "autonomy"]
+CompileLocale = Literal["en", "zh-CN"]
 ExecutionTarget = Literal["simulation", "hitl", "hardware"]
 PerceptionMode = Literal["map", "vision", "fusion"]
 ExecutionAdapter = Literal[
@@ -409,6 +410,7 @@ class AutonomyHarnessInspectResponse(StrictModel):
 
 class AutonomyCompileRequest(StrictModel):
     edition: Edition
+    locale: CompileLocale = "en"
     execution_target: ExecutionTarget = "simulation"
     natural_language: str = Field(min_length=3, max_length=2000)
     scene_id: str | None = Field(
@@ -490,6 +492,7 @@ class MissionContract(StrictModel):
     schema_version: Literal["dronedream.autonomy.mission.v2"] = "dronedream.autonomy.mission.v2"
     contract_id: str
     edition: Edition
+    locale: CompileLocale
     execution_target: ExecutionTarget
     scene_id: str
     perception_mode: PerceptionMode
@@ -639,6 +642,48 @@ class RuntimeOperatorCommand(StrictModel):
     reason: str = Field(min_length=3, max_length=240)
 
 
+class RuntimeInterruptionRequest(StrictModel):
+    schema_version: Literal["dronedream.autonomy.runtime-interruption-request.v1"] = (
+        "dronedream.autonomy.runtime-interruption-request.v1"
+    )
+    client_request_id: str = Field(
+        min_length=8,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+    instruction: str = Field(min_length=1, max_length=2_000)
+
+
+class RuntimeInterruptionReceipt(StrictModel):
+    schema_version: Literal["dronedream.autonomy.runtime-interruption.v1"] = (
+        "dronedream.autonomy.runtime-interruption.v1"
+    )
+    interruption_id: str = Field(pattern=r"^interrupt-[a-f0-9]{24}$")
+    client_request_id: str
+    state: Literal["holding_pending_interpretation", "applied", "cancelled"]
+    created_at: datetime
+    updated_at: datetime
+    previous_phase: RuntimePhase
+    expected_task_graph_revision: int = Field(ge=1)
+    snapshot_position_m: Vector3 | None = None
+    instruction_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class RuntimeReplanApplyRequest(StrictModel):
+    schema_version: Literal["dronedream.autonomy.runtime-replan-request.v1"] = (
+        "dronedream.autonomy.runtime-replan-request.v1"
+    )
+    interruption_id: str = Field(pattern=r"^interrupt-[a-f0-9]{24}$")
+    expected_task_graph_revision: int = Field(ge=1)
+    client_request_id: str = Field(
+        min_length=8,
+        max_length=80,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+    operator_confirmed: Literal[True]
+    mission: AutonomyCompileRequest
+
+
 class RuntimeSession(StrictModel):
     schema_version: Literal["dronedream.autonomy.runtime-session.v1"] = (
         "dronedream.autonomy.runtime-session.v1"
@@ -655,7 +700,9 @@ class RuntimeSession(StrictModel):
     latest_monotonic_ms: int
     observation_count: int
     decision: SafetyDecision
+    mission_revision: int = Field(default=1, ge=1)
     task_graph: MissionTaskGraph
+    interruption: RuntimeInterruptionReceipt | None = None
     perceived_entities: list[PerceivedEntity] = Field(default_factory=list, max_length=128)
     stream_health: list[PerceptionStreamHealth] = Field(default_factory=list, max_length=24)
     decision_events: list[RuntimeDecisionEvent] = Field(default_factory=list, max_length=100)

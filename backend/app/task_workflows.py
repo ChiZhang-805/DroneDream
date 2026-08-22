@@ -18,7 +18,7 @@ EditionId = Literal["universal", "sim", "lab", "field", "autonomy"]
 TaskType = Literal[
     "control_tuning",
     "mission_autonomy",
-    "vehicle_modeling",
+    "asset_import_qualification",
     "simulation_experiment",
     "cross_edition_workflow",
     "hardware_validation",
@@ -64,10 +64,10 @@ TASK_PROMPT_CONTRACTS: Final[dict[TaskType, str]] = {
         "Pack, then require geometry, dynamics, energy, perception, recovery, and approval "
         "checks."
     ),
-    "vehicle_modeling": (
-        "Compile an editable aircraft model draft with components, transforms, mass "
-        "properties, constraints, interference checks, and export qualification; do not "
-        "invent measured physics."
+    "asset_import_qualification": (
+        "Compile a source-bound import and qualification plan for an externally authored "
+        "map, world, or aircraft asset. Preserve source identity, normalize frames and units, "
+        "and require deterministic geometry, physics, ROS 2, Gazebo, PX4, and evidence gates."
     ),
     "simulation_experiment": (
         "Compile a repeatable simulator study with frozen firmware, vehicle, world, seeds, "
@@ -104,16 +104,24 @@ EDITION_TASKS: Final[dict[EditionId, frozenset[TaskType]]] = {
         {
             "control_tuning",
             "mission_autonomy",
-            "vehicle_modeling",
+            "asset_import_qualification",
             "simulation_experiment",
             "cross_edition_workflow",
         }
     ),
-    "sim": frozenset({"control_tuning", "mission_autonomy", "simulation_experiment"}),
+    "sim": frozenset(
+        {
+            "control_tuning",
+            "mission_autonomy",
+            "asset_import_qualification",
+            "simulation_experiment",
+        }
+    ),
     "lab": frozenset(
         {
             "control_tuning",
             "mission_autonomy",
+            "asset_import_qualification",
             "simulation_experiment",
             "hardware_validation",
             "calibration",
@@ -121,8 +129,12 @@ EDITION_TASKS: Final[dict[EditionId, frozenset[TaskType]]] = {
             "real_to_sim",
         }
     ),
-    "field": frozenset({"control_tuning", "mission_autonomy", "field_task"}),
-    "autonomy": frozenset({"mission_autonomy", "vehicle_modeling", "simulation_experiment"}),
+    "field": frozenset(
+        {"control_tuning", "mission_autonomy", "asset_import_qualification", "field_task"}
+    ),
+    "autonomy": frozenset(
+        {"mission_autonomy", "asset_import_qualification", "simulation_experiment"}
+    ),
 }
 
 TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
@@ -151,10 +163,27 @@ TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
         "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Inspect a qualified Vehicle Pack and capability envelope.",
     },
-    "vehicle.model_draft": {
+    "asset.source.inspect": {
+        "authority": "read",
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
+        "description": (
+            "Inspect source-tool identity, format, files, hashes, frames, and declared units."
+        ),
+    },
+    "asset.package.normalize": {
         "authority": "proposal",
-        "editions": ("universal", "autonomy"),
-        "description": "Propose a structured editable vehicle model.",
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
+        "description": (
+            "Propose a deterministic Asset IR and ddpkg normalization plan "
+            "without altering the source."
+        ),
+    },
+    "asset.qualification.plan": {
+        "authority": "proposal",
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
+        "description": (
+            "Plan geometry, physics, ROS 2, Gazebo, PX4, and evidence qualification gates."
+        ),
     },
     "map.inspect": {
         "authority": "read",
@@ -229,10 +258,11 @@ TASK_TOOLS: Final[dict[TaskType, tuple[str, ...]]] = {
         "trajectory.plan",
         "evidence.record",
     ),
-    "vehicle_modeling": (
+    "asset_import_qualification": (
         "context.inspect",
-        "vehicle.model_draft",
-        "vehicle.inspect",
+        "asset.source.inspect",
+        "asset.package.normalize",
+        "asset.qualification.plan",
         "evidence.record",
     ),
     "simulation_experiment": (
@@ -348,6 +378,7 @@ class TaskWorkflowContract(_Strict):
     owner_binding_sha256: str = Field(min_length=64, max_length=64)
     request_id: str
     edition: EditionId
+    locale: Literal["en", "zh-CN"]
     task_type: TaskType
     routing_source: Literal["explicit", "auto_detect"]
     status: WorkflowStatus
@@ -379,7 +410,27 @@ _KEYWORDS: Final[tuple[tuple[TaskType, tuple[str, ...]], ...]] = (
     ("real_to_sim", ("real-to-sim", "real2sim", "真机到仿真", "回灌仿真")),
     ("hardware_validation", ("hardware validation", "bench test", "hitl", "真机验证", "台架")),
     ("calibration", ("calibrat", "标定", "校准", "外参", "内参")),
-    ("vehicle_modeling", ("vehicle model", "airframe", "cad", "无人机建模", "机型建模", "机架")),
+    (
+        "asset_import_qualification",
+        (
+            "asset import",
+            "asset qualification",
+            "blender",
+            "onshape",
+            "solidworks",
+            "urdf",
+            "sdf",
+            "dae",
+            "gltf",
+            "fbx",
+            "外部资产",
+            "资产导入",
+            "资格认证",
+            "地图导入",
+            "世界导入",
+            "无人机模型导入",
+        ),
+    ),
     (
         "mission_autonomy",
         (
@@ -426,7 +477,11 @@ def _context_receipt(request: TaskWorkflowCompileRequest) -> tuple[str, int]:
     return hashlib.sha256(encoded).hexdigest(), len(encoded)
 
 
-def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[WorkflowStep]:
+def _task_steps(
+    task_type: TaskType,
+    eligible_tool_ids: set[str],
+    locale: Literal["en", "zh-CN"],
+) -> list[WorkflowStep]:
     specific: dict[TaskType, tuple[str, str, str, RiskLevel]] = {
         "control_tuning": (
             "Bind firmware, parameter catalog, scenarios, objectives, constraints, and budget",
@@ -440,11 +495,12 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
             "task-graph.receipt",
             "critical",
         ),
-        "vehicle_modeling": (
-            "Generate an editable component hierarchy and physical-property draft",
-            "vehicle.model_draft",
-            "vehicle-model.draft",
-            "medium",
+        "asset_import_qualification": (
+            "Bind the external source and define deterministic normalization "
+            "and qualification gates",
+            "asset.qualification.plan",
+            "external-asset-qualification.plan",
+            "high",
         ),
         "simulation_experiment": (
             "Freeze the simulator, world, vehicle, seeds, disturbances, and metrics",
@@ -490,6 +546,50 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         ),
     }
     title, primary_tool, evidence, risk = specific[task_type]
+    if locale == "zh-CN":
+        title = {
+            "control_tuning": "绑定固件、参数目录、场景、目标、约束与预算",
+            "mission_autonomy": "将任务图绑定到合格无人机、地图实体与恢复规则",
+            "asset_import_qualification": "绑定外部资产来源，并定义确定性的规范化与资格认证门槛",
+            "simulation_experiment": "冻结仿真器、世界、无人机、随机种子、扰动与指标",
+            "cross_edition_workflow": "定义相互独立的 SIM、LAB 与 FIELD 晋级门槛",
+            "hardware_validation": "绑定已签名的硬件身份、隔离环境、操作员与回滚方案",
+            "calibration": "绑定参考来源、可观测性、校准目标与验收边界",
+            "sim_to_real": "测量仿真到现实的差距，并要求硬件在环与受控飞行晋级",
+            "real_to_sim": "将采集的证据转换为经过隔离的模型更新",
+            "field_task": "绑定真机、地图、地理围栏、人工接管、链路丢失与中止策略",
+        }[task_type]
+
+    common_titles = {
+        "understand": (
+            "Classify the request and extract only explicit constraints",
+            "识别任务类型，并仅提取用户明确给出的约束",
+        ),
+        "plan": (
+            "Generate a structured proposal using only eligible tools",
+            "仅使用具备资格的工具生成结构化方案",
+        ),
+        "validate": (
+            "Run deterministic schema, physics, policy, and evidence checks",
+            "执行确定性的结构、物理、安全策略与证据检查",
+        ),
+        "approve": (
+            "Request explicit approval for any cost, simulation submission, or hardware handoff",
+            "对费用、仿真提交或硬件交接请求明确确认",
+        ),
+        "execute": (
+            "Dispatch only through the edition-specific runtime adapter",
+            "仅通过当前版本专用的运行时适配器执行",
+        ),
+        "evidence": (
+            "Record outcomes, deviations, failures, and replay evidence",
+            "记录结果、偏差、失败信息与可回放证据",
+        ),
+    }
+
+    def localized_title(key: str) -> str:
+        english, chinese = common_titles[key]
+        return chinese if locale == "zh-CN" else english
 
     def eligible_tools(*authorities: str) -> list[str]:
         return [
@@ -504,7 +604,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="01-understand",
             phase="understand",
-            title="Classify the request and extract only explicit constraints",
+            title=localized_title("understand"),
             executor="model",
             risk="low",
             tool_ids=["intent.classify"],
@@ -526,7 +626,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="03-plan",
             phase="plan",
-            title="Generate a structured proposal using only eligible tools",
+            title=localized_title("plan"),
             executor="model",
             risk=risk,
             tool_ids=model_tools[:4],
@@ -537,7 +637,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="04-validate",
             phase="validate",
-            title="Run deterministic schema, physics, policy, and evidence checks",
+            title=localized_title("validate"),
             executor="deterministic_service",
             risk="critical" if risk == "critical" else "high",
             tool_ids=eligible_tools("read", "simulation")[:4],
@@ -548,9 +648,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="05-approve",
             phase="approve",
-            title=(
-                "Request explicit approval for any cost, simulation submission, or hardware handoff"
-            ),
+            title=localized_title("approve"),
             executor="operator",
             risk="critical"
             if task_type in {"hardware_validation", "sim_to_real", "field_task"}
@@ -563,7 +661,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="06-execute",
             phase="execute",
-            title="Dispatch only through the edition-specific runtime adapter",
+            title=localized_title("execute"),
             executor="runtime_adapter",
             risk="critical",
             tool_ids=eligible_tools("simulation"),
@@ -578,7 +676,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="07-evidence",
             phase="evidence",
-            title="Record outcomes, deviations, failures, and replay evidence",
+            title=localized_title("evidence"),
             executor="deterministic_service",
             risk="medium",
             tool_ids=["evidence.record"] if "evidence.record" in eligible_tool_ids else [],
@@ -590,6 +688,8 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
 
 
 def _artifact_route(task_type: TaskType, edition: EditionId) -> tuple[str, str]:
+    if task_type == "asset_import_qualification":
+        return "external_asset_qualification_plan", "/autonomy"
     if task_type == "simulation_experiment":
         return {
             "universal": ("universal_simulation_experiment", "/jobs/new"),
@@ -601,7 +701,6 @@ def _artifact_route(task_type: TaskType, edition: EditionId) -> tuple[str, str]:
     return {
         "control_tuning": ("tuning_experiment", "/jobs/new"),
         "mission_autonomy": ("autonomy_mission_plan", "/autonomy"),
-        "vehicle_modeling": ("universal_vehicle_model", "/vehicle-studio"),
         "cross_edition_workflow": ("universal_cross_edition_workflow", "/dashboard"),
         "hardware_validation": ("lab_hardware_validation", "/lab"),
         "calibration": ("lab_calibration_workflow", "/lab"),
@@ -648,11 +747,12 @@ def compile_task_workflow(
     context_sha, context_bytes = _context_receipt(request)
     prompt_version = f"dronedream.{task_type}.system.v1"
     artifact_kind, product_path = _artifact_route(task_type, request.edition)
-    steps = _task_steps(task_type, set(eligible))
+    steps = _task_steps(task_type, set(eligible), request.locale)
     seed = {
         "owner": owner_binding,
         "request_id": request.request_id,
         "edition": request.edition,
+        "locale": request.locale,
         "task_type": task_type,
         "message_sha256": hashlib.sha256(request.message.encode()).hexdigest(),
         "context_sha256": context_sha,
@@ -673,6 +773,7 @@ def compile_task_workflow(
         owner_binding_sha256=owner_binding,
         request_id=request.request_id,
         edition=request.edition,
+        locale=request.locale,
         task_type=task_type,
         routing_source=routing_source,
         status="blocked" if blockers else "draft",

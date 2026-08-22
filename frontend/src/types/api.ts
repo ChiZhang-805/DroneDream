@@ -542,7 +542,7 @@ export interface ExperimentAssistantTurnRequest {
 export type TaskWorkflowTaskType =
   | "control_tuning"
   | "mission_autonomy"
-  | "vehicle_modeling"
+  | "asset_import_qualification"
   | "simulation_experiment"
   | "cross_edition_workflow"
   | "hardware_validation"
@@ -588,6 +588,7 @@ export interface TaskWorkflowContract {
   owner_binding_sha256: string;
   request_id: string;
   edition: "universal" | "sim" | "lab" | "field" | "autonomy";
+  locale: "en" | "zh-CN";
   task_type: TaskWorkflowTaskType;
   routing_source: "explicit" | "auto_detect";
   status: "draft" | "blocked";
@@ -632,6 +633,7 @@ export interface ExperimentAssistantTurnResponse {
     product_link: string;
     artifact_kind:
         | "autonomy_mission_plan"
+        | "external_asset_qualification_plan"
         | "universal_vehicle_model"
         | "universal_simulation_experiment"
         | "universal_cross_edition_workflow"
@@ -1261,6 +1263,7 @@ export interface AutonomyCompileAssetContext {
 
 export interface AutonomyCompileRequest {
   edition: AutonomyEdition;
+  locale: "en" | "zh-CN";
   execution_target: AutonomyExecutionTarget;
   natural_language: string;
   scene_id: string;
@@ -1362,6 +1365,7 @@ export interface AutonomyCompileResponse {
     schema_version: "dronedream.autonomy.mission.v2";
     contract_id: string;
     edition: AutonomyEdition;
+    locale: "en" | "zh-CN";
     execution_target: AutonomyExecutionTarget;
     scene_id: string;
     perception_mode: AutonomyPerceptionMode;
@@ -1447,6 +1451,34 @@ export interface AutonomyRuntimeObservation {
   stream_health?: AutonomyPerceptionStreamHealth[];
 }
 
+export interface AutonomyRuntimeInterruptionRequest {
+  schema_version?: "dronedream.autonomy.runtime-interruption-request.v1";
+  client_request_id: string;
+  instruction: string;
+}
+
+export interface AutonomyRuntimeInterruptionReceipt {
+  schema_version: "dronedream.autonomy.runtime-interruption.v1";
+  interruption_id: string;
+  client_request_id: string;
+  state: "holding_pending_interpretation" | "applied" | "cancelled";
+  created_at: string;
+  updated_at: string;
+  previous_phase: AutonomyRuntimeSession["phase"];
+  expected_task_graph_revision: number;
+  snapshot_position_m: { x: number; y: number; z: number } | null;
+  instruction_sha256: string;
+}
+
+export interface AutonomyRuntimeReplanApplyRequest {
+  schema_version?: "dronedream.autonomy.runtime-replan-request.v1";
+  interruption_id: string;
+  expected_task_graph_revision: number;
+  client_request_id: string;
+  operator_confirmed: true;
+  mission: AutonomyCompileRequest;
+}
+
 export interface AutonomyRuntimeSession {
   schema_version: "dronedream.autonomy.runtime-session.v1";
   session_id: string;
@@ -1475,7 +1507,9 @@ export interface AutonomyRuntimeSession {
     accepted: boolean;
     codes: string[];
   };
+  mission_revision: number;
   task_graph: AutonomyTaskGraph;
+  interruption: AutonomyRuntimeInterruptionReceipt | null;
   perceived_entities: AutonomyPerceivedEntity[];
   stream_health: AutonomyPerceptionStreamHealth[];
   decision_events: Array<{

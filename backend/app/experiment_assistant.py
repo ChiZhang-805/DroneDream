@@ -234,7 +234,7 @@ _FIELD_SPECS: tuple[FieldSpec, ...] = (
         "simulator_backend",
         "enum",
         "Simulation backend",
-        enum_values=("mock", "real_cli"),
+        enum_values=("real_cli",),
     ),
     _spec(
         "optimizer_strategy",
@@ -334,8 +334,8 @@ _QUESTIONS: dict[str, tuple[str, str]] = {
         "调优应优先考虑稳定、速度、平滑还是鲁棒性？",
     ),
     "simulator_backend": (
-        "Should this use the mock workflow or real PX4/Gazebo?",
-        "这次应使用模拟工作流还是真实 PX4/Gazebo？",
+        "Should this run through the real PX4/Gazebo workflow?",
+        "这次是否通过真实的 PX4/Gazebo 工作流执行？",
     ),
     "optimizer_strategy": (
         "Which optimization strategy should be used?",

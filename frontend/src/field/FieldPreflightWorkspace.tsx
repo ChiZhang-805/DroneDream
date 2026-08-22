@@ -15,6 +15,7 @@ import {
   type FieldParameterSnapshot,
   type FieldPreflightPlan,
 } from "../desktop/bridge";
+import { localeSafeError } from "../i18n/I18nProvider";
 import type { FieldLocale } from "./catalog";
 import { FIELD_HARDWARE_ACTIONS } from "./safety";
 
@@ -26,6 +27,7 @@ const COPY = {
     radius: "Radius (m)",
     altitude: "Maximum altitude (m)",
     evaluate: "Evaluate preflight",
+    evaluateFailed: "Preflight evaluation failed.",
     unavailable: "Native preflight evaluation is available in the installed Field app.",
     acknowledgement: "I confirm the declared zone and understand that this local record is not signed authority.",
     localOnly: "Local only",
@@ -65,6 +67,7 @@ const COPY = {
     radius: "半径（米）",
     altitude: "最大高度（米）",
     evaluate: "评估飞前条件",
+    evaluateFailed: "飞前条件评估失败。",
     unavailable: "原生飞前评估仅在已安装的 Field 应用中可用。",
     acknowledgement: "我确认所声明的区域，并理解此本地记录不是签名权限证据。",
     localOnly: "仅本地",
@@ -142,7 +145,10 @@ export function FieldPreflightWorkspace({
       }));
     } catch (reason) {
       setPlan(null);
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].evaluateFailed,
+        en: COPY.en.evaluateFailed,
+      }));
     } finally {
       setBusy(false);
     }

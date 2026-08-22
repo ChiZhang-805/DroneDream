@@ -168,9 +168,9 @@ class UserExperiencePreferences(BaseModel):
     default_track_type: DefaultTrackType | None = None
     default_altitude_m: float | None = None
     retention_days: int
-    stored_content: Literal[
+    stored_content: Literal["allowlisted_preferences_and_verified_structured_job_outcomes_only"] = (
         "allowlisted_preferences_and_verified_structured_job_outcomes_only"
-    ] = "allowlisted_preferences_and_verified_structured_job_outcomes_only"
+    )
     updated_at: datetime | None = None
 
 
@@ -317,9 +317,7 @@ class ContinueExplorationBudget(_Strict):
     def _validate_worst_case_provider_budget(self) -> ContinueExplorationBudget:
         worst_case = self.additional_generation_cap * 4
         if self.additional_provider_turn_cap > worst_case:
-            raise ValueError(
-                "additional_provider_turn_cap cannot exceed four turns per generation"
-            )
+            raise ValueError("additional_provider_turn_cap cannot exceed four turns per generation")
         return self
 
 
@@ -466,7 +464,7 @@ class ExperimentAssistantTurnRequest(_Strict):
         "auto_detect",
         "control_tuning",
         "mission_autonomy",
-        "vehicle_modeling",
+        "asset_import_qualification",
         "simulation_experiment",
         "cross_edition_workflow",
         "hardware_validation",
@@ -837,7 +835,7 @@ class JobCreateRequest(_Strict):
     objective_config: ObjectiveConfig = Field(default_factory=ObjectiveConfig)
     scenario_suite: ScenarioSuiteConfig = Field(default_factory=ScenarioSuiteConfig)
 
-    simulator_backend: SimulatorBackend = "mock"
+    simulator_backend: SimulatorBackend = "real_cli"
     optimizer_strategy: OptimizerStrategy = "heuristic"
     max_iterations: Annotated[int, Field(ge=1, le=100)] = 20
     trials_per_candidate: Annotated[int, Field(ge=1, le=10)] = 3
@@ -897,7 +895,29 @@ class JobCreateRequest(_Strict):
             and self.optimizer_strategy != "none"
             and not self.parameter_space
         ):
-            raise ValueError("real_cli optimization requires an explicit PX4 parameter_space")
+            if "parameter_space" in self.model_fields_set:
+                raise ValueError("real_cli optimization requires a non-empty PX4 parameter_space")
+            # A request that relies on product defaults must still be physically
+            # actionable. Seed the two coupled PX4 horizontal-loop parameters
+            # from the built-in catalog; an explicitly supplied empty list is
+            # rejected so callers cannot silently opt into inert optimization.
+            self.parameter_space = [
+                ParameterSelection(
+                    name="MPC_XY_P",
+                    baseline=0.95,
+                    minimum=0.6,
+                    maximum=1.3,
+                    step=0.1,
+                ),
+                ParameterSelection(
+                    name="MPC_XY_VEL_P_ACC",
+                    baseline=1.8,
+                    minimum=1.2,
+                    maximum=2.8,
+                    step=0.1,
+                ),
+            ]
+            enabled = [item for item in self.parameter_space if item.enabled and not item.locked]
         if self.optimizer_strategy != "none" and self.parameter_space and not enabled:
             raise ValueError("parameter_space requires at least one enabled, unlocked parameter")
         if self.openai is not None and self.llm is not None:
@@ -921,9 +941,7 @@ class JobCreateRequest(_Strict):
                     worst_case_provider_turns,
                 )
             elif self.provider_turn_cap > worst_case_provider_turns:
-                raise ValueError(
-                    "provider_turn_cap cannot exceed four turns per generation"
-                )
+                raise ValueError("provider_turn_cap cannot exceed four turns per generation")
             worst_case_provider_requests = min(
                 MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB,
                 self.provider_turn_cap * (self.provider_max_retries + 2),
@@ -999,7 +1017,7 @@ class Job(BaseModel):
     # have not emitted any events yet.
     recent_events: list[JobEventInfo] = Field(default_factory=list)
     # Phase 8: auto-tuning configuration + progress.
-    simulator_backend_requested: SimulatorBackend = "mock"
+    simulator_backend_requested: SimulatorBackend = "real_cli"
     optimizer_strategy: OptimizerStrategy = "heuristic"
     max_iterations: int = 20
     trials_per_candidate: int = 3
@@ -1217,9 +1235,7 @@ class FirstQualifiedAccounting(BaseModel):
     def _validate_provider_counts(self) -> FirstQualifiedAccounting:
         if self.provider_turns_succeeded > self.provider_turns_attempted:
             raise ValueError("provider turn successes cannot exceed attempts")
-        if (self.provider_requests_attempted is None) != (
-            self.provider_requests_succeeded is None
-        ):
+        if (self.provider_requests_attempted is None) != (self.provider_requests_succeeded is None):
             raise ValueError("provider request counts must be supplied together")
         if (
             self.provider_requests_attempted is not None

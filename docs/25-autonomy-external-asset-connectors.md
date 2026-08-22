@@ -1,8 +1,8 @@
-# AUTONOMY external asset connectors
+# DroneDream · AGENT external asset connectors
 
 ## Product boundary
 
-AUTONOMY is not a general-purpose CAD, DCC, GIS, or robot-modeling application.
+DroneDream · AGENT is not a general-purpose CAD, DCC, GIS, or robot-modeling application.
 Geometry is authored in specialist tools. DroneDream imports inert content,
 normalizes it to `.ddpkg` v1, validates its declared physics, and qualifies an
 exact map–vehicle pair against a pinned ROS 2 / Gazebo / PX4 environment.

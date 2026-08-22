@@ -1,4 +1,6 @@
 mod app_update;
+#[cfg(dronedream_agent)]
+mod agent_core;
 mod browser_auth;
 mod browser_auth_audit;
 mod browser_auth_vault;
@@ -78,6 +80,8 @@ pub fn run() {
         )
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
@@ -85,7 +89,12 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .manage(browser_auth::BrowserAuthCoordinator::default());
+        .manage(browser_auth::BrowserAuthCoordinator::default())
+        .setup(|app| {
+            #[cfg(dronedream_agent)]
+            agent_core::start(app);
+            Ok(())
+        });
 
     let builder = builder
         .manage(runtime_installer::RuntimeInstaller::default())
@@ -120,6 +129,11 @@ pub fn run() {
         runtime_keepalive::stop_runtime_for_exit,
         component_update::check_component_updates,
         component_update::install_component_update,
+        agent_core::agent_core_request,
+        agent_core::agent_core_restart,
+        agent_core::agent_core_status,
+        agent_core::agent_core_import_asset_path,
+        agent_core::agent_core_submit_companion_result_path,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
         field_adapters::inspect_field_protocol_frame,
@@ -168,6 +182,11 @@ pub fn run() {
         runtime_keepalive::stop_runtime_for_exit,
         component_update::check_component_updates,
         component_update::install_component_update,
+        agent_core::agent_core_request,
+        agent_core::agent_core_restart,
+        agent_core::agent_core_status,
+        agent_core::agent_core_import_asset_path,
+        agent_core::agent_core_submit_companion_result_path,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
         field_adapters::inspect_field_protocol_frame,
@@ -216,6 +235,11 @@ pub fn run() {
         runtime_keepalive::stop_runtime_for_exit,
         component_update::check_component_updates,
         component_update::install_component_update,
+        agent_core::agent_core_request,
+        agent_core::agent_core_restart,
+        agent_core::agent_core_status,
+        agent_core::agent_core_import_asset_path,
+        agent_core::agent_core_submit_companion_result_path,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
         field_adapters::inspect_field_protocol_frame,
@@ -265,9 +289,20 @@ pub fn run() {
         runtime_keepalive::stop_runtime_for_exit,
         component_update::check_component_updates,
         component_update::install_component_update,
+        agent_core::agent_core_request,
+        agent_core::agent_core_restart,
+        agent_core::agent_core_status,
+        agent_core::agent_core_import_asset_path,
+        agent_core::agent_core_submit_companion_result_path,
     ]);
 
-    builder
-        .run(tauri::generate_context!())
-        .expect("error while running DroneDream desktop");
+    let app = builder
+        .build(tauri::generate_context!())
+        .expect("error while building DroneDream desktop");
+    app.run(|handle, event| {
+        #[cfg(dronedream_agent)]
+        if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {
+            agent_core::stop(handle);
+        }
+    });
 }
