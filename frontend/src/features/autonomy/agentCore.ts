@@ -257,7 +257,10 @@ export interface AgentCoreHarnessCompositionItem {
   title_zh: string;
   description: string;
   description_zh: string;
+  category_id: string;
   color_token: "amber" | "green" | "blue" | "red" | "violet" | "cyan" | string;
+  visual_kind: "puzzle" | "model";
+  aspect_ratio: "1:1" | "1.5:1" | "model-bar";
   icon: string;
   order: number;
   member_node_ids: string[];

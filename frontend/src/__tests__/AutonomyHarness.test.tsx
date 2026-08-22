@@ -105,7 +105,10 @@ describe("visual Harness composer", () => {
         title_zh: "任务接入",
         description: "",
         description_zh: "",
+        category_id: "input",
         color_token: "amber",
+        visual_kind: "puzzle",
+        aspect_ratio: "1:1",
         icon: "inbox",
         order: 0,
         member_node_ids: [node.node_id],
@@ -126,7 +129,10 @@ describe("visual Harness composer", () => {
         title_zh: "接收任务",
         description: "",
         description_zh: "",
+        category_id: "input",
         color_token: "amber",
+        visual_kind: "puzzle",
+        aspect_ratio: "1:1",
         icon: "input",
         order: 0,
         member_node_ids: [node.node_id],
@@ -147,7 +153,10 @@ describe("visual Harness composer", () => {
         title_zh: "超时",
         description: "",
         description_zh: "",
+        category_id: "orchestration",
         color_token: "amber",
+        visual_kind: "puzzle",
+        aspect_ratio: "1:1",
         icon: "clock",
         order: 0,
         member_node_ids: [node.node_id],
@@ -166,7 +175,7 @@ describe("visual Harness composer", () => {
 
     expect(await screen.findByText("任务接入")).toBeVisible();
     expect(screen.getByRole("link", { name: "插件库" })).toHaveAttribute("href", "/autonomy/plugins");
-    expect(screen.getByRole("link", { name: "管理全部插件开关" })).toHaveAttribute("href", "/autonomy/plugins");
+    expect(screen.getByRole("link", { name: "插件开关" })).toHaveAttribute("href", "/autonomy/plugins");
     expect(screen.getByText("R4")).toBeVisible();
     expect(screen.getByText("已激活")).toBeVisible();
 
