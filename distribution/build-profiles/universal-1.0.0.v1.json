@@ -34,7 +34,7 @@
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "4a2cb385f3abcfe107216ee9bd16a25e5b93e1c8d1ca5f8c5fe1b30146834c0e"
+        "sha256": "8102ca98845d7cb6079b02fed297d545bb37342e32f7b76cb2820069fa6f1060"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
@@ -50,7 +50,7 @@
       },
       {
         "path": "frontend/src/styles.css",
-        "sha256": "da382f04a16e5bdfc3ac588126d5114eee0d8d8856c3bdf615f7d00b2fa10de3"
+        "sha256": "67b1c98d06903a29f9dbb72a731e517f9b73ac29f0c60924826b5f2fa82d7471"
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
@@ -62,10 +62,10 @@
       }
     ],
     "visualEvidence": {
-      "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json",
-      "sha256": "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4",
-      "subjectCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
-      "caseCount": 6,
+      "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/software-ui-layout-receipt.json",
+      "sha256": "f5bce9cc9a166be53c790cbd22e2b6e5f2f5a91ea3c81f7600a9be53b2d73700",
+      "subjectCommit": "7cf37d728211a92bbcbb411c3ce8cca904d4c38a",
+      "caseCount": 7,
       "locales": ["en", "zh-CN"],
       "viewportWidths": [390, 760, 1440],
       "coveredSettingsTabs": ["general", "memory", "model"],
@@ -85,7 +85,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "distribution/universal/integrated-workspaces.v2.json",
-    "sha256": "66574ddc63024587d34fdf198dec167a53726077d98d9e882e2191e19db7d436",
+    "sha256": "9f009fc47818ecb3262991908a7b38bdce926eb862f38582042b888fe74c8006",
     "sourceFileCount": 12,
     "workspaceModes": ["sim", "lab", "field", "autonomy"],
     "createsCrossEditionHarnessOrchestrator": false,
@@ -93,30 +93,33 @@
     "grantsHardwareAuthority": false
   },
   "workspaceModes": ["sim", "lab", "field", "autonomy"],
-  "universalExclusiveCapabilities": {
-    "vehicleStudio": {
-      "ownerEdition": "universal",
-      "route": "/vehicle-studio",
-      "productSourceCommit": "81550b94270ee4e47eed7d520fb8280bd3a8ee7b",
-      "contract": "distribution/universal/vehicle-studio.v1.json",
-      "schema": "distribution/schemas/vehicle-pack-draft-envelope.schema.json",
-      "shareTargets": ["sim", "lab", "field", "autonomy"],
-      "transport": "file-based-draft-envelope",
+  "sharedCapabilities": {
+    "externalAssetQualification": {
+      "ownerEdition": "autonomy",
+      "routes": ["/autonomy/maps", "/autonomy/aircraft"],
+      "productSourceCommit": "7cf37d728211a92bbcbb411c3ce8cca904d4c38a",
+      "contract": "distribution/shared/external-asset-qualification.v1.json",
+      "shareTargets": ["universal", "sim", "lab", "field", "autonomy"],
+      "transport": "agent-core-asset-ir-and-receipts",
+      "sourceKinds": ["file", "directory", "direct_url", "git"],
+      "qualificationTargets": ["ROS 2 Jazzy", "Gazebo Harmonic", "PX4 SITL"],
+      "builtInModeling": false,
       "automaticReceiverInstallation": false,
-      "modelHarnessStartsOnExchange": false,
+      "modelHarnessStartsOnImport": false,
+      "unqualifiedAssetCanExecute": false,
       "grantsSimulationExecution": false,
       "grantsHardwareAuthority": false,
       "sourceFiles": [
-        {"path": "frontend/src/pages/VehicleStudio.tsx", "sha256": "f74a42483f0885ab1e25e61601aac183ff15e223332edaa7f53c5c4494bfb38a"},
-        {"path": "frontend/src/components/VehicleModelPreview3D.tsx", "sha256": "79d4cc6d948356e87d5817455bd08b32b4d872665b03e3d45e21815fccf97956"},
-        {"path": "frontend/src/features/vehicleStudio/model.ts", "sha256": "2260affd2671cb8737ce3e3fff427ce7687137bafc3099482dbc04b84f8ec54c"},
-        {"path": "frontend/src/features/vehicleStudio/pack.ts", "sha256": "1eff6c24ef7ab4b2c33ebb762d11f9b1a52b4f9a101965d4141bd382ec0ca455"},
-        {"path": "frontend/src/features/vehicleStudio/preview.ts", "sha256": "b25aef0f255488b52ce000475e32ab893f31aab0e3241aeef3ea485f99b7e9b2"},
-        {"path": "frontend/src/features/vehicleStudio/storage.ts", "sha256": "b0a9d4a16e893ea6ad47510b4e403fa8669055a03136a118e3764affcc9c5591"},
-      {"path": "frontend/src/router.tsx", "sha256": "04bc165f1175f55c1854592426165946bff31273b7001ee103279c73df088dc2"},
-      {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "f6dc0666b734143617bea72d85e81008db5d14f7af9fea10e6bc9dbbb5ecdde5"},
-        {"path": "distribution/schemas/vehicle-pack-draft-envelope.schema.json", "sha256": "5ac6852fa3c0cf1a5386f8044e5773b3738462e92068842692a32b828d083d5a"},
-        {"path": "distribution/universal/vehicle-studio.v1.json", "sha256": "078a10289055e466a54dcfe637cf09482d34f1f967db27f1f027f8fa8e2a4107"}
+        {"path": "frontend/src/pages/AutonomyPlatform.tsx", "sha256": "a141103e5b16b0c2d8ef8c110ca094899608a4acb29f18d528ba7a2ca39c653c"},
+        {"path": "frontend/src/features/autonomy/agentCore.ts", "sha256": "d551e294f47ef1c9811fe2caab213af8879e15052cb4a517318986c87a66899b"},
+        {"path": "frontend/src/features/autonomy/agentCorePlanning.ts", "sha256": "23cc1ade3847735f3aae673fe505c10be0b9154d94700d3d0d6e56bc4cdf936b"},
+        {"path": "frontend/src/features/autonomy/assetLibraryStore.ts", "sha256": "136ba567e3cda78fa9c7f748997b1652d041658c89e001314ccb54fa190a7d46"},
+        {"path": "frontend/src/features/autonomy/autonomyPlanning.ts", "sha256": "314597e93f1f1b3933d9402b2e4a6824b59b8edf2f57b28fca63054c4cf53904"},
+        {"path": "backend/app/task_workflows.py", "sha256": "fd66513b5e589909c5113d9695d72bbf5d247796fbb3fb8d9e99a27a9447d5a9"},
+        {"path": "desktop/src-tauri/src/agent_core.rs", "sha256": "df07e7302781a1ce67314ef406fd5b80b3f19899c5fa2e30adc69cc642b00e7d"},
+        {"path": "docs/25-autonomy-external-asset-connectors.md", "sha256": "378c64111fa3009410f95e11e39065da05fb5391c5a354bdafda15331b525fa5"},
+        {"path": "supabase/migrations/20260822020000_replace_modeling_with_external_asset_qualification.sql", "sha256": "636d13ddd896e09faf3b27567ce3e24d66f95ae868f3851807b97562a28a5a71"},
+        {"path": "distribution/shared/external-asset-qualification.v1.json", "sha256": "7aea83ea999b7e37a42324a0b790618d7bac5a4e0cacb2f461078053527a7d3a"}
       ]
     }
   },

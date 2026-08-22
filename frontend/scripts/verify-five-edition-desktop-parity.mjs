@@ -20,7 +20,6 @@ const editions = [
     id: "universal",
     routes: [
       ["assistant", "/assistant"],
-      ["vehicle-studio", "/vehicle-studio"],
       ["autonomy-overview", "/autonomy"],
       ["autonomy-aircraft", "/autonomy/aircraft"],
       ["autonomy-maps", "/autonomy/maps"],
@@ -68,7 +67,6 @@ const editions = [
     id: "autonomy",
     routes: [
       ["assistant", "/assistant"],
-      ["vehicle-studio", "/vehicle-studio"],
       ["autonomy-overview", "/autonomy"],
       ["autonomy-aircraft", "/autonomy/aircraft"],
       ["autonomy-maps", "/autonomy/maps"],
@@ -127,7 +125,7 @@ try {
             await page.locator("h1").waitFor({ state: "visible" });
           }
         }
-        await page.waitForTimeout(surface.includes("vehicle") || surface.includes("live") ? 1400 : 350);
+        await page.waitForTimeout(surface.includes("live") ? 1400 : 350);
 
         const screenshot = path.join(outputRoot, `${edition.id}-${surface}-1440x900.png`);
         await page.screenshot({ path: screenshot, fullPage: false });
@@ -138,7 +136,7 @@ try {
           const sidebar = document.querySelector(".app-sidebar");
           const main = document.querySelector(".app-main");
           const lockup = document.querySelector(".app-title img, .universal-mode-switch-trigger img");
-          const title = document.querySelector("h1, .assistant-hero-question, .vehicle-studio-title");
+          const title = document.querySelector("h1, .assistant-hero-question");
           const adapterScroller = document.querySelector(".field-adapter-center .field-table-scroll");
           const adapterTable = document.querySelector(".field-adapter-table");
           const adapterAction = document.querySelector(".field-adapter-table td:last-child button");

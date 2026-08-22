@@ -13,6 +13,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/universal-1.0.0.v1.json"
 INTEGRATED_WORKSPACES = ROOT / "distribution/universal/integrated-workspaces.v2.json"
+EXTERNAL_ASSET_QUALIFICATION = (
+    ROOT / "distribution/shared/external-asset-qualification.v1.json"
+)
 OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
 FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
@@ -181,9 +184,9 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "integrated-in-universal"
     )
     visual = shared_ui["visualEvidence"]  # type: ignore[index]
-    assert visual["subjectCommit"] == "4933e214a57a048099d8f0bdd11c9748b620ac3e"
+    assert visual["subjectCommit"] == "7cf37d728211a92bbcbb411c3ce8cca904d4c38a"
     assert visual["subjectCommit"] != shared_ui["donorCommit"]
-    assert visual["caseCount"] == 6
+    assert visual["caseCount"] == 7
     assert visual["locales"] == ["en", "zh-CN"]
     assert visual["viewportWidths"] == [390, 760, 1440]
     assert visual["coveredSettingsTabs"] == ["general", "memory", "model"]
@@ -214,6 +217,16 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert integrated_manifest["createsCrossEditionHarnessOrchestrator"] is False
     assert integrated_manifest["validatedVehiclePackCount"] == 0
     assert integrated_manifest["hardwareActionDecision"] == "deny"
+    integrated_capability = integrated_manifest["sharedCapability"]  # type: ignore[index]
+    assert integrated_capability["id"] == "external-asset-qualification"
+    assert integrated_capability["ownerEdition"] == "autonomy"
+    assert integrated_capability["routes"] == [
+        "/autonomy/maps",
+        "/autonomy/aircraft",
+    ]
+    assert integrated_capability["builtInModeling"] is False
+    assert integrated_capability["unqualifiedAssetCanExecute"] is False
+    assert integrated_capability["grantsHardwareAuthority"] is False
     assert integrated_manifest["donors"]["lab"]["productSource"] == (  # type: ignore[index]
         "b3c5f90948f206472e3e12504d8205cb563ac9dc"
     )
@@ -243,17 +256,36 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
                 check=True,
             ).stdout.strip()
             assert actual_blob == source_file["donorBlob"]
-    vehicle_studio = profile["universalExclusiveCapabilities"]["vehicleStudio"]
-    assert vehicle_studio["ownerEdition"] == "universal"
-    assert vehicle_studio["shareTargets"] == ["sim", "lab", "field", "autonomy"]
-    assert vehicle_studio["automaticReceiverInstallation"] is False
-    assert vehicle_studio["modelHarnessStartsOnExchange"] is False
-    assert vehicle_studio["grantsSimulationExecution"] is False
-    assert vehicle_studio["grantsHardwareAuthority"] is False
-    assert vehicle_studio["productSourceCommit"] == (
-        "81550b94270ee4e47eed7d520fb8280bd3a8ee7b"
+    qualification = profile["sharedCapabilities"]["externalAssetQualification"]
+    assert qualification["ownerEdition"] == "autonomy"
+    assert qualification["routes"] == ["/autonomy/maps", "/autonomy/aircraft"]
+    assert qualification["shareTargets"] == [
+        "universal",
+        "sim",
+        "lab",
+        "field",
+        "autonomy",
+    ]
+    assert qualification["sourceKinds"] == ["file", "directory", "direct_url", "git"]
+    assert qualification["qualificationTargets"] == [
+        "ROS 2 Jazzy",
+        "Gazebo Harmonic",
+        "PX4 SITL",
+    ]
+    assert qualification["builtInModeling"] is False
+    assert qualification["automaticReceiverInstallation"] is False
+    assert qualification["modelHarnessStartsOnImport"] is False
+    assert qualification["unqualifiedAssetCanExecute"] is False
+    assert qualification["grantsSimulationExecution"] is False
+    assert qualification["grantsHardwareAuthority"] is False
+    assert qualification["productSourceCommit"] == (
+        "7cf37d728211a92bbcbb411c3ce8cca904d4c38a"
     )
-    for source_file in vehicle_studio["sourceFiles"]:
+    assert qualification["contract"] == str(
+        EXTERNAL_ASSET_QUALIFICATION.relative_to(ROOT)
+    ).replace("\\", "/")
+    assert len(qualification["sourceFiles"]) == 10
+    for source_file in qualification["sourceFiles"]:
         path = ROOT / source_file["path"]
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == source_file["sha256"]
@@ -351,10 +383,10 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'Universal integrated workspace byte-exact donor drifted:',
         'createsCrossEditionHarnessOrchestrator = $false',
         'integratedWorkspaceUi = [ordered]@{',
-        'Universal Vehicle Studio identity or safety policy drifted.',
-        'Universal Vehicle Studio source binding drifted:',
-        'Universal Vehicle Studio contract must bind exactly ten source files.',
-        'vehicleStudio = [ordered]@{',
+        'Shared external asset qualification identity or safety policy drifted.',
+        'Shared external asset qualification source binding drifted:',
+        'Shared external asset qualification contract must bind exactly ten source files.',
+        'externalAssetQualification = [ordered]@{',
         'dialogScrollHeight -gt $measurement.dialogClientHeight',
         'panelScrollHeight -gt $measurement.panelClientHeight',
         'runtimePanelHeadedValidationStatus',

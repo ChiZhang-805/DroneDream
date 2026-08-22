@@ -58,8 +58,8 @@ if (edition === "universal") {
     ...labChunks,
     "FieldApp",
     "UniversalFieldApp",
-    "VehicleStudio",
   ]) requireChunk(name);
+  forbidChunk("VehicleStudio");
 } else if (edition === "sim") {
   for (const name of [...labChunks, "FieldApp", "UniversalFieldApp", "VehicleStudio"]) {
     forbidChunk(name);
@@ -77,6 +77,6 @@ console.log(JSON.stringify({
   kind: "dronedream-edition-frontend-boundary",
   edition,
   fileCount: files.length,
-  vehicleStudioExclusive: edition === "universal" ? ownsChunk("VehicleStudio") : true,
+  builtInVehicleStudioAbsent: !ownsChunk("VehicleStudio"),
   result: "pass",
 }));

@@ -10,13 +10,15 @@
   "grantsHardwareAuthority": false,
   "validatedVehiclePackCount": 0,
   "hardwareActionDecision": "deny",
-  "universalExclusiveCapability": {
-    "id": "vehicle-studio",
-    "route": "/vehicle-studio",
-    "theme": "universal",
-    "shareTargets": ["sim", "lab", "field", "autonomy"],
+  "sharedCapability": {
+    "id": "external-asset-qualification",
+    "ownerEdition": "autonomy",
+    "routes": ["/autonomy/maps", "/autonomy/aircraft"],
+    "shareTargets": ["universal", "sim", "lab", "field", "autonomy"],
+    "builtInModeling": false,
     "automaticReceiverInstallation": false,
-    "startsModelHarnessOnExchange": false,
+    "startsModelHarnessOnImport": false,
+    "unqualifiedAssetCanExecute": false,
     "grantsHardwareAuthority": false
   },
   "donors": {
@@ -35,7 +37,7 @@
   "sourceFiles": [
     {
       "path": "frontend/scripts/verify-lab-ui.mjs",
-      "sha256": "1037a4b204b875963520a2db0c617ccc8de2f0352dce24f11b47265ceefaa142",
+      "sha256": "5b1dc3c16d1fd265c75a5776633c78a46ad826876efa612d192c2e21a567d891",
       "donorEdition": "lab",
       "donorBlob": "125386b98af709fbe559cb1dff6013dd52eee3ed",
       "integration": "semantic-universal-profile-and-final-field-adaptation"
@@ -49,7 +51,7 @@
     },
     {
       "path": "frontend/src/field/FieldAssistantWorkspace.tsx",
-      "sha256": "2641036493026ef85823ffb0f325434784c43b3e2c8b83cd596eb42a910cd5d8",
+      "sha256": "f148902c817b4d779bcc0948d000f49b3e1cb48ba07c3d6938b27b8abcc89d8d",
       "donorEdition": "field",
       "donorBlob": "17aef3e57559c652b080b1c37e675816d24de118",
       "integration": "semantic-universal-auth-and-workflow-adaptation"
@@ -63,7 +65,7 @@
     },
     {
       "path": "frontend/src/lab/LabSetup.tsx",
-      "sha256": "f70672fac9d546a6bb4964cc35fedf9f71c71e141532a7e166bb7dcbc2818b02",
+      "sha256": "270b0dec7ad8f753c44449a034ade23648bc1283b5562180fd585d6910414293",
       "donorEdition": "lab",
       "donorBlob": "b4a3a2198e8ce3b25cf766fe425b922f516bd546",
       "integration": "semantic-universal-auth-and-runtime-adaptation"
@@ -91,28 +93,28 @@
     },
     {
       "path": "frontend/src/pages/ExperimentAssistant.tsx",
-      "sha256": "dbe9d6d43d71779852ce17bd7d0bd3fb791c5383e01fe4205221a5e87a99a2ab",
+      "sha256": "2c1538707aa8403fb081f6375a980ad1bd3c717effd72f23a8da8bb38ec3b813",
       "donorEdition": "lab",
       "donorBlob": "c0bcfc6042582014a35e28ce2ff1f01bde3f44ad",
       "integration": "semantic-active-universal-workspace-theme"
     },
     {
       "path": "frontend/src/styles.css",
-      "sha256": "da382f04a16e5bdfc3ac588126d5114eee0d8d8856c3bdf615f7d00b2fa10de3",
+      "sha256": "67b1c98d06903a29f9dbb72a731e517f9b73ac29f0c60924826b5f2fa82d7471",
       "donorEdition": "lab",
       "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
       "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
     },
     {
       "path": "frontend/src/field/FieldApp.tsx",
-      "sha256": "90543197c22b533877f01b63cc19def749ae735f570f4e8a2d8f87b11f23f0be",
+      "sha256": "b69cd159e5ca92c085d467238d94ad5aedd52f13e81e1621bc878fac755c841c",
       "donorEdition": "field",
       "donorBlob": "5c4e3f01f16d831cdf0d995904c5b8b0a9b11c0d",
       "integration": "semantic-universal-shared-locale-adapter"
     },
     {
       "path": "frontend/src/router.tsx",
-      "sha256": "04bc165f1175f55c1854592426165946bff31273b7001ee103279c73df088dc2",
+      "sha256": "cf4689c356068019a92329e73032f3ccfddd78b1e3ae1562b1698ac36b5c361a",
       "donorEdition": "universal",
       "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
       "integration": "semantic-universal-workspace-routing-and-shared-locale"

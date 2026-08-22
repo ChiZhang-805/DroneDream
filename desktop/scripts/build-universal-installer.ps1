@@ -79,7 +79,7 @@ $browserAuth = Get-Content -LiteralPath $browserAuthPath -Raw -Encoding UTF8 | C
 $runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $sharedUi = $profile.sharedUiContract
 $integratedUi = $profile.integratedWorkspaceUiContract
-$vehicleStudio = $profile.universalExclusiveCapabilities.vehicleStudio
+$externalAssetQualification = $profile.sharedCapabilities.externalAssetQualification
 $toolchainContract = if ($Toolchain -ceq "msvc") {
     [ordered]@{
         builder = "desktop\scripts\build-windows-msvc.ps1"
@@ -115,7 +115,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $sharedUi.contractId -cne "dronedream-shared-edition-ui/v1" -or
     $sharedUi.donorCommit -cnotmatch "^[0-9a-f]{40}$" -or
     $sharedUi.visualEvidence.subjectCommit -cnotmatch "^[0-9a-f]{40}$" -or
-    $sharedUi.visualEvidence.caseCount -ne 6 -or
+    $sharedUi.visualEvidence.caseCount -ne 7 -or
     $sharedUi.visualEvidence.runtimePanelHeadedValidationStatus -cne "pending-exact-desktop-runtime-red-validation" -or
     $sharedUi.minimumDesktopViewport.width -ne 390 -or
     $sharedUi.minimumDesktopViewport.height -ne 700 -or
@@ -191,9 +191,12 @@ if ($integratedUiManifest.kind -cne "dronedream-universal-integrated-workspaces"
     $integratedUiManifest.grantsHardwareAuthority -ne $false -or
     $integratedUiManifest.validatedVehiclePackCount -ne 0 -or
     $integratedUiManifest.hardwareActionDecision -cne "deny" -or
-    $integratedUiManifest.universalExclusiveCapability.id -cne "vehicle-studio" -or
-    $integratedUiManifest.universalExclusiveCapability.route -cne "/vehicle-studio" -or
-    $integratedUiManifest.universalExclusiveCapability.grantsHardwareAuthority -ne $false) {
+    $integratedUiManifest.sharedCapability.id -cne "external-asset-qualification" -or
+    $integratedUiManifest.sharedCapability.ownerEdition -cne "autonomy" -or
+    (@($integratedUiManifest.sharedCapability.routes) -join ",") -cne "/autonomy/maps,/autonomy/aircraft" -or
+    $integratedUiManifest.sharedCapability.builtInModeling -ne $false -or
+    $integratedUiManifest.sharedCapability.unqualifiedAssetCanExecute -ne $false -or
+    $integratedUiManifest.sharedCapability.grantsHardwareAuthority -ne $false) {
     throw "Universal integrated workspace identity or authority policy drifted."
 }
 $integratedUiSourceRefs = @()
@@ -219,34 +222,38 @@ foreach ($expectedRef in @($integratedUiManifest.sourceFiles)) {
 if ($integratedUiSourceRefs.Count -ne [int]$integratedUi.sourceFileCount) {
     throw "Universal integrated workspace contract source count drifted."
 }
-$vehicleStudioTargets = @($vehicleStudio.shareTargets)
-if ($vehicleStudio.ownerEdition -cne "universal" -or
-    $vehicleStudio.productSourceCommit -cnotmatch "^[0-9a-f]{40}$" -or
-    $vehicleStudio.contract -cne "distribution/universal/vehicle-studio.v1.json" -or
-    $vehicleStudio.schema -cne "distribution/schemas/vehicle-pack-draft-envelope.schema.json" -or
-    $vehicleStudio.transport -cne "file-based-draft-envelope" -or
-    ($vehicleStudioTargets -join ",") -cne "sim,lab,field,autonomy" -or
-    $vehicleStudio.automaticReceiverInstallation -ne $false -or
-    $vehicleStudio.modelHarnessStartsOnExchange -ne $false -or
-    $vehicleStudio.grantsSimulationExecution -ne $false -or
-    $vehicleStudio.grantsHardwareAuthority -ne $false) {
-    throw "Universal Vehicle Studio identity or safety policy drifted."
+$externalAssetQualificationTargets = @($externalAssetQualification.shareTargets)
+if ($externalAssetQualification.ownerEdition -cne "autonomy" -or
+    $externalAssetQualification.productSourceCommit -cnotmatch "^[0-9a-f]{40}$" -or
+    $externalAssetQualification.contract -cne "distribution/shared/external-asset-qualification.v1.json" -or
+    $externalAssetQualification.transport -cne "agent-core-asset-ir-and-receipts" -or
+    (@($externalAssetQualification.routes) -join ",") -cne "/autonomy/maps,/autonomy/aircraft" -or
+    (@($externalAssetQualification.sourceKinds) -join ",") -cne "file,directory,direct_url,git" -or
+    (@($externalAssetQualification.qualificationTargets) -join ",") -cne "ROS 2 Jazzy,Gazebo Harmonic,PX4 SITL" -or
+    ($externalAssetQualificationTargets -join ",") -cne "universal,sim,lab,field,autonomy" -or
+    $externalAssetQualification.builtInModeling -ne $false -or
+    $externalAssetQualification.automaticReceiverInstallation -ne $false -or
+    $externalAssetQualification.modelHarnessStartsOnImport -ne $false -or
+    $externalAssetQualification.unqualifiedAssetCanExecute -ne $false -or
+    $externalAssetQualification.grantsSimulationExecution -ne $false -or
+    $externalAssetQualification.grantsHardwareAuthority -ne $false) {
+    throw "Shared external asset qualification identity or safety policy drifted."
 }
-Invoke-GitText @("merge-base", "--is-ancestor", [string]$vehicleStudio.productSourceCommit, $sourceCommit) | Out-Null
-$vehicleStudioSourceRefs = @()
-foreach ($expectedRef in @($vehicleStudio.sourceFiles)) {
-    if ($expectedRef.path -cnotmatch "^(frontend/src/|distribution/(schemas|universal)/)" -or
+Invoke-GitText @("merge-base", "--is-ancestor", [string]$externalAssetQualification.productSourceCommit, $sourceCommit) | Out-Null
+$externalAssetQualificationSourceRefs = @()
+foreach ($expectedRef in @($externalAssetQualification.sourceFiles)) {
+    if ($expectedRef.path -cnotmatch "^(frontend/src/|backend/app/|desktop/src-tauri/src/|docs/|supabase/migrations/|distribution/shared/)" -or
         $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$") {
-        throw "Universal Vehicle Studio source binding is malformed."
+        throw "Shared external asset qualification source binding is malformed."
     }
     $actualRef = New-RepoFileRef ([string]$expectedRef.path)
     if ($actualRef.sha256 -cne [string]$expectedRef.sha256) {
-        throw "Universal Vehicle Studio source binding drifted: $($expectedRef.path)"
+        throw "Shared external asset qualification source binding drifted: $($expectedRef.path)"
     }
-    $vehicleStudioSourceRefs += $actualRef
+    $externalAssetQualificationSourceRefs += $actualRef
 }
-if ($vehicleStudioSourceRefs.Count -ne 10) {
-    throw "Universal Vehicle Studio contract must bind exactly ten source files."
+if ($externalAssetQualificationSourceRefs.Count -ne 10) {
+    throw "Shared external asset qualification contract must bind exactly ten source files."
 }
 $coexistenceMatches = @($coexistence.editions | Where-Object { $_.editionId -ceq "universal" })
 $browserAuthMatches = @($browserAuth.editions | Where-Object { $_.editionId -ceq "universal" })
@@ -341,14 +348,15 @@ if (-not $Build) {
             presentationOnly = $true
             grantsHardwareAuthority = $false
         }
-        vehicleStudio = [ordered]@{
-            productSourceCommit = [string]$vehicleStudio.productSourceCommit
-            contract = New-RepoFileRef ([string]$vehicleStudio.contract)
-            schema = New-RepoFileRef ([string]$vehicleStudio.schema)
-            sourceFiles = $vehicleStudioSourceRefs
-            shareTargets = $vehicleStudioTargets
+        externalAssetQualification = [ordered]@{
+            productSourceCommit = [string]$externalAssetQualification.productSourceCommit
+            contract = New-RepoFileRef ([string]$externalAssetQualification.contract)
+            sourceFiles = $externalAssetQualificationSourceRefs
+            shareTargets = $externalAssetQualificationTargets
+            builtInModeling = $false
             automaticReceiverInstallation = $false
-            modelHarnessStartsOnExchange = $false
+            modelHarnessStartsOnImport = $false
+            unqualifiedAssetCanExecute = $false
             grantsSimulationExecution = $false
             grantsHardwareAuthority = $false
         }
@@ -558,14 +566,15 @@ $buildReceipt = [ordered]@{
         presentationOnly = $true
         grantsHardwareAuthority = $false
     }
-    vehicleStudio = [ordered]@{
-        productSourceCommit = [string]$vehicleStudio.productSourceCommit
-        contract = New-RepoFileRef ([string]$vehicleStudio.contract)
-        schema = New-RepoFileRef ([string]$vehicleStudio.schema)
-        sourceFiles = $vehicleStudioSourceRefs
-        shareTargets = $vehicleStudioTargets
+    externalAssetQualification = [ordered]@{
+        productSourceCommit = [string]$externalAssetQualification.productSourceCommit
+        contract = New-RepoFileRef ([string]$externalAssetQualification.contract)
+        sourceFiles = $externalAssetQualificationSourceRefs
+        shareTargets = $externalAssetQualificationTargets
+        builtInModeling = $false
         automaticReceiverInstallation = $false
-        modelHarnessStartsOnExchange = $false
+        modelHarnessStartsOnImport = $false
+        unqualifiedAssetCanExecute = $false
         grantsSimulationExecution = $false
         grantsHardwareAuthority = $false
     }
