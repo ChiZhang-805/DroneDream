@@ -67,9 +67,16 @@ if (edition === "universal") {
 } else if (edition === "lab") {
   for (const name of labChunks) requireChunk(name);
   for (const name of ["FieldApp", "UniversalFieldApp", "VehicleStudio"]) forbidChunk(name);
-} else {
+} else if (edition === "field") {
   requireChunk("UniversalFieldApp");
   for (const name of [...labChunks, "FieldApp", "VehicleStudio"]) forbidChunk(name);
+} else {
+  for (const name of [
+    ...labChunks,
+    "FieldApp",
+    "UniversalFieldApp",
+    "VehicleStudio",
+  ]) forbidChunk(name);
 }
 
 console.log(JSON.stringify({
