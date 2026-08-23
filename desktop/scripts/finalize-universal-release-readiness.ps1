@@ -188,7 +188,7 @@ if (($oauth.Document.protectedStateBefore | ConvertTo-Json -Depth 12 -Compress) 
 if ($icons.Document.kind -cne "dronedream-universal-icon-surfaces-receipt" -or
     $icons.Document.productSourceCommit -cne $ProductSourceCommit -or $icons.Document.passed -ne $true -or
     @($icons.Document.surfaces).Count -ne 4 -or $icons.Document.protectedShortcutParity -ne $true -or
-    $icons.Document.canonicalIcon.sha256 -cne "88223fab6c2b0d493aaedab932c04d40def4da58e28f6d670adbfd745a6ca8ba" -or
+    $icons.Document.canonicalIcon.sha256 -cne "d607a304ef09156ec7041744726791dedc9f96625f081676ace654e652536090" -or
     $icons.Document.counts.installer -ne 1 -or $icons.Document.counts.uninstaller -ne 1) {
     throw "Four-surface Universal icon receipt failed closed."
 }

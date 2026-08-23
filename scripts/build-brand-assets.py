@@ -65,7 +65,7 @@ def load_contract() -> dict[str, Any]:
     if (
         contract.get("schemaVersion") != 1
         or contract.get("kind") != "dronedream-edition-brand-system"
-        or contract.get("brandVersion") != "1.3.0"
+        or contract.get("brandVersion") != "1.3.1"
         or tuple(contract.get("editions", {})) != EDITION_IDS
         or contract.get("separator") != "\u00b7"
         or contract.get("safety") != {"presentationOnly": True, "grantsHardwareAuthority": False}
@@ -503,10 +503,12 @@ def build_outputs() -> dict[Path, bytes]:
                 raise BrandBuildError(f"brand gradient length drifted: {edition_id}")
             palette = (colors[0], colors[1], colors[2])
             if edition_id == "universal":
-                mark = recolor_mark(standard_master, palette)
-                favicon = recolor_mark(favicon_master, palette).resize(
-                    (64, 64), Image.Resampling.LANCZOS
-                )
+                # The Universal mother mark is already the approved
+                # pink-purple-blue artwork. Preserve those exact colors;
+                # recolouring it here collapses the small Windows icon into
+                # the retired mostly-purple variant.
+                mark = standard_master.copy()
+                favicon = favicon_master.resize((64, 64), Image.Resampling.LANCZOS)
                 primary = gradient_text(
                     font_path,
                     word="DroneDream",

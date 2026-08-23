@@ -18,8 +18,9 @@ They are copied into canonical 1024 px/primary outputs without re-rendering;
 smaller PNG, favicon, and ICO outputs remain deterministic derivatives of the
 unchanged marks. The retired small-label lockups have been deleted; only the
 approved large-edition-label centered lockups are canonical release inputs.
-`source/` also contains the Universal mother-brand master and the OFL-licensed
-Space Grotesk input.
+`source/` also contains the approved pink-purple-blue Universal mother-brand
+master. Its colors are preserved exactly rather than recolored during export.
+The same directory contains the OFL-licensed Space Grotesk input.
 `generated/brand-assets.v1.json` binds every canonical output to exact source,
 generator, locked requirements, font, bytes, dimensions, and SHA-256.
 

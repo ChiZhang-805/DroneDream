@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "dronedream-edition-brand-system",
-  "brandVersion": "1.3.0",
+  "brandVersion": "1.3.1",
   "masterName": "DroneDream",
   "separator": "·",
   "geometry": {
