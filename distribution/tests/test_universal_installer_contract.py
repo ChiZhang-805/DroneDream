@@ -143,6 +143,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     build_script = SCRIPT.read_text(encoding="utf-8")
     assert build_script.count('"sim,lab,field,autonomy"') == 3
     assert '"sim,lab,field"' not in build_script
+    assert build_script.count('@("universal", "sim", "lab", "field", "autonomy")') == 2
     assert profile["artifactFileName"] == "DroneDream-Universal-1.0.0.exe"
     assert profile["enginePackProfile"] == "unified-sim-lab"
     payload = profile["enginePackPayloadContract"]

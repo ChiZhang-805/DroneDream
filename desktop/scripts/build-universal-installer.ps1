@@ -332,7 +332,7 @@ if (-not $Build) {
         providerOAuthClientId = "external-registered-public-config-required"
         enginePackProfile = "unified-sim-lab"
         enginePackPayloadContract = "dronedream-universal-engine-payload/v1"
-        workspaceModes = @("universal", "sim", "lab", "field")
+        workspaceModes = @("universal", "sim", "lab", "field", "autonomy")
         presentationSwitchGrantsAuthority = $false
         validatedVehiclePackCount = 0
         hardwareActionDecision = "deny"
@@ -569,7 +569,7 @@ $buildReceipt = [ordered]@{
         buildPlanningPayloadExcluded = $true
     }
     modeSwitch = [ordered]@{
-        modes = @("universal", "sim", "lab", "field")
+        modes = @("universal", "sim", "lab", "field", "autonomy")
         presentationOnly = $true
         grantsHardwareAuthority = $false
     }
