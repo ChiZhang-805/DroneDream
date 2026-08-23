@@ -569,7 +569,7 @@ async function verifyFixedScenarios(page, testCase) {
         documentScrollWidth: document.documentElement.scrollWidth,
       };
     });
-    assert.equal(mobileMenu.links.length, 5);
+    assert.equal(mobileMenu.links.length, 6);
     assert(mobileMenu.account.bottom <= mobileMenu.links[0].top + 1);
     assert(mobileMenu.links.at(-1).bottom <= mobileMenu.settings.top + 1);
     assert(mobileMenu.links.every((entry) => closeEnough(
@@ -597,7 +597,7 @@ async function verifyFixedScenarios(page, testCase) {
     mobileMenuImage = await screenshot(page, testCase.id, "mobile-navigation");
   }
   await activeEntry.waitFor();
-  assert.equal(await navEntries.count(), 5);
+  assert.equal(await navEntries.count(), 6);
   assert.equal(await cards.count(), 4);
   assert(await activeEntry.evaluate((element) => element.classList.contains("active")));
 
