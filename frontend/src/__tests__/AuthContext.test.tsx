@@ -224,6 +224,28 @@ describe("AuthContext account profile", () => {
     ).toBe(remoteAvatar);
   });
 
+  it("keeps docs-preview avatar changes local and never contacts cloud storage", async () => {
+    window.history.replaceState(null, "", "/assistant?docsPreview=1");
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByLabelText("username"))
+      .toHaveTextContent("DroneDream Pilot");
+    fireEvent.click(screen.getByRole("button", { name: "Change avatar" }));
+
+    const avatar = "data:image/jpeg;base64,ZmFrZS1hdmF0YXI=";
+    await waitFor(() => {
+      expect(screen.getByLabelText("avatar")).toHaveTextContent(avatar);
+    });
+    expect(authMock.storageFrom).not.toHaveBeenCalled();
+    expect(authMock.updateUser).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("drone-dream:account-avatar:docs-preview"))
+      .toBe(avatar);
+  });
+
   it("uses passwords for sign-in and sets the password only after email-code verification", async () => {
     render(
       <AuthProvider>
