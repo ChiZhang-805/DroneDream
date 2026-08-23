@@ -1,6 +1,6 @@
-mod app_update;
 #[cfg(dronedream_agent)]
 mod agent_core;
+mod app_update;
 mod browser_auth;
 mod browser_auth_audit;
 mod browser_auth_vault;
@@ -301,7 +301,10 @@ pub fn run() {
         .expect("error while building DroneDream desktop");
     app.run(|handle, event| {
         #[cfg(dronedream_agent)]
-        if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {
+        if matches!(
+            event,
+            tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }
+        ) {
             agent_core::stop(handle);
         }
     });

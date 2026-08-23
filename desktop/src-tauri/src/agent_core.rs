@@ -136,14 +136,18 @@ fn collect_asset_directory_files(root: &Path) -> Result<Vec<(PathBuf, String, u6
             let metadata = fs::symlink_metadata(&path)
                 .map_err(|error| format!("Unable to inspect an asset file: {error}"))?;
             if metadata.file_type().is_symlink() {
-                return Err("Symbolic links are not allowed in imported asset directories.".to_owned());
+                return Err(
+                    "Symbolic links are not allowed in imported asset directories.".to_owned(),
+                );
             }
             if metadata.is_dir() {
                 pending.push(path);
                 continue;
             }
             if !metadata.is_file() {
-                return Err("Only regular files are allowed in imported asset directories.".to_owned());
+                return Err(
+                    "Only regular files are allowed in imported asset directories.".to_owned(),
+                );
             }
             if metadata.len() > MAX_ASSET_SOURCE_MEMBER_BYTES {
                 return Err("One file in the selected asset directory exceeds 2 GiB.".to_owned());
@@ -155,7 +159,9 @@ fn collect_asset_directory_files(root: &Path) -> Result<Vec<(PathBuf, String, u6
                 return Err("The selected asset directory exceeds 8 GiB.".to_owned());
             }
             if files.len() >= MAX_ASSET_SOURCE_MEMBERS {
-                return Err("The selected asset directory contains more than 20,000 files.".to_owned());
+                return Err(
+                    "The selected asset directory contains more than 20,000 files.".to_owned(),
+                );
             }
             let archive_path = normalized_archive_path(root, &path)?;
             files.push((path, archive_path, metadata.len()));
@@ -274,9 +280,7 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
     let (mut receiver, child) = sidecar
         .spawn()
         .map_err(|error| format!("Unable to start the AGENT Core sidecar: {error}"))?;
-    tauri::async_runtime::spawn(async move {
-        while receiver.recv().await.is_some() {}
-    });
+    tauri::async_runtime::spawn(async move { while receiver.recv().await.is_some() {} });
     if let Err(error) = wait_until_ready(port) {
         let _ = child.kill();
         return Err(error);
@@ -447,7 +451,11 @@ pub(crate) async fn agent_core_request(
     let body = request
         .body_base64
         .as_deref()
-        .map(|value| BASE64.decode(value).map_err(|_| "AGENT Core body is not valid base64.".to_owned()))
+        .map(|value| {
+            BASE64
+                .decode(value)
+                .map_err(|_| "AGENT Core body is not valid base64.".to_owned())
+        })
         .transpose()?
         .unwrap_or_default();
     if body.len() > MAX_REQUEST_BYTES {
@@ -482,7 +490,10 @@ pub(crate) async fn agent_core_request(
             .get(reqwest::header::CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned);
-        if response.content_length().is_some_and(|length| length > MAX_RESPONSE_BYTES as u64) {
+        if response
+            .content_length()
+            .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
+        {
             return Err("AGENT Core response exceeds 256 MiB.".to_owned());
         }
         let bytes = response
@@ -512,10 +523,11 @@ pub(crate) async fn agent_core_import_asset_path(
     }
     if request.source_format.is_empty()
         || request.source_format.len() > 80
-        || request
-            .source_format
-            .chars()
-            .any(|character| !character.is_ascii_lowercase() && !character.is_ascii_digit() && !"._-".contains(character))
+        || request.source_format.chars().any(|character| {
+            !character.is_ascii_lowercase()
+                && !character.is_ascii_digit()
+                && !"._-".contains(character)
+        })
     {
         return Err("AGENT Core source format is invalid.".to_owned());
     }
@@ -613,12 +625,17 @@ pub(crate) async fn agent_core_submit_companion_result_path(
     let info = state.connection()?;
     if !request.job_id.starts_with("asset-job-")
         || request.job_id.len() != "asset-job-".len() + 24
-        || !request.job_id["asset-job-".len()..].chars().all(|value| value.is_ascii_hexdigit())
+        || !request.job_id["asset-job-".len()..]
+            .chars()
+            .all(|value| value.is_ascii_hexdigit())
     {
         return Err("AGENT Core asset job ID is invalid.".to_owned());
     }
     if request.source_package_sha256.len() != 64
-        || !request.source_package_sha256.chars().all(|value| value.is_ascii_hexdigit())
+        || !request
+            .source_package_sha256
+            .chars()
+            .all(|value| value.is_ascii_hexdigit())
     {
         return Err("AGENT Core source hash is invalid.".to_owned());
     }
@@ -709,9 +726,24 @@ mod tests {
     #[test]
     fn core_request_rejects_non_v1_paths_and_unknown_methods() {
         for request in [
-            AgentCoreRequest { method: "GET".to_owned(), path: "/shutdown".to_owned(), body_base64: None, content_type: None },
-            AgentCoreRequest { method: "GET".to_owned(), path: "/v1/../shutdown".to_owned(), body_base64: None, content_type: None },
-            AgentCoreRequest { method: "TRACE".to_owned(), path: "/v1/plugins".to_owned(), body_base64: None, content_type: None },
+            AgentCoreRequest {
+                method: "GET".to_owned(),
+                path: "/shutdown".to_owned(),
+                body_base64: None,
+                content_type: None,
+            },
+            AgentCoreRequest {
+                method: "GET".to_owned(),
+                path: "/v1/../shutdown".to_owned(),
+                body_base64: None,
+                content_type: None,
+            },
+            AgentCoreRequest {
+                method: "TRACE".to_owned(),
+                path: "/v1/plugins".to_owned(),
+                body_base64: None,
+                content_type: None,
+            },
         ] {
             assert!(validate_request(&request).is_err());
         }
@@ -725,7 +757,12 @@ mod tests {
             ("POST", "/v1/asset-import-jobs"),
             ("DELETE", "/v1/plugins/example"),
         ] {
-            let request = AgentCoreRequest { method: method.to_owned(), path: path.to_owned(), body_base64: None, content_type: None };
+            let request = AgentCoreRequest {
+                method: method.to_owned(),
+                path: path.to_owned(),
+                body_base64: None,
+                content_type: None,
+            };
             assert!(validate_request(&request).is_ok());
         }
     }
@@ -737,9 +774,14 @@ mod tests {
             source_format: "auto".to_owned(),
             expected_kind: "texture".to_owned(),
         };
-        assert!(!matches!(invalid_kind.expected_kind.as_str(), "map" | "world" | "vehicle"));
+        assert!(!matches!(
+            invalid_kind.expected_kind.as_str(),
+            "map" | "world" | "vehicle"
+        ));
         assert!("GLB".chars().any(|character| {
-            !character.is_ascii_lowercase() && !character.is_ascii_digit() && !"._-".contains(character)
+            !character.is_ascii_lowercase()
+                && !character.is_ascii_digit()
+                && !"._-".contains(character)
         }));
     }
 }

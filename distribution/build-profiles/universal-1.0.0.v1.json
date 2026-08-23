@@ -116,7 +116,7 @@
         {"path": "frontend/src/features/autonomy/assetLibraryStore.ts", "sha256": "136ba567e3cda78fa9c7f748997b1652d041658c89e001314ccb54fa190a7d46"},
         {"path": "frontend/src/features/autonomy/autonomyPlanning.ts", "sha256": "314597e93f1f1b3933d9402b2e4a6824b59b8edf2f57b28fca63054c4cf53904"},
         {"path": "backend/app/task_workflows.py", "sha256": "fd66513b5e589909c5113d9695d72bbf5d247796fbb3fb8d9e99a27a9447d5a9"},
-        {"path": "desktop/src-tauri/src/agent_core.rs", "sha256": "df07e7302781a1ce67314ef406fd5b80b3f19899c5fa2e30adc69cc642b00e7d"},
+        {"path": "desktop/src-tauri/src/agent_core.rs", "sha256": "cc6dcfd2fa82fc37b0cb0717f271b10198142fd6f0b30883c62597b19c1d88f4"},
         {"path": "docs/25-autonomy-external-asset-connectors.md", "sha256": "378c64111fa3009410f95e11e39065da05fb5391c5a354bdafda15331b525fa5"},
         {"path": "supabase/migrations/20260822020000_replace_modeling_with_external_asset_qualification.sql", "sha256": "4b8177cc2899c09200a549ab83b796c9fce85cfd74f6a9c699060f38d6379aca"},
         {"path": "distribution/shared/external-asset-qualification.v1.json", "sha256": "7aea83ea999b7e37a42324a0b790618d7bac5a4e0cacb2f461078053527a7d3a"}
