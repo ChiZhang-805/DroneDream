@@ -121,9 +121,9 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         dronecan_line = next(
             line for line in manifest.splitlines() if line.startswith("dronecan =")
         )
-        self.assertIn('version = "=0.17.1"', mavlink_line)
-        self.assertIn('"common"', mavlink_line)
-        self.assertIn('"ardupilotmega"', mavlink_line)
+        self.assertIn('version = "=0.18.0"', mavlink_line)
+        self.assertIn('"dialect-common"', mavlink_line)
+        self.assertIn('"dialect-ardupilotmega"', mavlink_line)
         self.assertNotRegex(mavlink_line, r"direct-serial|transport-|\btcp\b|\budp\b")
         self.assertIn('version = "=4.9.0"', serial_line)
         self.assertIn("default-features = false", serial_line)
@@ -152,7 +152,7 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         notice_path = ROOT / "distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md"
         self.assertTrue(notice_path.is_file())
         notice = notice_path.read_text(encoding="utf-8")
-        self.assertIn("mavlink 0.17.1", notice)
+        self.assertIn("mavlink 0.18.0", notice)
         self.assertIn("serialport 4.9.0", notice)
         self.assertIn("MultiWii Serial Protocol parser 0.1.1", notice)
         self.assertIn("DroneCAN parser 0.1.0", notice)

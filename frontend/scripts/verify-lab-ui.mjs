@@ -232,7 +232,7 @@ try {
     await assertSingleScreen(page, testCase, "assistant", ".experiment-assistant-page");
     evidence.push(await screenshot(page, testCase, "assistant"));
 
-    await page.goto(`${origin}/lab`, { waitUntil: "networkidle" });
+    await page.goto(`${origin}/lab?docsPreview`, { waitUntil: "networkidle" });
 
     const title = testCase.locale === "en"
       ? "Sim-to-Real calibration laboratory"
@@ -337,7 +337,7 @@ try {
     await assertViewportFits(page, testCase, "safety");
     evidence.push(await screenshot(page, testCase, "safety"));
 
-    await page.goto(`${origin}/lab/hardware`, { waitUntil: "networkidle" });
+    await page.goto(`${origin}/lab/hardware?docsPreview`, { waitUntil: "networkidle" });
     const hardwareWorkspace = page.locator(
       '.lab-hardware-workspace[data-brand-edition="lab"]',
     );

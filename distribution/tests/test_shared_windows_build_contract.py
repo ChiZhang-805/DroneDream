@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import textwrap
@@ -133,9 +134,23 @@ def _run_powershell(script: str, *, cwd: Path) -> subprocess.CompletedProcess[st
         "$OutputEncoding = [Console]::OutputEncoding; "
         + script
     )
+    system_root = Path(os.environ.get("SYSTEMROOT", r"C:\Windows"))
+    powershell = system_root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+    env = os.environ.copy()
+    env["PSModulePath"] = os.pathsep.join(
+        (
+            str(Path.home() / "Documents" / "WindowsPowerShell" / "Modules"),
+            str(
+                Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"))
+                / "WindowsPowerShell"
+                / "Modules"
+            ),
+            str(system_root / "System32" / "WindowsPowerShell" / "v1.0" / "Modules"),
+        )
+    )
     return subprocess.run(
         [
-            "powershell.exe",
+            str(powershell),
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
@@ -148,6 +163,7 @@ def _run_powershell(script: str, *, cwd: Path) -> subprocess.CompletedProcess[st
         capture_output=True,
         text=True,
         encoding="utf-8",
+        env=env,
     )
 
 

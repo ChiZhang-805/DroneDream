@@ -29,8 +29,8 @@
   "exactContractAssets": [
     {
       "path": "distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md",
-      "gitBlob": "33ce0cbe5c7f6f2575729dd4b365c3c560e499c1",
-      "sha256": "2344531a2d7fa42e721d37db4639432f751aac89c3a3138eda89b4f1f279a1b8"
+      "gitBlob": "57d1892a76cdfd1e182f17f5e8456d3d15eed463",
+      "sha256": "988afa213fa6c419944f1c273f0ba9847e6a0d81429cbb160f16e98b55b521fd"
     },
     {
       "path": "distribution/editions/field/adapters/catalog.v1.json",
