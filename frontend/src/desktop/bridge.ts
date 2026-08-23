@@ -83,13 +83,21 @@ export interface EnginePackStatus {
 }
 
 export type ComponentUpdateId = "capability-pack" | "asset-pack";
-export type ComponentUpdatePolicy = "recommended" | "required";
+export type ComponentUpdateUrgency = "required" | "recommended" | "optional";
+export type ComponentUpdateInstallMode = "automatic" | "user-confirmed";
+
+export interface ComponentUpdateDependency {
+  componentId: ComponentUpdateId;
+  minimumReleaseSequence: number;
+}
 
 export interface ComponentUpdateCandidate {
   componentId: ComponentUpdateId;
   version: string;
   releaseSequence: number;
-  policy: ComponentUpdatePolicy;
+  urgency: ComponentUpdateUrgency;
+  installMode: ComponentUpdateInstallMode;
+  dependencies: ComponentUpdateDependency[];
   packId: string;
   installedVersion: string | null;
   installedReleaseSequence: number;
@@ -2068,15 +2076,26 @@ function parseComponentUpdateId(value: unknown, path: string): ComponentUpdateId
   return componentId;
 }
 
-function parseComponentUpdatePolicy(
+function parseComponentUpdateUrgency(
   value: unknown,
   path: string,
-): ComponentUpdatePolicy {
-  const policy = expectString(value, path);
-  if (policy !== "recommended" && policy !== "required") {
-    throw new Error(`${path} must be recommended or required`);
+): ComponentUpdateUrgency {
+  const urgency = expectString(value, path);
+  if (urgency !== "required" && urgency !== "recommended" && urgency !== "optional") {
+    throw new Error(`${path} must be required, recommended, or optional`);
   }
-  return policy;
+  return urgency;
+}
+
+function parseComponentUpdateInstallMode(
+  value: unknown,
+  path: string,
+): ComponentUpdateInstallMode {
+  const installMode = expectString(value, path);
+  if (installMode !== "automatic" && installMode !== "user-confirmed") {
+    throw new Error(`${path} must be automatic or user-confirmed`);
+  }
+  return installMode;
 }
 
 function parseComponentVersion(value: unknown, path: string): string {
@@ -2093,14 +2112,39 @@ function parseComponentUpdateCandidate(
 ): ComponentUpdateCandidate {
   const path = `componentUpdate.candidates[${index}]`;
   const record = expectRecord(value, path);
-  return {
+  const dependencies = expectArray(
+    record.dependencies,
+    `${path}.dependencies`,
+  ).map((dependency, dependencyIndex) => {
+    const dependencyPath = `${path}.dependencies[${dependencyIndex}]`;
+    const dependencyRecord = expectRecord(dependency, dependencyPath);
+    return {
+      componentId: parseComponentUpdateId(
+        dependencyRecord.componentId,
+        `${dependencyPath}.componentId`,
+      ),
+      minimumReleaseSequence: expectPositiveInteger(
+        dependencyRecord.minimumReleaseSequence,
+        `${dependencyPath}.minimumReleaseSequence`,
+      ),
+    };
+  });
+  if (dependencies.length > 1) {
+    throw new Error(`${path}.dependencies exceeds the signed catalog limit`);
+  }
+  const candidate: ComponentUpdateCandidate = {
     componentId: parseComponentUpdateId(record.componentId, `${path}.componentId`),
     version: parseComponentVersion(record.version, `${path}.version`),
     releaseSequence: expectPositiveInteger(
       record.releaseSequence,
       `${path}.releaseSequence`,
     ),
-    policy: parseComponentUpdatePolicy(record.policy, `${path}.policy`),
+    urgency: parseComponentUpdateUrgency(record.urgency, `${path}.urgency`),
+    installMode: parseComponentUpdateInstallMode(
+      record.installMode,
+      `${path}.installMode`,
+    ),
+    dependencies,
     packId: expectSha256Id(record.packId, `${path}.packId`),
     installedVersion: record.installedVersion == null
       ? null
@@ -2111,6 +2155,15 @@ function parseComponentUpdateCandidate(
     ),
     available: expectBoolean(record.available, `${path}.available`),
   };
+  if (candidate.dependencies.some((dependency) => (
+    dependency.componentId === candidate.componentId
+  ))) {
+    throw new Error(`${path}.dependencies may not reference the candidate itself`);
+  }
+  if (candidate.componentId === "asset-pack" && candidate.installMode === "automatic") {
+    throw new Error(`${path}.installMode may not automatically install assets`);
+  }
+  return candidate;
 }
 
 function parseComponentUpdateReport(value: unknown): ComponentUpdateReport {
@@ -2126,6 +2179,18 @@ function parseComponentUpdateReport(value: unknown): ComponentUpdateReport {
     candidates.map((candidate) => candidate.componentId),
     "componentUpdate.candidates component ids",
   );
+  for (const candidate of candidates) {
+    for (const dependency of candidate.dependencies) {
+      const dependencyCandidate = candidates.find((entry) => (
+        entry.componentId === dependency.componentId
+      ));
+      if (dependencyCandidate?.dependencies.some((nested) => (
+        nested.componentId === candidate.componentId
+      ))) {
+        throw new Error("componentUpdate dependency cycle was rejected");
+      }
+    }
+  }
   const report = {
     catalogSequence: expectPositiveInteger(
       record.catalogSequence,

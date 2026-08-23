@@ -383,7 +383,9 @@ describe("desktop bridge", () => {
         componentId: "capability-pack",
         version: "1.2.0",
         releaseSequence: 12,
-        policy: "required",
+        urgency: "required",
+        installMode: "user-confirmed",
+        dependencies: [],
         packId: `sha256:${"5".repeat(64)}`,
         installedVersion: "1.1.0",
         installedReleaseSequence: 11,
@@ -420,7 +422,7 @@ describe("desktop bridge", () => {
 
     invoke.mockResolvedValueOnce({
       ...report,
-      candidates: [{ ...report.candidates[0], policy: "critical" }],
+      candidates: [{ ...report.candidates[0], urgency: "critical" }],
     });
     await expect(checkComponentUpdates()).rejects.toMatchObject({
       name: "DesktopCommandContractError",

@@ -86,12 +86,12 @@
             "enum": ["tauri-updater", "runtime-base-manager", "engine-pack-manager", "component-pack-manager", "none"]
           },
           "implementationState": {"enum": ["implemented", "install-only", "planned", "not-updatable"]},
-          "defaultPolicy": {"enum": ["recommended", "required", "never"]},
+          "defaultPolicy": {"enum": ["automatic", "recommended", "optional", "required", "never"]},
           "activationStrategy": {
-            "enum": ["app-restart", "side-by-side-wsl-import", "atomic-symlink", "atomic-directory-swap", "none"]
+            "enum": ["app-restart", "verified-backup-reimport", "atomic-symlink", "atomic-directory-swap", "none"]
           },
           "rollbackStrategy": {
-            "enum": ["tauri-reinstall-previous", "previous-wsl-registration", "previous-symlink", "previous-directory", "never-touch"]
+            "enum": ["tauri-reinstall-previous", "verified-backup-restore", "previous-symlink", "previous-directory", "never-touch"]
           },
           "preservesUserState": {"const": true},
           "editions": {

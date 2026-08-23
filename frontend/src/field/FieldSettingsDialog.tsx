@@ -16,6 +16,7 @@ import {
 import { useRef, useState, type RefObject } from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
+import { SettingsUpdateCenter } from "../components/SettingsUpdateCenter";
 import {
   EditionSettingsPanel,
   EditionSettingsSurface,
@@ -27,8 +28,9 @@ import {
   SettingsLanguageRegionIcon,
   SettingsToggle,
 } from "../components/SettingsPrimitives";
+import { startRuntimeUpgrade } from "../desktop/bridge";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
-import type { InterfaceLocale } from "../i18n/I18nProvider";
+import { localeSafeError, type InterfaceLocale } from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type { FieldLocale } from "./catalog";
 
@@ -124,6 +126,8 @@ const COPY = {
     authority: "Hardware authority",
     missing: "Missing",
     denied: "Denied",
+    runtimeUpgradeStarted: "Runtime Base upgrade started. Keep DroneDream open.",
+    runtimeUpgradeUnavailable: "Runtime Base upgrade is unavailable in this build.",
   },
   "zh-CN": {
     title: "设置",
@@ -166,6 +170,8 @@ const COPY = {
     authority: "硬件权限",
     missing: "缺失",
     denied: "拒绝",
+    runtimeUpgradeStarted: "Runtime Base 升级已启动，请保持 DroneDream 打开。",
+    runtimeUpgradeUnavailable: "当前版本暂时无法启动 Runtime Base 升级。",
   },
 } as const;
 
@@ -200,6 +206,18 @@ function readInterfaceLocale(fallback: FieldLocale): InterfaceLocale {
   return fallback;
 }
 
+function configuredRuntimeReleaseManifestUrl(): string | null {
+  const configured = import.meta.env.VITE_RUNTIME_RELEASE_MANIFEST_URL?.trim();
+  if (!configured) return null;
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function FieldSettingsDialog({
   closeRef,
   locale,
@@ -228,6 +246,11 @@ export function FieldSettingsDialog({
   const [memoryScopes, setMemoryScopes] = useState(() =>
     readJson("dd.field.memory.scopes", DEFAULT_MEMORY_SCOPES)
   );
+  const [runtimeUpgradeBusy, setRuntimeUpgradeBusy] = useState(false);
+  const [runtimeUpgradeNotice, setRuntimeUpgradeNotice] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const customColorInputRef = useRef<HTMLInputElement>(null);
   const { account } = useAuthOrLocal();
   const editionTheme = useEditionTheme();
@@ -285,6 +308,32 @@ export function FieldSettingsDialog({
       }
       return next;
     });
+  };
+
+  const beginRuntimeBaseUpgrade = async () => {
+    if (runtimeUpgradeBusy) return;
+    const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
+    if (!releaseManifestUrl) {
+      setRuntimeUpgradeNotice({ tone: "error", text: copy.runtimeUpgradeUnavailable });
+      return;
+    }
+
+    setRuntimeUpgradeBusy(true);
+    setRuntimeUpgradeNotice(null);
+    try {
+      await startRuntimeUpgrade({ releaseManifestUrl });
+      setRuntimeUpgradeNotice({ tone: "success", text: copy.runtimeUpgradeStarted });
+    } catch (error) {
+      setRuntimeUpgradeNotice({
+        tone: "error",
+        text: localeSafeError(error, interfaceLocale, {
+          zh: "Runtime Base 升级未能启动。",
+          en: "The Runtime Base upgrade could not start.",
+        }),
+      });
+    } finally {
+      setRuntimeUpgradeBusy(false);
+    }
   };
 
   return (
@@ -468,6 +517,18 @@ export function FieldSettingsDialog({
             <div><dt>{copy.quorum}</dt><dd>{copy.missing}</dd></div>
             <div><dt>{copy.authority}</dt><dd><ShieldCheck aria-hidden="true" />{copy.denied}</dd></div>
           </dl>
+          <SettingsUpdateCenter
+            onOpenRuntimeBase={beginRuntimeBaseUpgrade}
+            runtimeBaseActionDisabled={runtimeUpgradeBusy}
+          />
+          {runtimeUpgradeNotice ? (
+            <p
+              className={`field-runtime-upgrade-notice ${runtimeUpgradeNotice.tone}`}
+              role={runtimeUpgradeNotice.tone === "error" ? "alert" : "status"}
+            >
+              {runtimeUpgradeNotice.text}
+            </p>
+          ) : null}
         </section>
       </EditionSettingsPanel>
     </EditionSettingsSurface>

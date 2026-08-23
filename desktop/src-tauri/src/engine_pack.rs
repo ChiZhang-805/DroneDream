@@ -325,7 +325,7 @@ fn runtime_execution_paths_current() -> bool {
 }
 
 #[cfg(target_os = "windows")]
-fn ensure_manager_idle(label: &str) -> Result<(), String> {
+pub(crate) fn ensure_manager_idle(label: &str) -> Result<(), String> {
     let output = wsl_output(
         MANAGER_PATH,
         &["--check-idle"],

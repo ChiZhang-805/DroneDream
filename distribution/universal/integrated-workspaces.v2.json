@@ -100,7 +100,7 @@
     },
     {
       "path": "frontend/src/styles.css",
-      "sha256": "67b1c98d06903a29f9dbb72a731e517f9b73ac29f0c60924826b5f2fa82d7471",
+      "sha256": "5bb9dea610d986b399291cf25ecc5256b21f06cebeebe9d36907a5f0f4a4eae5",
       "donorEdition": "lab",
       "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
       "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
@@ -114,7 +114,7 @@
     },
     {
       "path": "frontend/src/router.tsx",
-      "sha256": "1368694b018628dc780e50a257ab20c06ba17938601935eda4c1a8f8630e18fa",
+      "sha256": "064dae250bad196288b116006dbfd28924b84ad807bf9d671eb0ef951eef69d2",
       "donorEdition": "universal",
       "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
       "integration": "semantic-universal-workspace-routing-and-shared-locale"

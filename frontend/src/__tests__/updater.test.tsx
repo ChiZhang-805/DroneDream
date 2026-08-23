@@ -34,7 +34,12 @@ vi.mock("../desktop/bridge", () => ({
   installComponentUpdate: installComponentUpdateMock,
 }));
 
-import { appUpdateIsRequired, useAppUpdater } from "../desktop/updater";
+import {
+  appUpdateIsRequired,
+  orderComponentUpdates,
+  selectManualComponentUpdates,
+  useAppUpdater,
+} from "../desktop/updater";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -265,7 +270,9 @@ describe("useAppUpdater", () => {
         componentId: "capability-pack",
         version: "1.2.0",
         releaseSequence: 12,
-        policy: "required",
+        urgency: "required",
+        installMode: "user-confirmed",
+        dependencies: [],
         packId: `sha256:${"5".repeat(64)}`,
         installedVersion: "1.1.0",
         installedReleaseSequence: 11,
@@ -294,7 +301,12 @@ describe("useAppUpdater", () => {
           componentId: "asset-pack",
           version: "2.0.0",
           releaseSequence: 20,
-          policy: "recommended",
+          urgency: "recommended",
+          installMode: "user-confirmed",
+          dependencies: [{
+            componentId: "capability-pack",
+            minimumReleaseSequence: 12,
+          }],
           packId: `sha256:${"6".repeat(64)}`,
           installedVersion: null,
           installedReleaseSequence: 0,
@@ -304,7 +316,9 @@ describe("useAppUpdater", () => {
           componentId: "capability-pack",
           version: "1.2.0",
           releaseSequence: 12,
-          policy: "recommended",
+          urgency: "recommended",
+          installMode: "user-confirmed",
+          dependencies: [],
           packId: `sha256:${"5".repeat(64)}`,
           installedVersion: "1.1.0",
           installedReleaseSequence: 11,
@@ -335,5 +349,79 @@ describe("useAppUpdater", () => {
     expect(checkComponentUpdatesMock).toHaveBeenCalledTimes(2);
     expect(hook.result.current.status).toBe("current");
     hook.unmount();
+  });
+
+  it("installs signed automatic capability updates without silently downloading assets", async () => {
+    vi.stubEnv("VITE_COMPONENT_UPDATE_CATALOG_ENABLED", "true");
+    checkMock.mockResolvedValue(null);
+    const automatic = {
+      catalogSequence: 6,
+      generatedAt: "2026-08-16T00:00:00Z",
+      expiresAt: "2026-08-23T00:00:00Z",
+      candidates: [{
+        componentId: "capability-pack",
+        version: "1.3.0",
+        releaseSequence: 13,
+        urgency: "recommended",
+        installMode: "automatic",
+        dependencies: [],
+        packId: `sha256:${"8".repeat(64)}`,
+        installedVersion: "1.2.0",
+        installedReleaseSequence: 12,
+        available: true,
+      }],
+    };
+    checkComponentUpdatesMock
+      .mockResolvedValueOnce(automatic)
+      .mockResolvedValueOnce({ ...automatic, candidates: [] });
+    installComponentUpdateMock.mockResolvedValue({
+      componentId: "capability-pack",
+      packId: `sha256:${"8".repeat(64)}`,
+      version: "1.3.0",
+      releaseSequence: 13,
+      activated: true,
+    });
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+
+    expect(installComponentUpdateMock).toHaveBeenCalledWith(
+      "capability-pack",
+      undefined,
+    );
+    hook.unmount();
+  });
+
+  it("keeps urgency separate from delivery and resolves signed dependencies", () => {
+    const capability = {
+      componentId: "capability-pack" as const,
+      version: "1.2.0",
+      releaseSequence: 12,
+      urgency: "recommended" as const,
+      installMode: "user-confirmed" as const,
+      dependencies: [],
+      packId: `sha256:${"5".repeat(64)}`,
+      installedVersion: "1.1.0",
+      installedReleaseSequence: 11,
+      available: true,
+    };
+    const asset = {
+      ...capability,
+      componentId: "asset-pack" as const,
+      urgency: "required" as const,
+      dependencies: [{
+        componentId: "capability-pack" as const,
+        minimumReleaseSequence: 12,
+      }],
+    };
+    const optional = { ...capability, urgency: "optional" as const };
+
+    expect(orderComponentUpdates([asset, capability])).toEqual([
+      "capability-pack",
+      "asset-pack",
+    ]);
+    expect(selectManualComponentUpdates([asset, capability]).map((item) => item.componentId))
+      .toEqual(["asset-pack", "capability-pack"]);
+    expect(selectManualComponentUpdates([optional])).toEqual([optional]);
   });
 });

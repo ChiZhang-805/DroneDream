@@ -34,11 +34,15 @@
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "8102ca98845d7cb6079b02fed297d545bb37342e32f7b76cb2820069fa6f1060"
+        "sha256": "314289dee60c54e60730dfca4634f01647f1ab150c0c4ba6eb97a3f95f2f20ff"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
         "sha256": "3ec889dced66f1d54bdf94c16a95497aab3ff02ccf5eb6decec034fb8f7d3c12"
+      },
+      {
+        "path": "frontend/src/components/SettingsUpdateCenter.tsx",
+        "sha256": "64736b9d706bc87cd5057cf2cc6ba87a38179908a2d896c8ac39e2104c0dca02"
       },
       {
         "path": "frontend/src/components/DroneLaunchScene.tsx",
@@ -50,7 +54,7 @@
       },
       {
         "path": "frontend/src/styles.css",
-        "sha256": "67b1c98d06903a29f9dbb72a731e517f9b73ac29f0c60924826b5f2fa82d7471"
+        "sha256": "5bb9dea610d986b399291cf25ecc5256b21f06cebeebe9d36907a5f0f4a4eae5"
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
@@ -85,7 +89,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "distribution/universal/integrated-workspaces.v2.json",
-    "sha256": "8d4d6f64e50fe252881b96035f9ddf807bfd927e475e6ce54321d24a12f74db2",
+    "sha256": "668f36597482aaddc08f5e623af3165a052f4add0a232cc2b8b41dee9cb074cb",
     "sourceFileCount": 12,
     "workspaceModes": ["sim", "lab", "field", "autonomy"],
     "createsCrossEditionHarnessOrchestrator": false,

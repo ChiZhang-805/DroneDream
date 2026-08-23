@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import { AuthProvider } from "../features/auth/AuthContext";
+import { AppUpdaterProvider } from "../desktop/updaterContext";
 import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 import { FieldLocaleProvider } from "./FieldLocaleProvider";
 import { FieldRoot } from "./FieldRoot";
@@ -17,7 +18,9 @@ ReactDOM.createRoot(root).render(
     <EditionThemeProvider edition="field">
       <FieldLocaleProvider>
         <AuthProvider>
-          <FieldRoot />
+          <AppUpdaterProvider>
+            <FieldRoot />
+          </AppUpdaterProvider>
         </AuthProvider>
       </FieldLocaleProvider>
     </EditionThemeProvider>

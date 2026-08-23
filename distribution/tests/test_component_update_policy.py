@@ -56,6 +56,13 @@ def test_user_state_can_never_be_an_update_payload() -> None:
     assert user_state["rollbackStrategy"] == "never-touch"
 
 
+def test_non_user_components_reject_unknown_default_update_policies() -> None:
+    changed = deepcopy(_document())
+    changed["components"][0]["defaultPolicy"] = "surprise"
+    with pytest.raises(tool.ComponentUpdatePolicyError, match="default update policy"):
+        tool.validate_contract(changed)
+
+
 def test_unknown_components_and_dependency_reordering_fail_closed() -> None:
     policy = tool.load_contract(ROOT)
     with pytest.raises(tool.ComponentUpdatePolicyError, match="unknown"):
@@ -98,10 +105,26 @@ def test_only_implemented_managers_produce_ready_updates() -> None:
     )
     assert {entry["componentId"]: entry["status"] for entry in plan} == {
         "desktop-app": "ready-recommended",
-        "base-runtime": "blocked-manager-unavailable",
+        "base-runtime": "ready-required",
         "engine-pack": "ready-required",
         "capability-pack": "deferred-manager-unavailable",
     }
+
+
+def test_all_game_launcher_policies_are_planned_without_touching_user_state() -> None:
+    policy = tool.load_contract(ROOT)
+    plan = tool.plan_updates(
+        policy,
+        {"desktop-app": 1, "engine-pack": 1},
+        {
+            "desktop-app": _candidate(2, policy="optional"),
+            "engine-pack": _candidate(2, policy="automatic"),
+        },
+    )
+    assert [entry["status"] for entry in plan] == [
+        "ready-optional",
+        "ready-automatic",
+    ]
 
 
 def test_anti_rollback_sequence_never_reinstalls_equal_or_older_payloads() -> None:

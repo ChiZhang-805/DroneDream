@@ -61,6 +61,7 @@ import {
 import { BrandLockup } from "./components/BrandLockup";
 import { AssistantModelPicker } from "./components/AssistantModelPicker";
 import { CustomModelSettingsPanel } from "./components/CustomModelSettingsPanel";
+import { SettingsUpdateCenter } from "./components/SettingsUpdateCenter";
 import {
   EditionSettingsPanel,
   EditionSettingsSurface,
@@ -844,6 +845,7 @@ function SettingsDialog({
   onOpenExternal: (event: MouseEvent<HTMLAnchorElement>, url: string) => void;
 }) {
   const { locale, interfaceLocale, setLocale, t } = useI18n();
+  const navigate = useNavigate();
   const settingsCopy = SETTINGS_COPY[interfaceLocale];
   const editionTheme = useEditionTheme();
   const setAppearancePreference = editionTheme.setAppearance;
@@ -2086,6 +2088,12 @@ function SettingsDialog({
               </div>
             </details>
           ) : null}
+          <SettingsUpdateCenter
+            onOpenRuntimeBase={() => {
+              onClose();
+              navigate("/desktop/setup");
+            }}
+          />
           </section>
         </EditionSettingsPanel>
       ) : null}
@@ -3289,6 +3297,7 @@ function AppShellContent() {
     "componentUpdateDeferred",
     "componentError",
     "runtimeBaseRequired",
+    "error",
   ].includes(updater.status);
   const sidebarUpdateBusy = [
     "downloading",
