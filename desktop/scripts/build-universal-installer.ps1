@@ -107,7 +107,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $integratedUi.manifest -cne "distribution/universal/integrated-workspaces.v2.json" -or
     $integratedUi.sha256 -cnotmatch "^[0-9a-f]{64}$" -or
     $integratedUi.sourceFileCount -ne 12 -or
-    (@($integratedUi.workspaceModes) -join ",") -cne "sim,lab,field" -or
+    (@($integratedUi.workspaceModes) -join ",") -cne "sim,lab,field,autonomy" -or
     $integratedUi.createsCrossEditionHarnessOrchestrator -ne $false -or
     $integratedUi.presentationOnly -ne $true -or
     $integratedUi.grantsHardwareAuthority -ne $false -or
@@ -162,7 +162,7 @@ $integratedUiManifest = Get-Content -LiteralPath (Join-Path $repoRoot $integrate
     -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($integratedUiManifest.kind -cne "dronedream-universal-integrated-workspaces" -or
     $integratedUiManifest.contractId -cne [string]$integratedUi.contractId -or
-    (@($integratedUiManifest.workspaceModes) -join ",") -cne "sim,lab,field" -or
+    (@($integratedUiManifest.workspaceModes) -join ",") -cne "sim,lab,field,autonomy" -or
     $integratedUiManifest.workspaceSwitchMeaning -cne "presentation-and-module-selection-only" -or
     $integratedUiManifest.createsCrossEditionHarnessOrchestrator -ne $false -or
     $integratedUiManifest.presentationOnly -ne $true -or
@@ -203,7 +203,7 @@ if ($vehicleStudio.ownerEdition -cne "universal" -or
     $vehicleStudio.contract -cne "distribution/universal/vehicle-studio.v1.json" -or
     $vehicleStudio.schema -cne "distribution/schemas/vehicle-pack-draft-envelope.schema.json" -or
     $vehicleStudio.transport -cne "file-based-draft-envelope" -or
-    ($vehicleStudioTargets -join ",") -cne "sim,lab,field" -or
+    ($vehicleStudioTargets -join ",") -cne "sim,lab,field,autonomy" -or
     $vehicleStudio.automaticReceiverInstallation -ne $false -or
     $vehicleStudio.modelHarnessStartsOnExchange -ne $false -or
     $vehicleStudio.grantsSimulationExecution -ne $false -or
