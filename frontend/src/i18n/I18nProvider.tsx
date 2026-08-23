@@ -3186,6 +3186,8 @@ const HAN_PATTERN = /\p{Script=Han}/u;
  * user. Technical identifiers remain visible because they are useful for
  * support, while prose from the other locale is replaced by authored copy.
  */
+// Error localization is part of this provider's closed bilingual contract.
+// eslint-disable-next-line react-refresh/only-export-components
 export function localeSafeError(
   value: unknown,
   locale: Locale,

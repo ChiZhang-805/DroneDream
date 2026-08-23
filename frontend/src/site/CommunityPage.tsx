@@ -94,6 +94,8 @@ const HAN_CHARACTER_PATTERN = /\p{Script=Han}/u;
 const COMMUNITY_OWNER_DISPLAY_NAME = "Chi Zhang";
 const COMMUNITY_OWNER_AUTHOR_ID = "bc77348a-90e9-4c0c-92eb-9db31301cdbd";
 
+// Exported for deterministic layout tests that guard the rendered community grid.
+// eslint-disable-next-line react-refresh/only-export-components
 export function isLongCommunityTopicTitle(value: string): boolean {
   const normalizedValue = value.trim();
   const explicitLineCount = normalizedValue.split(/\r?\n/u).length;
@@ -131,6 +133,8 @@ export interface CommunityTopicPlacement {
   isLong: boolean;
 }
 
+// Exported for deterministic layout tests that guard the rendered community grid.
+// eslint-disable-next-line react-refresh/only-export-components
 export function packCommunityTopicPages(
   topics: CommunityTopic[],
 ): CommunityTopicPlacement[][] {

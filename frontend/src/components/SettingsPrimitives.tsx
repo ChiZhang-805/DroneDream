@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+// Shared by the settings surfaces; this is intentionally colocated with the
+// matching language-region component so the closed locale list cannot drift.
+// eslint-disable-next-line react-refresh/only-export-components
 export const SETTINGS_LOCALES = [
   { id: "en", label: "English", region: "west" },
   { id: "zh-CN", label: "简体中文", region: "east" },

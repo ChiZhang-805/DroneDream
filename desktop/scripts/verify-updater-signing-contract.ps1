@@ -159,11 +159,11 @@ process.exit(Number(process.env.DRONEDREAM_SIGNER_EXIT_CODE));
     $env:DRONEDREAM_SIGNER_WRITE_SIGNATURE = "1"
     $env:DRONEDREAM_SIGNER_EXIT_CODE = "0"
     $env:DRONEDREAM_SIGNER_PASSWORD_VARIABLE = $testPasswordVariable
-    [Environment]::SetEnvironmentVariable(
-        $testPasswordVariable,
-        $null,
-        [EnvironmentVariableTarget]::Process
-    )
+    # PowerShell 7 on Windows can preserve a process variable as an empty
+    # entry when SetEnvironmentVariable receives $null. Remove the Env drive
+    # entry explicitly so the child-process contract distinguishes absent
+    # credentials from an intentionally empty value.
+    Remove-Item -LiteralPath "Env:$testPasswordVariable" -ErrorAction SilentlyContinue
     & $helperPath `
         -NodeExecutable "node.exe" `
         -TauriCliPath $fakeCli `
@@ -257,11 +257,15 @@ process.exit(Number(process.env.DRONEDREAM_SIGNER_EXIT_CODE));
     }
     Assert-Contract $missingOutputClosed "a zero exit without a signature must fail closed"
 } finally {
-    [Environment]::SetEnvironmentVariable(
-        $testPasswordVariable,
-        $originalTestPassword,
-        [EnvironmentVariableTarget]::Process
-    )
+    if ($null -eq $originalTestPassword) {
+        Remove-Item -LiteralPath "Env:$testPasswordVariable" -ErrorAction SilentlyContinue
+    } else {
+        [Environment]::SetEnvironmentVariable(
+            $testPasswordVariable,
+            $originalTestPassword,
+            [EnvironmentVariableTarget]::Process
+        )
+    }
     Remove-Item Env:DRONEDREAM_SIGNER_ARGV_RECORD -ErrorAction SilentlyContinue
     Remove-Item Env:DRONEDREAM_SIGNER_WRITE_SIGNATURE -ErrorAction SilentlyContinue
     Remove-Item Env:DRONEDREAM_SIGNER_EXIT_CODE -ErrorAction SilentlyContinue

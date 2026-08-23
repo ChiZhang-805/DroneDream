@@ -629,7 +629,7 @@ class SimulationExecutionRegistry:
         mission: AutonomyCompileRequest,
     ) -> list[dict[str, object]]:
         compiled = compile_autonomy_mission(mission)
-        route = [
+        route: list[dict[str, object]] = [
             {
                 "x": point.x,
                 "y": point.y,
