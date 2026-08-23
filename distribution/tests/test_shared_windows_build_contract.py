@@ -20,6 +20,14 @@ RELEASE_POLICY = ROOT / "desktop" / "scripts" / "verify-release-source-policy.mj
 SIGNING_POLICY = ROOT / "desktop" / "scripts" / "verify-updater-signing-contract.ps1"
 DETACHED_SCHEMA = ROOT / "distribution" / "schemas" / "desktop-node-dependency-bundle.schema.json"
 DETACHED_VERIFIER = ROOT / "desktop" / "scripts" / "verify-detached-node-dependencies.ps1"
+TAURI_CONFIGS = (
+    ROOT / "desktop" / "src-tauri" / "tauri.conf.json",
+    ROOT / "desktop" / "src-tauri" / "tauri.universal.conf.json",
+    ROOT / "desktop" / "src-tauri" / "tauri.sim.conf.json",
+    ROOT / "desktop" / "src-tauri" / "tauri.lab.conf.json",
+    ROOT / "desktop" / "src-tauri" / "tauri.field.conf.json",
+    ROOT / "desktop" / "src-tauri" / "tauri.autonomy.conf.json",
+)
 
 
 def _script() -> str:
@@ -32,6 +40,23 @@ def _msvc_script() -> str:
 
 def _five_edition_script() -> str:
     return FIVE_EDITION_SCRIPT.read_text(encoding="utf-8-sig")
+
+
+def test_every_desktop_edition_preserves_native_window_controls() -> None:
+    for config_path in TAURI_CONFIGS:
+        config = json.loads(config_path.read_text(encoding="utf-8-sig"))
+        windows = config["app"]["windows"]
+        assert len(windows) == 1, config_path
+        window = windows[0]
+        for capability in (
+            "resizable",
+            "maximizable",
+            "minimizable",
+            "closable",
+            "decorations",
+        ):
+            assert window.get(capability) is True, f"{config_path}: {capability}"
+        assert window.get("fullscreen") is False, config_path
 
 
 def test_five_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs() -> None:

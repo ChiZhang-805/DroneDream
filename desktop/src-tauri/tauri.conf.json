@@ -20,6 +20,10 @@
         "minWidth": 1100,
         "minHeight": 700,
         "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
+        "decorations": true,
         "fullscreen": false,
         "transparent": false,
         "backgroundColor": "#ffffff"

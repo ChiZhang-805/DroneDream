@@ -85,7 +85,7 @@ describe("environment-aware routing", () => {
     router.dispose();
   });
 
-  it("routes a true desktop cold start into the edition console", async () => {
+  it("routes every true desktop cold start into the Runtime launcher", async () => {
     installDesktopBridge();
     window.history.replaceState(null, "", "/#/");
     vi.resetModules();
@@ -95,7 +95,7 @@ describe("environment-aware routing", () => {
       element?: { props?: { to?: string; replace?: boolean } };
     } | undefined)?.element;
 
-    expect(indexElement?.props?.to).toBe("/assistant");
+    expect(indexElement?.props?.to).toBe("/desktop/setup");
     expect(indexElement?.props?.replace).toBe(true);
 
     router.dispose();
@@ -185,9 +185,9 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/dashboard");
-    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
-    expect(window.location.hash).toBe("#/dashboard?settings=runtime&required=experiment");
+    expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe("?required=experiment");
+    expect(window.location.hash).toBe("#/desktop/setup?required=experiment");
     expect(invoke).not.toHaveBeenCalled();
 
     router.dispose();
@@ -215,8 +215,8 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/dashboard");
-    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
+    expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe("?required=experiment");
     expect(invoke).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(0);
@@ -238,8 +238,8 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/dashboard");
-    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
+    expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe("?required=experiment");
 
     router.dispose();
   });
@@ -264,7 +264,7 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const desktop = await import("../router");
     await desktop.router.navigate("/removed-route");
-    expect(desktop.router.state.location.pathname).toBe("/dashboard");
+    expect(desktop.router.state.location.pathname).toBe("/desktop/setup");
     desktop.router.dispose();
 
     delete window.__TAURI__;

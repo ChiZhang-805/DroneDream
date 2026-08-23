@@ -3272,7 +3272,9 @@ function AppShellContent() {
     && auth.configured
     && !auth.loading
     && !auth.account;
-  const accountDialogRequired = accountRequired && !launcherMode;
+  const accountDialogRequired = accountRequired
+    && !desktopRuntime
+    && !launcherMode;
   const accountDialogOpen = accountOpen || accountDialogRequired;
   const mobileMenuExpanded = mobileNavigationEnabled && mobileMenuOpen;
   const sidebarUpdateVisible = desktopRuntime && [

@@ -76,6 +76,9 @@ async function requestWindowClose(): Promise<ReturnType<typeof vi.fn>> {
 
 describe("desktop close protection", () => {
   beforeEach(() => {
+    // Exit protection is a workspace-only concern. Visual-QA mode deliberately
+    // bypasses the first-run launcher gate without probing or starting Runtime.
+    vi.stubEnv("VITE_DESKTOP_VISUAL_QA", "true");
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "en");
@@ -87,6 +90,7 @@ describe("desktop close protection", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     delete window.__TAURI__;
   });
 
@@ -249,5 +253,18 @@ describe("desktop close protection", () => {
     await requestWindowClose();
 
     await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
+  });
+
+  it("always lets the first-run launcher close without probing workspace jobs", async () => {
+    vi.mocked(invokeDesktop).mockRejectedValueOnce(
+      new Error("Runtime is not installed on this machine."),
+    );
+    renderShell("/desktop/setup");
+
+    await requestWindowClose();
+
+    await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
+    expect(apiClient.listJobs).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Before you close DroneDream" })).toBeNull();
   });
 });

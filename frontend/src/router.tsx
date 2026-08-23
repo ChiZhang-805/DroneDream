@@ -23,9 +23,10 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
     desktopRuntime && !desktopVisualQa
       ? () => getDesktopStartupGateSession().status === "ready"
         ? null
-        : redirect(`/dashboard?settings=runtime&required=${feature}`)
+        : redirect(`/desktop/setup?required=${feature}`)
       : undefined;
   const fallbackPath = editionLandingPath();
+  const entryPath = desktopRuntime ? "/desktop/setup" : fallbackPath;
 
   return [
     {
@@ -34,7 +35,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
       children: [
         {
           index: true,
-          element: <Navigate to={fallbackPath} replace />,
+          element: <Navigate to={entryPath} replace />,
         },
         ...(BUILD_HAS_SIM_WORKSPACE ? [{
           path: "sim",
@@ -217,7 +218,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: UniversalFieldApp };
           },
         }] : []),
-        { path: "*", loader: () => redirect(fallbackPath) },
+        { path: "*", loader: () => redirect(entryPath) },
       ],
     },
   ];
@@ -228,8 +229,9 @@ export function createAppRouter(desktopRuntime = isDesktopRuntime()) {
   // A packaged Tauri app has no HTTP server to resolve a console route after a
   // WebView reload. Hash history keeps every asset request on index.html while
   // the hosted web app retains clean browser URLs and normal deep links. The
-  // desktop index now opens the same edition landing surface as the website;
-  // /desktop/setup remains an explicit Runtime install and repair destination.
+  // Every packaged-desktop cold start enters the launcher first. The launcher
+  // owns Runtime install/repair, the 0-100 readiness proof, and browser sign-in;
+  // the hosted web app continues to enter the edition landing surface directly.
   if (desktopRuntime) return createHashRouter(routes);
   const pathname = window.location.pathname;
   const basename =

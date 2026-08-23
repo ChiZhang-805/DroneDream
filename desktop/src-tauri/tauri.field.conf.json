@@ -12,6 +12,10 @@
         "minWidth": 390,
         "minHeight": 620,
         "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
+        "decorations": true,
         "fullscreen": false
       }
     ]
