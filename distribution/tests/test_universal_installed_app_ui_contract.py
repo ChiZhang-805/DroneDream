@@ -127,6 +127,9 @@ def test_headed_browser_observer_covers_pre_auth_without_bypassing_account_gate(
     assert 'window.history.replaceState({}, "", "/desktop/setup")' not in script
     assert "if (authenticatedWorkspace)" in script
     assert 'universal: "/assistant"' in script
+    assert 'autonomy: "/autonomy"' in script
+    assert 'autonomy: ".autonomy-platform-page"' in script
+    assert 'autonomy: ["#FF5B74", "#EC214F", "#97153B"]' in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
     assert "requestId" not in script
