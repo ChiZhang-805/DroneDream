@@ -94,7 +94,7 @@ APPROVED_HASHES = {
 }
 
 CANONICAL_ICO_HASHES = {
-    "universal": "88223fab6c2b0d493aaedab932c04d40def4da58e28f6d670adbfd745a6ca8ba",
+    "universal": "d607a304ef09156ec7041744726791dedc9f96625f081676ace654e652536090",
     "sim": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
     "lab": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1",
     "field": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",

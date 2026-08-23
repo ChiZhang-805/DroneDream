@@ -503,10 +503,11 @@ def build_outputs() -> dict[Path, bytes]:
                 raise BrandBuildError(f"brand gradient length drifted: {edition_id}")
             palette = (colors[0], colors[1], colors[2])
             if edition_id == "universal":
-                mark = recolor_mark(standard_master, palette)
-                favicon = recolor_mark(favicon_master, palette).resize(
-                    (64, 64), Image.Resampling.LANCZOS
-                )
+                # Universal is the master DroneDream identity. Preserve the exact
+                # approved pink-blue-purple artwork instead of flattening it into
+                # a derived edition palette; only the edition marks are recolored.
+                mark = standard_master.copy()
+                favicon = favicon_master.resize((64, 64), Image.Resampling.LANCZOS)
                 primary = gradient_text(
                     font_path,
                     word="DroneDream",
@@ -609,9 +610,7 @@ def build_outputs() -> dict[Path, bytes]:
         preview_bytes = add_image(outputs, "brand/generated/edition-brand-preview.png", preview)
 
     universal_mark = marks["universal"]
-    universal_favicon = recolor_mark(
-        favicon_master, tuple(contract["editions"]["universal"]["gradientStops"])
-    ).resize((64, 64), Image.Resampling.LANCZOS)
+    universal_favicon = favicon_master.resize((64, 64), Image.Resampling.LANCZOS)
     universal_primary = lockups[("universal", "primary")]
     universal_compact = lockups[("universal", "compact")]
     for path, image in (

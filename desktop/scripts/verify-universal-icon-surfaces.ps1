@@ -48,10 +48,10 @@ $tauriIcon = Join-Path $repoRoot "desktop\src-tauri\icons\icon.ico"
 $canonicalIconSha256 = (Get-FileHash -LiteralPath $canonicalIcon -Algorithm SHA256).Hash.ToLowerInvariant()
 $canonicalPngSha256 = (Get-FileHash -LiteralPath $canonicalPng -Algorithm SHA256).Hash.ToLowerInvariant()
 $tauriIconSha256 = (Get-FileHash -LiteralPath $tauriIcon -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($canonicalIconSha256 -cne "88223fab6c2b0d493aaedab932c04d40def4da58e28f6d670adbfd745a6ca8ba" -or
-    $canonicalPngSha256 -cne "acd4ef1fc198bf157c73c26edfb6c2814d46286857b69bfbd857a7328243d19f" -or
+if ($canonicalIconSha256 -cne "d607a304ef09156ec7041744726791dedc9f96625f081676ace654e652536090" -or
+    $canonicalPngSha256 -cne "01080f8fd17fdcc793bfb6bead1b6cc0ca535a29d92b79c3501bf96c7d5d74a7" -or
     $tauriIconSha256 -cne $canonicalIconSha256) {
-    throw "Universal canonical and Tauri icon bytes are not the approved purple asset."
+    throw "Universal canonical and Tauri icon bytes are not the approved master artwork."
 }
 foreach ($path in @(
     "brand/generated/universal/windows/icon.ico",
