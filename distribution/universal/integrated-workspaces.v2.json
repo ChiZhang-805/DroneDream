@@ -35,16 +35,16 @@
   "sourceFiles": [
     {
       "path": "frontend/scripts/verify-lab-ui.mjs",
-      "sha256": "129dab7c0db9364472efca9cb53e02c2c622cdd56ed516596dc29fe5159b4e6b",
+      "sha256": "dfed265b3ffb5918620a20e248b1eb7664c0833e16d5d9851612eb0fd511015c",
       "donorEdition": "lab",
       "donorBlob": "125386b98af709fbe559cb1dff6013dd52eee3ed",
       "integration": "semantic-universal-profile-and-final-field-adaptation"
     },
     {
       "path": "frontend/src/__tests__/FieldAssistantWorkspace.test.tsx",
-      "sha256": "78c01f0723d504f6893a541549aae407caaa34aee705a2c042e4d0f63ea9f7b1",
+      "sha256": "d464f58a99973ca4b665bb189fdb0bd03c64b2f99e1258e83f3a2a430be3f3cf",
       "donorEdition": "field",
-      "donorBlob": "1311d713f1b5909e8731d99946706e069b83f93c",
+      "donorBlob": "2c0d1a6b9ac3cee6e079748eb6fb5d6076821c9a",
       "integration": "byte-exact"
     },
     {
@@ -112,7 +112,7 @@
     },
     {
       "path": "frontend/src/router.tsx",
-      "sha256": "474330bd706be5d816ba1297717ddcf264dd3ffb6b7eed6329d1ed755a503c30",
+      "sha256": "633b344d5c3c980d403459f5e5312f600f1c4c50621d5dc1a3750dbc943c7866",
       "donorEdition": "universal",
       "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
       "integration": "semantic-universal-workspace-routing-and-shared-locale"

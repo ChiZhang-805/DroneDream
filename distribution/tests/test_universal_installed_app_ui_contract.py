@@ -189,7 +189,7 @@ def test_headed_tools_parse_without_execution() -> None:
 
 def test_offline_layout_receipt_remains_exact_and_non_substitutive() -> None:
     receipt = ROOT / (
-        "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/"
+        "artifacts/test-runs/common-ui-theme-settings-7d230573-exact/"
         "software-ui-layout-receipt.json"
     )
     payload = json.loads(receipt.read_text(encoding="utf-8"))

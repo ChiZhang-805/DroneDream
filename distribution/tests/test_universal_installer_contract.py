@@ -186,9 +186,9 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "integrated-in-universal"
     )
     visual = shared_ui["visualEvidence"]  # type: ignore[index]
-    assert visual["subjectCommit"] == "4933e214a57a048099d8f0bdd11c9748b620ac3e"
+    assert visual["subjectCommit"] == "7d2305737c85b1f1f982df8ba612dfdd2ce99740"
     assert visual["subjectCommit"] != shared_ui["donorCommit"]
-    assert visual["caseCount"] == 6
+    assert visual["caseCount"] == 7
     assert visual["locales"] == ["en", "zh-CN"]
     assert visual["viewportWidths"] == [390, 760, 1440]
     assert visual["coveredSettingsTabs"] == ["general", "memory", "model"]

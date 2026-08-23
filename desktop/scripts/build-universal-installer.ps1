@@ -93,7 +93,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $sharedUi.contractId -cne "dronedream-shared-edition-ui/v1" -or
     $sharedUi.donorCommit -cnotmatch "^[0-9a-f]{40}$" -or
     $sharedUi.visualEvidence.subjectCommit -cnotmatch "^[0-9a-f]{40}$" -or
-    $sharedUi.visualEvidence.caseCount -ne 6 -or
+    $sharedUi.visualEvidence.caseCount -ne 7 -or
     $sharedUi.visualEvidence.runtimePanelHeadedValidationStatus -cne "pending-exact-desktop-runtime-red-validation" -or
     $sharedUi.minimumDesktopViewport.width -ne 390 -or
     $sharedUi.minimumDesktopViewport.height -ne 700 -or

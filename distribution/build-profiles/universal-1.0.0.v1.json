@@ -38,15 +38,15 @@
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
-        "sha256": "23f0c359b3c1e40d390b176a26a3e4ff75e54d62a6176c0debab7745848016e1"
+        "sha256": "b63cc024c6e52afe1d29fc033db7a66a7674906ce78f9e02806b6afc0f9c24f0"
       },
       {
         "path": "frontend/src/components/DroneLaunchScene.tsx",
-        "sha256": "36ffce3a6ca3209e6f7cfdb5ef0e62e23d731ef25ee3dcc938a7a927879dc0fe"
+        "sha256": "91fa72de9d5bc66b89798697aa8cc9e0243eb20f4e35ebf695d228b709c7d17e"
       },
       {
         "path": "frontend/src/features/distribution/universalMode.ts",
-        "sha256": "65352f7ee53e95c128e2269ab78f3c14edf9dd0f758a8a7c426a49fa65178410"
+        "sha256": "a61f46308c6bffe66617706a31bf0fed1847f0d9e5b1ce264fe2155de06ecf34"
       },
       {
         "path": "frontend/src/styles.css",
@@ -58,14 +58,14 @@
       },
       {
         "path": "frontend/src/theme/editionTheme.ts",
-        "sha256": "f380164874cb4bed6d147c08bff914450666d1000950e7714dbb7b9f50c9595e"
+        "sha256": "3b31e988a2fa6a9708a83b88fc00f6bee1c03cbafcaffd08f5be2ef56ca272fb"
       }
     ],
     "visualEvidence": {
-      "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json",
-      "sha256": "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4",
-      "subjectCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
-      "caseCount": 6,
+      "path": "artifacts/test-runs/common-ui-theme-settings-7d230573-exact/software-ui-layout-receipt.json",
+      "sha256": "f2bf4a54bed9cddcafc6c042d2bb5a1a10c52bfbed08253ffb730863bce46916",
+      "subjectCommit": "7d2305737c85b1f1f982df8ba612dfdd2ce99740",
+      "caseCount": 7,
       "locales": ["en", "zh-CN"],
       "viewportWidths": [390, 760, 1440],
       "coveredSettingsTabs": ["general", "memory", "model"],
@@ -85,7 +85,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "distribution/universal/integrated-workspaces.v2.json",
-    "sha256": "c2618c86d82c932e80e53ddffb02411988e61492fc09e78540e01b5f5de3f395",
+    "sha256": "ee2094b5ec44b10c213853c1ec94b99ecf266a0ef710c266e8c2004087433e78",
     "sourceFileCount": 12,
     "workspaceModes": ["sim", "lab", "field", "autonomy"],
     "createsCrossEditionHarnessOrchestrator": false,
@@ -113,8 +113,8 @@
         {"path": "frontend/src/features/vehicleStudio/pack.ts", "sha256": "82454a93ec0b8c4382971b6d51d033dca8521e569837aab9c39ba9252770684a"},
         {"path": "frontend/src/features/vehicleStudio/preview.ts", "sha256": "939d720edb9e03f20a344d98e1abf0ba884fe8e81b2c0a09edb8e2ecba5d9d35"},
         {"path": "frontend/src/features/vehicleStudio/storage.ts", "sha256": "65fbffacae77e3508b5aca477ccfb2227ac4847a4fa1dda54d1b524c05456559"},
-      {"path": "frontend/src/router.tsx", "sha256": "474330bd706be5d816ba1297717ddcf264dd3ffb6b7eed6329d1ed755a503c30"},
-      {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "9e482996699a9a4fd7bc72c72a84c4b29d779745b4852a764ab31a6f074060f0"},
+      {"path": "frontend/src/router.tsx", "sha256": "633b344d5c3c980d403459f5e5312f600f1c4c50621d5dc1a3750dbc943c7866"},
+      {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "5d49448a1361141cecd0efdfa8ca030e18b2849d75b2b28f7de364ef2eee4c01"},
         {"path": "distribution/schemas/vehicle-pack-draft-envelope.schema.json", "sha256": "6f4025c7a62eadbc4467d771c610697840f6cd04f276f6a259a5be8fac82f7d9"},
         {"path": "distribution/universal/vehicle-studio.v1.json", "sha256": "078a10289055e466a54dcfe637cf09482d34f1f967db27f1f027f8fa8e2a4107"}
       ]
