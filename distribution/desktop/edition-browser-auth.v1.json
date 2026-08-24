@@ -4,7 +4,7 @@
   "contractVersion": "1.0.0",
   "identityBinding": {
     "contractPath": "distribution/desktop/edition-coexistence.v1.json",
-    "contractSha256": "40d6e9df0428c31b6e20f5e2c8fe1b6cd02edb56f4a44d66a8d20a0a61e3eac8"
+    "contractSha256": "6d4c65351825ce4bcbef78015df84f912455ef9b1d7dd8804677f306af2dbc0b"
   },
   "accountAuthority": {
     "provider": "supabase",

@@ -82,6 +82,21 @@ def test_five_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
         '[ValidateSet("msvc", "gnullvm")]',
         'targetTriple = "x86_64-pc-windows-msvc"',
         'compilerFamily = "msvc"',
+        "[string]$StorageRoot",
+        "StorageRoot must be an absolute directory.",
+        "StorageRoot must not be a drive or share root.",
+        "StorageRoot must not overlap the source worktree.",
+        "$Label must not traverse a reparse point",
+        '"frontend/public/drone-favicon.png"',
+        '"brand/editions.json"',
+        '"scripts/build-brand-assets.py"',
+        "--edition $editionId",
+        "Brand asset generation failed for $editionId",
+        "contract = $brandContractBinding",
+        "mark = $brandMarkBinding",
+        "generator = $brandGeneratorBinding",
+        "$afterTree -cne $sourceTree",
+        "The source commit, tree, or status changed during the five-edition build.",
         "System32\\WindowsPowerShell\\v1.0\\Modules",
         "function Get-ProcessEnvironmentSnapshot",
         "function Restore-ProcessEnvironmentSnapshot",
@@ -93,6 +108,12 @@ def test_five_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
     ):
         assert fragment in script
     assert 'Join-Path $editionOutput "$($contract.product)-${version}.exe"' not in script
+    assert script.index("Remove-GeneratedSourceOutputs\n\n$sourceCommit") < script.index(
+        "$sourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()"
+    )
+    assert script.index("--edition $editionId") < script.index(
+        '"desktop\\scripts\\stage-agent-core.ps1"'
+    )
 
 
 def test_shared_msvc_build_is_pinned_native_and_fail_closed() -> None:

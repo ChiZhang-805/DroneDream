@@ -29,15 +29,15 @@
       "binaries/dronedream-plugin-isolator"
     ],
     "icon": [
-      "../../brand/generated/sim/windows/32x32.png",
-      "../../brand/generated/sim/windows/128x128.png",
-      "../../brand/generated/sim/windows/128x128@2x.png",
-      "../../brand/generated/sim/windows/icon.ico"
+      "gen/brand/sim/windows/32x32.png",
+      "gen/brand/sim/windows/128x128.png",
+      "gen/brand/sim/windows/128x128@2x.png",
+      "gen/brand/sim/windows/icon.ico"
     ],
     "windows": {
       "nsis": {
-        "installerIcon": "../../brand/generated/sim/windows/icon.ico",
-        "uninstallerIcon": "../../brand/generated/sim/windows/icon.ico"
+        "installerIcon": "gen/brand/sim/windows/icon.ico",
+        "uninstallerIcon": "gen/brand/sim/windows/icon.ico"
       }
     },
     "resources": {
@@ -53,8 +53,7 @@
       "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",
       "../../distribution/desktop/edition-browser-auth.v1.json": "distribution/desktop/edition-browser-auth.v1.json",
       "../../distribution/desktop/edition-runtime-update-families.v1.json": "distribution/desktop/edition-runtime-update-families.v1.json",
-      "../../brand/brand-editions.v1.json": "brand/brand-editions.v1.json",
-      "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json"
+      "../../brand/editions.json": "brand/editions.json"
     }
   },
   "plugins": {

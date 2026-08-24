@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TOOL_PATH = ROOT / "distribution/tools/desktop_edition_coexistence.py"
 CONTRACT_PATH = ROOT / "distribution/desktop/edition-coexistence.v1.json"
 SCHEMA_PATH = ROOT / "distribution/schemas/desktop-edition-coexistence.schema.json"
+BRAND_CONTRACT_PATH = ROOT / "brand/editions.json"
 UNIVERSAL_OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 NSIS_IDENTITY = ROOT / "desktop/src-tauri/nsis/edition-identity.nsh"
 NSIS_TEMPLATE = ROOT / "desktop/src-tauri/nsis/installer.nsi"
@@ -72,6 +73,8 @@ def test_all_desktop_identities_channels_auth_and_icons_are_unique() -> None:
         "customProtocol",
         "credentialVaultNamespace",
         "webViewDataNamespace",
+        "canonicalMark",
+        "generatedWindowsIcon",
     ):
         values = [edition[field] for edition in editions]
         assert len(values) == len(set(values)), field
@@ -118,20 +121,46 @@ def test_collision_in_any_windows_or_session_identity_fails_closed(field: str) -
         contract_tool.validate_contract(document, root=ROOT)
 
 
-def test_wrong_brand_byte_or_unapproved_display_name_fails_closed() -> None:
+def test_wrong_brand_byte_or_unapproved_display_name_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     document = _document()
     document["editions"][2]["displayName"] = "DroneDream LAB"
     with pytest.raises(contract_tool.DesktopEditionCoexistenceError, match="displayName drifted"):
         contract_tool.validate_contract(document, root=ROOT)
     document = _document()
-    document["editions"][2]["canonicalWindowsIcon"] = (
-        "brand/generated/universal/windows/icon.ico"
+    document["editions"][2]["canonicalMark"] = "brand/icons/lab-mark-copy.png"
+    with pytest.raises(
+        contract_tool.DesktopEditionCoexistenceError,
+        match="canonicalMark drifted",
+    ):
+        contract_tool.validate_contract(document, root=ROOT)
+    document = _document()
+    document["editions"][2]["generatedWindowsIcon"] = (
+        "desktop/src-tauri/gen/brand/lab/windows/icon-copy.ico"
     )
     with pytest.raises(
         contract_tool.DesktopEditionCoexistenceError,
-        match="canonicalWindowsIcon drifted",
+        match="generatedWindowsIcon drifted",
     ):
         contract_tool.validate_contract(document, root=ROOT)
+    monkeypatch.setattr(contract_tool, "sha256_file", lambda _path: "0" * 64)
+    with pytest.raises(
+        contract_tool.DesktopEditionCoexistenceError,
+        match="canonical mark drifted",
+    ):
+        contract_tool.validate_contract(_document(), root=ROOT)
+
+
+def test_desktop_brand_sources_follow_the_canonical_brand_contract() -> None:
+    document = contract_tool.load_contract(ROOT)
+    brand_editions = json.loads(BRAND_CONTRACT_PATH.read_text(encoding="utf-8"))["editions"]
+    for edition in document["editions"]:
+        edition_id = edition["editionId"]
+        assert edition["canonicalMark"] == brand_editions[edition_id]["mark"]["path"]
+        assert edition["generatedWindowsIcon"] == (
+            f"desktop/src-tauri/gen/brand/{edition_id}/windows/icon.ico"
+        )
 
 
 def test_universal_overlay_matches_its_namespaced_install_identity() -> None:
@@ -146,7 +175,7 @@ def test_universal_overlay_matches_its_namespaced_install_identity() -> None:
         (UNIVERSAL_OVERLAY.parent / path).resolve().relative_to(ROOT).as_posix()
         for path in overlay["bundle"]["icon"]
     }
-    assert universal["canonicalWindowsIcon"] in overlay_icons
+    assert universal["generatedWindowsIcon"] in overlay_icons
 
 
 def test_state_machine_requires_all_five_upgrade_uninstall_and_legacy_states() -> None:
@@ -251,6 +280,7 @@ def test_nsis_compile_check_covers_registration_repeated_expansion_and_unknown_e
         ("sim", "DroneDream-Sim", "DroneDream · SIM"),
         ("lab", "DroneDream-Lab", "DroneDream · LAB"),
         ("field", "DroneDream-Field", "DroneDream · FIELD"),
+        ("autonomy", "DroneDream-Agent", "DroneDream · AGENT"),
     ):
         invocation = (
             f'-EditionId "{edition_id}" -ProductName "{product_name}" '

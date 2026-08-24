@@ -166,6 +166,10 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     }
     assert profile["brand"]["presentationOnly"] is True  # type: ignore[index]
     assert profile["brand"]["grantsHardwareAuthority"] is False  # type: ignore[index]
+    assert profile["brand"]["manifest"] == "brand/editions.json"  # type: ignore[index]
+    assert profile["brand"]["windowsIcon"] == (  # type: ignore[index]
+        "desktop/src-tauri/gen/brand/universal/windows/icon.ico"
+    )
     shared_ui = profile["sharedUiContract"]
     assert shared_ui["contractId"] == "dronedream-shared-edition-ui/v1"  # type: ignore[index]
     assert shared_ui["donorCommit"] == (  # type: ignore[index]
@@ -299,11 +303,11 @@ def test_universal_overlay_uses_mother_brand_and_canonical_windows_icon() -> Non
     overlay = _json(OVERLAY)
     assert overlay["productName"] == "DroneDream-Universal"
     assert overlay["app"]["windows"][0]["title"] == "DroneDream"  # type: ignore[index]
-    assert "../../brand/generated/universal/windows/icon.ico" in overlay["bundle"]["icon"]  # type: ignore[index]
+    assert "gen/brand/universal/windows/icon.ico" in overlay["bundle"]["icon"]  # type: ignore[index]
     nsis = overlay["bundle"]["windows"]["nsis"]  # type: ignore[index]
     assert nsis == {
-        "installerIcon": "../../brand/generated/universal/windows/icon.ico",
-        "uninstallerIcon": "../../brand/generated/universal/windows/icon.ico",
+        "installerIcon": "gen/brand/universal/windows/icon.ico",
+        "uninstallerIcon": "gen/brand/universal/windows/icon.ico",
     }
     resources = overlay["bundle"]["resources"]  # type: ignore[index]
     assert resources["../../distribution/desktop/edition-coexistence.v1.json"] == (  # type: ignore[index]

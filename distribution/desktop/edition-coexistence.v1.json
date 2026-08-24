@@ -51,7 +51,8 @@
       "credentialVaultNamespace": "DroneDream/Auth/universal/v1",
       "webViewDataNamespace": "io.dronedream.desktop.universal",
       "brandEditionId": "universal",
-      "canonicalWindowsIcon": "brand/generated/universal/windows/icon.ico"
+      "canonicalMark": "brand/icons/universal-mark.png",
+      "generatedWindowsIcon": "desktop/src-tauri/gen/brand/universal/windows/icon.ico"
     },
     {
       "editionId": "sim",
@@ -74,7 +75,8 @@
       "credentialVaultNamespace": "DroneDream/Auth/sim/v1",
       "webViewDataNamespace": "io.dronedream.desktop.sim",
       "brandEditionId": "sim",
-      "canonicalWindowsIcon": "brand/generated/sim/windows/icon.ico"
+      "canonicalMark": "brand/icons/sim-mark.png",
+      "generatedWindowsIcon": "desktop/src-tauri/gen/brand/sim/windows/icon.ico"
     },
     {
       "editionId": "lab",
@@ -97,7 +99,8 @@
       "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
       "webViewDataNamespace": "io.dronedream.desktop.lab",
       "brandEditionId": "lab",
-      "canonicalWindowsIcon": "brand/generated/lab/windows/icon.ico"
+      "canonicalMark": "brand/icons/lab-mark.png",
+      "generatedWindowsIcon": "desktop/src-tauri/gen/brand/lab/windows/icon.ico"
     },
     {
       "editionId": "field",
@@ -120,7 +123,8 @@
       "credentialVaultNamespace": "DroneDream/Auth/field/v1",
       "webViewDataNamespace": "io.dronedream.desktop.field",
       "brandEditionId": "field",
-      "canonicalWindowsIcon": "brand/generated/field/windows/icon.ico"
+      "canonicalMark": "brand/icons/field-mark.png",
+      "generatedWindowsIcon": "desktop/src-tauri/gen/brand/field/windows/icon.ico"
     },
     {
       "editionId": "autonomy",
@@ -143,7 +147,8 @@
       "credentialVaultNamespace": "DroneDream/Auth/autonomy/v1",
       "webViewDataNamespace": "io.dronedream.desktop.autonomy",
       "brandEditionId": "autonomy",
-      "canonicalWindowsIcon": "brand/generated/autonomy/windows/icon.ico"
+      "canonicalMark": "brand/icons/agent-mark.png",
+      "generatedWindowsIcon": "desktop/src-tauri/gen/brand/autonomy/windows/icon.ico"
     }
   ],
   "stateMachineVerification": {

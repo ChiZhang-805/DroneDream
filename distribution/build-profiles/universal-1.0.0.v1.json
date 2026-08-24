@@ -23,8 +23,8 @@
   "brand": {
     "editionId": "universal",
     "displayName": "DroneDream",
-    "manifest": "brand/brand-editions.v1.json",
-    "windowsIcon": "brand/generated/universal/windows/icon.ico",
+    "manifest": "brand/editions.json",
+    "windowsIcon": "desktop/src-tauri/gen/brand/universal/windows/icon.ico",
     "presentationOnly": true,
     "grantsHardwareAuthority": false
   },
@@ -34,11 +34,11 @@
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "314289dee60c54e60730dfca4634f01647f1ab150c0c4ba6eb97a3f95f2f20ff"
+        "sha256": "4184667a014f38c7107a7cd3eccc68c2378bddf2b7c8d94547a1f7c71b9be630"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
-        "sha256": "3ec889dced66f1d54bdf94c16a95497aab3ff02ccf5eb6decec034fb8f7d3c12"
+        "sha256": "3ea948a9ba8cd24cab665b1c220de28873a3ae7b30f595253c38395a03d6d9ee"
       },
       {
         "path": "frontend/src/components/SettingsUpdateCenter.tsx",
@@ -54,7 +54,7 @@
       },
       {
         "path": "frontend/src/styles.css",
-        "sha256": "5bb9dea610d986b399291cf25ecc5256b21f06cebeebe9d36907a5f0f4a4eae5"
+        "sha256": "9478c028aea5fdc90bcd11ad252d04d93444fb47fe35f1fb7a7f2e19e1a00982"
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
@@ -89,7 +89,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "distribution/universal/integrated-workspaces.v2.json",
-    "sha256": "668f36597482aaddc08f5e623af3165a052f4add0a232cc2b8b41dee9cb074cb",
+    "sha256": "8d6d8f3ef26fd713599b750062b5b1f43d59f45dffac273325fd1a3bf56d71fe",
     "sourceFileCount": 12,
     "workspaceModes": ["sim", "lab", "field", "autonomy"],
     "createsCrossEditionHarnessOrchestrator": false,
@@ -114,12 +114,12 @@
       "grantsSimulationExecution": false,
       "grantsHardwareAuthority": false,
       "sourceFiles": [
-        {"path": "frontend/src/pages/AutonomyPlatform.tsx", "sha256": "a141103e5b16b0c2d8ef8c110ca094899608a4acb29f18d528ba7a2ca39c653c"},
+        {"path": "frontend/src/pages/AutonomyPlatform.tsx", "sha256": "fcd1329678b8086085eaf4b26de5e619d655852978b27b05bd911fc39568ac4f"},
         {"path": "frontend/src/features/autonomy/agentCore.ts", "sha256": "6f9b8bf90ac2059eff4bc11b3c95b887ad3c22c896f3e97784f3f7f78407323a"},
         {"path": "frontend/src/features/autonomy/agentCorePlanning.ts", "sha256": "23cc1ade3847735f3aae673fe505c10be0b9154d94700d3d0d6e56bc4cdf936b"},
         {"path": "frontend/src/features/autonomy/assetLibraryStore.ts", "sha256": "136ba567e3cda78fa9c7f748997b1652d041658c89e001314ccb54fa190a7d46"},
-        {"path": "frontend/src/features/autonomy/autonomyPlanning.ts", "sha256": "314597e93f1f1b3933d9402b2e4a6824b59b8edf2f57b28fca63054c4cf53904"},
-        {"path": "backend/app/task_workflows.py", "sha256": "fd66513b5e589909c5113d9695d72bbf5d247796fbb3fb8d9e99a27a9447d5a9"},
+        {"path": "frontend/src/features/autonomy/autonomyPlanning.ts", "sha256": "f3ddbdde867e1f7910d38aa5eb0c2e1f7a4eb277779ac5794c38c9c102711d65"},
+        {"path": "backend/app/task_workflows.py", "sha256": "5352eb0f955d12da7727fc95dfd2c14cc15c3798698785c58b6400d971da9e49"},
         {"path": "desktop/src-tauri/src/agent_core.rs", "sha256": "cc6dcfd2fa82fc37b0cb0717f271b10198142fd6f0b30883c62597b19c1d88f4"},
         {"path": "docs/25-autonomy-external-asset-connectors.md", "sha256": "378c64111fa3009410f95e11e39065da05fb5391c5a354bdafda15331b525fa5"},
         {"path": "supabase/migrations/20260822020000_replace_modeling_with_external_asset_qualification.sql", "sha256": "4b8177cc2899c09200a549ab83b796c9fce85cfd74f6a9c699060f38d6379aca"},

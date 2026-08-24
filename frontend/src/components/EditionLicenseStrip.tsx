@@ -1,8 +1,8 @@
-import autonomyMark from "../../../brand/commercial/autonomy-mark.png";
-import fieldMark from "../../../brand/commercial/field-mark.png";
-import labMark from "../../../brand/commercial/lab-mark.png";
-import simMark from "../../../brand/commercial/sim-mark.png";
-import universalMark from "../../../brand/commercial/universal-mark.png";
+import agentMark from "../../../brand/icons/agent-mark.png";
+import fieldMark from "../../../brand/icons/field-mark.png";
+import labMark from "../../../brand/icons/lab-mark.png";
+import simMark from "../../../brand/icons/sim-mark.png";
+import universalMark from "../../../brand/icons/universal-mark.png";
 import type { SoftwareEditionId } from "../features/licensing/softwareLicense";
 import "./EditionLicenseStrip.css";
 
@@ -11,7 +11,7 @@ const EDITIONS: ReadonlyArray<{ id: SoftwareEditionId; label: string; mark: stri
   { id: "sim", label: "SIM", mark: simMark },
   { id: "lab", label: "LAB", mark: labMark },
   { id: "field", label: "FIELD", mark: fieldMark },
-  { id: "autonomy", label: "AGENT", mark: autonomyMark },
+  { id: "autonomy", label: "AGENT", mark: agentMark },
 ];
 
 export function EditionLicenseStrip({

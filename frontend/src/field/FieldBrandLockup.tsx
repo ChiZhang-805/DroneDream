@@ -1,4 +1,4 @@
-import fieldLockup from "../../../brand/commercial/field-lockup.png";
+import fieldLockup from "../../../brand/icons/field-lockup.png";
 
 type FieldBrandLockupProps = {
   className?: string;

@@ -32,5 +32,3 @@
 /desktop/scripts/*.ps1 text eol=lf
 /desktop/src-tauri/nsis/*.nsi text eol=lf
 /desktop/src-tauri/nsis/*.nsh text eol=lf
-/brand/requirements.lock.txt text eol=lf
-/brand/source/Space-Grotesk-OFL-1.1.txt text eol=lf

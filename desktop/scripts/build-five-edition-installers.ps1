@@ -5,6 +5,7 @@ param(
     [string]$Toolchain = "msvc",
     [string]$OutputRoot,
     [string]$CargoRoot,
+    [string]$StorageRoot,
     [switch]$AllowUnsignedUpdater,
     [switch]$ReuseCargoTarget,
     [switch]$PreserveCargoTarget
@@ -25,8 +26,26 @@ if ($PSVersionTable.PSEdition -ceq "Desktop") {
 }
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
-$outputBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-builds"))
-$cargoBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache"))
+$storageRootFull = $null
+if ([string]::IsNullOrWhiteSpace($StorageRoot)) {
+    $outputBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-builds"))
+    $cargoBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache"))
+} else {
+    if (-not [IO.Path]::IsPathFullyQualified($StorageRoot)) {
+        throw "StorageRoot must be an absolute directory."
+    }
+    $storageRootFull = [IO.Path]::GetFullPath($StorageRoot)
+    $storageVolumeRoot = [IO.Path]::GetPathRoot($storageRootFull)
+    if ([string]::IsNullOrWhiteSpace($storageVolumeRoot) -or
+        $storageRootFull.TrimEnd('\', '/').Equals(
+            $storageVolumeRoot.TrimEnd('\', '/'),
+            [StringComparison]::OrdinalIgnoreCase
+        )) {
+        throw "StorageRoot must not be a drive or share root."
+    }
+    $outputBase = [IO.Path]::GetFullPath((Join-Path $storageRootFull "codex-builds"))
+    $cargoBase = [IO.Path]::GetFullPath((Join-Path $storageRootFull "codex-cache"))
+}
 $toolchainContract = if ($Toolchain -ceq "msvc") {
     [ordered]@{
         builder = "desktop\scripts\build-windows-msvc.ps1"
@@ -61,6 +80,67 @@ function Assert-StrictChildPath {
     }
 }
 
+function Test-PathAtOrBelow {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Parent
+    )
+    $pathFull = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    $parentFull = [IO.Path]::GetFullPath($Parent).TrimEnd('\', '/')
+    if ($pathFull.Equals($parentFull, [StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+    $parentPrefix = $parentFull + [IO.Path]::DirectorySeparatorChar
+    return $pathFull.StartsWith($parentPrefix, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Assert-NoExistingReparsePointInPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+    $full = [IO.Path]::GetFullPath($Path)
+    $cursor = $full
+    while (-not [string]::IsNullOrWhiteSpace($cursor)) {
+        if (Test-Path -LiteralPath $cursor) {
+            $item = Get-Item -LiteralPath $cursor -Force
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw "$Label must not traverse a reparse point: $cursor"
+            }
+            if ($cursor.Equals($full, [StringComparison]::OrdinalIgnoreCase) -and
+                -not $item.PSIsContainer) {
+                throw "$Label must be a directory: $full"
+            }
+        }
+        $parent = [IO.Directory]::GetParent($cursor)
+        if ($null -eq $parent -or
+            $parent.FullName.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) {
+            break
+        }
+        $cursor = $parent.FullName
+    }
+}
+
+function Get-SourceFileBinding {
+    param([Parameter(Mandatory = $true)][string]$RelativePath)
+
+    $normalized = $RelativePath.Replace('/', [IO.Path]::DirectorySeparatorChar)
+    $full = [IO.Path]::GetFullPath((Join-Path $repoRoot $normalized))
+    Assert-StrictChildPath -Path $full -Parent $repoRoot -Label "Source binding"
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+        throw "Source binding is unavailable: $RelativePath"
+    }
+    $item = Get-Item -LiteralPath $full -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw "Source binding must not be a reparse point: $RelativePath"
+    }
+    return [ordered]@{
+        path = $RelativePath.Replace('\', '/')
+        bytes = $item.Length
+        sha256 = (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+}
+
 function Remove-ExactExternalTree {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -90,6 +170,7 @@ function Remove-GeneratedSourceOutputs {
         "frontend/dist",
         "frontend/field-dist",
         "frontend/tsconfig.tsbuildinfo",
+        "frontend/public/drone-favicon.png",
         "desktop/src-tauri/gen",
         "desktop/src-tauri/target/llvm-bundle",
         "desktop/src-tauri/binaries",
@@ -224,6 +305,19 @@ function Import-FrontendPublicBuildEnvironment {
 if ($outputRootFull.Equals($cargoRootFull, [StringComparison]::OrdinalIgnoreCase)) {
     throw "OutputRoot and CargoRoot must be different directories."
 }
+if ($storageRootFull) {
+    if ((Test-PathAtOrBelow -Path $storageRootFull -Parent $repoRoot) -or
+        (Test-PathAtOrBelow -Path $repoRoot -Parent $storageRootFull)) {
+        throw "StorageRoot must not overlap the source worktree."
+    }
+    Assert-StrictChildPath -Path $outputBase -Parent $storageRootFull -Label "Output base"
+    Assert-StrictChildPath -Path $cargoBase -Parent $storageRootFull -Label "Cargo base"
+    Assert-NoExistingReparsePointInPath -Path $storageRootFull -Label "StorageRoot"
+    Assert-NoExistingReparsePointInPath -Path $outputBase -Label "Output base"
+    Assert-NoExistingReparsePointInPath -Path $cargoBase -Label "Cargo base"
+    Assert-NoExistingReparsePointInPath -Path $outputRootFull -Label "OutputRoot"
+    Assert-NoExistingReparsePointInPath -Path $cargoRootFull -Label "CargoRoot"
+}
 Assert-StrictChildPath -Path $outputRootFull -Parent $outputBase -Label "OutputRoot"
 Assert-StrictChildPath -Path $cargoRootFull -Parent $cargoBase -Label "CargoRoot"
 
@@ -250,6 +344,8 @@ foreach ($name in @("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")) {
     }
 }
 
+Remove-GeneratedSourceOutputs
+
 $sourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
 $sourceTree = (& git -C $repoRoot rev-parse 'HEAD^{tree}').Trim()
 $sourceBuildNumber = (& git -C $repoRoot rev-list --count $sourceCommit).Trim()
@@ -260,6 +356,17 @@ if ($LASTEXITCODE -ne 0 -or
     $sourceBuildNumber -cnotmatch '^[1-9][0-9]*$' -or
     $sourceStatus) {
     throw "The five-edition build requires one exact clean source commit."
+}
+
+$brandContractRelativePath = "brand/editions.json"
+$brandGeneratorRelativePath = "scripts/build-brand-assets.py"
+$brandContractBinding = Get-SourceFileBinding -RelativePath $brandContractRelativePath
+$brandGeneratorBinding = Get-SourceFileBinding -RelativePath $brandGeneratorRelativePath
+$brandContractDocument = Get-Content -LiteralPath (
+    Join-Path $repoRoot $brandContractRelativePath
+) -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($brandContractDocument.kind -cne "dronedream-edition-brand-system") {
+    throw "The canonical brand contract identity is invalid."
 }
 
 Import-FrontendPublicBuildEnvironment
@@ -366,6 +473,33 @@ try {
             Remove-Item Env:\RUSTFLAGS -ErrorAction SilentlyContinue
             Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
 
+            & python (Join-Path $repoRoot $brandGeneratorRelativePath) --edition $editionId
+            $brandGeneratorExitCode = $LASTEXITCODE
+            if ($brandGeneratorExitCode -ne 0) {
+                throw "Brand asset generation failed for $editionId with exit code $brandGeneratorExitCode."
+            }
+            $brandEdition = $brandContractDocument.editions.PSObject.Properties[$editionId]
+            if ($null -eq $brandEdition -or
+                [string]::IsNullOrWhiteSpace([string]$brandEdition.Value.mark.path)) {
+                throw "The canonical brand mark is not declared for $editionId."
+            }
+            $brandMarkBinding = Get-SourceFileBinding `
+                -RelativePath ([string]$brandEdition.Value.mark.path)
+            $expectedBrandOutputs = @(
+                "desktop/src-tauri/gen/brand/$editionId/windows/32x32.png",
+                "desktop/src-tauri/gen/brand/$editionId/windows/128x128.png",
+                "desktop/src-tauri/gen/brand/$editionId/windows/128x128@2x.png",
+                "desktop/src-tauri/gen/brand/$editionId/windows/icon.ico",
+                "frontend/public/drone-favicon.png"
+            )
+            foreach ($expectedBrandOutput in $expectedBrandOutputs) {
+                if (-not (Test-Path -LiteralPath (
+                    Join-Path $repoRoot $expectedBrandOutput
+                ) -PathType Leaf)) {
+                    throw "Brand asset generation did not produce $expectedBrandOutput"
+                }
+            }
+
             & (Join-Path $repoRoot "desktop\scripts\stage-agent-core.ps1") `
                 -TargetTriple $toolchainContract.targetTriple
             if ($LASTEXITCODE -ne 0) {
@@ -447,6 +581,11 @@ try {
             desktopVisualQa = $desktopVisualQa
             compilerFamily = $toolchainContract.compilerFamily
             targetTriple = $toolchainContract.targetTriple
+            brand = [ordered]@{
+                contract = $brandContractBinding
+                mark = $brandMarkBinding
+                generator = $brandGeneratorBinding
+            }
             installer = [ordered]@{
                 fileName = [IO.Path]::GetFileName($handoffInstaller)
                 bytes = (Get-Item -LiteralPath $handoffInstaller).Length
@@ -461,8 +600,11 @@ try {
 
         Remove-GeneratedSourceOutputs
         $afterCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
+        $afterTree = (& git -C $repoRoot rev-parse 'HEAD^{tree}').Trim()
         $afterStatus = (& git -C $repoRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
-        if ($afterCommit -cne $sourceCommit -or $afterStatus) {
+        if ($afterCommit -cne $sourceCommit -or
+            $afterTree -cne $sourceTree -or
+            $afterStatus) {
             throw "The source tree changed after the $editionId build."
         }
     }
@@ -480,6 +622,18 @@ try {
     }
     $cleanupErrors = [Collections.Generic.List[string]]::new()
     try { Remove-GeneratedSourceOutputs } catch { $cleanupErrors.Add($_.Exception.Message) }
+    try {
+        $finalCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
+        $finalTree = (& git -C $repoRoot rev-parse 'HEAD^{tree}').Trim()
+        $finalStatus = (& git -C $repoRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
+        if ($finalCommit -cne $sourceCommit -or
+            $finalTree -cne $sourceTree -or
+            $finalStatus) {
+            throw "The source commit, tree, or status changed during the five-edition build."
+        }
+    } catch {
+        $cleanupErrors.Add($_.Exception.Message)
+    }
     if (-not $PreserveCargoTarget) {
         try {
             Remove-ExactExternalTree -Path $cargoRootFull -AllowedParent $cargoBase
@@ -495,6 +649,14 @@ try {
         }
     }
     if ($cleanupErrors.Count -ne 0) {
+        if ($completed -and (Test-Path -LiteralPath $outputRootFull)) {
+            try {
+                Remove-ExactExternalTree -Path $outputRootFull -AllowedParent $outputBase
+                $completed = $false
+            } catch {
+                $cleanupErrors.Add($_.Exception.Message)
+            }
+        }
         throw "Build cleanup failed: $($cleanupErrors -join ' | ')"
     }
 }

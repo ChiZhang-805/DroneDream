@@ -539,7 +539,7 @@ $buildReceipt = [ordered]@{
     }
     profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
     overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
-    brand = New-RepoFileRef "brand\brand-editions.v1.json"
+    brand = New-RepoFileRef "brand\editions.json"
     sharedUi = [ordered]@{
         contractId = [string]$sharedUi.contractId
         donorCommit = [string]$sharedUi.donorCommit

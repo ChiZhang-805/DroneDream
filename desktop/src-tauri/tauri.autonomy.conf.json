@@ -25,10 +25,10 @@
     "shortDescription": "Natural-language autonomous mission workspace",
     "longDescription": "DroneDream · AGENT turns natural-language intent into structured, reviewable mission plans and supervises execution through repeated Model + Harness loops, pluginized tools, safety holds, replanning and evidence gates. Simulation is the default execution domain; hardware remains fail-closed until explicitly qualified.",
     "icon": [
-      "../../brand/generated/autonomy/windows/32x32.png",
-      "../../brand/generated/autonomy/windows/128x128.png",
-      "../../brand/generated/autonomy/windows/128x128@2x.png",
-      "../../brand/generated/autonomy/windows/icon.ico"
+      "gen/brand/autonomy/windows/32x32.png",
+      "gen/brand/autonomy/windows/128x128.png",
+      "gen/brand/autonomy/windows/128x128@2x.png",
+      "gen/brand/autonomy/windows/icon.ico"
     ],
     "externalBin": [
       "binaries/dronedream-autonomy-core",
@@ -36,8 +36,8 @@
     ],
     "windows": {
       "nsis": {
-        "installerIcon": "../../brand/generated/autonomy/windows/icon.ico",
-        "uninstallerIcon": "../../brand/generated/autonomy/windows/icon.ico"
+        "installerIcon": "gen/brand/autonomy/windows/icon.ico",
+        "uninstallerIcon": "gen/brand/autonomy/windows/icon.ico"
       }
     },
     "resources": {
@@ -53,8 +53,7 @@
       "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",
       "../../distribution/desktop/edition-browser-auth.v1.json": "distribution/desktop/edition-browser-auth.v1.json",
       "../../distribution/desktop/edition-runtime-update-families.v1.json": "distribution/desktop/edition-runtime-update-families.v1.json",
-      "../../brand/brand-editions.v1.json": "brand/brand-editions.v1.json",
-      "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json"
+      "../../brand/editions.json": "brand/editions.json"
     }
   },
   "plugins": {

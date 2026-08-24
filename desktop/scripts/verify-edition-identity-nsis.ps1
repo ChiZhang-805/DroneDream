@@ -140,6 +140,7 @@ try {
         Invoke-FixtureCompile -EditionId "sim" -ProductName "DroneDream-Sim" -DisplayName "DroneDream · SIM" -ExpectedSuccess $true
         Invoke-FixtureCompile -EditionId "lab" -ProductName "DroneDream-Lab" -DisplayName "DroneDream · LAB" -ExpectedSuccess $true
         Invoke-FixtureCompile -EditionId "field" -ProductName "DroneDream-Field" -DisplayName "DroneDream · FIELD" -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "autonomy" -ProductName "DroneDream-Agent" -DisplayName "DroneDream · AGENT" -ExpectedSuccess $true
         Invoke-FixtureCompile -EditionId "unknown" -ProductName "DroneDream-Unknown" -DisplayName "DroneDream · UNKNOWN" -ExpectedSuccess $false
     )
     [ordered]@{

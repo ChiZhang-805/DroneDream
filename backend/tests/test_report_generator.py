@@ -7,7 +7,10 @@ the `/api/v1/jobs/{job_id}/report` endpoint's failure-path behaviour.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import struct
+import zlib
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -884,8 +887,37 @@ def test_pdf_renderer_uses_unicode_cid_font_for_chinese_text() -> None:
     assert "蝶 梦 水 云 乡".encode("utf-16-be").hex().upper().encode("ascii") in pdf
 
 
-def test_free_pdf_renderer_draws_brand_watermark_on_every_page() -> None:
-    from app.services.pdf_report import _build_pdf
+def test_report_watermark_asset_is_the_only_transparent_image_source() -> None:
+    from app.services.pdf_report import _REPORT_WATERMARK_PATH, _load_report_watermark
+
+    image_files = sorted(
+        path.name
+        for path in _REPORT_WATERMARK_PATH.parent.iterdir()
+        if path.suffix.lower() in {".png", ".webp", ".gif", ".jpg", ".jpeg"}
+    )
+    assert image_files == ["report-watermark.png"]
+
+    payload = _REPORT_WATERMARK_PATH.read_bytes()
+    assert payload[:8] == b"\x89PNG\r\n\x1a\n"
+    assert payload[12:16] == b"IHDR"
+    width, height, bit_depth, color_type, compression, filtering, interlace = struct.unpack(
+        ">IIBBBBB", payload[16:29]
+    )
+    assert (width, height) == (512, 512)
+    assert (bit_depth, color_type, compression, filtering, interlace) == (8, 6, 0, 0, 0)
+
+    watermark = _load_report_watermark()
+    assert len(watermark.rgb) == width * height * 3
+    assert len(watermark.alpha) == width * height
+    assert min(watermark.alpha) == 0
+    assert max(watermark.alpha) == 255
+    assert watermark.source_sha256 == hashlib.sha256(payload).hexdigest()
+
+
+def test_free_pdf_renderer_embeds_canonical_brand_watermark_on_every_page() -> None:
+    from app.services.pdf_report import _build_pdf, _load_report_watermark
+
+    watermark = _load_report_watermark()
 
     pdf = _build_pdf(
         [f"report evidence line {index}" for index in range(120)],
@@ -895,8 +927,12 @@ def test_free_pdf_renderer_draws_brand_watermark_on_every_page() -> None:
     assert b"/Count 3" in pdf
     assert pdf.count(b"% DD-FREE-REPORT-WATERMARK-V1") == 3
     assert b"/CA 0.18 /ca 0.18" in pdf
-    assert b"0.45 0.16 0.88 RG" in pdf
-    assert b"0.92 0.17 0.57 RG" in pdf
+    assert pdf.count(b"/DDWatermark Do") == 3
+    assert pdf.count(b"/Subtype /Image") == 2
+    assert b"/SMask 6 0 R" in pdf
+    assert f"/DDSourceSHA256 ({watermark.source_sha256})".encode("ascii") in pdf
+    assert zlib.compress(watermark.rgb, level=9) in pdf
+    assert zlib.compress(watermark.alpha, level=9) in pdf
 
     paid_pdf = _build_pdf(
         [f"report evidence line {index}" for index in range(120)],
@@ -904,6 +940,9 @@ def test_free_pdf_renderer_draws_brand_watermark_on_every_page() -> None:
     )
     assert b"/Count 3" in paid_pdf
     assert b"DD-FREE-REPORT-WATERMARK" not in paid_pdf
+    assert b"/DDWatermark" not in paid_pdf
+    assert b"/DDSourceSHA256" not in paid_pdf
+    assert b"/Subtype /Image" not in paid_pdf
 
 
 def test_job_report_records_parameter_lineage_feedback_and_rationale(ctx):

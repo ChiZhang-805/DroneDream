@@ -1,2 +1,0 @@
-fonttools[woff]==4.63.0
-Pillow==12.2.0

@@ -112,7 +112,8 @@
           "credentialVaultNamespace",
           "webViewDataNamespace",
           "brandEditionId",
-          "canonicalWindowsIcon"
+          "canonicalMark",
+          "generatedWindowsIcon"
         ],
         "properties": {
           "editionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
@@ -135,7 +136,8 @@
           "credentialVaultNamespace": {"pattern": "^DroneDream/Auth/(universal|sim|lab|field|autonomy)/v1$"},
           "webViewDataNamespace": {"type": "string", "minLength": 1},
           "brandEditionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
-          "canonicalWindowsIcon": {"type": "string", "minLength": 1}
+          "canonicalMark": {"type": "string", "minLength": 1},
+          "generatedWindowsIcon": {"type": "string", "minLength": 1}
         }
       }
     },

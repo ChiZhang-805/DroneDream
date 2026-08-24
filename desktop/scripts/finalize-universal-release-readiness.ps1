@@ -97,8 +97,8 @@ if ($LASTEXITCODE -ne 0) { throw "Finalizer tool source does not descend from th
 foreach ($path in @(
     "distribution/build-profiles/universal-1.0.0.v1.json",
     "desktop/src-tauri/tauri.universal.conf.json",
-    "brand/brand-editions.v1.json",
-    "brand/generated/universal/windows/icon.ico"
+    "brand/editions.json",
+    "desktop/src-tauri/gen/brand/universal/windows/icon.ico"
 )) {
     & git -C $repoRoot diff --quiet $ProductSourceCommit -- $path
     if ($LASTEXITCODE -ne 0) { throw "Product input drifted after the frozen build: $path" }
