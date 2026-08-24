@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import {
@@ -47,7 +48,10 @@ const authMock = vi.hoisted(() => {
     }> => ({ data: {}, error: null })),
     updateUser: vi.fn(async (
       payload: { data?: Record<string, unknown>; password?: string },
-    ) => {
+    ): Promise<{
+      data: { user: typeof state.user };
+      error: Error | null;
+    }> => {
       if (payload.data) {
         state.user = {
           ...state.user,
@@ -87,11 +91,15 @@ vi.mock("../features/auth/supabaseClient", () => ({
 
 function AccountProbe() {
   const auth = useAuth();
+  const [registrationError, setRegistrationError] = useState("");
+  const [recoveryError, setRecoveryError] = useState("");
   return (
     <>
       <output aria-label="username">{auth.account?.displayName ?? ""}</output>
       <output aria-label="email">{auth.account?.email ?? ""}</output>
       <output aria-label="avatar">{auth.account?.avatarUrl ?? ""}</output>
+      <output aria-label="registration-error">{registrationError}</output>
+      <output aria-label="recovery-error">{recoveryError}</output>
       <output aria-label="password-recovery">{String(auth.passwordRecovery)}</output>
       <button
         type="button"
@@ -128,12 +136,50 @@ function AccountProbe() {
         onClick={() =>
           void auth.verifyRegistrationCode(
             "new@example.com",
-            "123456",
-            "correct-horse",
-          )
+           "123456",
+           "correct-horse",
+          ).catch((error: unknown) => {
+            setRegistrationError(error instanceof Error ? error.message : String(error));
+          })
         }
       >
         Finish registration
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          void auth.sendRecoveryCode(
+            " existing@example.com ",
+            "captcha-recovery",
+          )
+        }
+      >
+        Send recovery code
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          void auth.verifyRecoveryCode(
+            " existing@example.com ",
+            " 654321 ",
+          )
+        }
+      >
+        Sign in with recovery code
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          void auth.verifyRecoveryCode(
+            " existing@example.com ",
+            " 654321 ",
+            "new-recovery-password",
+          ).catch((error: unknown) => {
+            setRecoveryError(error instanceof Error ? error.message : String(error));
+          })
+        }
+      >
+        Reset with recovery code
       </button>
       <button
         type="button"
@@ -290,6 +336,33 @@ describe("AuthContext account profile", () => {
     });
   });
 
+  it("rolls back the verified registration session when the password update fails", async () => {
+    authMock.updateUser.mockResolvedValueOnce({
+      data: { user: authMock.state.user },
+      error: new Error("registration password update failed"),
+    });
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Finish registration" }),
+    );
+
+    await waitFor(() => {
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(screen.getByLabelText("registration-error"))
+        .toHaveTextContent("registration password update failed");
+    });
+    expect(authMock.verifyOtp.mock.invocationCallOrder[0])
+      .toBeLessThan(authMock.updateUser.mock.invocationCallOrder[0]);
+    expect(authMock.updateUser.mock.invocationCallOrder[0])
+      .toBeLessThan(authMock.signOut.mock.invocationCallOrder[0]);
+  });
+
   it("uses a same-origin email link and enters password recovery only after Supabase verifies it", async () => {
     render(
       <AuthProvider>
@@ -325,6 +398,90 @@ describe("AuthContext account profile", () => {
       });
       expect(screen.getByLabelText("password-recovery")).toHaveTextContent("false");
     });
+  });
+
+  it("sends a non-creating OTP and verifies it as a code-only login", async () => {
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(screen.getByRole("button", { name: "Send recovery code" }));
+    await waitFor(() => {
+      expect(authMock.signInWithOtp).toHaveBeenCalledWith({
+        email: "existing@example.com",
+        options: {
+          shouldCreateUser: false,
+          captchaToken: "captcha-recovery",
+        },
+      });
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Sign in with recovery code" }),
+    );
+    await waitFor(() => {
+      expect(authMock.verifyOtp).toHaveBeenCalledWith({
+        email: "existing@example.com",
+        token: "654321",
+        type: "email",
+      });
+    });
+    expect(authMock.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("updates the password only after the existing-user OTP is verified", async () => {
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset with recovery code" }),
+    );
+    await waitFor(() => {
+      expect(authMock.verifyOtp).toHaveBeenCalledWith({
+        email: "existing@example.com",
+        token: "654321",
+        type: "email",
+      });
+      expect(authMock.updateUser).toHaveBeenCalledWith({
+        password: "new-recovery-password",
+      });
+    });
+    expect(authMock.verifyOtp.mock.invocationCallOrder[0])
+      .toBeLessThan(authMock.updateUser.mock.invocationCallOrder[0]);
+  });
+
+  it("rolls back the verified recovery session when the password update fails", async () => {
+    authMock.updateUser.mockResolvedValueOnce({
+      data: { user: authMock.state.user },
+      error: new Error("password update failed"),
+    });
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset with recovery code" }),
+    );
+
+    await waitFor(() => {
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(screen.getByLabelText("recovery-error"))
+        .toHaveTextContent("password update failed");
+    });
+    expect(authMock.verifyOtp.mock.invocationCallOrder[0])
+      .toBeLessThan(authMock.updateUser.mock.invocationCallOrder[0]);
+    expect(authMock.updateUser.mock.invocationCallOrder[0])
+      .toBeLessThan(authMock.signOut.mock.invocationCallOrder[0]);
   });
 
   it.each(["/", "/#/desktop/setup"])(

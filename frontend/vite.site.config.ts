@@ -19,9 +19,15 @@ export default defineConfig(({ mode, isPreview }) => {
 
   return {
     plugins: [react()],
-    define: serializedRelease
-      ? { __DRONEDREAM_RELEASE__: serializedRelease }
-      : {},
+    define: {
+      // The public website uses the shared/universal product surface. Defining
+      // the edition here keeps shared brand and capability modules safe when
+      // they are reached from the browser-only OAuth entry point.
+      __DRONEDREAM_BUILD_EDITION__: JSON.stringify("universal"),
+      ...(serializedRelease
+        ? { __DRONEDREAM_RELEASE__: serializedRelease }
+        : {}),
+    },
     build: {
       outDir: "site-dist",
       emptyOutDir: true,

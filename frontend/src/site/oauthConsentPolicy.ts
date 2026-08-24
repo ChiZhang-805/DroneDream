@@ -17,7 +17,7 @@ const DESKTOP_REDIRECTS = new Map([
   ],
   [
     "http://127.0.0.1:49214/desktop-auth/autonomy/callback",
-    { edition: "AUTONOMY", product: "DroneDream AUTONOMY" },
+    { edition: "AGENT", product: "DroneDream · AGENT" },
   ],
 ] as const);
 
@@ -35,6 +35,21 @@ export function isAllowedDesktopCallback(value: string): boolean {
     url.search = "";
     url.hash = "";
     return isAllowedDesktopRedirectUri(url.toString());
+  } catch {
+    return false;
+  }
+}
+
+export function isDesktopCallbackForRedirectUri(
+  callbackValue: string,
+  redirectUri: string,
+): boolean {
+  if (!isAllowedDesktopRedirectUri(redirectUri)) return false;
+  try {
+    const callback = new URL(callbackValue);
+    callback.search = "";
+    callback.hash = "";
+    return callback.toString() === redirectUri;
   } catch {
     return false;
   }

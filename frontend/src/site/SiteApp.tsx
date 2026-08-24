@@ -39,7 +39,13 @@ const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`
 const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 const COMMUNITY_GUIDELINES_URL = `${GITHUB_URL}/blob/main/COMMUNITY_GUIDELINES.md`;
 
-type AuthMode = "sign-in" | "register" | "reset-request" | "reset-update";
+type AuthMode =
+  | "sign-in"
+  | "register"
+  | "recovery-choice"
+  | "recovery-sign-in"
+  | "recovery-password"
+  | "reset-update";
 
 const WEBSITE_DRONE_THEME = Object.freeze({
   primary: 0x68e8ff,
@@ -70,6 +76,7 @@ const content = {
     console: "Console",
     organization: "Manage organization",
     accountPlan: "Plan",
+    businessPlan: "Business",
     signIn: "Sign in",
     register: "Register",
     account: "Account",
@@ -90,13 +97,19 @@ const content = {
     passwordMismatch: "The two passwords do not match.",
     codeRequired: "Send and enter the verification code before creating the account.",
     completeCaptcha: "Complete the security check before continuing.",
-    registerNow: "New to DroneDream? Register now",
-    backToSignIn: "Already registered? Sign in",
-    forgotPassword: "Forgot your password? Reset it by email",
-    resetRequestTitle: "Reset password",
-    resetRequestBody: "Enter your account email. We will send a secure link that opens the password reset screen.",
-    sendResetLink: "Send reset link",
-    resetEmailSent: "If an account exists for this email, a password reset link has been sent.",
+    accountRequestFailed: "The account request could not be completed. Please try again.",
+    registerNow: "Register",
+    backToSignIn: "Back to sign in",
+    forgotPassword: "Forgot password",
+    recoveryTitle: "Recover account",
+    recoveryCodeSignIn: "Sign in with an email code",
+    recoveryPassword: "Reset password with an email code",
+    recoverySignInTitle: "Email code sign-in",
+    recoveryPasswordTitle: "Reset password",
+    recoveryCodeRequired: "Send and enter the email verification code first.",
+    recoveryCodeSent: "Verification code sent.",
+    signInWithCode: "Sign in",
+    resetAndSignIn: "Reset password and sign in",
     resetUpdateTitle: "Choose a new password",
     resetUpdateBody: "This email link verified the reset request. Choose a new password to finish.",
     updatePassword: "Update password",
@@ -269,6 +282,7 @@ const content = {
     console: "控制台",
     organization: "企业管理",
     accountPlan: "套餐",
+    businessPlan: "企业",
     signIn: "登录",
     register: "注册",
     account: "账号",
@@ -289,13 +303,19 @@ const content = {
     passwordMismatch: "两次输入的密码不一致。",
     codeRequired: "请先发送并填写邮箱验证码，再创建账号。",
     completeCaptcha: "请先完成安全验证，再继续。",
-    registerNow: "还没有账号？立即注册",
-    backToSignIn: "已经注册？返回登录",
-    forgotPassword: "忘记密码？通过邮件重置",
-    resetRequestTitle: "重置密码",
-    resetRequestBody: "输入账户邮箱，我们会发送一封包含安全链接的邮件，点击后进入密码重置界面。",
-    sendResetLink: "发送重置链接",
-    resetEmailSent: "如果该邮箱已注册，密码重置链接已经发送。",
+    accountRequestFailed: "无法完成账号请求，请稍后重试。",
+    registerNow: "注册",
+    backToSignIn: "返回登录",
+    forgotPassword: "忘记密码",
+    recoveryTitle: "找回账号",
+    recoveryCodeSignIn: "使用邮箱验证码登录",
+    recoveryPassword: "使用邮箱验证码修改密码",
+    recoverySignInTitle: "邮箱验证码登录",
+    recoveryPasswordTitle: "修改密码",
+    recoveryCodeRequired: "请先发送并填写邮箱验证码。",
+    recoveryCodeSent: "验证码已发送。",
+    signInWithCode: "登录",
+    resetAndSignIn: "修改密码并登录",
     resetUpdateTitle: "设置新密码",
     resetUpdateBody: "邮件链接已确认本次重置请求，请设置新密码以完成操作。",
     updatePassword: "更新密码",
@@ -824,7 +844,6 @@ export function SiteApp() {
   const droneFlightRef = useRef<(() => void) | null>(null);
   const authDialogRef = useRef<HTMLElement>(null);
   const authCloseRef = useRef<HTMLButtonElement>(null);
-  const oauthPromptedRef = useRef(false);
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
@@ -836,9 +855,12 @@ export function SiteApp() {
         ? "organization"
       : path === "/community"
         ? "community"
-        : path === "/oauth/consent"
-          ? "oauth-consent"
-        : "home";
+         : path === "/oauth/consent"
+           ? "oauth-consent"
+         : "home";
+  const oauthAuthPage = sitePage === "oauth-consent" && (
+    !auth.account || authPending || Boolean(authError)
+  );
 
   useEffect(() => {
     let active = true;
@@ -999,7 +1021,11 @@ export function SiteApp() {
       )?.focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && authMode !== "reset-update") {
+      if (
+        event.key === "Escape"
+        && authMode !== "reset-update"
+        && !oauthAuthPage
+      ) {
         setAuthOpen(false);
         return;
       }
@@ -1029,7 +1055,7 @@ export function SiteApp() {
       });
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [auth.account, authMode, authOpen]);
+  }, [auth.account, authMode, authOpen, oauthAuthPage]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -1082,6 +1108,20 @@ export function SiteApp() {
     setAuthOpen(true);
   };
 
+  const localizedAuthError = (reason: unknown): string => {
+    const message = reason instanceof Error ? reason.message : "";
+    const localizedValidationMessages: string[] = [
+      copy.passwordTooShort,
+      copy.passwordMismatch,
+      copy.codeRequired,
+      copy.recoveryCodeRequired,
+      copy.completeCaptcha,
+    ];
+    return localizedValidationMessages.includes(message)
+      ? message
+      : copy.accountRequestFailed;
+  };
+
   useEffect(() => {
     if (!auth.passwordRecovery) return;
     setAuthMode("reset-update");
@@ -1094,19 +1134,32 @@ export function SiteApp() {
 
   useEffect(() => {
     if (sitePage !== "oauth-consent") return;
-    if (auth.account && authOpen && !auth.passwordRecovery) {
+    if (
+      auth.account
+      && authOpen
+      && !auth.passwordRecovery
+      && !authPending
+      && !authError
+    ) {
       setAuthOpen(false);
     } else if (
       auth.configured
       && !auth.loading
       && !auth.account
       && !authOpen
-      && !oauthPromptedRef.current
     ) {
-      oauthPromptedRef.current = true;
       openAccount("sign-in");
     }
-  }, [auth.account, auth.configured, auth.loading, auth.passwordRecovery, authOpen, sitePage]);
+  }, [
+    auth.account,
+    auth.configured,
+    auth.loading,
+    auth.passwordRecovery,
+    authError,
+    authOpen,
+    authPending,
+    sitePage,
+  ]);
 
   const openConsole = () => {
     if (auth.account) {
@@ -1123,16 +1176,7 @@ export function SiteApp() {
     setAuthError(null);
     setAuthNotice(null);
     try {
-      if (authMode === "reset-request") {
-        if (captchaProtectionConfigured && !authCaptchaToken) {
-          throw new Error(copy.completeCaptcha);
-        }
-        await auth.requestPasswordReset(
-          authEmail,
-          authCaptchaToken ?? undefined,
-        );
-        setAuthNotice(copy.resetEmailSent);
-      } else if (authMode === "reset-update") {
+      if (authMode === "reset-update") {
         if (authPassword.length < 8) {
           throw new Error(copy.passwordTooShort);
         }
@@ -1157,7 +1201,7 @@ export function SiteApp() {
         } else {
           await auth.signInWithPassword(authEmail, authPassword);
         }
-      } else {
+      } else if (authMode === "register") {
         if (authPassword.length < 8) {
           throw new Error(copy.passwordTooShort);
         }
@@ -1172,16 +1216,35 @@ export function SiteApp() {
           authCode,
           authPassword,
         );
+      } else if (
+        authMode === "recovery-sign-in"
+        || authMode === "recovery-password"
+      ) {
+        if (!authCodeSent || !authCode.trim()) {
+          throw new Error(copy.recoveryCodeRequired);
+        }
+        if (authMode === "recovery-password") {
+          if (authPassword.length < 8) {
+            throw new Error(copy.passwordTooShort);
+          }
+          if (authPassword !== authPasswordConfirmation) {
+            throw new Error(copy.passwordMismatch);
+          }
+          await auth.verifyRecoveryCode(
+            authEmail,
+            authCode,
+            authPassword,
+          );
+        } else {
+          await auth.verifyRecoveryCode(authEmail, authCode);
+        }
       }
     } catch (reason) {
-      setAuthError(
-        reason instanceof Error ? reason.message : "Account request failed.",
-      );
+      setAuthError(localizedAuthError(reason));
     } finally {
       setAuthPending(false);
       if (
-        (authMode === "sign-in" || authMode === "reset-request")
-        && captchaProtectionConfigured
+        authMode === "sign-in" && captchaProtectionConfigured
       ) {
         setAuthCaptchaToken(null);
         setAuthCaptchaCycle((current) => current + 1);
@@ -1212,10 +1275,9 @@ export function SiteApp() {
         await auth.sendRegistrationCode(authEmail);
       }
       setAuthCodeSent(true);
+      setAuthNotice(copy.recoveryCodeSent);
     } catch (reason) {
-      setAuthError(
-        reason instanceof Error ? reason.message : "Account request failed.",
-      );
+      setAuthError(localizedAuthError(reason));
     } finally {
       setAuthPending(false);
       if (captchaProtectionConfigured) {
@@ -1224,6 +1286,65 @@ export function SiteApp() {
       }
     }
   };
+
+  const sendRecoveryCode = async () => {
+    if (authPending) return;
+    setAuthError(null);
+    setAuthNotice(null);
+    if (captchaProtectionConfigured && !authCaptchaToken) {
+      setAuthError(copy.completeCaptcha);
+      return;
+    }
+    setAuthPending(true);
+    try {
+      if (authCaptchaToken) {
+        await auth.sendRecoveryCode(authEmail, authCaptchaToken);
+      } else {
+        await auth.sendRecoveryCode(authEmail);
+      }
+      setAuthCodeSent(true);
+      setAuthNotice(copy.recoveryCodeSent);
+    } catch (reason) {
+      setAuthError(localizedAuthError(reason));
+    } finally {
+      setAuthPending(false);
+      if (captchaProtectionConfigured) {
+        setAuthCaptchaToken(null);
+        setAuthCaptchaCycle((current) => current + 1);
+      }
+    }
+  };
+
+  const recoveryCodeMode = authMode === "recovery-sign-in"
+    || authMode === "recovery-password";
+  const authTitle = authMode === "recovery-choice"
+    ? copy.recoveryTitle
+    : authMode === "recovery-sign-in"
+      ? copy.recoverySignInTitle
+      : authMode === "recovery-password"
+        ? copy.recoveryPasswordTitle
+        : authMode === "reset-update"
+          ? copy.resetUpdateTitle
+          : auth.account
+            ? copy.account
+            : authMode === "register"
+              ? copy.registerTitle
+              : copy.authTitle;
+  const showEmailField = authMode !== "reset-update"
+    && authMode !== "recovery-choice";
+  const showPasswordField = authMode === "sign-in"
+    || authMode === "register"
+    || authMode === "recovery-password"
+    || authMode === "reset-update";
+  const showPasswordConfirmation = authMode === "register"
+    || authMode === "recovery-password"
+    || authMode === "reset-update";
+  const showVerificationCode = authMode === "register" || recoveryCodeMode;
+  const showCaptcha = captchaProtectionConfigured && (
+    authMode === "sign-in"
+    || authMode === "register"
+    || recoveryCodeMode
+  );
 
   return (
     <div className="dd-site" data-locale={locale} data-page={sitePage}>
@@ -1301,7 +1422,10 @@ export function SiteApp() {
             account={auth.account}
             onRequireAccount={() => openAccount("sign-in")}
           />
-        ) : sitePage === "oauth-consent" ? (
+        ) : sitePage === "oauth-consent" && (
+          (auth.account && !authPending && !authError)
+          || (!auth.configured && !auth.loading)
+        ) ? (
           <OAuthConsentPage
             locale={locale}
             account={auth.account}
@@ -1315,16 +1439,14 @@ export function SiteApp() {
               void auth.signOut()
                 .then(() => openAccount("sign-in"))
                 .catch((reason: unknown) => {
-                  setAuthError(
-                    reason instanceof Error
-                      ? reason.message
-                      : "Account request failed.",
-                  );
+                  setAuthError(localizedAuthError(reason));
                   setAuthOpen(true);
                 })
                 .finally(() => setAuthPending(false));
             }}
           />
+        ) : sitePage === "oauth-consent" ? (
+          <div className="site-oauth-auth-stage" aria-hidden="true" />
         ) : (
           <>
         <section className="site-hero" id="home" aria-labelledby="hero-title">
@@ -1563,11 +1685,12 @@ export function SiteApp() {
 
       {authOpen ? (
         <div
-          className="site-auth-backdrop"
+          className={`site-auth-backdrop${oauthAuthPage ? " is-oauth-page" : ""}`}
           onMouseDown={(event) => {
             if (
               event.target === event.currentTarget
               && authMode !== "reset-update"
+              && !oauthAuthPage
             ) {
               setAuthOpen(false);
             }
@@ -1575,27 +1698,38 @@ export function SiteApp() {
         >
           <section
             ref={authDialogRef}
-            className="site-auth-dialog"
+            className={`site-auth-dialog${oauthAuthPage ? " is-oauth-page" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="site-auth-title"
           >
-            <header>
-              <h2 id="site-auth-title">
-                {authMode === "reset-request"
-                  ? copy.resetRequestTitle
-                  : authMode === "reset-update"
-                    ? copy.resetUpdateTitle
-                    : auth.account
-                  ? copy.account
-                  : authMode === "register"
-                    ? copy.registerTitle
-                    : copy.authTitle}
-              </h2>
-              {authMode !== "reset-update" ? (
+            <header className="site-auth-header">
+              <div className="site-auth-brand" role="img" aria-label="DroneDream">
+                <BrandLockup />
+              </div>
+              <div className="site-auth-header-actions">
+                {!auth.account && authMode !== "reset-update" ? (
+                  <button
+                    type="button"
+                    className="site-auth-mode-switch"
+                    disabled={authPending}
+                    onClick={() => openAccount(
+                      authMode === "sign-in" ? "register" : "sign-in",
+                    )}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M15.5 19.25v-1.5a3.5 3.5 0 0 0-3.5-3.5H7a3.5 3.5 0 0 0-3.5 3.5v1.5M9.5 10.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM18.25 7v6.5M15 10.25h6.5" />
+                    </svg>
+                    <span>
+                      {authMode === "sign-in" ? copy.registerNow : copy.backToSignIn}
+                    </span>
+                  </button>
+                ) : null}
+                {authMode !== "reset-update" && !oauthAuthPage ? (
                 <button
                   ref={authCloseRef}
                   type="button"
+                  className="site-auth-close"
                   aria-label={copy.closeAuth}
                   onClick={() => setAuthOpen(false)}
                 >
@@ -1604,7 +1738,9 @@ export function SiteApp() {
                   </svg>
                 </button>
               ) : null}
+              </div>
             </header>
+            <h2 id="site-auth-title">{authTitle}</h2>
             {auth.account && authMode !== "reset-update" ? (
               <div className="site-auth-account">
                 <AccountIcon />
@@ -1612,7 +1748,7 @@ export function SiteApp() {
                 <span>{auth.account.email}</span>
                 {accountPlan ? (
                   <span className="site-auth-plan">
-                    {copy.accountPlan}: {accountPlan.billingScope === "business" ? "Business " : ""}{accountPlan.name}
+                    {copy.accountPlan}: {accountPlan.billingScope === "business" ? `${copy.businessPlan} ` : ""}{accountPlan.name}
                   </span>
                 ) : null}
                 <a className="site-button site-button-primary" href="/console/">
@@ -1634,11 +1770,7 @@ export function SiteApp() {
                     setAuthError(null);
                     void auth.signOut()
                       .catch((reason: unknown) => {
-                        setAuthError(
-                          reason instanceof Error
-                            ? reason.message
-                            : "Account request failed.",
-                        );
+                        setAuthError(localizedAuthError(reason));
                       })
                       .finally(() => setAuthPending(false));
                   }}
@@ -1646,15 +1778,37 @@ export function SiteApp() {
                   {copy.signOut}
                 </button>
               </div>
+            ) : authMode === "recovery-choice" ? (
+              <div className="site-auth-recovery-options">
+                <button
+                  type="button"
+                  disabled={authPending}
+                  onClick={() => openAccount("recovery-sign-in")}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3.5 6.25 12 12l8.5-5.75M4.75 4.5h14.5A1.75 1.75 0 0 1 21 6.25v11.5a1.75 1.75 0 0 1-1.75 1.75H4.75A1.75 1.75 0 0 1 3 17.75V6.25A1.75 1.75 0 0 1 4.75 4.5Z" />
+                  </svg>
+                  <span>{copy.recoveryCodeSignIn}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={authPending}
+                  onClick={() => openAccount("recovery-password")}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14.25 8.75a4.5 4.5 0 1 0-3.73 4.43L13 15.66V18h2.34v2.34H18V17.7l-4.82-4.82a4.5 4.5 0 0 0 1.07-4.13Z" />
+                    <circle cx="9.75" cy="8.75" r="1" />
+                  </svg>
+                  <span>{copy.recoveryPassword}</span>
+                </button>
+              </div>
             ) : (
               <>
-                {authMode === "reset-request" ? (
-                  <p className="site-auth-guidance">{copy.resetRequestBody}</p>
-                ) : authMode === "reset-update" ? (
+                {authMode === "reset-update" ? (
                   <p className="site-auth-guidance">{copy.resetUpdateBody}</p>
                 ) : null}
                 <form className="site-auth-form" onSubmit={(event) => void submitAuth(event)}>
-                  {authMode !== "reset-update" ? (
+                  {showEmailField ? (
                     <label>
                       <span>{copy.email}</span>
                       <input
@@ -1664,13 +1818,13 @@ export function SiteApp() {
                         value={authEmail}
                         disabled={
                           authPending
-                          || (authMode === "register" && authCodeSent)
+                          || (showVerificationCode && authCodeSent)
                         }
                         onChange={(event) => setAuthEmail(event.target.value)}
                       />
                     </label>
                   ) : null}
-                  {authMode !== "reset-request" ? (
+                  {showPasswordField ? (
                     <label>
                       <span>{copy.password}</span>
                       <input
@@ -1689,97 +1843,88 @@ export function SiteApp() {
                       />
                     </label>
                   ) : null}
-                  {authMode === "register" || authMode === "reset-update" ? (
-                    <>
-                      <label>
-                        <span>{copy.confirmPassword}</span>
+                  {showPasswordConfirmation ? (
+                    <label>
+                      <span>{copy.confirmPassword}</span>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        value={authPasswordConfirmation}
+                        placeholder={copy.confirmPasswordPlaceholder}
+                        disabled={authPending}
+                        onChange={(event) =>
+                          setAuthPasswordConfirmation(event.target.value)
+                        }
+                      />
+                    </label>
+                  ) : null}
+                  {showVerificationCode ? (
+                    <div className="site-auth-code-field">
+                      <label htmlFor="site-verification-code">
+                        <span>{copy.code}</span>
+                      </label>
+                      <div className="site-auth-code-row">
                         <input
-                          type="password"
+                          id="site-verification-code"
+                          type="text"
                           required
-                          minLength={8}
-                          autoComplete="new-password"
-                          value={authPasswordConfirmation}
-                          placeholder={copy.confirmPasswordPlaceholder}
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          minLength={6}
+                          maxLength={12}
+                          value={authCode}
+                          placeholder={copy.codePlaceholder}
                           disabled={authPending}
                           onChange={(event) =>
-                            setAuthPasswordConfirmation(event.target.value)
+                            setAuthCode(event.target.value.replace(/\s/gu, ""))
                           }
                         />
-                      </label>
-                      {authMode === "register" ? (
-                        <div className="site-auth-code-field">
-                          <label htmlFor="site-registration-code">
-                            <span>{copy.code}</span>
-                          </label>
-                          <div className="site-auth-code-row">
-                            <input
-                              id="site-registration-code"
-                              type="text"
-                              required
-                              inputMode="numeric"
-                              autoComplete="one-time-code"
-                              minLength={6}
-                              maxLength={12}
-                              value={authCode}
-                              placeholder={copy.codePlaceholder}
-                              disabled={authPending}
-                              onChange={(event) =>
-                                setAuthCode(event.target.value.replace(/\s/gu, ""))
-                              }
-                            />
-                            <button
-                              type="button"
-                              className="site-auth-code-button"
-                              disabled={authPending || !authEmail.trim()}
-                              onClick={() => void sendRegistrationCode()}
-                            >
-                              {authCodeSent ? copy.resendCode : copy.sendCode}
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </>
+                        <button
+                          type="button"
+                          className="site-auth-code-button"
+                          disabled={authPending || !authEmail.trim()}
+                          onClick={() => void (
+                            authMode === "register"
+                              ? sendRegistrationCode()
+                              : sendRecoveryCode()
+                          )}
+                        >
+                          {authCodeSent ? copy.resendCode : copy.sendCode}
+                        </button>
+                      </div>
+                    </div>
                   ) : null}
-                  {captchaProtectionConfigured && authMode !== "reset-update" ? (
+                  {showCaptcha ? (
                     <AuthCaptcha
                       key={authCaptchaCycle}
                       siteKey={turnstileSiteKey}
+                      locale={locale}
                       onTokenChange={setAuthCaptchaToken}
                     />
                   ) : null}
                   <button type="submit" disabled={authPending || auth.loading}>
                     {authMode === "register"
                       ? copy.createAccount
-                      : authMode === "reset-request"
-                        ? copy.sendResetLink
-                        : authMode === "reset-update"
-                          ? copy.updatePassword
-                          : copy.signInAction}
+                      : authMode === "reset-update"
+                        ? copy.updatePassword
+                        : authMode === "recovery-sign-in"
+                          ? copy.signInWithCode
+                          : authMode === "recovery-password"
+                            ? copy.resetAndSignIn
+                            : copy.signInAction}
                   </button>
                 </form>
-                {authMode !== "reset-update" ? (
+                {authMode === "sign-in" ? (
                   <div className="site-auth-link-row">
-                    {authMode === "sign-in" ? (
-                      <button
-                        type="button"
-                        className="site-auth-text-button"
-                        disabled={authPending}
-                        onClick={() => openAccount("reset-request")}
-                      >
-                        {copy.forgotPassword}
-                      </button>
-                    ) : null}
                     <button
                       type="button"
                       className="site-auth-text-button"
                       disabled={authPending}
-                      onClick={() => openAccount(
-                        authMode === "sign-in" ? "register" : "sign-in",
-                      )}
+                      onClick={() => openAccount("recovery-choice")}
                     >
-                      {authMode === "sign-in"
-                        ? copy.registerNow
-                        : copy.backToSignIn}
+                      {copy.forgotPassword}
                     </button>
                   </div>
                 ) : null}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DroneDreamAccount } from "../features/auth/AuthContext";
 import { supabaseClient } from "../features/auth/supabaseClient";
@@ -6,6 +6,7 @@ import type { Locale } from "../i18n/I18nProvider";
 import {
   desktopEditionForRedirectUri,
   isAllowedDesktopCallback,
+  isDesktopCallbackForRedirectUri,
   isAllowedDesktopRedirectUri,
 } from "./oauthConsentPolicy";
 
@@ -32,6 +33,7 @@ interface OAuthConsentPageProps {
   onRequireSignIn: () => void;
   onRequireRegistration: () => void;
   onSwitchAccount: () => void;
+  onDesktopRedirect?: (value: string) => void;
 }
 
 const copy = {
@@ -46,7 +48,7 @@ const copy = {
     loading: "Checking the desktop sign-in request…",
     requestFailed: "The desktop sign-in request could not be verified. Return to the app and try again.",
     signedInAs: "Signed in as",
-    verifiedSession: "This browser has already verified this account.",
+    verifiedSession: "This browser has verified this account.",
     switchAccount: "Not your account? Switch account",
     wantsAccess: "wants to access your DroneDream account.",
     permissions: "Requested access",
@@ -54,7 +56,7 @@ const copy = {
     permissionSession: "Create a session for this desktop edition",
     standardFields: "Standard account fields",
     localReturn: "After approval, this browser returns only to the requesting app on this computer.",
-    approve: "Approve and return to the app",
+    retry: "Try again",
     deny: "Cancel sign-in",
     working: "Completing sign-in…",
   },
@@ -69,7 +71,7 @@ const copy = {
     loading: "正在核对桌面端登录请求…",
     requestFailed: "无法验证本次桌面端登录请求。请返回软件后重新尝试。",
     signedInAs: "当前登录账户",
-    verifiedSession: "当前浏览器已完成该账户的身份验证。",
+    verifiedSession: "当前浏览器已完成账户验证。",
     switchAccount: "不是您的账户？切换账户",
     wantsAccess: "正在申请访问您的 DroneDream 账户。",
     permissions: "申请的权限",
@@ -77,7 +79,7 @@ const copy = {
     permissionSession: "为当前桌面端版本创建独立会话",
     standardFields: "标准账户字段",
     localReturn: "授权后，浏览器只会回到本机上发起请求的 DroneDream 软件。",
-    approve: "同意并返回软件",
+    retry: "重试",
     deny: "取消登录",
     working: "正在完成登录…",
   },
@@ -101,15 +103,20 @@ export function OAuthConsentPage({
   account,
   authConfigured,
   authLoading,
-  onRequireSignIn,
-  onRequireRegistration,
   onSwitchAccount,
+  onDesktopRedirect = redirectToDesktop,
 }: OAuthConsentPageProps) {
   const text = copy[locale];
   const authorizationId = authorizationIdFromLocation();
   const [details, setDetails] = useState<AuthorizationDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requestLoading, setRequestLoading] = useState(false);
   const [pending, setPending] = useState(false);
+  const [retryCycle, setRetryCycle] = useState(0);
+  const approvalAttemptRef = useRef<string | null>(null);
+  const approvalIdentity = authorizationId && account
+    ? `${authorizationId}:${account.id}`
+    : null;
 
   useEffect(() => {
     if (!authorizationId || !account || !supabaseClient) {
@@ -117,19 +124,25 @@ export function OAuthConsentPage({
       return undefined;
     }
     let active = true;
+    setDetails(null);
     setError(null);
-    setPending(true);
+    setPending(false);
+    setRequestLoading(true);
     void supabaseClient.auth.oauth.getAuthorizationDetails(authorizationId)
       .then(({ data, error: requestError }) => {
         if (!active) return;
         if (requestError || !data) throw requestError ?? new Error("Authorization request missing.");
         if ("redirect_url" in data) {
-          redirectToDesktop(data.redirect_url);
+          if (!isAllowedDesktopCallback(data.redirect_url)) {
+            throw new Error("The authorization server returned an unapproved desktop callback.");
+          }
+          onDesktopRedirect(data.redirect_url);
           return;
         }
         if (
           data.authorization_id !== authorizationId
           || !isAllowedDesktopRedirectUri(data.redirect_uri)
+          || data.user.id !== account.id
         ) {
           throw new Error("The authorization request does not match a DroneDream desktop edition.");
         }
@@ -139,36 +152,53 @@ export function OAuthConsentPage({
         if (active) setError(text.requestFailed);
       })
       .finally(() => {
-        if (active) setPending(false);
+        if (active) setRequestLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [account, authorizationId, text.requestFailed]);
+  }, [account, authorizationId, onDesktopRedirect, text.requestFailed]);
 
-  const decide = async (approved: boolean) => {
-    if (!authorizationId || !details || !supabaseClient || pending) return;
+  useEffect(() => {
+    approvalAttemptRef.current = null;
+  }, [approvalIdentity]);
+
+  useEffect(() => {
+    if (!authorizationId || !details || !account || !supabaseClient) return;
+    if (
+      details.authorization_id !== authorizationId
+      || details.user.id !== account.id
+    ) return;
+    const attemptKey = `${authorizationId}:${account.id}:${retryCycle}`;
+    if (approvalAttemptRef.current === attemptKey) return;
+    approvalAttemptRef.current = attemptKey;
+    let active = true;
     setPending(true);
     setError(null);
-    try {
-      const response = approved
-        ? await supabaseClient.auth.oauth.approveAuthorization(
-          authorizationId,
-          { skipBrowserRedirect: true },
-        )
-        : await supabaseClient.auth.oauth.denyAuthorization(
-          authorizationId,
-          { skipBrowserRedirect: true },
-        );
-      if (response.error || !response.data) {
-        throw response.error ?? new Error("Authorization response missing.");
+    void supabaseClient.auth.oauth.approveAuthorization(
+      authorizationId,
+      { skipBrowserRedirect: true },
+    ).then(({ data, error: approvalError }) => {
+      if (!active) return;
+      if (approvalError || !data) {
+        throw approvalError ?? new Error("Authorization response missing.");
       }
-      redirectToDesktop(response.data.redirect_url);
-    } catch {
+      if (!isDesktopCallbackForRedirectUri(
+        data.redirect_url,
+        details.redirect_uri,
+      )) {
+        throw new Error("The authorization server returned an unapproved desktop callback.");
+      }
+      onDesktopRedirect(data.redirect_url);
+    }).catch(() => {
+      if (!active) return;
       setError(text.requestFailed);
       setPending(false);
-    }
-  };
+    });
+    return () => {
+      active = false;
+    };
+  }, [account, authorizationId, details, onDesktopRedirect, retryCycle, text.requestFailed]);
 
   const edition = details
     ? desktopEditionForRedirectUri(details.redirect_uri)
@@ -184,22 +214,12 @@ export function OAuthConsentPage({
         {authorizationId && !authConfigured ? (
           <div className="site-oauth-error" role="alert">{text.unavailable}</div>
         ) : null}
-        {authorizationId && authConfigured && (authLoading || pending) && !details ? (
+        {authorizationId && authConfigured && (authLoading || requestLoading) && !details ? (
           <div className="site-oauth-loading" role="status">{text.loading}</div>
         ) : null}
         {authorizationId && authConfigured && !authLoading && !account ? (
           <div className="site-oauth-sign-in">
             <p>{text.signInBody}</p>
-            <button type="button" className="site-button site-button-primary" onClick={onRequireSignIn}>
-              {text.signIn}
-            </button>
-            <button
-              type="button"
-              className="site-oauth-text-button"
-              onClick={onRequireRegistration}
-            >
-              {text.register}
-            </button>
           </div>
         ) : null}
         {details && account && edition ? (
@@ -215,7 +235,7 @@ export function OAuthConsentPage({
                 <dd>
                   <strong>{account.email ?? account.displayName}</strong>
                   <span>{text.verifiedSession}</span>
-                  <button type="button" onClick={onSwitchAccount}>
+                  <button type="button" disabled={pending} onClick={onSwitchAccount}>
                     {text.switchAccount}
                   </button>
                 </dd>
@@ -234,15 +254,21 @@ export function OAuthConsentPage({
                 </dd>
               </div>
             </dl>
-            <p className="site-oauth-local-return">{text.localReturn}</p>
-            <div className="site-oauth-actions">
-              <button type="button" className="site-button site-button-primary" disabled={pending} onClick={() => void decide(true)}>
-                {pending ? text.working : text.approve}
-              </button>
-              <button type="button" className="site-button site-button-ghost" disabled={pending} onClick={() => void decide(false)}>
-                {text.deny}
-              </button>
-            </div>
+            <p className="site-oauth-local-return">{pending ? text.working : text.localReturn}</p>
+            {error ? (
+              <div className="site-oauth-actions">
+                <button
+                  type="button"
+                  className="site-button site-button-primary"
+                  onClick={() => setRetryCycle((cycle) => cycle + 1)}
+                >
+                  {text.retry}
+                </button>
+                <button type="button" className="site-button site-button-ghost" onClick={onSwitchAccount}>
+                  {text.switchAccount}
+                </button>
+              </div>
+            ) : null}
           </div>
         ) : null}
         {error ? <div className="site-oauth-error" role="alert">{error}</div> : null}
