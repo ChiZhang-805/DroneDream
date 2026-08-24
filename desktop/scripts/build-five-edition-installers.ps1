@@ -14,6 +14,23 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+function Test-FullyQualifiedFileSystemPath {
+    param([AllowEmptyString()][string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $false
+    }
+
+    # System.IO.Path.IsPathFullyQualified is unavailable in the .NET Framework
+    # hosted by Windows PowerShell 5.1.  This release script must work in both
+    # Windows PowerShell 5.1 and PowerShell 7, so validate the two Windows forms
+    # we support directly: a drive-qualified path or a UNC share-qualified path.
+    return (
+        $Path -match '^[A-Za-z]:[\\/]' -or
+        $Path -match '^[\\/]{2}[^\\/]+[\\/][^\\/]+'
+    )
+}
+
 if ($PSVersionTable.PSEdition -ceq "Desktop") {
     $inboxModuleRoot = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\Modules"
     if (Test-Path -LiteralPath $inboxModuleRoot -PathType Container) {
@@ -31,7 +48,7 @@ if ([string]::IsNullOrWhiteSpace($StorageRoot)) {
     $outputBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-builds"))
     $cargoBase = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache"))
 } else {
-    if (-not [IO.Path]::IsPathFullyQualified($StorageRoot)) {
+    if (-not (Test-FullyQualifiedFileSystemPath -Path $StorageRoot)) {
         throw "StorageRoot must be an absolute directory."
     }
     $storageRootFull = [IO.Path]::GetFullPath($StorageRoot)
