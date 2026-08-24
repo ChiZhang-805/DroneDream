@@ -1,7 +1,9 @@
 import {
   ArrowRight,
   Bell,
+  Bot,
   BrainCircuit,
+  ChevronRight,
   GraduationCap,
   MapPinned,
   MonitorCog,
@@ -10,12 +12,15 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Settings,
   Sun,
   Workflow,
+  X,
 } from "lucide-react";
-import { useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
+import { CustomModelSettingsPanel } from "../components/CustomModelSettingsPanel";
 import { SettingsUpdateCenter } from "../components/SettingsUpdateCenter";
 import {
   EditionSettingsPanel,
@@ -28,8 +33,8 @@ import {
   SettingsLanguageRegionIcon,
   SettingsToggle,
 } from "../components/SettingsPrimitives";
-import { startRuntimeUpgrade } from "../desktop/bridge";
-import { useAuthOrLocal } from "../features/auth/AuthContext";
+import { isDesktopRuntime, startRuntimeUpgrade } from "../desktop/bridge";
+import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { localeSafeError, type InterfaceLocale } from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type { FieldLocale } from "./catalog";
@@ -80,8 +85,11 @@ const DEFAULT_MEMORY_SCOPES: Record<MemoryScopeKey, boolean> = {
 const COPY = {
   en: {
     title: "Settings",
+    quickTitle: "Quick settings",
     close: "Close settings",
-    tabs: ["General", "Memory", "Model", "Safety"] as const,
+    back: "Back to app",
+    allSettings: "All settings",
+    tabs: ["General", "Memory", "Models", "Runtime & updates"] as const,
     language: "Language",
     interface: "Interface",
     notifications: "Notifications",
@@ -98,7 +106,13 @@ const COPY = {
     ] as const,
     memory: "Memory",
     memoryState: ["Memory off", "Memory on"] as const,
+    accountMemory: "Account memory",
+    editionMemory: "FIELD memory",
     crossSession: "Cross-session memory",
+    modelEntry: "Models",
+    runtimeEntry: "Runtime & updates",
+    desktopRuntime: "Desktop Runtime",
+    browserRuntime: "Desktop only",
     scopes: [
       "Chat preferences",
       "Experiment defaults",
@@ -131,8 +145,11 @@ const COPY = {
   },
   "zh-CN": {
     title: "设置",
+    quickTitle: "快捷设置",
     close: "关闭设置",
-    tabs: ["常规", "记忆", "模型", "安全"] as const,
+    back: "返回应用",
+    allSettings: "全部设置",
+    tabs: ["常规", "记忆", "模型", "Runtime 与更新"] as const,
     language: "语言",
     interface: "界面",
     notifications: "通知",
@@ -149,7 +166,13 @@ const COPY = {
     ] as const,
     memory: "记忆",
     memoryState: ["记忆已关闭", "记忆已开启"] as const,
+    accountMemory: "账户记忆",
+    editionMemory: "FIELD 记忆",
     crossSession: "跨会话记忆",
+    modelEntry: "模型",
+    runtimeEntry: "Runtime 与更新",
+    desktopRuntime: "桌面 Runtime",
+    browserRuntime: "仅桌面端",
     scopes: [
       "对话偏好",
       "实验默认值",
@@ -220,16 +243,22 @@ function configuredRuntimeReleaseManifestUrl(): string | null {
 
 export function FieldSettingsDialog({
   closeRef,
+  initialTab = "general",
   locale,
   onClose,
   onLocaleChange,
+  onOpenWorkspace,
+  presentation = "workspace",
 }: {
   closeRef: RefObject<HTMLButtonElement>;
+  initialTab?: SettingsSurfaceTabId;
   locale: FieldLocale;
   onClose: () => void;
   onLocaleChange: (locale: FieldLocale) => void;
+  onOpenWorkspace?: (tab: SettingsSurfaceTabId) => void;
+  presentation?: "quick" | "workspace";
 }) {
-  const [activeTab, setActiveTab] = useState<SettingsSurfaceTabId>("general");
+  const [activeTab, setActiveTab] = useState<SettingsSurfaceTabId>(initialTab);
   const [interfaceLocale, setInterfaceLocale] = useState<InterfaceLocale>(() =>
     readInterfaceLocale(locale)
   );
@@ -243,6 +272,13 @@ export function FieldSettingsDialog({
       return true;
     }
   });
+  const [accountMemoryEnabled, setAccountMemoryEnabled] = useState(() => {
+    try {
+      return window.localStorage.getItem("dd.field.account-memory.enabled") !== "false";
+    } catch {
+      return true;
+    }
+  });
   const [memoryScopes, setMemoryScopes] = useState(() =>
     readJson("dd.field.memory.scopes", DEFAULT_MEMORY_SCOPES)
   );
@@ -252,16 +288,23 @@ export function FieldSettingsDialog({
     text: string;
   } | null>(null);
   const customColorInputRef = useRef<HTMLInputElement>(null);
-  const { account } = useAuthOrLocal();
+  const modelAccess = useModelAccess();
   const editionTheme = useEditionTheme();
   const copy = COPY[interfaceLocale === "zh-CN" ? "zh-CN" : "en"];
+  const modelSummary = modelAccess.settings.accessMode === "platform"
+    ? modelAccess.settings.managedModel
+    : modelAccess.settings.displayName || modelAccess.settings.model;
   const tabs: readonly SettingsSurfaceTab[] = [
     { id: "general", label: copy.tabs[0] },
     { id: "memory", label: copy.tabs[1] },
-    { id: "model", label: copy.tabs[2], disabled: !account },
+    { id: "model", label: copy.tabs[2] },
     { id: "course", label: "ECE498BH" },
     { id: "runtime", label: copy.tabs[3] },
   ];
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const selectLocale = (next: InterfaceLocale) => {
     setInterfaceLocale(next);
@@ -293,6 +336,15 @@ export function FieldSettingsDialog({
     setMemoryEnabled(enabled);
     try {
       window.localStorage.setItem("dd.field.memory.enabled", String(enabled));
+    } catch {
+      // The current session still reflects the user's selection.
+    }
+  };
+
+  const updateAccountMemoryEnabled = (enabled: boolean) => {
+    setAccountMemoryEnabled(enabled);
+    try {
+      window.localStorage.setItem("dd.field.account-memory.enabled", String(enabled));
     } catch {
       // The current session still reflects the user's selection.
     }
@@ -336,6 +388,125 @@ export function FieldSettingsDialog({
     }
   };
 
+  if (presentation === "quick") {
+    return (
+      <section
+        className="quick-settings-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="field-quick-settings-title"
+        data-brand-edition="field"
+        data-settings-consumer="field"
+        data-presentation-only="true"
+        data-grants-hardware-authority="false"
+      >
+        <header className="quick-settings-heading">
+          <h2 id="field-quick-settings-title">{copy.quickTitle}</h2>
+          <button
+            ref={closeRef}
+            type="button"
+            className="launcher-settings-close"
+            aria-label={copy.close}
+            title={copy.close}
+            onClick={onClose}
+          >
+            <X aria-hidden="true" />
+          </button>
+        </header>
+        <div className="quick-settings-grid">
+          <fieldset className="quick-settings-item quick-settings-language">
+            <legend>{copy.language}</legend>
+            <div role="group" aria-label={copy.language}>
+              {SETTINGS_LOCALES.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={interfaceLocale === option.id ? "selected" : undefined}
+                  aria-pressed={interfaceLocale === option.id}
+                  onClick={() => selectLocale(option.id)}
+                >
+                  <SettingsLanguageRegionIcon region={option.region} />
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <label className="quick-settings-item" htmlFor="field-quick-settings-appearance">
+            <span>{copy.interface}</span>
+            <select
+              id="field-quick-settings-appearance"
+              value={editionTheme.appearancePreference}
+              onChange={(event) => {
+                const value = event.target.value as typeof editionTheme.appearancePreference;
+                editionTheme.setAppearance(value);
+                if (value === "custom") {
+                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
+                }
+              }}
+            >
+              <option value="dark">{copy.appearance[0]}</option>
+              <option value="light">{copy.appearance[1]}</option>
+              <option value="system">{copy.appearance[2]}</option>
+              <option value="custom">{copy.appearance[3]}</option>
+            </select>
+            <input
+              ref={customColorInputRef}
+              className="settings-custom-color-input"
+              type="color"
+              tabIndex={-1}
+              aria-label={copy.appearance[3]}
+              value={editionTheme.customAccent}
+              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
+            />
+          </label>
+          <div className="quick-settings-item quick-settings-memory">
+            <SettingsToggle
+              checked={accountMemoryEnabled}
+              label={<><BrainCircuit aria-hidden="true" /><span>{copy.accountMemory}</span></>}
+              onChange={updateAccountMemoryEnabled}
+            />
+            <SettingsToggle
+              checked={memoryEnabled}
+              disabled={!accountMemoryEnabled}
+              label={<><Sparkles aria-hidden="true" /><span>{copy.editionMemory}</span></>}
+              onChange={updateMemoryEnabled}
+            />
+          </div>
+          <button
+            type="button"
+            className="quick-settings-item quick-settings-runtime field-quick-settings-model"
+            onClick={() => onOpenWorkspace?.("model")}
+          >
+            <Bot aria-hidden="true" />
+            <span>{copy.modelEntry}</span>
+            <strong>{modelSummary || copy.modelEntry}</strong>
+            <ChevronRight aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="quick-settings-item quick-settings-runtime"
+            onClick={() => onOpenWorkspace?.("runtime")}
+          >
+            <MonitorCog aria-hidden="true" />
+            <span>{copy.runtimeEntry}</span>
+            <strong>{isDesktopRuntime() ? copy.desktopRuntime : copy.browserRuntime}</strong>
+            <ChevronRight aria-hidden="true" />
+          </button>
+        </div>
+        <footer className="quick-settings-footer">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => onOpenWorkspace?.("general")}
+          >
+            <Settings aria-hidden="true" />
+            {copy.allSettings}
+          </button>
+        </footer>
+      </section>
+    );
+  }
+
   return (
     <EditionSettingsSurface
       activeTab={activeTab}
@@ -347,6 +518,8 @@ export function FieldSettingsDialog({
       tabs={tabs}
       title={copy.title}
       consumerProfile="field"
+      presentation="workspace"
+      backLabel={copy.back}
     >
       <EditionSettingsPanel active={activeTab === "general"} id="general">
         <section className="settings-general-panel">
@@ -431,16 +604,23 @@ export function FieldSettingsDialog({
         <section className="settings-memory-panel" aria-labelledby="field-settings-memory-title">
           <div className="settings-memory-heading">
             <h3 id="field-settings-memory-title">{copy.memory}</h3>
-            <span className={memoryEnabled ? "configured" : undefined}>
-              {copy.memoryState[memoryEnabled ? 1 : 0]}
+            <span className={accountMemoryEnabled && memoryEnabled ? "configured" : undefined}>
+              {copy.memoryState[accountMemoryEnabled && memoryEnabled ? 1 : 0]}
             </span>
           </div>
           <div className="settings-memory-body">
             <div className="settings-memory-switches">
               <SettingsToggle
-                checked={memoryEnabled}
+                checked={accountMemoryEnabled}
                 className="settings-memory-master-toggle"
-                label={<><BrainCircuit aria-hidden="true" />{copy.crossSession}</>}
+                label={<><BrainCircuit aria-hidden="true" />{copy.accountMemory}</>}
+                onChange={updateAccountMemoryEnabled}
+              />
+              <SettingsToggle
+                checked={memoryEnabled}
+                disabled={!accountMemoryEnabled}
+                className="settings-memory-master-toggle"
+                label={<><Sparkles aria-hidden="true" />{copy.editionMemory}</>}
                 onChange={updateMemoryEnabled}
               />
               <div className="settings-memory-scope-grid">
@@ -450,7 +630,7 @@ export function FieldSettingsDialog({
                     <SettingsToggle
                       key={key}
                       checked={memoryScopes[key]}
-                      disabled={!memoryEnabled}
+                      disabled={!accountMemoryEnabled || !memoryEnabled}
                       label={<><Icon aria-hidden="true" /><span>{copy.scopes[index]}</span></>}
                       onChange={(checked) => updateMemoryScope(key, checked)}
                     />
@@ -460,11 +640,11 @@ export function FieldSettingsDialog({
             </div>
             <div className="settings-memory-defaults">
               <div className="settings-memory-grid">
-                <label><span>{copy.defaults[0]}</span><input value="My Drone" readOnly disabled={!memoryEnabled} /></label>
-                <label><span>{copy.defaults[1]}</span><input value="School Map" readOnly disabled={!memoryEnabled} /></label>
-                <label><span>{copy.defaults[2]}</span><select defaultValue="strict" disabled={!memoryEnabled}><option value="strict">{locale === "zh-CN" ? "严格" : "Strict"}</option></select></label>
-                <label><span>{copy.defaults[3]}</span><select defaultValue="metric" disabled={!memoryEnabled}><option value="metric">{locale === "zh-CN" ? "公制" : "Metric"}</option></select></label>
-                <label><span>{copy.defaults[4]}</span><select defaultValue="evidence" disabled={!memoryEnabled}><option value="evidence">{locale === "zh-CN" ? "证据包" : "Evidence"}</option></select></label>
+                <label><span>{copy.defaults[0]}</span><input value="My Drone" readOnly disabled={!accountMemoryEnabled || !memoryEnabled} /></label>
+                <label><span>{copy.defaults[1]}</span><input value="School Map" readOnly disabled={!accountMemoryEnabled || !memoryEnabled} /></label>
+                <label><span>{copy.defaults[2]}</span><select defaultValue="strict" disabled={!accountMemoryEnabled || !memoryEnabled}><option value="strict">{locale === "zh-CN" ? "严格" : "Strict"}</option></select></label>
+                <label><span>{copy.defaults[3]}</span><select defaultValue="metric" disabled={!accountMemoryEnabled || !memoryEnabled}><option value="metric">{locale === "zh-CN" ? "公制" : "Metric"}</option></select></label>
+                <label><span>{copy.defaults[4]}</span><select defaultValue="evidence" disabled={!accountMemoryEnabled || !memoryEnabled}><option value="evidence">{locale === "zh-CN" ? "证据包" : "Evidence"}</option></select></label>
               </div>
             </div>
           </div>
@@ -472,7 +652,9 @@ export function FieldSettingsDialog({
       </EditionSettingsPanel>
 
       <EditionSettingsPanel active={activeTab === "model"} id="model">
-        <section className="settings-model-panel" aria-label={copy.tabs[2]} />
+        <section className="settings-model-panel" aria-label={copy.tabs[2]}>
+          <CustomModelSettingsPanel locale={interfaceLocale} edition="field" />
+        </section>
       </EditionSettingsPanel>
 
       <EditionSettingsPanel active={activeTab === "course"} id="course">

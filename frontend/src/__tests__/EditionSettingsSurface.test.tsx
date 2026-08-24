@@ -9,6 +9,7 @@ import {
   type SettingsSurfaceTabId,
 } from "../components/EditionSettingsSurface";
 import { FieldSettingsDialog } from "../field/FieldSettingsDialog";
+import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 
 const tabs = [
@@ -150,20 +151,25 @@ describe("EditionSettingsSurface", () => {
   it("keeps ECE498BH inside the standalone Field settings surface", () => {
     render(
       <EditionThemeProvider edition="field">
-        <FieldSettingsDialog
-          closeRef={createRef<HTMLButtonElement>()}
-          locale="en"
-          onClose={() => undefined}
-          onLocaleChange={() => undefined}
-        />
+        <ModelAccessProvider accountScope="field:test">
+          <FieldSettingsDialog
+            closeRef={createRef<HTMLButtonElement>()}
+            locale="en"
+            onClose={() => undefined}
+            onLocaleChange={() => undefined}
+            presentation="workspace"
+          />
+        </ModelAccessProvider>
       </EditionThemeProvider>,
     );
 
     expect(screen.getAllByRole("tab")).toHaveLength(5);
-    expect(screen.getByRole("tab", { name: "Model" })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Models" })).toBeEnabled();
     expect(screen.getByRole("tab", { name: "General" })).toBeEnabled();
     expect(screen.getByRole("tab", { name: "Memory" })).toBeEnabled();
     expect(screen.getByRole("tab", { name: "ECE498BH" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("tab", { name: "Models" }));
+    expect(screen.getByLabelText("Model profile")).toBeVisible();
     fireEvent.click(screen.getByRole("tab", { name: "ECE498BH" }));
     expect(screen.getByRole("link", { name: "Open course" })).toHaveAttribute(
       "href",

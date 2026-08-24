@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
+  ChevronUp,
+  Gauge,
   History,
+  LogOut,
   PackageCheck,
   RadioTower,
   RefreshCw,
+  Settings as SettingsIcon,
   ShieldCheck,
   SlidersHorizontal,
   Wrench,
 } from "lucide-react";
 
+import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
 import {
   discoverFieldDevices,
   isDesktopRuntime,
@@ -27,6 +32,7 @@ import {
 import { FieldAssistantWorkspace } from "./FieldAssistantWorkspace";
 import { FieldPreflightWorkspace } from "./FieldPreflightWorkspace";
 import { FieldRecoveryWorkspace } from "./FieldRecoveryWorkspace";
+import { FieldSettingsDialog } from "./FieldSettingsDialog";
 import { FieldTuningWorkspace } from "./FieldTuningWorkspace";
 import {
   evaluateFieldSafety,
@@ -53,6 +59,12 @@ const COPY = {
     packs: "Validated packs",
     quorum: "Quorum",
     locked: "Locked",
+    settings: "Settings",
+    remainingAllowance: "Remaining allowance",
+    account: "Account",
+    openAccountMenu: "Open account menu",
+    signOut: "Sign out",
+    signOutFailed: "Sign out failed. Try again.",
     page: {
       device: "Device & adapters",
       compatibility: "Compatibility",
@@ -109,6 +121,12 @@ const COPY = {
     packs: "已验证机型包",
     quorum: "仲裁",
     locked: "已锁定",
+    settings: "设置",
+    remainingAllowance: "剩余额度",
+    account: "账户",
+    openAccountMenu: "打开账户菜单",
+    signOut: "退出登录",
+    signOutFailed: "退出登录失败，请重试。",
     page: {
       device: "设备与适配器",
       compatibility: "兼容性",
@@ -229,7 +247,17 @@ function FieldWorkspace({
   const [deviceScanError, setDeviceScanError] = useState<string | null>(null);
   const [readOnlyEvidence, setReadOnlyEvidence] = useState<FieldReadOnlyProtocolEvidence | null>(null);
   const [latestSnapshot, setLatestSnapshot] = useState<FieldParameterSnapshot | null>(null);
+  const [settingsWorkspaceOpen, setSettingsWorkspaceOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsSurfaceTabId>("general");
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [signOutPending, setSignOutPending] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+  const applicationSurfaceRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const settingsCloseRef = useRef<HTMLButtonElement>(null);
+  const auth = useOptionalAuth();
   const copy = COPY[locale];
   const navigationLabel = embeddedInLab ? copy.navLab : copy.navField;
   const scanUnavailable = embeddedInLab
@@ -264,9 +292,75 @@ function FieldWorkspace({
     if (focusOnMount) pageRef.current?.focus({ preventScroll: true });
   }, [focusOnMount]);
 
+  useEffect(() => {
+    const applicationSurface = applicationSurfaceRef.current;
+    if (!applicationSurface) return undefined;
+    const previousInert = applicationSurface.inert;
+    applicationSurface.inert = settingsWorkspaceOpen;
+    return () => {
+      applicationSurface.inert = previousInert;
+    };
+  }, [settingsWorkspaceOpen]);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      accountMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    });
+    const closeOnOutsidePointer = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (accountMenuRef.current?.contains(target) || settingsButtonRef.current?.contains(target)) return;
+      setAccountMenuOpen(false);
+      setSignOutError(false);
+      window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setAccountMenuOpen(false);
+      setSignOutError(false);
+      window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+    };
+    document.addEventListener("mousedown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accountMenuOpen]);
+
   const selectPage = (page: FieldPageId) => {
     setActivePage(page);
     requestAnimationFrame(() => pageRef.current?.focus({ preventScroll: true }));
+  };
+
+  const openSettingsWorkspace = (tab: SettingsSurfaceTabId = "general") => {
+    setAccountMenuOpen(false);
+    setSignOutError(false);
+    setSettingsInitialTab(tab);
+    setSettingsWorkspaceOpen(true);
+  };
+
+  const closeSettingsWorkspace = () => {
+    setSettingsWorkspaceOpen(false);
+    window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+  };
+
+  const signOut = async () => {
+    if (!auth?.account || signOutPending) return;
+    setSignOutPending(true);
+    setSignOutError(false);
+    try {
+      await auth.signOut();
+      setAccountMenuOpen(false);
+      window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+    } catch {
+      setSignOutError(true);
+    } finally {
+      setSignOutPending(false);
+    }
   };
 
   const scanDevices = useCallback(async () => {
@@ -380,18 +474,108 @@ function FieldWorkspace({
       data-validated-pack-count={decision.validatedPackCount}
       data-quorum={decision.threeLayerQuorum}
     >
-      <a className="field-skip-link" href="#field-page">{copy.skip}</a>
-      <div className="field-layout">
-        <aside className="field-sidebar">
-          {!embeddedInConsole ? (
-            <nav aria-label={navigationLabel}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
-          ) : null}
-          <div className="field-sidebar-status" title={`${copy.packs}: 0`}><Wrench aria-hidden="true" /><div><span>{copy.packs}</span><strong>0</strong></div><small>{copy.locked}</small></div>
-        </aside>
-        <main className="field-main" id="field-page">
-          <div ref={pageRef} className="field-active-page" tabIndex={-1} data-page={activePage}>{renderActivePage()}</div>
-        </main>
+      <div
+        ref={applicationSurfaceRef}
+        className="field-application-surface"
+        aria-hidden={settingsWorkspaceOpen || undefined}
+      >
+        <a className="field-skip-link" href="#field-page">{copy.skip}</a>
+        <div className="field-layout">
+          <aside className="field-sidebar">
+            {!embeddedInConsole ? (
+              <nav aria-label={navigationLabel}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
+            ) : null}
+            <div className="field-sidebar-footer">
+              <div className="field-sidebar-status" title={`${copy.packs}: 0`}><Wrench aria-hidden="true" /><div><span>{copy.packs}</span><strong>0</strong></div><small>{copy.locked}</small></div>
+              {!embeddedInLab && !embeddedInConsole ? (
+                <>
+                  <button
+                    ref={settingsButtonRef}
+                    type="button"
+                    className="field-sidebar-settings"
+                    aria-label={copy.openAccountMenu}
+                    title={copy.openAccountMenu}
+                    aria-haspopup="menu"
+                    aria-expanded={accountMenuOpen}
+                    onClick={() => {
+                      setSignOutError(false);
+                      setAccountMenuOpen((open) => !open);
+                    }}
+                  >
+                    {auth?.account?.avatarUrl ? (
+                      <img src={auth.account.avatarUrl} alt="" />
+                    ) : (
+                      <span className="field-sidebar-settings-avatar" aria-hidden="true">
+                        {auth?.account?.displayName?.trim().charAt(0).toUpperCase() || <SettingsIcon />}
+                      </span>
+                    )}
+                    <span>{auth?.account?.displayName || copy.settings}</span>
+                    <ChevronUp aria-hidden="true" />
+                  </button>
+                  {accountMenuOpen ? (
+                    <div
+                      ref={accountMenuRef}
+                      className="account-menu-popover"
+                      role="menu"
+                      aria-label={copy.account}
+                    >
+                      <button
+                        type="button"
+                        className="account-menu-row"
+                        role="menuitem"
+                        onClick={() => openSettingsWorkspace("model")}
+                      >
+                        <Gauge aria-hidden="true" strokeWidth={1.8} />
+                        <span>{copy.remainingAllowance}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="account-menu-row"
+                        role="menuitem"
+                        onClick={() => openSettingsWorkspace("general")}
+                      >
+                        <SettingsIcon aria-hidden="true" strokeWidth={1.8} />
+                        <span>{copy.settings}</span>
+                      </button>
+                      {auth?.account ? (
+                        <button
+                          type="button"
+                          className="account-menu-row"
+                          role="menuitem"
+                          disabled={signOutPending}
+                          onClick={() => void signOut()}
+                        >
+                          <LogOut aria-hidden="true" strokeWidth={1.8} />
+                          <span>{copy.signOut}</span>
+                        </button>
+                      ) : null}
+                      {signOutError ? <p role="alert">{copy.signOutFailed}</p> : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </aside>
+          <main className="field-main" id="field-page">
+            <div ref={pageRef} className="field-active-page" tabIndex={-1} data-page={activePage}>{renderActivePage()}</div>
+          </main>
+        </div>
       </div>
+      {settingsWorkspaceOpen ? (
+        <div className="app-shell field-settings-workspace-context">
+          <div className="settings-workspace-host field-settings-workspace-host">
+            <FieldSettingsDialog
+              key={settingsInitialTab}
+              closeRef={settingsCloseRef}
+              initialTab={settingsInitialTab}
+              locale={locale}
+              onClose={closeSettingsWorkspace}
+              onLocaleChange={setLocale}
+              presentation="workspace"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

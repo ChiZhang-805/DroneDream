@@ -11686,6 +11686,18 @@ a {
   line-height: 1.2;
 }
 
+.settings-workspace-content .settings-memory-body,
+.settings-workspace-content .settings-memory-defaults {
+  grid-template-rows: auto auto;
+  height: auto;
+  align-content: start;
+}
+
+.settings-workspace-content .settings-memory-grid {
+  grid-template-rows: repeat(2, auto);
+  align-items: start;
+}
+
 .settings-workspace-content .settings-memory-scope-grid .settings-toggle-row {
   min-height: 38px;
   height: auto;
@@ -11711,6 +11723,15 @@ a {
   min-height: 0;
   font-size: 0.72rem;
   text-align: left;
+}
+
+.settings-workspace-content .settings-course-panel {
+  height: auto;
+  align-self: start;
+}
+
+.settings-workspace-content .settings-course-editions .brand-lockup[data-brand-edition="autonomy"] {
+  height: 20px;
 }
 
 .settings-workspace-content .settings-memory-panel,

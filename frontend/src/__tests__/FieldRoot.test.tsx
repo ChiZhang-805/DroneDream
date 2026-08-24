@@ -113,8 +113,23 @@ describe("FieldRoot", () => {
     expect(container).not.toHaveTextContent(/PX4|Gazebo|SITL|HITL/i);
 
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
-    expect(screen.getByRole("dialog", { name: "Settings" }))
-      .toHaveAttribute("data-settings-consumer", "field");
+    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    expect(quickSettings).toHaveAttribute("data-settings-consumer", "field");
+    expect(quickSettings.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(container.querySelector(".launcher-chrome")).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector(".launcher-main")).toHaveAttribute("aria-hidden", "true");
+    expect((container.querySelector(".launcher-main") as HTMLElement).inert).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "All settings" }));
+    const settingsWorkspace = screen.getByRole("region", { name: "Settings" });
+    expect(settingsWorkspace).toHaveAttribute("data-settings-consumer", "field");
+    expect(screen.getByRole("tablist", { name: "Settings" }))
+      .toHaveAttribute("aria-orientation", "vertical");
+    expect(container.querySelector(".launcher-chrome")).toHaveAttribute("aria-hidden", "true");
+    expect((container.querySelector(".launcher-main") as HTMLElement).inert).toBe(true);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+    expect(container.querySelector(".launcher-chrome")).not.toHaveAttribute("aria-hidden");
+    expect((container.querySelector(".launcher-main") as HTMLElement).inert).toBe(false);
   });
 
   it("keeps language inside settings and enters the localized Field workspace after auth", async () => {

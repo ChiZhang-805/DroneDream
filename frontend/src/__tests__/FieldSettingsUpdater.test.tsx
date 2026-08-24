@@ -45,19 +45,23 @@ vi.mock("../i18n/I18nProvider", async () => (
 import { FieldLocaleProvider } from "../field/FieldLocaleProvider";
 import { FieldSettingsDialog } from "../field/FieldSettingsDialog";
 import { EditionThemeProvider } from "../theme/EditionThemeProvider";
+import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 
 function renderSettings(locale: "en" | "zh-CN" = "en") {
   window.localStorage.setItem("dronedream:field:locale", locale);
   return render(
     <EditionThemeProvider edition="field">
-      <FieldLocaleProvider>
-        <FieldSettingsDialog
-          closeRef={createRef<HTMLButtonElement>()}
-          locale={locale}
-          onClose={() => undefined}
-          onLocaleChange={() => undefined}
-        />
-      </FieldLocaleProvider>
+      <ModelAccessProvider accountScope="field:test">
+        <FieldLocaleProvider>
+          <FieldSettingsDialog
+            closeRef={createRef<HTMLButtonElement>()}
+            locale={locale}
+            onClose={() => undefined}
+            onLocaleChange={() => undefined}
+            presentation="workspace"
+          />
+        </FieldLocaleProvider>
+      </ModelAccessProvider>
     </EditionThemeProvider>,
   );
 }
@@ -87,7 +91,7 @@ describe("Field settings update center", () => {
     };
     renderSettings();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Safety" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime & updates" }));
     expect(screen.getByRole("heading", { name: "Software updates" })).toBeVisible();
     expect(screen.getByText("Version 1.0.1 is available. Click to update."))
       .toBeVisible();
@@ -108,7 +112,7 @@ describe("Field settings update center", () => {
     };
     renderSettings("zh-CN");
 
-    fireEvent.click(screen.getByRole("tab", { name: "安全" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime 与更新" }));
     expect(screen.getByRole("heading", { name: "软件更新" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "升级 Runtime Base" }));
 

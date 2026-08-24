@@ -29,10 +29,6 @@ const port = Number(args.get("--port") || 5198);
 const cases = [
   { id: "field-desktop-en", locale: "en", viewport: { width: 1440, height: 900 } },
   { id: "field-desktop-zh", locale: "zh-CN", viewport: { width: 1440, height: 900 } },
-  { id: "field-tablet-en", locale: "en", viewport: { width: 760, height: 900 } },
-  { id: "field-tablet-zh", locale: "zh-CN", viewport: { width: 760, height: 900 } },
-  { id: "field-mobile-en", locale: "en", viewport: { width: 390, height: 620 } },
-  { id: "field-mobile-zh", locale: "zh-CN", viewport: { width: 390, height: 620 } },
 ];
 
 function git(...gitArgs) {
@@ -246,21 +242,113 @@ try {
         "starflight"
     );
     await page.locator(".launcher-settings-button").click();
-    const settingsDialog = page.locator(".launcher-settings-dialog");
-    await settingsDialog.waitFor();
-    const courseTab = settingsDialog.getByRole("tab", { name: "ECE498BH" });
+    const quickSettings = page.locator(".quick-settings-dialog");
+    await quickSettings.waitFor();
+    // Edge can expose the DOM one compositor frame before the newly opened
+    // fixed surface is fully painted over the WebGL launcher.
+    await page.waitForTimeout(250);
+    const quickMetrics = await quickSettings.evaluate((dialog) => {
+      const bounds = dialog.getBoundingClientRect();
+      return {
+        width: bounds.width,
+        height: bounds.height,
+        aspectRatio: bounds.width / bounds.height,
+        clientWidth: dialog.clientWidth,
+        scrollWidth: dialog.scrollWidth,
+        clientHeight: dialog.clientHeight,
+        scrollHeight: dialog.scrollHeight,
+        tabCount: dialog.querySelectorAll('[role="tab"]').length,
+      };
+    });
+    assert(quickMetrics.aspectRatio >= 1.55 && quickMetrics.aspectRatio <= 1.65,
+      `${testCase.id}: quick settings aspect ratio is not close to 1.6`);
+    assert.equal(quickMetrics.tabCount, 0,
+      `${testCase.id}: quick settings must not contain category tabs`);
+    assert(quickMetrics.scrollWidth <= quickMetrics.clientWidth + 1
+      && quickMetrics.scrollHeight <= quickMetrics.clientHeight + 1,
+    `${testCase.id}: quick settings overflowed its fixed desktop surface`);
+    const quickScreenshotPath = path.join(outputRoot, `${testCase.id}-quick-settings.png`);
+    await page.screenshot({ path: quickScreenshotPath, fullPage: false });
+
+    await quickSettings.getByRole("button", {
+      name: testCase.locale === "en" ? "All settings" : "全部设置",
+    }).click();
+    const settingsWorkspace = page.locator(".settings-workspace-surface");
+    await settingsWorkspace.waitFor();
+    await quickSettings.waitFor({ state: "detached" });
+    const workspaceMetrics = await settingsWorkspace.evaluate((surface) => {
+      const bounds = surface.getBoundingClientRect();
+      const sidebar = surface.querySelector(".settings-workspace-sidebar")?.getBoundingClientRect();
+      const content = surface.querySelector(".settings-workspace-content")?.getBoundingClientRect();
+      return {
+        width: bounds.width,
+        height: bounds.height,
+        sidebarHeight: sidebar?.height ?? 0,
+        contentHeight: content?.height ?? 0,
+        clientWidth: surface.clientWidth,
+        scrollWidth: surface.scrollWidth,
+        clientHeight: surface.clientHeight,
+        scrollHeight: surface.scrollHeight,
+      };
+    });
+    assert(workspaceMetrics.width >= testCase.viewport.width - 1
+      && workspaceMetrics.height >= testCase.viewport.height - 1,
+    `${testCase.id}: full settings did not cover the desktop viewport`);
+    assert(workspaceMetrics.sidebarHeight >= testCase.viewport.height - 1
+      && workspaceMetrics.contentHeight >= testCase.viewport.height - 1,
+    `${testCase.id}: full settings columns did not fill the workspace height`);
+    assert(workspaceMetrics.scrollWidth <= workspaceMetrics.clientWidth + 1
+      && workspaceMetrics.scrollHeight <= workspaceMetrics.clientHeight + 1,
+    `${testCase.id}: full settings surface overflowed the desktop viewport`);
+    const categoryList = settingsWorkspace.getByRole("tablist");
+    assert.equal(await categoryList.getAttribute("aria-orientation"), "vertical");
+    assert.equal(await categoryList.getByRole("tab").count(), 5);
+    const workspaceTabScreenshots = {};
+    const workspaceTabs = testCase.locale === "en"
+      ? [
+          ["general", "General"],
+          ["memory", "Memory"],
+          ["model", "Models"],
+          ["runtime", "Runtime & updates"],
+        ]
+      : [
+          ["general", "常规"],
+          ["memory", "记忆"],
+          ["model", "模型"],
+          ["runtime", "Runtime 与更新"],
+        ];
+    for (const [tabId, tabLabel] of workspaceTabs) {
+      await settingsWorkspace.getByRole("tab", { name: tabLabel }).click();
+      const panel = settingsWorkspace.locator(`[data-settings-panel="${tabId}"]`);
+      await panel.waitFor({ state: "visible" });
+      await page.waitForTimeout(100);
+      const tabScreenshotPath = path.join(
+        outputRoot,
+        `${testCase.id}-settings-${tabId}.png`,
+      );
+      await page.screenshot({ path: tabScreenshotPath, fullPage: false });
+      workspaceTabScreenshots[tabId] = {
+        path: path.relative(repoRoot, tabScreenshotPath).replaceAll("\\", "/"),
+        sha256: await sha256(tabScreenshotPath),
+      };
+    }
+    const courseTab = settingsWorkspace.getByRole("tab", { name: "ECE498BH" });
     await courseTab.click();
-    const courseLink = settingsDialog.locator(
+    const courseLink = settingsWorkspace.locator(
       'a[href="https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html"]',
     );
     await courseLink.waitFor();
     const courseHref = await courseLink.getAttribute("href");
     assert.equal(await courseLink.getAttribute("target"), "_blank");
     assert.equal(await courseLink.getAttribute("rel"), "noreferrer");
-    const settingsScreenshotPath = path.join(outputRoot, `${testCase.id}-ece498-settings.png`);
+    const settingsScreenshotPath = path.join(outputRoot, `${testCase.id}-settings-workspace.png`);
     await page.screenshot({ path: settingsScreenshotPath, fullPage: false });
-    await settingsDialog.locator(".launcher-settings-close").click();
-    await settingsDialog.waitFor({ state: "detached" });
+    await settingsWorkspace.getByRole("button", {
+      name: testCase.locale === "en" ? "Back to app" : "返回应用",
+    }).click();
+    await settingsWorkspace.waitFor({ state: "detached" });
+    assert.equal(await scene.getAttribute("data-flight-state"), "starflight",
+      `${testCase.id}: returning from settings reset the launcher scene`);
     results.push({
       ...testCase,
       theme,
@@ -269,8 +357,17 @@ try {
       entryBounds,
       launcherTiming,
       droneInteraction: "hover-to-starflight",
+      quickSettings: {
+        metrics: quickMetrics,
+        screenshot: {
+          path: path.relative(repoRoot, quickScreenshotPath).replaceAll("\\", "/"),
+          sha256: await sha256(quickScreenshotPath),
+        },
+      },
       ece498CourseEntry: {
         href: courseHref,
+        workspaceMetrics,
+        workspaceTabScreenshots,
         screenshot: {
           path: path.relative(repoRoot, settingsScreenshotPath).replaceAll("\\", "/"),
           sha256: await sha256(settingsScreenshotPath),
