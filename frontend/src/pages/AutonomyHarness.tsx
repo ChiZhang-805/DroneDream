@@ -166,16 +166,49 @@ function HarnessFlowEdgeView({
 const nodeTypes = { harness: HarnessPuzzleNode };
 const edgeTypes = { "harness-flow": HarnessFlowEdgeView };
 
-function CanvasAutoFit({ signature, level }: { signature: string; level: 1 | 2 | 3 }) {
+const INITIAL_CANVAS_ZOOM: Record<1 | 2 | 3, number> = {
+  1: 0.78,
+  2: 0.82,
+  3: 0.84,
+};
+
+function CanvasInitialViewport({ signature, level }: { signature: string; level: 1 | 2 | 3 }) {
   const nodesInitialized = useNodesInitialized();
-  const { fitView } = useReactFlow();
+  const { getNodes, getNodesBounds, getZoom, setCenter } = useReactFlow<HarnessFlowNode, HarnessFlowEdge>();
+
+  const centerNodes = useCallback((zoom: number, duration = 0) => {
+    const flowNodes = getNodes();
+    if (!flowNodes.length) return;
+    const bounds = getNodesBounds(flowNodes);
+    void setCenter(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+      { zoom, duration },
+    );
+  }, [getNodes, getNodesBounds, setCenter]);
+
   useEffect(() => {
     if (!nodesInitialized) return;
     const frame = window.requestAnimationFrame(() => {
-      void fitView({ padding: level === 1 ? 0.1 : 0.18, duration: 220 });
+      centerNodes(INITIAL_CANVAS_ZOOM[level], 220);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [fitView, level, nodesInitialized, signature]);
+  }, [centerNodes, level, nodesInitialized, signature]);
+
+  useEffect(() => {
+    if (!nodesInitialized) return;
+    let frame = 0;
+    const recenter = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => centerNodes(getZoom()));
+    };
+    window.addEventListener("resize", recenter);
+    return () => {
+      window.removeEventListener("resize", recenter);
+      window.cancelAnimationFrame(frame);
+    };
+  }, [centerNodes, getZoom, nodesInitialized]);
+
   return null;
 }
 
@@ -695,9 +728,10 @@ export function AutonomyHarness() {
               setSelectedItemId(item.item_id);
               setContextMenu({ itemId: item.item_id, x: event.clientX, y: event.clientY });
             }}
-            fitView fitViewOptions={{ padding: level === 1 ? 0.1 : 0.18 }} minZoom={typeof window !== "undefined" && window.innerWidth <= 560 ? 0.2 : 0.45} maxZoom={1.7}
+            defaultViewport={{ x: 0, y: 0, zoom: INITIAL_CANVAS_ZOOM[level] }}
+            minZoom={typeof window !== "undefined" && window.innerWidth <= 560 ? 0.2 : 0.45} maxZoom={1.7}
             deleteKeyCode={null} proOptions={{ hideAttribution: true }}>
-            <CanvasAutoFit
+            <CanvasInitialViewport
               signature={`${level}:${parentId ?? "root"}:${displayItems.map((item) => item.item_id).join("|")}`}
               level={level}
             />

@@ -233,7 +233,7 @@ try {
       naturalWidth: image instanceof HTMLImageElement ? image.naturalWidth : 0,
       naturalHeight: image instanceof HTMLImageElement ? image.naturalHeight : 0,
     }));
-    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 2648, naturalHeight: 480 });
+    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 2386, naturalHeight: 218 });
     assert((await page.getByText("DroneDream · LAB", { exact: false }).count()) > 0);
     const palette = await page.locator(".lab-page").evaluate((element) => {
       const style = getComputedStyle(element);

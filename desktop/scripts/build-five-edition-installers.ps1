@@ -542,10 +542,11 @@ try {
         }
 
         $bundleRoot = Join-Path $cargoRootFull "$($toolchainContract.targetTriple)\release\bundle\nsis"
+        $builtApplication = Join-Path $cargoRootFull "$($toolchainContract.targetTriple)\release\drone-dream-desktop.exe"
         $builtInstaller = Join-Path $bundleRoot "$($contract.product)_${version}_x64-setup.exe"
         $builtSignature = "$builtInstaller.sig"
         $builtChecksum = "$builtInstaller.sha256"
-        foreach ($required in @($builtInstaller, $builtChecksum)) {
+        foreach ($required in @($builtApplication, $builtInstaller, $builtChecksum)) {
             if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
                 throw "$editionId build did not produce $required"
             }
@@ -556,6 +557,7 @@ try {
         }
 
         $installerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $builtInstaller).Hash.ToLowerInvariant()
+        $applicationHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $builtApplication).Hash.ToLowerInvariant()
         $checksumLine = (Get-Content -LiteralPath $builtChecksum -Raw -Encoding ASCII).Trim()
         if ($checksumLine -notmatch "^$installerHash\s+") {
             throw "$editionId checksum sidecar does not match the installer."
@@ -608,6 +610,11 @@ try {
                 bytes = (Get-Item -LiteralPath $handoffInstaller).Length
                 sha256 = $installerHash
                 updaterSignature = -not $AllowUnsignedUpdater
+            }
+            application = [ordered]@{
+                fileName = [IO.Path]::GetFileName($builtApplication)
+                bytes = (Get-Item -LiteralPath $builtApplication).Length
+                sha256 = $applicationHash
             }
             elapsedSeconds = [Math]::Round($stopwatch.Elapsed.TotalSeconds, 1)
             generatedAt = [DateTimeOffset]::UtcNow.ToString("o")
