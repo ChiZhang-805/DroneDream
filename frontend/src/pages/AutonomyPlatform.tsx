@@ -17,7 +17,6 @@ import {
   Globe2,
   HardDrive,
   Layers3,
-  Map,
   MapPin,
   Mic,
   Paperclip,
@@ -648,7 +647,7 @@ export function AutonomyAssetConnectorPanel({
         <footer><button type="button" className="btn btn-primary" disabled={importing || !remoteLocation.trim() || Boolean(remoteSha256 && !/^[0-9a-fA-F]{64}$/u.test(remoteSha256))} onClick={() => void importRemoteAsset()}>{importing ? (chinese ? "正在导入" : "Importing") : (chinese ? "导入" : "Import")}</button></footer>
       </div> : null}
       {catalogState === "loading" ? <span className="autonomy-connector-state">{chinese ? "正在读取连接器" : "Loading connectors"}</span> : null}
-      {catalogState === "unavailable" ? <span className="autonomy-connector-state is-unavailable">{chinese ? "在桌面软件中可导入，当前显示连接器目录" : "Import in the desktop app; showing the connector catalog"}</span> : null}
+      {catalogState === "unavailable" ? <span className="autonomy-connector-state is-unavailable">{chinese ? "需要桌面端导入" : "Desktop import required"}</span> : null}
       {importError ? <span className="autonomy-connector-state is-unavailable">{importError}</span> : null}
       {adapters.length ? <div className="autonomy-connector-grid">{adapters.map((adapter) => (
         <article key={adapter.id} data-enabled={adapter.enabled}>
@@ -908,7 +907,7 @@ export function AutonomyAssetQualificationPanel({ chinese }: { chinese: boolean 
         {activeJob ? <em data-state={activeJob.state}>{states[activeJob.state][chinese ? 0 : 1]}</em> : null}
       </header>
       {state === "loading" ? <span className="autonomy-connector-state">{chinese ? "正在读取可认证资产" : "Loading eligible assets"}</span> : null}
-      {state === "unavailable" ? <span className="autonomy-connector-state is-unavailable">{chinese ? "请在桌面软件中运行成对认证。" : "Run pair qualification in the desktop app."}</span> : null}
+      {state === "unavailable" ? <span className="autonomy-connector-state is-unavailable">{chinese ? "需要桌面端认证" : "Desktop qualification required"}</span> : null}
       {state === "ready" ? <div className="autonomy-pair-selectors">
         <label><span>{chinese ? "地图版本" : "Map version"}</span><select value={mapHash} onChange={(event) => setMapHash(event.target.value)} disabled={working || Boolean(activeJob && !["qualified", "failed", "cancelled"].includes(activeJob.state))}><option value="">{chinese ? "选择地图" : "Choose map"}</option>{mapVersions.map((version) => <option key={version.content_sha256} value={version.content_sha256}>{qualificationAssetLabel(version)}</option>)}</select></label>
         <label><span>{chinese ? "无人机版本" : "Aircraft version"}</span><select value={vehicleHash} onChange={(event) => setVehicleHash(event.target.value)} disabled={working || Boolean(activeJob && !["qualified", "failed", "cancelled"].includes(activeJob.state))}><option value="">{chinese ? "选择无人机" : "Choose aircraft"}</option>{vehicleVersions.map((version) => <option key={version.content_sha256} value={version.content_sha256}>{qualificationAssetLabel(version)}</option>)}</select></label>
@@ -1973,12 +1972,16 @@ export function AutonomyOverview() {
             <h2>{copy.question}</h2>
             <div className="assistant-examples autonomy-command-examples">
               {copy.examples.map((example, index) => (
-                <button type="button" key={example.title} onClick={() => setComposer(example.body)}>
+                <button
+                  type="button"
+                  key={example.title}
+                  aria-label={example.title}
+                  onClick={() => setComposer(example.body)}
+                >
                   <span className="assistant-example-heading">
                     <AutonomyTemplateIcon index={index} />
                     <strong>{example.title}</strong>
                   </span>
-                  <span className="assistant-example-body">{example.body}</span>
                 </button>
               ))}
             </div>
@@ -2240,29 +2243,6 @@ function qualificationStateLabel(qualified: boolean, chinese: boolean): string {
     : chinese ? "等待导入与认证" : "Import and qualification required";
 }
 
-function ImportedAssetRequired({
-  chinese,
-  kind,
-}: {
-  chinese: boolean;
-  kind: "map" | "vehicle";
-}) {
-  return (
-    <div className="autonomy-connector-state" role="status">
-      <ShieldCheck aria-hidden="true" />
-      <span>
-        {kind === "vehicle"
-          ? chinese
-            ? "请从外部建模工具导入无人机资产，并完成地图与无人机的成对真实仿真认证。"
-            : "Import an aircraft asset from an external modeling tool, then complete paired real-simulation qualification."
-          : chinese
-            ? "请从外部建模工具导入地图或世界资产，并完成地图与无人机的成对真实仿真认证。"
-            : "Import a map or world asset from an external modeling tool, then complete paired real-simulation qualification."}
-      </span>
-    </div>
-  );
-}
-
 export function AutonomyAircraft() {
   const { chinese, workspace, assetLibrary, selectAircraft } = useAutonomyWorkspace();
   const aircraft = workspace.aircraft;
@@ -2282,7 +2262,7 @@ export function AutonomyAircraft() {
   ));
 
   return (
-    <section className="autonomy-config-page">
+    <section className="autonomy-config-page autonomy-config-page-continuous">
       <div className="autonomy-config-main">
         <AutonomyAssetConnectorPanel kind="vehicle" chinese={chinese} />
         <AutonomyAssetQualificationPanel chinese={chinese} />
@@ -2316,17 +2296,9 @@ export function AutonomyAircraft() {
               <label className="is-wide"><span>{chinese ? "内容哈希" : "Content hash"}</span><input readOnly value={aircraft.agentCoreContentSha256 ?? ""} /></label>
               <label className="is-wide"><span>{chinese ? "认证凭据" : "Qualification receipt"}</span><input readOnly value={aircraft.qualificationReceiptId ?? ""} /></label>
             </div>
-          ) : <ImportedAssetRequired chinese={chinese} kind="vehicle" />}
+          ) : null}
         </section>
       </div>
-      <aside className="autonomy-config-summary">
-        <header><ShieldCheck aria-hidden="true" /><h2>{chinese ? "无人机资格" : "Aircraft qualification"}</h2></header>
-        <Metric icon={<Navigation2 aria-hidden="true" />} label={chinese ? "无人机" : "Aircraft"} value={aircraft.name} />
-        <Metric icon={<Database aria-hidden="true" />} label={chinese ? "来源" : "Source"} value={sourceLabel} />
-        <Metric icon={<HardDrive aria-hidden="true" />} label={chinese ? "资产成熟度" : "Asset maturity"} value={source?.maturity.replaceAll("_", " ") ?? "—"} />
-        <Metric icon={<CircleCheck aria-hidden="true" />} label={chinese ? "状态" : "Status"} value={qualificationStateLabel(qualified, chinese)} />
-        <Metric icon={<FileClock aria-hidden="true" />} label={chinese ? "认证凭据" : "Receipt"} value={aircraft.qualificationReceiptId ?? "—"} />
-      </aside>
     </section>
   );
 }
@@ -2355,7 +2327,7 @@ export function AutonomyMaps() {
   ));
 
   return (
-    <section className="autonomy-config-page autonomy-maps-page">
+    <section className="autonomy-config-page autonomy-config-page-continuous autonomy-maps-page">
       <div className="autonomy-config-main">
         <AutonomyAssetConnectorPanel kind="map" chinese={chinese} />
         <AutonomyAssetQualificationPanel chinese={chinese} />
@@ -2395,7 +2367,7 @@ export function AutonomyMaps() {
               <label className="is-wide"><span>{chinese ? "内容哈希" : "Content hash"}</span><input readOnly value={mapPack.agentCoreContentSha256 ?? ""} /></label>
               <label className="is-wide"><span>{chinese ? "认证凭据" : "Qualification receipt"}</span><input readOnly value={mapPack.qualificationReceiptId ?? ""} /></label>
             </div>
-          ) : <ImportedAssetRequired chinese={chinese} kind="map" />}
+          ) : null}
         </section>
         {qualified ? (
           <section className="autonomy-config-card">
@@ -2415,14 +2387,6 @@ export function AutonomyMaps() {
           </section>
         ) : null}
       </div>
-      <aside className="autonomy-config-summary">
-        <header><Map aria-hidden="true" /><h2>{chinese ? "地图资格" : "Map qualification"}</h2></header>
-        <Metric icon={<Layers3 aria-hidden="true" />} label={chinese ? "地图" : "Map"} value={mapPack.name} />
-        <Metric icon={<HardDrive aria-hidden="true" />} label={chinese ? "资产文件" : "Assets"} value={String(mapPack.sourceFiles.length)} />
-        <Metric icon={<ScanLine aria-hidden="true" />} label={chinese ? "分辨率" : "Resolution"} value={String(mapPack.resolutionM) + " m"} />
-        <Metric icon={<ShieldCheck aria-hidden="true" />} label={chinese ? "状态" : "Status"} value={qualificationStateLabel(qualified, chinese)} />
-        <Metric icon={<Database aria-hidden="true" />} label={chinese ? "认证凭据" : "Receipt"} value={mapPack.qualificationReceiptId ?? "—"} />
-      </aside>
     </section>
   );
 }

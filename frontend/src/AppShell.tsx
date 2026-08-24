@@ -159,10 +159,14 @@ import type {
 } from "./types/api";
 import {
   deleteConsolePreferencesAndMemory,
+  loadConsoleMemoryConsent,
   loadConsolePreferences,
+  MODEL_HARNESS_MEMORY_NAMESPACES,
+  saveConsoleMemoryConsent,
   saveConsolePreferences,
   type ConsoleMemoryScope,
   type ConsolePreferenceRecord,
+  type ModelHarnessMemoryNamespace,
 } from "./features/settings/consolePreferences";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
 import { EditionThemeProvider, useEditionTheme } from "./theme/EditionThemeProvider";
@@ -419,7 +423,10 @@ function mobileNavigationSnapshot(): boolean {
 const MAX_ACTIVE_JOB_PAGES_PER_STATUS = 10;
 
 interface ExperiencePreferenceDraft {
+  account_memory_enabled: boolean;
   memory_enabled: boolean;
+  read_namespaces: ModelHarnessMemoryNamespace[];
+  write_namespaces: ModelHarnessMemoryNamespace[];
   memory_scopes: Record<ConsoleMemoryScope, boolean>;
   default_template_key: StarterExperienceTemplateKey | null;
   default_vehicle: string | null;
@@ -432,7 +439,10 @@ interface ExperiencePreferenceDraft {
 }
 
 const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
+  account_memory_enabled: false,
   memory_enabled: false,
+  read_namespaces: [...MODEL_HARNESS_MEMORY_NAMESPACES],
+  write_namespaces: [...MODEL_HARNESS_MEMORY_NAMESPACES],
   memory_scopes: {
     chat_preferences: true,
     experiment_defaults: true,
@@ -441,6 +451,8 @@ const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
     safety_approvals: true,
     workflow_tools: true,
     reports_delivery: true,
+    collaboration_organization: true,
+    files_artifacts: true,
   },
   default_template_key: null,
   default_vehicle: null,
@@ -486,7 +498,17 @@ type SettingsCopy = Readonly<{
   memoryTitle: string;
   memoryEnabled: readonly [string, string];
   crossSession: string;
-  memoryScopes: readonly [string, string, string, string, string, string, string];
+  memoryScopes: readonly [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
   memoryDefaults: readonly [string, string, string, string, string];
   courseOverview: string;
   courseOpen: string;
@@ -506,7 +528,7 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryTitle: "Memory",
     memoryEnabled: ["Memory off", "Memory on"],
     crossSession: "Cross-session memory",
-    memoryScopes: ["Chat preferences", "Experiment defaults", "Device and vehicle", "Metrics and constraints", "Safety and approvals", "Workflow and tools", "Reports and delivery"],
+    memoryScopes: ["Chat preferences", "Experiment defaults", "Device and vehicle", "Metrics and constraints", "Safety and approvals", "Workflow and tools", "Reports and delivery", "Organization collaboration", "Files and artifacts"],
     memoryDefaults: ["Default vehicle", "Default objective", "Default safety profile", "Default units", "Default report format"],
     courseOverview: "The course joins LLM reasoning with controls and aerospace engineering tools; DroneDream turns that foundation into practical UAV workflows that can be planned, executed, reviewed, and verified.",
     courseOpen: "Open course",
@@ -524,7 +546,7 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryTitle: "记忆",
     memoryEnabled: ["记忆已关闭", "记忆已开启"],
     crossSession: "跨会话记忆",
-    memoryScopes: ["对话偏好", "实验默认值", "设备与机型", "指标与约束", "安全与审批", "工作流与工具", "报告与交付"],
+    memoryScopes: ["对话偏好", "实验默认值", "设备与机型", "指标与约束", "安全与审批", "工作流与工具", "报告与交付", "组织协作", "文件与产物"],
     memoryDefaults: ["默认机型", "默认优化目标", "默认安全配置", "默认单位制", "默认报告格式"],
     courseOverview: "课程把大模型推理与控制、航空航天工程工具紧密结合，DroneDream 将这些基础能力落实为可规划、可执行、可复核、可验收的无人机工程工作流。",
     courseOpen: "打开课程",
@@ -536,6 +558,37 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
 const AUTONOMY_COURSE_COPY: Readonly<Record<InterfaceLocale, string>> = {
   en: "Turn natural-language intent into structured mission plans, validate them through repeated Model + Harness loops, and supervise execution with pluginized tools, safety holds, replanning, and evidence gates.",
   "zh-CN": "把自然语言意图转成结构化任务计划，通过模型与脚手架的多轮循环反复校验，并利用插件化工具、安全悬停、在线换路和证据门监督任务执行。",
+};
+
+const MEMORY_DOMAIN_LABELS: Readonly<
+  Record<InterfaceLocale, Readonly<Record<ModelHarnessMemoryNamespace, string>>>
+> = {
+  en: {
+    "account.shared": "Shared",
+    "optimization.control_tuning": "Tuning",
+    "autonomy.mission": "Missions",
+    "asset.qualification": "Assets",
+    "experiment.simulation": "Simulation",
+    "workflow.cross_edition": "Cross-edition",
+    "validation.hardware": "Hardware",
+    "calibration.system": "Calibration",
+    "transfer.sim_to_real": "Sim → real",
+    "transfer.real_to_sim": "Real → sim",
+    "operations.field": "Field",
+  },
+  "zh-CN": {
+    "account.shared": "账户共享",
+    "optimization.control_tuning": "控制调优",
+    "autonomy.mission": "自主任务",
+    "asset.qualification": "资产认证",
+    "experiment.simulation": "仿真实验",
+    "workflow.cross_edition": "跨软件流程",
+    "validation.hardware": "硬件验证",
+    "calibration.system": "系统校准",
+    "transfer.sim_to_real": "仿真→真机",
+    "transfer.real_to_sim": "真机→仿真",
+    "operations.field": "外场运行",
+  },
 };
 
 function AllowanceCardIcon({
@@ -936,6 +989,12 @@ function SettingsDialog({
     interfaceLocale,
     notificationPreferences,
   ]);
+  const consoleMemoryConsentRecord = useCallback(() => ({
+    memory_enabled: experiencePreferenceDraft.account_memory_enabled,
+    read_namespaces: experiencePreferenceDraft.read_namespaces,
+    write_namespaces: experiencePreferenceDraft.write_namespaces,
+    memory_scopes: experiencePreferenceDraft.memory_scopes,
+  }), [experiencePreferenceDraft]);
   const updateNotificationPreference = (
     key: NotificationPreferenceKey,
     checked: boolean,
@@ -1034,21 +1093,31 @@ function SettingsDialog({
     setExperiencePreferenceState("loading");
     setExperiencePreferenceMessage(null);
     const load = docsPreview || localDesktopPreferences
-      ? Promise.resolve(null)
+      ? Promise.resolve([null, null] as const)
       : preferenceBoundary
-        ? loadConsolePreferences(preferenceBoundary)
-        : Promise.resolve(null);
+        ? Promise.all([
+          loadConsolePreferences(preferenceBoundary),
+          loadConsoleMemoryConsent(preferenceBoundary),
+        ])
+        : Promise.resolve([null, null] as const);
     void load
-      .then((preferences) => {
+      .then(([preferences, consent]) => {
         if (!active) return;
-        if (preferences) {
-          const defaults = preferences.defaults ?? {};
+        if (preferences || consent) {
+          const defaults = preferences?.defaults ?? {};
           setExperiencePreferenceDraft({
             ...EMPTY_EXPERIENCE_PREFERENCE_DRAFT,
-            memory_enabled: preferences.memory_enabled,
+            account_memory_enabled: consent?.memory_enabled ?? false,
+            memory_enabled: preferences?.memory_enabled ?? false,
+            read_namespaces: consent?.read_namespaces ?? [
+              ...MODEL_HARNESS_MEMORY_NAMESPACES,
+            ],
+            write_namespaces: consent?.write_namespaces ?? [
+              ...MODEL_HARNESS_MEMORY_NAMESPACES,
+            ],
             memory_scopes: {
               ...EMPTY_EXPERIENCE_PREFERENCE_DRAFT.memory_scopes,
-              ...preferences.memory_scopes,
+              ...(preferences?.memory_scopes ?? {}),
             },
             default_template_key: (defaults.template ?? null) as StarterExperienceTemplateKey | null,
             default_vehicle: typeof defaults.vehicle === "string" ? defaults.vehicle : null,
@@ -1059,13 +1128,15 @@ function SettingsDialog({
             default_units: typeof defaults.units === "string" ? defaults.units : null,
             default_report_format: typeof defaults.report_format === "string" ? defaults.report_format : null,
           });
-          setNotificationPreferences({
-            ...DEFAULT_NOTIFICATION_PREFERENCES,
-            ...preferences.notifications,
-          });
-          setLocale(preferences.interface_locale);
-          setAppearancePreference(preferences.appearance_mode);
-          setCustomAccentPreference(preferences.custom_accent);
+          if (preferences) {
+            setNotificationPreferences({
+              ...DEFAULT_NOTIFICATION_PREFERENCES,
+              ...preferences.notifications,
+            });
+            setLocale(preferences.interface_locale);
+            setAppearancePreference(preferences.appearance_mode);
+            setCustomAccentPreference(preferences.custom_accent);
+          }
         }
         preferenceHydratedRef.current = true;
         setExperiencePreferenceState("ready");
@@ -1098,12 +1169,16 @@ function SettingsDialog({
       return undefined;
     }
     const pendingSave = window.setTimeout(() => {
-      void saveConsolePreferences(preferenceBoundary, consolePreferenceRecord())
+      void Promise.all([
+        saveConsolePreferences(preferenceBoundary, consolePreferenceRecord()),
+        saveConsoleMemoryConsent(preferenceBoundary, consoleMemoryConsentRecord()),
+      ])
         .catch(() => setExperiencePreferenceMessage(t("settings.memory.saveFailed")));
     }, 450);
     return () => window.clearTimeout(pendingSave);
   }, [
     consolePreferenceRecord,
+    consoleMemoryConsentRecord,
     docsPreview,
     experiencePreferenceState,
     preferenceBoundary,
@@ -1122,7 +1197,10 @@ function SettingsDialog({
     setExperiencePreferenceMessage(null);
     try {
       if (preferenceBoundary) {
-        await saveConsolePreferences(preferenceBoundary, consolePreferenceRecord());
+        await Promise.all([
+          saveConsolePreferences(preferenceBoundary, consolePreferenceRecord()),
+          saveConsoleMemoryConsent(preferenceBoundary, consoleMemoryConsentRecord()),
+        ]);
       } else if (localDesktopPreferences) {
         // Pre-login settings remain usable, but account-scoped Memory is never
         // sent to the Runtime without an authenticated account boundary.
@@ -1157,9 +1235,11 @@ function SettingsDialog({
       setConfirmExperiencePreferenceDelete(false);
       setExperiencePreferenceState("ready");
       setExperiencePreferenceMessage(
-        t("settings.memory.deleted", {
-          count: deletedCount,
-        }),
+        preferenceBoundary
+          ? t("settings.memory.deleted", { count: deletedCount })
+          : locale === "zh-CN"
+            ? "已删除本地个人默认值；未删除账户记忆。"
+            : "Personal defaults deleted; 0 memory rows erased.",
       );
     } catch {
       setExperiencePreferenceState("error");
@@ -1538,17 +1618,29 @@ function SettingsDialog({
           <div>
             <h3 id="settings-memory-title">{settingsCopy.memoryTitle}</h3>
           </div>
-          <span className={experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
-            {settingsCopy.memoryEnabled[experiencePreferenceDraft.memory_enabled ? 1 : 0]}
+          <span className={experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
+            {settingsCopy.memoryEnabled[
+              experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? 1 : 0
+            ]}
           </span>
         </div>
         <div className="settings-memory-body">
           <div className="settings-memory-switches">
             <SettingsToggle
-              checked={experiencePreferenceDraft.memory_enabled}
+              checked={experiencePreferenceDraft.account_memory_enabled}
               className="settings-memory-master-toggle"
               disabled={experiencePreferenceControlsDisabled}
-              label={<><BrainCircuit aria-hidden="true" /><span>{settingsCopy.crossSession}</span></>}
+              label={<><BrainCircuit aria-hidden="true" /><span>{t("settings.memory.accountConsent")}</span></>}
+              onChange={(checked) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                account_memory_enabled: checked,
+              }))}
+            />
+            <SettingsToggle
+              checked={experiencePreferenceDraft.memory_enabled}
+              className="settings-memory-master-toggle"
+              disabled={experiencePreferenceControlsDisabled || !experiencePreferenceDraft.account_memory_enabled}
+              label={<><BrainCircuit aria-hidden="true" /><span>{t("settings.memory.editionAccess")}</span></>}
               onChange={(checked) => setExperiencePreferenceDraft((current) => ({
                 ...current,
                 memory_enabled: checked,
@@ -1563,11 +1655,13 @@ function SettingsDialog({
                 ["safety_approvals", ShieldCheck, settingsCopy.memoryScopes[4]],
                 ["workflow_tools", BotMessageSquare, settingsCopy.memoryScopes[5]],
                 ["reports_delivery", Save, settingsCopy.memoryScopes[6]],
+                ["collaboration_organization", CircleUserRound, settingsCopy.memoryScopes[7]],
+                ["files_artifacts", ImagePlus, settingsCopy.memoryScopes[8]],
               ] as const).map(([scope, ScopeIcon, label]) => (
                 <SettingsToggle
                   key={scope}
                   checked={experiencePreferenceDraft.memory_scopes[scope]}
-                  disabled={experiencePreferenceControlsDisabled || !experiencePreferenceDraft.memory_enabled}
+                  disabled={experiencePreferenceControlsDisabled || !experiencePreferenceDraft.account_memory_enabled || !experiencePreferenceDraft.memory_enabled}
                   label={<><ScopeIcon aria-hidden="true" /><span>{label}</span></>}
                   onChange={(checked) => setExperiencePreferenceDraft((current) => ({
                     ...current,
@@ -1575,6 +1669,39 @@ function SettingsDialog({
                   }))}
                 />
               ))}
+            </div>
+            <div className="settings-memory-scope-grid settings-memory-domain-grid" aria-label={t("settings.memory.domainConsent")}>
+              {MODEL_HARNESS_MEMORY_NAMESPACES.map((namespace) => {
+                const readable = experiencePreferenceDraft.read_namespaces.includes(namespace);
+                const writable = experiencePreferenceDraft.write_namespaces.includes(namespace);
+                return (
+                  <div key={namespace} className="settings-memory-domain-consent">
+                    <span title={namespace}>{MEMORY_DOMAIN_LABELS[locale][namespace]}</span>
+                    <SettingsToggle
+                      checked={readable}
+                      disabled={experiencePreferenceControlsDisabled || !experiencePreferenceDraft.account_memory_enabled}
+                      label={t("settings.memory.allowRead")}
+                      onChange={(checked) => setExperiencePreferenceDraft((current) => ({
+                        ...current,
+                        read_namespaces: checked
+                          ? [...new Set([...current.read_namespaces, namespace])]
+                          : current.read_namespaces.filter((value) => value !== namespace),
+                      }))}
+                    />
+                    <SettingsToggle
+                      checked={writable}
+                      disabled={experiencePreferenceControlsDisabled || !experiencePreferenceDraft.account_memory_enabled}
+                      label={t("settings.memory.allowWrite")}
+                      onChange={(checked) => setExperiencePreferenceDraft((current) => ({
+                        ...current,
+                        write_namespaces: checked
+                          ? [...new Set([...current.write_namespaces, namespace])]
+                          : current.write_namespaces.filter((value) => value !== namespace),
+                      }))}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div className="settings-memory-defaults">
@@ -1743,7 +1870,11 @@ function SettingsDialog({
               <Trash2 aria-hidden="true" />{t("settings.memory.delete")}
             </button>
           ) : (
-            <div className="settings-memory-delete-confirm" role="group" aria-label={t("settings.memory.confirmDelete")}>
+            <div
+              className="settings-memory-delete-confirm"
+              role="group"
+              aria-label={locale === "zh-CN" ? "删除所有已保存的默认值和结构化记忆？" : "Delete all saved defaults and structured memory?"}
+            >
               <span>{t("settings.memory.confirmDelete")}</span>
               <button
                 type="button"

@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   CircleGauge,
   FileJson2,
-  FlaskConical,
   History,
   Play,
   RotateCcw,
@@ -40,14 +39,10 @@ import {
 const COPY = {
   en: {
     title: "Autonomous field tuning",
-    body: "Model proposes bounded candidates. Harness runs the controlled experiment, scores telemetry, classifies failures, and preserves rollback evidence.",
     domain: "Real-device domain",
     noSimulation: "No simulation stage",
     authority: "Hardware authority",
     denied: "Denied",
-    model: "Model proposes",
-    harness: "Harness controls",
-    evidence: "Evidence qualifies",
     objective: "Tuning objective",
     objectiveValue: "Reduce attitude tracking error without increasing control effort",
     iterations: "Iteration budget",
@@ -73,7 +68,6 @@ const COPY = {
     demoOnly: "Demo-qualified only",
     notHardwareEvidence: "The receipt is content-bound demonstration evidence and is never valid for hardware.",
     hardwareGate: "Real-hardware execution gate",
-    gateBody: "A real tuning job is prepared separately and must satisfy every compatibility, recovery, operator, and native authority gate.",
     evaluate: "Evaluate current hardware gate",
     blockers: "Current blockers",
     required: "Required evidence",
@@ -83,7 +77,6 @@ const COPY = {
     job: "Harness job",
     writeBudget: "Parameter write budget",
     recordedTitle: "Recorded-device Harness job",
-    recordedBody: "Import content-bound trial telemetry collected from this snapshot. The local Model proposes the next bounded candidate; Harness scores every trial, checks the final independent holdout, and stores a tamper-evident receipt.",
     jobName: "Job name",
     jobNameValue: "Field attitude evidence review",
     evidenceJson: "Parameter bounds and recorded trials (JSON)",
@@ -105,14 +98,10 @@ const COPY = {
   },
   "zh-CN": {
     title: "真机自主调参",
-    body: "Model 提出受边界约束的候选参数，Harness 负责受控实验、遥测评分、失败分类和回滚证据。",
     domain: "真机实验域",
     noSimulation: "无仿真阶段",
     authority: "真机权限",
     denied: "已拒绝",
-    model: "Model 提出候选",
-    harness: "Harness 受控执行",
-    evidence: "证据完成判定",
     objective: "调参目标",
     objectiveValue: "在不增加控制开销的前提下降低姿态跟踪误差",
     iterations: "迭代预算",
@@ -138,7 +127,6 @@ const COPY = {
     demoOnly: "仅演示通过",
     notHardwareEvidence: "该回执仅为内容绑定的演示证据，永远不能作为真机资格证据。",
     hardwareGate: "真机执行安全门",
-    gateBody: "真实调参任务必须单独准备，并同时满足兼容性、恢复、操作者确认和原生权限要求。",
     evaluate: "评估当前真机安全门",
     blockers: "当前阻断",
     required: "必需证据",
@@ -148,7 +136,6 @@ const COPY = {
     job: "Harness 作业",
     writeBudget: "参数写入预算",
     recordedTitle: "真机记录证据 Harness 作业",
-    recordedBody: "导入与当前快照绑定的真实试验遥测。Model 提出下一组受步长约束的候选参数，Harness 对试验评分、检查最后一组独立留出证据，并保存防篡改回执。",
     jobName: "作业名称",
     jobNameValue: "现场姿态调参证据复核",
     evidenceJson: "参数边界与真机试验记录（JSON）",
@@ -342,10 +329,7 @@ export function FieldTuningWorkspace({
   return (
     <div className="field-tuning-workspace" data-authority="false" data-simulation="false">
       <header className="field-tuning-header">
-        <div>
-          <h2 id="field-tuning-title">{copy.title}</h2>
-          <p>{copy.body}</p>
-        </div>
+        <h2 id="field-tuning-title" className="sr-only">{copy.title}</h2>
         <div className="field-tuning-domain" aria-label={copy.domain}>
           <span><RadioStatus />{copy.domain}</span>
           <span><Ban aria-hidden="true" />{copy.noSimulation}</span>
@@ -353,17 +337,10 @@ export function FieldTuningWorkspace({
         </div>
       </header>
 
-      <ol className="field-tuning-flow" aria-label={copy.title}>
-        <li><Sparkles aria-hidden="true" /><span>01</span><strong>{copy.model}</strong></li>
-        <li><FlaskConical aria-hidden="true" /><span>02</span><strong>{copy.harness}</strong></li>
-        <li><ShieldCheck aria-hidden="true" /><span>03</span><strong>{copy.evidence}</strong></li>
-      </ol>
-
       <section className="field-recorded-harness" aria-labelledby="field-recorded-harness-title">
         <header>
           <div>
             <h3 id="field-recorded-harness-title"><FileJson2 aria-hidden="true" />{copy.recordedTitle}</h3>
-            <p>{copy.recordedBody}</p>
           </div>
           <span><ShieldCheck aria-hidden="true" />hardwareAuthority=false</span>
         </header>
@@ -504,7 +481,7 @@ export function FieldTuningWorkspace({
       ) : null}
 
       <section className="field-hardware-gate" aria-labelledby="field-hardware-gate-title">
-        <header><div><h3 id="field-hardware-gate-title">{copy.hardwareGate}</h3><p>{copy.gateBody}</p></div><ShieldCheck aria-hidden="true" /></header>
+        <header><h3 id="field-hardware-gate-title">{copy.hardwareGate}</h3><ShieldCheck aria-hidden="true" /></header>
         <button type="button" onClick={() => void evaluateHardwareGate()}><ShieldCheck aria-hidden="true" />{copy.evaluate}</button>
         {hardwarePlan ? (
           <div className="field-gate-evidence" role="status">

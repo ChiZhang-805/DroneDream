@@ -35,7 +35,7 @@ export type AssistantRunStage =
 export interface AssistantWorkflowStep {
   step: string;
   label: string;
-  status: "completed" | "needs_input";
+  status: "completed" | "needs_input" | "proposed" | "refused";
 }
 
 export interface AssistantGeneratedFile {
@@ -314,7 +314,7 @@ function validWorkflow(value: unknown): value is AssistantWorkflowStep[] {
       && typeof item.label === "string"
       && item.label.length > 0
       && item.label.length <= 255
-      && (item.status === "completed" || item.status === "needs_input")
+      && ["completed", "needs_input", "proposed", "refused"].includes(String(item.status))
     );
 }
 

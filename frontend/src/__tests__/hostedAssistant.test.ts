@@ -86,6 +86,15 @@ describe("hosted edition assistant", () => {
     ]));
     expect(result.experiment_summary).toContain("editable");
     expect(result.usage.total_tokens).toBe(200);
+    expect(result.lifecycle_stage).toBe("proposal");
+    expect(result.model_entrypoint_role).toBe("managed_model_proposal");
+    expect(result.model_harness_domain).toBe("experiment.simulation");
+    expect(result.runtime_execution_performed).toBe(false);
+    expect(result.control_plane).toMatchObject({
+      plugin_selection_effect: "contract_only",
+      plugin_runtime_receipt_ids: [],
+    });
+    expect(result.harness_input_sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(complete.mock.calls[0][0]).toBe(GRANT);
     expect(JSON.stringify(complete.mock.calls[0][1])).toContain(
       "The public web console has no execution authority",

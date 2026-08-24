@@ -64,22 +64,16 @@ const HARDWARE_ACTIONS = [
 
 const COPY = {
   en: {
-    eyebrow: "LAB 1.0.0 PREVIEW",
     title: "Sim-to-Real calibration laboratory",
     subtitle:
       "Model + Harness connects simulation search, controlled real observations, model calibration, independent holdout, and evidence issuance in one bounded job.",
-    edition: "Edition",
-    editionValue: "DroneDream · LAB",
     packs: "Validated packs",
     packsValue: "0 of 8",
     authority: "Hardware authority",
     deny: "DENY",
     workspaceLabel: "Lab workspace",
     simulation: "Simulation workspace",
-    simulationShort: "Simulation",
-    simulationDetail: "PX4 SITL and Gazebo workflow",
     hardware: "Hardware laboratory",
-    hardwareDetail: "Configuration preview only",
     switchNotice:
       "Workspace selection changes the workflow only; it never grants hardware authority.",
     calibration: "Calibration loop",
@@ -87,15 +81,11 @@ const COPY = {
     evidence: "Qualification evidence",
     safety: "Safety review",
     simulationReady: "Simulation workflow",
-    simulationBody:
-      "Use the shared experiment workflow for parameter search, fixed scenarios, PX4 SITL, Gazebo, and qualification receipt generation.",
     openExperiment: "Open simulation experiment",
     simulationPack: "Simulation Vehicle Pack",
     selectedContract: "Selected contract",
     contractOnly: "Contract only",
     hardwareSetup: "Hardware configuration preview",
-    hardwareBody:
-      "Selections bind the intended vehicle, controller, and firmware context. They do not discover a device or authorize an action.",
     vehiclePack: "Vehicle Pack",
     controller: "Flight controller",
     firmware: "Firmware identity",
@@ -111,8 +101,6 @@ const COPY = {
     actionsDeniedBody:
       "All write, arm, flight, and HITL entry points are disabled because the registry contains zero validated and signed Vehicle Packs.",
     evidenceTitle: "Sim to Lab evidence import preview",
-    evidenceBody:
-      "Inspect a bounded JSON simulation qualification receipt and parameter candidate locally. Previewed evidence remains untrusted and cannot satisfy hardware authority.",
     chooseEvidence: "Choose JSON evidence",
     clearEvidence: "Clear preview",
     noEvidence: "No evidence selected",
@@ -125,8 +113,6 @@ const COPY = {
     parameters: "Parameters",
     evidenceRejected: "Evidence rejected",
     safetyTitle: "Execution quorum",
-    safetyBody:
-      "A hardware request can proceed only when every authority signs the same canonical context. Missing, stale, mismatched, or negative decisions resolve to deny.",
     native: "Native",
     backend: "Backend",
     runtime: "Runtime",
@@ -143,22 +129,16 @@ const COPY = {
     deniedCapabilities: "Denied capability IDs",
   },
   "zh-CN": {
-    eyebrow: "LAB 1.0.0 内测预览",
     title: "Sim-to-Real 校准实验室",
     subtitle:
       "Model + Harness 在同一份受预算约束的作业中贯通仿真搜索、受控真实观测、模型校准、独立 holdout 与证据签发。",
-    edition: "版本",
-    editionValue: "DroneDream · LAB",
     packs: "已验证机型包",
     packsValue: "0 / 8",
     authority: "真机权限",
     deny: "拒绝",
     workspaceLabel: "实验室工作区",
     simulation: "仿真工作区",
-    simulationShort: "仿真",
-    simulationDetail: "PX4 SITL 与 Gazebo 工作流",
     hardware: "真机实验室",
-    hardwareDetail: "仅提供配置预览",
     switchNotice:
       "切换工作区只改变流程，绝不会授予真机权限。",
     calibration: "校准闭环",
@@ -166,15 +146,11 @@ const COPY = {
     evidence: "资格证据",
     safety: "安全复核",
     simulationReady: "仿真工作流",
-    simulationBody:
-      "使用公共实验流程完成参数搜索、固定场景、PX4 SITL、Gazebo 以及仿真资格 receipt 生成。",
     openExperiment: "打开仿真实验",
     simulationPack: "仿真 Vehicle Pack",
     selectedContract: "当前合同",
     contractOnly: "仅合同",
     hardwareSetup: "真机配置预览",
-    hardwareBody:
-      "选择项用于绑定预期机型、飞控与固件上下文，不会发现设备，也不会授予执行权限。",
     vehiclePack: "Vehicle Pack",
     controller: "飞行控制器",
     firmware: "固件身份",
@@ -190,8 +166,6 @@ const COPY = {
     actionsDeniedBody:
       "注册表中没有已验证且签名的 Vehicle Pack，因此写参数、解锁、飞行与 HITL 入口全部禁用。",
     evidenceTitle: "Sim 到 Lab 证据导入预览",
-    evidenceBody:
-      "仅在本地检查受大小限制的 JSON 仿真资格 receipt 与参数候选。预览证据仍不受信任，不能构成真机权限。",
     chooseEvidence: "选择 JSON 证据",
     clearEvidence: "清除预览",
     noEvidence: "尚未选择证据",
@@ -204,8 +178,6 @@ const COPY = {
     parameters: "参数",
     evidenceRejected: "证据已拒绝",
     safetyTitle: "执行权限法定人数",
-    safetyBody:
-      "只有所有权限层对同一份规范上下文签发一致决定时，真机请求才可能继续。缺失、过期、不匹配或否定决定一律归为拒绝。",
     native: "Native",
     backend: "后端",
     runtime: "Runtime",
@@ -312,12 +284,10 @@ export function LabSetup({
     >
       <header className="lab-header">
         <div>
-          <p className="lab-eyebrow">{copy.eyebrow}</p>
           <h1>{copy.title}</h1>
           <p className="sr-only">{copy.subtitle}</p>
         </div>
         <div className="lab-status-summary" aria-label={copy.authority}>
-          <span><small>{copy.edition}</small><strong>{copy.editionValue}</strong></span>
           <span><small>{copy.packs}</small><strong>{copy.packsValue}</strong></span>
           <span className="lab-deny-summary"><small>{copy.authority}</small><strong>{copy.deny}</strong></span>
         </div>
@@ -390,7 +360,7 @@ export function LabSetup({
             <div className="lab-setup-layout">
               <div className="lab-tool-intro">
                 <MonitorUp aria-hidden="true" />
-                <div><h2>{copy.simulationReady}</h2><p>{copy.simulationBody}</p></div>
+                <h2>{copy.simulationReady}</h2>
               </div>
               <div className="lab-field-grid">
                 <label>
@@ -424,7 +394,7 @@ export function LabSetup({
             <div className="lab-setup-layout">
               <div className="lab-tool-intro">
                 <RadioTower aria-hidden="true" />
-                <div><h2>{copy.hardwareSetup}</h2><p>{copy.hardwareBody}</p></div>
+                <h2>{copy.hardwareSetup}</h2>
               </div>
               <div className="lab-field-grid lab-hardware-fields">
                 <label>
@@ -496,7 +466,7 @@ export function LabSetup({
         <section id="lab-panel-evidence" className="lab-tool" role="tabpanel" aria-labelledby="lab-view-evidence">
           <div className="lab-tool-intro">
             <FileCheck2 aria-hidden="true" />
-            <div><h2>{copy.evidenceTitle}</h2><p>{copy.evidenceBody}</p></div>
+            <h2>{copy.evidenceTitle}</h2>
           </div>
           <div className="lab-evidence-actions">
             <label className="btn lab-file-button">
@@ -536,7 +506,7 @@ export function LabSetup({
             </div>
           ) : (
             <div className="lab-empty-evidence">
-              <Upload aria-hidden="true" /><strong>{copy.noEvidence}</strong><p>{copy.noEvidenceBody}</p>
+              <Upload aria-hidden="true" /><strong>{copy.noEvidence}</strong><p className="sr-only">{copy.noEvidenceBody}</p>
             </div>
           )}
         </section>
@@ -546,7 +516,7 @@ export function LabSetup({
         <section id="lab-panel-safety" className="lab-tool" role="tabpanel" aria-labelledby="lab-view-safety">
           <div className="lab-tool-intro">
             <ShieldAlert aria-hidden="true" />
-            <div><h2>{copy.safetyTitle}</h2><p>{copy.safetyBody}</p></div>
+            <h2>{copy.safetyTitle}</h2>
           </div>
           <div className="lab-quorum" aria-label={copy.safetyTitle}>
             {[copy.native, copy.backend, copy.runtime].map((layer) => (

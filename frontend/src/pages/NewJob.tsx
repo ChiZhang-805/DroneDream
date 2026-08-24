@@ -139,23 +139,19 @@ const WIZARD_STEPS: Array<{ key: TranslationKey }> = [
 
 const STARTER_EXPERIENCE_I18N: Record<
   StarterExperienceId,
-  { title: TranslationKey; description: TranslationKey }
+  { title: TranslationKey }
 > = {
   "hover-basics": {
     title: "wizard.starter.hover.title",
-    description: "wizard.starter.hover.description",
   },
   "first-circle": {
     title: "wizard.starter.circle.title",
-    description: "wizard.starter.circle.description",
   },
   "light-wind-circle": {
     title: "wizard.starter.wind.title",
-    description: "wizard.starter.wind.description",
   },
   "wind-sensor-circle": {
     title: "wizard.starter.combined.title",
-    description: "wizard.starter.combined.description",
   },
 };
 
@@ -2241,7 +2237,6 @@ export function NewJob() {
               <div className="starter-experience-heading">
                 <div>
                   <h3 id="starter-experience-title">{t("wizard.starter.title")}</h3>
-                  <p>{t("wizard.starter.description")}</p>
                 </div>
                 <div className="starter-experience-heading-actions">
                   <span className="starter-experience-version">
@@ -2261,7 +2256,7 @@ export function NewJob() {
                   </button>
                 </div>
               </div>
-              <div className="starter-experience-layout">
+              <div className={`starter-experience-layout${lastAppliedTemplateKey ? " has-preview" : ""}`}>
                 <div className="starter-experience-grid">
                   {STARTER_EXPERIENCE_TEMPLATES.map((template) => {
                     const copy = STARTER_EXPERIENCE_I18N[template.id];
@@ -2272,7 +2267,6 @@ export function NewJob() {
                           <strong>{title}</strong>
                           <span>v{template.version}</span>
                         </div>
-                        <p>{t(copy.description)}</p>
                         <button
                           type="button"
                           className="btn btn-ghost btn-small"
@@ -2285,18 +2279,20 @@ export function NewJob() {
                     );
                   })}
                 </div>
-                <ExperienceTrackPreview
-                  trackType={form.track_type}
-                  points={localPreviewPoints}
-                  altitudeM={Number(form.altitude_m)}
-                  title={t("wizard.preview.title")}
-                  hoverLabel={t("wizard.preview.hover")}
-                  routeLabel={t("wizard.preview.route")}
-                  pointCountLabel={t("wizard.preview.pointCount", {
-                    count: localPreviewPoints.length,
-                  })}
-                  localOnlyLabel={t("wizard.preview.localOnly")}
-                />
+                {lastAppliedTemplateKey ? (
+                  <ExperienceTrackPreview
+                    trackType={form.track_type}
+                    points={localPreviewPoints}
+                    altitudeM={Number(form.altitude_m)}
+                    title={t("wizard.preview.title")}
+                    hoverLabel={t("wizard.preview.hover")}
+                    routeLabel={t("wizard.preview.route")}
+                    pointCountLabel={t("wizard.preview.pointCount", {
+                      count: localPreviewPoints.length,
+                    })}
+                    localOnlyLabel={t("wizard.preview.localOnly")}
+                  />
+                ) : null}
               </div>
               {lastAppliedTemplateKey ? (
                 <p className="starter-experience-status" role="status">
@@ -2779,16 +2775,21 @@ export function NewJob() {
               />
             </div>
             <section className="completion-policy-card" aria-labelledby="completion-policy-title">
-              <div className="completion-policy-heading">
+              <div
+                className="completion-policy-heading"
+                title={t("wizard.completionPolicy.firstQualifiedBody")}
+              >
                 <div>
                   <h3 id="completion-policy-title">{t("wizard.completionPolicy.title")}</h3>
-                  <p>{t("wizard.completionPolicy.firstQualifiedBody")}</p>
                 </div>
                 <span className="completion-policy-badge">
                   {t("wizard.completionPolicy.firstQualifiedBadge")}
                 </span>
               </div>
-              <label className="completion-policy-toggle">
+              <label
+                className="completion-policy-toggle"
+                title={t("wizard.completionPolicy.continueBody")}
+              >
                 <input
                   type="checkbox"
                   checked={form.continue_exploration_after_qualified}
@@ -2799,7 +2800,6 @@ export function NewJob() {
                 />
                 <span>
                   <strong>{t("wizard.completionPolicy.continueTitle")}</strong>
-                  <small>{t("wizard.completionPolicy.continueBody")}</small>
                 </span>
               </label>
               {form.continue_exploration_after_qualified ? (

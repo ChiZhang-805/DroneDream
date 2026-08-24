@@ -43,6 +43,22 @@ function renderAssistant(edition: BrandEditionId = "sim") {
 function assistantResponse(): ExperimentAssistantTurnResponse {
   return {
     schema_version: "1.0",
+    lifecycle_stage: "proposal",
+    model_entrypoint_role: "control_tuning_draft_compiler",
+    creates_job: false,
+    runtime_execution_performed: false,
+    next_required_stage: "review_and_submit_job",
+    model_harness_domain: "optimization.control_tuning",
+    memory_domain: "optimization.control_tuning",
+    control_plane: {
+      plugin_selection_effect: "contract_only",
+      plugin_runtime_receipt_ids: [],
+    },
+    harness_input_sha256: "0".repeat(64),
+    harness_output: {
+      lifecycle_stage: "proposal",
+      runtime_execution_performed: false,
+    },
     experiment_summary:
       "Tune an x500 on a five metre circular track at three metres altitude.",
     accepted_patches: [
@@ -154,6 +170,7 @@ describe("conversational experiment drafting", () => {
   it("compiles a turn into the shared V3 draft without persisting the API key", async () => {
     vi.spyOn(apiClient, "compileExperimentAssistantTurn").mockImplementation(
       async (request) => {
+        expect(request.conversation_id).toMatch(/^[A-Za-z0-9_-]{8,128}$/u);
         expect(request.current_parameters).toEqual(
           expect.arrayContaining([
             expect.objectContaining({ name: "MPC_XY_P", selected: true }),

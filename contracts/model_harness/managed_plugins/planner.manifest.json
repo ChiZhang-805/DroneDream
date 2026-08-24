@@ -1,0 +1,18 @@
+{
+  "api_contract": {
+    "contract_id": "dronedream.managed.planner.v1",
+    "input_schema_version": "dronedream.model-harness-input.v1",
+    "output_schema_version": "dronedream.model-harness-output.v1"
+  },
+  "implementation": {
+    "entrypoint": "compile_autonomy_mission",
+    "module": "app.autonomy.service",
+    "source_path": "backend/app/autonomy/service.py",
+    "source_sha256": "95e8fff29b6384eac0345ac808fe452110bb7b4a6702f2b968a8741f19b6d7a9"
+  },
+  "plugin_id": "dronedream.managed.planner",
+  "schema_version": "dronedream.managed-plugin-manifest.v1",
+  "slot": "planner",
+  "trust": "managed",
+  "version": "1.0.0"
+}

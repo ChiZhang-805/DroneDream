@@ -8,10 +8,16 @@ import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
 from app import experiment_assistant, models, schemas
 from app.auth import get_current_user
+from app.db import get_db
 from app.response import ok
+from app.services.user_preferences import (
+    account_shared_model_context,
+    get_user_experience_preferences,
+)
 from app.task_workflows import (
     TaskWorkflowCompileRequest,
     WorkflowContextItem,
@@ -53,6 +59,7 @@ def _localized_workflow_blocker(code: str, *, chinese: bool) -> str:
 @router.post("/turn")
 async def compile_turn(
     request: schemas.ExperimentAssistantTurnRequest,
+    db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
     """Compile one ordinary-language turn into validated draft patches.
@@ -61,6 +68,9 @@ async def compile_turn(
     simulator, or mutate persisted experiment state.
     """
 
+    account_context = account_shared_model_context(
+        get_user_experience_preferences(db, user_id=current_user.id)
+    )
     current_values = json.dumps(
         request.current_values,
         ensure_ascii=False,
@@ -69,6 +79,7 @@ async def compile_turn(
     )
     workflow_request = TaskWorkflowCompileRequest(
         request_id=f"assistant:{hashlib.sha256(request.message_id.encode()).hexdigest()[:32]}",
+        conversation_id=request.conversation_id,
         edition=request.edition,
         requested_task_type=request.requested_task_type,
         message=request.message,
@@ -79,6 +90,22 @@ async def compile_turn(
                 key="assistant.current_values",
                 value=current_values[:4_000],
                 source="workspace",
+            ),
+            *(
+                [
+                    WorkflowContextItem(
+                        key="account.shared.defaults",
+                        value=json.dumps(
+                            account_context,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        )[:4_000],
+                        source="account_memory",
+                    )
+                ]
+                if account_context is not None
+                else []
             ),
         ],
         requested_tool_ids=[],
@@ -98,6 +125,22 @@ async def compile_turn(
             if workflow.blockers:
                 summary += f". Current blockers: {'; '.join(workflow.blockers)}"
         response = schemas.ExperimentAssistantTurnResponse(
+            lifecycle_stage="compile_only",
+            model_entrypoint_role="workflow_contract_compiler",
+            creates_job=False,
+            runtime_execution_performed=False,
+            next_required_stage="managed_model_proposal",
+            model_harness_domain=workflow.model_harness_domain,
+            memory_domain=workflow.memory_domain,
+            control_plane=workflow.control_plane,
+            runtime_handler=workflow.runtime_handler,
+            harness_input_sha256=workflow.harness_input_sha256,
+            harness_output=workflow.harness_output,
+            account_memory_read=account_context is not None,
+            domain_memory_read=False,
+            memory_context_source=(
+                "request_and_account_defaults" if account_context is not None else "request_only"
+            ),
             experiment_summary=summary[:2_000],
             accepted_patches=[],
             rejected_patches=[],
@@ -112,11 +155,13 @@ async def compile_turn(
             assistant_message=summary[:4_000],
             orchestration={
                 "run_id": workflow.contract_id,
-                "conversation_id": f"conversation:{workflow.contract_sha256[:24]}",
+                "conversation_id": workflow.thread_id,
                 "tenant_id": workflow.owner_binding_sha256,
                 "organization_id": None,
                 "workspace_id": f"workflow:{workflow.contract_id}",
                 "edition": workflow.edition,
+                "model_harness_domain": workflow.model_harness_domain,
+                "memory_domain": workflow.memory_domain,
                 "artifact_id": workflow.contract_id,
                 "artifact_version": 1,
                 "product_link": workflow.product_path,
@@ -128,7 +173,7 @@ async def compile_turn(
                     {
                         "step": step.step_id,
                         "label": step.title,
-                        "status": "needs_input" if workflow.status == "blocked" else "completed",
+                        "status": "needs_input" if workflow.status == "blocked" else "proposed",
                     }
                     for step in workflow.steps
                 ],
@@ -147,6 +192,8 @@ async def compile_turn(
         result = await asyncio.to_thread(
             experiment_assistant.compile_experiment_turn,
             request,
+            owner_id=current_user.id,
+            account_shared_context=account_context,
         )
     except experiment_assistant.ExperimentAssistantError as exc:
         raise HTTPException(

@@ -18,7 +18,6 @@ import {
   SIMULATOR_BACKENDS,
   TRACK_TYPES,
 } from "../types/api";
-import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { statusTranslationKey } from "../components/statusLabels";
 import { type Column } from "../components/DataTable";
@@ -272,7 +271,8 @@ export function History() {
         <RuntimeAccessNotice page="history" showAction={false} />
       ) : null}
       <div className="history-body">
-      <SectionCard title={t("history.filters")}>
+      <section className="history-filter-toolbar" aria-labelledby="history-filters-title">
+        <h2 id="history-filters-title" className="sr-only">{t("history.filters")}</h2>
         <div className="history-filter-grid">
           <div className="form-field history-filter-search">
             <label htmlFor="filter-query">{t("history.search")}</label>
@@ -384,11 +384,11 @@ export function History() {
             {t("history.clearFilters")}
           </button>
         </div>
-      </SectionCard>
+      </section>
 
-      <SectionCard
-        title={t("history.jobs")}
-        actions={(
+      <section className="history-jobs-surface" aria-labelledby="history-jobs-title">
+        <header className="history-jobs-header">
+          <h2 id="history-jobs-title">{t("history.jobs")}</h2>
           <button
             type="button"
             className="btn history-compare-button"
@@ -399,31 +399,31 @@ export function History() {
           >
             {t("history.compareSelected", { count: selectedIds.length })}
           </button>
-        )}
-      >
-        {saveError ? <ErrorState description={saveError} /> : null}
-        {query.isLoading ? (
-          <Loading label={t("history.loading")} />
-        ) : query.isError ? (
-          <ErrorState
-            description={
-              localeSafeError(query.error, locale, {
-                zh: t("history.loadFailed"),
-                en: t("history.loadFailed"),
-              })
-            }
-            action={
-              <button
-                className="btn"
-                type="button"
-                onClick={() => query.refetch()}
-              >
-                {t("history.retry")}
-              </button>
-            }
-          />
-        ) : (
-          <div className="data-table-wrapper history-results">
+        </header>
+        <div className="history-jobs-body">
+          {saveError ? <ErrorState description={saveError} /> : null}
+          {query.isLoading ? (
+            <Loading label={t("history.loading")} />
+          ) : query.isError ? (
+            <ErrorState
+              description={
+                localeSafeError(query.error, locale, {
+                  zh: t("history.loadFailed"),
+                  en: t("history.loadFailed"),
+                })
+              }
+              action={
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => query.refetch()}
+                >
+                  {t("history.retry")}
+                </button>
+              }
+            />
+          ) : (
+            <div className="data-table-wrapper history-results">
             <table className="data-table history-table-centered">
               <colgroup>
                 <col className="history-col-select" />
@@ -503,9 +503,10 @@ export function History() {
               ) : null}
               </tbody>
             </table>
-          </div>
-        )}
-      </SectionCard>
+            </div>
+          )}
+        </div>
+      </section>
       </div>
       {runtimeAccess.canUseRuntime && deleteTarget ? (
         <div className="confirm-dialog-backdrop" role="presentation">

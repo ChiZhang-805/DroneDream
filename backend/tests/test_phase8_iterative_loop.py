@@ -167,18 +167,14 @@ def _harness_revision_response() -> dict[str, Any]:
 
 def _harness_response_for_prompt(user: str) -> dict[str, Any]:
     return (
-        _harness_plan_response()
-        if '"budget_opportunity"' in user
-        else _harness_revision_response()
+        _harness_plan_response() if '"budget_opportunity"' in user else _harness_revision_response()
     )
 
 
 def test_gpt_loop_dispatches_generation_after_baseline(gpt_ctx):
     ctx = gpt_ctx
     job_id = _create_job(ctx, strategy="gpt", target_rmse=0.01, max_iterations=2)
-    client = FakeOpenAIClient(
-        [_gpt_proposal(1.5), _gpt_proposal(0.9), RuntimeError("not needed")]
-    )
+    client = FakeOpenAIClient([_gpt_proposal(1.5), _gpt_proposal(0.9), RuntimeError("not needed")])
     status = _drive(ctx, job_id, client=client, max_ticks=80)
     assert status == "COMPLETED"
     with ctx["db_module"].SessionLocal() as db:
@@ -233,19 +229,13 @@ def test_first_qualified_baseline_freezes_without_provider_call(gpt_ctx):
         assert receipt.provider_turns_succeeded_to_first_qualified == 0
         assert receipt.provider_requests_attempted_to_first_qualified == 0
         assert receipt.provider_requests_succeeded_to_first_qualified == 0
-        assert (
-            receipt.receipt_schema
-            == "dronedream.first-qualified-freeze-receipt/v2"
-        )
+        assert receipt.receipt_schema == "dronedream.first-qualified-freeze-receipt/v2"
         assert receipt.trials_to_first_qualified == len(job.trials)
         assert receipt.simulations_to_first_qualified == len(job.trials)
         assert receipt.evidence_json["candidate_id"] == baseline.id
         assert receipt.evidence_json["accounting"]["provider_requests_attempted"] == 0
         assert receipt.evidence_json["accounting"]["provider_requests_succeeded"] == 0
-        assert any(
-            event.event_type == "first_qualified_candidate_frozen"
-            for event in job.events
-        )
+        assert any(event.event_type == "first_qualified_candidate_frozen" for event in job.events)
         blocked_client = FakeOpenAIClient([_gpt_proposal(1.5)])
         blocked = ctx["job_manager"].dispatch_next_llm_generation(
             db,
@@ -432,14 +422,10 @@ def test_first_qualified_receipt_is_immutable_but_job_delete_is_authorized(gpt_c
         assert job.first_qualified_freeze is not None
         job.first_qualified_freeze.trials_to_first_qualified += 1
         with pytest.raises(
-            sys.modules[
-                "app.orchestration.first_qualified"
-            ].FirstQualifiedFreezeError,
+            sys.modules["app.orchestration.first_qualified"].FirstQualifiedFreezeError,
             match="internally inconsistent",
         ):
-            sys.modules[
-                "app.orchestration.first_qualified"
-            ].require_first_qualified_freeze_receipt(
+            sys.modules["app.orchestration.first_qualified"].require_first_qualified_freeze_receipt(
                 job.first_qualified_freeze,
                 job=job,
             )
@@ -512,9 +498,7 @@ def test_first_qualified_same_window_uses_server_order_not_candidate_uuid(gpt_ct
             rmse=0.5,
             max_error=0.8,
         )
-        receipt = sys.modules[
-            "app.orchestration.first_qualified"
-        ].freeze_first_qualified_candidate(
+        receipt = sys.modules["app.orchestration.first_qualified"].freeze_first_qualified_candidate(
             db,
             job=job,
             qualified=[(later, acceptance), (earlier, acceptance)],
@@ -577,10 +561,9 @@ def test_concurrent_finalizers_create_one_first_qualified_freeze(gpt_ctx):
             )
         )
         assert len(receipts) == 1
-        assert sum(
-            event.event_type == "first_qualified_candidate_frozen"
-            for event in job.events
-        ) == 1
+        assert (
+            sum(event.event_type == "first_qualified_candidate_frozen" for event in job.events) == 1
+        )
 
 
 def test_llm_harness_selects_and_executes_registered_tool_after_baseline(gpt_ctx):
@@ -591,19 +574,14 @@ def test_llm_harness_selects_and_executes_registered_tool_after_baseline(gpt_ctx
         target_rmse=0.01,
         max_iterations=1,
     )
-    client = FakeOpenAIClient(
-        [_harness_plan_response(), _harness_revision_response()]
-    )
+    client = FakeOpenAIClient([_harness_plan_response(), _harness_revision_response()])
     status = _drive(ctx, job_id, client=client, max_ticks=80)
     assert status == "COMPLETED"
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         assert job.optimizer_strategy == "llm_harness"
         assert job.current_generation == 1
-        assert any(
-            candidate.source_type == "optimizer"
-            for candidate in job.candidates
-        )
+        assert any(candidate.source_type == "optimizer" for candidate in job.candidates)
         event_types = [event.event_type for event in job.events]
         assert "harness_budget_plan_started" in event_types
         assert "harness_budget_plan_accepted" in event_types
@@ -752,10 +730,7 @@ def test_llm_harness_concurrent_finalizers_dispatch_one_generation(gpt_ctx) -> N
             errors.append(exc)
 
     ctx["aggregation"].set_llm_client_override(client)
-    workers = [
-        threading.Thread(target=finalize_in_thread, daemon=True)
-        for _ in range(2)
-    ]
+    workers = [threading.Thread(target=finalize_in_thread, daemon=True) for _ in range(2)]
     for worker in workers:
         worker.start()
     try:
@@ -862,9 +837,7 @@ def test_llm_harness_expired_claim_cannot_duplicate_generation(
             job = db.get(ctx["models"].Job, job_id)
             stale_token = job.finalization_claim_token
             assert stale_token is not None
-            job.finalization_lease_expires_at = (
-                ctx["aggregation"]._now() - timedelta(seconds=1)
-            )
+            job.finalization_lease_expires_at = ctx["aggregation"]._now() - timedelta(seconds=1)
             db.commit()
 
         with ctx["db_module"].SessionLocal() as db:
@@ -895,9 +868,7 @@ def test_llm_harness_expired_claim_cannot_duplicate_generation(
         assert job.finalization_claim_generation is None
         assert job.finalization_lease_expires_at is None
         generation_one_candidates = [
-            candidate
-            for candidate in job.candidates
-            if candidate.generation_index == 1
+            candidate for candidate in job.candidates if candidate.generation_index == 1
         ]
         assert generation_one_candidates
         assert len({candidate.id for candidate in generation_one_candidates}) == len(
@@ -942,21 +913,20 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
     heartbeat_renewed = threading.Event()
     provider_wait_timeout_seconds = 30.0
 
-    original_renew_finalization_claim = ctx["aggregation"]._renew_finalization_claim
+    session_class = ctx["db_module"].SessionLocal.class_
+    original_commit = session_class.commit
 
-    def track_heartbeat_renewal(*args, **kwargs):
-        renewed = original_renew_finalization_claim(*args, **kwargs)
-        if renewed and threading.current_thread().name.startswith(
-            "finalization-lease-"
-        ):
+    def track_heartbeat_commit(session):
+        result = original_commit(session)
+        if threading.current_thread().name.startswith("finalization-lease-"):
+            # Signal only after the independent heartbeat transaction is
+            # committed. Signalling from _renew_finalization_claim() happens
+            # before commit and lets the polling reader starve SQLite's writer
+            # under a long, heavily loaded test run.
             heartbeat_renewed.set()
-        return renewed
+        return result
 
-    monkeypatch.setattr(
-        ctx["aggregation"],
-        "_renew_finalization_claim",
-        track_heartbeat_renewal,
-    )
+    monkeypatch.setattr(session_class, "commit", track_heartbeat_commit)
 
     class BlockingClient:
         def __init__(self) -> None:
@@ -965,9 +935,7 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
         def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
             self.calls += 1
             entered.set()
-            if self.calls == 1 and not release.wait(
-                timeout=provider_wait_timeout_seconds
-            ):
+            if self.calls == 1 and not release.wait(timeout=provider_wait_timeout_seconds):
                 raise TimeoutError("test did not release provider call")
             return _harness_response_for_prompt(user)
 
@@ -996,15 +964,9 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
         provider_entry_deadline = time.monotonic() + provider_wait_timeout_seconds
         while not entered.wait(timeout=0.05):
             if errors:
-                raise AssertionError(
-                    "finalizer failed before reaching provider"
-                ) from errors[0]
-            assert worker.is_alive(), (
-                "finalizer exited before reaching provider without an error"
-            )
-            assert time.monotonic() < provider_entry_deadline, (
-                "finalizer never reached provider"
-            )
+                raise AssertionError("finalizer failed before reaching provider") from errors[0]
+            assert worker.is_alive(), "finalizer exited before reaching provider without an error"
+            assert time.monotonic() < provider_entry_deadline, "finalizer never reached provider"
         with ctx["db_module"].SessionLocal() as db:
             job = db.get(ctx["models"].Job, job_id)
             initial_token = job.finalization_claim_token
@@ -1130,9 +1092,7 @@ def test_stale_terminal_finalizer_cannot_publish_report_or_events(
         assert first_rank_entered.wait(timeout=10), "finalizer never reached terminal ranking"
         with ctx["db_module"].SessionLocal() as db:
             job = db.get(ctx["models"].Job, job_id)
-            job.finalization_lease_expires_at = (
-                ctx["aggregation"]._now() - timedelta(seconds=1)
-            )
+            job.finalization_lease_expires_at = ctx["aggregation"]._now() - timedelta(seconds=1)
             db.commit()
         with ctx["db_module"].SessionLocal() as db:
             assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == [job_id]
@@ -1165,14 +1125,17 @@ def test_stale_terminal_finalizer_cannot_publish_report_or_events(
         assert job.status == "COMPLETED"
         assert job.finalization_claim_token is None
         assert [event.id for event in job.events] == before_release_event_ids
-        assert list(
-            db.scalars(
-                select(ctx["models"].Artifact.id).where(
-                    ctx["models"].Artifact.owner_type == "job",
-                    ctx["models"].Artifact.owner_id == job_id,
+        assert (
+            list(
+                db.scalars(
+                    select(ctx["models"].Artifact.id).where(
+                        ctx["models"].Artifact.owner_type == "job",
+                        ctx["models"].Artifact.owner_id == job_id,
+                    )
                 )
             )
-        ) == before_release_artifact_ids
+            == before_release_artifact_ids
+        )
         event_types = [event.event_type for event in job.events]
         assert event_types.count("best_candidate_selected") == 1
         assert event_types.count("job_completed") == 1
@@ -1349,9 +1312,7 @@ def test_stale_failure_finalizer_cannot_commit_failure_event(
         assert first_failure_entered.wait(timeout=10), "finalizer never reached failure path"
         with ctx["db_module"].SessionLocal() as db:
             job = db.get(ctx["models"].Job, job_id)
-            job.finalization_lease_expires_at = (
-                ctx["aggregation"]._now() - timedelta(seconds=1)
-            )
+            job.finalization_lease_expires_at = ctx["aggregation"]._now() - timedelta(seconds=1)
             db.commit()
         with ctx["db_module"].SessionLocal() as db:
             assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == [job_id]
@@ -1431,11 +1392,7 @@ def test_iterative_optimizer_without_stopping_target_uses_budget(gpt_ctx, strate
         min_pass_rate=0.0,
         max_iterations=1,
     )
-    client = (
-        FakeOpenAIClient([_gpt_proposal(1.5)])
-        if strategy == "gpt"
-        else None
-    )
+    client = FakeOpenAIClient([_gpt_proposal(1.5)]) if strategy == "gpt" else None
 
     assert _drive(ctx, job_id, client=client, max_ticks=80) == "COMPLETED"
     with ctx["db_module"].SessionLocal() as db:
@@ -1500,9 +1457,7 @@ def test_acceptance_evaluator_checks_thresholds(gpt_ctx):
     assert failed.reason == "pass_rate_too_low"
     assert failed.pass_rate == 0.5
     assert failed.completion_rate == 1.0
-    assert schemas.AcceptanceCriteria(
-        target_rmse=0.5, target_max_error=1.5, min_pass_rate=0.8
-    )
+    assert schemas.AcceptanceCriteria(target_rmse=0.5, target_max_error=1.5, min_pass_rate=0.8)
 
 
 if __name__ == "__main__":  # pragma: no cover

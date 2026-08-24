@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import json
 import os
 import sqlite3
 import subprocess
@@ -88,6 +89,47 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 )
                 """
             )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO jobs (id, created_at, updated_at)
+                VALUES ('job-v3', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE job_events (
+                    id VARCHAR(64) PRIMARY KEY,
+                    job_id VARCHAR(64) NOT NULL,
+                    event_type VARCHAR(64) NOT NULL,
+                    payload_json JSON,
+                    created_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO job_events (
+                    id,
+                    job_id,
+                    event_type,
+                    payload_json,
+                    created_at
+                ) VALUES (
+                    'evt-legacy-created',
+                    'job-v3',
+                    'job_created',
+                    :payload_json,
+                    CURRENT_TIMESTAMP
+                )
+                """
+            ),
+            {"payload_json": '{"legacy":true}'},
         )
         conn.execute(
             text(
@@ -239,17 +281,80 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 """
             )
         )
+        conn.execute(
+            text(
+                """
+                CREATE TABLE harness_experience_memories (
+                    id VARCHAR(64) PRIMARY KEY,
+                    user_id VARCHAR(64) NOT NULL,
+                    source_job_id VARCHAR(64) NOT NULL,
+                    task_family_sha256 VARCHAR(64) NOT NULL
+                )
+                """
+            )
+        )
 
+    db_module._apply_sqlite_lightweight_migrations()
+
+    from app.model_harness.control_plane import compile_control_plane_receipt
+
+    alternate_receipt = compile_control_plane_receipt(
+        "optimization.control_tuning",
+        effective_maximum_model_calls=5,
+        effective_maximum_repair_cycles=2,
+    )
+    with db_module.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE jobs SET model_harness_control_plane_json = :receipt, "
+                "model_harness_control_plane_selection_sha256 = :selection_sha256 "
+                "WHERE id = 'job-v3'"
+            ),
+            {
+                "receipt": json.dumps(alternate_receipt.model_dump(mode="json")),
+                "selection_sha256": alternate_receipt.selection_sha256,
+            },
+        )
+    # Re-running the lightweight migrator must preserve an already-issued
+    # historical receipt and rebind its audit events without duplicating them.
     db_module._apply_sqlite_lightweight_migrations()
 
     with db_module.engine.begin() as conn:
         job_columns = {row[1] for row in conn.execute(text("PRAGMA table_info('jobs')")).fetchall()}
+        job_receipt = conn.execute(
+            text(
+                "SELECT model_harness_control_plane_json, "
+                "model_harness_control_plane_selection_sha256 FROM jobs "
+                "WHERE id = 'job-v3'"
+            )
+        ).one()
+        job_event_payloads = {
+            event_type: json.loads(payload_json)
+            for event_type, payload_json in conn.execute(
+                text(
+                    "SELECT event_type, payload_json FROM job_events "
+                    "WHERE job_id = 'job-v3' ORDER BY event_type"
+                )
+            )
+        }
         columns = {row[1] for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()}
         batch_columns = {
             row[1] for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
         }
         secret_columns = {
             row[1] for row in conn.execute(text("PRAGMA table_info('job_secrets')")).fetchall()
+        }
+        memory_columns = {
+            row[1]
+            for row in conn.execute(
+                text("PRAGMA table_info('harness_experience_memories')")
+            ).fetchall()
+        }
+        memory_indexes = {
+            row[1]
+            for row in conn.execute(
+                text("PRAGMA index_list('harness_experience_memories')")
+            ).fetchall()
         }
         candidate_columns = {
             row[1]
@@ -322,6 +427,20 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         "finalization_lease_expires_at",
     }.issubset(job_columns)
     assert "control_version" in job_columns
+    assert "model_harness_domain" in job_columns
+    assert "model_harness_control_plane_json" in job_columns
+    assert "model_harness_control_plane_selection_sha256" in job_columns
+    from app.model_harness.control_plane import HarnessControlPlaneReceipt
+
+    lightweight_receipt = HarnessControlPlaneReceipt.model_validate(json.loads(job_receipt[0]))
+    assert lightweight_receipt == alternate_receipt
+    assert job_receipt[1] == lightweight_receipt.selection_sha256
+    assert set(job_event_payloads) == {"job_created", "job_queued"}
+    assert job_event_payloads["job_created"]["legacy"] is True
+    for payload in job_event_payloads.values():
+        assert payload["model_harness_domain"] == lightweight_receipt.domain
+        assert payload["control_plane_schema_version"] == lightweight_receipt.schema_version
+        assert payload["control_plane_selection_sha256"] == lightweight_receipt.selection_sha256
     assert "llm_access_mode" in job_columns
     assert {
         "completion_policy",
@@ -353,6 +472,17 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     assert "cancelled_at" in batch_columns
     assert "control_version" in batch_columns
     assert "expires_at" in secret_columns
+    assert {
+        "memory_domain",
+        "source_kind",
+        "evidence_count",
+        "confidence",
+        "lifecycle_status",
+    }.issubset(memory_columns)
+    assert {
+        "ix_harness_experience_memories_memory_domain",
+        "ix_harness_experience_owner_domain_family",
+    }.issubset(memory_indexes)
     assert "optimizer_metadata_json" in candidate_columns
     assert "evidence_ledger_required" in candidate_columns
     assert {
@@ -510,6 +640,18 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
             row[1] for row in connection.execute("PRAGMA table_info('trials')").fetchall()
         }
         job_columns = {row[1] for row in connection.execute("PRAGMA table_info('jobs')").fetchall()}
+        harness_memory_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('harness_experience_memories')"
+            ).fetchall()
+        }
+        harness_memory_indexes = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA index_list('harness_experience_memories')"
+            ).fetchall()
+        }
         batch_columns = {
             row[1] for row in connection.execute("PRAGMA table_info('batch_jobs')").fetchall()
         }
@@ -645,6 +787,20 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "finalization_lease_expires_at",
     }.issubset(job_columns)
     assert "control_version" in job_columns
+    assert "model_harness_domain" in job_columns
+    assert "model_harness_control_plane_json" in job_columns
+    assert "model_harness_control_plane_selection_sha256" in job_columns
+    assert {
+        "memory_domain",
+        "source_kind",
+        "evidence_count",
+        "confidence",
+        "lifecycle_status",
+    }.issubset(harness_memory_columns)
+    assert {
+        "ix_harness_experience_memories_memory_domain",
+        "ix_harness_experience_owner_domain_family",
+    }.issubset(harness_memory_indexes)
     assert {
         "completion_policy",
         "job_kind",
@@ -825,7 +981,114 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260816_0005 (head)"]
+    assert heads == ["20260824_0007 (head)"]
+
+
+def test_job_control_plane_migration_backfills_receipt_and_event_bindings(
+    tmp_path: Path,
+) -> None:
+    database_file = tmp_path / "job-control-plane-backfill.db"
+    with sqlite3.connect(database_file) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE alembic_version (
+                version_num VARCHAR(32) NOT NULL PRIMARY KEY
+            );
+            INSERT INTO alembic_version(version_num) VALUES ('20260824_0006');
+            CREATE TABLE jobs (
+                id VARCHAR(64) NOT NULL PRIMARY KEY,
+                model_harness_domain VARCHAR(64) NOT NULL
+            );
+            INSERT INTO jobs(id, model_harness_domain)
+            VALUES ('job_existing', 'optimization.control_tuning');
+            INSERT INTO jobs(id, model_harness_domain)
+            VALUES ('job_without_events', 'optimization.control_tuning');
+            CREATE TABLE job_events (
+                id VARCHAR(64) NOT NULL PRIMARY KEY,
+                job_id VARCHAR(64) NOT NULL,
+                event_type VARCHAR(64) NOT NULL,
+                payload_json JSON,
+                created_at DATETIME NOT NULL
+            );
+            INSERT INTO job_events(id, job_id, event_type, payload_json, created_at)
+            VALUES
+                (
+                    'evt_created', 'job_existing', 'job_created',
+                    '{"legacy":true}', '2026-08-01 00:00:00'
+                ),
+                (
+                    'evt_queued', 'job_existing', 'job_queued',
+                    NULL, '2026-08-01 00:00:01'
+                );
+            """
+        )
+
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "APP_ENV": "test",
+            "DATABASE_URL": f"sqlite:///{database_file.as_posix()}",
+            "DATABASE_AUTO_CREATE": "false",
+        }
+    )
+    backend_root = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend_root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    with sqlite3.connect(database_file) as connection:
+        version = connection.execute("SELECT version_num FROM alembic_version").fetchone()
+        job_columns = {row[1]: row for row in connection.execute("PRAGMA table_info('jobs')")}
+        job_receipts = {
+            job_id: (receipt_json, selection_sha256)
+            for job_id, receipt_json, selection_sha256 in connection.execute(
+                "SELECT id, model_harness_control_plane_json, "
+                "model_harness_control_plane_selection_sha256 FROM jobs"
+            )
+        }
+        event_payloads = {
+            (job_id, event_type): json.loads(payload_json)
+            for job_id, event_type, payload_json in connection.execute(
+                "SELECT job_id, event_type, payload_json FROM job_events "
+                "ORDER BY job_id, event_type"
+            )
+        }
+
+    assert version == ("20260824_0007",)
+    assert job_columns["model_harness_control_plane_json"][3] == 1
+    assert job_columns["model_harness_control_plane_selection_sha256"][3] == 1
+    receipt_json, persisted_selection_sha256 = job_receipts["job_existing"]
+    receipt_payload = json.loads(receipt_json)
+
+    from app.model_harness.control_plane import HarnessControlPlaneReceipt
+
+    receipt = HarnessControlPlaneReceipt.model_validate(receipt_payload)
+    assert receipt.domain == "optimization.control_tuning"
+    assert receipt.selection_sha256 == (
+        "535ee5de83035b2120a7ce6fdd3a28b943d51095c24e89156b469cea2891f3a5"
+    )
+    assert persisted_selection_sha256 == receipt.selection_sha256
+    assert event_payloads[("job_existing", "job_created")]["legacy"] is True
+    assert set(event_payloads) == {
+        ("job_existing", "job_created"),
+        ("job_existing", "job_queued"),
+        ("job_without_events", "job_created"),
+        ("job_without_events", "job_queued"),
+    }
+    for payload in event_payloads.values():
+        assert payload["model_harness_domain"] == receipt.domain
+        assert payload["control_plane_schema_version"] == receipt.schema_version
+        assert payload["control_plane_selection_sha256"] == receipt.selection_sha256
+    for receipt_json, selection_sha256 in job_receipts.values():
+        parsed = HarnessControlPlaneReceipt.model_validate(json.loads(receipt_json))
+        assert selection_sha256 == parsed.selection_sha256
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -989,7 +1252,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             ).fetchall()
         }
 
-    assert version == ("20260816_0005",)
+    assert version == ("20260824_0007",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",

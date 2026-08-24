@@ -1,0 +1,2288 @@
+{
+  "control_plane_schema_version": "dronedream.model-harness-control-plane.v1",
+  "domains": {
+    "asset.qualification": {
+      "hard_maximum_model_calls": 6,
+      "hard_maximum_repair_cycles": 2,
+      "loop_kind": "plan_validate",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "asset_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "simulator_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "asset.qualification"
+      ],
+      "writable_memory_domain": "asset.qualification"
+    },
+    "autonomy.mission": {
+      "hard_maximum_model_calls": 48,
+      "hard_maximum_repair_cycles": 6,
+      "loop_kind": "observe_repair",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "agent_harness_designer",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "agent_harness_designer",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "agent_harness_designer",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "agent_harness_designer",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "agent_harness_designer",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "agent_harness_designer",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "planner",
+          "cardinality": "many",
+          "exposure": "agent_harness_designer",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "agent_harness_designer",
+          "swap_boundary": "safe_hold_only"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "telemetry_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "idle_only"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "recovery_strategy",
+          "cardinality": "many",
+          "exposure": "agent_harness_designer",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "agent_harness_designer",
+          "swap_boundary": "safe_hold_only"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "simulator_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "autonomy.mission"
+      ],
+      "writable_memory_domain": "autonomy.mission"
+    },
+    "calibration.system": {
+      "hard_maximum_model_calls": 8,
+      "hard_maximum_repair_cycles": 3,
+      "loop_kind": "iterative_optimize",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "optimizer",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "telemetry_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "idle_only"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "calibration.system"
+      ],
+      "writable_memory_domain": "calibration.system"
+    },
+    "experiment.simulation": {
+      "hard_maximum_model_calls": 6,
+      "hard_maximum_repair_cycles": 2,
+      "loop_kind": "plan_validate",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "planner",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "simulator_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "telemetry_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "idle_only"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "experiment.simulation"
+      ],
+      "writable_memory_domain": "experiment.simulation"
+    },
+    "operations.field": {
+      "hard_maximum_model_calls": 10,
+      "hard_maximum_repair_cycles": 3,
+      "loop_kind": "observe_repair",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "planner",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "safe_hold_only"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "telemetry_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "idle_only"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "recovery_strategy",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "safe_hold_only"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "notification_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "operations.field"
+      ],
+      "writable_memory_domain": "operations.field"
+    },
+    "optimization.control_tuning": {
+      "hard_maximum_model_calls": 12,
+      "hard_maximum_repair_cycles": 4,
+      "loop_kind": "iterative_optimize",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "optimizer",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "simulator_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "telemetry_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "optimization.control_tuning"
+      ],
+      "writable_memory_domain": "optimization.control_tuning"
+    },
+    "transfer.real_to_sim": {
+      "hard_maximum_model_calls": 8,
+      "hard_maximum_repair_cycles": 2,
+      "loop_kind": "promotion_pipeline",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "planner",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "simulator_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "telemetry_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "idle_only"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "transfer.real_to_sim"
+      ],
+      "writable_memory_domain": "transfer.real_to_sim"
+    },
+    "transfer.sim_to_real": {
+      "hard_maximum_model_calls": 8,
+      "hard_maximum_repair_cycles": 2,
+      "loop_kind": "promotion_pipeline",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "planner",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "simulator_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "telemetry_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "idle_only"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "transfer.sim_to_real"
+      ],
+      "writable_memory_domain": "transfer.sim_to_real"
+    },
+    "validation.hardware": {
+      "hard_maximum_model_calls": 4,
+      "hard_maximum_repair_cycles": 1,
+      "loop_kind": "plan_validate",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "telemetry_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "idle_only"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "validation.hardware"
+      ],
+      "writable_memory_domain": "validation.hardware"
+    },
+    "workflow.cross_edition": {
+      "hard_maximum_model_calls": 8,
+      "hard_maximum_repair_cycles": 2,
+      "loop_kind": "promotion_pipeline",
+      "plugin_slots": [
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "model_provider",
+          "cardinality": "one",
+          "exposure": "account_settings",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "account_configurable",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "intent_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "context_enricher",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "prompt_pack",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "tool_provider",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "critic",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_extractor",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_consolidator",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "memory_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "semantic_retriever",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "evidence_exporter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "planner",
+          "cardinality": "one",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "validator",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "fail_closed",
+          "hot_swappable": true,
+          "required": true,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        },
+        {
+          "allowed_trust": [
+            "managed",
+            "signed"
+          ],
+          "capability": "notification_adapter",
+          "cardinality": "many",
+          "exposure": "internal",
+          "failure_mode": "degrade_without_capability",
+          "hot_swappable": true,
+          "required": false,
+          "selection_authority": "product_managed",
+          "swap_boundary": "between_invocations"
+        }
+      ],
+      "readable_memory_domains": [
+        "account.shared",
+        "workflow.cross_edition"
+      ],
+      "writable_memory_domain": "workflow.cross_edition"
+    }
+  },
+  "execution_authority_enforcement": "not_integrated",
+  "fixed_kernel_responsibilities": [
+    "identity_and_tenant_boundary",
+    "structured_io_validation",
+    "safety_policy",
+    "budget_enforcement",
+    "acceptance_and_evidence",
+    "memory_governance",
+    "plugin_trust_and_lifecycle"
+  ],
+  "grants_execution_authority": false,
+  "learning_promotion_policy_version": "dronedream.learning-promotion-policy.v1",
+  "memory_namespaces": [
+    "account.shared",
+    "optimization.control_tuning",
+    "autonomy.mission",
+    "asset.qualification",
+    "experiment.simulation",
+    "workflow.cross_edition",
+    "validation.hardware",
+    "calibration.system",
+    "transfer.sim_to_real",
+    "transfer.real_to_sim",
+    "operations.field"
+  ],
+  "memory_retrieval_policy_version": "dronedream.memory-retrieval-policy.v1",
+  "online_policy_updates_allowed": false,
+  "plugin_runtime_receipt_ids": [],
+  "plugin_selection_effect": "contract_only",
+  "schema_version": "dronedream.model-harness-domain-policy.v1",
+  "semantic_memory_authority": "advisory_only",
+  "structured_input_schema_version": "dronedream.model-harness-input.v1",
+  "structured_output_schema_version": "dronedream.model-harness-output.v1",
+  "tasks": {
+    "asset_import_qualification": {
+      "domain": "asset.qualification",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    },
+    "calibration": {
+      "domain": "calibration.system",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    },
+    "control_tuning": {
+      "domain": "optimization.control_tuning",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    },
+    "cross_edition_workflow": {
+      "domain": "workflow.cross_edition",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    },
+    "field_task": {
+      "domain": "operations.field",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    },
+    "hardware_validation": {
+      "domain": "validation.hardware",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    },
+    "mission_autonomy": {
+      "domain": "autonomy.mission",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 4,
+        "effective_maximum_repair_cycles": 3
+      }
+    },
+    "real_to_sim": {
+      "domain": "transfer.real_to_sim",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    },
+    "sim_to_real": {
+      "domain": "transfer.sim_to_real",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    },
+    "simulation_experiment": {
+      "domain": "experiment.simulation",
+      "managed_assistant": {
+        "effective_maximum_model_calls": 1,
+        "effective_maximum_repair_cycles": 0
+      }
+    }
+  }
+}

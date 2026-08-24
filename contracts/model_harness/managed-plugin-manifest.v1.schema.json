@@ -1,0 +1,134 @@
+{
+  "$defs": {
+    "ManagedPluginApiContract": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_id": {
+          "pattern": "^dronedream\\.[a-z0-9._-]+\\.v[0-9]+$",
+          "title": "Contract Id",
+          "type": "string"
+        },
+        "input_schema_version": {
+          "const": "dronedream.model-harness-input.v1",
+          "default": "dronedream.model-harness-input.v1",
+          "title": "Input Schema Version",
+          "type": "string"
+        },
+        "output_schema_version": {
+          "const": "dronedream.model-harness-output.v1",
+          "default": "dronedream.model-harness-output.v1",
+          "title": "Output Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_id"
+      ],
+      "title": "ManagedPluginApiContract",
+      "type": "object"
+    },
+    "ManagedPluginImplementation": {
+      "additionalProperties": false,
+      "properties": {
+        "entrypoint": {
+          "pattern": "^_?[a-z][a-z0-9_]*$",
+          "title": "Entrypoint",
+          "type": "string"
+        },
+        "module": {
+          "pattern": "^app(?:\\.[a-z][a-z0-9_]*)+$",
+          "title": "Module",
+          "type": "string"
+        },
+        "source_path": {
+          "pattern": "^backend/app(?:/[a-z][a-z0-9_]*)+\\.py$",
+          "title": "Source Path",
+          "type": "string"
+        },
+        "source_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "module",
+        "entrypoint",
+        "source_path",
+        "source_sha256"
+      ],
+      "title": "ManagedPluginImplementation",
+      "type": "object"
+    }
+  },
+  "$id": "urn:dronedream:schema:model-harness:managed-plugin-manifest:v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "api_contract": {
+      "$ref": "#/$defs/ManagedPluginApiContract"
+    },
+    "implementation": {
+      "$ref": "#/$defs/ManagedPluginImplementation"
+    },
+    "plugin_id": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]{1,126}[a-z0-9])?$",
+      "title": "Plugin Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "dronedream.managed-plugin-manifest.v1",
+      "default": "dronedream.managed-plugin-manifest.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "slot": {
+      "enum": [
+        "model_provider",
+        "intent_extractor",
+        "context_enricher",
+        "prompt_pack",
+        "tool_provider",
+        "planner",
+        "optimizer",
+        "critic",
+        "validator",
+        "memory_extractor",
+        "memory_consolidator",
+        "memory_retriever",
+        "semantic_retriever",
+        "simulator_adapter",
+        "asset_adapter",
+        "telemetry_adapter",
+        "recovery_strategy",
+        "evidence_exporter",
+        "notification_adapter"
+      ],
+      "title": "Slot",
+      "type": "string"
+    },
+    "trust": {
+      "const": "managed",
+      "default": "managed",
+      "title": "Trust",
+      "type": "string"
+    },
+    "version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "slot",
+    "plugin_id",
+    "version",
+    "implementation",
+    "api_contract"
+  ],
+  "title": "ManagedPluginManifest",
+  "type": "object"
+}

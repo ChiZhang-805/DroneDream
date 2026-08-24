@@ -1,0 +1,160 @@
+{
+  "$id": "urn:dronedream:schema:model-harness:output:v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Structured model/Harness result with no implicit execution authority.",
+  "properties": {
+    "control_plane_selection_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Control Plane Selection Sha256",
+      "type": "string"
+    },
+    "domain": {
+      "enum": [
+        "optimization.control_tuning",
+        "autonomy.mission",
+        "asset.qualification",
+        "experiment.simulation",
+        "workflow.cross_edition",
+        "validation.hardware",
+        "calibration.system",
+        "transfer.sim_to_real",
+        "transfer.real_to_sim",
+        "operations.field"
+      ],
+      "title": "Domain",
+      "type": "string"
+    },
+    "evidence_receipt_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 128,
+      "title": "Evidence Receipt Ids",
+      "type": "array"
+    },
+    "execution_authority_enforcement": {
+      "const": "not_integrated",
+      "default": "not_integrated",
+      "title": "Execution Authority Enforcement",
+      "type": "string"
+    },
+    "grants_execution_authority": {
+      "const": false,
+      "default": false,
+      "title": "Grants Execution Authority",
+      "type": "boolean"
+    },
+    "input_envelope_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Envelope Sha256",
+      "type": "string"
+    },
+    "lifecycle_stage": {
+      "default": "proposal",
+      "enum": [
+        "compile_only",
+        "proposal",
+        "execute",
+        "refused"
+      ],
+      "title": "Lifecycle Stage",
+      "type": "string"
+    },
+    "memory_candidate_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Memory Candidate Ids",
+      "type": "array"
+    },
+    "model_call_count": {
+      "minimum": 0,
+      "title": "Model Call Count",
+      "type": "integer"
+    },
+    "physical_action_performed": {
+      "const": false,
+      "default": false,
+      "title": "Physical Action Performed",
+      "type": "boolean"
+    },
+    "repair_cycle_count": {
+      "minimum": 0,
+      "title": "Repair Cycle Count",
+      "type": "integer"
+    },
+    "request_id": {
+      "maxLength": 128,
+      "minLength": 8,
+      "title": "Request Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "dronedream.model-harness-output.v1",
+      "default": "dronedream.model-harness-output.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "needs_input",
+        "blocked",
+        "validated_proposal",
+        "closed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "structured_result": {
+      "additionalProperties": true,
+      "title": "Structured Result",
+      "type": "object"
+    },
+    "task_id": {
+      "maxLength": 128,
+      "minLength": 8,
+      "title": "Task Id",
+      "type": "string"
+    },
+    "tool_receipt_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 128,
+      "title": "Tool Receipt Ids",
+      "type": "array"
+    },
+    "validation_receipt_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 128,
+      "title": "Validation Receipt Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "request_id",
+    "task_id",
+    "domain",
+    "control_plane_selection_sha256",
+    "input_envelope_sha256",
+    "status",
+    "structured_result",
+    "model_call_count",
+    "repair_cycle_count"
+  ],
+  "title": "HarnessOutputEnvelope",
+  "type": "object"
+}

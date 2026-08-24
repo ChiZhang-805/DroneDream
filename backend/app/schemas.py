@@ -16,6 +16,21 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.model_harness.control_plane import (
+    HarnessControlPlaneReceipt,
+    HarnessOutputEnvelope,
+)
+from app.model_harness.domains import (
+    DOMAIN_SCHEMA_VERSION,
+    LONG_TERM_MEMORY_AUTHORITY,
+    MEMORY_PRECEDENCE,
+    RAW_CONVERSATION_RETENTION,
+    MemoryDomain,
+    MemoryPrecedenceLayer,
+    ModelHarnessDomain,
+)
+from app.model_harness.runtime import HarnessRuntimeHandler
+
 # --- Enums / literals -------------------------------------------------------
 
 TrackType = Literal["hover", "circle", "u_turn", "lemniscate", "custom"]
@@ -161,6 +176,9 @@ class UserExperiencePreferencesUpdate(_Strict):
 
 class UserExperiencePreferences(BaseModel):
     schema_version: Literal["1.0"] = "1.0"
+    memory_domain: Literal["account.shared"] = "account.shared"
+    memory_precedence: tuple[MemoryPrecedenceLayer, ...] = MEMORY_PRECEDENCE
+    long_term_memory_authority: Literal["advisory_only"] = LONG_TERM_MEMORY_AUTHORITY
     saved: bool
     memory_enabled: bool
     locale: Literal["en", "zh-CN"] | None = None
@@ -457,6 +475,12 @@ class ExperimentAssistantDocumentContextReceipt(_Strict):
 
 class ExperimentAssistantTurnRequest(_Strict):
     message_id: str = Field(min_length=1, max_length=128)
+    conversation_id: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_.:-]+$",
+    )
     message: str = Field(min_length=1, max_length=12_000)
     locale: Literal["en", "zh-CN"] = "en"
     edition: Literal["universal", "sim", "lab", "field", "autonomy"] = "universal"
@@ -507,6 +531,32 @@ class ExperimentAssistantTurnRequest(_Strict):
 
 class ExperimentAssistantTurnResponse(_Strict):
     schema_version: Literal["1.0"] = "1.0"
+    domain_schema_version: Literal["dronedream.model-harness-domains.v1"] = DOMAIN_SCHEMA_VERSION
+    lifecycle_stage: Literal["compile_only", "proposal"]
+    model_entrypoint_role: Literal[
+        "workflow_contract_compiler",
+        "control_tuning_draft_compiler",
+        "managed_model_proposal",
+    ]
+    creates_job: Literal[False] = False
+    runtime_execution_performed: Literal[False] = False
+    next_required_stage: Literal[
+        "managed_model_proposal",
+        "review_and_submit_job",
+        "review_proposal",
+    ]
+    model_harness_domain: ModelHarnessDomain
+    memory_domain: MemoryDomain
+    memory_precedence: tuple[MemoryPrecedenceLayer, ...] = MEMORY_PRECEDENCE
+    raw_conversation_retention: Literal["task_instance_only"] = RAW_CONVERSATION_RETENTION
+    long_term_memory_authority: Literal["advisory_only"] = LONG_TERM_MEMORY_AUTHORITY
+    control_plane: HarnessControlPlaneReceipt
+    runtime_handler: HarnessRuntimeHandler
+    harness_input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    harness_output: HarnessOutputEnvelope
+    account_memory_read: bool = False
+    domain_memory_read: Literal[False] = False
+    memory_context_source: Literal["request_only", "request_and_account_defaults"] = "request_only"
     experiment_summary: str = Field(max_length=2_000)
     accepted_patches: list[ExperimentAssistantPatch] = Field(max_length=96)
     rejected_patches: list[ExperimentAssistantRejectedPatch] = Field(max_length=96)
@@ -982,6 +1032,12 @@ class BatchCreateRequest(_Strict):
 
 class Job(BaseModel):
     id: str
+    model_harness_domain: Literal["optimization.control_tuning"] = "optimization.control_tuning"
+    memory_domain: Literal["optimization.control_tuning"] = "optimization.control_tuning"
+    memory_precedence: tuple[MemoryPrecedenceLayer, ...] = MEMORY_PRECEDENCE
+    raw_conversation_retention: Literal["task_instance_only"] = RAW_CONVERSATION_RETENTION
+    long_term_memory_authority: Literal["advisory_only"] = LONG_TERM_MEMORY_AUTHORITY
+    control_plane: HarnessControlPlaneReceipt
     control_version: int = Field(ge=1)
     track_type: TrackType
     start_point: StartPoint

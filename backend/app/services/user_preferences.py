@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app import models, schemas
+from app.model_harness.domains import validate_long_term_memory_payload
 from app.orchestration.experience_memory import (
     HARNESS_EXPERIENCE_RETENTION_DAYS,
     delete_cross_job_experiences,
@@ -30,6 +31,26 @@ def cross_job_memory_enabled(db: Session, *, user_id: str) -> bool:
     return bool(preferences is not None and preferences.memory_enabled)
 
 
+def account_shared_model_context(
+    preferences: models.UserExperiencePreferences | None,
+) -> dict[str, object] | None:
+    """Return only allowlisted account defaults for bounded model context."""
+
+    if preferences is None or not preferences.memory_enabled:
+        return None
+    context: dict[str, object] = {
+        "memory_domain": "account.shared",
+        "source_kind": "account_defaults",
+        "long_term_memory_authority": "advisory_only",
+        "locale": preferences.locale,
+        "default_template_key": preferences.default_template_key,
+        "default_track_type": preferences.default_track_type,
+        "default_altitude_m": preferences.default_altitude_m,
+    }
+    validate_long_term_memory_payload(context)
+    return context
+
+
 def serialize_user_experience_preferences(
     preferences: models.UserExperiencePreferences | None,
 ) -> schemas.UserExperiencePreferences:
@@ -38,15 +59,9 @@ def serialize_user_experience_preferences(
             "saved": preferences is not None,
             "memory_enabled": bool(preferences and preferences.memory_enabled),
             "locale": preferences.locale if preferences else None,
-            "default_template_key": (
-                preferences.default_template_key if preferences else None
-            ),
-            "default_track_type": (
-                preferences.default_track_type if preferences else None
-            ),
-            "default_altitude_m": (
-                preferences.default_altitude_m if preferences else None
-            ),
+            "default_template_key": (preferences.default_template_key if preferences else None),
+            "default_track_type": (preferences.default_track_type if preferences else None),
+            "default_altitude_m": (preferences.default_altitude_m if preferences else None),
             "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
             "updated_at": preferences.updated_at if preferences else None,
         }
@@ -95,6 +110,7 @@ def delete_user_experience_preferences(
 
 
 __all__ = [
+    "account_shared_model_context",
     "cross_job_memory_enabled",
     "delete_user_experience_preferences",
     "get_user_experience_preferences",

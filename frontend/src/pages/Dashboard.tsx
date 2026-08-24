@@ -5,7 +5,6 @@ import { apiClient, ApiClientError } from "../api/client";
 import { JOB_STATUSES } from "../types/api";
 import type { JobStatus, ObjectiveProfile, TrackType } from "../types/api";
 import { MetricCard } from "../components/MetricCard";
-import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { DataTable, type Column } from "../components/DataTable";
 import { Loading, ErrorState } from "../components/States";
@@ -208,7 +207,8 @@ function DashboardBody({
 
   return (
     <div className="dashboard-body">
-      <SectionCard title={t("dashboard.statusSummary")}>
+      <section className="dashboard-status-summary" aria-labelledby="dashboard-status-summary-title">
+        <h2 id="dashboard-status-summary-title">{t("dashboard.statusSummary")}</h2>
         <div className="metric-grid">
           <MetricCard
             label={t("dashboard.totalJobs")}
@@ -241,31 +241,29 @@ function DashboardBody({
             tone="muted"
           />
         </div>
-      </SectionCard>
+      </section>
 
-      <SectionCard
-        title={t("dashboard.recentJobs")}
-        actions={(
+      <section className={`dashboard-recent-jobs${recentJobs.length === 0 ? " is-empty" : ""}`} aria-labelledby="dashboard-recent-jobs-title">
+        <header>
+          <h2 id="dashboard-recent-jobs-title">{t("dashboard.recentJobs")}</h2>
+          {recentJobs.length === 0 ? <span className="dashboard-empty-jobs" aria-label={t("dashboard.recentJobs")}>—</span> : null}
           <Link to="/history" className="dashboard-view-all">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 12h13M14 7l5 5-5 5" />
             </svg>
             <span>{t("dashboard.viewAll")}</span>
           </Link>
-        )}
-      >
-        <div className="dashboard-recent-jobs-content">
-          {recentJobs.length > 0 ? (
+        </header>
+        {recentJobs.length > 0 ? (
+          <div className="dashboard-recent-jobs-content">
             <DataTable
               columns={columns}
               rows={recentJobs}
               rowKey={(j) => j.id}
             />
-          ) : (
-            <div className="dashboard-empty-jobs" aria-hidden="true" />
-          )}
-        </div>
-      </SectionCard>
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }

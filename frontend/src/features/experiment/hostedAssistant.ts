@@ -9,7 +9,24 @@ import type {
   ExperimentAssistantFieldValue,
   ExperimentAssistantPatch,
   ExperimentAssistantTurnResponse,
+  TaskWorkflowModelHarnessDomain,
 } from "../../types/api";
+
+const HOSTED_MODEL_HARNESS_DOMAIN: Record<BrandEditionId, TaskWorkflowModelHarnessDomain> = {
+  universal: "workflow.cross_edition",
+  sim: "experiment.simulation",
+  lab: "validation.hardware",
+  field: "operations.field",
+  autonomy: "autonomy.mission",
+};
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 const HOSTED_RESPONSE_FORMAT = {
   type: "json_schema",
@@ -327,6 +344,19 @@ function patch(
 export async function compileHostedAssistantTurn(
   input: HostedAssistantTurnInput,
 ): Promise<ExperimentAssistantTurnResponse> {
+  const domain = HOSTED_MODEL_HARNESS_DOMAIN[input.edition];
+  const harnessInputSha256 = await sha256Hex(JSON.stringify({
+    domain,
+    edition: input.edition,
+    message_id: input.messageId,
+    message: input.message,
+    conversation_summary: input.conversationSummary,
+    current_values: input.currentValues,
+    document_receipts: input.documentContext?.chunks.map((chunk) => ({
+      content_sha256: chunk.content_sha256,
+      display_name: chunk.display_name,
+    })) ?? [],
+  }));
   const documentContext = input.documentContext?.chunks.map((chunk) => ({
     display_name: chunk.display_name,
     content: chunk.content,
@@ -401,6 +431,27 @@ export async function compileHostedAssistantTurn(
   }
   return {
     schema_version: "1.0",
+    lifecycle_stage: "proposal",
+    model_entrypoint_role: "managed_model_proposal",
+    creates_job: false,
+    runtime_execution_performed: false,
+    next_required_stage: "review_proposal",
+    model_harness_domain: domain,
+    memory_domain: domain,
+    control_plane: {
+      source: "managed_model_grant",
+      maximum_model_calls: 1,
+      plugin_selection_effect: "contract_only",
+      plugin_runtime_receipt_ids: [],
+    },
+    harness_input_sha256: harnessInputSha256,
+    harness_output: {
+      lifecycle_stage: "proposal",
+      input_envelope_sha256: harnessInputSha256,
+      model_call_count: 1,
+      runtime_execution_performed: false,
+      plugin_runtime_receipt_ids: [],
+    },
     experiment_summary: payload.summary,
     accepted_patches: acceptedPatches,
     rejected_patches: [],

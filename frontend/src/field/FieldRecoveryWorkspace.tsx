@@ -34,7 +34,6 @@ import type { FieldReadOnlyProtocolEvidence } from "./FieldAdapterCenter";
 const COPY = {
   en: {
     title: "Parameter snapshot & recovery",
-    body: "Persist an imported read-only parameter set, compare drift, and prepare a content-bound rollback plan before any write is considered.",
     observation: "Observation receipt SHA-256",
     firmware: "Observed firmware",
     adapter: "Protocol adapter",
@@ -68,7 +67,6 @@ const COPY = {
   },
   "zh-CN": {
     title: "参数快照与恢复",
-    body: "在考虑任何写入前，保存导入的只读参数集、比较漂移并准备内容绑定的回滚计划。",
     observation: "观察回执 SHA-256",
     firmware: "已观察固件",
     adapter: "通信协议适配器",
@@ -367,7 +365,7 @@ export function FieldRecoveryWorkspace({
   return (
     <div className="field-recovery-workspace" data-authority="false" data-hardware-write-attempts="0">
       <header>
-        <div><h2 id="field-recovery-title">{copy.title}</h2><p>{copy.body}</p></div>
+        <h2 id="field-recovery-title">{copy.title}</h2>
         <ArchiveRestore aria-hidden="true" />
       </header>
       <p className="field-inline-boundary"><ShieldCheck aria-hidden="true" />{copy.evidence}</p>

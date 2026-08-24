@@ -43,7 +43,12 @@ export function assistantArtifactMatchesEdition(
       || artifactKind === "external_asset_qualification_plan"
       || (options.legacyRead === true && artifactKind === "universal_vehicle_model")
       || artifactKind === "universal_simulation_experiment"
-      || artifactKind === "universal_cross_edition_workflow";
+      || artifactKind === "universal_cross_edition_workflow"
+      || artifactKind === "lab_hardware_validation"
+      || artifactKind === "lab_calibration_workflow"
+      || artifactKind === "lab_sim_to_real_workflow"
+      || artifactKind === "lab_real_to_sim_workflow"
+      || artifactKind === "field_task_plan";
   }
   if (edition === "sim") {
     return artifactKind === "autonomy_mission_plan"

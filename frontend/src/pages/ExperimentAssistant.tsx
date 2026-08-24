@@ -991,6 +991,7 @@ export function ExperimentAssistant() {
             })()
         : await apiClient.compileExperimentAssistantTurn({
         message_id: id,
+        conversation_id: targetWorkspaceId,
         message: visibleMessage,
         locale,
         edition: editionTheme.id,
@@ -1189,13 +1190,13 @@ export function ExperimentAssistant() {
                 <button
                   key={example.title}
                   type="button"
+                  aria-label={example.title}
                   onClick={() => handleExample(example.body)}
                 >
                   <span className="assistant-example-heading">
                     <AssistantTemplateIcon index={index} />
                     <strong>{example.title}</strong>
                   </span>
-                  <span className="assistant-example-body">{example.body}</span>
                 </button>
               ))}
             </div>
@@ -1269,7 +1270,11 @@ export function ExperimentAssistant() {
                   <ol className="assistant-workflow-receipt" aria-label={locale === "zh-CN" ? "任务步骤" : "Task steps"}>
                     {latest.orchestration.workflow.map((step: AssistantWorkflowStep) => (
                       <li key={step.step} data-status={step.status}>
-                        <span aria-hidden="true">{step.status === "completed" ? "✓" : "!"}</span>
+                        <span aria-hidden="true">{
+                          step.status === "completed" ? "✓"
+                            : step.status === "proposed" ? "→"
+                              : step.status === "refused" ? "×" : "!"
+                        }</span>
                         <span>{step.label}</span>
                       </li>
                     ))}

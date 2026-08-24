@@ -405,6 +405,7 @@ export async function planAutonomyMission(
     try {
       const workflow = await apiClient.compileTaskWorkflow({
         request_id: `autonomy:${input.conversationId}:${input.turnId}`,
+        conversation_id: input.conversationId,
         edition: input.edition,
         requested_task_type: "mission_autonomy",
         message: input.instruction,

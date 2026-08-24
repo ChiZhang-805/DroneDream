@@ -24,6 +24,11 @@ from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
 from app.llm_provider_policy import llm_base_url_is_allowed
+from app.model_harness.control_plane import (
+    HarnessControlPlaneReceipt,
+    compile_control_plane_receipt,
+)
+from app.model_harness.domains import OPTIMIZATION_CONTROL_TUNING_DOMAIN
 from app.optimization.candidate_evidence_ledger import (
     authorize_candidate_evidence_deletion,
 )
@@ -75,6 +80,52 @@ class JobServiceError(Exception):
         self.code = code
         self.message = message
         self.http_status = http_status
+
+
+def _control_plane_event_binding(
+    receipt: HarnessControlPlaneReceipt,
+) -> dict[str, str]:
+    return {
+        "model_harness_domain": receipt.domain,
+        "control_plane_schema_version": receipt.schema_version,
+        "control_plane_selection_sha256": receipt.selection_sha256,
+    }
+
+
+def _validated_job_control_plane_receipt(
+    job: models.Job,
+) -> HarnessControlPlaneReceipt:
+    """Validate the persisted receipt and its immutable creation-event binding."""
+
+    def invalid() -> JobServiceError:
+        return JobServiceError(
+            "MODEL_HARNESS_CONTROL_PLANE_RECEIPT_INVALID",
+            f"Job {job.id} has an invalid Model + Harness control-plane receipt.",
+            http_status=409,
+        )
+
+    if job.model_harness_domain != OPTIMIZATION_CONTROL_TUNING_DOMAIN:
+        raise invalid()
+    try:
+        receipt = HarnessControlPlaneReceipt.model_validate(job.model_harness_control_plane_json)
+    except (TypeError, ValueError) as exc:
+        raise invalid() from exc
+    if receipt.domain != job.model_harness_domain:
+        raise invalid()
+    if job.model_harness_control_plane_selection_sha256 != receipt.selection_sha256:
+        raise invalid()
+
+    expected_binding = _control_plane_event_binding(receipt)
+    bound_events = [
+        event for event in job.events if event.event_type in {"job_created", "job_queued"}
+    ]
+    for event in bound_events:
+        payload = event.payload_json
+        if not isinstance(payload, dict):
+            raise invalid()
+        if any(payload.get(key) != value for key, value in expected_binding.items()):
+            raise invalid()
+    return receipt
 
 
 def _now() -> datetime:
@@ -488,8 +539,13 @@ def _create_job_from_config(
         llm_model = None
         llm_base_url = None
         llm_credential = None
+    control_plane_receipt = compile_control_plane_receipt(OPTIMIZATION_CONTROL_TUNING_DOMAIN)
+    control_plane_binding = _control_plane_event_binding(control_plane_receipt)
     job = models.Job(
         user_id=user.id,
+        model_harness_domain=OPTIMIZATION_CONTROL_TUNING_DOMAIN,
+        model_harness_control_plane_json=control_plane_receipt.model_dump(mode="json"),
+        model_harness_control_plane_selection_sha256=(control_plane_receipt.selection_sha256),
         track_type=req.track_type,
         start_point_x=req.start_point.x,
         start_point_y=req.start_point.y,
@@ -583,6 +639,7 @@ def _create_job_from_config(
             job_id=job.id,
             event_type="job_created",
             payload_json={
+                **control_plane_binding,
                 "source_job_id": source_job_id,
                 "batch_id": batch_id,
                 "simulator_backend": req.simulator_backend,
@@ -617,7 +674,7 @@ def _create_job_from_config(
         models.JobEvent(
             job_id=job.id,
             event_type="job_queued",
-            payload_json=None,
+            payload_json=control_plane_binding,
         )
     )
     return job
@@ -736,7 +793,7 @@ def list_jobs(
     if page_size < 1 or page_size > 200:
         raise JobServiceError("INVALID_INPUT", "page_size must be in [1, 200]", http_status=422)
 
-    stmt = select(models.Job)
+    stmt = select(models.Job).options(selectinload(models.Job.events))
     count_stmt = select(func.count(models.Job.id))
     if user is not None:
         if get_settings().auth_mode == "disabled":
@@ -755,6 +812,8 @@ def list_jobs(
         stmt.order_by(models.Job.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     )
     items = list(db.scalars(stmt))
+    for item in items:
+        _validated_job_control_plane_receipt(item)
     return items, total
 
 
@@ -765,6 +824,7 @@ def get_job(db: Session, job_id: str, *, user: models.User | None = None) -> mod
     auth_disabled_owned_null = get_settings().auth_mode == "disabled" and job.user_id is None
     if user is not None and job.user_id != user.id and not auth_disabled_owned_null:
         raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
+    _validated_job_control_plane_receipt(job)
     return job
 
 
@@ -2088,6 +2148,7 @@ def _recent_events(job: models.Job) -> list[schemas.JobEventInfo]:
 
 
 def to_job_schema(job: models.Job) -> schemas.Job:
+    control_plane_receipt = _validated_job_control_plane_receipt(job)
     latest_error = None
     if job.latest_error_code is not None:
         latest_error = schemas.JobErrorInfo(
@@ -2110,6 +2171,9 @@ def to_job_schema(job: models.Job) -> schemas.Job:
 
     return schemas.Job(
         id=job.id,
+        model_harness_domain=job.model_harness_domain,  # type: ignore[arg-type]
+        memory_domain=job.model_harness_domain,  # type: ignore[arg-type]
+        control_plane=control_plane_receipt,
         control_version=job.control_version,
         track_type=job.track_type,  # type: ignore[arg-type]
         start_point=schemas.StartPoint(x=job.start_point_x, y=job.start_point_y),

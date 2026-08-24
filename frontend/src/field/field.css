@@ -1313,6 +1313,15 @@ input:focus-visible {
   gap: 8px;
 }
 
+.field-action-matrix {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border-block: 1px solid var(--field-line);
+  list-style: none;
+}
+
 .field-preflight-inputs {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(120px, 0.75fr) minmax(140px, 0.75fr);
@@ -1369,8 +1378,7 @@ input:focus-visible {
   opacity: 0.48;
 }
 
-.field-gate-grid div,
-.field-action-matrix div {
+.field-gate-grid div {
   display: grid;
   min-width: 0;
   grid-template-columns: 17px minmax(0, 1fr);
@@ -1379,6 +1387,24 @@ input:focus-visible {
   background: #ffffff;
   border: 1px solid var(--field-line);
   border-radius: 5px;
+}
+
+.field-action-matrix li {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 9px 10px;
+}
+
+.field-action-matrix li:nth-child(3n + 2),
+.field-action-matrix li:nth-child(3n + 3) {
+  border-left: 1px solid var(--field-line);
+}
+
+.field-action-matrix li:nth-child(n + 4) {
+  border-top: 1px solid var(--field-line);
 }
 
 .field-gate-grid svg,
@@ -1395,9 +1421,13 @@ input:focus-visible {
   font-weight: 650;
 }
 
-.field-gate-grid strong,
-.field-action-matrix strong {
+.field-gate-grid strong {
   grid-column: 2;
+  color: var(--field-danger);
+  font-size: 11px;
+}
+
+.field-action-matrix strong {
   color: var(--field-danger);
   font-size: 11px;
 }
@@ -1538,6 +1568,18 @@ input:focus-visible {
   .field-gate-grid,
   .field-action-matrix {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-action-matrix li {
+    border-left: 0;
+  }
+
+  .field-action-matrix li:nth-child(even) {
+    border-left: 1px solid var(--field-line);
+  }
+
+  .field-action-matrix li:nth-child(n + 3) {
+    border-top: 1px solid var(--field-line);
   }
 
   .field-observation-result {
@@ -1756,6 +1798,14 @@ input:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .field-action-matrix li:nth-child(even) {
+    border-left: 0;
+  }
+
+  .field-action-matrix li + li {
+    border-top: 1px solid var(--field-line);
+  }
+
   .field-device-grid div + div,
   .field-device-grid div:nth-child(3) {
     border-top: 1px solid var(--field-line);
@@ -1842,48 +1892,6 @@ input:focus-visible {
   border: 2px solid #ffffff;
   border-radius: 50%;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--dd-brand-middle), transparent 62%);
-}
-
-.field-tuning-flow {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  list-style: none;
-  border-block: 1px solid var(--field-line);
-}
-
-.field-tuning-flow li {
-  position: relative;
-  display: grid;
-  min-height: 76px;
-  align-items: center;
-  gap: 3px 10px;
-  padding: 14px 18px;
-  grid-template-columns: 28px minmax(0, 1fr);
-}
-
-.field-tuning-flow li + li {
-  border-left: 1px solid var(--field-line);
-}
-
-.field-tuning-flow svg {
-  width: 21px;
-  height: 21px;
-  color: var(--dd-brand-middle);
-  grid-row: 1 / span 2;
-}
-
-.field-tuning-flow span {
-  color: var(--field-muted);
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.field-tuning-flow strong {
-  min-width: 0;
-  font-size: 13px;
-  overflow-wrap: anywhere;
 }
 
 .field-recorded-harness {
@@ -2691,15 +2699,6 @@ input:focus-visible {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .field-tuning-flow {
-    grid-template-columns: 1fr;
-  }
-
-  .field-tuning-flow li + li {
-    border-top: 1px solid var(--field-line);
-    border-left: 0;
-  }
-
   .field-tuning-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2960,34 +2959,26 @@ body:has(.field-app),
   gap: 18px;
 }
 
+.field-page-heading > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.field-page-heading > div > svg {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  color: var(--dd-brand-middle);
+}
+
 .field-page-heading h1 {
-  margin: 2px 0 3px;
+  margin: 0;
   color: var(--dd-brand-dark-surface);
   font-size: 25px;
   line-height: 1.2;
   letter-spacing: 0;
-}
-
-.field-page-heading p {
-  max-width: 880px;
-  margin: 0;
-  color: var(--field-muted);
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.field-page-eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--dd-brand-middle);
-  font-size: 11px;
-  font-weight: 760;
-}
-
-.field-page-eyebrow svg {
-  width: 14px;
-  height: 14px;
 }
 
 .field-page-component {

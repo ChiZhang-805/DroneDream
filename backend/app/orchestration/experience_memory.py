@@ -18,6 +18,12 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app import models
+from app.model_harness.domains import (
+    MODEL_HARNESS_DOMAIN_VALUES,
+    OPTIMIZATION_CONTROL_TUNING_DOMAIN,
+    consolidated_verified_outcome_lifecycle,
+    validate_long_term_memory_payload,
+)
 from app.orchestration.harness_context import (
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_PROMPT_TEMPLATE_VERSION,
@@ -177,12 +183,16 @@ def _row_memory(row: models.HarnessExperienceMemory) -> HarnessExecutionMemory |
 
 def _row_contract_is_current(row: models.HarnessExperienceMemory) -> bool:
     return (
-        row.memory_schema_version == HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION
+        row.memory_domain in MODEL_HARNESS_DOMAIN_VALUES
+        and row.source_kind == "verified_job_outcome"
+        and row.evidence_count >= 1
+        and row.confidence == 1.0
+        and row.lifecycle_status == "consolidated"
+        and row.memory_schema_version == HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION
         and row.source_evidence_schema_version == HARNESS_EVIDENCE_SCHEMA_VERSION
         and row.source_prompt_template_version == HARNESS_PROMPT_TEMPLATE_VERSION
         and row.source_tool_registry_version == HARNESS_TOOL_REGISTRY_VERSION
-        and row.source_eligibility_policy_version
-        == HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION
+        and row.source_eligibility_policy_version == HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION
     )
 
 
@@ -223,6 +233,7 @@ def materialize_verified_terminal_job_experiences(
         or not _memory_is_enabled(db, user_id=source_job.user_id)
         or source_job.status not in _TERMINAL_JOB_STATUSES
         or snapshot.schema_version != HARNESS_EVIDENCE_SCHEMA_VERSION
+        or source_job.model_harness_domain != OPTIMIZATION_CONTROL_TUNING_DOMAIN
     ):
         return 0
 
@@ -236,9 +247,7 @@ def materialize_verified_terminal_job_experiences(
             )
         )
     )
-    existing_by_generation = {
-        row.source_generation: row for row in existing_rows
-    }
+    existing_by_generation = {row.source_generation: row for row in existing_rows}
     verified_generations: set[int] = set()
     inserted = 0
     for memory in snapshot.decision_memory:
@@ -249,6 +258,24 @@ def materialize_verified_terminal_job_experiences(
             or memory.decision_source not in {"model", "deterministic_fallback"}
         ):
             continue
+        lifecycle = consolidated_verified_outcome_lifecycle(
+            evidence_count=memory.observed_outcome.cohort_candidate_count,
+            recency_at=current_time,
+            ttl_days=HARNESS_EXPERIENCE_RETENTION_DAYS,
+        )
+        validate_long_term_memory_payload(
+            {
+                "memory_domain": source_job.model_harness_domain,
+                "source_kind": lifecycle.source,
+                "evidence_count": lifecycle.evidence_count,
+                "confidence": lifecycle.confidence,
+                "recency_at": lifecycle.recency_at,
+                "ttl_days": lifecycle.ttl_days,
+                "lifecycle_status": lifecycle.status,
+                "scenario_profile": scenario_profile,
+                "execution": memory.model_dump(mode="json", exclude_none=True),
+            }
+        )
         verified_generations.add(memory.generation)
         receipt_hash = _sha256_json(
             _receipt_payload(
@@ -260,10 +287,7 @@ def materialize_verified_terminal_job_experiences(
         )
         existing = existing_by_generation.get(memory.generation)
         if existing is not None:
-            if (
-                existing.source_receipt_sha256 != receipt_hash
-                and existing.revoked_at is None
-            ):
+            if existing.source_receipt_sha256 != receipt_hash and existing.revoked_at is None:
                 existing.revoked_at = current_time
                 existing.revocation_reason = "source_receipt_drift"
             continue
@@ -272,13 +296,16 @@ def materialize_verified_terminal_job_experiences(
                 user_id=source_job.user_id,
                 source_job_id=source_job.id,
                 source_generation=memory.generation,
+                memory_domain=source_job.model_harness_domain,
+                source_kind=lifecycle.source,
+                evidence_count=lifecycle.evidence_count,
+                confidence=lifecycle.confidence,
+                lifecycle_status=lifecycle.status,
                 memory_schema_version=HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
                 source_evidence_schema_version=HARNESS_EVIDENCE_SCHEMA_VERSION,
                 source_prompt_template_version=HARNESS_PROMPT_TEMPLATE_VERSION,
                 source_tool_registry_version=HARNESS_TOOL_REGISTRY_VERSION,
-                source_eligibility_policy_version=(
-                    HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION
-                ),
+                source_eligibility_policy_version=(HARNESS_TOOL_ELIGIBILITY_POLICY_VERSION),
                 task_family_sha256=family_hash,
                 scenario_profile_json=scenario_profile,
                 tool_id=memory.tool_id,
@@ -293,16 +320,12 @@ def materialize_verified_terminal_job_experiences(
                 ),
                 source_receipt_sha256=receipt_hash,
                 created_at=current_time,
-                expires_at=current_time
-                + timedelta(days=HARNESS_EXPERIENCE_RETENTION_DAYS),
+                expires_at=current_time + timedelta(days=HARNESS_EXPERIENCE_RETENTION_DAYS),
             )
         )
         inserted += 1
     for existing in existing_rows:
-        if (
-            existing.source_generation not in verified_generations
-            and existing.revoked_at is None
-        ):
+        if existing.source_generation not in verified_generations and existing.revoked_at is None:
             existing.revoked_at = current_time
             existing.revocation_reason = "source_receipt_drift"
     return inserted
@@ -372,9 +395,7 @@ def scenario_profile_similarity(
         else 0.0
     )
     return round(
-        0.6 * type_similarity
-        + 0.2 * replicate_similarity
-        + 0.2 * environment_similarity,
+        0.6 * type_similarity + 0.2 * replicate_similarity + 0.2 * environment_similarity,
         12,
     )
 
@@ -390,6 +411,8 @@ def retrieve_cross_job_memory(
 
     if not isinstance(current_job.user_id, str) or not current_job.user_id:
         return HarnessCrossJobMemory()
+    if current_job.model_harness_domain != OPTIMIZATION_CONTROL_TUNING_DOMAIN:
+        return HarnessCrossJobMemory()
     if not _memory_is_enabled(db, user_id=current_job.user_id):
         return HarnessCrossJobMemory()
     current_time = _utc(now)
@@ -404,11 +427,13 @@ def retrieve_cross_job_memory(
             )
             .where(
                 models.HarnessExperienceMemory.user_id == current_job.user_id,
+                models.HarnessExperienceMemory.memory_domain == current_job.model_harness_domain,
                 models.HarnessExperienceMemory.source_job_id != current_job.id,
                 models.HarnessExperienceMemory.task_family_sha256 == family_hash,
                 models.HarnessExperienceMemory.revoked_at.is_(None),
                 models.HarnessExperienceMemory.expires_at > current_time,
                 models.Job.user_id == current_job.user_id,
+                models.Job.model_harness_domain == current_job.model_harness_domain,
                 models.Job.status.in_(tuple(_TERMINAL_JOB_STATUSES)),
             )
             .order_by(
@@ -457,9 +482,7 @@ def retrieve_cross_job_memory(
         )
     ranked.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
     return HarnessCrossJobMemory(
-        experiences=tuple(
-            item[3] for item in ranked[:MAX_CROSS_JOB_EXPERIENCE_ITEMS]
-        )
+        experiences=tuple(item[3] for item in ranked[:MAX_CROSS_JOB_EXPERIENCE_ITEMS])
     )
 
 
@@ -480,9 +503,7 @@ def revoke_cross_job_experiences(
         models.HarnessExperienceMemory.revoked_at.is_(None),
     ]
     if source_job_id is not None:
-        predicates.append(
-            models.HarnessExperienceMemory.source_job_id == source_job_id
-        )
+        predicates.append(models.HarnessExperienceMemory.source_job_id == source_job_id)
     result = db.execute(
         update(models.HarnessExperienceMemory)
         .where(*predicates)
@@ -517,9 +538,7 @@ def delete_cross_job_experiences(
 
     predicates = [models.HarnessExperienceMemory.user_id == user_id]
     if source_job_id is not None:
-        predicates.append(
-            models.HarnessExperienceMemory.source_job_id == source_job_id
-        )
+        predicates.append(models.HarnessExperienceMemory.source_job_id == source_job_id)
     result = db.execute(delete(models.HarnessExperienceMemory).where(*predicates))
     return int(getattr(result, "rowcount", 0) or 0)
 

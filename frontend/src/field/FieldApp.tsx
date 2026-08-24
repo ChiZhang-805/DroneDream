@@ -15,7 +15,6 @@ import {
   isDesktopRuntime,
   type FieldDeviceDiscoveryReport,
   type FieldParameterSnapshot,
-  type HardwareDomainEdition,
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
@@ -55,11 +54,11 @@ const COPY = {
     quorum: "Quorum",
     locked: "Locked",
     page: {
-      device: ["Device & adapters", "Discover hardware without opening a transport, then select the matching protocol adapter."],
-      compatibility: ["Compatibility", "Match the Vehicle Pack, controller, firmware, and adapter before any controlled test."],
-      tuning: ["Autonomous tuning", "Model proposes candidates; Harness constrains trials, evidence, holdout, and rollback."],
-      recovery: ["Snapshots & rollback", "Capture parameter state and prepare a content-bound recovery transaction."],
-      operations: ["Preflight & control", "Review zone, operator confirmation, takeover, and emergency controls."],
+      device: "Device & adapters",
+      compatibility: "Compatibility",
+      tuning: "Autonomous tuning",
+      recovery: "Snapshots & rollback",
+      operations: "Preflight & control",
     },
     scan: "Discover",
     scanning: "Scanning",
@@ -111,11 +110,11 @@ const COPY = {
     quorum: "仲裁",
     locked: "已锁定",
     page: {
-      device: ["设备与适配器", "在不打开传输端口的前提下发现硬件，并选择匹配的协议适配器。"],
-      compatibility: ["兼容性", "受控测试前，确认机型包、飞控、固件和适配器一致。"],
-      tuning: ["自主调优", "Model 提出候选，Harness 约束试验、证据、留出验证与回滚。"],
-      recovery: ["快照与回滚", "采集参数状态，并准备内容绑定的恢复事务。"],
-      operations: ["飞前与控制", "检查区域、操作员确认、接管与紧急控制。"],
+      device: "设备与适配器",
+      compatibility: "兼容性",
+      tuning: "自主调优",
+      recovery: "快照与回滚",
+      operations: "飞前与控制",
     },
     scan: "发现设备",
     scanning: "正在扫描",
@@ -192,22 +191,15 @@ export interface FieldAppProps {
 function FieldPageHeading({
   icon: Icon,
   title,
-  body,
-  edition,
 }: {
   icon: typeof RadioTower;
   title: string;
-  body: string;
-  edition: HardwareDomainEdition;
 }) {
   return (
     <header className="field-page-heading">
       <div>
-        <span className="field-page-eyebrow"><Icon aria-hidden="true" />{
-          edition === "lab" ? "LAB · HARDWARE" : edition === "autonomy" ? "AGENT · HARDWARE" : "FIELD"
-        }</span>
+        <Icon aria-hidden="true" />
         <h1>{title}</h1>
-        <p>{body}</p>
       </div>
     </header>
   );
@@ -293,10 +285,10 @@ function FieldWorkspace({
   }, [locale]);
 
   const renderDevicePage = () => {
-    const [title, body] = copy.page.device;
+    const title = copy.page.device;
     return (
       <div className="field-page field-device-page">
-        <FieldPageHeading icon={RadioTower} title={title} body={body} edition={presentationEdition} />
+        <FieldPageHeading icon={RadioTower} title={title} />
         <div className="field-device-dashboard">
           <section className="field-compact-panel field-device-observation-panel">
             <div className="field-panel-toolbar">
@@ -340,10 +332,10 @@ function FieldWorkspace({
   };
 
   const renderCompatibilityPage = () => {
-    const [title, body] = copy.page.compatibility;
+    const title = copy.page.compatibility;
     return (
       <div className="field-page field-compatibility-page">
-        <FieldPageHeading icon={PackageCheck} title={title} body={body} edition={presentationEdition} />
+        <FieldPageHeading icon={PackageCheck} title={title} />
         <section className="field-compact-panel field-compatibility-controls" data-authority="false">
           <label><span>{copy.selectedPack}</span><select value={selectedPackId} onChange={(event) => {
             const pack = FIELD_CATALOG.vehiclePacks.find((candidate) => candidate.packId === event.target.value) ?? FIRST_FIELD_PACK;
@@ -369,15 +361,15 @@ function FieldWorkspace({
     if (activePage === "device") return renderDevicePage();
     if (activePage === "compatibility") return renderCompatibilityPage();
     if (activePage === "tuning") {
-      const [title, body] = copy.page.tuning;
-      return <div className="field-page"><FieldPageHeading icon={SlidersHorizontal} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldTuningWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
+      const title = copy.page.tuning;
+      return <div className="field-page"><FieldPageHeading icon={SlidersHorizontal} title={title} /><div className="field-page-component"><FieldTuningWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
     }
     if (activePage === "recovery") {
-      const [title, body] = copy.page.recovery;
-      return <div className="field-page"><FieldPageHeading icon={History} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldRecoveryWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} device={deviceReport?.devices[0]} evidence={readOnlyEvidence ?? undefined} onSnapshotCreated={setLatestSnapshot} /></div></div>;
+      const title = copy.page.recovery;
+      return <div className="field-page"><FieldPageHeading icon={History} title={title} /><div className="field-page-component"><FieldRecoveryWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} device={deviceReport?.devices[0]} evidence={readOnlyEvidence ?? undefined} onSnapshotCreated={setLatestSnapshot} /></div></div>;
     }
-    const [title, body] = copy.page.operations;
-    return <div className="field-page"><FieldPageHeading icon={ShieldCheck} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldPreflightWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
+    const title = copy.page.operations;
+    return <div className="field-page"><FieldPageHeading icon={ShieldCheck} title={title} /><div className="field-page-component"><FieldPreflightWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
   };
 
   return (

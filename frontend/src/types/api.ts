@@ -291,6 +291,12 @@ export interface DeleteJobResponse {
 
 export interface Job {
   id: string;
+  model_harness_domain: "optimization.control_tuning";
+  memory_domain: "optimization.control_tuning";
+  memory_precedence: HarnessMemoryPrecedenceLayer[];
+  raw_conversation_retention: "task_instance_only";
+  long_term_memory_authority: "advisory_only";
+  control_plane: HarnessControlPlaneReceipt;
   control_version: number;
   track_type: TrackType;
   reference_track: TrackPoint[] | null;
@@ -527,6 +533,7 @@ export interface ExperimentAssistantDocumentContextReceipt {
 
 export interface ExperimentAssistantTurnRequest {
   message_id: string;
+  conversation_id?: string | null;
   message: string;
   locale: "en" | "zh-CN";
   edition?: "universal" | "sim" | "lab" | "field" | "autonomy";
@@ -556,11 +563,12 @@ export type TaskWorkflowRequestedTaskType = TaskWorkflowTaskType | "auto_detect"
 export interface TaskWorkflowContextItem {
   key: string;
   value: string;
-  source: "user" | "workspace" | "asset_receipt" | "prior_summary";
+  source: "user" | "workspace" | "asset_receipt" | "prior_summary" | "account_memory";
 }
 
 export interface TaskWorkflowCompileRequest {
   request_id: string;
+  conversation_id?: string | null;
   edition: "universal" | "sim" | "lab" | "field" | "autonomy";
   requested_task_type: TaskWorkflowRequestedTaskType;
   message: string;
@@ -568,6 +576,112 @@ export interface TaskWorkflowCompileRequest {
   conversation_summary?: string;
   context?: TaskWorkflowContextItem[];
   requested_tool_ids?: string[];
+}
+
+export type TaskWorkflowModelHarnessDomain =
+  | "optimization.control_tuning"
+  | "autonomy.mission"
+  | "asset.qualification"
+  | "experiment.simulation"
+  | "workflow.cross_edition"
+  | "validation.hardware"
+  | "calibration.system"
+  | "transfer.sim_to_real"
+  | "transfer.real_to_sim"
+  | "operations.field";
+
+export type HarnessMemoryDomain = "account.shared" | TaskWorkflowModelHarnessDomain;
+export type HarnessMemoryPrecedenceLayer =
+  | "current_request"
+  | "session"
+  | "domain_memory"
+  | "account_defaults";
+export type HarnessLoopKind =
+  | "single_pass"
+  | "plan_validate"
+  | "iterative_optimize"
+  | "observe_repair"
+  | "promotion_pipeline";
+export type HarnessFixedKernelResponsibility =
+  | "identity_and_tenant_boundary"
+  | "structured_io_validation"
+  | "safety_policy"
+  | "budget_enforcement"
+  | "acceptance_and_evidence"
+  | "memory_governance"
+  | "plugin_trust_and_lifecycle";
+export type HarnessPluginCapability =
+  | "model_provider"
+  | "intent_extractor"
+  | "context_enricher"
+  | "prompt_pack"
+  | "tool_provider"
+  | "planner"
+  | "optimizer"
+  | "critic"
+  | "validator"
+  | "memory_extractor"
+  | "memory_consolidator"
+  | "memory_retriever"
+  | "semantic_retriever"
+  | "simulator_adapter"
+  | "asset_adapter"
+  | "telemetry_adapter"
+  | "recovery_strategy"
+  | "evidence_exporter"
+  | "notification_adapter";
+
+export interface HarnessControlPlanePluginSelection {
+  slot: HarnessPluginCapability;
+  plugin_id: string;
+  version: string;
+  content_sha256: string;
+  trust: "managed" | "signed" | "local_development";
+  source: "explicit" | "product_managed_default";
+  selected_by: "product_managed" | "account_configurable" | "agent_harness_designer";
+}
+
+export interface HarnessControlPlaneReceipt {
+  schema_version: "dronedream.model-harness-control-plane.v1";
+  structured_input_schema_version: "dronedream.model-harness-input.v1";
+  structured_output_schema_version: "dronedream.model-harness-output.v1";
+  domain: TaskWorkflowModelHarnessDomain;
+  loop_kind: HarnessLoopKind;
+  hard_maximum_model_calls: number;
+  hard_maximum_repair_cycles: number;
+  effective_maximum_model_calls: number;
+  effective_maximum_repair_cycles: number;
+  fixed_kernel_responsibilities: HarnessFixedKernelResponsibility[];
+  readable_memory_domains: HarnessMemoryDomain[];
+  writable_memory_domain: HarnessMemoryDomain;
+  memory_retrieval_policy_version: "dronedream.memory-retrieval-policy.v1";
+  learning_promotion_policy_version: "dronedream.learning-promotion-policy.v1";
+  semantic_memory_authority: "advisory_only";
+  online_policy_updates_allowed: false;
+  execution_authority_enforcement: "not_integrated";
+  grants_execution_authority: false;
+  plugin_selection_effect: "contract_only";
+  plugin_runtime_receipt_ids: [];
+  selected_plugins: HarnessControlPlanePluginSelection[];
+  selection_sha256: string;
+}
+
+export interface TaskWorkflowRuntimeOperation {
+  operation_id: string;
+  status: "available" | "delegated" | "refused";
+  execution_state: "not_invoked" | "refused";
+  boundary: "public_backend" | "managed_cloud" | "private_agent_core" | "not_integrated";
+  handler_id: string | null;
+  api_path: string | null;
+  refusal_code: string | null;
+  requires_receipts: string[];
+  may_perform_physical_action: false;
+}
+
+export interface TaskWorkflowRuntimeHandler {
+  schema_version: "dronedream.model-harness-runtime-registry.v1";
+  domain: TaskWorkflowModelHarnessDomain;
+  operations: TaskWorkflowRuntimeOperation[];
 }
 
 export interface TaskWorkflowStep {
@@ -587,10 +701,21 @@ export interface TaskWorkflowContract {
   contract_id: string;
   owner_binding_sha256: string;
   request_id: string;
+  task_id: string;
+  thread_id: string;
+  lifecycle_stage: "compile_only";
+  model_execution_performed: false;
+  runtime_execution_performed: false;
   edition: "universal" | "sim" | "lab" | "field" | "autonomy";
   locale: "en" | "zh-CN";
   task_type: TaskWorkflowTaskType;
   routing_source: "explicit" | "auto_detect";
+  model_harness_domain: TaskWorkflowModelHarnessDomain;
+  memory_domain: TaskWorkflowModelHarnessDomain;
+  control_plane: HarnessControlPlaneReceipt;
+  runtime_handler: TaskWorkflowRuntimeHandler;
+  harness_input_sha256: string;
+  harness_output: Record<string, unknown>;
   status: "draft" | "blocked";
   system_prompt_registry_version: "dronedream.workflow-prompts.v1";
   system_prompt_version: string;
@@ -608,6 +733,22 @@ export interface TaskWorkflowContract {
 
 export interface ExperimentAssistantTurnResponse {
   schema_version: "1.0";
+  lifecycle_stage: "compile_only" | "proposal";
+  model_entrypoint_role:
+    | "workflow_contract_compiler"
+    | "control_tuning_draft_compiler"
+    | "managed_model_proposal";
+  creates_job: false;
+  runtime_execution_performed: false;
+  next_required_stage: "managed_model_proposal" | "review_and_submit_job" | "review_proposal";
+  model_harness_domain: TaskWorkflowModelHarnessDomain;
+  memory_domain: TaskWorkflowModelHarnessDomain;
+  // The hosted proposal adapter can return a bounded control-plane summary,
+  // while Job resources always expose the complete persisted receipt above.
+  control_plane: Record<string, unknown>;
+  runtime_handler?: TaskWorkflowRuntimeHandler;
+  harness_input_sha256: string;
+  harness_output: Record<string, unknown>;
   experiment_summary: string;
   accepted_patches: ExperimentAssistantPatch[];
   rejected_patches: ExperimentAssistantRejectedPatch[];
@@ -651,7 +792,7 @@ export interface ExperimentAssistantTurnResponse {
     workflow: Array<{
       step: string;
       label: string;
-      status: "completed" | "needs_input";
+      status: "completed" | "needs_input" | "proposed" | "refused";
     }>;
     generated_files?: Array<{
       file_id: string;

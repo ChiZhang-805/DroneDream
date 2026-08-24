@@ -34,7 +34,6 @@ const CATALOG_SHA256 = "5b1a7b9f5bd64624b6d4af7b0745e1ba4b1babca63fab0ba765ca97e
 const COPY = {
   en: {
     title: "Protocol adapters",
-    body: "Enable source-bound open-protocol frame inspection and bounded read-only serial telemetry without adding proprietary SDKs to the base app.",
     refresh: "Refresh adapter state",
     offline: "Native adapter installation is available in the installed Field app.",
     loadError: "The native adapter catalog could not be verified.",
@@ -81,7 +80,6 @@ const COPY = {
   },
   "zh-CN": {
     title: "协议适配器",
-    body: "在不把专有 SDK 塞入基础应用的前提下，启用源绑定开放协议帧检查和有时间上限的只读串口遥测。",
     refresh: "刷新适配器状态",
     offline: "原生适配器安装仅在已安装的 Field 应用中可用。",
     loadError: "无法验证原生适配器目录。",
@@ -401,7 +399,6 @@ export function FieldAdapterCenter({
       <header>
         <div>
           <h2 id="field-adapter-title">{copy.title}</h2>
-          <p>{copy.body}</p>
         </div>
         <PackageOpen aria-hidden="true" />
       </header>

@@ -32,7 +32,6 @@ import { LabEvidenceBridgePanel } from "./LabEvidenceBridgePanel";
 const COPY = {
   en: {
     title: "Bidirectional calibration loop",
-    subtitle: "One evidence-bound job carries each candidate from simulation into real observation, model revision, resimulation, holdout, and qualification.",
     model: "Model",
     modelState: "Proposal only",
     harness: "Harness",
@@ -52,7 +51,6 @@ const COPY = {
     import: "Import bound cycle evidence",
     reset: "Reset analysis",
     noInput: "No cycle evidence bound",
-    noInputBody: "The Harness is idle. Model requests, experiments, provider calls, and hardware actions remain at zero.",
     rejected: "Evidence rejected",
     inspectFailed: "The evidence could not be inspected.",
     exportFailed: "The draft receipt could not be generated.",
@@ -101,7 +99,6 @@ const COPY = {
   },
   "zh-CN": {
     title: "双向校准闭环",
-    subtitle: "同一份证据绑定作业将候选参数从仿真带入真实观测，再完成模型修正、重仿真、独立留出验证与资格判定。",
     model: "Model",
     modelState: "仅提出建议",
     harness: "Harness",
@@ -121,7 +118,6 @@ const COPY = {
     import: "导入已绑定循环证据",
     reset: "重置分析",
     noInput: "尚未绑定循环证据",
-    noInputBody: "Harness 当前空闲；Model 请求、实验、模型服务商调用和真机动作次数均为零。",
     rejected: "证据已拒绝",
     inspectFailed: "无法检查导入的证据。",
     exportFailed: "无法生成草稿回执。",

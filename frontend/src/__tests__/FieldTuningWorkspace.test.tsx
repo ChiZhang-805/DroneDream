@@ -80,8 +80,8 @@ describe("FieldTuningWorkspace", () => {
 
     expect(screen.getByRole("heading", { name: "真机自主调参" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "运行安全调参演示" })).toBeInTheDocument();
-    expect(screen.getByText("Model 提出受边界约束的候选参数，Harness 负责受控实验、遥测评分、失败分类和回滚证据。"))
-      .toBeInTheDocument();
+    expect(screen.getByText("真机权限: 已拒绝")).toBeInTheDocument();
+    expect(screen.getByText("无仿真阶段")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "真机记录证据 Harness 作业" })).toBeInTheDocument();
   });
 

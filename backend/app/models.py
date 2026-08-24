@@ -30,10 +30,22 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+from app.model_harness.control_plane import compile_control_plane_receipt
+from app.model_harness.domains import OPTIMIZATION_CONTROL_TUNING_DOMAIN
 
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
+
+
+def _default_optimization_control_plane_receipt() -> dict[str, Any]:
+    """Issue the current product-managed receipt for directly-created Job rows."""
+
+    return compile_control_plane_receipt(OPTIMIZATION_CONTROL_TUNING_DOMAIN).model_dump(mode="json")
+
+
+def _default_optimization_control_plane_selection_sha256() -> str:
+    return compile_control_plane_receipt(OPTIMIZATION_CONTROL_TUNING_DOMAIN).selection_sha256
 
 
 def _now() -> datetime:
@@ -673,11 +685,31 @@ class Job(Base):
             "next_qualification_sequence >= 1",
             name="ck_jobs_next_qualification_sequence",
         ),
+        CheckConstraint(
+            "model_harness_domain = 'optimization.control_tuning'",
+            name="ck_jobs_model_harness_domain",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("job"))
     user_id: Mapped[str | None] = mapped_column(
         String(64), ForeignKey("users.id"), nullable=True, index=True
+    )
+    model_harness_domain: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default=OPTIMIZATION_CONTROL_TUNING_DOMAIN,
+        server_default=OPTIMIZATION_CONTROL_TUNING_DOMAIN,
+    )
+    model_harness_control_plane_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=_default_optimization_control_plane_receipt,
+    )
+    model_harness_control_plane_selection_sha256: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default=_default_optimization_control_plane_selection_sha256,
     )
 
     # Configuration (flat columns — high-query fields should not be buried in JSON).
@@ -2139,6 +2171,38 @@ class HarnessExperienceMemory(Base):
             "source_generation",
             name="uq_harness_experience_source_generation",
         ),
+        Index(
+            "ix_harness_experience_owner_domain_family",
+            "user_id",
+            "memory_domain",
+            "task_family_sha256",
+        ),
+        CheckConstraint(
+            "source_kind = 'verified_job_outcome'",
+            name="ck_harness_experience_source_kind",
+        ),
+        CheckConstraint(
+            "memory_domain IN ("
+            "'optimization.control_tuning', 'autonomy.mission', "
+            "'asset.qualification', 'experiment.simulation', "
+            "'workflow.cross_edition', 'validation.hardware', "
+            "'calibration.system', 'transfer.sim_to_real', "
+            "'transfer.real_to_sim', 'operations.field'"
+            ")",
+            name="ck_harness_experience_memory_domain",
+        ),
+        CheckConstraint(
+            "evidence_count >= 1",
+            name="ck_harness_experience_evidence_count",
+        ),
+        CheckConstraint(
+            "confidence >= 0 AND confidence <= 1",
+            name="ck_harness_experience_confidence",
+        ),
+        CheckConstraint(
+            "lifecycle_status = 'consolidated'",
+            name="ck_harness_experience_lifecycle_status",
+        ),
     )
 
     id: Mapped[str] = mapped_column(
@@ -2159,6 +2223,37 @@ class HarnessExperienceMemory(Base):
         index=True,
     )
     source_generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    memory_domain: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default=OPTIMIZATION_CONTROL_TUNING_DOMAIN,
+        server_default=OPTIMIZATION_CONTROL_TUNING_DOMAIN,
+        index=True,
+    )
+    source_kind: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="verified_job_outcome",
+        server_default="verified_job_outcome",
+    )
+    evidence_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    confidence: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        default=1.0,
+        server_default="1.0",
+    )
+    lifecycle_status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="consolidated",
+        server_default="consolidated",
+    )
     memory_schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
     source_evidence_schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
     source_prompt_template_version: Mapped[str] = mapped_column(String(32), nullable=False)

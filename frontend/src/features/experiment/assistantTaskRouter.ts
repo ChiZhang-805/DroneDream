@@ -26,6 +26,11 @@ const TASKS_BY_EDITION: Readonly<Record<BrandEditionId, readonly AssistantTaskTy
     "asset_import_qualification",
     "simulation_experiment",
     "cross_edition_workflow",
+    "hardware_validation",
+    "calibration",
+    "sim_to_real",
+    "real_to_sim",
+    "field_task",
   ],
   sim: ["control_tuning", "mission_autonomy", "asset_import_qualification", "simulation_experiment"],
   lab: [
