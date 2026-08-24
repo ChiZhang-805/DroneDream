@@ -260,7 +260,7 @@ export function History() {
                 : t("runtimeGate.checkingShort")}
             </button>
           ) : (
-            <button type="button" className="btn btn-primary" onClick={openAppSettings}>
+            <button type="button" className="btn btn-primary" onClick={() => openAppSettings("runtime")}>
               {t("runtimeGate.openSetup")}
             </button>
           )}

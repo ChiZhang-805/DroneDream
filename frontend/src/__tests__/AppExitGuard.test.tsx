@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
@@ -161,6 +161,40 @@ describe("desktop close protection", () => {
     expect(screen.getByRole("button", { name: "Exit anyway" })).toBeVisible();
     expect(destroyWindow).not.toHaveBeenCalled();
     expect(invokeDesktop).not.toHaveBeenCalled();
+  });
+
+  it("keeps the native-close confirmation operable above the full settings workspace", async () => {
+    vi.mocked(apiClient.listJobs).mockImplementation(async (params) =>
+      emptyJobs(params?.status === "RUNNING" ? 1 : 0)
+    );
+    renderShell("/dashboard");
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
+    const settingsWorkspace = await screen.findByRole("region", { name: "Settings" });
+    const activeSettingsTab = within(settingsWorkspace).getByRole("tab", { name: "General" });
+    await waitFor(() => expect(activeSettingsTab).toHaveFocus());
+
+    await requestWindowClose();
+
+    const exitDialog = screen.getByRole("dialog", { name: "Before you close DroneDream" });
+    expect(exitDialog).toBeVisible();
+    expect(exitDialog.closest("[inert]")).toBeNull();
+    const settingsHost = settingsWorkspace.closest(".settings-workspace-host");
+    expect(settingsHost).toHaveAttribute("inert");
+    const returnButton = within(exitDialog).getByRole("button", { name: "Return to DroneDream" });
+    const exitButton = within(exitDialog).getByRole("button", { name: "Exit anyway" });
+    await waitFor(() => expect(returnButton).toHaveFocus());
+    exitButton.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(returnButton).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(exitButton).toHaveFocus();
+    fireEvent.click(returnButton);
+    expect(screen.queryByRole("dialog", { name: "Before you close DroneDream" })).toBeNull();
+    await waitFor(() => expect(settingsHost).not.toHaveAttribute("inert"));
+    await waitFor(() => expect(activeSettingsTab).toHaveFocus());
   });
 
   it("cancels known jobs and stops the dedicated runtime before destroying the window", async () => {

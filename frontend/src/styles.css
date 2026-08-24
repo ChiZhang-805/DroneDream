@@ -10994,7 +10994,7 @@ a {
 
 .app-exit-backdrop {
   position: fixed;
-  z-index: 90;
+  z-index: 1300;
   inset: 0;
   display: grid;
   place-items: center;
@@ -11318,6 +11318,422 @@ a {
     min-height: 25px;
     padding: 0.28rem 0.36rem;
     font-size: 0.58rem;
+  }
+}
+
+/* Desktop quick settings intentionally exposes only high-frequency choices.
+   Detailed account, model, Memory, course, Runtime and update controls live in
+   the dedicated settings workspace below. */
+.quick-settings-dialog {
+  width: min(840px, calc(100vw - 96px));
+  height: min(525px, calc(100vh - 96px));
+  min-width: 720px;
+  min-height: 450px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  padding: 1.1rem;
+  overflow: hidden;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 30%, var(--border));
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--bg-elev) 94%, var(--dd-brand-light-surface));
+  box-shadow: 0 28px 84px rgba(31, 22, 34, 0.28);
+}
+
+.quick-settings-heading,
+.quick-settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quick-settings-heading h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+}
+
+.quick-settings-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr)) auto;
+  gap: 0.65rem;
+}
+
+.quick-settings-grid:not(:has(.quick-settings-memory)) {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.quick-settings-item {
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 22%, var(--border));
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--bg-elev-2) 84%, transparent);
+}
+
+.quick-settings-item > span,
+.quick-settings-item legend {
+  padding: 0;
+  font-size: 0.77rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.quick-settings-item select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0.45rem 0.7rem;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+}
+
+.quick-settings-language {
+  grid-column: span 2;
+}
+
+.quick-settings-language > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.quick-settings-language button {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+}
+
+.quick-settings-language button.selected {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 58%, var(--border));
+  background: color-mix(in srgb, var(--dd-brand-start) 15%, var(--bg-elev));
+}
+
+.quick-settings-language .launcher-language-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.quick-settings-memory {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+}
+
+.quick-settings-memory .settings-toggle-row {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.4rem 0.5rem;
+  background: transparent;
+}
+
+.quick-settings-memory .settings-toggle-row > span {
+  min-width: 0;
+}
+
+.quick-settings-memory .settings-toggle-row svg {
+  width: 18px;
+  height: 18px;
+  color: var(--dd-brand-middle);
+}
+
+.quick-settings-runtime {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  justify-content: initial;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick-settings-runtime > svg {
+  width: 20px;
+  height: 20px;
+  color: var(--dd-brand-middle);
+}
+
+.quick-settings-runtime > span {
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.quick-settings-runtime > strong {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.quick-settings-runtime > strong[data-health="healthy"] {
+  color: #187a54;
+}
+
+.quick-settings-runtime:hover,
+.quick-settings-runtime:focus-visible {
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 58%, var(--border));
+  background: color-mix(in srgb, var(--dd-brand-start) 12%, var(--bg-elev));
+}
+
+.quick-settings-footer {
+  justify-content: flex-end;
+  padding-top: 0.15rem;
+}
+
+.quick-settings-footer .btn {
+  min-width: 150px;
+  justify-content: center;
+}
+
+.quick-settings-footer svg {
+  width: 17px;
+  height: 17px;
+}
+
+.settings-workspace-host {
+  position: fixed;
+  z-index: 1100;
+  inset: 0;
+  width: 100%;
+  min-width: 960px;
+  height: 100vh;
+  min-height: 640px;
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.settings-workspace-host .settings-workspace-surface {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  display: grid;
+  grid-template-columns: 272px minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg-elev);
+  box-shadow: none;
+  animation: none;
+  transform: none;
+}
+
+.settings-workspace-sidebar {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 2rem 1.25rem 1.25rem;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 28%, var(--bg-elev-2));
+}
+
+.settings-workspace-sidebar h2 {
+  margin: 0 0 0.35rem;
+  padding-inline: 0.6rem;
+  font-size: 1.25rem;
+}
+
+.settings-workspace-sidebar .launcher-settings-tabs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.28rem;
+  margin: 0;
+}
+
+.settings-workspace-sidebar .launcher-settings-tabs button {
+  width: 100%;
+  min-height: 44px;
+  justify-content: flex-start;
+  gap: 0.7rem;
+  padding: 0.65rem 0.8rem;
+  text-align: left;
+  border-color: transparent;
+  background: transparent;
+}
+
+.settings-workspace-sidebar .launcher-settings-tabs button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-workspace-sidebar .launcher-settings-tabs button[aria-selected="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--dd-brand-start) 14%, var(--bg-elev-2));
+  box-shadow: none;
+}
+
+.settings-workspace-back {
+  width: 100%;
+  min-height: 42px;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.8rem;
+  color: var(--text-dim);
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.settings-workspace-back:hover,
+.settings-workspace-back:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--dd-brand-start) 10%, var(--bg-elev));
+}
+
+.settings-workspace-back svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-workspace-content {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-elev);
+}
+
+.settings-workspace-content > .launcher-settings-heading {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 2rem clamp(2rem, 6vw, 6rem) 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-workspace-content > .launcher-settings-heading h2 {
+  font-size: 1.65rem;
+}
+
+.settings-workspace-content > .launcher-settings-panels {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 1.5rem clamp(2rem, 6vw, 6rem) 3rem;
+}
+
+.settings-workspace-content .launcher-settings-panel {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  overflow: visible;
+}
+
+.settings-workspace-content .settings-general-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  height: auto;
+}
+
+.settings-workspace-content .settings-language-card,
+.settings-workspace-content .settings-interface-card {
+  grid-template-rows: auto auto;
+  align-self: start;
+}
+
+.settings-workspace-content .settings-language-card .launcher-language-options {
+  grid-template-rows: repeat(2, auto);
+  height: auto;
+}
+
+.settings-workspace-content .settings-interface-card .settings-appearance-options {
+  grid-template-rows: repeat(4, auto) !important;
+  height: auto;
+}
+
+.settings-workspace-content .settings-notification-card {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto repeat(4, auto);
+  align-self: start;
+}
+
+.settings-workspace-content .settings-notification-card .settings-card-heading {
+  grid-column: 1 / -1;
+}
+
+.settings-workspace-content .settings-memory-switches > .settings-toggle-row > span,
+.settings-workspace-content .settings-memory-scope-grid .settings-toggle-row > span,
+.settings-workspace-content .settings-memory-switches > .settings-toggle-row > span > span,
+.settings-workspace-content .settings-memory-scope-grid .settings-toggle-row > span > span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.settings-workspace-content .settings-memory-scope-grid .settings-toggle-row {
+  min-height: 38px;
+  height: auto;
+}
+
+.settings-workspace-content .settings-course-editions {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.settings-workspace-content .settings-course-editions article {
+  grid-column: span 2;
+}
+
+.settings-workspace-content .settings-course-editions article:nth-child(4) {
+  grid-column: 2 / span 2;
+}
+
+.settings-workspace-content .settings-course-editions article:nth-child(5) {
+  grid-column: 4 / span 2;
+}
+
+.settings-workspace-content .settings-course-editions p {
+  min-height: 0;
+  font-size: 0.72rem;
+  text-align: left;
+}
+
+.settings-workspace-content .settings-memory-panel,
+.settings-workspace-content .settings-model-panel,
+.settings-workspace-content .settings-runtime-panel,
+.settings-workspace-content .settings-course-panel {
+  max-height: none;
+  overflow: visible;
+}
+
+@media (max-width: 1120px) and (min-width: 761px) {
+  .quick-settings-dialog {
+    width: min(840px, calc(100vw - 56px));
+    min-width: 700px;
+  }
+
+  .settings-workspace-host .settings-workspace-surface {
+    grid-template-columns: 224px minmax(0, 1fr);
+  }
+
+  .settings-workspace-content > .launcher-settings-heading,
+  .settings-workspace-content > .launcher-settings-panels {
+    padding-inline: 2rem;
   }
 }
 
@@ -20753,4 +21169,125 @@ body {
     padding: 0.2rem 0.28rem;
     font-size: 0.5rem;
   }
+}
+
+/* Settings follows the selected appearance independently from the operational
+   workspace's intentionally light default. This block stays last because the
+   legacy edition rules above still contain fixed light colors. */
+.app-shell .quick-settings-backdrop {
+  animation: none;
+}
+
+.app-shell .settings-workspace-host .settings-workspace-surface {
+  color: var(--text);
+  border: 0;
+  background: var(--bg-elev);
+  box-shadow: none;
+  animation: none;
+  transform: none;
+}
+
+.app-shell .settings-workspace-host .launcher-settings-tabs button {
+  color: var(--text-dim);
+  border-color: transparent;
+  background: transparent;
+}
+
+.app-shell .settings-workspace-host .launcher-settings-tabs button[aria-selected="true"] {
+  color: var(--text);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--dd-brand-start) 14%, var(--bg-elev-2));
+}
+
+:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host {
+  color-scheme: dark;
+  --bg: #0b1020;
+  --bg-elev: #101735;
+  --bg-elev-2: #151d42;
+  --border: #2a3763;
+  --border-strong: #3a4b82;
+  --text: #f2f4fb;
+  --text-muted: #aab4d0;
+  --text-dim: #d0d6e7;
+  color: var(--text);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog {
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 42%, var(--border));
+  background:
+    radial-gradient(
+      circle at 96% 0,
+      color-mix(in srgb, var(--dd-brand-middle) 14%, transparent),
+      transparent 36%
+    ),
+    var(--bg-elev);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.56);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog .launcher-settings-close {
+  color: var(--text-dim);
+  border-color: var(--border);
+  background: var(--bg-elev-2);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host {
+  background: var(--bg);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-workspace-surface,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-workspace-content {
+  color: var(--text);
+  background: var(--bg-elev);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-workspace-sidebar {
+  color: var(--text);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 62%, var(--bg-elev-2));
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-workspace-content > .launcher-settings-heading,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-panel {
+  border-color: var(--border);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-general-card,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-switches,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-grid,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-reset-row,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-access-mode > button,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-usage,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-course-panel,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-course-editions article,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-details,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-state,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-components > li {
+  color: var(--text);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 34%, var(--bg-elev-2));
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host input,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host select,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host textarea,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-general-card .settings-toggle-row,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-grid input,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-grid select,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-reset-row select {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--bg-elev);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-grid label > span,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-grid label > span,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-profile-row label > span,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-course-overview p,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-course-editions p,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-heading p,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-copy small,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-components small,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-progress span {
+  color: var(--text-muted);
 }

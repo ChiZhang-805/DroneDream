@@ -104,17 +104,19 @@ function renderDashboard() {
   return { ...page, router };
 }
 
-function openRuntimeSettings(locale: "en" | "zh-CN" = "en") {
+async function openRuntimeSettings(locale: "en" | "zh-CN" = "en") {
   fireEvent.click(screen.getByRole("button", {
     name: locale === "zh-CN" ? "设置" : "Settings",
   }));
-  const dialog = screen.getByRole("dialog", {
+  const quickSettings = screen.getByRole("dialog", {
+    name: locale === "zh-CN" ? "快捷设置" : "Quick settings",
+  });
+  fireEvent.click(within(quickSettings).getByRole("button", {
+    name: locale === "zh-CN" ? /Runtime 与更新/ : /Runtime & updates/,
+  }));
+  return screen.findByRole("region", {
     name: locale === "zh-CN" ? "设置" : "Settings",
   });
-  fireEvent.click(within(dialog).getByRole("tab", {
-    name: locale === "zh-CN" ? "运行环境" : "Runtime",
-  }));
-  return dialog;
 }
 
 afterEach(() => {
@@ -201,7 +203,7 @@ describe("workspace sidebar version module", () => {
     router.dispose();
   });
 
-  it("keeps generic update failures reachable from the account-adjacent retry action", () => {
+  it("keeps generic update failures reachable from the account-adjacent retry action", async () => {
     const checkForUpdates = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -217,7 +219,7 @@ describe("workspace sidebar version module", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry DroneDream update" }));
     expect(checkForUpdates).toHaveBeenCalledOnce();
 
-    const dialog = openRuntimeSettings();
+    const dialog = await openRuntimeSettings();
     fireEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
     expect(checkForUpdates).toHaveBeenCalledTimes(2);
 
@@ -243,14 +245,14 @@ describe("workspace sidebar version module", () => {
 });
 
 describe("Settings update center", () => {
-  it("checks again from the current state and keeps environment checks separate", () => {
+  it("checks again from the current state and keeps environment checks separate", async () => {
     const checkForUpdates = vi.fn(async () => undefined);
     updaterState.current = { ...updaterState.current, checkForUpdates };
     installReadyDesktopBridge();
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    const dialog = openRuntimeSettings();
+    const dialog = await openRuntimeSettings();
     expect(within(dialog).getByRole("heading", { name: "Software updates" })).toBeVisible();
     expect(within(dialog).getByText("DroneDream is up to date. Click to check again."))
       .toBeVisible();
@@ -261,7 +263,7 @@ describe("Settings update center", () => {
     router.dispose();
   });
 
-  it("shows required application updates and invokes the signed installer", () => {
+  it("shows required application updates and invokes the signed installer", async () => {
     const installAvailableUpdate = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -274,7 +276,7 @@ describe("Settings update center", () => {
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    const dialog = openRuntimeSettings();
+    const dialog = await openRuntimeSettings();
     expect(within(dialog).getByText("Version 1.0.1 is available. Click to update."))
       .toBeVisible();
     expect(within(dialog).getByText("Required")).toBeVisible();
@@ -284,7 +286,7 @@ describe("Settings update center", () => {
     router.dispose();
   });
 
-  it("lists signed pack urgency and installs the selected pack update set", () => {
+  it("lists signed pack urgency and installs the selected pack update set", async () => {
     const installComponentUpdates = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -313,7 +315,7 @@ describe("Settings update center", () => {
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    const dialog = openRuntimeSettings();
+    const dialog = await openRuntimeSettings();
     expect(within(dialog).getByText("Workflow pack")).toBeVisible();
     expect(within(dialog).getByText("v1.2.0")).toBeVisible();
     expect(within(dialog).getAllByText("Required").length).toBeGreaterThan(0);
@@ -323,7 +325,7 @@ describe("Settings update center", () => {
     router.dispose();
   });
 
-  it("renders application download progress", () => {
+  it("renders application download progress", async () => {
     updaterState.current = {
       ...updaterState.current,
       status: "downloading",
@@ -333,14 +335,14 @@ describe("Settings update center", () => {
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    const dialog = openRuntimeSettings();
+    const dialog = await openRuntimeSettings();
     expect(within(dialog).getByRole("progressbar", { name: "Update progress" }))
       .toHaveValue(42);
     expect(within(dialog).getByText("42%")).toBeVisible();
     router.dispose();
   });
 
-  it("opens the Runtime Base upgrade entry for an incompatible manager", () => {
+  it("opens the Runtime Base upgrade entry for an incompatible manager", async () => {
     updaterState.current = {
       ...updaterState.current,
       status: "runtimeBaseRequired",
@@ -350,7 +352,7 @@ describe("Settings update center", () => {
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    const dialog = openRuntimeSettings();
+    const dialog = await openRuntimeSettings();
     fireEvent.click(within(dialog).getByRole("button", {
       name: "Open Runtime Base upgrade",
     }));
@@ -359,13 +361,13 @@ describe("Settings update center", () => {
     router.dispose();
   });
 
-  it("renders independently authored Simplified Chinese update copy", () => {
+  it("renders independently authored Simplified Chinese update copy", async () => {
     installReadyDesktopBridge();
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    const dialog = openRuntimeSettings("zh-CN");
+    const dialog = await openRuntimeSettings("zh-CN");
     expect(within(dialog).getByRole("heading", { name: "软件更新" })).toBeVisible();
     expect(within(dialog).getByText("DroneDream 已是最新版本，点击可再次检查。"))
       .toBeVisible();

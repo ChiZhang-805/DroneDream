@@ -1,5 +1,6 @@
 import {
   Activity,
+  ArrowLeft,
   Bot,
   Database,
   GraduationCap,
@@ -8,6 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  useEffect,
   useRef,
   type KeyboardEvent,
   type ReactNode,
@@ -43,6 +45,8 @@ export function EditionSettingsSurface({
   title,
   children,
   consumerProfile = "shared",
+  presentation = "dialog",
+  backLabel,
 }: {
   activeTab: SettingsSurfaceTabId;
   closeLabel: string;
@@ -54,8 +58,31 @@ export function EditionSettingsSurface({
   title: string;
   children: ReactNode;
   consumerProfile?: "shared" | BrandEditionId;
+  presentation?: "dialog" | "workspace";
+  backLabel?: string;
 }) {
   const tabRefs = useRef(new Map<SettingsSurfaceTabId, HTMLButtonElement>());
+  useEffect(() => {
+    if (presentation !== "workspace") return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      tabRefs.current.get(activeTab)?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, presentation]);
+  useEffect(() => {
+    if (presentation !== "workspace") return undefined;
+    const returnToApplication = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      const nestedModal = document.querySelector<HTMLElement>(
+        '[role="dialog"][aria-modal="true"]',
+      );
+      if (nestedModal) return;
+      event.preventDefault();
+      onClose();
+    };
+    document.addEventListener("keydown", returnToApplication);
+    return () => document.removeEventListener("keydown", returnToApplication);
+  }, [onClose, presentation]);
   const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
     let direction = 0;
     let nextIndex: number;
@@ -86,62 +113,93 @@ export function EditionSettingsSurface({
     tabRefs.current.get(next.id)?.focus();
   };
 
+  const navigation = (
+    <div
+      className="launcher-settings-tabs"
+      role="tablist"
+      aria-label={title}
+      aria-orientation={presentation === "workspace" ? "vertical" : "horizontal"}
+    >
+      {tabs.map((tab, index) => {
+        const Icon = TAB_ICONS[tab.id];
+        const selected = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            ref={(element) => {
+              if (element) tabRefs.current.set(tab.id, element);
+              else tabRefs.current.delete(tab.id);
+            }}
+            type="button"
+            role="tab"
+            id={`settings-tab-${tab.id}`}
+            aria-controls={`settings-panel-${tab.id}`}
+            aria-selected={selected}
+            aria-disabled={tab.disabled || undefined}
+            disabled={tab.disabled}
+            tabIndex={!tab.disabled && selected ? 0 : -1}
+            title={tab.label}
+            onClick={() => onTabChange(tab.id)}
+            onKeyDown={(event) => moveFocus(event, index)}
+          >
+            <Icon aria-hidden="true" />
+            <span>{tab.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <section
-      className="launcher-settings-dialog"
-      role="dialog"
-      aria-modal="true"
+      className={`launcher-settings-dialog${presentation === "workspace" ? " settings-workspace-surface" : ""}`}
+      role={presentation === "workspace" ? "region" : "dialog"}
+      aria-modal={presentation === "dialog" ? "true" : undefined}
       aria-labelledby="launcher-settings-title"
       data-brand-edition={edition}
       data-settings-consumer={consumerProfile}
       data-presentation-only="true"
       data-grants-hardware-authority="false"
     >
-      <div className="launcher-settings-heading">
-        <div className="launcher-settings-title-lockup">
+      {presentation === "workspace" ? (
+        <aside className="settings-workspace-sidebar">
           <h2 id="launcher-settings-title">{title}</h2>
-        </div>
-        <button
-          ref={closeRef}
-          type="button"
-          className="launcher-settings-close"
-          aria-label={closeLabel}
-          title={closeLabel}
-          onClick={onClose}
-        >
-          <X aria-hidden="true" />
-        </button>
-      </div>
-      <div className="launcher-settings-tabs" role="tablist" aria-label={title}>
-        {tabs.map((tab, index) => {
-          const Icon = TAB_ICONS[tab.id];
-          const selected = activeTab === tab.id;
-          return (
+          {navigation}
+          <button
+            type="button"
+            className="settings-workspace-back"
+            onClick={onClose}
+          >
+            <ArrowLeft aria-hidden="true" />
+            <span>{backLabel ?? closeLabel}</span>
+          </button>
+        </aside>
+      ) : null}
+      <div className={presentation === "workspace" ? "settings-workspace-content" : undefined}>
+        <div className="launcher-settings-heading">
+          <div className="launcher-settings-title-lockup">
+            <h2 id={presentation === "workspace" ? undefined : "launcher-settings-title"}>
+              {presentation === "workspace"
+                ? tabs.find((tab) => tab.id === activeTab)?.label ?? title
+                : title}
+            </h2>
+          </div>
+          {presentation === "workspace" ? null : (
             <button
-              key={tab.id}
-              ref={(element) => {
-                if (element) tabRefs.current.set(tab.id, element);
-                else tabRefs.current.delete(tab.id);
-              }}
+              ref={closeRef}
               type="button"
-              role="tab"
-              id={`settings-tab-${tab.id}`}
-              aria-controls={`settings-panel-${tab.id}`}
-              aria-selected={selected}
-              aria-disabled={tab.disabled || undefined}
-              disabled={tab.disabled}
-              tabIndex={!tab.disabled && selected ? 0 : -1}
-              title={tab.label}
-              onClick={() => onTabChange(tab.id)}
-              onKeyDown={(event) => moveFocus(event, index)}
+              className="launcher-settings-close"
+              aria-label={closeLabel}
+              title={closeLabel}
+              onClick={onClose}
             >
-              <Icon aria-hidden="true" />
-              <span>{tab.label}</span>
+              <X aria-hidden="true" />
             </button>
-          );
-        })}
+          )}
+        </div>
+        {presentation === "workspace" ? null : navigation}
+        <div className="launcher-settings-panels">{children}</div>
       </div>
-      <div className="launcher-settings-panels">{children}</div>
     </section>
   );
 }

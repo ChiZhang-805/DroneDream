@@ -1948,7 +1948,7 @@ export function NewJob() {
       setErrors((previous) => ({ ...previous, ...nextErrors }));
       if (step === 2 && opensAdvancedScenarioDialog(firstErrorKey)) setShowAdvancedScenario(true);
       if (step === 0 && opensTrackDialog(firstErrorKey)) setShowTrackEditor(true);
-      if (step === 3 && opensModelSettings(firstErrorKey)) openAppSettings();
+      if (step === 3 && opensModelSettings(firstErrorKey)) openAppSettings("model");
       focusErrorField(firstErrorKey, catalog);
       return;
     }
@@ -1980,7 +1980,7 @@ export function NewJob() {
       setStep(firstStep);
       if (firstStep === 2 && opensAdvancedScenarioDialog(firstKey)) setShowAdvancedScenario(true);
       if (firstStep === 0 && opensTrackDialog(firstKey)) setShowTrackEditor(true);
-      if (firstStep === 3 && opensModelSettings(firstKey)) openAppSettings();
+      if (firstStep === 3 && opensModelSettings(firstKey)) openAppSettings("model");
       focusErrorField(firstKey, catalog);
       return;
     }
@@ -2857,7 +2857,7 @@ export function NewJob() {
                         setStep(issueStep);
                         if (firstIssueKey && issueStep === 2 && opensAdvancedScenarioDialog(firstIssueKey)) setShowAdvancedScenario(true);
                         if (firstIssueKey && issueStep === 0 && opensTrackDialog(firstIssueKey)) setShowTrackEditor(true);
-                        if (firstIssueKey && issueStep === 3 && opensModelSettings(firstIssueKey)) openAppSettings();
+                        if (firstIssueKey && issueStep === 3 && opensModelSettings(firstIssueKey)) openAppSettings("model");
                       }}
                     >
                       {t(WIZARD_STEPS[issueStep].key)} ({Object.keys(preflightErrors).filter((key) => errorStep(key, catalog) === issueStep).length})

@@ -40,7 +40,7 @@ export function RuntimeAccessNotice({
                 : t("runtimeGate.historyPreviewBody")}
       </p>
       {!busy && showAction ? (
-        <button className="btn btn-primary" type="button" onClick={openAppSettings}>
+        <button className="btn btn-primary" type="button" onClick={() => openAppSettings("runtime")}>
           {t("runtimeGate.openSetup")}
         </button>
       ) : null}

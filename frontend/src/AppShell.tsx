@@ -7,7 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { ChangeEvent, MouseEvent, RefObject } from "react";
+import type { ChangeEvent, MouseEvent, MutableRefObject, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
@@ -99,7 +99,10 @@ import {
   AppUpdaterProvider,
   useAppUpdaterState,
 } from "./desktop/updaterContext";
-import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
+import {
+  OPEN_APP_SETTINGS_EVENT,
+  type AppSettingsTarget,
+} from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import {
@@ -510,7 +513,6 @@ type SettingsCopy = Readonly<{
     string,
   ];
   memoryDefaults: readonly [string, string, string, string, string];
-  courseOverview: string;
   courseOpen: string;
   courseActions: readonly [string, string];
   courseEditions: readonly [string, string, string, string];
@@ -530,10 +532,9 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     crossSession: "Cross-session memory",
     memoryScopes: ["Chat preferences", "Experiment defaults", "Device and vehicle", "Metrics and constraints", "Safety and approvals", "Workflow and tools", "Reports and delivery", "Organization collaboration", "Files and artifacts"],
     memoryDefaults: ["Default vehicle", "Default objective", "Default safety profile", "Default units", "Default report format"],
-    courseOverview: "The course joins LLM reasoning with controls and aerospace engineering tools; DroneDream turns that foundation into practical UAV workflows that can be planned, executed, reviewed, and verified.",
     courseOpen: "Open course",
     courseActions: ["Read manual", "Explore product"],
-    courseEditions: ["Shape vehicle models, design repeatable simulations, coordinate laboratory and field validation, and keep every decision connected to traceable engineering evidence. The integrated workspace carries requirements, parameters, reviews, reports, and delivery records through one coherent UAV workflow.", "Build reproducible PX4 and Gazebo studies with bounded scenarios, parameter domains, budgets, objectives, and safety constraints. Compare candidates against common metrics, preserve holdout evidence, explain failures, and turn each simulation result into a reviewable experiment record.", "Connect simulation evidence with captured hardware data through calibration, mismatch diagnosis, controlled trials, and safety gates. Track Sim-to-Real and Real-to-Sim updates, qualify each change, record approvals, and preserve the evidence required for dependable validation.", "Prepare real-device tuning with compatibility checks, operator approvals, telemetry boundaries, parameter snapshots, abort rules, and reliable rollback plans. Every field task remains reviewable before execution and produces an auditable record for safe follow-up decisions."],
+    courseEditions: ["Unified UAV workflow across all five editions.", "Reproducible PX4 and Gazebo experiments.", "Calibration and Sim-to-Real validation.", "Real-device tuning with safety and rollback."],
   },
   "zh-CN": {
     title: "设置",
@@ -548,16 +549,15 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     crossSession: "跨会话记忆",
     memoryScopes: ["对话偏好", "实验默认值", "设备与机型", "指标与约束", "安全与审批", "工作流与工具", "报告与交付", "组织协作", "文件与产物"],
     memoryDefaults: ["默认机型", "默认优化目标", "默认安全配置", "默认单位制", "默认报告格式"],
-    courseOverview: "课程把大模型推理与控制、航空航天工程工具紧密结合，DroneDream 将这些基础能力落实为可规划、可执行、可复核、可验收的无人机工程工作流。",
     courseOpen: "打开课程",
     courseActions: ["阅读说明书", "查看产品"],
-    courseEditions: ["在统一工作区中完成无人机机型建模、可重复仿真实验、实验室验证和现场交付。需求、参数、审批、报告与版本记录始终关联，并把每次判断沉淀为可追踪、可复核、可验收的完整无人机工程证据链。", "围绕 PX4 与 Gazebo 设计可重复的飞行研究，明确场景、参数边界、试验预算、优化目标和安全约束。统一比较候选方案与留出证据，解释失败原因，并把每次仿真结果保存为可继续审查的结构化实验记录。", "贯通仿真证据与真实硬件采集数据，完成标定、差异诊断、受控试验和安全门检查。持续记录 Sim-to-Real 与 Real-to-Sim 更新、审批和资格验证，让每次模型变化都有可靠依据并可以回溯。", "通过兼容性检查、操作员审批、遥测边界、参数快照、中止规则和可靠回滚方案准备真机调优。所有现场任务在执行前都可复核，执行后形成可审计记录，为下一轮安全决策提供完整依据。"],
+    courseEditions: ["贯通五款软件的统一无人机工作流。", "可重复的 PX4 与 Gazebo 仿真实验。", "标定与仿真到真机验证。", "具备安全边界与回滚的真机调优。"],
   },
 };
 
 const AUTONOMY_COURSE_COPY: Readonly<Record<InterfaceLocale, string>> = {
-  en: "Turn natural-language intent into structured mission plans, validate them through repeated Model + Harness loops, and supervise execution with pluginized tools, safety holds, replanning, and evidence gates.",
-  "zh-CN": "把自然语言意图转成结构化任务计划，通过模型与脚手架的多轮循环反复校验，并利用插件化工具、安全悬停、在线换路和证据门监督任务执行。",
+  en: "Natural-language mission planning and supervised execution.",
+  "zh-CN": "自然语言任务规划与受监督执行。",
 };
 
 const MEMORY_DOMAIN_LABELS: Readonly<
@@ -886,16 +886,27 @@ function SettingsDialog({
   access,
   closeRef,
   edition,
+  initialPreferenceDraft,
   initialTab,
   onClose,
+  onOpenAllSettings,
   onOpenExternal,
+  presentation = "workspace",
+  preferenceSaveQueueRef,
 }: {
   access: DesktopRuntimeAccess;
   closeRef: RefObject<HTMLButtonElement>;
   edition: BrandEditionId;
+  initialPreferenceDraft?: ExperiencePreferenceDraft | null;
   initialTab: SettingsSurfaceTabId;
   onClose: () => void;
+  onOpenAllSettings?: (
+    tab?: SettingsSurfaceTabId,
+    draft?: ExperiencePreferenceDraft,
+  ) => void;
   onOpenExternal: (event: MouseEvent<HTMLAnchorElement>, url: string) => void;
+  presentation?: "quick" | "workspace";
+  preferenceSaveQueueRef: MutableRefObject<Promise<boolean>>;
 }) {
   const { locale, interfaceLocale, setLocale, t } = useI18n();
   const navigate = useNavigate();
@@ -933,16 +944,25 @@ function SettingsDialog({
   const [allowanceResetMessage, setAllowanceResetMessage] = useState<string | null>(null);
   const customColorInputRef = useRef<HTMLInputElement>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
-    useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
+    useState<ExperiencePreferenceDraft>(
+      initialPreferenceDraft ?? EMPTY_EXPERIENCE_PREFERENCE_DRAFT,
+    );
   const [experiencePreferenceState, setExperiencePreferenceState] =
     useState<"blocked" | "loading" | "ready" | "saving" | "saved" | "error">(
-      auth.account || docsPreview || localDesktopPreferences ? "loading" : "blocked",
+      initialPreferenceDraft
+        ? "ready"
+        : auth.account || docsPreview || localDesktopPreferences
+          ? "loading"
+          : "blocked",
     );
   const [experiencePreferenceMessage, setExperiencePreferenceMessage] =
     useState<string | null>(null);
   const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
     useState(false);
   const preferenceHydratedRef = useRef(false);
+  const preferenceSaveTimerRef = useRef<number | null>(null);
+  const preferenceSaveRequestRef = useRef<(() => Promise<boolean>) | null>(null);
+  const preferenceComponentMountedRef = useRef(true);
   const [notificationPreferences, setNotificationPreferences] =
     useState<NotificationPreferences>(() => {
       try {
@@ -1083,6 +1103,14 @@ function SettingsDialog({
   ]);
   useEffect(() => {
     preferenceHydratedRef.current = false;
+    if (initialPreferenceDraft) {
+      setExperiencePreferenceDraft(initialPreferenceDraft);
+      setExperiencePreferenceState("ready");
+      setExperiencePreferenceMessage(null);
+      setConfirmExperiencePreferenceDelete(false);
+      preferenceHydratedRef.current = true;
+      return undefined;
+    }
     if (!preferenceBoundary && !docsPreview && !localDesktopPreferences) {
       setExperiencePreferenceState("blocked");
       setExperiencePreferenceMessage(null);
@@ -1151,6 +1179,7 @@ function SettingsDialog({
     };
   }, [
     docsPreview,
+    initialPreferenceDraft,
     localDesktopPreferences,
     preferenceBoundary,
     setAppearancePreference,
@@ -1166,24 +1195,83 @@ function SettingsDialog({
       experiencePreferenceState === "loading" ||
       experiencePreferenceState === "saving"
     ) {
+      if (preferenceSaveTimerRef.current !== null) {
+        window.clearTimeout(preferenceSaveTimerRef.current);
+        preferenceSaveTimerRef.current = null;
+      }
+      preferenceSaveRequestRef.current = null;
       return undefined;
     }
-    const pendingSave = window.setTimeout(() => {
-      void Promise.all([
-        saveConsolePreferences(preferenceBoundary, consolePreferenceRecord()),
-        saveConsoleMemoryConsent(preferenceBoundary, consoleMemoryConsentRecord()),
-      ])
-        .catch(() => setExperiencePreferenceMessage(t("settings.memory.saveFailed")));
+    const saveCurrentPreferences = async () => {
+      try {
+        await Promise.all([
+          saveConsolePreferences(preferenceBoundary, consolePreferenceRecord()),
+          saveConsoleMemoryConsent(preferenceBoundary, consoleMemoryConsentRecord()),
+        ]);
+        return true;
+      } catch {
+        if (preferenceComponentMountedRef.current) {
+          setExperiencePreferenceMessage(t("settings.memory.saveFailed"));
+        }
+        return false;
+      }
+    };
+    preferenceSaveRequestRef.current = saveCurrentPreferences;
+    if (preferenceSaveTimerRef.current !== null) {
+      window.clearTimeout(preferenceSaveTimerRef.current);
+    }
+    preferenceSaveTimerRef.current = window.setTimeout(() => {
+      preferenceSaveTimerRef.current = null;
+      const request = preferenceSaveRequestRef.current;
+      preferenceSaveRequestRef.current = null;
+      if (request) {
+        preferenceSaveQueueRef.current = preferenceSaveQueueRef.current.then(request);
+      }
     }, 450);
-    return () => window.clearTimeout(pendingSave);
+    return undefined;
   }, [
     consolePreferenceRecord,
     consoleMemoryConsentRecord,
     docsPreview,
     experiencePreferenceState,
     preferenceBoundary,
+    preferenceSaveQueueRef,
     t,
   ]);
+  const flushPendingPreferenceSave = async () => {
+    if (preferenceSaveTimerRef.current !== null) {
+      window.clearTimeout(preferenceSaveTimerRef.current);
+      preferenceSaveTimerRef.current = null;
+    }
+    const pendingSave = preferenceSaveRequestRef.current;
+    preferenceSaveRequestRef.current = null;
+    if (pendingSave) {
+      preferenceSaveQueueRef.current = preferenceSaveQueueRef.current.then(pendingSave);
+    }
+    return preferenceSaveQueueRef.current;
+  };
+  const flushPendingPreferenceSaveForNavigation = async () => {
+    const save = flushPendingPreferenceSave();
+    await Promise.race([
+      save.then(() => undefined),
+      new Promise<void>((resolve) => window.setTimeout(resolve, 200)),
+    ]);
+  };
+  useEffect(() => {
+    preferenceComponentMountedRef.current = true;
+    return () => {
+      preferenceComponentMountedRef.current = false;
+      if (preferenceSaveTimerRef.current !== null) {
+        window.clearTimeout(preferenceSaveTimerRef.current);
+        preferenceSaveTimerRef.current = null;
+      }
+      const pendingSave = preferenceSaveRequestRef.current;
+      preferenceSaveRequestRef.current = null;
+      if (pendingSave) {
+        preferenceSaveQueueRef.current = preferenceSaveQueueRef.current.then(pendingSave);
+      }
+    };
+  }, [preferenceSaveQueueRef]);
   const saveExperiencePreferences = async () => {
     if (
       (!preferenceBoundary && !docsPreview && !localDesktopPreferences) ||
@@ -1352,10 +1440,17 @@ function SettingsDialog({
   const settingsTabs: readonly SettingsSurfaceTab[] = [
     { id: "general", label: settingsCopy.tabs[0] },
     { id: "memory", label: settingsCopy.tabs[1] },
-    { id: "model", label: settingsCopy.tabs[2], disabled: !auth.account },
+    {
+      id: "model",
+      label: interfaceLocale === "zh-CN" ? "模型与额度" : "Models & allowance",
+      disabled: !auth.account,
+    },
     { id: "course", label: "ECE498BH" },
     ...(access.desktopRuntime
-      ? [{ id: "runtime", label: settingsCopy.tabs[3] } as const]
+      ? [{
+          id: "runtime",
+          label: interfaceLocale === "zh-CN" ? "Runtime 与更新" : "Runtime & updates",
+        } as const]
       : []),
   ];
   const level = runtimeHealthLevel(access);
@@ -1409,6 +1504,191 @@ function SettingsDialog({
       }).format(access.lastFullCheckAt)
     : t("settings.runtime.neverChecked");
 
+  if (presentation === "quick") {
+    const quickCopy = interfaceLocale === "zh-CN"
+      ? {
+          title: "快捷设置",
+          language: "语言",
+          appearance: "外观",
+          accountMemory: "账户记忆",
+          editionMemory: "本软件记忆",
+          model: "默认平台模型",
+          runtime: "Runtime 与更新",
+          allSettings: "全部设置",
+          dark: "深色",
+          light: "浅色",
+          system: "跟随系统",
+          custom: "自定义",
+        }
+      : {
+          title: "Quick settings",
+          language: "Language",
+          appearance: "Appearance",
+          accountMemory: "Account memory",
+          editionMemory: "This edition's memory",
+          model: "Default platform model",
+          runtime: "Runtime & updates",
+          allSettings: "All settings",
+          dark: "Dark",
+          light: "Light",
+          system: "System",
+          custom: "Custom",
+        };
+    const availableModels = managedModels.filter(managedModelAvailableForAssistant);
+    const selectedModel = `${modelAccess.managedProvider}:${modelAccess.managedModel}`;
+
+    return (
+      <section
+        className="quick-settings-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-settings-title"
+        data-brand-edition={edition}
+      >
+        <header className="quick-settings-heading">
+          <h2 id="quick-settings-title">{quickCopy.title}</h2>
+          <button
+            ref={closeRef}
+            type="button"
+            className="launcher-settings-close"
+            aria-label={t("app.closeSettings")}
+            title={t("app.closeSettings")}
+            onClick={onClose}
+          >
+            <X aria-hidden="true" />
+          </button>
+        </header>
+        <div className="quick-settings-grid">
+          <fieldset className="quick-settings-item quick-settings-language">
+            <legend>{quickCopy.language}</legend>
+            <div role="group" aria-label={t("app.interfaceLanguage")}>
+              {SETTINGS_LOCALES.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={interfaceLocale === option.id ? "selected" : undefined}
+                  aria-pressed={interfaceLocale === option.id}
+                  onClick={() => setLocale(option.id)}
+                >
+                  <SettingsLanguageRegionIcon region={option.region} />
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <label className="quick-settings-item" htmlFor="quick-settings-appearance">
+            <span>{quickCopy.appearance}</span>
+            <select
+              id="quick-settings-appearance"
+              value={editionTheme.appearancePreference}
+              onChange={(event) => {
+                const value = event.target.value as typeof editionTheme.appearancePreference;
+                editionTheme.setAppearance(value);
+                if (value === "custom") {
+                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
+                }
+              }}
+            >
+              <option value="dark">{quickCopy.dark}</option>
+              <option value="light">{quickCopy.light}</option>
+              <option value="system">{quickCopy.system}</option>
+              <option value="custom">{quickCopy.custom}</option>
+            </select>
+            <input
+              ref={customColorInputRef}
+              className="settings-custom-color-input"
+              type="color"
+              tabIndex={-1}
+              aria-label={interfaceLocale === "zh-CN" ? "选择自定义主题色" : "Choose a custom theme color"}
+              value={editionTheme.customAccent}
+              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
+            />
+          </label>
+          {auth.account || docsPreview ? (
+            <>
+              <div className="quick-settings-item quick-settings-memory">
+                <SettingsToggle
+                  checked={experiencePreferenceDraft.account_memory_enabled}
+                  disabled={experiencePreferenceControlsDisabled}
+                  label={<><BrainCircuit aria-hidden="true" /><span>{quickCopy.accountMemory}</span></>}
+                  onChange={(checked) => setExperiencePreferenceDraft((current) => ({
+                    ...current,
+                    account_memory_enabled: checked,
+                  }))}
+                />
+                <SettingsToggle
+                  checked={experiencePreferenceDraft.memory_enabled}
+                  disabled={experiencePreferenceControlsDisabled || !experiencePreferenceDraft.account_memory_enabled}
+                  label={<><Sparkles aria-hidden="true" /><span>{quickCopy.editionMemory}</span></>}
+                  onChange={(checked) => setExperiencePreferenceDraft((current) => ({
+                    ...current,
+                    memory_enabled: checked,
+                  }))}
+                />
+              </div>
+              <label className="quick-settings-item" htmlFor="quick-settings-model">
+                <span>{quickCopy.model}</span>
+                <select
+                  id="quick-settings-model"
+                  value={selectedModel}
+                  disabled={availableModels.length === 0}
+                  onChange={(event) => {
+                    const selected = availableModels.find(
+                      (model) => `${model.provider}:${model.model}` === event.target.value,
+                    );
+                    if (!selected) return;
+                    selectAccessMode("platform");
+                    selectManagedModel(selected.provider, selected.model);
+                  }}
+                >
+                  {availableModels.map((model) => (
+                    <option key={`${model.provider}:${model.model}`} value={`${model.provider}:${model.model}`}>
+                      {model.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : null}
+          {access.desktopRuntime ? (
+            <button
+              type="button"
+              className="quick-settings-item quick-settings-runtime"
+              onClick={async () => {
+                await flushPendingPreferenceSaveForNavigation();
+                onOpenAllSettings?.(
+                  "runtime",
+                  preferenceHydratedRef.current ? experiencePreferenceDraft : undefined,
+                );
+              }}
+            >
+              <MonitorCog aria-hidden="true" />
+              <span>{quickCopy.runtime}</span>
+              <strong data-health={level}>{statusLabel}</strong>
+              <ChevronRight aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+        <footer className="quick-settings-footer">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={async () => {
+              await flushPendingPreferenceSaveForNavigation();
+              onOpenAllSettings?.(
+                "general",
+                preferenceHydratedRef.current ? experiencePreferenceDraft : undefined,
+              );
+            }}
+          >
+            <Settings aria-hidden="true" />
+            {quickCopy.allSettings}
+          </button>
+        </footer>
+      </section>
+    );
+  }
+
   return (
     <EditionSettingsSurface
       activeTab={activeSettingsTab}
@@ -1420,6 +1700,8 @@ function SettingsDialog({
       tabs={settingsTabs}
       title={settingsCopy.title}
       consumerProfile={edition}
+      presentation="workspace"
+      backLabel={interfaceLocale === "zh-CN" ? "返回应用" : "Back to app"}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
         <section className="settings-general-panel">
@@ -1568,10 +1850,7 @@ function SettingsDialog({
             <div className="settings-course-mark" aria-hidden="true">
               <GraduationCap />
             </div>
-            <div>
-              <h3 id="settings-course-title">ECE498BH</h3>
-              <p>{settingsCopy.courseOverview}</p>
-            </div>
+            <h3 id="settings-course-title">ECE498BH</h3>
             <a
               href={ECE498BH_COURSE_URL}
               target="_blank"
@@ -1616,7 +1895,12 @@ function SettingsDialog({
         <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
         <div className="settings-memory-heading">
           <div>
-            <h3 id="settings-memory-title">{settingsCopy.memoryTitle}</h3>
+            <h3
+              id="settings-memory-title"
+              className={presentation === "workspace" ? "sr-only" : undefined}
+            >
+              {settingsCopy.memoryTitle}
+            </h3>
           </div>
           <span className={experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
             {settingsCopy.memoryEnabled[
@@ -2242,6 +2526,9 @@ function ExitGuardDialog({
   onConfirmExit: () => void;
 }) {
   const { t } = useI18n();
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const returnButtonRef = useRef<HTMLButtonElement>(null);
   const paragraphKey: TranslationKey = state.hasDraft
     ? state.activeJobsUnknown
       ? "exitGuard.draftActiveUnknown"
@@ -2252,9 +2539,81 @@ function ExitGuardDialog({
       ? "exitGuard.activeUnknown"
       : "exitGuard.active";
 
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const backdrop = backdropRef.current;
+    const parent = backdrop?.parentElement;
+    const siblings = parent && backdrop
+      ? Array.from(parent.children)
+        .filter((element): element is HTMLElement => (
+          element instanceof HTMLElement && element !== backdrop
+        ))
+        .map((element) => ({
+          element,
+          inert: element.hasAttribute("inert"),
+          ariaHidden: element.getAttribute("aria-hidden"),
+        }))
+      : [];
+    for (const { element } of siblings) {
+      element.setAttribute("inert", "");
+      element.setAttribute("aria-hidden", "true");
+    }
+
+    const focusFrame = window.requestAnimationFrame(() => returnButtonRef.current?.focus());
+    const keepFocusInside = (event: globalThis.KeyboardEvent) => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onReturn();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => !element.closest("[inert]"));
+      if (controls.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", keepFocusInside, true);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", keepFocusInside, true);
+      for (const { element, inert, ariaHidden } of siblings) {
+        if (!inert) element.removeAttribute("inert");
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+      }
+      window.requestAnimationFrame(() => {
+        const fallback = document.querySelector<HTMLElement>(
+          '.settings-workspace-sidebar [role="tab"][aria-selected="true"], .launcher-settings-button, .account-button',
+        );
+        const target = previousFocus && previousFocus.isConnected && previousFocus !== document.body
+          ? previousFocus
+          : fallback;
+        if (target && !target.closest("[inert]")) target.focus();
+      });
+    };
+  }, [onReturn]);
+
   return (
-    <div className="app-exit-backdrop" role="presentation">
+    <div ref={backdropRef} className="app-exit-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="app-exit-dialog"
         role="dialog"
         aria-modal="true"
@@ -2275,7 +2634,7 @@ function ExitGuardDialog({
           </p>
         ) : null}
         <div className="app-exit-actions">
-          <button type="button" className="btn" autoFocus onClick={onReturn}>
+          <button ref={returnButtonRef} type="button" className="btn" onClick={onReturn}>
             {t("exitGuard.return")}
           </button>
           <button
@@ -3357,8 +3716,11 @@ function AppShellContent() {
     () => false,
   );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
+  const [settingsWorkspaceOpen, setSettingsWorkspaceOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] =
     useState<SettingsSurfaceTabId>("general");
+  const [settingsPreferenceHandoff, setSettingsPreferenceHandoff] =
+    useState<ExperiencePreferenceDraft | null>(null);
   const [universalMode, setUniversalMode] = useState(() => {
     const requestedEdition = new URLSearchParams(location.search).get("edition");
     return initialWorkspaceMode(
@@ -3381,6 +3743,8 @@ function AppShellContent() {
   const accountCloseRef = useRef<HTMLButtonElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
+  const settingsWorkspaceOpenerRef = useRef<"account" | "settings">("settings");
+  const settingsPreferenceSaveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
   const currentPathRef = useRef(location.pathname);
   const exitPromptRef = useRef<ExitPromptState | null>(null);
@@ -3630,6 +3994,63 @@ function AppShellContent() {
     });
   }, [mobileNavigationEnabled]);
 
+  const openSettingsWorkspace = useCallback((
+    tab: SettingsSurfaceTabId = "general",
+    opener: "account" | "settings" = "settings",
+    draft: ExperiencePreferenceDraft | null = null,
+  ) => {
+    settingsWorkspaceOpenerRef.current = opener;
+    setSettingsPreferenceHandoff(draft);
+    setSettingsInitialTab(tab);
+    setLauncherSettingsOpen(false);
+    setAccountMenuOpen(false);
+    setMobileMenuOpen(false);
+    setSettingsWorkspaceOpen(true);
+  }, []);
+  const openAllSettings = useCallback((
+    tab: SettingsSurfaceTabId = "general",
+    draft?: ExperiencePreferenceDraft,
+  ) => {
+    openSettingsWorkspace(tab, "settings", draft ?? null);
+  }, [openSettingsWorkspace]);
+
+  const closeSettingsWorkspace = useCallback(() => {
+    setSettingsWorkspaceOpen(false);
+    setSettingsPreferenceHandoff(null);
+    setSettingsInitialTab("general");
+    requestAnimationFrame(() => {
+      const opener = settingsWorkspaceOpenerRef.current === "account"
+        ? accountButtonRef.current
+        : launcherSettingsButtonRef.current;
+      (opener ?? accountButtonRef.current ?? launcherSettingsButtonRef.current)?.focus();
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!settingsWorkspaceOpen) return undefined;
+    const workspace = document.querySelector<HTMLElement>(".settings-workspace-host");
+    const appShell = workspace?.parentElement;
+    if (!workspace || !appShell) return undefined;
+    const siblings = Array.from(appShell.children)
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== workspace)
+      .map((element) => ({
+        element,
+        inert: element.hasAttribute("inert"),
+        ariaHidden: element.getAttribute("aria-hidden"),
+      }));
+    for (const { element } of siblings) {
+      element.setAttribute("inert", "");
+      element.setAttribute("aria-hidden", "true");
+    }
+    return () => {
+      for (const { element, inert, ariaHidden } of siblings) {
+        if (!inert) element.removeAttribute("inert");
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+      }
+    };
+  }, [settingsWorkspaceOpen]);
+
   useEffect(() => {
     if (!accountMenuOpen) return undefined;
     const closeOnOutside = (event: PointerEvent) => {
@@ -3799,16 +4220,23 @@ function AppShellContent() {
   }, [desktopRuntime]);
 
   useEffect(() => {
-    const openSettings = () => setLauncherSettingsOpen(true);
+    const openSettings = (event: Event) => {
+      const requested = event instanceof CustomEvent
+        ? (event.detail as { target?: AppSettingsTarget } | undefined)?.target ?? "general"
+        : "general";
+      openSettingsWorkspace(
+        requested === "runtime" && !runtimeAccess.desktopRuntime ? "general" : requested,
+      );
+    };
     window.addEventListener(OPEN_APP_SETTINGS_EVENT, openSettings);
     return () => window.removeEventListener(OPEN_APP_SETTINGS_EVENT, openSettings);
-  }, []);
+  }, [openSettingsWorkspace, runtimeAccess.desktopRuntime]);
 
   useEffect(() => {
     if (new URLSearchParams(location.search).get("settings") === "runtime") {
-      setLauncherSettingsOpen(true);
+      openSettingsWorkspace(runtimeAccess.desktopRuntime ? "runtime" : "general");
     }
-  }, [location.search]);
+  }, [location.search, openSettingsWorkspace, runtimeAccess.desktopRuntime]);
 
   useEffect(() => {
     if (!launcherSettingsOpen) return;
@@ -3944,6 +4372,22 @@ function AppShellContent() {
       />
     </div>
   ) : null;
+  const settingsWorkspace = settingsWorkspaceOpen ? (
+    <div className="settings-workspace-host">
+      <SettingsDialog
+        key={settingsInitialTab}
+        access={runtimeAccess}
+        closeRef={launcherSettingsCloseRef}
+        edition={activeThemeEdition}
+        initialPreferenceDraft={settingsPreferenceHandoff}
+        initialTab={settingsInitialTab}
+        onClose={closeSettingsWorkspace}
+        onOpenExternal={openExternalNavigation}
+        presentation="workspace"
+        preferenceSaveQueueRef={settingsPreferenceSaveQueueRef}
+      />
+    </div>
+  ) : null;
 
   if (launcherMode) {
     return (
@@ -3991,7 +4435,7 @@ function AppShellContent() {
         </header>
         {launcherSettingsOpen ? (
           <div
-            className="launcher-settings-backdrop"
+            className="launcher-settings-backdrop quick-settings-backdrop"
             role="presentation"
             onMouseDown={(event) => {
               if (event.target !== event.currentTarget) return;
@@ -4004,15 +4448,19 @@ function AppShellContent() {
               edition={activeThemeEdition}
               initialTab={settingsInitialTab}
               onClose={closeSettings}
+              onOpenAllSettings={openAllSettings}
               onOpenExternal={openExternalNavigation}
+              presentation="quick"
+              preferenceSaveQueueRef={settingsPreferenceSaveQueueRef}
             />
           </div>
         ) : null}
-        {exitGuard}
-        <main id="main-content" className="launcher-main" tabIndex={-1}>
-          <Outlet key={activeThemeEdition} />
-        </main>
-        </div>
+         <main id="main-content" className="launcher-main" tabIndex={-1}>
+           <Outlet key={activeThemeEdition} />
+         </main>
+         {settingsWorkspace}
+         {exitGuard}
+         </div>
       </EditionThemeProvider>
     );
   }
@@ -4163,14 +4611,10 @@ function AppShellContent() {
                   setAccountOpen(true);
                 }}
                 onOpenAllowance={() => {
-                  setAccountMenuOpen(false);
-                  setSettingsInitialTab("model");
-                  setLauncherSettingsOpen(true);
+                  openSettingsWorkspace("model", "account");
                 }}
                 onOpenSettings={() => {
-                  setAccountMenuOpen(false);
-                  setSettingsInitialTab("general");
-                  setLauncherSettingsOpen(true);
+                  openSettingsWorkspace("general", "account");
                 }}
               />
             ) : null}
@@ -4266,7 +4710,7 @@ function AppShellContent() {
         </header>
         {launcherSettingsOpen ? (
           <div
-            className="launcher-settings-backdrop"
+            className="launcher-settings-backdrop quick-settings-backdrop"
             role="presentation"
             onMouseDown={(event) => {
               if (event.target !== event.currentTarget) return;
@@ -4279,12 +4723,14 @@ function AppShellContent() {
               edition={activeThemeEdition}
               initialTab={settingsInitialTab}
               onClose={closeSettings}
+              onOpenAllSettings={openAllSettings}
               onOpenExternal={openExternalNavigation}
+              presentation="quick"
+              preferenceSaveQueueRef={settingsPreferenceSaveQueueRef}
             />
           </div>
         ) : null}
         {accountDialog}
-        {exitGuard}
         {externalNavigationError ? (
           <div className="app-external-navigation-error" role="alert">
             <span>{externalNavigationError}</span>
@@ -4307,6 +4753,8 @@ function AppShellContent() {
           </div>
         </footer>
       </div>
+      {settingsWorkspace}
+      {exitGuard}
       </div>
     </EditionThemeProvider>
   );

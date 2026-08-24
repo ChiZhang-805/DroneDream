@@ -937,7 +937,7 @@ export function ExperimentAssistant() {
       && !modelAccess.apiKey.trim()
     ) {
       setError(copy.modelRequired);
-      openAppSettings();
+      openAppSettings("model");
       return;
     }
     if (
@@ -1500,7 +1500,7 @@ export function ExperimentAssistant() {
               selectProfile(profileId);
               selectAccessMode("byok");
             }}
-            onOpenSettings={openAppSettings}
+            onOpenSettings={() => openAppSettings("model")}
           />
           <button
             type="button"

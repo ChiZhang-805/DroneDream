@@ -9,7 +9,7 @@
         "title": "DroneDream",
         "width": 1440,
         "height": 900,
-        "minWidth": 390,
+        "minWidth": 960,
         "minHeight": 700,
         "resizable": true,
         "maximizable": true,

@@ -180,18 +180,23 @@ describe("workspace account entry", () => {
     expect(within(panel!).queryByRole("link", { name: "SIM" }))
       .not.toBeInTheDocument();
 
-    fireEvent.click(within(panel!).getByRole("button", { name: "Settings" }));
+    const settingsEntry = within(panel!).getByRole("button", { name: "Settings" });
+    fireEvent.click(settingsEntry);
     expect(panel).toHaveAttribute("hidden");
-    expect(screen.getByRole("dialog", { name: "Settings" })).toBeVisible();
+    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    expect(quickSettings).toBeVisible();
     expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "ECE498BH" }));
-    expect(screen.getByRole("link", { name: "Open course" }))
+    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
+
+    const workspace = await screen.findByRole("region", { name: "Settings" });
+    fireEvent.click(within(workspace).getByRole("tab", { name: "ECE498BH" }));
+    expect(within(workspace).getByRole("link", { name: "Open course" }))
       .toHaveAttribute(
         "href",
         "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
       );
-    fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
-    await waitFor(() => expect(trigger).toHaveFocus());
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
+    await waitFor(() => expect(settingsEntry).toHaveFocus());
 
     fireEvent.click(trigger);
     fireEvent.keyDown(document, { key: "Escape" });

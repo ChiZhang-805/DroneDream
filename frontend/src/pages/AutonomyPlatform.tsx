@@ -2119,7 +2119,7 @@ export function AutonomyOverview() {
                 selectProfile(profileId);
                 selectAccessMode("byok");
               }}
-              onOpenSettings={openAppSettings}
+              onOpenSettings={() => openAppSettings("model")}
             />
             <button
               type="button"
