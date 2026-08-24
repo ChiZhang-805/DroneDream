@@ -48,6 +48,16 @@ type DroneLaunchSceneCoreProps = Omit<
   labels: DroneLaunchSceneLabels;
 };
 
+function launchTaglineLines(labels: DroneLaunchSceneLabels) {
+  if (labels.locale !== "en") return [labels.tagline];
+
+  const words = labels.tagline.trim().split(/\s+/);
+  if (words.length < 2) return [labels.tagline];
+
+  const splitAt = Math.floor(words.length / 2);
+  return [words.slice(0, splitAt).join(" "), words.slice(splitAt).join(" ")];
+}
+
 const CARBON = 0x171827;
 const GRAPHITE = 0x30334a;
 const METAL = 0x697087;
@@ -1173,6 +1183,8 @@ export function DroneLaunchSceneCore({
     };
   }, [editionTheme.id, lightAppearance, reducedMotion, sceneTheme, starflightControllerRef, visualOffsetX]);
 
+  const taglineLines = launchTaglineLines(labels);
+
   return (
     <div
       className="drone-launch-scene"
@@ -1192,8 +1204,14 @@ export function DroneLaunchSceneCore({
       <div className="drone-launch-aura" aria-hidden="true" />
       <h1
         className={`drone-launch-tagline drone-launch-tagline-${labels.locale === "zh-CN" ? "zh" : "en"}${starflightActive ? " is-hidden" : ""}`}
+        aria-label={labels.tagline}
+        data-line-count={taglineLines.length}
       >
-        {labels.tagline}
+        {taglineLines.map((line, index) => (
+          <span className="drone-launch-tagline-line" key={`${index}:${line}`}>
+            {line}{index < taglineLines.length - 1 ? " " : null}
+          </span>
+        ))}
       </h1>
       <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">
         <span>{labels.system}</span>

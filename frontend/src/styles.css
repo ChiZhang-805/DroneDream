@@ -14428,8 +14428,14 @@ a {
 }
 
 .drone-launch-tagline-en {
+  width: min(94vw, 76rem);
   max-width: 94vw;
   font-size: clamp(3.4rem, 5.2vw, 5rem);
+}
+
+.drone-launch-tagline-line {
+  display: block;
+  white-space: nowrap;
 }
 
 .drone-launch-tagline.is-hidden {

@@ -18,9 +18,10 @@ const args = new Map(process.argv.slice(2).map((argument) => {
 }));
 const edition = String(args.get("--edition") || "sim");
 assert(
-  ["universal", "sim", "lab"].includes(edition),
+  ["universal", "sim", "lab", "autonomy"].includes(edition),
   `Unsupported shared desktop launcher edition: ${edition}`,
 );
+const desktopOnly = Boolean(args.get("--desktop-only"));
 const label = String(args.get("--label") || "working-tree");
 const outputRoot = path.resolve(
   repoRoot,
@@ -51,11 +52,16 @@ const runtimeManifestLines = productionEnvironment.match(
 assert.equal(runtimeManifestLines.length, 1);
 process.env.VITE_RUNTIME_RELEASE_MANIFEST_URL = runtimeManifestLines[0].split("=", 2)[1];
 
-const viewports = [
-  { id: "desktop", width: 1440, height: 900 },
-  { id: "tablet", width: 760, height: 900 },
-  { id: "mobile", width: 390, height: 700 },
-];
+const viewports = desktopOnly
+  ? [
+      { id: "desktop-default", width: 1455, height: 937 },
+      { id: "desktop-maximized", width: 1707, height: 1019 },
+    ]
+  : [
+      { id: "desktop", width: 1440, height: 900 },
+      { id: "tablet", width: 760, height: 900 },
+      { id: "mobile", width: 390, height: 700 },
+    ];
 const cases = ["en", "zh-CN"].flatMap((locale) =>
   ["dark", "light"].flatMap((appearance) =>
     viewports.flatMap((viewport) =>
@@ -312,6 +318,7 @@ async function verifyCase(browser, testCase) {
       universal: ["Sign in and enter DroneDream", "登录并进入 DroneDream"],
       sim: ["Sign in and enter simulation workspace", "登录并进入仿真工作区"],
       lab: ["Sign in and enter laboratory workspace", "登录并进入实验室工作区"],
+      autonomy: ["Sign in and enter autonomous mission workspace", "登录并进入自主任务工作区"],
     }[edition][testCase.locale === "en" ? 0 : 1];
     const install = page.getByRole("button", { name: installText });
     const signIn = page.getByRole("button", { name: signInText });
@@ -366,6 +373,26 @@ async function verifyCase(browser, testCase) {
       sceneStars: document.querySelector(".drone-launch-scene")?.getAttribute("data-scene-stars"),
       sceneParticles: document.querySelector(".drone-launch-scene")
         ?.getAttribute("data-scene-particles"),
+      tagline: (() => {
+        const heading = document.querySelector(".drone-launch-tagline");
+        if (!heading) return null;
+        return {
+          text: heading.getAttribute("aria-label") ?? heading.textContent?.trim() ?? "",
+          lineCount: Number(heading.getAttribute("data-line-count")),
+          lines: Array.from(heading.querySelectorAll(".drone-launch-tagline-line")).map((line) => {
+            const bounds = line.getBoundingClientRect();
+            return {
+              text: line.textContent?.trim() ?? "",
+              left: bounds.left,
+              right: bounds.right,
+              top: bounds.top,
+              bottom: bounds.bottom,
+              clientWidth: line.clientWidth,
+              scrollWidth: line.scrollWidth,
+            };
+          }),
+        };
+      })(),
       lightContrast: (() => {
         const runtimeIndicator = document.querySelector(".launcher-runtime-indicator");
         const settingsButton = document.querySelector(".launcher-settings-button");
@@ -388,6 +415,22 @@ async function verifyCase(browser, testCase) {
     assert.equal(dimensions.grantsHardwareAuthority, "false");
     assert.equal(dimensions.sceneStars, testCase.appearance === "light" ? "false" : "true");
     assert.equal(dimensions.sceneParticles, testCase.appearance === "light" ? "false" : "true");
+    assert(dimensions.tagline, `${testCase.id}: launcher tagline is missing`);
+    const expectedTaglineLines = testCase.locale === "en" ? 2 : 1;
+    assert.equal(
+      dimensions.tagline.lineCount,
+      expectedTaglineLines,
+      `${testCase.id}: launcher tagline changed line count`,
+    );
+    assert.equal(dimensions.tagline.lines.length, expectedTaglineLines);
+    assert(
+      dimensions.tagline.lines.every((line) => (
+        line.left >= 0
+        && line.right <= testCase.viewport.width + 1
+        && line.scrollWidth <= line.clientWidth + 1
+      )),
+      `${testCase.id}: launcher tagline is clipped`,
+    );
     if (testCase.appearance === "light") {
       assert(dimensions.lightContrast, `${testCase.id}: light contrast metrics are missing`);
       if (edition === "sim") {

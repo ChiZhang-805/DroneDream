@@ -38,8 +38,12 @@ describe("DroneLaunchScene localization", () => {
     renderScene("en");
 
     expect(screen.getByText("PX4 / SITL")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Let Every Flight Flow Like a Dream" }))
-      .toBeInTheDocument();
+    const heading = screen.getByRole("heading", {
+      name: "Let Every Flight Flow Like a Dream",
+    });
+    expect(heading).toHaveAttribute("data-line-count", "2");
+    expect(heading.querySelectorAll(".drone-launch-tagline-line")).toHaveLength(2);
+    expect(heading).toHaveTextContent("Let Every Flight Flow Like a Dream");
     expect(screen.getByText("LINK ACTIVE")).toBeInTheDocument();
     expect(screen.getByText("ATTITUDE")).toBeInTheDocument();
     expect(screen.getByText(/HOLD/)).toBeInTheDocument();
@@ -51,8 +55,9 @@ describe("DroneLaunchScene localization", () => {
     renderScene("zh-CN");
 
     expect(screen.getByText("PX4 / 软件在环")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "蝶 梦 水 云 乡" }))
-      .toBeInTheDocument();
+    const heading = screen.getByRole("heading", { name: "蝶 梦 水 云 乡" });
+    expect(heading).toHaveAttribute("data-line-count", "1");
+    expect(heading.querySelectorAll(".drone-launch-tagline-line")).toHaveLength(1);
     expect(screen.getByText("链路已连接")).toBeInTheDocument();
     expect(screen.getByText("飞行姿态")).toBeInTheDocument();
     expect(screen.getByText(/悬停/)).toBeInTheDocument();
