@@ -35,6 +35,8 @@ mod runtime_cache;
 mod runtime_installer;
 mod runtime_keepalive;
 mod webview2_preflight;
+#[cfg(target_os = "windows")]
+mod window_placement;
 
 use tauri::Manager;
 
@@ -85,12 +87,22 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
+                #[cfg(target_os = "windows")]
+                if let Err(error) = window_placement::clamp_to_nearest_work_area(&window) {
+                    eprintln!("Could not clamp restored main window to its work area: {error}");
+                }
                 let _ = window.show();
                 let _ = window.set_focus();
             }
         }))
         .manage(browser_auth::BrowserAuthCoordinator::default())
         .setup(|app| {
+            #[cfg(target_os = "windows")]
+            if let Some(window) = app.get_webview_window("main") {
+                if let Err(error) = window_placement::clamp_to_nearest_work_area(&window) {
+                    eprintln!("Could not clamp main window to its work area: {error}");
+                }
+            }
             #[cfg(dronedream_agent)]
             agent_core::start(app);
             Ok(())
