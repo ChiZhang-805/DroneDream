@@ -75,6 +75,12 @@ export interface RuntimeStatusReport {
 export interface EnginePackStatus {
   supported: boolean;
   updateRequired: boolean;
+  /**
+   * False when Runtime compatibility is required but the configured signed
+   * channel cannot currently advance the installed Runtime identity. Optional
+   * only for compatibility with test fixtures and older paired backends.
+   */
+  runtimeBaseUpgradeAvailable?: boolean | null;
   embeddedPackId: string;
   embeddedSourceCommit: string;
   installedPackId: string | null;
@@ -2027,6 +2033,14 @@ function parseEnginePackStatus(value: unknown): EnginePackStatus {
   const status: EnginePackStatus = {
     supported: expectBoolean(record.supported, "enginePack.supported"),
     updateRequired: expectBoolean(record.updateRequired, "enginePack.updateRequired"),
+    ...(record.runtimeBaseUpgradeAvailable === undefined
+      ? {}
+      : {
+        runtimeBaseUpgradeAvailable: expectBoolean(
+          record.runtimeBaseUpgradeAvailable,
+          "enginePack.runtimeBaseUpgradeAvailable",
+        ),
+      }),
     embeddedPackId: expectSafeNonEmptyString(
       record.embeddedPackId,
       "enginePack.embeddedPackId",

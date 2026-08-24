@@ -117,6 +117,12 @@ function componentCatalogUrl(): string | undefined {
   return import.meta.env.VITE_COMPONENT_UPDATE_CATALOG_URL?.trim() || undefined;
 }
 
+const NO_PUBLISHED_DESKTOP_UPDATE = "Could not fetch a valid release JSON from the remote";
+
+export function isNoPublishedDesktopUpdate(error: unknown): boolean {
+  return errorMessage(error).trim() === NO_PUBLISHED_DESKTOP_UPDATE;
+}
+
 const UPDATE_POLICY_PATTERN = /^update-policy:\s*(recommended|required)$/gmu;
 
 /**
@@ -157,6 +163,14 @@ export function useAppUpdater() {
     enginePack?: EnginePackStatus | null,
   ) => {
     if (!desktopRuntime || import.meta.env.MODE === "test") return;
+    // A healthy installed Runtime may keep running its existing Engine Pack
+    // while the signed Runtime channel has no compatible newer base. Preserve
+    // that evidence, but do not attempt component mutation through a manager
+    // whose capabilities were not verified.
+    if (enginePack && !enginePack.supported) {
+      setState({ ...CURRENT_STATE, enginePack });
+      return;
+    }
     if (!componentCatalogEnabled()) {
       setState({ ...CURRENT_STATE, enginePack: enginePack ?? null });
       return;
@@ -266,6 +280,12 @@ export function useAppUpdater() {
       const observed = await getEnginePackStatus();
       if (generation !== undefined && generation !== checkGenerationRef.current) return null;
       if (!observed.supported) {
+        const runtimeBaseUpgradeAvailable =
+          observed.runtimeBaseUpgradeAvailable !== false;
+        if (!runtimeBaseUpgradeAvailable) {
+          setState({ ...CURRENT_STATE, enginePack: observed });
+          return observed;
+        }
         setState({
           status: "runtimeBaseRequired",
           availableVersion: null,
@@ -311,11 +331,12 @@ export function useAppUpdater() {
     if (installInFlightRef.current) return;
     const generation = ++checkGenerationRef.current;
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
+    let enginePack: EnginePackStatus | null = null;
     try {
       // The installed app's embedded Engine Pack is part of its executable
       // contract. Reconcile it before advertising a newer app so a user who
       // defers that app update still runs the engine paired with this build.
-      const enginePack = await ensureEnginePackCurrent(generation);
+      enginePack = await ensureEnginePackCurrent(generation);
       if (!enginePack || generation !== checkGenerationRef.current) return;
       const previousUpdate = updateRef.current;
       updateRef.current = null;
@@ -345,6 +366,14 @@ export function useAppUpdater() {
       });
     } catch (error) {
       if (generation !== checkGenerationRef.current) return;
+      // Tauri reports an endpoint that has no published channel manifest as
+      // ReleaseNotFound. That is a valid pre-release channel state, not a
+      // launcher failure. Network, parsing, signature and platform errors keep
+      // their explicit error state below.
+      if (isNoPublishedDesktopUpdate(error)) {
+        await reconcileComponentPacks(generation, enginePack);
+        return;
+      }
       setState({
         status: "error",
         availableVersion: null,

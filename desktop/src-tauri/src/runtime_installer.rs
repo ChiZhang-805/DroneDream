@@ -59,6 +59,8 @@ const COMMAND_TIMEOUT: Duration = Duration::from_secs(60);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(3 * 60);
 const NETWORK_ATTEMPTS: usize = 5;
 const NETWORK_RETRY_BASE_DELAY_MS: u64 = 400;
+const UPGRADE_PROBE_CONNECT_TIMEOUT: Duration = Duration::from_secs(4);
+const UPGRADE_PROBE_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 // The installed-app observer owns a 300 second action window. Native startup
 // uses at most 270 seconds and reserves the final 30 seconds for IPC delivery,
 // durable evidence, app shutdown, and the verifier's owned rollback.
@@ -1846,13 +1848,41 @@ trait ReleaseTransport: Send + Sync {
 
 struct HttpReleaseTransport {
     client: reqwest::blocking::Client,
+    attempts: usize,
 }
 
 impl HttpReleaseTransport {
     fn new() -> Result<Self, InstallFailure> {
+        Self::with_policy(
+            Duration::from_secs(20),
+            Duration::from_secs(30 * 60),
+            NETWORK_ATTEMPTS,
+        )
+    }
+
+    fn for_upgrade_probe() -> Result<Self, InstallFailure> {
+        Self::with_policy(
+            UPGRADE_PROBE_CONNECT_TIMEOUT,
+            UPGRADE_PROBE_REQUEST_TIMEOUT,
+            1,
+        )
+    }
+
+    fn with_policy(
+        connect_timeout: Duration,
+        request_timeout: Duration,
+        attempts: usize,
+    ) -> Result<Self, InstallFailure> {
+        if attempts == 0 {
+            return Err(fail(
+                "http_client",
+                "The HTTPS client retry policy must allow at least one attempt.",
+                false,
+            ));
+        }
         let client = reqwest::blocking::Client::builder()
-            .connect_timeout(Duration::from_secs(20))
-            .timeout(Duration::from_secs(30 * 60))
+            .connect_timeout(connect_timeout)
+            .timeout(request_timeout)
             .redirect(reqwest::redirect::Policy::custom(|attempt| {
                 if attempt.url().scheme() != "https" {
                     attempt.error("runtime download redirect attempted to leave HTTPS")
@@ -1871,7 +1901,7 @@ impl HttpReleaseTransport {
                     true,
                 )
             })?;
-        Ok(Self { client })
+        Ok(Self { client, attempts })
     }
 
     fn send(
@@ -1906,7 +1936,7 @@ impl ReleaseTransport for HttpReleaseTransport {
         cancel: &AtomicBool,
     ) -> Result<Vec<u8>, InstallFailure> {
         let mut last_failure = None;
-        for attempt in 0..NETWORK_ATTEMPTS {
+        for attempt in 0..self.attempts {
             let result = (|| {
                 let mut response = self.send(url, None, cancel)?;
                 if !response.status().is_success() {
@@ -1953,7 +1983,7 @@ impl ReleaseTransport for HttpReleaseTransport {
             })();
             match result {
                 Ok(body) => return Ok(body),
-                Err(error) if error.retryable && attempt + 1 < NETWORK_ATTEMPTS => {
+                Err(error) if error.retryable && attempt + 1 < self.attempts => {
                     last_failure = Some(error);
                     wait_before_network_retry(cancel, attempt)?;
                 }
@@ -3283,6 +3313,47 @@ fn validate_upgrade_version(
         ));
     }
     Ok(())
+}
+
+fn upgrade_candidate_available(
+    installed_build_id: &str,
+    installed_version: &str,
+    manifest: &ReleaseManifest,
+) -> Result<bool, InstallFailure> {
+    match validate_upgrade_version(installed_build_id, installed_version, manifest) {
+        Ok(()) => Ok(true),
+        Err(error) if error.code == "runtime_upgrade_not_newer" => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+/// Checks whether the configured, signed Runtime Base channel can actually
+/// satisfy an upgrade request for the installed identity. This probe is
+/// deliberately read-only and bounded: it never prepares WSL, creates cache
+/// state, or starts an installer. Engine Pack compatibility checks use it to
+/// avoid advertising an upgrade action that the signed channel would reject as
+/// equal or older.
+pub(crate) fn runtime_upgrade_candidate_available(
+    installed_build_id: &str,
+    installed_version: &str,
+) -> Result<bool, String> {
+    validate_release_url(DEFAULT_RELEASE_MANIFEST_URL, false)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    let transport =
+        HttpReleaseTransport::for_upgrade_probe().map_err(runtime_maintenance_error_for_ipc)?;
+    let cancel = AtomicBool::new(false);
+    let raw_manifest = transport
+        .fetch(DEFAULT_RELEASE_MANIFEST_URL, MAX_MANIFEST_BYTES, &cancel)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    let signature_url = detached_signature_url(DEFAULT_RELEASE_MANIFEST_URL)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    let raw_signature = transport
+        .fetch(&signature_url, MAX_SIGNATURE_BYTES, &cancel)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    let manifest = parse_and_verify_manifest(&raw_manifest, &raw_signature, TRUSTED_KEYRING)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    upgrade_candidate_available(installed_build_id, installed_version, &manifest)
+        .map_err(runtime_maintenance_error_for_ipc)
 }
 
 fn recover_pending_install(
@@ -6250,6 +6321,35 @@ mod tests {
         let same_build = validate_upgrade_version(&manifest.runtime.build_id, "1.2.2", &manifest)
             .expect_err("a reused build identity must not be accepted as an upgrade");
         assert_eq!(same_build.code, "runtime_upgrade_not_newer");
+    }
+
+    #[test]
+    fn runtime_upgrade_action_is_hidden_when_the_signed_candidate_cannot_advance_identity() {
+        let manifest = fixture_manifest(b"runtime");
+
+        assert!(upgrade_candidate_available(
+            "123e4567-e89b-12d3-a456-426614174099",
+            "1.2.2",
+            &manifest,
+        )
+        .unwrap());
+        assert!(!upgrade_candidate_available(
+            "123e4567-e89b-12d3-a456-426614174099",
+            "1.2.3",
+            &manifest,
+        )
+        .unwrap());
+        assert!(
+            !upgrade_candidate_available(&manifest.runtime.build_id, "1.2.2", &manifest,).unwrap()
+        );
+
+        let invalid = upgrade_candidate_available(
+            "123e4567-e89b-12d3-a456-426614174099",
+            "not-semver",
+            &manifest,
+        )
+        .expect_err("invalid installed identity must not be misclassified as no update");
+        assert_eq!(invalid.code, "invalid_installed_version");
     }
 
     #[test]

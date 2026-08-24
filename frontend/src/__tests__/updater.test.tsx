@@ -36,6 +36,7 @@ vi.mock("../desktop/bridge", () => ({
 
 import {
   appUpdateIsRequired,
+  isNoPublishedDesktopUpdate,
   orderComponentUpdates,
   selectManualComponentUpdates,
   useAppUpdater,
@@ -107,6 +108,30 @@ describe("useAppUpdater", () => {
       body: "update-policy: recommended",
       rawJson: { updatePolicy: "required" },
     })).toBe(true);
+  });
+
+  it("treats an unpublished desktop channel as current without hiding real updater errors", async () => {
+    const unpublished = new Error("Could not fetch a valid release JSON from the remote");
+    expect(isNoPublishedDesktopUpdate(unpublished)).toBe(true);
+    expect(isNoPublishedDesktopUpdate(new Error("network unavailable"))).toBe(false);
+
+    checkMock.mockRejectedValue(unpublished);
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+
+    expect(hook.result.current.error).toBeNull();
+    expect(getEnginePackStatusMock).toHaveBeenCalledOnce();
+    hook.unmount();
+  });
+
+  it("keeps genuine desktop updater failures visible", async () => {
+    checkMock.mockRejectedValue(new Error("network unavailable"));
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("error"));
+
+    expect(hook.result.current.error).toBe("network unavailable");
+    hook.unmount();
   });
 
   it("discards a stale check that finishes after a newer request", async () => {
@@ -245,6 +270,7 @@ describe("useAppUpdater", () => {
     getEnginePackStatusMock.mockResolvedValue({
       supported: false,
       updateRequired: true,
+      runtimeBaseUpgradeAvailable: true,
       embeddedPackId: `sha256:${"3".repeat(64)}`,
       embeddedSourceCommit: "4".repeat(40),
       installedPackId: null,
@@ -256,6 +282,36 @@ describe("useAppUpdater", () => {
     await waitFor(() => expect(hook.result.current.status).toBe("runtimeBaseRequired"));
 
     expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("keeps an unavailable Runtime Base upgrade non-blocking and skips component mutation", async () => {
+    vi.stubEnv("VITE_COMPONENT_UPDATE_CATALOG_ENABLED", "true");
+    checkMock.mockResolvedValue(null);
+    getEnginePackStatusMock.mockResolvedValue({
+      supported: false,
+      updateRequired: true,
+      runtimeBaseUpgradeAvailable: false,
+      embeddedPackId: `sha256:${"3".repeat(64)}`,
+      embeddedSourceCommit: "4".repeat(40),
+      installedPackId: null,
+      installedSourceCommit: null,
+      message: "The signed Runtime Base channel does not contain a newer build.",
+    });
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+
+    expect(hook.result.current.updateRequired).toBe(false);
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.enginePack).toMatchObject({
+      supported: false,
+      updateRequired: true,
+      runtimeBaseUpgradeAvailable: false,
+    });
+    expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
+    expect(checkMock).toHaveBeenCalledOnce();
+    expect(checkComponentUpdatesMock).not.toHaveBeenCalled();
     hook.unmount();
   });
 
