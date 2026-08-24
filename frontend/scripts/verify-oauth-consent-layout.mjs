@@ -20,16 +20,19 @@ const outputRoot = path.join(
 const host = "127.0.0.1";
 const port = 5197;
 const origin = `http://${host}:${port}`;
+const callbackPath = "/desktop-auth/autonomy/callback";
+const callbackOrigin = "http://127.0.0.1:49214";
+const callbackUrl = `${callbackOrigin}${callbackPath}?code=layout-code&state=layout-state`;
 
 process.env.VITE_SUPABASE_URL = origin;
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "oauth-consent-layout-public-key";
 
 const authorization = {
   authorization_id: "authorization-layout-check",
-  redirect_uri: "http://127.0.0.1:49211/desktop-auth/sim/callback",
+  redirect_uri: `${callbackOrigin}${callbackPath}`,
   scope: "openid email profile",
   client: {
-    name: "DroneDream SIM Windows",
+    name: "DroneDream AGENT Windows",
     uri: "https://getdronedream.com",
     logo_uri: "https://getdronedream.com/logo.svg",
   },
@@ -39,8 +42,19 @@ const authorization = {
   },
 };
 
-async function mockAuthorizationApi(page) {
+async function mockDesktopAuthorization(page, consentRequests) {
   await page.route("**/auth/v1/oauth/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (url.pathname.endsWith("/consent")) {
+      consentRequests.push({ method: request.method(), url: request.url() });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ redirect_url: callbackUrl }),
+      });
+      return;
+    }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -49,7 +63,7 @@ async function mockAuthorizationApi(page) {
   });
 }
 
-async function measure(page) {
+async function measureAuthenticationPage(page) {
   return page.evaluate(() => {
     const rect = (selector) => {
       const element = document.querySelector(selector);
@@ -64,18 +78,6 @@ async function measure(page) {
         height: Number(bounds.height.toFixed(2)),
       };
     };
-    const lineCount = (selector) => {
-      const element = document.querySelector(selector);
-      if (!(element instanceof HTMLElement)) return null;
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      const tops = [];
-      for (const box of range.getClientRects()) {
-        if (box.width < 1 || box.height < 1) continue;
-        if (!tops.some((top) => Math.abs(top - box.top) < 1)) tops.push(box.top);
-      }
-      return tops.length;
-    };
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
       document: {
@@ -84,18 +86,39 @@ async function measure(page) {
         clientHeight: document.documentElement.clientHeight,
         scrollHeight: document.documentElement.scrollHeight,
       },
-      card: rect(".site-oauth-card"),
-      title: rect(".site-oauth-card h1"),
-      product: rect(".site-oauth-product"),
-      localReturn: rect(".site-oauth-local-return"),
-      approve: rect(".site-oauth-actions .site-button-primary"),
-      cancel: rect(".site-oauth-actions .site-button-ghost"),
-      titleLines: lineCount(".site-oauth-card h1"),
-      productNameLines: lineCount(".site-oauth-product strong"),
-      productBodyLines: lineCount(".site-oauth-product p"),
-      localReturnLines: lineCount(".site-oauth-local-return"),
-      visibleButtons: document.querySelectorAll(".site-oauth-actions button").length,
+      dialog: rect(".site-auth-dialog"),
+      brand: rect(".site-auth-brand .brand-lockup"),
+      title: rect(".site-auth-dialog h2"),
+      form: rect(".site-auth-form"),
+      closeButtons: document.querySelectorAll(".site-auth-close").length,
     };
+  });
+}
+
+function installLocale(context, locale) {
+  return context.addInitScript((selectedLocale) => {
+    window.localStorage.setItem("drone-dream:locale", selectedLocale);
+  }, locale);
+}
+
+function installBrowserSession(context) {
+  return context.addInitScript(() => {
+    window.localStorage.setItem("dronedream-browser-auth:v1", JSON.stringify({
+      access_token: "layout-access-token",
+      refresh_token: "layout-refresh-token",
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      token_type: "bearer",
+      user: {
+        id: "docs-preview",
+        aud: "authenticated",
+        role: "authenticated",
+        email: "pilot@example.com",
+        user_metadata: {},
+        app_metadata: {},
+        created_at: "2026-08-18T00:00:00.000Z",
+      },
+    }));
   });
 }
 
@@ -112,6 +135,7 @@ const results = [];
 try {
   await server.listen();
   browser = await chromium.launch({ channel: "msedge", headless: true });
+
   for (const testCase of [
     { id: "desktop-en-1920x1080", locale: "en", width: 1920, height: 1080 },
     { id: "desktop-zh-1920x1080", locale: "zh-CN", width: 1920, height: 1080 },
@@ -122,91 +146,34 @@ try {
       viewport: { width: testCase.width, height: testCase.height },
       colorScheme: "dark",
     });
-    await context.addInitScript((locale) => {
-      window.localStorage.setItem("drone-dream:locale", locale);
-      window.localStorage.setItem("dronedream-browser-auth:v1", JSON.stringify({
-        access_token: "layout-access-token",
-        refresh_token: "layout-refresh-token",
-        expires_in: 3600,
-        expires_at: Math.floor(Date.now() / 1000) + 3600,
-        token_type: "bearer",
-        user: {
-          id: "docs-preview",
-          aud: "authenticated",
-          role: "authenticated",
-          email: "pilot@example.com",
-          user_metadata: {},
-          app_metadata: {},
-          created_at: "2026-08-18T00:00:00.000Z",
-        },
-      }));
-    }, testCase.locale);
+    await installLocale(context, testCase.locale);
     const page = await context.newPage();
     const consoleErrors = [];
     const pageErrors = [];
-    const authRequests = [];
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
     page.on("pageerror", (error) => pageErrors.push(error.message));
-    page.on("request", (request) => {
-      if (request.url().includes("/auth/v1/")) authRequests.push(request.url());
-    });
-    await mockAuthorizationApi(page);
+
     await page.goto(
-      `${origin}/oauth/consent/?authorization_id=${authorization.authorization_id}&docsPreview=1`,
+      `${origin}/oauth/consent/?authorization_id=${authorization.authorization_id}`,
       { waitUntil: "networkidle" },
     );
-    try {
-      await page.locator(".site-oauth-actions .site-button-primary").waitFor({
-        timeout: 8_000,
-      });
-    } catch (error) {
-      await page.screenshot({
-        path: path.join(outputRoot, `${testCase.id}-failure.png`),
-        fullPage: true,
-      });
-      await writeFile(
-        path.join(outputRoot, `${testCase.id}-failure.html`),
-        await page.content(),
-        "utf8",
-      );
-      const authStorage = await page.evaluate(() => Object.fromEntries(
-        Object.keys(window.localStorage)
-          .filter((key) => key.includes("auth"))
-          .map((key) => [key, window.localStorage.getItem(key)]),
-      ));
-      const authClientState = await page.evaluate(async () => {
-        const client = globalThis.__droneDreamSupabaseClient;
-        if (!client) return null;
-        const auth = client.auth;
-        const session = await auth.getSession();
-        return {
-          storageKey: auth.storageKey,
-          url: auth.url,
-          ownKeys: Object.keys(auth),
-          session: session.data.session,
-          error: session.error?.message ?? null,
-        };
-      });
-      process.stderr.write(`${JSON.stringify({
-        consoleErrors,
-        pageErrors,
-        authRequests,
-        authStorage,
-        authClientState,
-      })}\n`);
-      throw error;
-    }
-    const metrics = await measure(page);
+    const dialog = page.locator(".site-auth-dialog");
+    await dialog.waitFor();
+    const expectedTitle = testCase.locale === "zh-CN" ? "登录" : "Sign in";
+    await page.getByRole("heading", { name: expectedTitle }).waitFor();
+
+    const metrics = await measureAuthenticationPage(page);
     await page.screenshot({
       path: path.join(outputRoot, `${testCase.id}.png`),
       fullPage: true,
     });
 
-    assert(metrics.card, `${testCase.id}: consent card missing`);
-    assert(metrics.approve && metrics.cancel, `${testCase.id}: consent actions missing`);
-    assert.equal(metrics.visibleButtons, 2, `${testCase.id}: action count changed`);
+    assert(metrics.dialog, `${testCase.id}: authentication dialog missing`);
+    assert(metrics.brand, `${testCase.id}: brand lockup missing`);
+    assert(metrics.form, `${testCase.id}: authentication form missing`);
+    assert.equal(metrics.closeButtons, 0, `${testCase.id}: OAuth page must not be closable`);
     assert.equal(
       metrics.document.scrollHeight,
       metrics.document.clientHeight,
@@ -217,93 +184,154 @@ try {
       metrics.document.clientWidth,
       `${testCase.id}: page requires horizontal scrolling`,
     );
-    assert(metrics.card.top >= 96, `${testCase.id}: card overlaps the fixed header`);
-    assert(metrics.card.bottom <= testCase.height, `${testCase.id}: card leaves the viewport`);
-    assert(metrics.approve.bottom <= testCase.height, `${testCase.id}: approve action is below the fold`);
-    assert.equal(metrics.titleLines, 1, `${testCase.id}: title wrapped`);
-    assert.equal(metrics.productNameLines, 1, `${testCase.id}: product name wrapped`);
-    assert.equal(metrics.productBodyLines, 1, `${testCase.id}: product request wrapped`);
-    assert.equal(metrics.localReturnLines, 1, `${testCase.id}: local-return copy wrapped`);
+    assert(metrics.dialog.top >= 24, `${testCase.id}: dialog leaves the top edge`);
+    assert(
+      metrics.dialog.bottom <= testCase.height - 24,
+      `${testCase.id}: dialog leaves the bottom edge`,
+    );
+    assert.equal(
+      await page.getByLabel(testCase.locale === "zh-CN" ? "邮箱地址" : "Email address").count(),
+      1,
+      `${testCase.id}: email field missing`,
+    );
+    assert.equal(
+      await page.getByLabel(testCase.locale === "zh-CN" ? "密码" : "Password").count(),
+      1,
+      `${testCase.id}: password field missing`,
+    );
     assert.equal(consoleErrors.length, 0, `${testCase.id}: browser console errors`);
     assert.equal(pageErrors.length, 0, `${testCase.id}: browser page errors`);
     results.push({ ...testCase, ...metrics, consoleErrors, pageErrors });
     await context.close();
   }
 
-  const accountContext = await browser.newContext({
+  const modesContext = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     colorScheme: "dark",
   });
-  await accountContext.addInitScript(() => {
-    window.localStorage.setItem("drone-dream:locale", "en");
+  await installLocale(modesContext, "en");
+  const modesPage = await modesContext.newPage();
+  const modesConsoleErrors = [];
+  const modesPageErrors = [];
+  modesPage.on("console", (message) => {
+    if (message.type() === "error") modesConsoleErrors.push(message.text());
   });
-  const accountPage = await accountContext.newPage();
-  const accountConsoleErrors = [];
-  const accountPageErrors = [];
-  accountPage.on("console", (message) => {
-    if (message.type() === "error") accountConsoleErrors.push(message.text());
-  });
-  accountPage.on("pageerror", (error) => accountPageErrors.push(error.message));
-  await accountPage.goto(
+  modesPage.on("pageerror", (error) => modesPageErrors.push(error.message));
+  await modesPage.goto(
     `${origin}/oauth/consent/?authorization_id=${authorization.authorization_id}`,
     { waitUntil: "networkidle" },
   );
-  const dialog = accountPage.locator(".site-auth-dialog");
-  await dialog.waitFor();
 
-  const captureAccountDialog = async (id, expectedTitle) => {
-    await accountPage.getByRole("heading", { name: expectedTitle }).waitFor();
-    const bounds = await dialog.boundingBox();
-    assert(bounds, `${id}: account dialog missing`);
-    assert(bounds.y >= 0, `${id}: account dialog starts above the viewport`);
-    assert(bounds.y + bounds.height <= 900, `${id}: account dialog leaves the viewport`);
-    await accountPage.screenshot({
+  const captureMode = async (id, expectedTitle) => {
+    await modesPage.getByRole("heading", { name: expectedTitle }).waitFor();
+    const metrics = await measureAuthenticationPage(modesPage);
+    assert(metrics.dialog, `${id}: authentication dialog missing`);
+    assert(metrics.dialog.top >= 24, `${id}: dialog leaves the top edge`);
+    assert(metrics.dialog.bottom <= 876, `${id}: dialog leaves the bottom edge`);
+    await modesPage.screenshot({
       path: path.join(outputRoot, `${id}.png`),
       fullPage: true,
     });
-    results.push({ id, dialog: bounds });
+    results.push({ id, ...metrics });
   };
 
-  await captureAccountDialog("account-sign-in-1440x900", "Sign in");
+  await modesPage.getByRole("button", { name: "Register" }).click();
+  await captureMode("account-register-1440x900", "Create account");
+  assert.equal(await modesPage.getByLabel("Confirm password").count(), 1);
+  assert.equal(await modesPage.getByLabel("Verification code").count(), 1);
+
+  await modesPage.getByRole("button", { name: "Back to sign in" }).click();
+  await modesPage.getByRole("button", { name: "Forgot password" }).click();
+  await captureMode("account-recovery-choice-1440x900", "Recover account");
   assert.equal(
-    await accountPage.getByRole("button", { name: "Forgot your password? Reset it by email" }).count(),
+    await modesPage.getByRole("button", { name: "Sign in with an email code" }).count(),
     1,
-    "Sign-in dialog lost the password reset entry",
   );
   assert.equal(
-    await accountPage.getByRole("button", { name: "New to DroneDream? Register now" }).count(),
+    await modesPage.getByRole("button", { name: "Reset password with an email code" }).count(),
     1,
-    "Sign-in dialog lost the registration entry",
   );
 
-  await accountPage.getByRole("button", {
-    name: "Forgot your password? Reset it by email",
-  }).click();
-  await captureAccountDialog("account-reset-request-1440x900", "Reset password");
-  assert.equal(
-    await accountPage.getByRole("button", { name: "Send reset link" }).count(),
-    1,
-    "Password reset request lost its email-link action",
-  );
+  await modesPage.getByRole("button", { name: "Sign in with an email code" }).click();
+  await captureMode("account-code-sign-in-1440x900", "Email code sign-in");
+  assert.equal(await modesPage.getByLabel("Verification code").count(), 1);
 
-  await accountPage.getByRole("button", { name: "Already registered? Sign in" }).click();
-  await accountPage.getByRole("button", { name: "New to DroneDream? Register now" }).click();
-  await captureAccountDialog("account-register-1440x900", "Create account");
-  assert.equal(
-    await accountPage.getByRole("button", { name: "Create account" }).count(),
-    1,
-    "Registration dialog lost its account creation action",
+  await modesPage.getByRole("button", { name: "Back to sign in" }).click();
+  await modesPage.getByRole("button", { name: "Forgot password" }).click();
+  await modesPage.getByRole("button", { name: "Reset password with an email code" }).click();
+  await captureMode("account-code-reset-1440x900", "Reset password");
+  assert.equal(await modesPage.getByLabel("Password", { exact: true }).count(), 1);
+  assert.equal(await modesPage.getByLabel("Confirm password", { exact: true }).count(), 1);
+  assert.equal(await modesPage.getByLabel("Verification code").count(), 1);
+  assert.equal(modesConsoleErrors.length, 0, "Authentication modes emitted console errors");
+  assert.equal(modesPageErrors.length, 0, "Authentication modes emitted page errors");
+  await modesContext.close();
+
+  const callbackContext = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    colorScheme: "dark",
+  });
+  await installLocale(callbackContext, "en");
+  await installBrowserSession(callbackContext);
+  const callbackPage = await callbackContext.newPage();
+  const consentRequests = [];
+  const callbackConsoleErrors = [];
+  const callbackPageErrors = [];
+  const callbackHttpErrors = [];
+  callbackPage.on("console", (message) => {
+    if (message.type() === "error") callbackConsoleErrors.push(message.text());
+  });
+  callbackPage.on("pageerror", (error) => callbackPageErrors.push(error.message));
+  callbackPage.on("response", (response) => {
+    if (response.status() >= 400) {
+      callbackHttpErrors.push({ status: response.status(), url: response.url() });
+    }
+  });
+  await callbackPage.route("**/functions/v1/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: "{}",
+    });
+  });
+  await mockDesktopAuthorization(callbackPage, consentRequests);
+  await callbackPage.route(`${callbackOrigin}${callbackPath}**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<!doctype html><title>Returned to AGENT</title><p id='returned'>Returned to AGENT</p>",
+    });
+  });
+  await callbackPage.goto(
+    `${origin}/oauth/consent/?authorization_id=${authorization.authorization_id}`,
   );
-  assert.equal(accountConsoleErrors.length, 0, "Account dialogs emitted console errors");
-  assert.equal(accountPageErrors.length, 0, "Account dialogs emitted page errors");
-  await accountContext.close();
+  await callbackPage.waitForURL(`${callbackOrigin}${callbackPath}**`);
+  assert.equal(consentRequests.length, 1, "verified session was not approved exactly once");
+  assert.equal(consentRequests[0].method, "POST", "approval did not use POST");
+  assert.equal(await callbackPage.locator("#returned").count(), 1, "desktop callback did not load");
+  assert.equal(
+    callbackConsoleErrors.length,
+    0,
+    `automatic return emitted console errors: ${JSON.stringify({ callbackConsoleErrors, callbackHttpErrors })}`,
+  );
+  assert.equal(
+    callbackPageErrors.length,
+    0,
+    `automatic return emitted page errors: ${JSON.stringify(callbackPageErrors)}`,
+  );
+  results.push({
+    id: "authenticated-auto-return",
+    callback: callbackPage.url(),
+    consentRequests,
+  });
+  await callbackContext.close();
 
   await writeFile(
     path.join(outputRoot, "summary.json"),
     `${JSON.stringify({ passed: true, results }, null, 2)}\n`,
     "utf8",
   );
-  process.stdout.write(`OAuth consent layout verification passed: ${outputRoot}\n`);
+  process.stdout.write(`OAuth browser authentication layout verification passed: ${outputRoot}\n`);
 } finally {
   await browser?.close();
   await server.close();

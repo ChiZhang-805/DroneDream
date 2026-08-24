@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 
+import type { Locale } from "../../i18n/I18nProvider";
+
 interface TurnstileOptions {
   sitekey: string;
   theme: "auto";
+  language: "en" | "zh-cn";
   callback: (token: string) => void;
   "error-callback": () => void;
   "expired-callback": () => void;
@@ -59,9 +62,11 @@ function loadTurnstile(): Promise<TurnstileApi> {
 
 export function AuthCaptcha({
   siteKey,
+  locale = "en",
   onTokenChange,
 }: {
   siteKey: string;
+  locale?: Locale;
   onTokenChange: (token: string | null) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,6 +81,7 @@ export function AuthCaptcha({
         widgetId = api.render(containerRef.current, {
           sitekey: siteKey,
           theme: "auto",
+          language: locale === "zh-CN" ? "zh-cn" : "en",
           callback: (token) => {
             if (active) onTokenChange(token);
           },
@@ -101,7 +107,7 @@ export function AuthCaptcha({
         window.turnstile.remove(widgetId);
       }
     };
-  }, [onTokenChange, siteKey]);
+  }, [locale, onTokenChange, siteKey]);
 
   return <div className="auth-captcha" ref={containerRef} />;
 }

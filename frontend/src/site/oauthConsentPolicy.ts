@@ -39,3 +39,18 @@ export function isAllowedDesktopCallback(value: string): boolean {
     return false;
   }
 }
+
+export function isDesktopCallbackForRedirectUri(
+  callbackValue: string,
+  redirectUri: string,
+): boolean {
+  if (!isAllowedDesktopRedirectUri(redirectUri)) return false;
+  try {
+    const callback = new URL(callbackValue);
+    callback.search = "";
+    callback.hash = "";
+    return callback.toString() === redirectUri;
+  } catch {
+    return false;
+  }
+}

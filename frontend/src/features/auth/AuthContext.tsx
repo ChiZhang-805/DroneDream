@@ -58,6 +58,15 @@ interface AuthContextValue {
     token: string,
     password: string,
   ) => Promise<void>;
+  sendRecoveryCode: (
+    email: string,
+    captchaToken?: string,
+  ) => Promise<void>;
+  verifyRecoveryCode: (
+    email: string,
+    token: string,
+    newPassword?: string,
+  ) => Promise<void>;
   requestPasswordReset: (
     email: string,
     captchaToken?: string,
@@ -83,6 +92,8 @@ const OPTIONAL_AUTH_FALLBACK: AuthContextValue = {
   signInWithPassword: unavailableAuthAction,
   sendRegistrationCode: unavailableAuthAction,
   verifyRegistrationCode: unavailableAuthAction,
+  sendRecoveryCode: unavailableAuthAction,
+  verifyRecoveryCode: unavailableAuthAction,
   requestPasswordReset: unavailableAuthAction,
   updatePassword: unavailableAuthAction,
   signInWithProvider: unavailableAuthAction,
@@ -356,8 +367,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       type: "email",
     });
     if (error) throw error;
-    const { error: passwordError } = await client.auth.updateUser({ password });
-    if (passwordError) throw passwordError;
+    try {
+      const { error: passwordError } = await client.auth.updateUser({ password });
+      if (passwordError) throw passwordError;
+    } catch (passwordError) {
+      const { error: rollbackError } = await client.auth.signOut({ scope: "local" });
+      if (rollbackError) throw rollbackError;
+      throw passwordError;
+    }
+  }, []);
+
+  const sendRecoveryCode = useCallback(async (
+    email: string,
+    captchaToken?: string,
+  ) => {
+    const { error } = await requireClient().auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        shouldCreateUser: false,
+        ...(captchaToken ? { captchaToken } : {}),
+      },
+    });
+    if (error) throw error;
+  }, []);
+
+  const verifyRecoveryCode = useCallback(async (
+    email: string,
+    token: string,
+    newPassword?: string,
+  ) => {
+    const client = requireClient();
+    const { error } = await client.auth.verifyOtp({
+      email: email.trim(),
+      token: token.trim(),
+      type: "email",
+    });
+    if (error) throw error;
+    if (newPassword === undefined) return;
+    try {
+      const { error: passwordError } = await client.auth.updateUser({
+        password: newPassword,
+      });
+      if (passwordError) throw passwordError;
+    } catch (passwordError) {
+      const { error: rollbackError } = await client.auth.signOut({ scope: "local" });
+      if (rollbackError) throw rollbackError;
+      throw passwordError;
+    }
   }, []);
 
   const requestPasswordReset = useCallback(async (
@@ -598,6 +654,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithPassword,
       sendRegistrationCode,
       verifyRegistrationCode,
+      sendRecoveryCode,
+      verifyRecoveryCode,
       requestPasswordReset,
       updatePassword,
       signInWithProvider,
@@ -611,6 +669,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       passwordRecovery,
       requestPasswordReset,
+      sendRecoveryCode,
       sendRegistrationCode,
       signInWithProvider,
       signInWithPassword,
@@ -618,6 +677,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateAvatar,
       updateDisplayName,
       updatePassword,
+      verifyRecoveryCode,
       verifyRegistrationCode,
     ],
   );

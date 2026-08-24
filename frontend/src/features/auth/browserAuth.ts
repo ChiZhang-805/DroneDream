@@ -15,7 +15,40 @@ const CLIENT_BY_EDITION = {
   sim: "dronedream-desktop-sim",
   lab: "dronedream-desktop-lab",
   field: "dronedream-desktop-field",
+  autonomy: "dronedream-desktop-autonomy",
 } as const;
+
+export type BrowserAuthAdoptionFailure =
+  | "configuration"
+  | "session-binding"
+  | "credential-rejected"
+  | "transient"
+  | "unknown";
+
+export class BrowserAuthAdoptionError extends Error {
+  readonly failure: BrowserAuthAdoptionFailure;
+
+  constructor(
+    message: string,
+    failure: BrowserAuthAdoptionFailure,
+    cause?: unknown,
+  ) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = "BrowserAuthAdoptionError";
+    this.failure = failure;
+  }
+}
+
+export function shouldClearBrowserAuthVaultAfterAdoptionError(
+  error: unknown,
+): boolean {
+  return error instanceof BrowserAuthAdoptionError
+    && (
+      error.failure === "session-binding"
+      || error.failure === "credential-rejected"
+    );
+}
+
 let refreshTimer: number | null = null;
 const REFRESH_RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000, 300_000] as const;
 
@@ -77,10 +110,90 @@ function expectedDesktopEdition(): keyof typeof CLIENT_BY_EDITION {
   const configured = (import.meta.env.VITE_DRONEDREAM_EDITION as string | undefined)
     ?.trim()
     .toLowerCase();
-  if (configured && configured in CLIENT_BY_EDITION) {
+  if (!configured) return "universal";
+  if (Object.hasOwn(CLIENT_BY_EDITION, configured)) {
     return configured as keyof typeof CLIENT_BY_EDITION;
   }
-  return "universal";
+  throw new BrowserAuthAdoptionError(
+    `The configured DroneDream edition "${configured}" is unsupported. Browser session adoption was blocked.`,
+    "configuration",
+  );
+}
+
+function errorDetails(error: unknown): {
+  message: string | null;
+  name: string | null;
+  status: number | null;
+  code: string | null;
+} {
+  if (typeof error !== "object" || error === null) {
+    return {
+      message: typeof error === "string" && error.trim() ? error : null,
+      name: null,
+      status: null,
+      code: null,
+    };
+  }
+  const candidate = error as {
+    message?: unknown;
+    name?: unknown;
+    status?: unknown;
+    code?: unknown;
+  };
+  return {
+    message: typeof candidate.message === "string" && candidate.message.trim()
+      ? candidate.message
+      : null,
+    name: typeof candidate.name === "string" ? candidate.name : null,
+    status: typeof candidate.status === "number" && Number.isFinite(candidate.status)
+      ? candidate.status
+      : null,
+    code: typeof candidate.code === "string" ? candidate.code : null,
+  };
+}
+
+function classifyRemoteAdoptionError(error: unknown): BrowserAuthAdoptionError {
+  const { message, name, status, code } = errorDetails(error);
+  const normalizedMessage = message?.toLowerCase() ?? "";
+  if (
+    status === 401
+    || status === 403
+    || name === "AuthSessionMissingError"
+    || code === "session_not_found"
+  ) {
+    return new BrowserAuthAdoptionError(
+      message ?? "The saved browser session is no longer authorized.",
+      "credential-rejected",
+      error,
+    );
+  }
+  if (
+    status === 0
+    || status === 429
+    || (status !== null && status >= 500 && status <= 599)
+    || name === "AuthRetryableFetchError"
+    || name === "AbortError"
+    || name === "TimeoutError"
+    || normalizedMessage.includes("failed to fetch")
+    || normalizedMessage.includes("network")
+    || normalizedMessage.includes("timed out")
+    || normalizedMessage.includes("timeout")
+    || normalizedMessage.includes("offline")
+    || normalizedMessage.includes("temporarily unavailable")
+  ) {
+    return new BrowserAuthAdoptionError(
+      message
+        ?? "The account service could not validate the saved browser session. The saved sign-in was preserved; try again.",
+      "transient",
+      error,
+    );
+  }
+  return new BrowserAuthAdoptionError(
+    message
+      ?? "The browser session could not be adopted. The saved sign-in was preserved; try again.",
+    "unknown",
+    error,
+  );
 }
 
 export async function adoptBrowserAuthSession(
@@ -94,22 +207,49 @@ export async function adoptBrowserAuthSession(
   };
   throwIfCancelled();
   if (!supabaseClient) {
-    throw new Error("DroneDream account authentication is not configured.");
+    throw new BrowserAuthAdoptionError(
+      "DroneDream account authentication is not configured.",
+      "configuration",
+    );
   }
   const edition = expectedDesktopEdition();
-  if (
-    session.protocolVersion !== EXPECTED_PROTOCOL
-    || session.editionId !== edition
-    || session.authClientId !== CLIENT_BY_EDITION[edition]
-  ) {
-    throw new Error("The browser session belongs to a different DroneDream edition.");
+  if (session.protocolVersion !== EXPECTED_PROTOCOL) {
+    throw new BrowserAuthAdoptionError(
+      "The browser session uses an unsupported authentication protocol.",
+      "session-binding",
+    );
   }
-  const { data, error } = await supabaseClient.auth.getUser(session.accessToken);
+  if (session.editionId !== edition) {
+    throw new BrowserAuthAdoptionError(
+      "The browser session belongs to a different DroneDream edition.",
+      "session-binding",
+    );
+  }
+  if (session.authClientId !== CLIENT_BY_EDITION[edition]) {
+    throw new BrowserAuthAdoptionError(
+      "The browser session does not match this DroneDream edition's authentication client.",
+      "session-binding",
+    );
+  }
+  let response: Awaited<ReturnType<typeof supabaseClient.auth.getUser>>;
+  try {
+    response = await supabaseClient.auth.getUser(session.accessToken);
+  } catch (error) {
+    throwIfCancelled();
+    throw classifyRemoteAdoptionError(error);
+  }
   // Cancellation must win over a token response. No account event or access
   // token may escape after the operator has cancelled the transaction.
   throwIfCancelled();
+  const { data, error } = response;
   if (error || !data.user) {
-    throw new Error(error?.message || "The browser session could not be adopted.");
+    if (!error) {
+      throw new BrowserAuthAdoptionError(
+        "The browser session could not be adopted because it has no authenticated account.",
+        "credential-rejected",
+      );
+    }
+    throw classifyRemoteAdoptionError(error);
   }
   setAuthAccessToken(session.accessToken);
   window.dispatchEvent(new CustomEvent(ADOPT_DESKTOP_AUTH_EVENT, {
