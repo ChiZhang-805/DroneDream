@@ -497,15 +497,27 @@ async function collectMetrics(page) {
         }
         ancestor = ancestor.parentElement;
       }
-      if (element.matches("h1, h2, h3, h4, h5, h6, button, a[href], summary")
-        && (element.scrollWidth > element.clientWidth + 1
-          || element.scrollHeight > element.clientHeight + 1)) {
-        clippingIssues.push({
-          axis: element.scrollWidth > element.clientWidth + 1 ? "horizontal" : "vertical",
-          boundary: "content-box",
-          label,
-          rect: rectSnapshot(rect),
-        });
+      if (element.matches("h1, h2, h3, h4, h5, h6, button, a[href], summary")) {
+        const elementStyle = getComputedStyle(element);
+        const clipsOwnOverflow = (value) => /^(?:auto|scroll|hidden|clip)$/u.test(value);
+        if (clipsOwnOverflow(elementStyle.overflowX)
+          && element.scrollWidth > element.clientWidth + 1) {
+          clippingIssues.push({
+            axis: "horizontal",
+            boundary: "content-box",
+            label,
+            rect: rectSnapshot(rect),
+          });
+        }
+        if (clipsOwnOverflow(elementStyle.overflowY)
+          && element.scrollHeight > element.clientHeight + 1) {
+          clippingIssues.push({
+            axis: "vertical",
+            boundary: "content-box",
+            label,
+            rect: rectSnapshot(rect),
+          });
+        }
       }
     }
     const horizontalClipping = clippingIssues.filter(({ axis }) => axis === "horizontal");
@@ -664,8 +676,16 @@ try {
   assert(metrics.title.length > 0, `${edition}/${surfaceId}: primary title is missing`);
   assert(!metrics.errorBoundary, `${edition}/${surfaceId}: error boundary rendered`);
   assert(!metrics.mobileNavigationVisible, `${edition}/${surfaceId}: mobile navigation rendered`);
-  assert.equal(metrics.horizontalClipping.length, 0, `${edition}/${surfaceId}: content is horizontally clipped`);
-  assert.equal(metrics.verticalClipping.length, 0, `${edition}/${surfaceId}: content is vertically clipped`);
+  assert.equal(
+    metrics.horizontalClipping.length,
+    0,
+    `${edition}/${surfaceId}: content is horizontally clipped: ${JSON.stringify(metrics.horizontalClipping)}`,
+  );
+  assert.equal(
+    metrics.verticalClipping.length,
+    0,
+    `${edition}/${surfaceId}: content is vertically clipped: ${JSON.stringify(metrics.verticalClipping)}`,
+  );
   assert.equal(metrics.overlapIssues.length, 0, `${edition}/${surfaceId}: peer controls overlap`);
   assert(metrics.document.width <= metrics.viewport.width + 1, `${edition}/${surfaceId}: page horizontally overflows`);
   assert(metrics.document.height <= metrics.viewport.height + 1, `${edition}/${surfaceId}: page vertically overflows`);
