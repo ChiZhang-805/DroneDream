@@ -599,6 +599,89 @@ function Get-CleanRepositorySourceBinding {
     return [ordered]@{ commit = $commit; tree = $tree; clean = $true }
 }
 
+function Find-ByteSequenceOccurrences {
+    param(
+        [Parameter(Mandatory = $true)][byte[]]$Bytes,
+        [Parameter(Mandatory = $true)][byte[]]$Sequence
+    )
+
+    if ($Sequence.Length -eq 0 -or $Bytes.Length -lt $Sequence.Length) {
+        return @()
+    }
+    # ASCII decoding preserves one character per byte and maps non-ASCII bytes
+    # to '?', which cannot fabricate this ASCII-only sentinel. String.IndexOf
+    # keeps this scan native-speed even for a 60+ MB executable under PS 5.1.
+    $haystack = [Text.Encoding]::ASCII.GetString($Bytes)
+    $needle = [Text.Encoding]::ASCII.GetString($Sequence)
+    $matches = [Collections.Generic.List[int]]::new()
+    $searchFrom = 0
+    while ($searchFrom -le $haystack.Length - $needle.Length) {
+        $offset = $haystack.IndexOf($needle, $searchFrom, [StringComparison]::Ordinal)
+        if ($offset -lt 0) { break }
+        $matches.Add($offset)
+        $searchFrom = $offset + 1
+    }
+    return $matches.ToArray()
+}
+
+function Get-ByteArraySha256 {
+    param([Parameter(Mandatory = $true)][byte[]]$Bytes)
+
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        return -join ($algorithm.ComputeHash($Bytes) | ForEach-Object { $_.ToString("x2") })
+    }
+    finally {
+        $algorithm.Dispose()
+    }
+}
+
+function Get-NormalizedInstalledApplicationBinding {
+    param(
+        [Parameter(Mandatory = $true)][byte[]]$Bytes,
+        [Parameter(Mandatory = $true)]$Contract
+    )
+
+    $prefix = [string]$Contract.prefix
+    $buildMarker = [string]$Contract.buildMarker
+    $installedMarker = [string]$Contract.installedMarker
+    Assert-Condition (
+        $prefix -ceq "__TAURI_BUNDLE_TYPE_VAR_" -and
+        $buildMarker -ceq "UNK" -and
+        $installedMarker -ceq "NSS" -and
+        [int]$Contract.occurrenceCount -eq 1
+    ) "Unsupported Tauri bundle-type normalization contract."
+    $prefixBytes = [Text.Encoding]::ASCII.GetBytes($prefix)
+    $buildMarkerBytes = [Text.Encoding]::ASCII.GetBytes($buildMarker)
+    $installedMarkerBytes = [Text.Encoding]::ASCII.GetBytes($installedMarker)
+    Assert-Condition (
+        $buildMarkerBytes.Length -eq $installedMarkerBytes.Length
+    ) "Tauri build and installed bundle markers must have equal byte lengths."
+    $occurrences = @(Find-ByteSequenceOccurrences -Bytes $Bytes -Sequence $prefixBytes)
+    Assert-Condition (
+        $occurrences.Count -eq [int]$Contract.occurrenceCount
+    ) "Installed application must contain exactly one Tauri bundle-type prefix; found $($occurrences.Count)."
+    $markerOffset = [int]$occurrences[0] + $prefixBytes.Length
+    Assert-Condition (
+        $markerOffset + $installedMarkerBytes.Length -le $Bytes.Length
+    ) "Installed application Tauri bundle-type marker is truncated."
+    for ($index = 0; $index -lt $installedMarkerBytes.Length; $index++) {
+        Assert-Condition (
+            $Bytes[$markerOffset + $index] -eq $installedMarkerBytes[$index]
+        ) "Installed application does not contain the expected Tauri NSS marker."
+    }
+    [byte[]]$normalized = $Bytes.Clone()
+    for ($index = 0; $index -lt $buildMarkerBytes.Length; $index++) {
+        $normalized[$markerOffset + $index] = $buildMarkerBytes[$index]
+    }
+    return [ordered]@{
+        occurrenceCount = $occurrences.Count
+        markerOffset = $markerOffset
+        installedMarker = $installedMarker
+        normalizedSha256 = Get-ByteArraySha256 -Bytes $normalized
+    }
+}
+
 function Get-InstalledApplicationBinding {
     param(
         [Parameter(Mandatory = $true)][string]$ApplicationPath,
@@ -608,11 +691,16 @@ function Get-InstalledApplicationBinding {
         (Test-Path -LiteralPath $ApplicationPath -PathType Leaf)
     ) "Installed application is missing: $ApplicationPath"
     $file = Get-Item -LiteralPath $ApplicationPath
-    $hash = (Get-FileHash -LiteralPath $ApplicationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    [byte[]]$bytes = [IO.File]::ReadAllBytes($ApplicationPath)
+    $hash = Get-ByteArraySha256 -Bytes $bytes
+    $normalization = Get-NormalizedInstalledApplicationBinding `
+        -Bytes $bytes `
+        -Contract $BuildReceipt.application.bundleTypeNormalization
     Assert-Condition (
         [long]$file.Length -eq [long]$BuildReceipt.application.bytes -and
-        $hash -ceq [string]$BuildReceipt.application.sha256
-    ) "Installed application bytes or SHA-256 do not match the exact application recorded by the build receipt: $ApplicationPath"
+        [string]$normalization.normalizedSha256 -ceq [string]$BuildReceipt.application.bundleTypeNormalization.normalizedSha256 -and
+        [string]$normalization.normalizedSha256 -ceq [string]$BuildReceipt.application.sha256
+    ) "Installed application differs from the exact build application beyond the one permitted Tauri UNK-to-NSS marker change: $ApplicationPath"
     $version = $file.VersionInfo
     Assert-Condition (
         [string]$version.FileVersion -ceq [string]$BuildReceipt.version -and
@@ -625,6 +713,7 @@ function Get-InstalledApplicationBinding {
         path = $file.FullName
         bytes = [long]$file.Length
         sha256 = $hash
+        bundleTypeNormalization = $normalization
         fileVersion = [string]$version.FileVersion
         productVersion = [string]$version.ProductVersion
         productName = [string]$version.ProductName
@@ -682,7 +771,13 @@ function Get-FiveEditionBuildBindings {
             $null -ne $receipt.application -and
             [string]$receipt.application.fileName -ceq "drone-dream-desktop.exe" -and
             [long]$receipt.application.bytes -gt 0 -and
-            [string]$receipt.application.sha256 -cmatch '^[0-9a-f]{64}$'
+            [string]$receipt.application.sha256 -cmatch '^[0-9a-f]{64}$' -and
+            $null -ne $receipt.application.bundleTypeNormalization -and
+            [string]$receipt.application.bundleTypeNormalization.prefix -ceq "__TAURI_BUNDLE_TYPE_VAR_" -and
+            [string]$receipt.application.bundleTypeNormalization.buildMarker -ceq "UNK" -and
+            [string]$receipt.application.bundleTypeNormalization.installedMarker -ceq "NSS" -and
+            [int]$receipt.application.bundleTypeNormalization.occurrenceCount -eq 1 -and
+            [string]$receipt.application.bundleTypeNormalization.normalizedSha256 -ceq [string]$receipt.application.sha256
         ) "$editionId build receipt has no exact application executable binding."
         $installerPath = Join-Path $editionRoot ([string]$receipt.installer.fileName)
         Assert-Condition (Test-Path -LiteralPath $installerPath -PathType Leaf) "$editionId installer recorded by the receipt is missing."
@@ -715,6 +810,7 @@ function Get-FiveEditionBuildBindings {
                 fileName = [string]$receipt.application.fileName
                 bytes = [long]$receipt.application.bytes
                 sha256 = [string]$receipt.application.sha256
+                bundleTypeNormalization = $receipt.application.bundleTypeNormalization
             }
             installedApplication = $installed
         })
@@ -1091,10 +1187,64 @@ function Invoke-InMemorySelfTest {
         $bitmap.Dispose()
         $memory.Dispose()
     }
+
+    $prefix = "__TAURI_BUNDLE_TYPE_VAR_"
+    [byte[]]$buildBytes = [Text.Encoding]::ASCII.GetBytes("before-$($prefix)UNK-after")
+    $normalizationContract = [ordered]@{
+        prefix = $prefix
+        buildMarker = "UNK"
+        installedMarker = "NSS"
+        occurrenceCount = 1
+        normalizedSha256 = Get-ByteArraySha256 -Bytes $buildBytes
+    }
+    [byte[]]$installedBytes = $buildBytes.Clone()
+    $prefixOffset = [Text.Encoding]::ASCII.GetString($installedBytes).IndexOf($prefix, [StringComparison]::Ordinal)
+    $markerOffset = $prefixOffset + [Text.Encoding]::ASCII.GetByteCount($prefix)
+    [byte[]]$installedMarker = [Text.Encoding]::ASCII.GetBytes("NSS")
+    [Array]::Copy($installedMarker, 0, $installedBytes, $markerOffset, $installedMarker.Length)
+    $normalized = Get-NormalizedInstalledApplicationBinding -Bytes $installedBytes -Contract $normalizationContract
+    Assert-Condition (
+        [string]$normalized.normalizedSha256 -ceq [string]$normalizationContract.normalizedSha256
+    ) "Tauri UNK-to-NSS normalization self-test failed."
+
+    $missingRejected = $false
+    try {
+        Get-NormalizedInstalledApplicationBinding `
+            -Bytes ([Text.Encoding]::ASCII.GetBytes("no-bundle-marker")) `
+            -Contract $normalizationContract | Out-Null
+    }
+    catch { $missingRejected = $true }
+    Assert-Condition $missingRejected "Missing Tauri bundle marker was not rejected."
+
+    $duplicateRejected = $false
+    try {
+        [byte[]]$duplicateBytes = [Text.Encoding]::ASCII.GetBytes("$($prefix)NSS-$($prefix)NSS")
+        Get-NormalizedInstalledApplicationBinding -Bytes $duplicateBytes -Contract $normalizationContract | Out-Null
+    }
+    catch { $duplicateRejected = $true }
+    Assert-Condition $duplicateRejected "Duplicate Tauri bundle markers were not rejected."
+
+    [byte[]]$mutatedBytes = $installedBytes.Clone()
+    $mutatedBytes[0] = $mutatedBytes[0] -bxor 1
+    $mutated = Get-NormalizedInstalledApplicationBinding -Bytes $mutatedBytes -Contract $normalizationContract
+    $unrelatedMutationRejected = $false
+    try {
+        Assert-Condition (
+            [string]$mutated.normalizedSha256 -ceq [string]$normalizationContract.normalizedSha256
+        ) "Unrelated installed-application byte mutation rejected by receipt SHA-256."
+    }
+    catch { $unrelatedMutationRejected = $true }
+    Assert-Condition $unrelatedMutationRejected "An unrelated installed-application byte mutation was not rejected."
     return [ordered]@{
         intersection = $intersection
         negativeCoordinateIntersection = $negativeIntersection
         pngDimensions = [ordered]@{ width = 17; height = 11 }
+        bundleTypeNormalization = [ordered]@{
+            permittedTransition = "UNK-to-NSS"
+            missingMarkerRejected = $missingRejected
+            duplicateMarkerRejected = $duplicateRejected
+            unrelatedMutationRejected = $unrelatedMutationRejected
+        }
     }
 }
 

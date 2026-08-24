@@ -31,6 +31,62 @@ function Test-FullyQualifiedFileSystemPath {
     )
 }
 
+function Find-ByteSequenceOccurrences {
+    param(
+        [Parameter(Mandatory = $true)][byte[]]$Bytes,
+        [Parameter(Mandatory = $true)][byte[]]$Sequence
+    )
+
+    if ($Sequence.Length -eq 0 -or $Bytes.Length -lt $Sequence.Length) {
+        return @()
+    }
+    # ASCII decoding preserves one character per byte and maps non-ASCII bytes
+    # to '?', which cannot fabricate this ASCII-only sentinel. String.IndexOf
+    # keeps this scan native-speed even for a 60+ MB executable under PS 5.1.
+    $haystack = [Text.Encoding]::ASCII.GetString($Bytes)
+    $needle = [Text.Encoding]::ASCII.GetString($Sequence)
+    $matches = [Collections.Generic.List[int]]::new()
+    $searchFrom = 0
+    while ($searchFrom -le $haystack.Length - $needle.Length) {
+        $offset = $haystack.IndexOf($needle, $searchFrom, [StringComparison]::Ordinal)
+        if ($offset -lt 0) { break }
+        $matches.Add($offset)
+        $searchFrom = $offset + 1
+    }
+    return $matches.ToArray()
+}
+
+function Get-BundleTypeNormalizationBinding {
+    param([Parameter(Mandatory = $true)][string]$ApplicationPath)
+
+    $prefix = "__TAURI_BUNDLE_TYPE_VAR_"
+    $buildMarker = "UNK"
+    $installedMarker = "NSS"
+    $bytes = [IO.File]::ReadAllBytes($ApplicationPath)
+    $prefixBytes = [Text.Encoding]::ASCII.GetBytes($prefix)
+    $buildMarkerBytes = [Text.Encoding]::ASCII.GetBytes($buildMarker)
+    $occurrences = @(Find-ByteSequenceOccurrences -Bytes $bytes -Sequence $prefixBytes)
+    if ($occurrences.Count -ne 1) {
+        throw "Application must contain exactly one Tauri bundle-type prefix; found $($occurrences.Count): $ApplicationPath"
+    }
+    $markerOffset = [int]$occurrences[0] + $prefixBytes.Length
+    if ($markerOffset + $buildMarkerBytes.Length -gt $bytes.Length) {
+        throw "Application Tauri bundle-type marker is truncated: $ApplicationPath"
+    }
+    for ($index = 0; $index -lt $buildMarkerBytes.Length; $index++) {
+        if ($bytes[$markerOffset + $index] -ne $buildMarkerBytes[$index]) {
+            throw "Unbundled application does not contain the expected Tauri UNK marker: $ApplicationPath"
+        }
+    }
+    return [ordered]@{
+        prefix = $prefix
+        buildMarker = $buildMarker
+        installedMarker = $installedMarker
+        occurrenceCount = 1
+        normalizedSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $ApplicationPath).Hash.ToLowerInvariant()
+    }
+}
+
 if ($PSVersionTable.PSEdition -ceq "Desktop") {
     $inboxModuleRoot = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\Modules"
     if (Test-Path -LiteralPath $inboxModuleRoot -PathType Container) {
@@ -558,6 +614,10 @@ try {
 
         $installerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $builtInstaller).Hash.ToLowerInvariant()
         $applicationHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $builtApplication).Hash.ToLowerInvariant()
+        $bundleTypeNormalization = Get-BundleTypeNormalizationBinding -ApplicationPath $builtApplication
+        if ([string]$bundleTypeNormalization.normalizedSha256 -cne $applicationHash) {
+            throw "$editionId application normalization binding does not match its raw build SHA-256."
+        }
         $checksumLine = (Get-Content -LiteralPath $builtChecksum -Raw -Encoding ASCII).Trim()
         if ($checksumLine -notmatch "^$installerHash\s+") {
             throw "$editionId checksum sidecar does not match the installer."
@@ -615,6 +675,7 @@ try {
                 fileName = [IO.Path]::GetFileName($builtApplication)
                 bytes = (Get-Item -LiteralPath $builtApplication).Length
                 sha256 = $applicationHash
+                bundleTypeNormalization = $bundleTypeNormalization
             }
             elapsedSeconds = [Math]::Round($stopwatch.Elapsed.TotalSeconds, 1)
             generatedAt = [DateTimeOffset]::UtcNow.ToString("o")
