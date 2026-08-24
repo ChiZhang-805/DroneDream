@@ -18,6 +18,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
 import { ManualPage } from "./ManualPage";
 import { OAuthConsentPage } from "./OAuthConsentPage";
+import { authorizationIdFromLocation } from "./oauthConsentPolicy";
 import { OrganizationPage } from "./OrganizationPage";
 import { PricingPage } from "./PricingPage";
 import { ProductPage } from "./ProductPage";
@@ -858,7 +859,9 @@ export function SiteApp() {
          : path === "/oauth/consent"
            ? "oauth-consent"
          : "home";
-  const oauthAuthPage = sitePage === "oauth-consent" && (
+  const hasValidOAuthAuthorizationId = sitePage === "oauth-consent"
+    && authorizationIdFromLocation() !== null;
+  const oauthAuthPage = hasValidOAuthAuthorizationId && (
     !auth.account || authPending || Boolean(authError)
   );
 
@@ -1133,7 +1136,7 @@ export function SiteApp() {
   }, [auth.passwordRecovery]);
 
   useEffect(() => {
-    if (sitePage !== "oauth-consent") return;
+    if (sitePage !== "oauth-consent" || !hasValidOAuthAuthorizationId) return;
     if (
       auth.account
       && authOpen
@@ -1158,6 +1161,7 @@ export function SiteApp() {
     authError,
     authOpen,
     authPending,
+    hasValidOAuthAuthorizationId,
     sitePage,
   ]);
 
@@ -1423,6 +1427,8 @@ export function SiteApp() {
             onRequireAccount={() => openAccount("sign-in")}
           />
         ) : sitePage === "oauth-consent" && (
+          !hasValidOAuthAuthorizationId
+          ||
           (auth.account && !authPending && !authError)
           || (!auth.configured && !auth.loading)
         ) ? (
