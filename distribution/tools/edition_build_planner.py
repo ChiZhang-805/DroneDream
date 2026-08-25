@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create and validate plan-only SIM/LAB/FIELD/AUTONOMY build inventories.
+"""Create and validate plan-only SIM/LAB/FIELD/AGENT build inventories.
 
 This tool never invokes Tauri, NSIS, an installer, Runtime migration, a release
 API, or a release-branch mutation.  It derives a deterministic, source-bound
@@ -36,9 +36,7 @@ COMPONENT_IDS = {
 RECEIPT_ONLY_PREFIX = "distribution/build-plans/"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-SAFE_PATH_RE = re.compile(
-    r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
-)
+SAFE_PATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$")
 ID_RE = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$")
 
 REQUEST_KEYS = {
@@ -359,7 +357,7 @@ def validate_request(request: Any) -> dict[str, Any]:
         _positive_or_zero(item["vehiclePackInstalledEstimateBytes"], "Vehicle Pack installed")
         if item["vehiclePackInstalledEstimateBytes"] < item["vehiclePackDownloadEstimateBytes"]:
             raise BuildPlanError("Vehicle Pack installed estimate is too small")
-        expected_name = f"DroneDream-{edition_id.title()}-1.0.0.exe"
+        expected_name = f"DroneDream-{EDITION_LABELS[edition_id]}-1.0.0.exe"
         if item["artifactFileName"] != expected_name or expected_name in artifact_names:
             raise BuildPlanError("edition artifact filename drifted or duplicated")
         artifact_names.add(expected_name)
@@ -380,8 +378,10 @@ def validate_request(request: Any) -> dict[str, Any]:
         if item["editionId"] not in EDITION_IDS or item["region"] not in {"cn", "global"}:
             raise BuildPlanError("bundle target is unsupported")
         name = item["artifactFileName"]
-        if not isinstance(name, str) or not name.startswith("DroneDream-") or not name.endswith(
-            "-1.0.0.exe"
+        if (
+            not isinstance(name, str)
+            or not name.startswith("DroneDream-")
+            or not name.endswith("-1.0.0.exe")
         ):
             raise BuildPlanError("bundle artifact filename is invalid")
         if name in artifact_names:
@@ -447,9 +447,7 @@ def _load_contract_inputs(
     return editions, edition_shas, packs, pack_shas
 
 
-def _component_plan(
-    item: dict[str, Any], source_commit: str, repo_root: Path
-) -> dict[str, Any]:
+def _component_plan(item: dict[str, Any], source_commit: str, repo_root: Path) -> dict[str, Any]:
     resolved_source = (
         source_commit if item["sourcePolicy"] == "common-source" else item["sourceCommit"]
     )
@@ -513,9 +511,7 @@ def create_build_plan(
 
     editions, edition_shas, packs, pack_shas = _load_contract_inputs(request, repo_root)
     short_source = source_commit[:12]
-    components = [
-        _component_plan(item, source_commit, repo_root) for item in request["components"]
-    ]
+    components = [_component_plan(item, source_commit, repo_root) for item in request["components"]]
     components_by_id = {item["componentId"]: item for item in components}
     edition_plans: list[dict[str, Any]] = []
     all_license_ids: set[str] = set()
@@ -528,9 +524,10 @@ def create_build_plan(
         )
         pack_id = _read_json(pack_path, "selected Vehicle Pack")["packId"]
         pack = packs[pack_id]
-        if edition_id not in pack["supportedEditions"] or selection["region"] not in pack[
-            "availabilityRegions"
-        ]:
+        if (
+            edition_id not in pack["supportedEditions"]
+            or selection["region"] not in pack["availabilityRegions"]
+        ):
             raise BuildPlanError("Vehicle Pack is incompatible with edition or region")
         controller = selection["controllerModel"]
         controller_models = {item["model"] for item in pack["controllers"]}
@@ -657,7 +654,8 @@ def create_build_plan(
         "blockers": [
             "No edition installer or precombined bundle has been built by this plan.",
             "All eight Vehicle Packs remain contract-only or planned; zero are validated.",
-            "Each edition update must be forward-integrated through its long-lived product branch and reviewed pull request.",
+            "Each edition update must be forward-integrated through its long-lived "
+            "product branch and reviewed pull request.",
             "Artifact-specific license, NOTICE, signature, and rollback evidence is pending.",
         ],
         "productDisplayVersion": "1.0.0",
@@ -681,9 +679,7 @@ def create_build_plan(
         "policyBindings": {
             "capabilityPolicy": _file_ref(repo_root, policy_paths["capabilityPolicy"]),
             "upstreamInventory": upstream_ref,
-            "vehiclePackRegistry": _file_ref(
-                repo_root, policy_paths["vehiclePackRegistry"]
-            ),
+            "vehiclePackRegistry": _file_ref(repo_root, policy_paths["vehiclePackRegistry"]),
         },
         "components": components,
         "editions": edition_plans,

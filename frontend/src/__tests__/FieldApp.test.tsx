@@ -161,6 +161,9 @@ describe("FieldApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "设备" }));
     expect(screen.getByRole("heading", { name: "设备与适配器" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "观察状态" })).toHaveValue("firmware-drift");
+    fireEvent.click(screen.getByRole("button", { name: "打开账户菜单" }));
+    expect(screen.getByRole("menuitem", { name: "剩余额度" })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: "设置" })).toBeVisible();
   });
 
   it("keeps the hardware-domain capability surface free of simulation and standalone Field shell payloads", () => {
@@ -177,14 +180,78 @@ describe("FieldApp", () => {
 
     expect(sources).not.toMatch(/AppShell|react-router|\/assistant|\/scenarios/);
     expect(sources).not.toMatch(/gazebo|sitl|hitl|SimulatorAdapter|simulation\.execute/i);
-    expect(sources).not.toMatch(/FieldBrandLockup|FieldAuthControl|FieldSettingsDialog/);
+    expect(sources).not.toMatch(/FieldBrandLockup|FieldAuthControl/);
+    expect(sources).toContain("FieldSettingsDialog");
     expect(sources).toContain("hardwareDomainEdition");
     expect(sources).toContain('data-authority="false"');
   });
 
-  it("does not duplicate the outer Lab settings or authentication controls", async () => {
+  it("keeps the active Field page mounted while the full settings workspace is open", async () => {
     const { container } = await renderField();
+    fireEvent.click(screen.getByRole("button", { name: "Device" }));
+    const activePage = container.querySelector(".field-active-page");
+    expect(activePage).toHaveAttribute("data-page", "device");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open account menu" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Settings" }));
+    const workspace = screen.getByRole("region", { name: "Settings" });
+    const applicationSurface = container.querySelector(".field-application-surface") as HTMLElement;
+    expect(workspace).toBeVisible();
+    expect(applicationSurface).toHaveAttribute("aria-hidden", "true");
+    expect(applicationSurface.inert).toBe(true);
+    expect(activePage).toBeInTheDocument();
+    expect(activePage).toHaveAttribute("data-page", "device");
+    fireEvent.click(screen.getByRole("button", { name: "Back to app" }));
+
+    expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+    expect(applicationSurface).not.toHaveAttribute("aria-hidden");
+    expect(applicationSurface.inert).toBe(false);
+    expect(activePage).toBeVisible();
+    expect(activePage).toHaveAttribute("data-page", "device");
+    expect(screen.getByRole("heading", { name: "Device & adapters" })).toBeVisible();
+  });
+
+  it("routes the Field account menu to allowance and general settings", async () => {
+    await renderField();
+    const accountButton = screen.getByRole("button", { name: "Open account menu" });
+
+    fireEvent.click(accountButton);
+    expect(screen.getByRole("menu", { name: "Account" })).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Remaining allowance" }));
+
+    expect(screen.getByRole("tab", { name: "Models" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Back to app" }));
+
+    fireEvent.click(accountButton);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Settings" }));
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("closes the Field account menu with Escape or an outside pointer and restores focus", async () => {
+    await renderField();
+    const accountButton = screen.getByRole("button", { name: "Open account menu" });
+
+    fireEvent.click(accountButton);
+    expect(screen.getByRole("menu", { name: "Account" })).toBeVisible();
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(accountButton).toHaveFocus());
+    expect(screen.queryByRole("menu", { name: "Account" })).not.toBeInTheDocument();
+
+    fireEvent.click(accountButton);
+    fireEvent.mouseDown(document.body);
+    await waitFor(() => expect(accountButton).toHaveFocus());
+    expect(screen.queryByRole("menu", { name: "Account" })).not.toBeInTheDocument();
+  });
+
+  it("does not duplicate the outer Lab settings or authentication controls", async () => {
+    const { container } = render(<FieldApp initialLocale="en" embeddedInLab />);
+    await waitFor(() => {
+      expect(screen.getByRole("navigation", { name: "Hardware laboratory navigation" }))
+        .toBeInTheDocument();
+    });
     expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open account menu" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(container.querySelector("[data-quorum='missing']")).toBeTruthy();

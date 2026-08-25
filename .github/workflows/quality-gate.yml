@@ -122,6 +122,9 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Validate exact allowance-cycle contract
+        run: node scripts/verify-exact-30-day-allowance.mjs
+
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 
@@ -165,6 +168,43 @@ jobs:
           node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 2048 1280 0.80 "$RUNNER_TEMP/site-audit-2048.json"
           node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 390 844 0.80 "$RUNNER_TEMP/site-audit-mobile.json" layout-only
 
+  repository-contracts:
+    name: Repository contracts / Windows
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/pyproject.toml
+            worker/pyproject.toml
+
+      - name: Install repository-contract dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check `
+            --editable "./backend[dev]" `
+            --editable "./worker[dev]" `
+            "pytest==9.1.1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Test cross-edition and Windows build contracts
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "$PWD\worker;$PWD"
+          python -m pytest brand/tests distribution/tests engine-pack/tests `
+            runtime/tests -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   runtime-contract:
     name: Runtime / Static contract
     runs-on: ubuntu-24.04
@@ -207,7 +247,7 @@ jobs:
           python runtime/tools/runtime_manifest.py validate-config \
             --pins runtime/pins.env \
             --python-lock runtime/locks/python-requirements.lock
-          python -m unittest discover -s runtime/tests -v
+          python -m pytest runtime/tests -q
 
       - name: Validate every Runtime shell script
         shell: bash
@@ -228,6 +268,8 @@ jobs:
     timeout-minutes: 30
     env:
       CARGO_INCREMENTAL: "0"
+      DRONEDREAM_DESKTOP_EDITION_ID: autonomy
+      DRONEDREAM_EDITION_PROFILE: autonomy-full
     steps:
       - name: Check out source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

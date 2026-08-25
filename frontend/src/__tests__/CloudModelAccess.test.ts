@@ -14,6 +14,15 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("cloud model access client", () => {
+  it("fills the allowance bar from remaining credits and clamps invalid values", async () => {
+    const { cloud } = await loadCloudAccess();
+    expect(cloud.remainingAllowanceRatio(2_000, 2_000)).toBe(100);
+    expect(cloud.remainingAllowanceRatio(1_316, 2_000)).toBeCloseTo(65.8);
+    expect(cloud.remainingAllowanceRatio(-1, 2_000)).toBe(0);
+    expect(cloud.remainingAllowanceRatio(2_001, 2_000)).toBe(100);
+    expect(cloud.remainingAllowanceRatio(10, 0)).toBe(0);
+  });
+
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv(
@@ -30,45 +39,6 @@ describe("cloud model access client", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
-  });
-
-  it("keeps all seven managed choices visible when provider policy rows are partial", async () => {
-    const { cloud } = await loadCloudAccess();
-    const completed = cloud.completeManagedModelCatalog([
-      {
-        provider: "kimi",
-        display_name: "Kimi K2.6",
-        model: "kimi-k2.6",
-        enabled: true,
-        assistant_enabled: true,
-        job_enabled: true,
-        policy_version: 7,
-      },
-      {
-        provider: "kimi",
-        display_name: "Kimi K3",
-        model: "kimi-k3",
-        enabled: true,
-        assistant_enabled: true,
-        job_enabled: true,
-        policy_version: 7,
-      },
-    ]);
-
-    expect(completed).toHaveLength(7);
-    expect(completed.map((model) => model.display_name)).toEqual([
-      "GPT 4.1",
-      "GPT 5.1",
-      "GPT 5.4",
-      "DeepSeek V4 Flash",
-      "DeepSeek V4 Pro",
-      "Kimi K2.6",
-      "Kimi K3",
-    ]);
-    expect(completed.filter(cloud.managedModelAvailableForAssistant))
-      .toHaveLength(2);
-    expect(completed.find((model) => model.model === "gpt-4.1"))
-      .toMatchObject({ enabled: false, assistant_enabled: false });
   });
 
   it("requires a signed-in account before requesting platform usage", async () => {

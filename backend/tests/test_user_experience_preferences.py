@@ -13,6 +13,14 @@ def test_experience_preferences_are_opt_in_bounded_and_deletable(client) -> None
     assert initial.status_code == 200
     assert initial.json()["data"] == {
         "schema_version": "1.0",
+        "memory_domain": "account.shared",
+        "memory_precedence": [
+            "current_request",
+            "session",
+            "domain_memory",
+            "account_defaults",
+        ],
+        "long_term_memory_authority": "advisory_only",
         "saved": False,
         "memory_enabled": False,
         "locale": None,
@@ -20,9 +28,7 @@ def test_experience_preferences_are_opt_in_bounded_and_deletable(client) -> None
         "default_track_type": None,
         "default_altitude_m": None,
         "retention_days": 90,
-        "stored_content": (
-            "allowlisted_preferences_and_verified_structured_job_outcomes_only"
-        ),
+        "stored_content": ("allowlisted_preferences_and_verified_structured_job_outcomes_only"),
         "updated_at": None,
     }
 
@@ -39,6 +45,7 @@ def test_experience_preferences_are_opt_in_bounded_and_deletable(client) -> None
     assert saved.status_code == 200
     saved_data = saved.json()["data"]
     assert saved_data["saved"] is True
+    assert saved_data["memory_domain"] == "account.shared"
     assert saved_data["memory_enabled"] is True
     assert saved_data["locale"] == "zh-CN"
     assert saved_data["default_template_key"] == "hover-basics@1"
@@ -119,27 +126,45 @@ def test_experience_preferences_are_opt_in_bounded_and_deletable(client) -> None
 
 
 def test_experience_preferences_reject_unknown_or_unbounded_values(client) -> None:
-    assert client.put(
-        "/api/v1/preferences/experience",
-        json={},
-    ).status_code == 422
-    assert client.put(
-        "/api/v1/preferences/experience",
-        json={"raw_chat_history": "never store this"},
-    ).status_code == 422
-    assert client.put(
-        "/api/v1/preferences/experience",
-        json={"default_template_key": "unreviewed@999"},
-    ).status_code == 422
-    assert client.put(
-        "/api/v1/preferences/experience",
-        json={"default_altitude_m": 200.0},
-    ).status_code == 422
-    assert client.put(
-        "/api/v1/preferences/experience",
-        json={"default_track_type": "custom"},
-    ).status_code == 422
-    assert client.put(
-        "/api/v1/preferences/experience",
-        json={"memory_enabled": None},
-    ).status_code == 422
+    assert (
+        client.put(
+            "/api/v1/preferences/experience",
+            json={},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.put(
+            "/api/v1/preferences/experience",
+            json={"raw_chat_history": "never store this"},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.put(
+            "/api/v1/preferences/experience",
+            json={"default_template_key": "unreviewed@999"},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.put(
+            "/api/v1/preferences/experience",
+            json={"default_altitude_m": 200.0},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.put(
+            "/api/v1/preferences/experience",
+            json={"default_track_type": "custom"},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.put(
+            "/api/v1/preferences/experience",
+            json={"memory_enabled": None},
+        ).status_code
+        == 422
+    )

@@ -27,13 +27,13 @@ use crate::{browser_auth_audit, browser_auth_vault};
 
 const AUTH_RESULT_TEMPLATE: &str = include_str!("../browser-auth.html");
 const UNIVERSAL_BRAND_LOCKUP: &[u8] =
-    include_bytes!("../../../brand/generated/universal/lockup-primary.png");
-const SIM_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/generated/sim/lockup-primary.png");
-const LAB_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/generated/lab/lockup-primary.png");
+    include_bytes!("../../../brand/icons/universal-lockup.png");
+const SIM_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/icons/sim-lockup.png");
+const LAB_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/icons/lab-lockup.png");
 const FIELD_BRAND_LOCKUP: &[u8] =
-    include_bytes!("../../../brand/generated/field/lockup-primary.png");
+    include_bytes!("../../../brand/icons/field-lockup.png");
 const AUTONOMY_BRAND_LOCKUP: &[u8] =
-    include_bytes!("../../../brand/generated/autonomy/lockup-primary.png");
+    include_bytes!("../../../brand/icons/agent-lockup.png");
 const OAUTH_AUTHORIZE_URL: &str =
     "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize";
 const OAUTH_TOKEN_URL: &str = "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/token";
@@ -110,7 +110,7 @@ fn desktop_auth_identity(edition_id: &str) -> Result<DesktopAuthIdentity, String
         "autonomy" => Ok(DesktopAuthIdentity {
             edition_id: "autonomy",
             auth_client_id: "dronedream-desktop-autonomy",
-            display_name: "DroneDream · AUTONOMY",
+            display_name: "DroneDream · AGENT",
             brand_lockup: AUTONOMY_BRAND_LOCKUP,
             bundle_identifier: "io.dronedream.desktop.autonomy",
             callback_port: 49214,

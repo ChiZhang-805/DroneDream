@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -121,6 +121,17 @@ const autoStartableRuntime = {
   })),
 };
 
+async function openSettingsWorkspace() {
+  fireEvent.click(screen.getByRole("button", { name: /Settings|设置/ }));
+  const quickSettings = screen.getByRole("dialog", {
+    name: /Quick settings|快捷设置/,
+  });
+  fireEvent.click(within(quickSettings).getByRole("button", {
+    name: /All settings|全部设置/,
+  }));
+  return screen.findByRole("region", { name: /Settings|设置/ });
+}
+
 const prerequisites = {
   platform: "windows",
   supported: true,
@@ -190,9 +201,9 @@ afterEach(() => {
     expect(screen.getByRole("link", { name: "Evidence Review" }))
       .toHaveAttribute("href", "/lab/validation");
     expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    fireEvent.click(screen.getByRole("tab", { name: "ECE498BH" }));
-    const courseLink = screen.getByRole("link", { name: "Open course" });
+    const workspace = await openSettingsWorkspace();
+    fireEvent.click(within(workspace).getByRole("tab", { name: "ECE498BH" }));
+    const courseLink = within(workspace).getByRole("link", { name: "Open course" });
     expect(courseLink).toHaveAttribute("target", "_blank");
     fireEvent.click(courseLink);
     await waitFor(() => {
@@ -202,6 +213,7 @@ afterEach(() => {
     });
     openerMocks.openUrl.mockRejectedValueOnce(new Error("browser unavailable"));
     fireEvent.click(courseLink);
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
     expect(await screen.findByRole("alert"))
       .toHaveTextContent(/course page could not be opened/i);
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
@@ -209,8 +221,6 @@ afterEach(() => {
     expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
-      .not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
       .querySelectorAll("a")).toHaveLength(7);
     expect(listJobs).not.toHaveBeenCalled();
@@ -272,15 +282,16 @@ afterEach(() => {
     expect(await screen.findByText("Runtime disconnected")).toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const workspace = await openSettingsWorkspace();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
-    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
         .toHaveLength(1);
     });
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
     await act(async () => {
       await router.navigate("/history");
     });
@@ -333,15 +344,21 @@ afterEach(() => {
       .toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const workspace = await openSettingsWorkspace();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
-    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
     expect(await screen.findByText("The local runtime could not start"))
       .toBeInTheDocument();
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
     expect(screen.getAllByRole("button", { name: "Open settings" }).length)
       .toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Open settings" })[0]);
+    const targetedWorkspace = await screen.findByRole("region", { name: "Settings" });
+    expect(within(targetedWorkspace).getByRole("tab", { name: "Runtime & updates" }))
+      .toHaveAttribute("aria-selected", "true");
+    fireEvent.click(within(targetedWorkspace).getByRole("button", { name: "Back to app" }));
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(1);
     await act(async () => {
@@ -391,7 +408,7 @@ afterEach(() => {
     expect(await screen.findByText("The installed runtime is ready."))
       .toBeInTheDocument();
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();
@@ -435,17 +452,18 @@ afterEach(() => {
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const workspace = await openSettingsWorkspace();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "简体中文" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "General" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "简体中文" }));
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "English" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "English" }));
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
-    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
         .toHaveLength(1);
@@ -455,10 +473,10 @@ afterEach(() => {
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(1);
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Check environment" }))
+      expect(within(workspace).getByRole("button", { name: "Check environment" }))
         .not.toBeDisabled();
     });
-    fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
 
     router.dispose();
   });
@@ -510,9 +528,9 @@ afterEach(() => {
       ([command]) => command === "probe_runtime_status",
     )).toHaveLength(initialRuntimeProbeCount);
 
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
-    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    const workspace = await openSettingsWorkspace();
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
 
     expect(await screen.findByText("Environment unavailable")).toBeInTheDocument();
     expect(screen.getByText("DroneDreamRuntime is not installed."))
@@ -520,6 +538,7 @@ afterEach(() => {
     expect(invoke.mock.calls.filter(
       ([command]) => command === "probe_runtime_status",
     )).toHaveLength(initialRuntimeProbeCount + 1);
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "0");
 

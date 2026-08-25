@@ -699,6 +699,7 @@ def _run_arm(
                     max_iterations=max_iterations,
                     max_total_trials=max_total_trials,
                 ),
+                allow_internal_test_backend=True,
             )
             job_id = job.id
             db.commit()
@@ -1066,9 +1067,7 @@ def _verify_arm(
     expected_memory_counts = {
         "full_aurora": [(index, index) for index in range(expected_prompt_count)],
         "no_decision_memory": [(0, 0)] * expected_prompt_count,
-        "no_observed_outcome_reflection": [
-            (index, 0) for index in range(expected_prompt_count)
-        ],
+        "no_observed_outcome_reflection": [(index, 0) for index in range(expected_prompt_count)],
     }[expected_name]
     actual_memory_counts = [
         (

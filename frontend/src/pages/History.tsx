@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient, ApiClientError } from "../api/client";
+import { apiClient } from "../api/client";
 import type {
   Job,
   JobStatus,
@@ -18,14 +18,13 @@ import {
   SIMULATOR_BACKENDS,
   TRACK_TYPES,
 } from "../types/api";
-import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { statusTranslationKey } from "../components/statusLabels";
 import { type Column } from "../components/DataTable";
 import { Loading, ErrorState } from "../components/States";
 import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
 import { useDesktopRuntimeAccess } from "../desktop/access";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 import { formatDateTime } from "../utils/format";
 import { openAppSettings } from "../appSettings";
@@ -105,7 +104,7 @@ export function History() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const runtimeAccess = useDesktopRuntimeAccess();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [statusFilter, setStatusFilter] = useState<JobStatus | "ALL">("ALL");
   const [trackFilter, setTrackFilter] = useState<TrackType | "ALL">("ALL");
   const [objectiveFilter, setObjectiveFilter] = useState<
@@ -181,7 +180,10 @@ export function History() {
       setEditingId(null);
       await query.refetch();
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : t("history.saveFailed"));
+      setSaveError(localeSafeError(e, locale, {
+        zh: t("history.saveFailed"),
+        en: t("history.saveFailed"),
+      }));
     } finally {
       savingNameIdsRef.current.delete(job.id);
     }
@@ -230,7 +232,10 @@ export function History() {
       await query.refetch();
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : t("history.deleteFailed"));
+      setDeleteError(localeSafeError(e, locale, {
+        zh: t("history.deleteFailed"),
+        en: t("history.deleteFailed"),
+      }));
     } finally {
       deletingRef.current = false;
       setIsDeleting(false);
@@ -255,7 +260,7 @@ export function History() {
                 : t("runtimeGate.checkingShort")}
             </button>
           ) : (
-            <button type="button" className="btn btn-primary" onClick={openAppSettings}>
+            <button type="button" className="btn btn-primary" onClick={() => openAppSettings("runtime")}>
               {t("runtimeGate.openSetup")}
             </button>
           )}
@@ -266,7 +271,8 @@ export function History() {
         <RuntimeAccessNotice page="history" showAction={false} />
       ) : null}
       <div className="history-body">
-      <SectionCard title={t("history.filters")}>
+      <section className="history-filter-toolbar" aria-labelledby="history-filters-title">
+        <h2 id="history-filters-title" className="sr-only">{t("history.filters")}</h2>
         <div className="history-filter-grid">
           <div className="form-field history-filter-search">
             <label htmlFor="filter-query">{t("history.search")}</label>
@@ -378,11 +384,11 @@ export function History() {
             {t("history.clearFilters")}
           </button>
         </div>
-      </SectionCard>
+      </section>
 
-      <SectionCard
-        title={t("history.jobs")}
-        actions={(
+      <section className="history-jobs-surface" aria-labelledby="history-jobs-title">
+        <header className="history-jobs-header">
+          <h2 id="history-jobs-title">{t("history.jobs")}</h2>
           <button
             type="button"
             className="btn history-compare-button"
@@ -393,30 +399,31 @@ export function History() {
           >
             {t("history.compareSelected", { count: selectedIds.length })}
           </button>
-        )}
-      >
-        {saveError ? <ErrorState description={saveError} /> : null}
-        {query.isLoading ? (
-          <Loading label={t("history.loading")} />
-        ) : query.isError ? (
-          <ErrorState
-            description={
-              query.error instanceof ApiClientError
-                ? query.error.message
-                : t("history.loadFailed")
-            }
-            action={
-              <button
-                className="btn"
-                type="button"
-                onClick={() => query.refetch()}
-              >
-                {t("history.retry")}
-              </button>
-            }
-          />
-        ) : (
-          <div className="data-table-wrapper history-results">
+        </header>
+        <div className="history-jobs-body">
+          {saveError ? <ErrorState description={saveError} /> : null}
+          {query.isLoading ? (
+            <Loading label={t("history.loading")} />
+          ) : query.isError ? (
+            <ErrorState
+              description={
+                localeSafeError(query.error, locale, {
+                  zh: t("history.loadFailed"),
+                  en: t("history.loadFailed"),
+                })
+              }
+              action={
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => query.refetch()}
+                >
+                  {t("history.retry")}
+                </button>
+              }
+            />
+          ) : (
+            <div className="data-table-wrapper history-results">
             <table className="data-table history-table-centered">
               <colgroup>
                 <col className="history-col-select" />
@@ -496,9 +503,10 @@ export function History() {
               ) : null}
               </tbody>
             </table>
-          </div>
-        )}
-      </SectionCard>
+            </div>
+          )}
+        </div>
+      </section>
       </div>
       {runtimeAccess.canUseRuntime && deleteTarget ? (
         <div className="confirm-dialog-backdrop" role="presentation">

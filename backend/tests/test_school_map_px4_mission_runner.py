@@ -158,6 +158,119 @@ def test_precreated_run_directory_preserves_only_a_valid_early_abort_file(tmp_pa
     assert runner._read_live_abort_request(abort_path) == ("operator_abort: stop", False)
 
 
+def _runtime_control_payload(
+    *,
+    revision: int = 1,
+    action: str = "hold",
+    route: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    return {
+        "schema_version": "dronedream.autonomy.runtime-control.v1",
+        "revision": revision,
+        "action": action,
+        "runtime_session_id": "runtime-0123456789abcdef01234567",
+        "mission_revision": 2 if action == "replace_route" else 1,
+        "contract_id": "contract-runtime-test",
+        "issued_at": "2026-08-21T00:00:00Z",
+        "reason_codes": ["operator.interruption-hold"],
+        "route": route,
+    }
+
+
+def test_precreated_run_directory_preserves_a_valid_early_runtime_hold(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    control_path = run_dir / "runtime_control.request.json"
+    control_path.write_text(
+        json.dumps(_runtime_control_payload()),
+        encoding="utf-8",
+    )
+
+    runner._prepare_run_directory(run_dir)
+
+    assert control_path.is_file()
+    assert runner._read_runtime_control_request(control_path) == (1, "hold", None, None)
+
+
+def test_runtime_control_reader_returns_replacement_route_and_phases(tmp_path: Path) -> None:
+    route = [
+        {"x": 1.0, "y": 2.0, "z": 3.0, "phase": "transit"},
+        {"x": 2.0, "y": 2.5, "z": 3.0, "phase": "pickup"},
+    ]
+    control_path = tmp_path / "runtime_control.request.json"
+    control_path.write_text(
+        json.dumps(
+            _runtime_control_payload(
+                revision=2,
+                action="replace_route",
+                route=route,
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    assert runner._read_runtime_control_request(control_path) == (
+        2,
+        "replace_route",
+        [(1.0, 2.0, 3.0), (2.0, 2.5, 3.0)],
+        ["transit", "pickup"],
+    )
+
+
+@pytest.mark.parametrize(
+    "override, expected_error",
+    [
+        ({"mission_revision": False}, "mission revision is invalid"),
+        ({"contract_id": "short"}, "contract id is invalid"),
+        ({"action": "teleport"}, "action is invalid"),
+        ({"route": []}, "must not include a route"),
+        (
+            {
+                "action": "replace_route",
+                "route": [
+                    {"x": 0.0, "y": 0.0, "z": 1.0, "phase": "transit"},
+                    {"x": math.nan, "y": 0.0, "z": 1.0, "phase": "pickup"},
+                ],
+            },
+            "point 1.x is invalid",
+        ),
+        (
+            {
+                "action": "replace_route",
+                "route": [
+                    {"x": 0.0, "y": 0.0, "z": 1.0, "phase": "transit"},
+                    {"x": 1.0, "y": 0.0, "z": 1.0, "phase": "unknown"},
+                ],
+            },
+            "point 1.phase is invalid",
+        ),
+    ],
+)
+def test_runtime_control_reader_rejects_invalid_requests(
+    tmp_path: Path,
+    override: dict[str, object],
+    expected_error: str,
+) -> None:
+    payload = _runtime_control_payload()
+    payload.update(override)
+    control_path = tmp_path / "runtime_control.request.json"
+    control_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match=expected_error):
+        runner._read_runtime_control_request(control_path)
+
+
+def test_precreated_run_directory_rejects_an_invalid_early_runtime_control(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "runtime_control.request.json").write_text("not-json", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="runtime control request is invalid"):
+        runner._prepare_run_directory(run_dir)
+
+
 def test_precreated_run_directory_rejects_unexpected_artifacts(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()

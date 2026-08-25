@@ -71,6 +71,7 @@ SOURCE_BASE_PATHS = (
     "backend/alembic",
     "backend/alembic.ini",
     "backend/pyproject.toml",
+    "brand/report",
     "worker/drone_dream_worker",
     "worker/pyproject.toml",
     "scripts/simulators",

@@ -15,7 +15,7 @@ import re
 from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import RLock
 
@@ -27,13 +27,17 @@ from app.autonomy.models import (
     PerceivedEntity,
     RuntimeDecisionEvent,
     RuntimeDecisionKind,
+    RuntimeInterruptionReceipt,
+    RuntimeInterruptionRequest,
     RuntimeObservation,
     RuntimeOperatorCommand,
     RuntimePhase,
+    RuntimeReplanApplyRequest,
     RuntimeSession,
     RuntimeSessionCreateRequest,
     SafetyAction,
     SafetyDecision,
+    Vector3,
     VehicleEnvelope,
 )
 from app.autonomy.planner_artifact import VerifiedPlannerArtifactReceipt
@@ -66,7 +70,10 @@ class _SessionRecord:
     asset_receipt: VerifiedAutonomyAssetReceipt | None
     result: RuntimeSession
     last_observation: RuntimeObservation | None = None
+    transport_position_m: Vector3 | None = None
     managed_simulation_execution_id: str | None = None
+    interruption_requests: dict[str, tuple[str, str]] = field(default_factory=dict)
+    replan_requests: dict[str, tuple[str, str]] = field(default_factory=dict)
 
 
 def _now() -> datetime:
@@ -76,6 +83,21 @@ def _now() -> datetime:
 def _hash(value: object) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode()).hexdigest()
+
+
+def _runtime_text(locale: str, english: str, chinese: str) -> str:
+    return chinese if locale == "zh-CN" else english
+
+
+def _runtime_action_label(locale: str, action: str) -> str:
+    if locale != "zh-CN":
+        return action
+    return {
+        "continue": "继续",
+        "hold": "悬停",
+        "land": "降落",
+        "abort": "中止",
+    }.get(action, action)
 
 
 def _safety_decision(
@@ -193,6 +215,7 @@ def _advance_task_graph(
     graph: MissionTaskGraph,
     observation: RuntimeObservation,
     decision: SafetyDecision,
+    locale: str,
 ) -> MissionTaskGraph:
     """Advance compiler nodes and insert deterministic runtime recovery branches."""
 
@@ -253,7 +276,11 @@ def _advance_task_graph(
         if hold is None:
             hold = MissionTaskNode(
                 task_id=hold_id,
-                label=f"Protect the safety envelope around tracked {entity.kind} {entity.track_id}",
+                label=_runtime_text(
+                    locale,
+                    f"Protect the safety envelope around tracked {entity.kind} {entity.track_id}",
+                    f"保护已跟踪{entity.kind} {entity.track_id} 周围的安全包络",
+                ),
                 status="active" if decision.action == "hold" else "completed",
                 depends_on=[anchor],
                 executor="mission_executive",
@@ -261,7 +288,11 @@ def _advance_task_graph(
                 max_retries=0,
                 timeout_s=120.0,
                 fallback="land",
-                expected_output="Clearance restored or a bounded alternative corridor selected",
+                expected_output=_runtime_text(
+                    locale,
+                    "Clearance restored or a bounded alternative corridor selected",
+                    "恢复安全净空，或选定有边界的备用走廊",
+                ),
                 completion_evidence=["entity.track", "entity.range", "safety.decision"],
                 inserted_by="runtime",
             )
@@ -272,9 +303,13 @@ def _advance_task_graph(
         if replan is None:
             replan = MissionTaskNode(
                 task_id=replan_id,
-                label=(
-                    f"Repair the local corridor around {entity.track_id} and rejoin "
-                    "the mission graph"
+                label=_runtime_text(
+                    locale,
+                    (
+                        f"Repair the local corridor around {entity.track_id} and rejoin "
+                        "the mission graph"
+                    ),
+                    f"绕过 {entity.track_id} 修复局部走廊并重新接入任务图",
                 ),
                 status=(
                     "blocked"
@@ -287,8 +322,10 @@ def _advance_task_graph(
                 max_retries=3,
                 timeout_s=20.0,
                 fallback="hold",
-                expected_output=(
-                    "A collision-checked trajectory revision inside the approved corridor"
+                expected_output=_runtime_text(
+                    locale,
+                    "A collision-checked trajectory revision inside the approved corridor",
+                    "在已批准走廊内生成通过碰撞检查的航迹修订",
                 ),
                 completion_evidence=["trajectory.revision", "clearance.minimum", "planner.receipt"],
                 inserted_by="runtime",
@@ -314,11 +351,23 @@ def _advance_task_graph(
     signature_after = [(node.task_id, node.status) for node in nodes]
     changed = signature_after != signature_before
     if entity_ids:
-        reason = "dynamic entities updated the executable task graph"
+        reason = _runtime_text(
+            locale,
+            "dynamic entities updated the executable task graph",
+            "动态实体已更新可执行任务图",
+        )
     elif decision.action != "continue":
-        reason = f"safety supervisor selected {decision.action}"
+        reason = _runtime_text(
+            locale,
+            f"safety supervisor selected {decision.action}",
+            f"安全监督器已选择动作：{_runtime_action_label(locale, decision.action)}",
+        )
     elif changed:
-        reason = "mission progress advanced compiler tasks"
+        reason = _runtime_text(
+            locale,
+            "mission progress advanced compiler tasks",
+            "任务进度已推进编译任务",
+        )
     else:
         reason = graph.change_reason
     return MissionTaskGraph(
@@ -326,6 +375,58 @@ def _advance_task_graph(
         nodes=nodes,
         active_node_ids=active,
         change_reason=reason,
+    )
+
+
+def _activate_replanned_task_graph(
+    graph: MissionTaskGraph,
+    *,
+    revision: int,
+    locale: str,
+) -> MissionTaskGraph:
+    """Resume a revised graph after flight has already crossed the launch boundary.
+
+    The runtime replan has already revalidated the immutable vehicle/map binding,
+    planner receipt and deterministic mission contract. Reissuing preflight or
+    takeoff tasks to an airborne vehicle would be physically incorrect, so those
+    prerequisites are sealed as completed and the first remaining mission task is
+    activated. No later mission action is inherited by task id because a changed
+    destination may reuse the compiler's stable ids with different semantics.
+    """
+
+    nodes = [node.model_copy(deep=True) for node in graph.nodes]
+    satisfied_ids = {
+        node.task_id
+        for node in nodes
+        if node.task_id.startswith("preflight-")
+        or node.task_id in {"world-map-binding", "world-localization", "plan-global-corridor"}
+        or "-takeoff-" in node.task_id
+    }
+    for node in nodes:
+        node.status = "completed" if node.task_id in satisfied_ids else "pending"
+    active_node_ids: list[str] = []
+    completed_ids = set(satisfied_ids)
+    for node in nodes:
+        if node.status == "completed":
+            continue
+        if all(dependency in completed_ids for dependency in node.depends_on):
+            node.status = "active"
+            active_node_ids = [node.task_id]
+            break
+    if not active_node_ids:
+        raise AutonomyRuntimeError(
+            "AUTONOMY_REPLAN_GRAPH_NOT_RESUMABLE",
+            "The revised task graph has no dependency-satisfied task after the live hold.",
+        )
+    return MissionTaskGraph(
+        revision=revision,
+        nodes=nodes,
+        active_node_ids=active_node_ids,
+        change_reason=_runtime_text(
+            locale,
+            "operator interruption resumed after live prerequisite validation",
+            "操作员打断完成实时前置验证后已恢复任务",
+        ),
     )
 
 
@@ -350,6 +451,8 @@ class RuntimeSessionRegistry:
             "validated_signed_vehicle_packs": 0,
             "physical_transport_bound": False,
             "safe_operator_commands": ["hold", "resume-if-safe", "abort"],
+            "immediate_operator_interruption": True,
+            "structured_runtime_replanning": True,
             "dynamic_task_graph": True,
             "tracked_entity_contract": True,
             "perception_stream_health_contract": True,
@@ -449,6 +552,275 @@ class RuntimeSessionRegistry:
     def get(self, owner_id: str, session_id: str) -> RuntimeSession:
         with self._lock:
             record = self._owned(owner_id, session_id)
+            return record.result.model_copy(deep=True)
+
+    def interrupt(
+        self,
+        owner_id: str,
+        session_id: str,
+        request: RuntimeInterruptionRequest,
+    ) -> RuntimeSession:
+        """Immediately hold a mission before any model interprets new operator intent.
+
+        The raw instruction is deliberately not retained in the runtime receipt or
+        event log. Only its digest is chained so an audit can prove which message
+        caused the hold without exposing the operator's conversation content.
+        """
+
+        instruction_sha256 = _hash(request.instruction)
+        with self._lock:
+            record = self._owned(owner_id, session_id)
+            current = record.result
+            if current.terminal:
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_RUNTIME_TERMINAL",
+                    "A completed or aborted session cannot accept an interruption.",
+                )
+            if current.phase == "landing":
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_INTERRUPTION_LANDING_LOCKED",
+                    "A safety landing cannot be replaced by an operator replan; "
+                    "abort remains available.",
+                )
+            if (
+                current.phase == "ready"
+                and record.last_observation is None
+                and record.managed_simulation_execution_id is None
+            ):
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_INTERRUPTION_NOT_RUNNING",
+                    "Plan revisions before launch must use the planning workflow.",
+                )
+            repeated = record.interruption_requests.get(request.client_request_id)
+            if repeated is not None:
+                repeated_id, repeated_sha256 = repeated
+                if repeated_sha256 != instruction_sha256:
+                    raise AutonomyRuntimeError(
+                        "AUTONOMY_INTERRUPTION_IDEMPOTENCY_CONFLICT",
+                        "client_request_id was already used for another interruption.",
+                    )
+                if (
+                    current.interruption is None
+                    or current.interruption.interruption_id != repeated_id
+                ):
+                    raise AutonomyRuntimeError(
+                        "AUTONOMY_INTERRUPTION_SUPERSEDED",
+                        "The repeated interruption has already been superseded.",
+                    )
+                return current.model_copy(deep=True)
+
+            now = _now()
+            interruption_id = (
+                "interrupt-"
+                + _hash([owner_id, session_id, request.client_request_id, instruction_sha256])[:24]
+            )
+            task_graph = current.task_graph.model_copy(deep=True)
+            for node in task_graph.nodes:
+                if node.status == "active":
+                    node.status = "blocked"
+            task_graph.active_node_ids = []
+            task_graph.revision += 1
+            locale = record.mission.mission.locale
+            task_graph.change_reason = _runtime_text(
+                locale,
+                "operator interruption requested an immediate safe hold",
+                "操作员打断已触发立即安全悬停",
+            )
+            receipt = RuntimeInterruptionReceipt(
+                interruption_id=interruption_id,
+                client_request_id=request.client_request_id,
+                state="holding_pending_interpretation",
+                created_at=now,
+                updated_at=now,
+                previous_phase=current.phase,
+                expected_task_graph_revision=task_graph.revision,
+                snapshot_position_m=(
+                    record.last_observation.position_m.model_copy(deep=True)
+                    if record.last_observation is not None
+                    else (
+                        record.transport_position_m.model_copy(deep=True)
+                        if record.transport_position_m is not None
+                        else None
+                    )
+                ),
+                instruction_sha256=instruction_sha256,
+            )
+            event = RuntimeDecisionEvent(
+                revision=_next_decision_revision(current.decision_events),
+                created_at=now,
+                kind="operator",
+                code="operator.interruption-hold",
+                summary=_runtime_text(
+                    locale,
+                    "Operator input triggered an immediate hold before model interpretation.",
+                    "操作员输入已在模型理解前触发立即悬停。",
+                ),
+                task_ids=[],
+            )
+            record.result = current.model_copy(
+                deep=True,
+                update={
+                    "phase": "holding",
+                    "updated_at": now,
+                    "decision": SafetyDecision(
+                        action="hold",
+                        accepted=True,
+                        codes=["operator.interruption-hold"],
+                    ),
+                    "task_graph": task_graph,
+                    "interruption": receipt,
+                    "decision_events": [*current.decision_events, event][-100:],
+                    "evidence_chain_head": _hash(
+                        {
+                            "previous": current.evidence_chain_head,
+                            "event": "operator.interruption-hold",
+                            "interruption_id": interruption_id,
+                            "instruction_sha256": instruction_sha256,
+                            "task_graph_revision": task_graph.revision,
+                        }
+                    ),
+                },
+            )
+            record.interruption_requests[request.client_request_id] = (
+                interruption_id,
+                instruction_sha256,
+            )
+            self._records.move_to_end(session_id)
+            return record.result.model_copy(deep=True)
+
+    def update_transport_position(
+        self,
+        owner_id: str,
+        session_id: str,
+        position_m: Vector3,
+    ) -> None:
+        """Cache a measured simulator pose without fabricating a full observation."""
+
+        with self._lock:
+            record = self._owned(owner_id, session_id)
+            if record.result.terminal:
+                return
+            record.transport_position_m = position_m.model_copy(deep=True)
+
+    def apply_replan(
+        self,
+        owner_id: str,
+        session_id: str,
+        request: RuntimeReplanApplyRequest,
+        *,
+        planner_receipt: VerifiedPlannerArtifactReceipt | None = None,
+        asset_receipt: VerifiedAutonomyAssetReceipt | None = None,
+    ) -> RuntimeSession:
+        """Atomically replace a held mission graph with an authorized revision."""
+
+        compiled = compile_autonomy_mission(request.mission)
+        if not compiled.execution_policy.can_execute:
+            raise AutonomyRuntimeError(
+                "AUTONOMY_REPLAN_NOT_AUTHORIZED",
+                "Only a feasible simulation contract can replace a running mission.",
+                403,
+            )
+        request_sha256 = _hash(request.model_dump(mode="json"))
+        with self._lock:
+            record = self._owned(owner_id, session_id)
+            current = record.result
+            if current.terminal:
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_RUNTIME_TERMINAL",
+                    "A completed or aborted session cannot accept a replan.",
+                )
+            repeated = record.replan_requests.get(request.client_request_id)
+            if repeated is not None:
+                repeated_interruption_id, repeated_sha256 = repeated
+                if (
+                    repeated_sha256 != request_sha256
+                    or repeated_interruption_id != request.interruption_id
+                ):
+                    raise AutonomyRuntimeError(
+                        "AUTONOMY_REPLAN_IDEMPOTENCY_CONFLICT",
+                        "client_request_id was already used for another runtime replan.",
+                    )
+                return current.model_copy(deep=True)
+            interruption = current.interruption
+            if (
+                interruption is None
+                or interruption.state != "holding_pending_interpretation"
+                or interruption.interruption_id != request.interruption_id
+            ):
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_REPLAN_INTERRUPTION_MISMATCH",
+                    "The replan does not match the active held interruption.",
+                )
+            if (
+                request.expected_task_graph_revision != interruption.expected_task_graph_revision
+                or current.task_graph.revision != request.expected_task_graph_revision
+            ):
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_REPLAN_STALE_REVISION",
+                    "The held task graph changed before this replan could be applied.",
+                )
+            self._validate_replan_scope(record, request)
+
+            now = _now()
+            task_graph = _activate_replanned_task_graph(
+                compiled.contract.task_graph,
+                revision=current.task_graph.revision + 1,
+                locale=request.mission.locale,
+            )
+            applied_interruption = interruption.model_copy(
+                deep=True,
+                update={"state": "applied", "updated_at": now},
+            )
+            event = RuntimeDecisionEvent(
+                revision=_next_decision_revision(current.decision_events),
+                created_at=now,
+                kind="operator",
+                code="operator.replan-applied",
+                summary=_runtime_text(
+                    request.mission.locale,
+                    "A qualified mission revision replaced the held task graph.",
+                    "已通过资格验证的任务修订替换了悬停中的任务图。",
+                ),
+                task_ids=task_graph.active_node_ids,
+            )
+            record.mission = RuntimeSessionCreateRequest(
+                mission=request.mission.model_copy(deep=True),
+                client_request_id=request.client_request_id,
+            )
+            record.vehicle = request.mission.vehicle.model_copy(deep=True)
+            record.planner_receipt = planner_receipt
+            record.asset_receipt = asset_receipt
+            record.result = current.model_copy(
+                deep=True,
+                update={
+                    "contract_id": compiled.contract.contract_id,
+                    "phase": "replanning",
+                    "updated_at": now,
+                    "decision": SafetyDecision(
+                        action="continue",
+                        accepted=True,
+                        codes=["operator.replan-applied"],
+                    ),
+                    "mission_revision": current.mission_revision + 1,
+                    "task_graph": task_graph,
+                    "interruption": applied_interruption,
+                    "decision_events": [*current.decision_events, event][-100:],
+                    "evidence_chain_head": _hash(
+                        {
+                            "previous": current.evidence_chain_head,
+                            "event": "operator.replan-applied",
+                            "interruption_id": request.interruption_id,
+                            "contract_id": compiled.contract.contract_id,
+                            "task_graph_revision": task_graph.revision,
+                        }
+                    ),
+                },
+            )
+            record.replan_requests[request.client_request_id] = (
+                request.interruption_id,
+                request_sha256,
+            )
+            self._records.move_to_end(session_id)
             return record.result.model_copy(deep=True)
 
     def execution_binding(
@@ -632,13 +1004,32 @@ class RuntimeSessionRegistry:
                 vehicle=record.vehicle,
                 previous_monotonic_ms=current.latest_monotonic_ms,
             )
+            interruption_pending = (
+                current.interruption is not None
+                and current.interruption.state == "holding_pending_interpretation"
+            )
+            if interruption_pending and decision.action == "continue":
+                decision = SafetyDecision(
+                    action="hold",
+                    accepted=True,
+                    codes=["operator.interruption-pending"],
+                )
             phase = _next_phase(observation, decision)
             if phase == "completed" and record.managed_simulation_execution_id is not None:
                 raise AutonomyRuntimeError(
                     "AUTONOMY_RUNTIME_SIMULATION_EVIDENCE_PENDING",
                     "A managed simulation can complete only after its physical evidence is sealed.",
                 )
-            task_graph = _advance_task_graph(current.task_graph, observation, decision)
+            task_graph = (
+                current.task_graph.model_copy(deep=True)
+                if interruption_pending
+                else _advance_task_graph(
+                    current.task_graph,
+                    observation,
+                    decision,
+                    record.mission.mission.locale,
+                )
+            )
             all_entity_ids = [entity.track_id for entity in _dynamic_entities(observation)]
             entity_ids = all_entity_ids[:32]
             event_kind: RuntimeDecisionKind = (
@@ -648,9 +1039,22 @@ class RuntimeSessionRegistry:
             )
             event_code = decision.codes[0]
             event_summary = (
-                f"Tracked {len(all_entity_ids)} dynamic entities and selected {decision.action}."
+                _runtime_text(
+                    record.mission.mission.locale,
+                    (
+                        f"Tracked {len(all_entity_ids)} dynamic entities and selected "
+                        f"{decision.action}."
+                    ),
+                    f"已跟踪 {len(all_entity_ids)} 个动态实体，并选择动作："
+                    f"{_runtime_action_label(record.mission.mission.locale, decision.action)}。",
+                )
                 if all_entity_ids
-                else f"Task graph revision {task_graph.revision}; safety action {decision.action}."
+                else _runtime_text(
+                    record.mission.mission.locale,
+                    f"Task graph revision {task_graph.revision}; safety action {decision.action}.",
+                    f"任务图修订为 R{task_graph.revision}；安全动作："
+                    f"{_runtime_action_label(record.mission.mission.locale, decision.action)}。",
+                )
             )
             decision_events = [
                 *current.decision_events,
@@ -712,6 +1116,14 @@ class RuntimeSessionRegistry:
                     "A completed or aborted session cannot accept operator commands.",
                 )
             if command.action == "resume":
+                if (
+                    current.interruption is not None
+                    and current.interruption.state == "holding_pending_interpretation"
+                ):
+                    raise AutonomyRuntimeError(
+                        "AUTONOMY_RUNTIME_REPLAN_PENDING",
+                        "Resume is denied until the held interruption is applied or cancelled.",
+                    )
                 if current.phase != "holding" or record.last_observation is None:
                     raise AutonomyRuntimeError(
                         "AUTONOMY_RUNTIME_RESUME_NOT_AVAILABLE",
@@ -737,6 +1149,7 @@ class RuntimeSessionRegistry:
                     current.task_graph,
                     record.last_observation,
                     decision,
+                    record.mission.mission.locale,
                 )
             else:
                 phase = "holding" if command.action == "hold" else "aborted"
@@ -760,6 +1173,12 @@ class RuntimeSessionRegistry:
                 summary=command.reason,
                 task_ids=task_graph.active_node_ids,
             )
+            interruption = current.interruption
+            if command.action == "abort" and interruption is not None:
+                interruption = interruption.model_copy(
+                    deep=True,
+                    update={"state": "cancelled", "updated_at": _now()},
+                )
             record.result = current.model_copy(
                 deep=True,
                 update={
@@ -767,6 +1186,7 @@ class RuntimeSessionRegistry:
                     "updated_at": _now(),
                     "decision": decision,
                     "task_graph": task_graph,
+                    "interruption": interruption,
                     "decision_events": [*current.decision_events, event][-100:],
                     "evidence_chain_head": _hash(
                         {
@@ -779,6 +1199,63 @@ class RuntimeSessionRegistry:
             )
             self._records.move_to_end(session_id)
             return record.result.model_copy(deep=True)
+
+    @staticmethod
+    def _validate_replan_scope(
+        record: _SessionRecord,
+        request: RuntimeReplanApplyRequest,
+    ) -> None:
+        current = record.mission.mission
+        candidate = request.mission
+        if (
+            current.execution_target != "simulation"
+            or candidate.execution_target != current.execution_target
+            or candidate.edition != current.edition
+        ):
+            raise AutonomyRuntimeError(
+                "AUTONOMY_REPLAN_EXECUTION_SCOPE_CHANGED",
+                "A runtime replan cannot change edition or execution target.",
+            )
+        if candidate.scene_id != current.scene_id:
+            raise AutonomyRuntimeError(
+                "AUTONOMY_REPLAN_SCENE_CHANGED",
+                "A running mission cannot switch to another scene or map.",
+            )
+        if candidate.vehicle != current.vehicle:
+            raise AutonomyRuntimeError(
+                "AUTONOMY_REPLAN_VEHICLE_CHANGED",
+                "A running mission cannot replace its qualified vehicle envelope.",
+            )
+        current_assets = current.asset_context
+        candidate_assets = candidate.asset_context
+        if (current_assets is None) != (candidate_assets is None):
+            raise AutonomyRuntimeError(
+                "AUTONOMY_REPLAN_ASSET_CONTEXT_CHANGED",
+                "A runtime replan must retain the qualified asset context.",
+            )
+        if current_assets is None or candidate_assets is None:
+            return
+        for label, current_asset, candidate_asset in (
+            ("aircraft", current_assets.aircraft, candidate_assets.aircraft),
+            ("map", current_assets.map_pack, candidate_assets.map_pack),
+        ):
+            current_identity = (
+                current_asset.asset_id,
+                current_asset.version,
+                current_asset.content_hash,
+                current_asset.qualification_receipt_id,
+            )
+            candidate_identity = (
+                candidate_asset.asset_id,
+                candidate_asset.version,
+                candidate_asset.content_hash,
+                candidate_asset.qualification_receipt_id,
+            )
+            if candidate_identity != current_identity:
+                raise AutonomyRuntimeError(
+                    "AUTONOMY_REPLAN_ASSET_CHANGED",
+                    f"A running mission cannot replace its qualified {label} asset.",
+                )
 
     def _owned(self, owner_id: str, session_id: str) -> _SessionRecord:
         record = self._records.get(session_id)

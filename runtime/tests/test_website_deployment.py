@@ -182,7 +182,7 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
                 "DroneDream-Sim",
                 "DroneDream-Lab",
                 "DroneDream-Field",
-                "DroneDream-Autonomy",
+                "DroneDream-Agent",
             ):
                 self.assertIn(product, script)
             self.assertIn("buildNumber", script)

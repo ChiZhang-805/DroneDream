@@ -54,7 +54,8 @@ jobs:
             exit 2
           fi
           python -m pip install --disable-pip-version-check \
-            --requirement runtime/locks/release-tools-requirements.lock
+            --requirement runtime/locks/release-tools-requirements.lock \
+            "pytest==9.1.1"
           python - <<'PY'
           import importlib.util
           import pathlib
@@ -120,7 +121,7 @@ jobs:
           python runtime/tools/runtime_manifest.py validate-config \
             --pins runtime/pins.env \
             --python-lock runtime/locks/python-requirements.lock
-          python -m unittest discover -s runtime/tests -v
+          python -m pytest runtime/tests -q
           bash -n runtime/build-rootfs.sh runtime/smoke-image.sh runtime/export-rootfs.sh
 
       - name: Build immutable linux amd64 runtime image

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient, ApiClientError } from "../api/client";
+import { apiClient } from "../api/client";
 import type {
   ContinueExplorationBudget,
   ContinueExplorationRequest,
@@ -28,7 +28,7 @@ import {
   optimizerStrategyLabel,
 } from "../features/experiment/optimizerStrategies";
 import { optimizerUsesModelAccess } from "../types/api";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import { issueManagedModelGrant } from "../features/settings/cloudModelAccess";
 
 // Polling interval for active jobs. The frontend only polls; all state
@@ -158,7 +158,7 @@ function buildTrialColumns(
 }
 
 export function JobDetail() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -387,9 +387,10 @@ export function JobDetail() {
       <ErrorState
         title={t("jobDetail.loadFailed")}
         description={
-          jobQuery.error instanceof ApiClientError
-            ? jobQuery.error.message
-            : t("jobDetail.notFound")
+          localeSafeError(jobQuery.error, locale, {
+            zh: t("jobDetail.notFound"),
+            en: t("jobDetail.notFound"),
+          })
         }
         action={<Link to="/history" className="btn">{t("jobDetail.backHistory")}</Link>}
       />
@@ -409,9 +410,10 @@ export function JobDetail() {
   ) ?? bestCandidateTrials[0];
   const artifactsError = artifactsQuery.isError
     ? (
-        artifactsQuery.error instanceof ApiClientError
-          ? artifactsQuery.error.message
-          : t("artifacts.loadFailedDescription")
+        localeSafeError(artifactsQuery.error, locale, {
+          zh: t("artifacts.loadFailedDescription"),
+          en: t("artifacts.loadFailedDescription"),
+        })
       )
     : null;
   const pdfArtifact = artifacts.find(
@@ -560,7 +562,7 @@ export function JobDetail() {
   };
 
   return (
-    <section className="stack-md">
+    <section className="stack-md job-detail-content">
       <JobHeader
         job={job}
         onRerun={handleRerun}
@@ -591,16 +593,18 @@ export function JobDetail() {
       ) : null}
       {rerunMutation.isError ? (
         <Alert tone="danger" title={t("jobDetail.rerunFailed")}>
-          {rerunMutation.error instanceof ApiClientError
-            ? rerunMutation.error.message
-            : t("jobDetail.rerunFailedBody")}
+          {localeSafeError(rerunMutation.error, locale, {
+            zh: t("jobDetail.rerunFailedBody"),
+            en: t("jobDetail.rerunFailedBody"),
+          })}
         </Alert>
       ) : null}
       {cancelMutation.isError ? (
         <Alert tone="danger" title={t("jobDetail.cancelFailed")}>
-          {cancelMutation.error instanceof ApiClientError
-            ? cancelMutation.error.message
-            : t("jobDetail.cancelFailedBody")}
+          {localeSafeError(cancelMutation.error, locale, {
+            zh: t("jobDetail.cancelFailedBody"),
+            en: t("jobDetail.cancelFailedBody"),
+          })}
         </Alert>
       ) : null}
       <JobSummaryCard job={job} />
@@ -618,19 +622,11 @@ export function JobDetail() {
       {report?.optimized_metrics.holdout ? (
         <HoldoutValidationSummary holdout={report.optimized_metrics.holdout} />
       ) : null}
-      <SectionCard
-        title={t("jobDetail.bestReplay")}
-        description={t("jobDetail.bestReplayDescription")}
-      >
-        {bestTrial ? (
+      {bestTrial ? (
+        <SectionCard title={t("jobDetail.bestReplay")}>
           <Link to={`/trials/${bestTrial.id}`}>{t("jobDetail.openBestReplay")}</Link>
-        ) : (
-          <Empty
-            title={t("trajectory.unavailable")}
-            description={t("jobDetail.noBestTrial")}
-          />
-        )}
-      </SectionCard>
+        </SectionCard>
+      ) : null}
 
       <GazeboLivePanel />
 
@@ -642,17 +638,13 @@ export function JobDetail() {
                 ? t("jobDetail.bestSoFarComparison")
                 : t("comparison.ariaLabel")
             }
-            description={t("jobDetail.comparisonDescription")}
           >
             <ComparisonChart data={report.comparison} />
           </SectionCard>
 
           <BestParametersSection job={job} report={report} />
 
-          <SectionCard
-            title={t("jobDetail.summary")}
-            description={t("jobDetail.summaryDescription")}
-          >
+          <SectionCard title={t("jobDetail.summary")}>
             <p style={{ margin: 0 }}>
               {reportHasValidatedRecommendation(job, report)
                 ? report.summary_text
@@ -664,16 +656,14 @@ export function JobDetail() {
 
       {reportEnabled && reportQuery.isError && job.status === "COMPLETED" ? (
         <Alert tone="danger" title={t("jobDetail.reportUnavailable")}>
-          {reportQuery.error instanceof ApiClientError
-            ? reportQuery.error.message
-            : t("jobDetail.reportUnavailableBody")}
+          {localeSafeError(reportQuery.error, locale, {
+            zh: t("jobDetail.reportUnavailableBody"),
+            en: t("jobDetail.reportUnavailableBody"),
+          })}
         </Alert>
       ) : null}
 
-      <SectionCard
-        title={t("jobDetail.insights")}
-        description={t("jobDetail.insightsDescription")}
-      >
+      <SectionCard title={t("jobDetail.insights")}>
         {trialsQuery.isLoading ? (
           <Loading label={t("jobDetail.loadingEvidence")} />
         ) : trialsQuery.isError ? (
@@ -695,18 +685,16 @@ export function JobDetail() {
         )}
       </SectionCard>
 
-      <SectionCard
-        title={t("jobDetail.trials")}
-        description={t("jobDetail.trialsDescription")}
-      >
+      <SectionCard title={t("jobDetail.trials")}>
         {trialsQuery.isLoading ? (
           <Loading label={t("jobDetail.loadingTrials")} />
         ) : trialsQuery.isError ? (
           <ErrorState
             description={
-              trialsQuery.error instanceof ApiClientError
-                ? trialsQuery.error.message
-                : t("jobDetail.trialsLoadFailed")
+              localeSafeError(trialsQuery.error, locale, {
+                zh: t("jobDetail.trialsLoadFailed"),
+                en: t("jobDetail.trialsLoadFailed"),
+              })
             }
           />
         ) : (
@@ -715,10 +703,7 @@ export function JobDetail() {
             rows={trials}
             rowKey={(t) => t.id}
             emptyState={
-              <Empty
-                title={t("jobDetail.noTrials")}
-                description={t("jobDetail.noTrialsDescription")}
-              />
+              <Empty title={t("jobDetail.noTrials")} />
             }
           />
         )}
@@ -727,10 +712,8 @@ export function JobDetail() {
       {artifactsEnabled ? (
         <ArtifactsPanel
           title={t("artifacts.title")}
-          description={t("jobDetail.artifactsDescription")}
           isLoading={artifactsQuery.isLoading}
           error={artifactsError}
-          emptyDescription={t("jobDetail.artifactsEmpty")}
           sections={[
             {
               heading: t("trial.jobArtifacts", { count: artifacts.filter((a) => a.owner_type === "job").length }),
@@ -818,9 +801,10 @@ export function JobDetail() {
             {continuationError ? <p className="form-error" role="alert">{continuationError}</p> : null}
             {continuationMutation.isError ? (
               <p className="form-error" role="alert">
-                {continuationMutation.error instanceof ApiClientError
-                  ? continuationMutation.error.message
-                  : t("jobDetail.continuation.failed")}
+                {localeSafeError(continuationMutation.error, locale, {
+                  zh: t("jobDetail.continuation.failed"),
+                  en: t("jobDetail.continuation.failed"),
+                })}
               </p>
             ) : null}
             <div className="confirm-dialog-actions">
@@ -954,12 +938,6 @@ function JobHeader({
         <h1>
           {t("jobDetail.job")} <code>{job.id}</code>
         </h1>
-        <p className="page-header-subtitle">
-          {t("jobDetail.createdUpdated", {
-            created: formatDateTime(job.created_at),
-            updated: formatDateTime(job.updated_at),
-          })}
-        </p>
       </div>
       <div className="page-header-actions">
         <StatusBadge status={job.status} />
@@ -1093,10 +1071,7 @@ function ExecutionBackendCard({ job }: { job: Job }) {
   const { t } = useI18n();
   const ac = job.acceptance_criteria;
   return (
-    <SectionCard
-      title={t("jobDetail.execution")}
-      description={t("jobDetail.executionDescription")}
-    >
+    <SectionCard title={t("jobDetail.execution")}>
       <ul className="kv-list">
         <li>
           <span className="kv-key">{t("trial.simulatorBackend")}</span>
@@ -1241,27 +1216,12 @@ function StatusSpecificTop({
   report: JobReport | undefined;
 }) {
   const { t } = useI18n();
-  if (job.status === "QUEUED") {
-    return (
-      <Alert tone="info" title={t("jobDetail.queuedTitle")}>
-        {t("jobDetail.queuedBody")}
-      </Alert>
-    );
-  }
-  if (job.status === "RUNNING") {
-    return (
-      <Alert tone="info" title={t("jobDetail.runningTitle")}>
-        {t("jobDetail.runningBody")}
-      </Alert>
-    );
-  }
-  if (job.status === "AGGREGATING" || job.status === "FINALIZING") {
-    return (
-      <Alert tone="info" title={t("jobDetail.finalizingTitle")}>
-        {t("jobDetail.finalizingBody")}
-      </Alert>
-    );
-  }
+  if (
+    job.status === "QUEUED"
+    || job.status === "RUNNING"
+    || job.status === "AGGREGATING"
+    || job.status === "FINALIZING"
+  ) return null;
   if (job.status === "CANCELLED") {
     return (
       <Alert tone="warning" title={t("jobDetail.cancelledTitle")}>
@@ -1325,13 +1285,10 @@ function StatusSpecificTop({
       );
     }
     if (job.optimization_outcome === "success") {
+      if (job.first_qualified_candidate_id) return null;
       return (
-        <Alert tone="success" title={t(job.first_qualified_candidate_id
-          ? "jobDetail.firstQualified.title"
-          : "jobDetail.acceptanceSatisfied")}>
-          {t(job.first_qualified_candidate_id
-            ? "jobDetail.firstQualified.body"
-            : "jobDetail.acceptanceSatisfiedBody")}
+        <Alert tone="success" title={t("jobDetail.acceptanceSatisfied")}>
+          {t("jobDetail.acceptanceSatisfiedBody")}
         </Alert>
       );
     }
@@ -1350,11 +1307,7 @@ function StatusSpecificTop({
     }
   }
   if (job.status === "COMPLETED" && !report) {
-    return (
-      <Alert tone="info" title={t("jobDetail.loadingReport")}>
-        {t("jobDetail.loadingReportBody")}
-      </Alert>
-    );
+    return <Loading label={t("jobDetail.loadingReport")} />;
   }
   return null;
 }
@@ -1412,20 +1365,7 @@ function MetricsCards({
     );
   }
 
-  return (
-    <SectionCard title={t("jobDetail.headlineMetrics")}>
-      <Empty
-        title={t("jobDetail.metricsNotReady")}
-        description={
-          job.status === "FAILED"
-            ? t("jobDetail.metricsFailed")
-            : job.status === "CANCELLED"
-              ? t("jobDetail.metricsCancelled")
-              : t("jobDetail.metricsPending")
-        }
-      />
-    </SectionCard>
-  );
+  return null;
 }
 
 function HoldoutValidationSummary({
@@ -1479,11 +1419,7 @@ function BestParametersSection({
           ? t("jobDetail.diagnosticParametersDescription")
           : isContinuation
             ? t("jobDetail.continuation.parametersDescription")
-            : isFirstQualified
-              ? t("jobDetail.firstQualified.parametersDescription")
-              : baselineWon
-                ? t("jobDetail.baselineWinnerDescription")
-                : t("jobDetail.optimizerWinnerDescription")
+            : null
       }
     >
       <div className="best-parameters-head">
@@ -1581,11 +1517,11 @@ function DiagnosticsPanel({ job }: { job: Job }) {
 
   return (
     <SectionCard
-      title={t("jobDetail.diagnostics")}
+      title={eventLines.length > 0
+        ? `${t("jobDetail.diagnostics")} (${events.length})`
+        : t("jobDetail.diagnostics")}
       description={
-        eventLines.length > 0
-          ? t("jobDetail.diagnosticsEvents", { count: events.length })
-          : t("jobDetail.diagnosticsFallback")
+        eventLines.length > 0 ? null : t("jobDetail.diagnosticsFallback")
       }
     >
       <pre className="log-panel">{lines.join("\n")}</pre>

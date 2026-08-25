@@ -127,7 +127,7 @@ describe("FieldPreflightWorkspace", () => {
       target: { value: "0" },
     });
     fireEvent.click(screen.getByRole("button", { name: "评估飞前条件" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/outside its bound/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent("飞前条件评估失败。");
     expect(bridge.prepare).toHaveBeenCalledOnce();
   });
 });

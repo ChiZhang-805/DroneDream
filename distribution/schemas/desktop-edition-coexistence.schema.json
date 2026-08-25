@@ -112,15 +112,16 @@
           "credentialVaultNamespace",
           "webViewDataNamespace",
           "brandEditionId",
-          "canonicalWindowsIcon"
+          "canonicalMark",
+          "generatedWindowsIcon"
         ],
         "properties": {
           "editionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
-          "artifactFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field|Autonomy)-1\\.0\\.0\\.exe$"},
-          "installerProductName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field|Autonomy)$"},
+          "artifactFileName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field|Agent)-1\\.0\\.0\\.exe$"},
+          "installerProductName": {"pattern": "^DroneDream-(Universal|Sim|Lab|Field|Agent)$"},
           "displayName": {"type": "string", "minLength": 10},
           "bundleIdentifier": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field|autonomy)$"},
-          "installRoot": {"pattern": "^%LOCALAPPDATA%/DroneDream-(Universal|Sim|Lab|Field|Autonomy)$"},
+          "installRoot": {"pattern": "^%LOCALAPPDATA%/DroneDream-(Universal|Sim|Lab|Field|Agent)$"},
           "uninstallRegistryKey": {"type": "string", "minLength": 1},
           "productRegistryKey": {"type": "string", "minLength": 1},
           "startMenuFolder": {"type": "string", "minLength": 1},
@@ -135,7 +136,8 @@
           "credentialVaultNamespace": {"pattern": "^DroneDream/Auth/(universal|sim|lab|field|autonomy)/v1$"},
           "webViewDataNamespace": {"type": "string", "minLength": 1},
           "brandEditionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
-          "canonicalWindowsIcon": {"type": "string", "minLength": 1}
+          "canonicalMark": {"type": "string", "minLength": 1},
+          "generatedWindowsIcon": {"type": "string", "minLength": 1}
         }
       }
     },

@@ -1,0 +1,18 @@
+{
+  "api_contract": {
+    "contract_id": "dronedream.managed.optimizer.v1",
+    "input_schema_version": "dronedream.model-harness-input.v1",
+    "output_schema_version": "dronedream.model-harness-output.v1"
+  },
+  "implementation": {
+    "entrypoint": "select_optimizer_tool",
+    "module": "app.orchestration.decision_harness",
+    "source_path": "backend/app/orchestration/decision_harness.py",
+    "source_sha256": "276fcf6791788a825368c15dc70d45442cc1d7e21020e47378603756b4d903b8"
+  },
+  "plugin_id": "dronedream.managed.optimizer",
+  "schema_version": "dronedream.managed-plugin-manifest.v1",
+  "slot": "optimizer",
+  "trust": "managed",
+  "version": "1.0.0"
+}

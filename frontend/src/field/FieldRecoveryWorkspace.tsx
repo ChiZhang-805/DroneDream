@@ -25,6 +25,7 @@ import {
   type FieldParameterSnapshotSummary,
   type FieldRollbackPlan,
 } from "../desktop/bridge";
+import { localeSafeError } from "../i18n/I18nProvider";
 import sourceCatalog from "../../../distribution/editions/field/adapters/catalog.v1.json";
 import type { FieldLocale } from "./catalog";
 import { hardwareDomainEdition } from "./hardwareDomain";
@@ -33,7 +34,6 @@ import type { FieldReadOnlyProtocolEvidence } from "./FieldAdapterCenter";
 const COPY = {
   en: {
     title: "Parameter snapshot & recovery",
-    body: "Persist an imported read-only parameter set, compare drift, and prepare a content-bound rollback plan before any write is considered.",
     observation: "Observation receipt SHA-256",
     firmware: "Observed firmware",
     adapter: "Protocol adapter",
@@ -58,11 +58,15 @@ const COPY = {
     unavailable: "Snapshot tools are available in the installed Field app.",
     invalid: "Enter a JSON object containing 1 to 256 finite numeric parameters.",
     mismatch: "The saved snapshot does not match the selected Vehicle Pack and controller.",
+    historyFailed: "Saved snapshots could not be loaded.",
+    captureFailed: "The parameter snapshot could not be saved.",
+    loadFailed: "The selected snapshot could not be loaded.",
+    compareFailed: "Parameter drift could not be compared.",
+    rollbackFailed: "The rollback plan could not be prepared.",
     evidence: "Imported values are evidence only. Saving, comparing, or planning never opens a device or grants hardware authority.",
   },
   "zh-CN": {
     title: "参数快照与恢复",
-    body: "在考虑任何写入前，保存导入的只读参数集、比较漂移并准备内容绑定的回滚计划。",
     observation: "观察回执 SHA-256",
     firmware: "已观察固件",
     adapter: "通信协议适配器",
@@ -87,6 +91,11 @@ const COPY = {
     unavailable: "快照工具仅在已安装的 Field 应用中可用。",
     invalid: "请输入包含 1 到 256 个有限数值参数的 JSON 对象。",
     mismatch: "已保存快照与当前选择的机型包和飞控不匹配。",
+    historyFailed: "无法加载已保存的参数快照。",
+    captureFailed: "无法保存参数快照。",
+    loadFailed: "无法加载所选参数快照。",
+    compareFailed: "无法比较参数差异。",
+    rollbackFailed: "无法准备回滚计划。",
     evidence: "导入值仅作为证据。保存、比较或规划不会打开设备，也不会授予真机权限。",
   },
 } as const;
@@ -174,11 +183,14 @@ export function FieldRecoveryWorkspace({
     try {
       setHistory(await listFieldParameterSnapshots());
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].historyFailed,
+        en: COPY.en.historyFailed,
+      }));
     } finally {
       setHistoryBusy(false);
     }
-  }, [desktop]);
+  }, [desktop, locale]);
 
   useEffect(() => {
     void refreshHistory();
@@ -265,7 +277,10 @@ export function FieldRecoveryWorkspace({
     } catch (reason) {
       setError(reason instanceof SyntaxError || (reason instanceof Error && /shape|count|parameter/.test(reason.message))
         ? copy.invalid
-        : reason instanceof Error ? reason.message : String(reason));
+        : localeSafeError(reason, locale, {
+            zh: COPY["zh-CN"].captureFailed,
+            en: COPY.en.captureFailed,
+          }));
     } finally {
       setBusy(null);
     }
@@ -293,7 +308,10 @@ export function FieldRecoveryWorkspace({
       setCurrentText(JSON.stringify(loaded.parameters, null, 2));
       onSnapshotCreated?.(loaded);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].loadFailed,
+        en: COPY.en.loadFailed,
+      }));
     } finally {
       setHistoryBusy(false);
     }
@@ -312,7 +330,10 @@ export function FieldRecoveryWorkspace({
     } catch (reason) {
       setError(reason instanceof SyntaxError || (reason instanceof Error && /shape|count|parameter/.test(reason.message))
         ? copy.invalid
-        : reason instanceof Error ? reason.message : String(reason));
+        : localeSafeError(reason, locale, {
+            zh: COPY["zh-CN"].compareFailed,
+            en: COPY.en.compareFailed,
+          }));
     } finally {
       setBusy(null);
     }
@@ -330,7 +351,10 @@ export function FieldRecoveryWorkspace({
     } catch (reason) {
       setError(reason instanceof SyntaxError || (reason instanceof Error && /shape|count|parameter/.test(reason.message))
         ? copy.invalid
-        : reason instanceof Error ? reason.message : String(reason));
+        : localeSafeError(reason, locale, {
+            zh: COPY["zh-CN"].rollbackFailed,
+            en: COPY.en.rollbackFailed,
+          }));
     } finally {
       setBusy(null);
     }
@@ -341,7 +365,7 @@ export function FieldRecoveryWorkspace({
   return (
     <div className="field-recovery-workspace" data-authority="false" data-hardware-write-attempts="0">
       <header>
-        <div><h2 id="field-recovery-title">{copy.title}</h2><p>{copy.body}</p></div>
+        <h2 id="field-recovery-title">{copy.title}</h2>
         <ArchiveRestore aria-hidden="true" />
       </header>
       <p className="field-inline-boundary"><ShieldCheck aria-hidden="true" />{copy.evidence}</p>

@@ -8,21 +8,24 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { getInstallerLocale, isDesktopRuntime } from "../desktop/bridge";
+import { BUILD_EDITION } from "../edition";
+import { launcherCopyForEdition } from "./launcherEditionCopy";
 
-// Settings offers six authored locales. Product views that do not yet have an
-// authored dictionary use English rather than pretending that a different
-// language has been translated.
+// The desktop product intentionally exposes exactly two independently authored
+// interfaces. Keeping this type closed prevents a partially translated locale
+// from leaking English or Chinese fragments into the selected interface.
 export type Locale = "en" | "zh-CN";
-export type InterfaceLocale = Locale | "zh-TW" | "es" | "ja" | "ko";
+export type InterfaceLocale = Locale;
+
+const launcherCopy = launcherCopyForEdition(BUILD_EDITION);
 
 const enTranslations = {
-    "app.conversation": "Tuning Chat",
+    "app.conversation": "Chatbot",
     "app.dashboard": "Dashboard",
     "app.newExperiment": "Experiment",
     "app.history": "Run History",
     "app.fixedScenarios": "Scenarios",
     "app.autonomyLab": "Autonomy",
-    "app.vehicleStudio": "Vehicle Studio",
     "app.experimentBuilder": "Experiment",
     "app.labValidation": "Evidence Review",
     "app.fieldDeviceSetup": "Device & Vehicle",
@@ -75,6 +78,36 @@ const enTranslations = {
     "settings.runtime.notInstalled": "DroneDreamRuntime is not installed.",
     "settings.runtime.notRunning": "DroneDreamRuntime is not running.",
     "settings.runtime.noResult": "No environment check result is available.",
+    "settings.updates.title": "Software updates",
+    "settings.updates.description": "Application, Runtime, Engine Pack, workflow, and asset updates.",
+    "settings.updates.checkNow": "Check for updates",
+    "settings.updates.currentHint": "Runtime and signed packs were checked with this application.",
+    "settings.updates.checkingHint": "Checking each update layer in dependency order.",
+    "settings.updates.required": "Required",
+    "settings.updates.recommended": "Recommended",
+    "settings.updates.optional": "Optional",
+    "settings.updates.automatic": "Automatic",
+    "settings.updates.requiredHint": "This update must finish before the workspace can open.",
+    "settings.updates.recommendedHint": "Install when convenient; it does not block your work.",
+    "settings.updates.optionalHint": "Choose whether to install this signed update.",
+    "settings.updates.automaticHint": "DroneDream applies this signed update automatically when the Runtime is idle.",
+    "settings.updates.deferredHint": "Finish active experiments, then retry.",
+    "settings.updates.retryHint": "No changes were applied. Check the connection and retry.",
+    "settings.updates.inProgressHint": "Keep DroneDream open until this step finishes.",
+    "settings.updates.downloading": "Downloading the application update…",
+    "settings.updates.engineError": "The Engine Pack update could not finish.",
+    "settings.updates.packsAvailable": "Workflow and asset updates are ready.",
+    "settings.updates.packsDeferred": "Pack updates are waiting for the Runtime.",
+    "settings.updates.packsError": "Pack updates could not finish.",
+    "settings.updates.runtimeBaseHint": "Open Environment to install the compatible Runtime Base, then return here.",
+    "settings.updates.installApp": "Install update",
+    "settings.updates.installPacks": "Install pack updates",
+    "settings.updates.retry": "Retry",
+    "settings.updates.openRuntimeBase": "Open Runtime Base upgrade",
+    "settings.updates.progressLabel": "Update progress",
+    "settings.updates.packList": "Available pack updates",
+    "settings.updates.capabilityPack": "Workflow pack",
+    "settings.updates.assetPack": "Asset pack",
     "settings.model.title": "Optimization model access",
     "settings.memory.title": "Personal defaults & experiment memory",
     "settings.memory.description": "Save only a small allowlist of setup defaults. Cross-Job memory is off until you opt in.",
@@ -94,12 +127,17 @@ const enTranslations = {
     "settings.memory.runtimeRequired": "Check the local environment before loading or changing personal defaults.",
     "settings.memory.loadFailed": "Personal defaults could not be loaded. Nothing was changed.",
     "settings.memory.saveFailed": "Personal defaults could not be saved.",
+    "settings.memory.accountConsent": "Cross-session memory for this account",
+    "settings.memory.editionAccess": "Allow this edition to use account memory",
+    "settings.memory.domainConsent": "Memory domain permissions",
+    "settings.memory.allowRead": "Read",
+    "settings.memory.allowWrite": "Write",
     "settings.memory.delete": "Delete defaults & memory",
-    "settings.memory.confirmDelete": "Delete all saved defaults and structured memory?",
+    "settings.memory.confirmDelete": "Permanently delete structured memory for all five products and reset this edition's defaults? Audit tombstones retain no memory payload.",
     "settings.memory.confirm": "Delete permanently",
     "settings.memory.cancel": "Cancel",
-    "settings.memory.deleted": "Personal defaults deleted; {{count}} memory rows erased.",
-    "settings.memory.deleteFailed": "Personal defaults and memory could not be deleted.",
+    "settings.memory.deleted": "Account memory deleted across all products; {{count}} payload rows erased.",
+    "settings.memory.deleteFailed": "Account memory could not be permanently deleted.",
     "settings.model.managed": "Included allowance",
     "settings.model.configured": "Key ready",
     "settings.model.notConfigured": "Key required",
@@ -114,6 +152,7 @@ const enTranslations = {
     "settings.model.subscriptionOpenFailed":
       "The subscription page could not be opened in your browser.",
     "settings.model.periodUsage": "Current-period usage",
+    "settings.model.remainingAllowance": "Remaining allowance",
     "settings.model.credits": "credits",
     "settings.model.remaining": "Remaining",
     "settings.model.requests": "Requests",
@@ -200,13 +239,13 @@ const enTranslations = {
     "desktop.title": "Desktop environment setup",
     "desktop.subtitle":
       "Check this computer, the dedicated DroneDream runtime, and the steps required before local PX4/Gazebo tuning begins.",
-    "launcher.title.welcome": "Build your autonomous flight workspace",
+    "launcher.title.welcome": launcherCopy.enWelcome,
     "launcher.title.checking": "Checking your simulation environment",
     "launcher.title.downloading": "Downloading your flight environment",
     "launcher.title.preparing": "Preparing your flight environment",
-    "launcher.title.ready": "Your flight lab is ready",
-    "launcher.openWorkspace": "Open tuning workspace",
-    "launcher.signIn": "Sign in and enter tuning workspace",
+    "launcher.title.ready": launcherCopy.enReady,
+    "launcher.openWorkspace": launcherCopy.enOpen,
+    "launcher.signIn": launcherCopy.enSignIn,
     "launcher.browserAuthWaiting": "Waiting for browser sign-in…",
     "launcher.browserAuthAdopting": "Confirming account…",
     "launcher.browserAuthErrorTitle": "Browser sign-in needs attention",
@@ -1631,8 +1670,7 @@ const zhTranslations = {
     "app.newExperiment": "调优实验",
     "app.history": "历史报告",
     "app.fixedScenarios": "场景",
-    "app.autonomyLab": "自主飞行",
-    "app.vehicleStudio": "无人机建模",
+    "app.autonomyLab": "任务智能体",
     "app.experimentBuilder": "实验",
     "app.labValidation": "验证与证据",
     "app.fieldDeviceSetup": "设备与机型",
@@ -1685,6 +1723,36 @@ const zhTranslations = {
     "settings.runtime.notInstalled": "尚未安装 DroneDreamRuntime。",
     "settings.runtime.notRunning": "DroneDreamRuntime 尚未运行。",
     "settings.runtime.noResult": "暂无运行环境检查结果。",
+    "settings.updates.title": "软件更新",
+    "settings.updates.description": "集中查看软件、Runtime、Engine Pack、工作流与资源更新。",
+    "settings.updates.checkNow": "检查更新",
+    "settings.updates.currentHint": "已按当前软件版本检查 Runtime 与签名组件包。",
+    "settings.updates.checkingHint": "正在按依赖顺序检查各层更新。",
+    "settings.updates.required": "必需",
+    "settings.updates.recommended": "建议",
+    "settings.updates.optional": "可选",
+    "settings.updates.automatic": "自动",
+    "settings.updates.requiredHint": "必须完成此更新，才能进入工作区。",
+    "settings.updates.recommendedHint": "可在方便时安装，不会阻断当前工作。",
+    "settings.updates.optionalHint": "可自行决定是否安装此签名更新。",
+    "settings.updates.automaticHint": "Runtime 空闲时，DroneDream 会自动应用此签名更新。",
+    "settings.updates.deferredHint": "请先结束当前实验，再重试。",
+    "settings.updates.retryHint": "未应用任何更改，请检查连接后重试。",
+    "settings.updates.inProgressHint": "请保持 DroneDream 打开，直至此步骤完成。",
+    "settings.updates.downloading": "正在下载软件更新……",
+    "settings.updates.engineError": "Engine Pack 更新未能完成。",
+    "settings.updates.packsAvailable": "工作流与资源更新已就绪。",
+    "settings.updates.packsDeferred": "组件包更新正在等待 Runtime 空闲。",
+    "settings.updates.packsError": "组件包更新未能完成。",
+    "settings.updates.runtimeBaseHint": "请打开运行环境安装兼容的 Runtime Base，然后返回此处。",
+    "settings.updates.installApp": "安装更新",
+    "settings.updates.installPacks": "安装组件包更新",
+    "settings.updates.retry": "重试",
+    "settings.updates.openRuntimeBase": "打开 Runtime Base 升级",
+    "settings.updates.progressLabel": "更新进度",
+    "settings.updates.packList": "可用的组件包更新",
+    "settings.updates.capabilityPack": "工作流包",
+    "settings.updates.assetPack": "资源包",
     "settings.model.title": "优化模型访问配置",
     "settings.memory.title": "个人默认值与实验记忆",
     "settings.memory.description": "只保存少量白名单配置；跨任务记忆默认关闭，只有主动同意后才会启用。",
@@ -1704,12 +1772,17 @@ const zhTranslations = {
     "settings.memory.runtimeRequired": "请先检查本地运行环境，再加载或修改个人默认值。",
     "settings.memory.loadFailed": "无法加载个人默认值，当前设置未被修改。",
     "settings.memory.saveFailed": "无法保存个人默认值。",
-    "settings.memory.delete": "删除默认值与记忆",
-    "settings.memory.confirmDelete": "确认删除全部个人默认值和结构化记忆吗？",
+    "settings.memory.accountConsent": "跨对话账户记忆",
+    "settings.memory.editionAccess": "允许当前软件使用账户记忆",
+    "settings.memory.domainConsent": "记忆领域权限",
+    "settings.memory.allowRead": "读取",
+    "settings.memory.allowWrite": "写入",
+    "settings.memory.delete": "删除默认值和记忆",
+    "settings.memory.confirmDelete": "确认永久删除五款软件共享的全部结构化记忆，并重置当前软件的默认值吗？审计墓碑不会保留记忆内容。",
     "settings.memory.confirm": "永久删除",
     "settings.memory.cancel": "取消",
-    "settings.memory.deleted": "个人默认值已删除，并清除 {{count}} 条记忆。",
-    "settings.memory.deleteFailed": "无法删除个人默认值与记忆。",
+    "settings.memory.deleted": "已删除所有软件共享的账户记忆，共清除 {{count}} 条内容记录。",
+    "settings.memory.deleteFailed": "无法永久删除账户记忆。",
     "settings.model.managed": "赠送额度",
     "settings.model.configured": "密钥已就绪",
     "settings.model.notConfigured": "需要密钥",
@@ -1723,11 +1796,12 @@ const zhTranslations = {
     "settings.model.manageSubscription": "管理订阅",
     "settings.model.subscriptionOpenFailed": "无法在浏览器中打开订阅页面。",
     "settings.model.periodUsage": "本周期使用量",
+    "settings.model.remainingAllowance": "剩余额度",
     "settings.model.credits": "额度",
     "settings.model.remaining": "剩余额度",
     "settings.model.requests": "请求次数",
-    "settings.model.inputTokens": "输入 tokens",
-    "settings.model.outputTokens": "输出 tokens",
+    "settings.model.inputTokens": "输入词元",
+    "settings.model.outputTokens": "输出词元",
     "settings.model.resetsAt": "重置时间",
     "settings.model.estimatedUsage": "{{count}} 次请求采用保守估算记账",
     "settings.model.loadingUsage": "正在读取服务端权威账本…",
@@ -1801,13 +1875,13 @@ const zhTranslations = {
     "desktop.eyebrow": "本地运行环境",
     "desktop.title": "桌面环境设置",
     "desktop.subtitle": "检查本机、DroneDream 专用运行环境，以及在本地执行 PX4/Gazebo 调优前需要完成的步骤。",
-    "launcher.title.welcome": "构建你的自主飞行工作空间",
+    "launcher.title.welcome": launcherCopy.zhWelcome,
     "launcher.title.checking": "正在检查仿真运行环境",
     "launcher.title.downloading": "正在下载飞行环境",
     "launcher.title.preparing": "正在准备飞行环境",
-    "launcher.title.ready": "你的飞行实验室已经就绪",
-    "launcher.openWorkspace": "进入调优平台",
-    "launcher.signIn": "登录并进入调优平台",
+    "launcher.title.ready": launcherCopy.zhReady,
+    "launcher.openWorkspace": launcherCopy.zhOpen,
+    "launcher.signIn": launcherCopy.zhSignIn,
     "launcher.browserAuthWaiting": "正在等待浏览器登录…",
     "launcher.browserAuthAdopting": "正在确认账户…",
     "launcher.browserAuthErrorTitle": "浏览器登录需要处理",
@@ -3173,62 +3247,36 @@ const translations = {
   "zh-CN": zhTranslations,
 } as const;
 
-const interfaceTranslationOverrides: Readonly<Record<Exclude<InterfaceLocale, Locale>, Partial<Record<TranslationKey, string>>>> = {
-  "zh-TW": {
-    "app.conversation": "調校對話", "app.dashboard": "任務總覽", "app.newExperiment": "調校實驗",
-    "app.history": "歷史報告", "app.fixedScenarios": "場景", "app.autonomyLab": "自主飛行", "app.vehicleStudio": "無人機建模",
-    "app.experimentBuilder": "實驗", "app.labValidation": "驗證與證據", "app.fieldDeviceSetup": "裝置與機型",
-    "app.fieldTuning": "調校計畫", "app.fieldSafety": "安全與回復", "app.labWorkspace": "實驗室工作區",
-    "app.hardwareLab": "實機實驗室", "app.fieldWorkspace": "現場工作區", "app.platform": "無人機控制參數自動調校平台", "app.autonomyPlatform": "無人機自主飛行模擬平台",
-    "app.primaryNav": "主導覽", "app.navSectionAutonomy": "自主任務", "app.navSectionExperiment": "實驗與驗證",
-    "app.navSectionWorkspace": "工作區", "app.navSectionOperations": "現場執行", "app.navSectionRecords": "記錄",
-    "app.openMenu": "開啟導覽選單", "app.closeMenu": "關閉導覽選單",
-    "app.language": "語言", "app.settings": "設定", "app.settingsTitle": "設定", "app.closeSettings": "關閉設定",
-    "app.interfaceLanguage": "介面語言", "app.dismiss": "關閉提示", "app.accountOptions": "帳戶選項",
-    "app.author": "作者", "app.contact": "聯絡方式", "app.skipToContent": "跳至主要內容",
-  },
-  es: {
-    "app.conversation": "Chat de ajuste", "app.dashboard": "Panel", "app.newExperiment": "Experimento",
-    "app.history": "Historial", "app.fixedScenarios": "Escenarios", "app.autonomyLab": "Vuelo autónomo", "app.vehicleStudio": "Modelado UAV",
-    "app.experimentBuilder": "Experimento", "app.labValidation": "Validación", "app.fieldDeviceSetup": "Equipo y vehículo",
-    "app.fieldTuning": "Plan de ajuste", "app.fieldSafety": "Seguridad", "app.labWorkspace": "Laboratorio",
-    "app.hardwareLab": "Prueba física", "app.fieldWorkspace": "Operación de campo", "app.platform": "Plataforma de ajuste automático UAV", "app.autonomyPlatform": "Simulación de vuelo autónomo",
-    "app.primaryNav": "Navegación principal", "app.navSectionAutonomy": "Tareas autónomas", "app.navSectionExperiment": "Experimentos y validación",
-    "app.navSectionWorkspace": "Espacio de trabajo", "app.navSectionOperations": "Operaciones de campo", "app.navSectionRecords": "Registros",
-    "app.openMenu": "Abrir navegación", "app.closeMenu": "Cerrar navegación",
-    "app.language": "Idioma", "app.settings": "Ajustes", "app.settingsTitle": "Ajustes", "app.closeSettings": "Cerrar ajustes",
-    "app.interfaceLanguage": "Idioma de interfaz", "app.dismiss": "Cerrar", "app.accountOptions": "Opciones de cuenta",
-    "app.author": "Autor", "app.contact": "Contacto", "app.skipToContent": "Ir al contenido",
-  },
-  ja: {
-    "app.conversation": "調整チャット", "app.dashboard": "ダッシュボード", "app.newExperiment": "実験",
-    "app.history": "実行履歴", "app.fixedScenarios": "シナリオ", "app.autonomyLab": "自律飛行", "app.vehicleStudio": "機体モデリング",
-    "app.experimentBuilder": "実験", "app.labValidation": "検証記録", "app.fieldDeviceSetup": "デバイスと機体",
-    "app.fieldTuning": "調整計画", "app.fieldSafety": "安全と復元", "app.labWorkspace": "ラボ作業",
-    "app.hardwareLab": "実機検証", "app.fieldWorkspace": "フィールド ワークスペース", "app.platform": "UAV 制御パラメータ自動調整プラットフォーム", "app.autonomyPlatform": "自律飛行シミュレーション",
-    "app.primaryNav": "メイン ナビゲーション", "app.navSectionAutonomy": "自律タスク", "app.navSectionExperiment": "実験と検証",
-    "app.navSectionWorkspace": "ワークスペース", "app.navSectionOperations": "現場運用", "app.navSectionRecords": "記録",
-    "app.openMenu": "ナビゲーションを開く", "app.closeMenu": "ナビゲーションを閉じる",
-    "app.language": "言語", "app.settings": "設定", "app.settingsTitle": "設定", "app.closeSettings": "設定を閉じる",
-    "app.interfaceLanguage": "表示言語", "app.dismiss": "閉じる", "app.accountOptions": "アカウント オプション",
-    "app.author": "作成者", "app.contact": "連絡先", "app.skipToContent": "本文へ移動",
-  },
-  ko: {
-    "app.conversation": "튜닝 대화", "app.dashboard": "대시보드", "app.newExperiment": "실험",
-    "app.history": "실행 기록", "app.fixedScenarios": "시나리오", "app.autonomyLab": "자율 비행", "app.vehicleStudio": "기체 모델링",
-    "app.experimentBuilder": "실험", "app.labValidation": "검증 기록", "app.fieldDeviceSetup": "장치 및 기체",
-    "app.fieldTuning": "튜닝 계획", "app.fieldSafety": "안전 및 복구", "app.labWorkspace": "랩 작업",
-    "app.hardwareLab": "실기체 검증", "app.fieldWorkspace": "현장 작업 공간", "app.platform": "UAV 제어 파라미터 자동 튜닝 플랫폼", "app.autonomyPlatform": "자율 비행 시뮬레이션",
-    "app.primaryNav": "기본 탐색", "app.navSectionAutonomy": "자율 작업", "app.navSectionExperiment": "실험 및 검증",
-    "app.navSectionWorkspace": "작업 공간", "app.navSectionOperations": "현장 운영", "app.navSectionRecords": "기록",
-    "app.openMenu": "탐색 메뉴 열기", "app.closeMenu": "탐색 메뉴 닫기",
-    "app.language": "언어", "app.settings": "설정", "app.settingsTitle": "설정", "app.closeSettings": "설정 닫기",
-    "app.interfaceLanguage": "인터페이스 언어", "app.dismiss": "닫기", "app.accountOptions": "계정 옵션",
-    "app.author": "작성자", "app.contact": "연락처", "app.skipToContent": "본문으로 이동",
-  },
-};
-
 export type TranslationParams = Record<string, string | number>;
+
+const HAN_PATTERN = /\p{Script=Han}/u;
+
+/**
+ * Keep dynamic backend/runtime errors inside the language selected by the
+ * user. Technical identifiers remain visible because they are useful for
+ * support, while prose from the other locale is replaced by authored copy.
+ */
+// Error localization is part of this provider's closed bilingual contract.
+// eslint-disable-next-line react-refresh/only-export-components
+export function localeSafeError(
+  value: unknown,
+  locale: Locale,
+  fallback: { zh: string; en: string },
+): string {
+  const raw = value instanceof Error ? value.message : String(value ?? "");
+  const normalized = raw.trim();
+  const english = locale === "en";
+  const localizedFallback = english ? fallback.en : fallback.zh;
+  if (!normalized) return localizedFallback;
+
+  const technicalCode = /^[A-Z0-9_.:-]+$/u.test(normalized);
+  if (english) {
+    if (HAN_PATTERN.test(normalized)) return localizedFallback;
+    return technicalCode ? `${localizedFallback} (${normalized})` : normalized;
+  }
+  if (HAN_PATTERN.test(normalized)) return normalized;
+  return technicalCode ? `${localizedFallback}（${normalized}）` : localizedFallback;
+}
 
 interface I18nValue {
   locale: Locale;
@@ -3238,12 +3286,7 @@ interface I18nValue {
 }
 
 function translate(locale: InterfaceLocale, key: TranslationKey, params?: TranslationParams): string {
-  const baseTemplate = locale === "zh-CN"
-    ? translations["zh-CN"][key]
-    : translations.en[key];
-  const template = locale === "en" || locale === "zh-CN"
-    ? String(baseTemplate)
-    : String(interfaceTranslationOverrides[locale][key] ?? baseTemplate);
+  const template = String(translations[locale][key]);
   if (!params) return template;
   return Object.entries(params).reduce<string>(
     (result, [name, value]) => result.replaceAll(`{{${name}}}`, String(value)),
@@ -3262,9 +3305,8 @@ function initialLocale(): InterfaceLocale {
   if (typeof window === "undefined") return "en";
   try {
     const saved = window.localStorage.getItem("drone-dream:locale");
-    if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) {
-      return saved as InterfaceLocale;
-    }
+    if (saved === "en" || saved === "zh-CN") return saved;
+    if (saved !== null) window.localStorage.setItem("drone-dream:locale", "en");
   } catch {
     // Language preference storage is optional; the app must still start when
     // browser or WebView policy denies access to localStorage.
@@ -3280,7 +3322,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     if (!isDesktopRuntime()) return;
     try {
       const saved = window.localStorage.getItem("drone-dream:locale");
-        if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) return;
+      if (saved === "en" || saved === "zh-CN") return;
     } catch {
       // The installer preference is still safe to use in memory.
     }
@@ -3291,7 +3333,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         try {
           const saved = window.localStorage.getItem("drone-dream:locale");
-          if (["en", "zh-CN", "zh-TW", "es", "ja", "ko"].includes(saved ?? "")) return;
+          if (saved === "en" || saved === "zh-CN") return;
         } catch {
           // Apply the installer language without persistence.
         }

@@ -8,6 +8,8 @@ import { createServer } from "vite";
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const outputRoot = path.join(frontendRoot, "node_modules", ".cache", "autonomy-mission-entry");
 const screenshotPath = path.join(outputRoot, "overview-conversation-1440x900.png");
+const aircraftScreenshotPath = path.join(outputRoot, "aircraft-connectors-1440x900.png");
+const mapScreenshotPath = path.join(outputRoot, "map-connectors-1440x900.png");
 const host = "127.0.0.1";
 const port = 5196;
 const origin = `http://${host}:${port}`;
@@ -35,7 +37,26 @@ try {
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
   });
   const page = await context.newPage();
+  await page.route("**/api/v1/autonomy/asset-connectors", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      success: true,
+      data: {
+        schema_version: "dronedream.autonomy.asset-connector-catalog.v1",
+        normalized_format: "ddpkg-v1",
+        imported_code_execution: false,
+        items: [
+          { connector_id: "dronedream.ddpkg", name: "DroneDream Package", source_application: "DroneDream", source_formats: ["ddpkg"], asset_kinds: ["map", "world", "vehicle"], availability: "builtin", execution_boundary: "declarative_parser", enabled: true, output_format: "ddpkg", maximum_import_maturity: "qualified" },
+          { connector_id: "gazebo.sdf", name: "Gazebo SDF", source_application: "Gazebo Sim", source_formats: ["sdf", "world"], asset_kinds: ["map", "world", "vehicle"], availability: "builtin", execution_boundary: "declarative_parser", enabled: true, output_format: "ddpkg", maximum_import_maturity: "simulation_ready" },
+          { connector_id: "blender.phobos", name: "Blender + Phobos", source_application: "Blender", source_formats: ["blend", "smurf"], asset_kinds: ["map", "world", "vehicle"], availability: "companion_required", execution_boundary: "isolated_local_companion", enabled: false, output_format: "ddpkg", maximum_import_maturity: "simulation_ready" },
+        ],
+      },
+      error: null,
+    }),
+  }));
   await page.goto(`${origin}/console/autonomy`, { waitUntil: "networkidle" });
+  await page.locator(".autonomy-command-page").waitFor();
   if (await page.locator(".autonomy-command-hero-icon").count() !== 1) {
     throw new Error("Fresh Overview must preserve the mission hero before the first message.");
   }
@@ -163,8 +184,8 @@ try {
     document.querySelectorAll("[inert]").forEach((element) => element.removeAttribute("inert"));
   });
   const navigationLabels = await page.locator(".autonomy-section-switch a").allTextContents();
-  if (navigationLabels.length !== 5 || navigationLabels.some((label) => label.trim() === "任务" || label.trim() === "Mission")) {
-    throw new Error(`Unexpected Autonomy navigation: ${navigationLabels.join(" | ")}`);
+  if (navigationLabels.length !== 6 || navigationLabels.some((label) => label.trim() === "任务" || label.trim() === "Mission")) {
+    throw new Error(`Unexpected Agent navigation: ${navigationLabels.join(" | ")}`);
   }
   if (await page.locator(".autonomy-command-page.is-conversation").count() !== 1) {
     throw new Error("Overview did not switch into the in-page conversation state.");
@@ -213,33 +234,40 @@ try {
     document.querySelectorAll("[inert]").forEach((element) => element.removeAttribute("inert"));
   });
   if (await page.locator(".autonomy-asset-toolbar select").count() !== 1
-    || await page.locator(".autonomy-asset-toolbar button").count() !== 1) {
-    throw new Error("Aircraft library must expose saved-profile selection and new-profile creation.");
+    || await page.locator(".autonomy-asset-toolbar button").count() !== 0) {
+    throw new Error("Aircraft repository must select qualified imports without exposing an in-product model creator.");
   }
   const aircraftOptions = await page.locator(".autonomy-asset-toolbar option").count();
-  await page.locator(".autonomy-asset-toolbar button").click();
-  if (await page.locator(".autonomy-asset-toolbar option").count() !== aircraftOptions + 1) {
-    throw new Error("Creating a new aircraft did not preserve the prior saved profile.");
+  if (aircraftOptions < 1 || await page.locator(".autonomy-connector-import-actions button").count() < 3) {
+    throw new Error("Aircraft repository must expose its qualified asset and external import actions.");
   }
+  if (await page.locator(".autonomy-connector-grid article").count() !== 3
+    || await page.getByText("需要本机配套程序", { exact: true }).count() !== 1) {
+    throw new Error("Aircraft connector catalog did not distinguish the isolated companion.");
+  }
+  await page.screenshot({ path: aircraftScreenshotPath, fullPage: false });
   await page.goto(`${origin}/console/autonomy/maps`, { waitUntil: "networkidle" });
   await page.evaluate(() => {
     document.querySelector(".account-dialog-backdrop")?.remove();
     document.querySelectorAll("[inert]").forEach((element) => element.removeAttribute("inert"));
   });
   if (await page.locator(".autonomy-asset-toolbar select").count() !== 1
-    || await page.locator(".autonomy-asset-toolbar button").count() !== 1) {
-    throw new Error("Map library must expose saved-pack selection and new-pack creation.");
+    || await page.locator(".autonomy-asset-toolbar button").count() !== 0) {
+    throw new Error("Map repository must select qualified imports without exposing an in-product map creator.");
   }
   const mapOptions = await page.locator(".autonomy-asset-toolbar option").count();
-  await page.locator(".autonomy-asset-toolbar button").click();
-  if (await page.locator(".autonomy-asset-toolbar option").count() !== mapOptions + 1) {
-    throw new Error("Creating a new map did not preserve the prior saved pack.");
+  if (mapOptions < 1 || await page.locator(".autonomy-connector-import-actions button").count() < 3) {
+    throw new Error("Map repository must expose its qualified asset and external import actions.");
   }
+  if (await page.locator(".autonomy-connector-grid article").count() !== 3) {
+    throw new Error("Map connector catalog did not render the common import boundaries.");
+  }
+  await page.screenshot({ path: mapScreenshotPath, fullPage: false });
   await page.goto(`${origin}/console/autonomy/mission`, { waitUntil: "networkidle" });
   if (!page.url().endsWith("/console/autonomy")) {
     throw new Error(`Legacy Mission URL did not redirect to Overview: ${page.url()}`);
   }
-  process.stdout.write(`${JSON.stringify({ navigationLabels, taskNodes: 21, screenshotPath }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ navigationLabels, taskNodes: 21, screenshotPath, aircraftScreenshotPath, mapScreenshotPath }, null, 2)}\n`);
   await context.close();
 } finally {
   await browser?.close();

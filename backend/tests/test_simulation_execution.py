@@ -15,8 +15,10 @@ from app.autonomy.credentials import (
 )
 from app.autonomy.models import (
     AutonomyCompileRequest,
+    RuntimeInterruptionRequest,
     RuntimeObservation,
     RuntimeOperatorCommand,
+    RuntimeReplanApplyRequest,
     RuntimeSessionCreateRequest,
     SimulationExecutionStartRequest,
     Vector3,
@@ -475,11 +477,9 @@ def test_operator_abort_writes_bounded_runner_request(
     processes[0].finish(1)
 
 
-@pytest.mark.parametrize("action", ["hold", "abort"])
-def test_runtime_operator_control_stops_an_active_simulator(
+def test_runtime_operator_hold_keeps_the_active_simulator_alive(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    action: str,
 ) -> None:
     registry, sessions, processes = _registry(monkeypatch, tmp_path)
     session = _create_session(
@@ -487,7 +487,50 @@ def test_runtime_operator_control_stops_an_active_simulator(
         "owner-a",
         RuntimeSessionCreateRequest(
             mission=_mission(),
-            client_request_id=f"runtime-request-active-{action}",
+            client_request_id="runtime-request-active-hold",
+        ),
+    )
+    created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+
+    holding = sessions.command(
+        "owner-a",
+        session.session_id,
+        RuntimeOperatorCommand.model_validate(
+            {"action": "hold", "reason": "operator selected hold"}
+        ),
+    )
+    control_request = next(tmp_path.rglob("runtime_control.request.json"), None)
+    deadline = time.monotonic() + 2
+    while control_request is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+        control_request = next(tmp_path.rglob("runtime_control.request.json"), None)
+
+    assert holding.phase == "holding"
+    assert control_request is not None
+    payload = json.loads(control_request.read_text(encoding="utf-8"))
+    assert payload["schema_version"] == "dronedream.autonomy.runtime-control.v1"
+    assert payload["action"] == "hold"
+    assert payload["runtime_session_id"] == session.session_id
+    assert payload["mission_revision"] == 1
+    assert not list(tmp_path.rglob("live_abort.request.json"))
+    assert processes[0].poll() is None
+    execution = registry.get("owner-a", created.execution_id)
+    assert execution.state in {"starting", "running"}
+    assert execution.phase == "holding"
+    processes[0].finish(1)
+
+
+def test_runtime_operator_abort_stops_an_active_simulator(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-active-abort",
         ),
     )
     created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
@@ -496,7 +539,7 @@ def test_runtime_operator_control_stops_an_active_simulator(
         "owner-a",
         session.session_id,
         RuntimeOperatorCommand.model_validate(
-            {"action": action, "reason": f"operator selected {action}"}
+            {"action": "abort", "reason": "operator selected abort"}
         ),
     )
     abort_request = next(tmp_path.rglob("live_abort.request.json"), None)
@@ -509,6 +552,112 @@ def test_runtime_operator_control_stops_an_active_simulator(
     payload = json.loads(abort_request.read_text(encoding="utf-8"))
     assert payload["reason"].startswith("runtime_control_abort: runtime_session_")
     assert registry.get("owner-a", created.execution_id).state == "aborting"
+    processes[0].finish(1)
+
+
+def test_runtime_interruption_replaces_the_live_route_from_measured_transport_position(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    registry, sessions, processes = _registry(monkeypatch, tmp_path)
+    session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=_mission(),
+            client_request_id="runtime-request-live-replan",
+        ),
+    )
+    created = registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+    run_dir = next(tmp_path.rglob(created.execution_id))
+    measured_position = [13.25, -4.5, 2.75]
+    (run_dir / "mission_live_status.json").write_text(
+        json.dumps(
+            {
+                "progress": 0.35,
+                "phase": "outbound",
+                "vehicle_model_root_world_enu_m": measured_position,
+                "vehicle_envelope_center_world_enu_m": measured_position,
+                "vehicle_speed_m_s": 0.8,
+                "payload_spawned": False,
+                "payload_attached": False,
+                "abort_reason": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    registry.get("owner-a", created.execution_id)
+
+    held = sessions.interrupt(
+        "owner-a",
+        session.session_id,
+        RuntimeInterruptionRequest(
+            client_request_id="interrupt-live-replan-001",
+            instruction="The pickup location changed. Replan from the current position.",
+        ),
+    )
+    assert held.interruption is not None
+    assert held.interruption.snapshot_position_m == Vector3(
+        x=measured_position[0],
+        y=measured_position[1],
+        z=measured_position[2],
+    )
+
+    control_path = run_dir / "runtime_control.request.json"
+    deadline = time.monotonic() + 2
+    control: dict[str, object] | None = None
+    while time.monotonic() < deadline:
+        if control_path.exists():
+            control = json.loads(control_path.read_text(encoding="utf-8"))
+            if control.get("action") == "hold":
+                break
+        time.sleep(0.01)
+    assert control is not None
+    assert control["action"] == "hold"
+    hold_revision = control["revision"]
+
+    _bound, _request, planner_receipt, asset_receipt = sessions.execution_binding(
+        "owner-a",
+        session.session_id,
+    )
+    replanned = sessions.apply_replan(
+        "owner-a",
+        session.session_id,
+        RuntimeReplanApplyRequest(
+            interruption_id=held.interruption.interruption_id,
+            expected_task_graph_revision=held.task_graph.revision,
+            client_request_id="runtime-replan-live-001",
+            operator_confirmed=True,
+            mission=_mission().model_copy(
+                update={
+                    "natural_language": (
+                        "Continue from the held position to the revised pickup and return safely."
+                    )
+                }
+            ),
+        ),
+        planner_receipt=planner_receipt,
+        asset_receipt=asset_receipt,
+    )
+    assert replanned.mission_revision == 2
+
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        control = json.loads(control_path.read_text(encoding="utf-8"))
+        if control.get("action") == "replace_route":
+            break
+        time.sleep(0.01)
+    assert control["action"] == "replace_route"
+    assert isinstance(control["revision"], int)
+    assert control["revision"] > hold_revision
+    assert control["mission_revision"] == 2
+    route = control["route"]
+    assert isinstance(route, list)
+    assert route[0]["x"] == pytest.approx(measured_position[0])
+    assert route[0]["y"] == pytest.approx(measured_position[1])
+    assert route[0]["z"] == pytest.approx(measured_position[2])
+    assert not list(tmp_path.rglob("live_abort.request.json"))
+    assert processes[0].poll() is None
     processes[0].finish(1)
 
 

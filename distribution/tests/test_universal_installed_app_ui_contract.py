@@ -13,45 +13,45 @@ OFFLINE_BROWSER = ROOT / "frontend/scripts/verify-software-ui-layout.mjs"
 def test_headed_verifier_has_exact_bounded_execution_contract() -> None:
     script = POWERSHELL.read_text(encoding="utf-8-sig")
     for fragment in (
-        'DroneDream-Universal-1.0.0.exe',
-        '$installerCountCap = 1',
-        '$appLaunchCountCap = 1',
-        '$appCloseCountCap = 1',
-        '$uninstallerCountCap = 1',
-        '$ownedCleanupCountCap = 1',
+        "DroneDream-Universal-1.0.0.exe",
+        "$installerCountCap = 1",
+        "$appLaunchCountCap = 1",
+        "$appCloseCountCap = 1",
+        "$uninstallerCountCap = 1",
+        "$ownedCleanupCountCap = 1",
         '@("/S", "/NS", "/L=1033")',
-        'settingsOpen = $matrix.Count',
-        'settingsTabActivations = $matrix.Count * 4',
-        'screenshots = $matrix.Count * 2',
-        'runtimeStart = 0',
-        'px4 = 0',
-        'gazebo = 0',
-        'browser = 0',
-        'auth = 0',
-        'offline-layout-contract-only-not-installed-app-evidence',
-        'reviewedEvidenceHead = $head',
-        'presentationOnly = $true',
-        'grantsHardwareAuthority = $false',
-        'modeSwitchMayAuthorizeHardware = $false',
-        'loopback-cdp-parent-child-read-only-existing-runtime',
-        'closeOnlyThisBatchApp = $true',
-        'invokeOnlyThisBatchUninstaller = $true',
-        'retryAllowed = $false',
-        'WEBVIEW2_USER_DATA_FOLDER',
-        'webview2-profile',
-        r'distribution\desktop\edition-coexistence.v1.json',
+        "settingsOpen = $matrix.Count",
+        "settingsTabActivations = $matrix.Count * 4",
+        "screenshots = $matrix.Count * 2",
+        "runtimeStart = 0",
+        "px4 = 0",
+        "gazebo = 0",
+        "browser = 0",
+        "auth = 0",
+        "offline-layout-contract-only-not-installed-app-evidence",
+        "reviewedEvidenceHead = $head",
+        "presentationOnly = $true",
+        "grantsHardwareAuthority = $false",
+        "modeSwitchMayAuthorizeHardware = $false",
+        "loopback-cdp-parent-child-read-only-existing-runtime",
+        "closeOnlyThisBatchApp = $true",
+        "invokeOnlyThisBatchUninstaller = $true",
+        "retryAllowed = $false",
+        "WEBVIEW2_USER_DATA_FOLDER",
+        "webview2-profile",
+        r"distribution\desktop\edition-coexistence.v1.json",
         '$expectedEditionIds = @("universal", "sim", "lab", "field", "autonomy")',
-        '$otherEditionContracts',
-        'otherEditions = @(',
-        'Convert-CoexistenceFilePath',
-        'Convert-CoexistenceRegistryPath',
-        'io.dronedream.desktop.$editionId',
-        'credentialVaultNamespace',
-        'Invoke-IsolatedUninstallerOnce',
-        'Invoke-OwnedCleanupOnce',
-        'Close-ThisBatchAppOnce',
-        'if (-not $Execute)',
-        'Refusing to overwrite an existing installed-app execution root.',
+        "$otherEditionContracts",
+        "otherEditions = @(",
+        "Convert-CoexistenceFilePath",
+        "Convert-CoexistenceRegistryPath",
+        "io.dronedream.desktop.$editionId",
+        "credentialVaultNamespace",
+        "Invoke-IsolatedUninstallerOnce",
+        "Invoke-OwnedCleanupOnce",
+        "Close-ThisBatchAppOnce",
+        "if (-not $Execute)",
+        "Refusing to overwrite an existing installed-app execution root.",
     ):
         assert fragment in script
     assert "tauri build" not in script
@@ -86,38 +86,38 @@ def test_headed_verifier_protects_every_non_universal_edition_namespace() -> Non
 def test_headed_browser_observer_covers_pre_auth_without_bypassing_account_gate() -> None:
     script = BROWSER.read_text(encoding="utf-8")
     for fragment in (
-        'chromium.connectOverCDP(cdpEndpoint)',
+        "chromium.connectOverCDP(cdpEndpoint)",
         'launcherUrl.hash = "/desktop/setup"',
         'assert.equal(edition, "universal")',
-        'The pre-auth prerequisite intentionally stays on the Universal launcher.',
-        'startupTheme',
-        'validationSurface: authenticatedWorkspace '
+        "The pre-auth prerequisite intentionally stays on the Universal launcher.",
+        "startupTheme",
+        "validationSurface: authenticatedWorkspace "
         '? "authenticated-workspace" : "pre-auth-launcher"',
-        'drone-dream:locale',
-        'data-theme-grants-hardware-authority',
-        'data-grants-hardware-authority',
+        "drone-dream:locale",
+        "data-theme-grants-hardware-authority",
+        "data-grants-hardware-authority",
         'assert.equal(theme.grantsHardwareAuthority, "false")',
         'assert.equal(scene.grantsHardwareAuthority, "false")',
-        'assert.equal(await tabs.count(), 4',
-        'measurement.dialogScrollHeight <= measurement.dialogClientHeight + 1',
-        'measurement.panelScrollHeight <= measurement.panelClientHeight + 1',
+        "assert.equal(await tabs.count(), 4",
+        "measurement.dialogScrollHeight <= measurement.dialogClientHeight + 1",
+        "measurement.panelScrollHeight <= measurement.panelClientHeight + 1",
         'await settingsButton.press("Enter")',
-        'async function visibleSettingsButton(page)',
+        "async function visibleSettingsButton(page)",
         '".app-mobile-menu-button:visible"',
         '".app-mobile-settings-entry:visible"',
-        'await menuButton.click()',
+        "await menuButton.click()",
         '".app-mobile-menu-panel.is-open:visible"',
         'assert.equal(await menuButton.getAttribute("aria-expanded"), "true")',
-        'async function assertAuthenticatedAccountSurface(page)',
-        'await workspaceModeSelector.selectOption(edition)',
-        'assert.equal(await workspaceModeSelector.inputValue(), edition)',
-        'prevents each case from inheriting the previous case\'s language',
+        "async function assertAuthenticatedAccountSurface(page)",
+        "await workspaceModeSelector.selectOption(edition)",
+        "assert.equal(await workspaceModeSelector.inputValue(), edition)",
+        "prevents each case from inheriting the previous case's language",
         'menuPanel.locator(".app-account-button:visible")',
         'await menuPanel.waitFor({ state: "hidden", timeout: 30_000 })',
         'await closeButton.press("Enter")',
         'const emulateViewport = args.get("--emulate-viewport") === "true"',
-        'await page.setViewportSize({ width: expectedWidth, height: expectedHeight })',
-        'cdp-emulated-installed-webview',
+        "await page.setViewportSize({ width: expectedWidth, height: expectedHeight })",
+        "cdp-emulated-installed-webview",
     ):
         assert fragment in script
     assert "CDP must remain loopback-only" in script
@@ -125,8 +125,11 @@ def test_headed_browser_observer_covers_pre_auth_without_bypassing_account_gate(
     assert "await browser.close()" not in script
     assert "window.location.assign(nextRoute)" not in script
     assert 'window.history.replaceState({}, "", "/desktop/setup")' not in script
-    assert 'if (authenticatedWorkspace)' in script
-    assert 'universal: "/vehicle-studio"' in script
+    assert "if (authenticatedWorkspace)" in script
+    assert 'universal: "/assistant"' in script
+    assert 'autonomy: "/autonomy"' in script
+    assert 'autonomy: ".autonomy-platform-page"' in script
+    assert 'autonomy: ["#FF5B74", "#EC214F", "#97153B"]' in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
     assert "requestId" not in script
@@ -138,13 +141,14 @@ def test_headed_browser_observer_covers_pre_auth_without_bypassing_account_gate(
 
 def test_ui_verifiers_use_the_current_universal_workspace_storage_contract() -> None:
     script = BROWSER.read_text(encoding="utf-8")
-    assert 'dronedream:universal-workspace:v2' not in script
-    assert 'dronedream:universal-mode:v1' not in script
+    assert "dronedream:universal-workspace:v2" not in script
+    assert "dronedream:universal-mode:v1" not in script
 
     offline = OFFLINE_BROWSER.read_text(encoding="utf-8")
-    assert 'dronedream:universal-workspace:v2' in offline
+    assert "dronedream:universal-workspace:v2" in offline
     assert 'testCase.edition === "universal"' in offline
-    assert '"/vehicle-studio"' in offline
+    assert '"/vehicle-studio"' not in offline
+    assert '"/autonomy/aircraft?source=legacy-vehicle-studio"' not in offline
 
 
 def test_headed_plan_matrix_is_two_sizes_two_locales_on_the_universal_launcher() -> None:
@@ -153,7 +157,7 @@ def test_headed_plan_matrix_is_two_sizes_two_locales_on_the_universal_launcher()
     assert '[ordered]@{ id = "desktop"; width = 1440; height = 900 }' in script
     assert '@("en", "zh-CN")' in script
     assert 'presentationEdition = "universal"' in script
-    assert 'authenticatedWorkspaceMatrixDeferredToOAuthReceipt = $true' in script
+    assert "authenticatedWorkspaceMatrixDeferredToOAuthReceipt = $true" in script
 
 
 def test_headed_tools_parse_without_execution() -> None:
@@ -189,8 +193,7 @@ def test_headed_tools_parse_without_execution() -> None:
 
 def test_offline_layout_receipt_remains_exact_and_non_substitutive() -> None:
     receipt = ROOT / (
-        "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/"
-        "software-ui-layout-receipt.json"
+        "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json"
     )
     payload = json.loads(receipt.read_text(encoding="utf-8"))
     assert payload

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.auth import get_current_user
+from app.autonomy.asset_connectors import get_asset_connector_catalog
 from app.autonomy.catalog import get_bundled_map_manifest, list_scenes
 from app.autonomy.credentials import (
     QualificationCredentialConflict,
@@ -24,8 +25,10 @@ from app.autonomy.harness import inspect_autonomy_harness
 from app.autonomy.models import (
     AutonomyCompileRequest,
     AutonomyHarnessInspectRequest,
+    RuntimeInterruptionRequest,
     RuntimeObservation,
     RuntimeOperatorCommand,
+    RuntimeReplanApplyRequest,
     RuntimeSessionCreateRequest,
     SimulationExecutionStartRequest,
 )
@@ -133,6 +136,15 @@ async def _authorize_compile_request(
         planner_receipt,
         verified_asset_receipt(current_user.id, verification),
     )
+
+
+@router.get("/asset-connectors")
+def read_autonomy_asset_connectors(
+    _current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Describe supported external authoring boundaries without launching them."""
+
+    return ok(get_asset_connector_catalog().model_dump(mode="json"))
 
 
 @router.get("/scenes")
@@ -390,6 +402,56 @@ async def ingest_runtime_observation(
             current_user.id,
             session_id,
             observation,
+        )
+    except AutonomyRuntimeError as exc:
+        raise _runtime_error(exc) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.post("/runtime/sessions/{session_id}/interruptions")
+async def interrupt_runtime_session(
+    session_id: str,
+    request: RuntimeInterruptionRequest,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Hold immediately; model interpretation and replanning happen only afterward."""
+
+    try:
+        result = await asyncio.to_thread(
+            runtime_sessions.interrupt,
+            current_user.id,
+            session_id,
+            request,
+        )
+    except AutonomyRuntimeError as exc:
+        raise _runtime_error(exc) from exc
+    return ok(result.model_dump(mode="json"))
+
+
+@router.post("/runtime/sessions/{session_id}/replans")
+async def apply_runtime_replan(
+    session_id: str,
+    request: RuntimeReplanApplyRequest,
+    http_request: Request,
+    current_user: Annotated[models.User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    """Apply one asset-qualified revision to the currently held mission graph."""
+
+    _context_sha256, planner_receipt, asset_receipt = await _authorize_compile_request(
+        request.mission,
+        current_user,
+        db,
+        http_request.headers.get("Authorization"),
+    )
+    try:
+        result = await asyncio.to_thread(
+            runtime_sessions.apply_replan,
+            current_user.id,
+            session_id,
+            request,
+            planner_receipt=planner_receipt,
+            asset_receipt=asset_receipt,
         )
     except AutonomyRuntimeError as exc:
         raise _runtime_error(exc) from exc

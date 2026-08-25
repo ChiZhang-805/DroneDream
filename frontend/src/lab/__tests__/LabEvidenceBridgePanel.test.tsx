@@ -69,7 +69,7 @@ describe("Lab SIM / FIELD evidence bridge panel", () => {
 
     expect(screen.getByRole("heading", { name: "SIM / FIELD 证据桥" }))
       .toBeInTheDocument();
-    expect(screen.getByText("等待两侧 receipt")).toBeInTheDocument();
+    expect(screen.getByText("等待两侧回执")).toBeInTheDocument();
     expect(screen.getByText("导入证据绝不授予真机权限。")).toBeInTheDocument();
   });
 });

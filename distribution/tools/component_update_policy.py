@@ -18,6 +18,7 @@ COMPONENT_IDS = (
 )
 UPDATE_ORDER = COMPONENT_IDS[:-1]
 EDITIONS = ("universal", "sim", "lab", "field", "autonomy")
+UPDATE_POLICIES = ("automatic", "recommended", "optional", "required")
 
 
 class ComponentUpdatePolicyError(RuntimeError):
@@ -64,9 +65,10 @@ def validate_contract(document: Any) -> dict[str, Any]:
         raise ComponentUpdatePolicyError("component activation order drifted")
 
     components = document["components"]
-    if not isinstance(components, list) or tuple(
-        component.get("componentId") for component in components
-    ) != COMPONENT_IDS:
+    if (
+        not isinstance(components, list)
+        or tuple(component.get("componentId") for component in components) != COMPONENT_IDS
+    ):
         raise ComponentUpdatePolicyError("components must be canonical and ordered")
     component_keys = {
         "componentId",
@@ -85,6 +87,8 @@ def validate_contract(document: Any) -> dict[str, Any]:
     for index, component in enumerate(components):
         component_id = component["componentId"]
         _exact_keys(component, component_keys, component_id)
+        if component_id != "user-state" and component["defaultPolicy"] not in UPDATE_POLICIES:
+            raise ComponentUpdatePolicyError(f"{component_id} default update policy is invalid")
         if component["editions"] != list(EDITIONS):
             raise ComponentUpdatePolicyError(f"{component_id} edition coverage drifted")
         if component["preservesUserState"] is not True:
@@ -94,9 +98,7 @@ def validate_contract(document: Any) -> dict[str, Any]:
             raise ComponentUpdatePolicyError(f"{component_id} dependencies repeat")
         for dependency in dependencies:
             if dependency not in by_id or COMPONENT_IDS.index(dependency) >= index:
-                raise ComponentUpdatePolicyError(
-                    f"{component_id} dependency order is unsafe"
-                )
+                raise ComponentUpdatePolicyError(f"{component_id} dependency order is unsafe")
 
     user_state = by_id["user-state"]
     if (
@@ -145,7 +147,7 @@ def plan_updates(
         required_fields = {"sequence", "version", "trusted", "compatible", "policy"}
         if set(candidate) != required_fields:
             raise ComponentUpdatePolicyError(f"{component_id} candidate fields drifted")
-        if candidate["policy"] not in {"recommended", "required"}:
+        if candidate["policy"] not in UPDATE_POLICIES:
             raise ComponentUpdatePolicyError(f"{component_id} update policy is invalid")
         sequence = candidate["sequence"]
         installed = installed_sequences.get(component_id, 0)
@@ -164,7 +166,7 @@ def plan_updates(
                 else "deferred-manager-unavailable"
             )
         else:
-            status = "ready-required" if candidate["policy"] == "required" else "ready-recommended"
+            status = f"ready-{candidate['policy']}"
         plan.append(
             {
                 "componentId": component_id,

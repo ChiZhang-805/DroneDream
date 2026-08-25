@@ -35,6 +35,7 @@ const canonicalColors = Object.freeze({
   sim: ["#00D9FF", "#2671FF", "#744CFF"],
   lab: ["#A7E84A", "#20C77A", "#087E69"],
   field: ["#FFC247", "#FF754B", "#D746A5"],
+  autonomy: ["#FF5B74", "#EC214F", "#97153B"],
 });
 
 assert(locale === "en" || locale === "zh-CN", `Unsupported locale: ${locale}`);
@@ -154,20 +155,22 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   if (authenticatedWorkspace) {
     await assertAuthenticatedAccountSurface(page);
     const workspaceRoute = {
-      universal: "/vehicle-studio",
+      universal: "/assistant",
       sim: "/assistant",
       lab: "/lab",
       field: "/field",
+      autonomy: "/autonomy",
     }[edition];
     const workspaceModeSelector = await visibleWorkspaceModeSelector(page);
     await workspaceModeSelector.selectOption(edition);
     await page.waitForURL((url) => url.hash === `#${workspaceRoute}`);
     assert.equal(await workspaceModeSelector.inputValue(), edition);
     const workspaceSelector = {
-      universal: ".vehicle-studio-page",
+      universal: ".experiment-assistant-page",
       sim: ".experiment-assistant-page",
       lab: ".lab-page",
       field: ".field-app",
+      autonomy: ".autonomy-platform-page",
     }[edition];
     await page.locator(workspaceSelector).waitFor({ state: "visible", timeout: 30_000 });
     await page.waitForFunction(

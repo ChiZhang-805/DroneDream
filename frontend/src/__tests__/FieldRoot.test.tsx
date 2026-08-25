@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FieldLocaleProvider } from "../field/FieldLocaleProvider";
 
@@ -66,11 +66,26 @@ import { FieldRoot } from "../field/FieldRoot";
 
 async function finishLoading(): Promise<void> {
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(1_100);
+    await vi.advanceTimersByTimeAsync(5_000);
   });
 }
 
 describe("FieldRoot", () => {
+  beforeEach(() => {
+    document.documentElement.dataset.brandEdition = "field";
+    document.documentElement.style.setProperty("--dd-brand-start", "#ff9f3f");
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => ({
+      getExtension: () => ({ loseContext: vi.fn() }),
+    }) as unknown as RenderingContext);
+  });
+
+  afterEach(() => {
+    delete document.documentElement.dataset.brandEdition;
+    document.documentElement.style.removeProperty("--dd-brand-start");
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   it("loads the shared 3D launch scene to 100 percent before offering entry", async () => {
     vi.useFakeTimers();
     const { container } = render(
@@ -98,8 +113,23 @@ describe("FieldRoot", () => {
     expect(container).not.toHaveTextContent(/PX4|Gazebo|SITL|HITL/i);
 
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
-    expect(screen.getByRole("dialog", { name: "Settings" }))
-      .toHaveAttribute("data-settings-consumer", "field");
+    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    expect(quickSettings).toHaveAttribute("data-settings-consumer", "field");
+    expect(quickSettings.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(container.querySelector(".launcher-chrome")).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector(".launcher-main")).toHaveAttribute("aria-hidden", "true");
+    expect((container.querySelector(".launcher-main") as HTMLElement).inert).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "All settings" }));
+    const settingsWorkspace = screen.getByRole("region", { name: "Settings" });
+    expect(settingsWorkspace).toHaveAttribute("data-settings-consumer", "field");
+    expect(screen.getByRole("tablist", { name: "Settings" }))
+      .toHaveAttribute("aria-orientation", "vertical");
+    expect(container.querySelector(".launcher-chrome")).toHaveAttribute("aria-hidden", "true");
+    expect((container.querySelector(".launcher-main") as HTMLElement).inert).toBe(true);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
+    expect(container.querySelector(".launcher-chrome")).not.toHaveAttribute("aria-hidden");
+    expect((container.querySelector(".launcher-main") as HTMLElement).inert).toBe(false);
   });
 
   it("keeps language inside settings and enters the localized Field workspace after auth", async () => {

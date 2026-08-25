@@ -14,7 +14,7 @@ EDITION_LABELS = {
     "sim": "Sim",
     "lab": "Lab",
     "field": "Field",
-    "autonomy": "Autonomy",
+    "autonomy": "Agent",
 }
 RUNTIME_PROFILES = {
     "universal": "unified-sim-lab",

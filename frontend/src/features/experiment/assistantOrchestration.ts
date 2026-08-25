@@ -1,4 +1,9 @@
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
+import {
+  assistantArtifactMatchesEdition,
+  isAssistantArtifactKind,
+  type AssistantArtifactKind,
+} from "./assistantProductPolicy";
 import type {
   ExperimentAssistantDocumentContext,
   ExperimentAssistantTurnResponse,
@@ -30,7 +35,7 @@ export type AssistantRunStage =
 export interface AssistantWorkflowStep {
   step: string;
   label: string;
-  status: "completed" | "needs_input";
+  status: "completed" | "needs_input" | "proposed" | "refused";
 }
 
 export interface AssistantGeneratedFile {
@@ -63,6 +68,7 @@ export interface AssistantOrchestratedRun {
     questions: string[];
     artifact_kind:
       | "autonomy_mission_plan"
+      | "external_asset_qualification_plan"
       | "universal_vehicle_model"
       | "universal_simulation_experiment"
       | "universal_cross_edition_workflow"
@@ -129,7 +135,7 @@ export interface AssistantWorkspaceArtifact {
   run_id: string;
   edition: BrandEditionId;
   workspace_id: string;
-  artifact_kind: typeof ARTIFACT_KINDS[number];
+  artifact_kind: AssistantArtifactKind;
   title: string;
   payload_json: Record<string, unknown>;
   version: number;
@@ -197,7 +203,7 @@ export interface AssistantWorkspaceIndexEntry {
   updated_at: string;
   latest_artifact: {
     artifact_id: string;
-    artifact_kind: typeof ARTIFACT_KINDS[number];
+    artifact_kind: AssistantArtifactKind;
     title: string;
     version: number;
     status: "draft" | "archived";
@@ -244,20 +250,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const ARTIFACT_KINDS = [
-  "autonomy_mission_plan",
-  "universal_vehicle_model",
-  "universal_simulation_experiment",
-  "universal_cross_edition_workflow",
-  "simulation_experiment",
-  "lab_simulation_experiment",
-  "lab_hardware_validation",
-  "lab_calibration_workflow",
-  "lab_sim_to_real_workflow",
-  "lab_real_to_sim_workflow",
-  "field_task_plan",
-] as const;
-
 function validCompletedResult(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return isRecord(value.response)
@@ -271,7 +263,7 @@ function validCompletedResult(value: unknown): boolean {
     && Array.isArray(value.response.questions)
     && typeof value.assistant_message === "string"
     && Array.isArray(value.questions)
-    && ARTIFACT_KINDS.includes(value.artifact_kind as typeof ARTIFACT_KINDS[number])
+    && isAssistantArtifactKind(value.artifact_kind)
     && (
       value.artifact_sha256 === undefined
       || (typeof value.artifact_sha256 === "string"
@@ -305,34 +297,9 @@ function artifactMatchesEdition(
   edition: BrandEditionId,
   result: unknown,
 ): boolean {
-  if (!isRecord(result) || typeof result.artifact_kind !== "string") return false;
-  if (edition === "universal") {
-    return result.artifact_kind === "autonomy_mission_plan"
-      || result.artifact_kind === "universal_vehicle_model"
-      || result.artifact_kind === "universal_simulation_experiment"
-      || result.artifact_kind === "universal_cross_edition_workflow";
-  }
-  if (edition === "sim") {
-    return result.artifact_kind === "autonomy_mission_plan"
-      || result.artifact_kind === "simulation_experiment";
-  }
-  if (edition === "field") {
-    return result.artifact_kind === "autonomy_mission_plan"
-      || result.artifact_kind === "field_task_plan";
-  }
-  if (edition === "autonomy") {
-    return result.artifact_kind === "autonomy_mission_plan"
-      || result.artifact_kind === "universal_vehicle_model"
-      || result.artifact_kind === "simulation_experiment";
-  }
-  return [
-    "autonomy_mission_plan",
-    "lab_simulation_experiment",
-    "lab_hardware_validation",
-    "lab_calibration_workflow",
-    "lab_sim_to_real_workflow",
-    "lab_real_to_sim_workflow",
-  ].includes(result.artifact_kind);
+  return isRecord(result)
+    && isAssistantArtifactKind(result.artifact_kind)
+    && assistantArtifactMatchesEdition(edition, result.artifact_kind, { legacyRead: true });
 }
 
 function validWorkflow(value: unknown): value is AssistantWorkflowStep[] {
@@ -347,7 +314,7 @@ function validWorkflow(value: unknown): value is AssistantWorkflowStep[] {
       && typeof item.label === "string"
       && item.label.length > 0
       && item.label.length <= 255
-      && (item.status === "completed" || item.status === "needs_input")
+      && ["completed", "needs_input", "proposed", "refused"].includes(String(item.status))
     );
 }
 
@@ -540,7 +507,7 @@ function parseWorkspaceSnapshot(
       || typeof item.run_id !== "string"
       || item.edition !== expectedEdition
       || item.workspace_id !== expectedWorkspaceId
-      || !ARTIFACT_KINDS.includes(item.artifact_kind as typeof ARTIFACT_KINDS[number])
+      || !isAssistantArtifactKind(item.artifact_kind)
       || !artifactMatchesEdition(expectedEdition, item)
       || typeof item.title !== "string"
       || !isRecord(item.payload_json)
@@ -660,7 +627,7 @@ function parseWorkspaceIndex(
       || item.organization_id !== expectedOrganizationId
       || item.edition !== expectedEdition
       || typeof item.workspace_id !== "string"
-      || !ARTIFACT_KINDS.includes(item.artifact_kind as typeof ARTIFACT_KINDS[number])
+      || !isAssistantArtifactKind(item.artifact_kind)
       || !artifactMatchesEdition(expectedEdition, item)
       || typeof item.title !== "string"
       || typeof item.version !== "number"
@@ -691,7 +658,7 @@ function parseWorkspaceIndex(
     if (!latestArtifacts.has(item.conversation_id)) {
       latestArtifacts.set(item.conversation_id, {
         artifact_id: item.artifact_id,
-        artifact_kind: item.artifact_kind as typeof ARTIFACT_KINDS[number],
+        artifact_kind: item.artifact_kind as AssistantArtifactKind,
         title: item.title,
         version: item.version,
         status: item.status,

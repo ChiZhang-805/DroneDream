@@ -24,19 +24,23 @@ const homeUrl = "http://getdronedream.com/";
 const editions = {
   universal: {
     displayName: "DroneDream",
-    lockupPath: "brand/commercial/universal-lockup.png",
+    lockupPath: "brand/icons/universal-lockup.png",
   },
   sim: {
     displayName: "DroneDream · SIM",
-    lockupPath: "brand/commercial/sim-lockup.png",
+    lockupPath: "brand/icons/sim-lockup.png",
   },
   lab: {
     displayName: "DroneDream · LAB",
-    lockupPath: "brand/commercial/lab-lockup.png",
+    lockupPath: "brand/icons/lab-lockup.png",
   },
   field: {
     displayName: "DroneDream · FIELD",
-    lockupPath: "brand/commercial/field-lockup.png",
+    lockupPath: "brand/icons/field-lockup.png",
+  },
+  autonomy: {
+    displayName: "DroneDream · AGENT",
+    lockupPath: "brand/icons/agent-lockup.png",
   },
 };
 
@@ -126,6 +130,7 @@ const cases = [
   { edition: "sim", locale: "zh-CN", success: true, width: 390, height: 844 },
   { edition: "lab", locale: "en", success: false, width: 760, height: 900 },
   { edition: "field", locale: "zh-CN", success: false, width: 390, height: 844 },
+  { edition: "autonomy", locale: "en", success: true, width: 1440, height: 900 },
 ];
 const measurements = [];
 

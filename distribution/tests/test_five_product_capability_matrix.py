@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 MATRIX = ROOT / "distribution" / "repository" / "five-product-capability-matrix.v1.json"
 TOPOLOGY = ROOT / "distribution" / "repository" / "branch-topology.v1.json"
@@ -26,7 +25,9 @@ def test_matrix_covers_exactly_five_distinct_products_and_branches() -> None:
         for branch in topology["branches"]
         if branch["role"] == "long-lived-product"
     }
-    assert {product_id: product["branch"] for product_id, product in by_product.items()} == product_branches
+    assert {
+        product_id: product["branch"] for product_id, product in by_product.items()
+    } == product_branches
 
 
 def test_every_product_keeps_autonomy_without_erasing_its_product_boundary() -> None:

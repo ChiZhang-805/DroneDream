@@ -5,13 +5,12 @@ import { apiClient, ApiClientError } from "../api/client";
 import { JOB_STATUSES } from "../types/api";
 import type { JobStatus, ObjectiveProfile, TrackType } from "../types/api";
 import { MetricCard } from "../components/MetricCard";
-import { SectionCard } from "../components/SectionCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { DataTable, type Column } from "../components/DataTable";
 import { Loading, ErrorState } from "../components/States";
 import { RuntimeAccessNotice } from "../components/RuntimeAccessNotice";
 import { useDesktopRuntimeAccess } from "../desktop/access";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
 import type { Job } from "../types/api";
 import { formatDateTime } from "../utils/format";
@@ -86,7 +85,7 @@ function buildJobColumns(t: Translator): Column<Job>[] {
 export function Dashboard() {
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuthOrLocal();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const accountBoundary = auth.configured
     ? auth.account?.id ?? "signed-out"
     : "local";
@@ -138,7 +137,7 @@ export function Dashboard() {
                 : t("runtimeGate.checkingShort")}
             </button>
           ) : (
-            <button type="button" className="btn btn-primary" onClick={openAppSettings}>
+            <button type="button" className="btn btn-primary" onClick={() => openAppSettings("runtime")}>
               {t("runtimeGate.openSetup")}
             </button>
           )}
@@ -165,9 +164,10 @@ export function Dashboard() {
       ) : jobsQuery.isError ? (
         <ErrorState
           description={
-            jobsQuery.error instanceof ApiClientError
-              ? jobsQuery.error.message
-              : t("dashboard.loadFailed")
+            localeSafeError(jobsQuery.error, locale, {
+              zh: t("dashboard.loadFailed"),
+              en: t("dashboard.loadFailed"),
+            })
           }
           action={
             <button
@@ -207,7 +207,7 @@ function DashboardBody({
 
   return (
     <div className="dashboard-body">
-      <SectionCard title={t("dashboard.statusSummary")}>
+      <section className="dashboard-status-summary" aria-label={t("dashboard.statusSummary")}>
         <div className="metric-grid">
           <MetricCard
             label={t("dashboard.totalJobs")}
@@ -240,31 +240,28 @@ function DashboardBody({
             tone="muted"
           />
         </div>
-      </SectionCard>
+      </section>
 
-      <SectionCard
-        title={t("dashboard.recentJobs")}
-        actions={(
+      <section className={`dashboard-recent-jobs${recentJobs.length === 0 ? " is-empty" : ""}`} aria-labelledby="dashboard-recent-jobs-title">
+        <header>
+          <h2 id="dashboard-recent-jobs-title">{t("dashboard.recentJobs")}</h2>
           <Link to="/history" className="dashboard-view-all">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 12h13M14 7l5 5-5 5" />
             </svg>
             <span>{t("dashboard.viewAll")}</span>
           </Link>
-        )}
-      >
-        <div className="dashboard-recent-jobs-content">
-          {recentJobs.length > 0 ? (
+        </header>
+        {recentJobs.length > 0 ? (
+          <div className="dashboard-recent-jobs-content">
             <DataTable
               columns={columns}
               rows={recentJobs}
               rowKey={(j) => j.id}
             />
-          ) : (
-            <div className="dashboard-empty-jobs" aria-hidden="true" />
-          )}
-        </div>
-      </SectionCard>
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }

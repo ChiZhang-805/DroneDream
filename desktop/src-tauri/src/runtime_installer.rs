@@ -57,6 +57,10 @@ const MAX_JCS_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 const IMPORT_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(60);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(3 * 60);
+const NETWORK_ATTEMPTS: usize = 5;
+const NETWORK_RETRY_BASE_DELAY_MS: u64 = 400;
+const UPGRADE_PROBE_CONNECT_TIMEOUT: Duration = Duration::from_secs(4);
+const UPGRADE_PROBE_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 // The installed-app observer owns a 300 second action window. Native startup
 // uses at most 270 seconds and reserves the final 30 seconds for IPC delivery,
 // durable evidence, app shutdown, and the verifier's owned rollback.
@@ -1271,6 +1275,24 @@ fn check_cancel(cancel: &AtomicBool) -> Result<(), InstallFailure> {
     }
 }
 
+fn wait_before_network_retry(
+    cancel: &AtomicBool,
+    failed_attempt: usize,
+) -> Result<(), InstallFailure> {
+    if cfg!(test) {
+        return check_cancel(cancel);
+    }
+    let exponent = u32::try_from(failed_attempt.min(4)).unwrap_or(4);
+    let delay =
+        Duration::from_millis(NETWORK_RETRY_BASE_DELAY_MS.saturating_mul(1_u64 << exponent));
+    let deadline = Instant::now() + delay;
+    while Instant::now() < deadline {
+        check_cancel(cancel)?;
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    check_cancel(cancel)
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ReleaseManifest {
@@ -1826,13 +1848,41 @@ trait ReleaseTransport: Send + Sync {
 
 struct HttpReleaseTransport {
     client: reqwest::blocking::Client,
+    attempts: usize,
 }
 
 impl HttpReleaseTransport {
     fn new() -> Result<Self, InstallFailure> {
+        Self::with_policy(
+            Duration::from_secs(20),
+            Duration::from_secs(30 * 60),
+            NETWORK_ATTEMPTS,
+        )
+    }
+
+    fn for_upgrade_probe() -> Result<Self, InstallFailure> {
+        Self::with_policy(
+            UPGRADE_PROBE_CONNECT_TIMEOUT,
+            UPGRADE_PROBE_REQUEST_TIMEOUT,
+            1,
+        )
+    }
+
+    fn with_policy(
+        connect_timeout: Duration,
+        request_timeout: Duration,
+        attempts: usize,
+    ) -> Result<Self, InstallFailure> {
+        if attempts == 0 {
+            return Err(fail(
+                "http_client",
+                "The HTTPS client retry policy must allow at least one attempt.",
+                false,
+            ));
+        }
         let client = reqwest::blocking::Client::builder()
-            .connect_timeout(Duration::from_secs(20))
-            .timeout(Duration::from_secs(30 * 60))
+            .connect_timeout(connect_timeout)
+            .timeout(request_timeout)
             .redirect(reqwest::redirect::Policy::custom(|attempt| {
                 if attempt.url().scheme() != "https" {
                     attempt.error("runtime download redirect attempted to leave HTTPS")
@@ -1851,7 +1901,7 @@ impl HttpReleaseTransport {
                     true,
                 )
             })?;
-        Ok(Self { client })
+        Ok(Self { client, attempts })
     }
 
     fn send(
@@ -1885,48 +1935,68 @@ impl ReleaseTransport for HttpReleaseTransport {
         maximum: u64,
         cancel: &AtomicBool,
     ) -> Result<Vec<u8>, InstallFailure> {
-        let mut response = self.send(url, None, cancel)?;
-        if !response.status().is_success() {
-            return Err(fail(
-                "download_status",
-                format!("{url} returned HTTP {}.", response.status()),
+        let mut last_failure = None;
+        for attempt in 0..self.attempts {
+            let result = (|| {
+                let mut response = self.send(url, None, cancel)?;
+                if !response.status().is_success() {
+                    return Err(fail(
+                        "download_status",
+                        format!("{url} returned HTTP {}.", response.status()),
+                        true,
+                    ));
+                }
+                if response
+                    .content_length()
+                    .is_some_and(|length| length > maximum)
+                {
+                    return Err(fail(
+                        "download_too_large",
+                        format!("{url} exceeds the allowed size."),
+                        false,
+                    ));
+                }
+                let mut body = Vec::new();
+                let mut chunk = [0_u8; 16 * 1024];
+                loop {
+                    check_cancel(cancel)?;
+                    let count = response.read(&mut chunk).map_err(|error| {
+                        fail(
+                            "download_failed",
+                            format!("Unable to read {url}: {error}"),
+                            true,
+                        )
+                    })?;
+                    if count == 0 {
+                        break;
+                    }
+                    if body.len() as u64 + count as u64 > maximum {
+                        return Err(fail(
+                            "download_too_large",
+                            format!("{url} exceeds the allowed size."),
+                            false,
+                        ));
+                    }
+                    body.extend_from_slice(&chunk[..count]);
+                }
+                Ok(body)
+            })();
+            match result {
+                Ok(body) => return Ok(body),
+                Err(error) if error.retryable && attempt + 1 < self.attempts => {
+                    last_failure = Some(error);
+                    wait_before_network_retry(cancel, attempt)?;
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Err(last_failure.unwrap_or_else(|| {
+            fail(
+                "download_failed",
+                format!("Unable to download {url}."),
                 true,
-            ));
-        }
-        if response
-            .content_length()
-            .is_some_and(|length| length > maximum)
-        {
-            return Err(fail(
-                "download_too_large",
-                format!("{url} exceeds the allowed size."),
-                false,
-            ));
-        }
-        let mut body = Vec::new();
-        let mut chunk = [0_u8; 16 * 1024];
-        loop {
-            check_cancel(cancel)?;
-            let count = response.read(&mut chunk).map_err(|error| {
-                fail(
-                    "download_failed",
-                    format!("Unable to read {url}: {error}"),
-                    true,
-                )
-            })?;
-            if count == 0 {
-                break;
-            }
-            if body.len() as u64 + count as u64 > maximum {
-                return Err(fail(
-                    "download_too_large",
-                    format!("{url} exceeds the allowed size."),
-                    false,
-                ));
-            }
-            body.extend_from_slice(&chunk[..count]);
-        }
-        Ok(body)
+            )
+        }))
     }
 
     fn download_range(
@@ -1945,6 +2015,27 @@ impl ReleaseTransport for HttpReleaseTransport {
             .get(CONTENT_RANGE)
             .and_then(|value| value.to_str().ok())
             .map(str::to_string);
+        let declared_total = start.checked_add(maximum).ok_or_else(|| {
+            fail(
+                "download_too_large",
+                "Artifact part range overflowed.",
+                false,
+            )
+        })?;
+        let valid_range = if start == 0 {
+            status == 200
+                || (status == 206
+                    && content_range_matches(content_range.as_deref(), 0, declared_total))
+        } else {
+            status == 206 && content_range_matches(content_range.as_deref(), start, declared_total)
+        };
+        if !valid_range {
+            return Err(fail(
+                "invalid_range_response",
+                "The artifact server returned an invalid byte range before download began.",
+                true,
+            ));
+        }
         if response
             .headers()
             .get(CONTENT_LENGTH)
@@ -3224,6 +3315,47 @@ fn validate_upgrade_version(
     Ok(())
 }
 
+fn upgrade_candidate_available(
+    installed_build_id: &str,
+    installed_version: &str,
+    manifest: &ReleaseManifest,
+) -> Result<bool, InstallFailure> {
+    match validate_upgrade_version(installed_build_id, installed_version, manifest) {
+        Ok(()) => Ok(true),
+        Err(error) if error.code == "runtime_upgrade_not_newer" => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+/// Checks whether the configured, signed Runtime Base channel can actually
+/// satisfy an upgrade request for the installed identity. This probe is
+/// deliberately read-only and bounded: it never prepares WSL, creates cache
+/// state, or starts an installer. Engine Pack compatibility checks use it to
+/// avoid advertising an upgrade action that the signed channel would reject as
+/// equal or older.
+pub(crate) fn runtime_upgrade_candidate_available(
+    installed_build_id: &str,
+    installed_version: &str,
+) -> Result<bool, String> {
+    validate_release_url(DEFAULT_RELEASE_MANIFEST_URL, false)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    let transport =
+        HttpReleaseTransport::for_upgrade_probe().map_err(runtime_maintenance_error_for_ipc)?;
+    let cancel = AtomicBool::new(false);
+    let raw_manifest = transport
+        .fetch(DEFAULT_RELEASE_MANIFEST_URL, MAX_MANIFEST_BYTES, &cancel)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    let signature_url = detached_signature_url(DEFAULT_RELEASE_MANIFEST_URL)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    let raw_signature = transport
+        .fetch(&signature_url, MAX_SIGNATURE_BYTES, &cancel)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    let manifest = parse_and_verify_manifest(&raw_manifest, &raw_signature, TRUSTED_KEYRING)
+        .map_err(runtime_maintenance_error_for_ipc)?;
+    upgrade_candidate_available(installed_build_id, installed_version, &manifest)
+        .map_err(runtime_maintenance_error_for_ipc)
+}
+
 fn recover_pending_install(
     installer: &RuntimeInstaller,
     target: &Path,
@@ -4422,12 +4554,23 @@ fn run_install_core_with_mode(
             }
         }
 
-        if existing < part.size_bytes {
+        let mut download_attempt = 0_usize;
+        while existing < part.size_bytes {
             let base_downloaded = resume.archive_size;
             installer.update(|snapshot| {
                 snapshot.current_part = Some(part.index + 1);
                 snapshot.bytes_downloaded = base_downloaded + existing;
+                snapshot.message = if download_attempt == 0 {
+                    Some("Downloading the verified runtime image...".to_string())
+                } else {
+                    Some(format!(
+                        "Network interrupted; resuming verified download (attempt {}/{NETWORK_ATTEMPTS})...",
+                        download_attempt + 1,
+                    ))
+                };
             });
+            let request_start = existing;
+            let expected_remaining = part.size_bytes - request_start;
             let mut output = OpenOptions::new()
                 .create(true)
                 .append(true)
@@ -4439,58 +4582,110 @@ fn run_install_core_with_mode(
                         true,
                     )
                 })?;
-            let expected_remaining = part.size_bytes - existing;
             let mut on_progress = |written: u64| {
                 installer.update(|snapshot| {
-                    snapshot.bytes_downloaded = base_downloaded + existing + written;
+                    snapshot.bytes_downloaded = base_downloaded + request_start + written;
                 });
             };
-            let response = match transport.download_range(
+            let response = transport.download_range(
                 &part.url,
-                existing,
+                request_start,
                 expected_remaining,
                 &mut output,
                 cancel,
                 &mut on_progress,
-            ) {
-                Ok(value) => value,
-                Err(error) => {
-                    let _ = output.flush();
-                    return Err(error);
-                }
-            };
-            output.sync_all().map_err(|error| {
+            );
+            let persist_result = output.sync_all().map_err(|error| {
                 fail(
                     "cache_write",
                     format!("Unable to persist {}: {error}", archive_path.display()),
                     true,
                 )
-            })?;
-            validate_release_url(&response.final_url, false)?;
-            let valid_range = if existing == 0 {
-                response.status == 200
-                    || (response.status == 206
-                        && content_range_matches(
-                            response.content_range.as_deref(),
-                            0,
-                            part.size_bytes,
-                        ))
-            } else {
-                response.status == 206
-                    && content_range_matches(
-                        response.content_range.as_deref(),
-                        existing,
-                        part.size_bytes,
+            });
+            drop(output);
+            persist_result?;
+
+            let observed = fs::metadata(&archive_path)
+                .map(|metadata| metadata.len().saturating_sub(resume.archive_size))
+                .map_err(|error| {
+                    fail(
+                        "cache_read",
+                        format!("Unable to inspect {}: {error}", archive_path.display()),
+                        true,
                     )
-            };
-            if !valid_range || response.bytes_written != expected_remaining {
-                truncate_file(&archive_path, resume.archive_size + existing)?;
+                })?;
+            if observed > part.size_bytes {
+                truncate_file(&archive_path, resume.archive_size + request_start)?;
                 return Err(fail(
-                    "invalid_range_response",
-                    "The artifact server returned an invalid or incomplete byte range; cached verified data was preserved.",
+                    "download_too_large",
+                    "The artifact response exceeded its declared part size; unverified bytes were removed.",
+                    false,
+                ));
+            }
+
+            match response {
+                Ok(response) => {
+                    validate_release_url(&response.final_url, false)?;
+                    let valid_range = if request_start == 0 {
+                        response.status == 200
+                            || (response.status == 206
+                                && content_range_matches(
+                                    response.content_range.as_deref(),
+                                    0,
+                                    part.size_bytes,
+                                ))
+                    } else {
+                        response.status == 206
+                            && content_range_matches(
+                                response.content_range.as_deref(),
+                                request_start,
+                                part.size_bytes,
+                            )
+                    };
+                    if !valid_range {
+                        truncate_file(&archive_path, resume.archive_size + request_start)?;
+                        return Err(fail(
+                            "invalid_range_response",
+                            "The artifact server returned an invalid byte range; cached verified data was preserved.",
+                            true,
+                        ));
+                    }
+                    existing = observed;
+                    if response.bytes_written == expected_remaining && existing == part.size_bytes {
+                        break;
+                    }
+                    if response.bytes_written == 0 || existing <= request_start {
+                        return Err(fail(
+                            "incomplete_range_response",
+                            "The artifact server made no download progress.",
+                            true,
+                        ));
+                    }
+                }
+                Err(error) if error.retryable && !error.cancelled => {
+                    existing = observed;
+                    if existing <= request_start {
+                        truncate_file(&archive_path, resume.archive_size + request_start)?;
+                    }
+                    download_attempt += 1;
+                    if download_attempt >= NETWORK_ATTEMPTS {
+                        return Err(error);
+                    }
+                    wait_before_network_retry(cancel, download_attempt - 1)?;
+                    continue;
+                }
+                Err(error) => return Err(error),
+            }
+
+            download_attempt += 1;
+            if download_attempt >= NETWORK_ATTEMPTS {
+                return Err(fail(
+                    "incomplete_range_response",
+                    "The artifact download remained incomplete after automatic resume attempts.",
                     true,
                 ));
             }
+            wait_before_network_retry(cancel, download_attempt - 1)?;
         }
 
         match verify_file_range_sha256(
@@ -6129,6 +6324,35 @@ mod tests {
     }
 
     #[test]
+    fn runtime_upgrade_action_is_hidden_when_the_signed_candidate_cannot_advance_identity() {
+        let manifest = fixture_manifest(b"runtime");
+
+        assert!(upgrade_candidate_available(
+            "123e4567-e89b-12d3-a456-426614174099",
+            "1.2.2",
+            &manifest,
+        )
+        .unwrap());
+        assert!(!upgrade_candidate_available(
+            "123e4567-e89b-12d3-a456-426614174099",
+            "1.2.3",
+            &manifest,
+        )
+        .unwrap());
+        assert!(
+            !upgrade_candidate_available(&manifest.runtime.build_id, "1.2.2", &manifest,).unwrap()
+        );
+
+        let invalid = upgrade_candidate_available(
+            "123e4567-e89b-12d3-a456-426614174099",
+            "not-semver",
+            &manifest,
+        )
+        .expect_err("invalid installed identity must not be misclassified as no update");
+        assert_eq!(invalid.code, "invalid_installed_version");
+    }
+
+    #[test]
     fn runtime_upgrade_recovery_records_are_owner_bound_and_time_bounded() {
         let now = chrono::Utc::now().to_rfc3339();
         assert!(validate_upgrade_record_identity(
@@ -6186,6 +6410,8 @@ mod tests {
         mode: TransportMode,
         starts: Mutex<Vec<u64>>,
         fetches: AtomicUsize,
+        fail_after_bytes: Option<usize>,
+        failures_remaining: AtomicUsize,
     }
 
     impl FakeTransport {
@@ -6195,6 +6421,8 @@ mod tests {
                 mode: TransportMode::Valid,
                 starts: Mutex::new(Vec::new()),
                 fetches: AtomicUsize::new(0),
+                fail_after_bytes: None,
+                failures_remaining: AtomicUsize::new(0),
             }
         }
     }
@@ -6218,6 +6446,17 @@ mod tests {
             self.starts.lock().unwrap().push(start);
             let tail = &self.body[start as usize..];
             assert!(tail.len() as u64 <= maximum);
+            if self.failures_remaining.load(Ordering::Relaxed) > 0 {
+                self.failures_remaining.fetch_sub(1, Ordering::Relaxed);
+                let partial = self.fail_after_bytes.unwrap_or(1).min(tail.len());
+                output.write_all(&tail[..partial]).unwrap();
+                progress(partial as u64);
+                return Err(fail(
+                    "download_failed",
+                    "injected transient network interruption",
+                    true,
+                ));
+            }
             output.write_all(tail).unwrap();
             progress(tail.len() as u64);
             let valid_range = matches!(self.mode, TransportMode::Valid);
@@ -6639,6 +6878,37 @@ mod tests {
     }
 
     #[test]
+    fn automatically_resumes_a_partial_part_after_a_transient_network_failure() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        let body = b"runtime-image";
+        let manifest = fixture_manifest(body);
+        let raw = serde_jcs::to_vec(&manifest).unwrap();
+        let transport = FakeTransport {
+            body: body.to_vec(),
+            mode: TransportMode::Valid,
+            starts: Mutex::new(Vec::new()),
+            fetches: AtomicUsize::new(0),
+            fail_after_bytes: Some(4),
+            failures_remaining: AtomicUsize::new(1),
+        };
+
+        let result = run_install_core(
+            &RuntimeInstaller::default(),
+            &target,
+            &manifest,
+            &raw,
+            &transport,
+            &FakeWsl::default(),
+            &AtomicBool::new(false),
+        )
+        .unwrap();
+
+        assert_eq!(result.version, "1.2.3");
+        assert_eq!(*transport.starts.lock().unwrap(), vec![0, 4]);
+    }
+
+    #[test]
     fn planner_credits_only_marker_owned_bytes_with_a_valid_cached_signature() {
         let sandbox = Sandbox::new();
         let target = sandbox.target();
@@ -6696,6 +6966,8 @@ mod tests {
             mode: TransportMode::InvalidRange,
             starts: Mutex::new(Vec::new()),
             fetches: AtomicUsize::new(0),
+            fail_after_bytes: None,
+            failures_remaining: AtomicUsize::new(0),
         };
         let error = run_install_core(
             &RuntimeInstaller::default(),

@@ -400,7 +400,7 @@ def test_public_scene_catalog_exposes_only_the_canonical_school_map_name() -> No
     ]
 
 
-def test_frontend_fallback_manifest_matches_the_backend_geometry_digest() -> None:
+def test_frontend_reads_the_backend_manifest_instead_of_freezing_its_digest() -> None:
     artifact_cache_before = get_school_map_gazebo_artifact.cache_info()
     manifest = get_bundled_map_manifest("school-campus-v1")
     artifact_cache_after = get_school_map_gazebo_artifact.cache_info()
@@ -408,8 +408,12 @@ def test_frontend_fallback_manifest_matches_the_backend_geometry_digest() -> Non
     frontend_source = (
         Path(__file__).resolve().parents[2] / "frontend" / "src" / "pages" / "AutonomyPlatform.tsx"
     ).read_text(encoding="utf-8")
+    frontend_api_types = (
+        Path(__file__).resolve().parents[2] / "frontend" / "src" / "types" / "api.ts"
+    ).read_text(encoding="utf-8")
 
-    assert f'manifest_sha256: "{manifest["manifest_sha256"]}"' in frontend_source
+    assert manifest["manifest_sha256"] not in frontend_source
+    assert "map_pack_manifest: AutonomyBundledMapManifest" in frontend_api_types
     assert artifact_cache_after == artifact_cache_before
 
 

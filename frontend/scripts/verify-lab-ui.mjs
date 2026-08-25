@@ -220,7 +220,7 @@ try {
     await assertSingleScreen(page, testCase, "assistant", ".experiment-assistant-page");
     evidence.push(await screenshot(page, testCase, "assistant"));
 
-    await page.goto(`${origin}/lab`, { waitUntil: "networkidle" });
+    await page.goto(`${origin}/lab?docsPreview=1`, { waitUntil: "networkidle" });
 
     const title = testCase.locale === "en"
       ? "Sim-to-Real calibration laboratory"
@@ -233,7 +233,7 @@ try {
       naturalWidth: image instanceof HTMLImageElement ? image.naturalWidth : 0,
       naturalHeight: image instanceof HTMLImageElement ? image.naturalHeight : 0,
     }));
-    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 2648, naturalHeight: 480 });
+    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 2386, naturalHeight: 218 });
     assert((await page.getByText("DroneDream · LAB", { exact: false }).count()) > 0);
     const palette = await page.locator(".lab-page").evaluate((element) => {
       const style = getComputedStyle(element);
@@ -325,7 +325,7 @@ try {
     await assertViewportFits(page, testCase, "safety");
     evidence.push(await screenshot(page, testCase, "safety"));
 
-    await page.goto(`${origin}/lab/hardware`, { waitUntil: "networkidle" });
+    await page.goto(`${origin}/lab/hardware?docsPreview=1`, { waitUntil: "networkidle" });
     const hardwareWorkspace = page.locator(
       '.lab-hardware-workspace[data-brand-edition="lab"]',
     );
@@ -338,7 +338,10 @@ try {
     assert.equal(await embeddedHardware.getAttribute("data-validated-pack-count"), "0");
     assert.equal(await embeddedHardware.getAttribute("data-quorum"), "missing");
     assert.equal(
-      await hardwareWorkspace.getByText("0 validated packs", { exact: true }).count(),
+      await hardwareWorkspace.getByText(
+        testCase.locale === "en" ? "0 validated packs" : "0 个已验证机型包",
+        { exact: true },
+      ).count(),
       1,
     );
     await assertViewportFits(page, testCase, "hardware-domain");

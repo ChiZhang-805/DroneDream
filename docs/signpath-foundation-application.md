@@ -119,7 +119,8 @@ for each desktop callback identity:
 - variable `DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL`;
 - variable `DRONEDREAM_OAUTH_CLIENT_ID_SIM`;
 - variable `DRONEDREAM_OAUTH_CLIENT_ID_LAB`; and
-- variable `DRONEDREAM_OAUTH_CLIENT_ID_FIELD`.
+- variable `DRONEDREAM_OAUTH_CLIENT_ID_FIELD`; and
+- variable `DRONEDREAM_OAUTH_CLIENT_ID_AGENT`.
 
 The SignPath GitHub App must be installed for this repository and the
 predefined GitHub.com trusted build system must be linked to the SignPath
@@ -136,7 +137,7 @@ authorization and cannot be delegated to a build script:
 4. If accepted, create/authorize the SignPath account, install the SignPath
    GitHub App, link GitHub.com as the trusted build system, and approve the
    requested artifact/policy configuration.
-5. Register or confirm the four public desktop OAuth clients in the browser and
+5. Register or confirm the five public desktop OAuth clients in the browser and
    enter their public client IDs as the four GitHub repository variables above.
 6. Create a least-privilege SignPath submitter token and enter it directly as
    the GitHub `SIGNPATH_API_TOKEN` secret. Never send the token in chat or

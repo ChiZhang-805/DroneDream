@@ -2,7 +2,6 @@ import {
   Ban,
   CheckCircle2,
   CircleOff,
-  ClipboardCheck,
   MapPinned,
   ShieldAlert,
   SlidersHorizontal,
@@ -15,17 +14,18 @@ import {
   type FieldParameterSnapshot,
   type FieldPreflightPlan,
 } from "../desktop/bridge";
+import { localeSafeError } from "../i18n/I18nProvider";
 import type { FieldLocale } from "./catalog";
 import { FIELD_HARDWARE_ACTIONS } from "./safety";
 
 const COPY = {
   en: {
     preflightTitle: "Preflight quorum",
-    preflightBody: "Evaluate source-bound aircraft, snapshot, zone, and operator evidence. Evaluation never grants control.",
     zoneName: "Operating zone",
     radius: "Radius (m)",
     altitude: "Maximum altitude (m)",
     evaluate: "Evaluate preflight",
+    evaluateFailed: "Preflight evaluation failed.",
     unavailable: "Native preflight evaluation is available in the installed Field app.",
     acknowledgement: "I confirm the declared zone and understand that this local record is not signed authority.",
     localOnly: "Local only",
@@ -34,7 +34,6 @@ const COPY = {
     blockers: "Blocking evidence",
     plan: "Plan",
     controlTitle: "Takeover & emergency",
-    controlBody: "Control commands remain unavailable until the native safety contract is complete.",
     takeover: "Request takeover",
     emergency: "Emergency stop",
     actionMatrix: "Hardware action decisions",
@@ -60,11 +59,11 @@ const COPY = {
   },
   "zh-CN": {
     preflightTitle: "飞前仲裁",
-    preflightBody: "评估源绑定的机型、快照、区域和操作者证据；评估本身永远不授予控制权限。",
     zoneName: "作业区域",
     radius: "半径（米）",
     altitude: "最大高度（米）",
     evaluate: "评估飞前条件",
+    evaluateFailed: "飞前条件评估失败。",
     unavailable: "原生飞前评估仅在已安装的 Field 应用中可用。",
     acknowledgement: "我确认所声明的区域，并理解此本地记录不是签名权限证据。",
     localOnly: "仅本地",
@@ -73,7 +72,6 @@ const COPY = {
     blockers: "阻断证据",
     plan: "计划",
     controlTitle: "接管与紧急操作",
-    controlBody: "原生安全合同完整闭合前，所有控制命令保持不可用。",
     takeover: "请求接管",
     emergency: "紧急停止",
     actionMatrix: "真机动作决策",
@@ -142,7 +140,10 @@ export function FieldPreflightWorkspace({
       }));
     } catch (reason) {
       setPlan(null);
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].evaluateFailed,
+        en: COPY.en.evaluateFailed,
+      }));
     } finally {
       setBusy(false);
     }
@@ -156,10 +157,7 @@ export function FieldPreflightWorkspace({
         aria-labelledby="field-preflight-title"
         data-authority="false"
       >
-        <header>
-          <div><h2 id="field-preflight-title">{copy.preflightTitle}</h2><p>{copy.preflightBody}</p></div>
-          <ClipboardCheck aria-hidden="true" />
-        </header>
+        <h2 id="field-preflight-title" className="sr-only">{copy.preflightTitle}</h2>
         {!desktop ? <p className="field-adapter-offline"><Ban aria-hidden="true" />{copy.unavailable}</p> : null}
         <div className="field-preflight-inputs">
           <label><span>{copy.zoneName}</span><input value={zoneName} maxLength={160} onChange={(event) => setZoneName(event.target.value)} /></label>
@@ -200,17 +198,17 @@ export function FieldPreflightWorkspace({
       </section>
 
       <section id="control" className="field-section" aria-labelledby="field-control-title">
-        <header><div><h2 id="field-control-title">{copy.controlTitle}</h2><p>{copy.controlBody}</p></div><ShieldAlert aria-hidden="true" /></header>
+        <header><h2 id="field-control-title">{copy.controlTitle}</h2><ShieldAlert aria-hidden="true" /></header>
         <div className="field-control-buttons">
           <button type="button" disabled><SlidersHorizontal aria-hidden="true" />{copy.takeover}</button>
           <button type="button" disabled><ShieldAlert aria-hidden="true" />{copy.emergency}</button>
         </div>
         <h3>{copy.actionMatrix}</h3>
-        <div className="field-action-matrix">
+        <ul className="field-action-matrix">
           {FIELD_HARDWARE_ACTIONS.map((action) => (
-            <div key={action}><CircleOff aria-hidden="true" /><span>{copy.action[action]}</span><strong>{plan?.actionDecisions[action] ?? copy.denied}</strong></div>
+            <li key={action}><CircleOff aria-hidden="true" /><span>{copy.action[action]}</span><strong>{plan?.actionDecisions[action] ?? copy.denied}</strong></li>
           ))}
-        </div>
+        </ul>
       </section>
     </>
   );

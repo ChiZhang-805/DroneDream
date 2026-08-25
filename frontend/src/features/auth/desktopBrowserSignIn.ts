@@ -4,12 +4,20 @@ import {
   clearBrowserAuthVault,
   restoreBrowserAuthVault,
 } from "../../desktop/bridge";
-import { adoptBrowserAuthSession } from "./browserAuth";
+import {
+  adoptBrowserAuthSession,
+  shouldClearBrowserAuthVaultAfterAdoptionError,
+} from "./browserAuth";
 import { activateDesktopAuthSession } from "./desktopAuthActivation";
 
 export interface DesktopBrowserSignInOptions {
   signal?: AbortSignal;
   restoreFromVault?: boolean;
+  onAdopting?: () => void;
+}
+
+export interface DesktopBrowserRestoreOptions {
+  signal?: AbortSignal;
   onAdopting?: () => void;
 }
 
@@ -43,6 +51,21 @@ function abortable<T>(operation: Promise<T>, signal?: AbortSignal): Promise<T> {
   });
 }
 
+async function rethrowAdoptionError(
+  error: unknown,
+  signal?: AbortSignal,
+): Promise<never> {
+  if (signal?.aborted) throw cancelledError();
+  if (shouldClearBrowserAuthVaultAfterAdoptionError(error)) {
+    // Native vault entries are edition-scoped. Remove this one only when the
+    // adoption result proves it cannot become usable again; connectivity,
+    // throttling, service, configuration, and unknown failures retain it.
+    await clearBrowserAuthVault().catch(() => false);
+    throwIfCancelled(signal);
+  }
+  throw error;
+}
+
 export async function completeDesktopBrowserSignIn(
   locale: "en" | "zh-CN",
   options: DesktopBrowserSignInOptions = {},
@@ -61,14 +84,28 @@ export async function completeDesktopBrowserSignIn(
   try {
     await abortable(adoptBrowserAuthSession(session, { signal }), signal);
   } catch (error) {
-    if (signal?.aborted) throw cancelledError();
-    // Native stores only this edition's refresh grant before returning the
-    // session. If the WebView cannot adopt it, remove the exact unusable grant
-    // so the next explicit sign-in cannot loop on stale credentials.
-    await clearBrowserAuthVault().catch(() => false);
-    throw error;
+    await rethrowAdoptionError(error, signal);
   }
   throwIfCancelled(signal);
+}
+
+export async function restoreDesktopBrowserSession(
+  options: DesktopBrowserRestoreOptions = {},
+): Promise<boolean> {
+  const { signal, onAdopting } = options;
+  throwIfCancelled(signal);
+  activateDesktopAuthSession();
+  const restored = await abortable(restoreBrowserAuthVault(), signal);
+  throwIfCancelled(signal);
+  if (!restored) return false;
+  onAdopting?.();
+  try {
+    await abortable(adoptBrowserAuthSession(restored, { signal }), signal);
+  } catch (error) {
+    await rethrowAdoptionError(error, signal);
+  }
+  throwIfCancelled(signal);
+  return true;
 }
 
 export async function cancelDesktopBrowserSignIn(

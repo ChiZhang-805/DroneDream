@@ -10,6 +10,7 @@ import {
   installComponentUpdate,
   isDesktopRuntime,
   type ComponentUpdateId,
+  type ComponentUpdateCandidate,
   type ComponentUpdateReport,
   type EnginePackStatus,
 } from "./bridge";
@@ -55,12 +56,71 @@ const COMPONENT_INSTALL_ORDER: ComponentUpdateId[] = [
   "asset-pack",
 ];
 
+export function orderComponentUpdates(
+  candidates: ComponentUpdateCandidate[],
+): ComponentUpdateId[] {
+  const available = candidates.filter((candidate) => candidate.available);
+  const byId = new Map(available.map((candidate) => [candidate.componentId, candidate]));
+  const pending = new Set(byId.keys());
+  const ordered: ComponentUpdateId[] = [];
+  while (pending.size > 0) {
+    const ready = COMPONENT_INSTALL_ORDER.filter((componentId) => {
+      if (!pending.has(componentId)) return false;
+      const candidate = byId.get(componentId);
+      return candidate?.dependencies.every((dependency) => !pending.has(dependency.componentId));
+    });
+    if (ready.length === 0) {
+      throw new Error("The signed component update dependency graph contains a cycle.");
+    }
+    for (const componentId of ready) {
+      pending.delete(componentId);
+      ordered.push(componentId);
+    }
+  }
+  return ordered;
+}
+
+export function selectManualComponentUpdates(
+  candidates: ComponentUpdateCandidate[],
+): ComponentUpdateCandidate[] {
+  const available = candidates.filter((candidate) => candidate.available);
+  const required = available.filter((candidate) => candidate.urgency === "required");
+  const recommended = available.filter((candidate) => candidate.urgency === "recommended");
+  const primary = required.length > 0
+    ? required
+    : recommended.length > 0
+      ? recommended
+      : available.filter((candidate) => candidate.urgency === "optional");
+  const selected = new Map(primary.map((candidate) => [candidate.componentId, candidate]));
+  const byId = new Map(available.map((candidate) => [candidate.componentId, candidate]));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const candidate of [...selected.values()]) {
+      for (const dependency of candidate.dependencies) {
+        const pendingDependency = byId.get(dependency.componentId);
+        if (pendingDependency && !selected.has(pendingDependency.componentId)) {
+          selected.set(pendingDependency.componentId, pendingDependency);
+          changed = true;
+        }
+      }
+    }
+  }
+  return [...selected.values()];
+}
+
 function componentCatalogEnabled(): boolean {
   return import.meta.env.VITE_COMPONENT_UPDATE_CATALOG_ENABLED === "true";
 }
 
 function componentCatalogUrl(): string | undefined {
   return import.meta.env.VITE_COMPONENT_UPDATE_CATALOG_URL?.trim() || undefined;
+}
+
+const NO_PUBLISHED_DESKTOP_UPDATE = "Could not fetch a valid release JSON from the remote";
+
+export function isNoPublishedDesktopUpdate(error: unknown): boolean {
+  return errorMessage(error).trim() === NO_PUBLISHED_DESKTOP_UPDATE;
 }
 
 const UPDATE_POLICY_PATTERN = /^update-policy:\s*(recommended|required)$/gmu;
@@ -103,14 +163,78 @@ export function useAppUpdater() {
     enginePack?: EnginePackStatus | null,
   ) => {
     if (!desktopRuntime || import.meta.env.MODE === "test") return;
+    // A healthy installed Runtime may keep running its existing Engine Pack
+    // while the signed Runtime channel has no compatible newer base. Preserve
+    // that evidence, but do not attempt component mutation through a manager
+    // whose capabilities were not verified.
+    if (enginePack && !enginePack.supported) {
+      setState({ ...CURRENT_STATE, enginePack });
+      return;
+    }
     if (!componentCatalogEnabled()) {
       setState({ ...CURRENT_STATE, enginePack: enginePack ?? null });
       return;
     }
     try {
-      const report = await checkSignedComponentUpdates(componentCatalogUrl());
+      let report = await checkSignedComponentUpdates(componentCatalogUrl());
       if (generation !== undefined && generation !== checkGenerationRef.current) return;
-      const candidates = report.candidates.filter((candidate) => candidate.available);
+      let candidates = report.candidates.filter((candidate) => candidate.available);
+      const automaticCandidates = candidates.filter((candidate) => {
+        if (candidate.installMode !== "automatic") return false;
+        return candidate.dependencies.every((dependency) => {
+          const pendingDependency = candidates.find((entry) => (
+            entry.componentId === dependency.componentId
+          ));
+          return !pendingDependency || pendingDependency.installMode === "automatic";
+        });
+      });
+      if (automaticCandidates.length > 0 && !installInFlightRef.current) {
+        const automaticIds = orderComponentUpdates(automaticCandidates);
+        installInFlightRef.current = true;
+        setState({
+          status: "installingComponents",
+          availableVersion: null,
+          updateRequired: automaticCandidates.some((candidate) => (
+            candidate.urgency === "required"
+          )),
+          progress: 0,
+          error: null,
+          enginePack: enginePack ?? null,
+          componentUpdates: report,
+        });
+        try {
+          await ensureAppUpdateIdle();
+          for (let index = 0; index < automaticIds.length; index += 1) {
+            await installComponentUpdate(automaticIds[index], componentCatalogUrl());
+            setState((current) => ({
+              ...current,
+              progress: Math.round(((index + 1) / automaticIds.length) * 100),
+            }));
+          }
+          report = await checkSignedComponentUpdates(componentCatalogUrl());
+          if (generation !== undefined && generation !== checkGenerationRef.current) return;
+          candidates = report.candidates.filter((candidate) => candidate.available);
+        } catch (error) {
+          if (generation !== undefined && generation !== checkGenerationRef.current) return;
+          const message = errorMessage(error);
+          setState({
+            status: isActiveExperimentDeferral(message)
+              ? "componentUpdateDeferred"
+              : "componentError",
+            availableVersion: null,
+            updateRequired: automaticCandidates.some((candidate) => (
+              candidate.urgency === "required"
+            )),
+            progress: null,
+            error: message,
+            enginePack: enginePack ?? null,
+            componentUpdates: report,
+          });
+          return;
+        } finally {
+          installInFlightRef.current = false;
+        }
+      }
       if (candidates.length === 0) {
         setState({
           ...CURRENT_STATE,
@@ -122,7 +246,7 @@ export function useAppUpdater() {
       setState({
         status: "componentAvailable",
         availableVersion: null,
-        updateRequired: candidates.some((candidate) => candidate.policy === "required"),
+        updateRequired: candidates.some((candidate) => candidate.urgency === "required"),
         progress: null,
         error: null,
         enginePack: enginePack ?? null,
@@ -156,6 +280,12 @@ export function useAppUpdater() {
       const observed = await getEnginePackStatus();
       if (generation !== undefined && generation !== checkGenerationRef.current) return null;
       if (!observed.supported) {
+        const runtimeBaseUpgradeAvailable =
+          observed.runtimeBaseUpgradeAvailable !== false;
+        if (!runtimeBaseUpgradeAvailable) {
+          setState({ ...CURRENT_STATE, enginePack: observed });
+          return observed;
+        }
         setState({
           status: "runtimeBaseRequired",
           availableVersion: null,
@@ -201,11 +331,12 @@ export function useAppUpdater() {
     if (installInFlightRef.current) return;
     const generation = ++checkGenerationRef.current;
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
+    let enginePack: EnginePackStatus | null = null;
     try {
       // The installed app's embedded Engine Pack is part of its executable
       // contract. Reconcile it before advertising a newer app so a user who
       // defers that app update still runs the engine paired with this build.
-      const enginePack = await ensureEnginePackCurrent(generation);
+      enginePack = await ensureEnginePackCurrent(generation);
       if (!enginePack || generation !== checkGenerationRef.current) return;
       const previousUpdate = updateRef.current;
       updateRef.current = null;
@@ -235,6 +366,14 @@ export function useAppUpdater() {
       });
     } catch (error) {
       if (generation !== checkGenerationRef.current) return;
+      // Tauri reports an endpoint that has no published channel manifest as
+      // ReleaseNotFound. That is a valid pre-release channel state, not a
+      // launcher failure. Network, parsing, signature and platform errors keep
+      // their explicit error state below.
+      if (isNoPublishedDesktopUpdate(error)) {
+        await reconcileComponentPacks(generation, enginePack);
+        return;
+      }
       setState({
         status: "error",
         availableVersion: null,
@@ -296,14 +435,8 @@ export function useAppUpdater() {
       || state.status !== "componentAvailable"
       || installInFlightRef.current
     ) return;
-    const availableIds = new Set(
-      report.candidates
-        .filter((candidate) => candidate.available)
-        .map((candidate) => candidate.componentId),
-    );
-    const componentIds = COMPONENT_INSTALL_ORDER.filter((componentId) => (
-      availableIds.has(componentId)
-    ));
+    const selectedCandidates = selectManualComponentUpdates(report.candidates);
+    const componentIds = orderComponentUpdates(selectedCandidates);
     if (componentIds.length === 0) return;
 
     installInFlightRef.current = true;

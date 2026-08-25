@@ -5,7 +5,6 @@ import hashlib
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "distribution/schemas/component-update-catalog.schema.json"
 KEYRING_PATH = ROOT / "distribution/desktop/component-release-public-keys.json"
@@ -31,17 +30,31 @@ def test_catalog_schema_is_closed_and_excludes_user_state() -> None:
         "capability-pack",
         "asset-pack",
     ]
+    assert candidate["properties"]["urgency"]["enum"] == [
+        "required",
+        "recommended",
+        "optional",
+    ]
+    assert candidate["properties"]["installMode"]["enum"] == [
+        "automatic",
+        "user-confirmed",
+    ]
+    asset_mode = candidate["allOf"][0]["then"]["properties"]["installMode"]["const"]
+    assert asset_mode == "user-confirmed"
     assert "user-state" not in json.dumps(schema)
 
 
 def test_catalog_artifacts_are_https_hash_and_size_bound() -> None:
     schema = _json(SCHEMA_PATH)
-    artifact = schema["$defs"]["artifact"]
-    assert artifact["additionalProperties"] is False
-    assert set(artifact["required"]) == {"url", "sizeBytes", "sha256"}
-    assert artifact["properties"]["url"]["pattern"] == "^https://"
-    assert artifact["properties"]["sizeBytes"]["maximum"] == 4 * 1024**3
-    assert artifact["properties"]["sha256"]["pattern"] == "^[0-9a-f]{64}$"
+    manifest = schema["$defs"]["manifestArtifact"]
+    archive = schema["$defs"]["archiveArtifact"]
+    assert manifest["additionalProperties"] is False
+    assert archive["additionalProperties"] is False
+    assert set(manifest["required"]) == {"url", "sizeBytes", "sha256"}
+    assert manifest["properties"]["sizeBytes"]["maximum"] == 1024**2
+    assert archive["properties"]["url"]["pattern"] == "^https://"
+    assert archive["properties"]["sizeBytes"]["maximum"] == 4 * 1024**3
+    assert archive["properties"]["sha256"]["pattern"] == "^[0-9a-f]{64}$"
 
 
 def test_component_catalog_key_identity_is_self_authenticating_and_domain_scoped() -> None:

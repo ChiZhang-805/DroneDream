@@ -143,7 +143,7 @@ async function measure(page) {
       }),
     );
     const rows = Array.from(document.querySelectorAll(".history-results tbody tr"));
-    const resultCard = box(".history-body > .section-card:last-child");
+    const resultCard = box(".history-jobs-surface");
     const historyBody = box(".history-body");
     const historyResults = box(".history-results");
     const columnWidths = Array.from(
@@ -160,7 +160,7 @@ async function measure(page) {
       historyPage: box(".history-page"),
       historyBody,
       resultCard,
-      resultCardBody: box(".history-body > .section-card:last-child > .section-card-body"),
+      resultCardBody: box(".history-jobs-body"),
       historyResults,
       historyTable: box(".history-results > table"),
       headers,
@@ -349,7 +349,7 @@ const finishedAt = new Date().toISOString();
 const evidence = {
   schemaVersion: 2,
   label,
-  expected: "full-height Jobs card, non-equal eight-column table, and contained vertical scrolling",
+  expected: "full-height Jobs surface, non-equal eight-column table, and contained vertical scrolling",
   sourceCommit: git("rev-parse", "HEAD"),
   sourceDirty: git("status", "--short") !== "",
   sourceChanges: git("status", "--short").split(/\r?\n/).filter(Boolean),

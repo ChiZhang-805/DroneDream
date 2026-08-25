@@ -17,9 +17,9 @@
 !else if "${PRODUCTNAME}" == "DroneDream-Field"
   !define DRONEDREAM_EDITION_ID "field"
   !define DRONEDREAM_DISPLAYNAME "DroneDream · FIELD"
-!else if "${PRODUCTNAME}" == "DroneDream-Autonomy"
+!else if "${PRODUCTNAME}" == "DroneDream-Agent"
   !define DRONEDREAM_EDITION_ID "autonomy"
-  !define DRONEDREAM_DISPLAYNAME "DroneDream · AUTONOMY"
+  !define DRONEDREAM_DISPLAYNAME "DroneDream · AGENT"
 !else if "${PRODUCTNAME}" == "DroneDream"
   ; Retain source-build compatibility for the pre-edition development config.
   ; This identity is never promotion-eligible under the five-edition contract.
@@ -58,7 +58,7 @@
   Delete "${SHORTCUT_PATH}"
   ${LABEL_PREFIX}_create:
     ; Read the icon from the edition-bound executable. Each Tauri overlay embeds
-    ; its canonical Universal/SIM/LAB/FIELD/AUTONOMY icon in this binary.
+; its canonical Universal/SIM/LAB/FIELD/AGENT icon in this binary.
     CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
     !insertmacro SetLnkAppUserModelId "${SHORTCUT_PATH}"
   ${LABEL_PREFIX}_done:

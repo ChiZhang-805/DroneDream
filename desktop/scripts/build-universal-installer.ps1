@@ -115,7 +115,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $sharedUi.contractId -cne "dronedream-shared-edition-ui/v1" -or
     $sharedUi.donorCommit -cnotmatch "^[0-9a-f]{40}$" -or
     $sharedUi.visualEvidence.subjectCommit -cnotmatch "^[0-9a-f]{40}$" -or
-    $sharedUi.visualEvidence.caseCount -ne 6 -or
+    $sharedUi.visualEvidence.caseCount -ne 7 -or
     $sharedUi.visualEvidence.runtimePanelHeadedValidationStatus -cne "pending-exact-desktop-runtime-red-validation" -or
     $sharedUi.minimumDesktopViewport.width -ne 390 -or
     $sharedUi.minimumDesktopViewport.height -ne 700 -or
@@ -237,10 +237,10 @@ if (($vehicleStudioHosts -join ",") -cne "universal,autonomy" -or
     $vehicleStudio.grantsHardwareAuthority -ne $false) {
     throw "Product-scoped Vehicle Studio identity or safety policy drifted."
 }
-Invoke-GitText @("merge-base", "--is-ancestor", [string]$vehicleStudio.productSourceCommit, $sourceCommit) | Out-Null
-$vehicleStudioSourceRefs = @()
-foreach ($expectedRef in @($vehicleStudio.sourceFiles)) {
-    if ($expectedRef.path -cnotmatch "^(frontend/src/|distribution/(schemas|universal)/)" -or
+Invoke-GitText @("merge-base", "--is-ancestor", [string]$externalAssetQualification.productSourceCommit, $sourceCommit) | Out-Null
+$externalAssetQualificationSourceRefs = @()
+foreach ($expectedRef in @($externalAssetQualification.sourceFiles)) {
+    if ($expectedRef.path -cnotmatch "^(frontend/src/|backend/app/|desktop/src-tauri/src/|docs/|supabase/migrations/|distribution/shared/)" -or
         $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$") {
         throw "Product-scoped Vehicle Studio source binding is malformed."
     }
@@ -248,7 +248,7 @@ foreach ($expectedRef in @($vehicleStudio.sourceFiles)) {
     if ($actualRef.sha256 -cne [string]$expectedRef.sha256) {
         throw "Product-scoped Vehicle Studio source binding drifted: $($expectedRef.path)"
     }
-    $vehicleStudioSourceRefs += $actualRef
+    $externalAssetQualificationSourceRefs += $actualRef
 }
 if ($vehicleStudioSourceRefs.Count -ne 10) {
     throw "Product-scoped Vehicle Studio contract must bind exactly ten source files."
@@ -355,7 +355,8 @@ if (-not $Build) {
             sourceFiles = $vehicleStudioSourceRefs
             shareTargets = $vehicleStudioTargets
             automaticReceiverInstallation = $false
-            modelHarnessStartsOnExchange = $false
+            modelHarnessStartsOnImport = $false
+            unqualifiedAssetCanExecute = $false
             grantsSimulationExecution = $false
             grantsHardwareAuthority = $false
         }
@@ -538,7 +539,7 @@ $buildReceipt = [ordered]@{
     }
     profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
     overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
-    brand = New-RepoFileRef "brand\brand-editions.v1.json"
+    brand = New-RepoFileRef "brand\editions.json"
     sharedUi = [ordered]@{
         contractId = [string]$sharedUi.contractId
         donorCommit = [string]$sharedUi.donorCommit
@@ -574,7 +575,8 @@ $buildReceipt = [ordered]@{
         sourceFiles = $vehicleStudioSourceRefs
         shareTargets = $vehicleStudioTargets
         automaticReceiverInstallation = $false
-        modelHarnessStartsOnExchange = $false
+        modelHarnessStartsOnImport = $false
+        unqualifiedAssetCanExecute = $false
         grantsSimulationExecution = $false
         grantsHardwareAuthority = $false
     }

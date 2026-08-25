@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronLeft, ChevronRight, Gauge, Wind } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -124,9 +124,6 @@ export function FixedScenarios() {
           );
           if (!template) return null;
           const points = scenarioPreviewPoints(definition.id);
-          const difficultyKey = definition.difficulty === "simple"
-            ? "scenarioLibrary.difficulty.simple"
-            : "scenarioLibrary.difficulty.medium";
           const isWindy = Number(template.patch.wind_north) > 0
             || Number(template.patch.wind_east) > 0
             || Number(template.patch.wind_south) > 0
@@ -141,15 +138,8 @@ export function FixedScenarios() {
             >
               <div className="fixed-scenario-card-heading">
                 <div>
-                  <span className="fixed-scenario-difficulty">
-                    {definition.difficulty === "simple"
-                      ? <Gauge aria-hidden="true" />
-                      : <Wind aria-hidden="true" />}
-                    {t(difficultyKey)}
-                  </span>
                   <h2>{t(definition.titleKey)}</h2>
                 </div>
-                <code>{template.key}</code>
               </div>
               <dl className="fixed-scenario-facts">
                 <div>

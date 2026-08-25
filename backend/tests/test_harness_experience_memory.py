@@ -122,16 +122,12 @@ def test_cross_job_memory_is_user_isolated_closed_and_revocable(client) -> None:
         owner = models.User(
             id="usr_owner_sentinel",
             email="owner@example.test",
-            experience_preferences=models.UserExperiencePreferences(
-                memory_enabled=True
-            ),
+            experience_preferences=models.UserExperiencePreferences(memory_enabled=True),
         )
         other = models.User(
             id="usr_other_sentinel",
             email="other@example.test",
-            experience_preferences=models.UserExperiencePreferences(
-                memory_enabled=True
-            ),
+            experience_preferences=models.UserExperiencePreferences(memory_enabled=True),
         )
         source = _job(
             models,
@@ -176,6 +172,14 @@ def test_cross_job_memory_is_user_isolated_closed_and_revocable(client) -> None:
             == 1
         )
         db.flush()
+        row = db.query(models.HarnessExperienceMemory).one()
+        assert row.memory_domain == "optimization.control_tuning"
+        assert row.source_kind == "verified_job_outcome"
+        assert row.evidence_count == 2
+        assert row.confidence == 1.0
+        assert row.lifecycle_status == "consolidated"
+        assert row.created_at.replace(tzinfo=timezone.utc) == now
+        assert row.expires_at.replace(tzinfo=timezone.utc) == now + timedelta(days=90)
         assert (
             experience_memory.materialize_verified_terminal_job_experiences(
                 db,
@@ -268,9 +272,7 @@ def test_cross_job_memory_fails_closed_on_expiry_version_or_receipt_drift(client
     with SessionLocal() as db:
         owner = models.User(
             id="usr_memory_owner",
-            experience_preferences=models.UserExperiencePreferences(
-                memory_enabled=True
-            ),
+            experience_preferences=models.UserExperiencePreferences(memory_enabled=True),
         )
         source = _job(
             models,
@@ -301,6 +303,17 @@ def test_cross_job_memory_fails_closed_on_expiry_version_or_receipt_drift(client
         row = db.query(models.HarnessExperienceMemory).one()
         target_snapshot = _snapshot(harness_context, target)
 
+        row.memory_domain = "autonomy.mission"
+        db.flush()
+        assert not experience_memory.retrieve_cross_job_memory(
+            db,
+            current_job=target,
+            current_snapshot=target_snapshot,
+            now=now + timedelta(days=1),
+        ).experiences
+        row.memory_domain = "optimization.control_tuning"
+        db.flush()
+
         row.source_evidence_schema_version = "retired"
         db.flush()
         assert not experience_memory.retrieve_cross_job_memory(
@@ -310,9 +323,7 @@ def test_cross_job_memory_fails_closed_on_expiry_version_or_receipt_drift(client
             now=now + timedelta(days=1),
         ).experiences
 
-        row.source_evidence_schema_version = (
-            harness_context.HARNESS_EVIDENCE_SCHEMA_VERSION
-        )
+        row.source_evidence_schema_version = harness_context.HARNESS_EVIDENCE_SCHEMA_VERSION
         row.observed_outcome_json = {
             **row.observed_outcome_json,
             "cohort_best_score": 0.6,
@@ -325,9 +336,9 @@ def test_cross_job_memory_fails_closed_on_expiry_version_or_receipt_drift(client
             now=now + timedelta(days=1),
         ).experiences
 
-        row.observed_outcome_json = _verified_memory(
-            harness_context
-        ).observed_outcome.model_dump(mode="json", exclude_none=True)
+        row.observed_outcome_json = _verified_memory(harness_context).observed_outcome.model_dump(
+            mode="json", exclude_none=True
+        )
         row.expires_at = now
         db.flush()
         assert not experience_memory.retrieve_cross_job_memory(
@@ -354,9 +365,7 @@ def test_cross_job_memory_rejects_nonterminal_or_incomplete_sources(client) -> N
     with SessionLocal() as db:
         owner = models.User(
             id="usr_incomplete_owner",
-            experience_preferences=models.UserExperiencePreferences(
-                memory_enabled=True
-            ),
+            experience_preferences=models.UserExperiencePreferences(memory_enabled=True),
         )
         running = _job(
             models,
@@ -439,9 +448,7 @@ def test_live_harness_trace_binds_provider_safe_cross_job_memory(client) -> None
     with SessionLocal() as db:
         owner = models.User(
             id="usr_live_memory_owner",
-            experience_preferences=models.UserExperiencePreferences(
-                memory_enabled=True
-            ),
+            experience_preferences=models.UserExperiencePreferences(memory_enabled=True),
         )
         source = _job(
             models,
@@ -502,9 +509,7 @@ def test_live_harness_trace_binds_provider_safe_cross_job_memory(client) -> None
             ]
         )
         for index, newer in enumerate(
-            db.query(models.Job)
-            .filter(models.Job.id.like("job_newer_terminal_%"))
-            .all()
+            db.query(models.Job).filter(models.Job.id.like("job_newer_terminal_%")).all()
         ):
             newer.updated_at = now + timedelta(minutes=index)
         db.flush()
@@ -521,21 +526,15 @@ def test_live_harness_trace_binds_provider_safe_cross_job_memory(client) -> None
         assert decision.prompt_template_version == "1.7"
         assert len(fake.calls) == 1
         provider_payload = json.loads(fake.calls[0]["user"])
-        experiences = provider_payload["evidence"]["cross_job_memory"][
-            "experiences"
-        ]
+        experiences = provider_payload["evidence"]["cross_job_memory"]["experiences"]
         assert len(experiences) == 1
         encoded = json.dumps(experiences, sort_keys=True)
         assert source.id not in encoded
         assert owner.id not in encoded
         assert experiences[0]["tool_id"] == "turbo"
         started = next(
-            event
-            for event in target.events
-            if event.event_type == "harness_decision_started"
+            event for event in target.events if event.event_type == "harness_decision_started"
         )
-        verification = decision_harness.verify_harness_decision_trace(
-            started.payload_json
-        )
+        verification = decision_harness.verify_harness_decision_trace(started.payload_json)
         assert verification.valid is True
         assert verification.failures == ()

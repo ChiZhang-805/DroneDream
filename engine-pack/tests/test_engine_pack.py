@@ -216,6 +216,7 @@ class EnginePackTests(unittest.TestCase):
             with tarfile.open(output / engine_pack.ARCHIVE_FILENAME, mode="r:gz") as archive:
                 names = [member.name for member in archive.getmembers()]
             self.assertIn("payload/backend/app/main.py", names)
+            self.assertIn("payload/brand/report/report-watermark.png", names)
             self.assertIn("payload/worker/drone_dream_worker/main.py", names)
             self.assertIn("payload/scripts/simulators/px4_gazebo_runner.py", names)
             self.assertIn(

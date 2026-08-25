@@ -82,26 +82,7 @@ import {
   removeExperimentWorkspace,
   setActiveAssistantTenantContext,
 } from "../features/experiment/workspaceRegistry";
-import {
-  createVehicleModelFromBrief,
-  rebuildVehicleRotorArchitecture,
-  scaleVehicleModelMass,
-  type VehicleDesignMission,
-  type VehicleModelDraft,
-} from "../features/vehicleStudio/model";
-import {
-  cacheVehicleModels,
-  loadVehicleModels,
-  nextVehicleRevision,
-  saveVehicleModel,
-  vehicleModelStorageScope,
-} from "../features/vehicleStudio/storage";
-import {
-  loadCloudVehicleModels,
-  mergeVehicleModelStores,
-  saveCloudVehicleModel,
-  vehicleModelBoundaryFor,
-} from "../features/vehicleStudio/cloudStorage";
+import { assistantArtifactMatchesEdition } from "../features/experiment/assistantProductPolicy";
 import { useVoiceInput } from "../features/experiment/useVoiceInput";
 import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
@@ -115,6 +96,7 @@ import {
   type ManagedModelCatalogEntry,
 } from "../features/settings/cloudModelAccess";
 import {
+  localeSafeError,
   useI18n,
   type InterfaceLocale,
 } from "../i18n/I18nProvider";
@@ -128,7 +110,7 @@ import type { BrandEditionId } from "../brand/edition-brand.generated";
 const TASK_ICON_BY_TYPE: Record<AssistantTaskType, LucideIcon> = {
   control_tuning: SlidersHorizontal,
   mission_autonomy: Route,
-  vehicle_modeling: Boxes,
+  asset_import_qualification: Boxes,
   simulation_experiment: MonitorPlay,
   cross_edition_workflow: GitFork,
   hardware_validation: Microchip,
@@ -296,11 +278,11 @@ type EditionAssistantCopy = Readonly<{
 const EDITION_ASSISTANT_COPY: Record<BrandEditionId, EditionAssistantCopy> = {
   universal: {
     title: "What should DroneDream design with you?",
-    openDraft: "Open Vehicle Studio",
+    openDraft: "Open asset repositories",
     examples: [
       {
-        title: "Build a 3D Vehicle",
-        body: "Create an editable quadrotor digital prototype with an x-frame, camera payload, realistic mass properties, and a reviewable component layout.",
+        title: "Qualify an External Asset",
+        body: "Prepare an import and qualification plan for an aircraft or world authored in a mainstream 3D tool, including source identity, coordinate frames, physics, ROS 2, Gazebo, and PX4 evidence.",
       },
       {
         title: "Plan the Full Workflow",
@@ -390,186 +372,7 @@ const EDITION_ASSISTANT_TITLES: Readonly<
     field: "想准备怎样的真机任务？",
     autonomy: "想规划怎样的自主任务？",
   },
-  "zh-TW": {
-    universal: "想讓 DroneDream 與你設計什麼？",
-    sim: "想建立怎樣的飛行調校實驗？",
-    lab: "想建立怎樣的驗證實驗？",
-    field: "想準備怎樣的實機任務？",
-    autonomy: "想規劃怎樣的自主任務？",
-  },
-  es: {
-    universal: "¿Qué debería diseñar DroneDream contigo?",
-    sim: "¿Qué experimento de vuelo creamos?",
-    lab: "¿Qué experimento de validación creamos?",
-    field: "¿Qué tarea de vuelo real preparamos?",
-    autonomy: "¿Qué misión autónoma planificamos?",
-  },
-  ja: {
-    universal: "DroneDreamと何を設計しますか？",
-    sim: "どんな飛行実験を作りますか？",
-    lab: "どんな検証実験を作りますか？",
-    field: "どんな実機タスクを準備しますか？",
-    autonomy: "どんな自律ミッションを計画しますか？",
-  },
-  ko: {
-    universal: "DroneDream과 무엇을 설계할까요?",
-    sim: "어떤 비행 실험을 만들까요?",
-    lab: "어떤 검증 실험을 만들까요?",
-    field: "어떤 실기체 작업을 준비할까요?",
-    autonomy: "어떤 자율 임무를 계획할까요?",
-  },
 };
-
-function universalVehicleName(
-  result: ExperimentAssistantTurnResponse,
-): string | null {
-  const accepted = result.accepted_patches.find((candidate) =>
-    candidate.field_id === "display_name"
-    && typeof candidate.value === "string"
-  );
-  return typeof accepted?.value === "string" && accepted.value.trim()
-    ? accepted.value.trim().slice(0, 96)
-    : null;
-}
-
-function universalVehiclePatch(
-  result: ExperimentAssistantTurnResponse,
-  fieldId: string,
-): unknown {
-  return result.accepted_patches.find((candidate) => candidate.field_id === fieldId)?.value;
-}
-
-function inferUniversalVehicleMission(result: ExperimentAssistantTurnResponse): VehicleDesignMission {
-  const text = [
-    result.experiment_summary,
-    ...result.accepted_patches.map((patch) => `${patch.field_id} ${String(patch.value ?? "")}`),
-  ].join(" ").toLowerCase();
-  if (/payload|cargo|delivery|载荷|运输|吊运/.test(text)) return "payload";
-  if (/endurance|long.range|flight.time|续航|长航时|航程/.test(text)) return "endurance";
-  if (/race|racing|agility|acro|敏捷|竞速|特技/.test(text)) return "agility";
-  if (/inspect|inspection|lidar|巡检|激光雷达|测量/.test(text)) return "inspection";
-  return "survey";
-}
-
-function numericUniversalVehiclePatch(
-  result: ExperimentAssistantTurnResponse,
-  fieldIds: string[],
-): number | undefined {
-  for (const fieldId of fieldIds) {
-    const value = universalVehiclePatch(result, fieldId);
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-  }
-  return undefined;
-}
-
-async function saveVehicleDraft(
-  ownerId: string,
-  result: ExperimentAssistantTurnResponse,
-  currentDraftId: string | null,
-  edition: Extract<BrandEditionId, "universal" | "autonomy">,
-): Promise<VehicleModelDraft> {
-  const activeBoundary = activeAssistantTenantContext(ownerId);
-  const tenantId = result.orchestration?.tenant_id ?? activeBoundary.tenantId;
-  const organizationId = result.orchestration?.organization_id ?? activeBoundary.organizationId;
-  const localStorageScope = vehicleModelStorageScope({
-    userId: ownerId,
-    tenantId,
-    organizationId,
-    workspaceId: `console-${edition}`,
-    edition,
-  });
-  const cloudBoundary = vehicleModelBoundaryFor(ownerId, tenantId, organizationId, edition);
-  let storedModels = loadVehicleModels(localStorageScope);
-  if (cloudBoundary) {
-    try {
-      const cloudModels = await loadCloudVehicleModels(cloudBoundary);
-      if (cloudModels) {
-        storedModels = cacheVehicleModels(localStorageScope, mergeVehicleModelStores(storedModels, cloudModels));
-      }
-    } catch {
-      // Preserve the local-first workflow when the network or cloud store is unavailable.
-    }
-  }
-  const current = currentDraftId
-    ? storedModels.find((model) => model.draftId === currentDraftId)
-      ?.revisions[0]
-    : null;
-  const proposedMotorCount = numericUniversalVehiclePatch(result, ["motor_count"]);
-  const motorCount = proposedMotorCount === 4 || proposedMotorCount === 6 || proposedMotorCount === 8
-    ? proposedMotorCount
-    : undefined;
-  const generated = createVehicleModelFromBrief({
-    name: universalVehicleName(result) ?? "AI-assisted aircraft",
-    mission: inferUniversalVehicleMission(result),
-    motorCount,
-    payloadKg: numericUniversalVehiclePatch(result, ["payload_mass_kg", "payload_kg"]),
-    targetFlightMinutes: numericUniversalVehiclePatch(result, ["target_flight_minutes", "flight_time_minutes"]),
-    camera: universalVehiclePatch(result, "camera_payload") === true,
-    lidar: universalVehiclePatch(result, "lidar_payload") === true,
-    operatingEnvironment: /wind|gust|风/.test(result.experiment_summary.toLowerCase()) ? "windy" : "outdoor",
-  });
-  let draft = current ? nextVehicleRevision(current) : generated.draft;
-  draft.name = universalVehicleName(result) ?? draft.name;
-  draft.notes = [result.experiment_summary.trim(), ...(!current ? generated.decisions : [])]
-    .filter(Boolean)
-    .join("\n\n")
-    .slice(0, 4096);
-  let rotorArchitectureChanged = false;
-  let requestedVehicleMassKg: number | null = null;
-  for (const accepted of result.accepted_patches) {
-    if (accepted.field_id === "vehicle_mass_kg" && typeof accepted.value === "number") {
-      requestedVehicleMassKg = accepted.value;
-    }
-    if (
-      accepted.field_id === "motor_count"
-      && (accepted.value === 4 || accepted.value === 6 || accepted.value === 8)
-    ) {
-      draft.propulsion.motorCount = accepted.value;
-      rotorArchitectureChanged = true;
-    }
-    if (accepted.field_id === "arm_length_m" && typeof accepted.value === "number") {
-      draft.propulsion.armLengthM = accepted.value;
-      rotorArchitectureChanged = true;
-    }
-    if (
-      accepted.field_id === "propeller_diameter_m"
-      && typeof accepted.value === "number"
-    ) {
-      draft.propulsion.propellerDiameterM = accepted.value;
-      rotorArchitectureChanged = true;
-    }
-    if (accepted.field_id === "camera_payload" && accepted.value === true) {
-      const camera = draft.sensors.find((sensor) => sensor.type === "camera");
-      if (camera) camera.enabled = true;
-      else {
-        draft.sensors.push({
-          id: crypto.randomUUID(),
-          type: "camera",
-          model: "Generic camera payload",
-          enabled: true,
-        });
-      }
-    }
-  }
-  if (rotorArchitectureChanged) {
-    draft = rebuildVehicleRotorArchitecture(draft, {
-      motorCount: draft.propulsion.motorCount,
-      armLengthM: draft.propulsion.armLengthM,
-      propellerDiameterM: draft.propulsion.propellerDiameterM,
-    });
-  }
-  if (requestedVehicleMassKg !== null) draft = scaleVehicleModelMass(draft, requestedVehicleMassKg);
-  draft.updatedAt = new Date().toISOString();
-  saveVehicleModel(localStorageScope, draft);
-  if (cloudBoundary) {
-    try {
-      await saveCloudVehicleModel(cloudBoundary, draft);
-    } catch {
-      // The local revision remains available and can be synchronized on a later save.
-    }
-  }
-  return draft;
-}
 
 const ACCEPTED_REFERENCE_EXTENSIONS = new Set([
   "csv",
@@ -723,10 +526,10 @@ function reviewLabels(
 function assistantErrorMessage(
   reason: unknown,
   copy: (typeof COPY)[keyof typeof COPY],
+  locale: InterfaceLocale,
 ): string {
-  if (reason instanceof CloudModelAccessError) {
-    return reason.message || copy.requestFailed;
-  }
+  const errorLocale = locale === "zh-CN" ? "zh-CN" : "en";
+  if (reason instanceof CloudModelAccessError) return localeSafeError(reason, errorLocale, { zh: copy.requestFailed, en: copy.requestFailed });
   if (!(reason instanceof ApiClientError)) return copy.requestFailed;
   if (reason.httpStatus === 404 || reason.code === "NOT_FOUND") {
     return copy.runtimeOutdated;
@@ -737,7 +540,7 @@ function assistantErrorMessage(
   ) {
     return copy.runtimeUnavailable;
   }
-  return reason.message || copy.requestFailed;
+  return localeSafeError(reason, errorLocale, { zh: copy.requestFailed, en: copy.requestFailed });
 }
 
 export function ExperimentAssistant() {
@@ -748,7 +551,7 @@ export function ExperimentAssistant() {
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
   const copy = COPY[locale];
-  const chinese = interfaceLocale === "zh-CN" || interfaceLocale === "zh-TW";
+  const chinese = interfaceLocale === "zh-CN";
   const editionCopy = {
     ...(locale === "en"
       ? EDITION_ASSISTANT_COPY[editionTheme.id]
@@ -775,19 +578,18 @@ export function ExperimentAssistant() {
         (workspace) => workspace.source === "assistant" && !workspace.archived,
       )) ?? null;
   })()).current;
-  const [vehicleDraftId, setVehicleDraftId] = useState<string | null>(
-    initialWorkspace?.vehicleDraftId ?? null,
-  );
-
   function openDraftPath(): string {
     if (latest?.orchestration?.intent === "mission_autonomy") {
       return "/autonomy?from=tuning-chat";
     }
-    if (editionTheme.id === "universal" || editionTheme.id === "autonomy") {
-      return latest?.orchestration?.artifact_kind === "universal_vehicle_model"
-        && vehicleDraftId
-        ? `/vehicle-studio?draft=${encodeURIComponent(vehicleDraftId)}`
-        : workspaceId
+    if (latest?.orchestration?.artifact_kind === "external_asset_qualification_plan") {
+      return "/autonomy";
+    }
+    if (latest?.orchestration?.artifact_kind === "universal_vehicle_model") {
+      return "/autonomy/aircraft";
+    }
+    if (editionTheme.id === "universal") {
+      return workspaceId
         ? `/jobs/new?experiment=${encodeURIComponent(workspaceId)}`
         : "/jobs/new";
     }
@@ -1025,7 +827,7 @@ export function ExperimentAssistant() {
       .catch((reason) => {
         if (!active) return;
         restoredWorkspaceRef.current = null;
-        setError(assistantErrorMessage(reason, copy));
+        setError(assistantErrorMessage(reason, copy, interfaceLocale));
       });
     return () => {
       active = false;
@@ -1034,6 +836,7 @@ export function ExperimentAssistant() {
     auth?.account,
     copy,
     editionTheme.id,
+    interfaceLocale,
     ownerId,
     requestedArtifactId,
     workspaceId,
@@ -1134,7 +937,7 @@ export function ExperimentAssistant() {
       && !modelAccess.apiKey.trim()
     ) {
       setError(copy.modelRequired);
-      openAppSettings();
+      openAppSettings("model");
       return;
     }
     if (
@@ -1188,6 +991,7 @@ export function ExperimentAssistant() {
             })()
         : await apiClient.compileExperimentAssistantTurn({
         message_id: id,
+        conversation_id: targetWorkspaceId,
         message: visibleMessage,
         locale,
         edition: editionTheme.id,
@@ -1231,20 +1035,13 @@ export function ExperimentAssistant() {
         },
         targetWorkspaceId,
       );
-      let createdVehicleDraftId: string | null = null;
-      if (
-        (editionTheme.id === "universal" || editionTheme.id === "autonomy")
-        && result.orchestration?.artifact_kind === "universal_vehicle_model"
-      ) {
-        const vehicleDraft = await saveVehicleDraft(
-          ownerId,
-          result,
-          vehicleDraftId,
-          editionTheme.id,
-        );
-        setVehicleDraftId(vehicleDraft.draftId);
-        createdVehicleDraftId = vehicleDraft.draftId;
-      }
+      const workflowBlocked = result.orchestration?.artifact_payload?.status === "blocked";
+      const currentArtifactKind = result.orchestration?.artifact_kind ?? null;
+      const persistableArtifactKind = !workflowBlocked
+        && currentArtifactKind
+        && assistantArtifactMatchesEdition(editionTheme.id, currentArtifactKind)
+        ? currentArtifactKind
+        : null;
       registerExperimentWorkspace({
         id: targetWorkspaceId,
         ownerId,
@@ -1258,8 +1055,8 @@ export function ExperimentAssistant() {
         source: "assistant",
         activeStep: next.activeStep,
         completedSteps: next.completedSteps,
-        assistantArtifactKind: result.orchestration?.artifact_kind ?? null,
-        vehicleDraftId: createdVehicleDraftId,
+        assistantArtifactKind: persistableArtifactKind,
+        vehicleDraftId: null,
       });
       if (!workspaceId) {
         setWorkspaceId(targetWorkspaceId);
@@ -1284,7 +1081,7 @@ export function ExperimentAssistant() {
         has_reference_files: referenceFiles.length > 0,
       });
     } catch (reason) {
-      setError(assistantErrorMessage(reason, copy));
+      setError(assistantErrorMessage(reason, copy, interfaceLocale));
       void recordProductEvent("assistant_turn_failed", {
         access_mode: modelAccess.accessMode,
         provider: modelAccess.accessMode === "platform"
@@ -1393,13 +1190,16 @@ export function ExperimentAssistant() {
                 <button
                   key={example.title}
                   type="button"
+                  aria-label={example.title}
                   onClick={() => handleExample(example.body)}
                 >
                   <span className="assistant-example-heading">
                     <AssistantTemplateIcon index={index} />
-                    <strong>{example.title}</strong>
+                    <span>
+                      <strong>{example.title}</strong>
+                      <small>{example.body}</small>
+                    </span>
                   </span>
-                  <span className="assistant-example-body">{example.body}</span>
                 </button>
               ))}
             </div>
@@ -1473,7 +1273,11 @@ export function ExperimentAssistant() {
                   <ol className="assistant-workflow-receipt" aria-label={locale === "zh-CN" ? "任务步骤" : "Task steps"}>
                     {latest.orchestration.workflow.map((step: AssistantWorkflowStep) => (
                       <li key={step.step} data-status={step.status}>
-                        <span aria-hidden="true">{step.status === "completed" ? "✓" : "!"}</span>
+                        <span aria-hidden="true">{
+                          step.status === "completed" ? "✓"
+                            : step.status === "proposed" ? "→"
+                              : step.status === "refused" ? "×" : "!"
+                        }</span>
                         <span>{step.label}</span>
                       </li>
                     ))}
@@ -1623,7 +1427,7 @@ export function ExperimentAssistant() {
                   );
                 })}
                 <hr />
-                <strong className="assistant-task-popover-title">{chinese ? "自主任务资产" : "Autonomy assets"}</strong>
+                <strong className="assistant-task-popover-title">{chinese ? "任务智能体资产" : "Agent assets"}</strong>
                 <button
                   type="button"
                   role="menuitemradio"
@@ -1678,6 +1482,11 @@ export function ExperimentAssistant() {
           <span className="assistant-composer-spacer" />
           <AssistantModelPicker
             ariaLabel={copy.model}
+            chooseModelLabel={chinese ? "选择模型" : "Choose model"}
+            defaultGroupLabel={chinese ? "默认" : "Default"}
+            customGroupLabel={chinese ? "自定义" : "Custom"}
+            addCustomModelLabel={chinese ? "添加自定义模型" : "Add custom model"}
+            temporarilyUnavailableLabel={chinese ? "暂时不可用" : "Temporarily unavailable"}
             defaultModels={assistantManagedModels}
             customProfiles={configuredModelProfiles}
             selectedDefault={modelAccess.accessMode === "platform" ? selectedManagedModel ?? null : null}
@@ -1694,7 +1503,7 @@ export function ExperimentAssistant() {
               selectProfile(profileId);
               selectAccessMode("byok");
             }}
-            onOpenSettings={openAppSettings}
+            onOpenSettings={() => openAppSettings("model")}
           />
           <button
             type="button"

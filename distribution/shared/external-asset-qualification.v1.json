@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-shared-external-asset-qualification-contract",
+  "contractVersion": "1.0.0",
+  "ownerEdition": "autonomy",
+  "purpose": "Import externally authored map, world, and aircraft assets, normalize them into Asset IR, and promote only evidence-bound versions for ROS 2, Gazebo, and PX4 simulation use.",
+  "routes": ["/autonomy/maps", "/autonomy/aircraft"],
+  "receivers": ["universal", "sim", "lab", "field", "autonomy"],
+  "sourceKinds": ["file", "directory", "direct_url", "git"],
+  "sourceApplications": [
+    "Blender",
+    "FreeCAD",
+    "SolidWorks",
+    "Unreal Engine",
+    "Unity",
+    "Gazebo",
+    "ROS 2 package",
+    "generic glTF, URDF, SDF, OBJ, STL, DAE, FBX, USD, or world package"
+  ],
+  "transport": {
+    "contractId": "dronedream-agent-core-asset-ir-and-receipts/v1",
+    "contentIntegrity": "SHA-256",
+    "qualificationReceiptRequired": true,
+    "qualifiedPairBindingRequired": true
+  },
+  "requiredSequence": [
+    "acquire-without-executing-source-content",
+    "hash-and-detect-source-format",
+    "extract-into-quarantined-workspace",
+    "normalize-to-asset-ir",
+    "validate-geometry-materials-dynamics-and-connectivity",
+    "export-ros2-gazebo-px4-targets",
+    "run-qualification-gates",
+    "seal-evidence-and-pair-receipt",
+    "publish-qualified-version"
+  ],
+  "qualificationTargets": ["ROS 2 Jazzy", "Gazebo Harmonic", "PX4 SITL"],
+  "authority": {
+    "builtInModeling": false,
+    "frontendIsAuthority": false,
+    "importExecutesSourceContent": false,
+    "automaticReceiverInstallation": false,
+    "modelHarnessStartsOnImport": false,
+    "unqualifiedAssetCanExecute": false,
+    "grantsSimulationExecution": false,
+    "grantsHardwareAuthority": false,
+    "hardwareUseRequiresSeparateSignedValidationEvidence": true
+  },
+  "currentDelivery": {
+    "agentCoreReceiverImplemented": true,
+    "assetVersionRegistryImplemented": true,
+    "qualificationJobLifecycleImplemented": true,
+    "issueAndEvidenceInspectionImplemented": true,
+    "qualifiedPairBindingImplemented": true,
+    "defaultQualifiedMap": "School Map",
+    "defaultQualifiedAircraft": "My Drone"
+  }
+}

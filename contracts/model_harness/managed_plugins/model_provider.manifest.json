@@ -1,0 +1,18 @@
+{
+  "api_contract": {
+    "contract_id": "dronedream.managed.model-provider.v1",
+    "input_schema_version": "dronedream.model-harness-input.v1",
+    "output_schema_version": "dronedream.model-harness-output.v1"
+  },
+  "implementation": {
+    "entrypoint": "_provider_generate",
+    "module": "app.experiment_assistant",
+    "source_path": "backend/app/experiment_assistant.py",
+    "source_sha256": "5ad67677b4027c7053c59dd4918585963242dd87b4d4ac3312be630c1c044ac9"
+  },
+  "plugin_id": "dronedream.managed.model-provider",
+  "schema_version": "dronedream.managed-plugin-manifest.v1",
+  "slot": "model_provider",
+  "trust": "managed",
+  "version": "1.0.0"
+}

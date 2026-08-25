@@ -5,92 +5,24 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTRACT_PATH = ROOT / "brand" / "brand-editions.v1.json"
-SCHEMA_PATH = ROOT / "brand" / "brand-editions.schema.json"
-MANIFEST_PATH = ROOT / "brand" / "generated" / "brand-assets.v1.json"
+CONTRACT_PATH = ROOT / "brand" / "editions.json"
+ICON_DIR = ROOT / "brand" / "icons"
 EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
-APPROVED_HASHES = {
-    "sim": {
-        "markPath": "brand/source/approved/sim-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/sim-large-label-centered-lockup.png",
-        "markSha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
-        "dotLockupSha256": ("f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e"),
-        "dotLockupDimensions": {"width": 2337, "height": 218},
-        "separatorGeometry": {
-            "wordmarkEndX": 1748,
-            "separatorStartX": 1802,
-            "separatorEndX": 1851,
-            "editionLabelStartX": 1905,
-            "leftGapPx": 53,
-            "rightGapPx": 53,
-        },
-        "supersededLargeLabelPath": "brand/source/approved/sim-large-label-lockup.png",
-        "supersededLargeLabelSha256": (
-            "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"
-        ),
-    },
-    "lab": {
-        "markPath": "brand/source/approved/lab-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/lab-large-label-centered-lockup.png",
-        "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
-        "dotLockupSha256": ("c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94"),
-        "dotLockupDimensions": {"width": 2386, "height": 218},
-        "separatorGeometry": {
-            "wordmarkEndX": 1748,
-            "separatorStartX": 1807,
-            "separatorEndX": 1858,
-            "editionLabelStartX": 1917,
-            "leftGapPx": 58,
-            "rightGapPx": 58,
-        },
-        "supersededLargeLabelPath": "brand/source/approved/lab-large-label-lockup.png",
-        "supersededLargeLabelSha256": (
-            "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
-        ),
-    },
-    "field": {
-        "markPath": "brand/source/approved/field-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/field-large-label-centered-lockup.png",
-        "markSha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
-        "dotLockupSha256": ("e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa"),
-        "dotLockupDimensions": {"width": 2581, "height": 218},
-        "separatorGeometry": {
-            "wordmarkEndX": 1748,
-            "separatorStartX": 1807,
-            "separatorEndX": 1858,
-            "editionLabelStartX": 1917,
-            "leftGapPx": 58,
-            "rightGapPx": 58,
-        },
-        "supersededLargeLabelPath": "brand/source/approved/field-large-label-lockup.png",
-        "supersededLargeLabelSha256": (
-            "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
-        ),
-    },
-    "autonomy": {
-        "markPath": "brand/source/approved/autonomy-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/autonomy-large-label-centered-lockup.png",
-        "markSha256": "a67fe1fb2558471806fe19c3eb9423d041a1a5de58a30bfb9893353c00a9f651",
-        "dotLockupSha256": (
-            "8f8ce7bc4a8cf1782fe006c05f4798201ac063625bb8d9c98070f61491b84b2b"
-        ),
-        "dotLockupDimensions": {"width": 3090, "height": 340},
-        "dotLockupStyle": "autonomy-approved-lockup-v1",
-        "separatorTolerancePx": 9,
-        "separatorGeometry": {
-            "wordmarkEndX": 1718,
-            "separatorStartX": 1789,
-            "separatorEndX": 1853,
-            "editionLabelStartX": 1915,
-            "leftGapPx": 70,
-            "rightGapPx": 61,
-        },
-    },
+EXPECTED_NAMES = {
+    "universal-lockup.png",
+    "universal-mark.png",
+    "sim-lockup.png",
+    "sim-mark.png",
+    "lab-lockup.png",
+    "lab-mark.png",
+    "field-lockup.png",
+    "field-mark.png",
+    "agent-lockup.png",
+    "agent-mark.png",
 }
 
 CANONICAL_ICO_HASHES = {
@@ -119,14 +51,12 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() -> None:
-    contract = load_json(CONTRACT_PATH)
-    schema = load_json(SCHEMA_PATH)
-
-    assert contract["brandVersion"] == "1.2.0"
-    assert contract["separator"] == "\u00b7"
-    assert schema["properties"]["separator"]["const"] == "\u00b7"
-    assert contract["safety"] == {
+def load_contract() -> dict[str, object]:
+    payload = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    assert payload["schemaVersion"] == 1
+    assert payload["kind"] == "dronedream-edition-brand-system"
+    assert payload["separator"] == "·"
+    assert payload["safety"] == {
         "presentationOnly": True,
         "grantsHardwareAuthority": False,
     }
@@ -220,35 +150,15 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
                 )
             ).getbbox() is None
     assert {
-        edition_id: {
-            "productName": contract["editions"][edition_id]["productName"],
-            "gradientStops": contract["editions"][edition_id]["gradientStops"],
-        }
-        for edition_id in EDITION_IDS
+        edition_id: edition["productName"]
+        for edition_id, edition in contract["editions"].items()
     } == {
-        "universal": {
-            "productName": "DroneDream",
-            "gradientStops": ["#FF5574", "#6A4CFF", "#E657D1"],
-        },
-        "sim": {
-            "productName": "DroneDream · SIM",
-            "gradientStops": ["#00D9FF", "#2671FF", "#744CFF"],
-        },
-        "lab": {
-            "productName": "DroneDream · LAB",
-            "gradientStops": ["#A7E84A", "#20C77A", "#087E69"],
-        },
-        "field": {
-            "productName": "DroneDream · FIELD",
-            "gradientStops": ["#FFC247", "#FF754B", "#D746A5"],
-        },
-        "autonomy": {
-            "productName": "DroneDream · AUTONOMY",
-            "gradientStops": ["#FF5B74", "#EC214F", "#97153B"],
-        },
+        "universal": "DroneDream",
+        "sim": "DroneDream · SIM",
+        "lab": "DroneDream · LAB",
+        "field": "DroneDream · FIELD",
+        "autonomy": "DroneDream · AGENT",
     }
-    for edition_id in EDITION_IDS[1:]:
-        assert contract["editions"][edition_id]["productName"].split()[1] == "\u00b7"
 
 
 def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
@@ -391,21 +301,99 @@ def test_brand_generation_is_reproducible_from_repository_owned_inputs() -> None
         check=False,
         capture_output=True,
         text=True,
-        timeout=90,
+        timeout=30,
     )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "status": "verified",
+        "canonicalIconCount": 10,
+    }
 
+
+def test_windows_derivatives_are_generated_only_in_temporary_output(
+    tmp_path: Path,
+) -> None:
+    derivative_root = tmp_path / "brand"
+    favicon = tmp_path / "drone-favicon.png"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build-brand-assets.py",
+            "--edition",
+            "all",
+            "--derivative-root",
+            str(derivative_root),
+            "--favicon-path",
+            str(favicon),
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
     assert result.returncode == 0, result.stderr
     receipt = json.loads(result.stdout)
-    assert receipt["status"] == "verified"
-    assert receipt["assetCount"] == 81
-    assert receipt["presentationOnly"] is True
-    assert receipt["universalIsCanonical"] is True
+    assert receipt["status"] == "generated"
+    assert tuple(receipt["editionIds"]) == EDITION_IDS
+    assert receipt["derivativeCount"] == 21
 
-    production_inputs = (
-        CONTRACT_PATH,
-        SCHEMA_PATH,
-        ROOT / "scripts/build-brand-assets.py",
-        ROOT / "frontend/src/brand/edition-brand.generated.ts",
-        ROOT / "frontend/src/brand/edition-brand.generated.css",
+    for edition_id in EDITION_IDS:
+        windows = derivative_root / edition_id / "windows"
+        expected_sizes = {
+            "32x32.png": (32, 32),
+            "128x128.png": (128, 128),
+            "128x128@2x.png": (256, 256),
+        }
+        for name, size in expected_sizes.items():
+            with Image.open(windows / name) as image:
+                assert image.format == "PNG"
+                assert image.mode == "RGBA"
+                assert image.size == size
+        with Image.open(windows / "icon.ico") as image:
+            assert sorted(image.ico.sizes()) == [
+                (size, size) for size in (16, 20, 24, 32, 40, 48, 64, 128, 256)
+            ]
+    with Image.open(favicon) as image:
+        assert image.size == (64, 64)
+        assert image.mode == "RGBA"
+
+
+def test_no_tracked_duplicate_brand_image_roots() -> None:
+    tracked = subprocess.run(
+        ["git", "ls-files"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout.splitlines()
+    banned_prefixes = (
+        "brand/commercial/",
+        "brand/generated/",
+        "brand/source/",
+        "frontend/src/assets/brand/",
+        "frontend/src/assets/drone-dream-",
+        "desktop/src-tauri/icons/",
     )
-    assert all("work/" not in path.read_text(encoding="utf-8") for path in production_inputs)
+    banned_exact = {
+        "desktop/src-tauri/app-icon.png",
+        "desktop/src-tauri/icon-source.svg",
+        "frontend/public/drone-favicon.png",
+        "frontend/public/drone-favicon.svg",
+        "docs/assets/drone-dream-icon.png",
+        "docs/assets/drone-dream-logo-source.png",
+        "docs/assets/brand/drone-dream-lockup-compact.png",
+        "docs/assets/brand/drone-dream-lockup-primary.png",
+        "docs/assets/brand/drone-dream-logo-horizontal-white.png",
+        "docs/assets/brand/drone-dream-wordmark-compact.png",
+        "docs/assets/brand/drone-dream-wordmark-primary.png",
+        "scripts/build-agent-assets.py",
+        "scripts/build-commercial-brand-assets.py",
+    }
+    duplicates = [
+        path
+        for path in tracked
+        if path in banned_exact or path.startswith(banned_prefixes)
+    ]
+    assert duplicates == []

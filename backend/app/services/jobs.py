@@ -24,6 +24,11 @@ from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
 from app.llm_provider_policy import llm_base_url_is_allowed
+from app.model_harness.control_plane import (
+    HarnessControlPlaneReceipt,
+    compile_control_plane_receipt,
+)
+from app.model_harness.domains import OPTIMIZATION_CONTROL_TUNING_DOMAIN
 from app.optimization.candidate_evidence_ledger import (
     authorize_candidate_evidence_deletion,
 )
@@ -77,6 +82,52 @@ class JobServiceError(Exception):
         self.http_status = http_status
 
 
+def _control_plane_event_binding(
+    receipt: HarnessControlPlaneReceipt,
+) -> dict[str, str]:
+    return {
+        "model_harness_domain": receipt.domain,
+        "control_plane_schema_version": receipt.schema_version,
+        "control_plane_selection_sha256": receipt.selection_sha256,
+    }
+
+
+def _validated_job_control_plane_receipt(
+    job: models.Job,
+) -> HarnessControlPlaneReceipt:
+    """Validate the persisted receipt and its immutable creation-event binding."""
+
+    def invalid() -> JobServiceError:
+        return JobServiceError(
+            "MODEL_HARNESS_CONTROL_PLANE_RECEIPT_INVALID",
+            f"Job {job.id} has an invalid Model + Harness control-plane receipt.",
+            http_status=409,
+        )
+
+    if job.model_harness_domain != OPTIMIZATION_CONTROL_TUNING_DOMAIN:
+        raise invalid()
+    try:
+        receipt = HarnessControlPlaneReceipt.model_validate(job.model_harness_control_plane_json)
+    except (TypeError, ValueError) as exc:
+        raise invalid() from exc
+    if receipt.domain != job.model_harness_domain:
+        raise invalid()
+    if job.model_harness_control_plane_selection_sha256 != receipt.selection_sha256:
+        raise invalid()
+
+    expected_binding = _control_plane_event_binding(receipt)
+    bound_events = [
+        event for event in job.events if event.event_type in {"job_created", "job_queued"}
+    ]
+    for event in bound_events:
+        payload = event.payload_json
+        if not isinstance(payload, dict):
+            raise invalid()
+        if any(payload.get(key) != value for key, value in expected_binding.items()):
+            raise invalid()
+    return receipt
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -117,6 +168,28 @@ def _validate_real_cli_scenario_effect_contract(req: schemas.JobCreateRequest) -
                     f"scenario case {case.id!r} seed {seed} is not physically executable: {exc}",
                     http_status=422,
                 ) from exc
+
+
+def _validate_operator_simulator_backend(
+    req: schemas.JobCreateRequest,
+    *,
+    allow_internal_test_backend: bool = False,
+) -> None:
+    """Keep synthetic adapters behind the explicit regression-test boundary."""
+
+    if req.simulator_backend != "mock":
+        return
+    if allow_internal_test_backend:
+        return
+    app_env = get_settings().app_env.strip().lower()
+    if app_env in {"test", "testing"}:
+        return
+    raise JobServiceError(
+        "SIMULATOR_BACKEND_TEST_ONLY",
+        "The deterministic mock simulator is available only to the regression-test suite; "
+        "operator jobs must use the configured real PX4/Gazebo runtime.",
+        http_status=422,
+    )
 
 
 def _expected_control_version(
@@ -405,7 +478,12 @@ def _create_job_from_config(
     continuation_root_job_id: str | None = None,
     holdout_policy_version: str = "legacy-visible-v0",
     holdout_contract: dict[str, object] | None = None,
+    allow_internal_test_backend: bool = False,
 ) -> models.Job:
+    _validate_operator_simulator_backend(
+        req,
+        allow_internal_test_backend=allow_internal_test_backend,
+    )
     _validate_real_cli_scenario_effect_contract(req)
     try:
         outcome_contract = compile_outcome_contract(
@@ -461,8 +539,13 @@ def _create_job_from_config(
         llm_model = None
         llm_base_url = None
         llm_credential = None
+    control_plane_receipt = compile_control_plane_receipt(OPTIMIZATION_CONTROL_TUNING_DOMAIN)
+    control_plane_binding = _control_plane_event_binding(control_plane_receipt)
     job = models.Job(
         user_id=user.id,
+        model_harness_domain=OPTIMIZATION_CONTROL_TUNING_DOMAIN,
+        model_harness_control_plane_json=control_plane_receipt.model_dump(mode="json"),
+        model_harness_control_plane_selection_sha256=(control_plane_receipt.selection_sha256),
         track_type=req.track_type,
         start_point_x=req.start_point.x,
         start_point_y=req.start_point.y,
@@ -556,6 +639,7 @@ def _create_job_from_config(
             job_id=job.id,
             event_type="job_created",
             payload_json={
+                **control_plane_binding,
                 "source_job_id": source_job_id,
                 "batch_id": batch_id,
                 "simulator_backend": req.simulator_backend,
@@ -567,9 +651,7 @@ def _create_job_from_config(
                 "provider_turn_cap": req.provider_turn_cap,
                 "provider_request_cap": req.provider_request_cap,
                 "provider_max_retries": req.provider_max_retries,
-                "continue_exploration_preregistered": (
-                    req.continue_exploration_after_qualified
-                ),
+                "continue_exploration_preregistered": (req.continue_exploration_after_qualified),
                 "continuation_parent_job_id": continuation_parent_job_id,
                 "continuation_root_job_id": continuation_root_job_id,
                 "holdout_policy_version": holdout_policy_version,
@@ -592,7 +674,7 @@ def _create_job_from_config(
         models.JobEvent(
             job_id=job.id,
             event_type="job_queued",
-            payload_json=None,
+            payload_json=control_plane_binding,
         )
     )
     return job
@@ -711,7 +793,7 @@ def list_jobs(
     if page_size < 1 or page_size > 200:
         raise JobServiceError("INVALID_INPUT", "page_size must be in [1, 200]", http_status=422)
 
-    stmt = select(models.Job)
+    stmt = select(models.Job).options(selectinload(models.Job.events))
     count_stmt = select(func.count(models.Job.id))
     if user is not None:
         if get_settings().auth_mode == "disabled":
@@ -730,6 +812,8 @@ def list_jobs(
         stmt.order_by(models.Job.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     )
     items = list(db.scalars(stmt))
+    for item in items:
+        _validated_job_control_plane_receipt(item)
     return items, total
 
 
@@ -740,6 +824,7 @@ def get_job(db: Session, job_id: str, *, user: models.User | None = None) -> mod
     auth_disabled_owned_null = get_settings().auth_mode == "disabled" and job.user_id is None
     if user is not None and job.user_id != user.id and not auth_disabled_owned_null:
         raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
+    _validated_job_control_plane_receipt(job)
     return job
 
 
@@ -908,12 +993,7 @@ def _independent_continuation_suite(
             http_status=409,
         )
     source_suite = schemas.ScenarioSuiteConfig(**source.scenario_suite_json)
-    used_seeds = {
-        seed
-        for case in source_suite.cases
-        if case.enabled
-        for seed in case.seeds
-    }
+    used_seeds = {seed for case in source_suite.cases if case.enabled for seed in case.seeds}
     child_cases: list[schemas.ScenarioCaseConfig] = []
     derivations: list[dict[str, object]] = []
     enabled_holdout_count = 0
@@ -1195,9 +1275,7 @@ def continue_exploration(
         parent,
         candidate=incumbent,
     )
-    scenario_trial_count = sum(
-        len(case.seeds) for case in child_suite.cases if case.enabled
-    )
+    scenario_trial_count = sum(len(case.seeds) for case in child_suite.cases if case.enabled)
     minimum_trial_cap = scenario_trial_count * 2
     if request.budget.additional_trial_cap < minimum_trial_cap:
         raise JobServiceError(
@@ -1211,9 +1289,7 @@ def continue_exploration(
     fresh_openai, fresh_llm = _continuation_provider_config(parent, request)
     suffix = " (continue exploration)"
     display_name = (
-        f"{parent.display_name[: 255 - len(suffix)]}{suffix}"
-        if parent.display_name
-        else None
+        f"{parent.display_name[: 255 - len(suffix)]}{suffix}" if parent.display_name else None
     )
     child_request = schemas.JobCreateRequest(
         track_type=parent.track_type,  # type: ignore[arg-type]
@@ -1325,9 +1401,7 @@ def continue_exploration(
             "first_qualified_receipt_id": parent.first_qualified_freeze.id,
             "budget": request.budget.model_dump(mode="json"),
             "holdout_contract_sha256": holdout_contract["contract_sha256"],
-            "fresh_child_credential_binding": (
-                fresh_openai is not None or fresh_llm is not None
-            ),
+            "fresh_child_credential_binding": (fresh_openai is not None or fresh_llm is not None),
         },
     )
     if commit:
@@ -2074,6 +2148,7 @@ def _recent_events(job: models.Job) -> list[schemas.JobEventInfo]:
 
 
 def to_job_schema(job: models.Job) -> schemas.Job:
+    control_plane_receipt = _validated_job_control_plane_receipt(job)
     latest_error = None
     if job.latest_error_code is not None:
         latest_error = schemas.JobErrorInfo(
@@ -2096,6 +2171,9 @@ def to_job_schema(job: models.Job) -> schemas.Job:
 
     return schemas.Job(
         id=job.id,
+        model_harness_domain=job.model_harness_domain,  # type: ignore[arg-type]
+        memory_domain=job.model_harness_domain,  # type: ignore[arg-type]
+        control_plane=control_plane_receipt,
         control_version=job.control_version,
         track_type=job.track_type,  # type: ignore[arg-type]
         start_point=schemas.StartPoint(x=job.start_point_x, y=job.start_point_y),
@@ -2174,9 +2252,7 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         provider_requests_succeeded=job.provider_requests_succeeded,
         first_qualified_candidate_id=job.first_qualified_candidate_id,
         first_qualified_freeze_receipt_id=(
-            job.first_qualified_freeze.id
-            if job.first_qualified_freeze is not None
-            else None
+            job.first_qualified_freeze.id if job.first_qualified_freeze is not None else None
         ),
         first_qualified_at=job.first_qualified_at,
         continue_exploration_requested=job.continue_exploration_requested,
@@ -2348,10 +2424,7 @@ def compare_jobs(
             verified_real_winner = True
         validated_best = bool(
             job.best_candidate_id
-            and (
-                job.simulator_backend_requested != "real_cli"
-                or verified_real_winner
-            )
+            and (job.simulator_backend_requested != "real_cli" or verified_real_winner)
         )
         if job.status != "COMPLETED":
             baseline_metrics = None

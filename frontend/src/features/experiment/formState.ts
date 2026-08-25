@@ -147,7 +147,7 @@ export const EXPERIMENT_FORM_DEFAULTS: ExperimentFormState = {
   robust_aggregation: "cvar",
   cvar_alpha: "0.2",
   percentile: "95",
-  simulator_backend: "mock",
+  simulator_backend: import.meta.env.MODE === "test" ? "mock" : "real_cli",
   optimizer_strategy: "optimizer_portfolio",
   max_iterations: "12",
   trials_per_candidate: "3",

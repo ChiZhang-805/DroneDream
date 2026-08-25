@@ -15,6 +15,12 @@ import type {
   ManagedModelProvider,
   ModelProvider,
 } from "./ModelAccessContext";
+import {
+  isManagedModelProvider,
+  isModelProvider,
+  modelProviderDefaults,
+  type ModelApiProtocol,
+} from "./modelProviderCatalog";
 
 interface PersistedModelAccessProfile {
   id: string;
@@ -23,9 +29,12 @@ interface PersistedModelAccessProfile {
   managedModel: string;
   provider: ModelProvider;
   model: string;
+  displayName: string;
   baseUrl: string;
+  protocol: ModelApiProtocol;
+  agentCoreProfileId: string | null;
+  agentCoreSelectionId: string | null;
 }
-
 interface PersistedModelAccessProfiles {
   activeProfileId: string;
   profiles: PersistedModelAccessProfile[];
@@ -54,35 +63,23 @@ const DEFAULT_MODEL_ACCESS: ModelAccessSettings = {
   provider: "openai",
   apiKey: "",
   model: "",
+  displayName: "",
   baseUrl: "",
+  protocol: "openai-responses",
+  agentCoreProfileId: null,
+  agentCoreSelectionId: null,
 };
 
-const PROVIDER_DEFAULTS: Record<
-  ModelProvider,
-  Pick<ModelAccessSettings, "model" | "baseUrl">
-> = {
-  openai: { model: "", baseUrl: "" },
-  qwen: {
-    model: "qwen-plus",
-    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-  },
-  deepseek: {
-    model: "deepseek-v4-flash",
-    baseUrl: "https://api.deepseek.com",
-  },
-  kimi: {
-    model: "kimi-k2.6",
-    baseUrl: "https://api.moonshot.ai/v1",
-  },
-  custom: { model: "", baseUrl: "" },
-};
-
-function isModelProvider(value: unknown): value is ModelProvider {
-  return ["openai", "qwen", "deepseek", "kimi", "custom"].includes(String(value));
-}
-
-function isManagedModelProvider(value: unknown): value is ManagedModelProvider {
-  return ["openai", "qwen", "deepseek", "kimi"].includes(String(value));
+function isModelApiProtocol(value: unknown): value is ModelApiProtocol {
+  return [
+    "openai-responses",
+    "openai-chat",
+    "anthropic-messages",
+    "google-generate-content",
+    "aws-bedrock-converse",
+    "ollama-chat",
+    "custom-http",
+  ].includes(String(value));
 }
 
 function isModelAccessMode(value: unknown): value is ModelAccessMode {
@@ -113,6 +110,8 @@ function parsePersistedProfile(value: unknown): PersistedModelAccessProfile | nu
     || !isModelProvider(candidate.provider)
     || typeof candidate.model !== "string"
     || candidate.model.length > 128
+    || (candidate.displayName !== undefined
+      && (typeof candidate.displayName !== "string" || candidate.displayName.length > 128))
     || typeof candidate.baseUrl !== "string"
     || candidate.baseUrl.length > 2_048
   ) {
@@ -133,7 +132,19 @@ function parsePersistedProfile(value: unknown): PersistedModelAccessProfile | nu
       : "gpt-4.1",
     provider: candidate.provider,
     model: candidate.model,
+    displayName: typeof candidate.displayName === "string" ? candidate.displayName : "",
     baseUrl: candidate.baseUrl,
+    protocol: isModelApiProtocol(candidate.protocol)
+      ? candidate.protocol
+      : modelProviderDefaults(candidate.provider).protocol,
+    agentCoreProfileId: typeof candidate.agentCoreProfileId === "string"
+        && /^cmp-[a-f0-9]{24}$/u.test(candidate.agentCoreProfileId)
+      ? candidate.agentCoreProfileId
+      : null,
+    agentCoreSelectionId: typeof candidate.agentCoreSelectionId === "string"
+        && /^custom:cmp-[a-f0-9]{24}$/u.test(candidate.agentCoreSelectionId)
+      ? candidate.agentCoreSelectionId
+      : null,
   };
 }
 
@@ -192,7 +203,11 @@ function loadModelAccessState(
           managedModel: "gpt-4.1",
           provider: candidate.provider,
           model: candidate.model,
-          baseUrl: candidate.baseUrl,
+          displayName: "",
+            baseUrl: candidate.baseUrl,
+            protocol: modelProviderDefaults(candidate.provider).protocol,
+            agentCoreProfileId: null,
+            agentCoreSelectionId: null,
         }],
       };
     }
@@ -279,7 +294,11 @@ export function ModelAccessProvider({
             managedModel: profile.managedModel,
             provider: profile.provider,
             model: profile.model,
+            displayName: profile.displayName,
             baseUrl: profile.baseUrl,
+            protocol: profile.protocol,
+            agentCoreProfileId: profile.agentCoreProfileId,
+            agentCoreSelectionId: profile.agentCoreSelectionId,
           })),
         } satisfies PersistedModelAccessProfiles),
       );
@@ -307,6 +326,15 @@ export function ModelAccessProvider({
                 && values.apiKey === undefined
                 ? { apiKey: "" }
                 : {}),
+              ...((values.provider !== undefined && values.provider !== profile.provider)
+                || (values.baseUrl !== undefined && values.baseUrl !== profile.baseUrl)
+                || (values.model !== undefined && values.model !== profile.model)
+                || (values.protocol !== undefined && values.protocol !== profile.protocol)
+                ? {
+                    ...(values.agentCoreProfileId === undefined ? { agentCoreProfileId: null } : {}),
+                    ...(values.agentCoreSelectionId === undefined ? { agentCoreSelectionId: null } : {}),
+                  }
+                : {}),
             }
           : profile
       ),
@@ -324,7 +352,9 @@ export function ModelAccessProvider({
               // Credentials belong to a provider/endpoint pair. Never carry a
               // key across providers where it could be sent to the wrong host.
               apiKey: profile.provider === provider ? profile.apiKey : "",
-              ...PROVIDER_DEFAULTS[provider],
+              agentCoreProfileId: profile.provider === provider ? profile.agentCoreProfileId : null,
+              agentCoreSelectionId: profile.provider === provider ? profile.agentCoreSelectionId : null,
+              ...modelProviderDefaults(provider),
             }
           : profile
       ),
@@ -401,7 +431,9 @@ export function ModelAccessProvider({
             managedModel: "gpt-4.1",
             provider: "custom",
             apiKey: "",
-            ...PROVIDER_DEFAULTS.custom,
+            agentCoreProfileId: null,
+            agentCoreSelectionId: null,
+            ...modelProviderDefaults("custom"),
           },
         ],
       };

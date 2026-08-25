@@ -6,6 +6,8 @@ features so Postgres can be swapped in later by changing ``DATABASE_URL``.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterator
 
 from sqlalchemy import create_engine, event, text
@@ -136,11 +138,157 @@ def _apply_sqlite_lightweight_migrations() -> None:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN batch_id VARCHAR(64)"))
         if "control_version" not in job_columns:
             conn.execute(
+                text("ALTER TABLE jobs ADD COLUMN control_version INTEGER NOT NULL DEFAULT 1")
+            )
+        if "model_harness_domain" not in job_columns:
+            conn.execute(
                 text(
-                    "ALTER TABLE jobs ADD COLUMN control_version "
-                    "INTEGER NOT NULL DEFAULT 1"
+                    "ALTER TABLE jobs ADD COLUMN model_harness_domain "
+                    "VARCHAR(64) NOT NULL DEFAULT 'optimization.control_tuning'"
                 )
             )
+        if "model_harness_control_plane_json" not in job_columns:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN model_harness_control_plane_json JSON"))
+        if "model_harness_control_plane_selection_sha256" not in job_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE jobs ADD COLUMN "
+                    "model_harness_control_plane_selection_sha256 VARCHAR(64)"
+                )
+            )
+        from app.model_harness.control_plane import compile_control_plane_receipt
+        from app.model_harness.domains import OPTIMIZATION_CONTROL_TUNING_DOMAIN
+
+        canonical_control_plane_receipt = compile_control_plane_receipt(
+            OPTIMIZATION_CONTROL_TUNING_DOMAIN
+        )
+        canonical_control_plane_json = json.dumps(
+            canonical_control_plane_receipt.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        conn.execute(
+            text(
+                "UPDATE jobs SET model_harness_control_plane_json = :receipt "
+                "WHERE model_harness_control_plane_json IS NULL"
+            ),
+            {"receipt": canonical_control_plane_json},
+        )
+        canonical_selection_sha256 = canonical_control_plane_receipt.selection_sha256
+        conn.execute(
+            text(
+                "UPDATE jobs SET model_harness_control_plane_selection_sha256 = :sha256 "
+                "WHERE model_harness_control_plane_selection_sha256 IS NULL"
+            ),
+            {"sha256": canonical_selection_sha256},
+        )
+        if "job_events" in table_names:
+            job_bindings: dict[str, dict[str, str]] = {}
+            job_rows = (
+                conn.execute(
+                    text(
+                        "SELECT id, model_harness_domain, "
+                        "model_harness_control_plane_json, "
+                        "model_harness_control_plane_selection_sha256 FROM jobs"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            for job_row in job_rows:
+                raw_receipt = job_row["model_harness_control_plane_json"]
+                if isinstance(raw_receipt, str):
+                    try:
+                        decoded_receipt = json.loads(raw_receipt)
+                    except json.JSONDecodeError:
+                        decoded_receipt = None
+                else:
+                    decoded_receipt = raw_receipt
+                receipt_schema_version = (
+                    decoded_receipt.get("schema_version")
+                    if isinstance(decoded_receipt, dict)
+                    else None
+                )
+                if not isinstance(receipt_schema_version, str):
+                    receipt_schema_version = canonical_control_plane_receipt.schema_version
+                job_bindings[str(job_row["id"])] = {
+                    "model_harness_domain": str(job_row["model_harness_domain"]),
+                    "control_plane_schema_version": receipt_schema_version,
+                    "control_plane_selection_sha256": str(
+                        job_row["model_harness_control_plane_selection_sha256"]
+                    ),
+                }
+            event_types_by_job: dict[str, set[str]] = {}
+            legacy_events = (
+                conn.execute(
+                    text(
+                        "SELECT id, job_id, event_type, payload_json FROM job_events "
+                        "WHERE event_type IN ('job_created', 'job_queued')"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            for event_row in legacy_events:
+                job_id = str(event_row["job_id"])
+                event_type = str(event_row["event_type"])
+                event_types_by_job.setdefault(job_id, set()).add(event_type)
+                binding = job_bindings.get(job_id)
+                if binding is None:
+                    continue
+                raw_payload = event_row["payload_json"]
+                if isinstance(raw_payload, str):
+                    try:
+                        decoded_payload = json.loads(raw_payload)
+                    except json.JSONDecodeError:
+                        decoded_payload = None
+                else:
+                    decoded_payload = raw_payload
+                payload = dict(decoded_payload) if isinstance(decoded_payload, dict) else {}
+                payload.update(binding)
+                conn.execute(
+                    text("UPDATE job_events SET payload_json = :payload WHERE id = :id"),
+                    {
+                        "id": event_row["id"],
+                        "payload": json.dumps(
+                            payload,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ),
+                    },
+                )
+            for job_id, binding in job_bindings.items():
+                existing_types = event_types_by_job.get(job_id, set())
+                for event_type in ("job_created", "job_queued"):
+                    if event_type in existing_types:
+                        continue
+                    digest = hashlib.sha256(
+                        f"sqlite-control-plane:{job_id}:{event_type}".encode()
+                    ).hexdigest()
+                    payload = {
+                        **binding,
+                        "control_plane_binding_source": "lightweight_migration_backfill",
+                    }
+                    conn.execute(
+                        text(
+                            "INSERT INTO job_events "
+                            "(id, job_id, event_type, payload_json, created_at) "
+                            "VALUES (:id, :job_id, :event_type, :payload, CURRENT_TIMESTAMP)"
+                        ),
+                        {
+                            "id": f"evt_mh_{digest[:48]}",
+                            "job_id": job_id,
+                            "event_type": event_type,
+                            "payload": json.dumps(
+                                payload,
+                                ensure_ascii=False,
+                                sort_keys=True,
+                                separators=(",", ":"),
+                            ),
+                        },
+                    )
         experiment_columns = {
             "vehicle_profile_json": "JSON",
             "parameter_space_json": "JSON",
@@ -154,13 +302,9 @@ def _apply_sqlite_lightweight_migrations() -> None:
             if column_name not in job_columns:
                 conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
         first_qualified_columns = {
-            "completion_policy": (
-                "VARCHAR(32) NOT NULL DEFAULT 'first_qualified_stop'"
-            ),
+            "completion_policy": ("VARCHAR(32) NOT NULL DEFAULT 'first_qualified_stop'"),
             "job_kind": "VARCHAR(32) NOT NULL DEFAULT 'primary'",
-            "cognitive_policy_version": (
-                "VARCHAR(32) NOT NULL DEFAULT 'adaptive-2-4-v1'"
-            ),
+            "cognitive_policy_version": ("VARCHAR(32) NOT NULL DEFAULT 'adaptive-2-4-v1'"),
             "provider_turn_cap": "INTEGER NOT NULL DEFAULT 64",
             "provider_turns_attempted": "INTEGER NOT NULL DEFAULT 0",
             "provider_turns_succeeded": "INTEGER NOT NULL DEFAULT 0",
@@ -176,16 +320,12 @@ def _apply_sqlite_lightweight_migrations() -> None:
             "exploration_budget_json": "JSON",
             "continuation_parent_job_id": "VARCHAR(64)",
             "continuation_root_job_id": "VARCHAR(64)",
-            "holdout_policy_version": (
-                "VARCHAR(32) NOT NULL DEFAULT 'legacy-visible-v0'"
-            ),
+            "holdout_policy_version": ("VARCHAR(32) NOT NULL DEFAULT 'legacy-visible-v0'"),
             "holdout_contract_json": "JSON",
         }
         for column_name, column_type in first_qualified_columns.items():
             if column_name not in job_columns:
-                conn.execute(
-                    text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}")
-                )
+                conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
         conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS "
@@ -231,12 +371,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
         }
         for column_name, column_type in finalization_claim_columns.items():
             if column_name not in job_columns:
-                conn.execute(
-                    text(
-                        f"ALTER TABLE jobs ADD COLUMN {column_name} "
-                        f"{column_type}"
-                    )
-                )
+                conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
         conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS "
@@ -277,6 +412,43 @@ def _apply_sqlite_lightweight_migrations() -> None:
             }
             if "expires_at" not in secret_columns:
                 conn.execute(text("ALTER TABLE job_secrets ADD COLUMN expires_at DATETIME"))
+        if "harness_experience_memories" in table_names:
+            memory_columns = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info('harness_experience_memories')")
+                ).fetchall()
+            }
+            lifecycle_columns = {
+                "memory_domain": ("VARCHAR(64) NOT NULL DEFAULT 'optimization.control_tuning'"),
+                "source_kind": ("VARCHAR(32) NOT NULL DEFAULT 'verified_job_outcome'"),
+                "evidence_count": "INTEGER NOT NULL DEFAULT 1",
+                "confidence": "FLOAT NOT NULL DEFAULT 1.0",
+                "lifecycle_status": "VARCHAR(16) NOT NULL DEFAULT 'consolidated'",
+            }
+            for column_name, column_type in lifecycle_columns.items():
+                if column_name not in memory_columns:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE harness_experience_memories "
+                            f"ADD COLUMN {column_name} {column_type}"
+                        )
+                    )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS "
+                    "ix_harness_experience_memories_memory_domain "
+                    "ON harness_experience_memories(memory_domain)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS "
+                    "ix_harness_experience_owner_domain_family "
+                    "ON harness_experience_memories"
+                    "(user_id, memory_domain, task_family_sha256)"
+                )
+            )
         if "candidate_parameter_sets" in table_names:
             candidate_columns = {
                 row[1]
@@ -365,26 +537,16 @@ def _apply_sqlite_lightweight_migrations() -> None:
             )
         if "trials" in table_names:
             trial_columns = {
-                row[1]
-                for row in conn.execute(
-                    text("PRAGMA table_info('trials')")
-                ).fetchall()
+                row[1] for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()
             }
             qualification_trial_columns = {
                 "qualification_id": "VARCHAR(64)",
-                "evaluation_phase": (
-                    "VARCHAR(32) NOT NULL DEFAULT 'optimization'"
-                ),
+                "evaluation_phase": ("VARCHAR(32) NOT NULL DEFAULT 'optimization'"),
                 "qualification_ordinal": "INTEGER",
             }
             for column_name, column_type in qualification_trial_columns.items():
                 if column_name not in trial_columns:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE trials "
-                            f"ADD COLUMN {column_name} {column_type}"
-                        )
-                    )
+                    conn.execute(text(f"ALTER TABLE trials ADD COLUMN {column_name} {column_type}"))
             conn.execute(
                 text(
                     "CREATE INDEX IF NOT EXISTS "
@@ -493,10 +655,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
                 )
             )
             conn.execute(
-                text(
-                    "DROP TRIGGER IF EXISTS "
-                    "trg_first_qualified_freeze_receipts_no_delete"
-                )
+                text("DROP TRIGGER IF EXISTS trg_first_qualified_freeze_receipts_no_delete")
             )
             conn.execute(
                 text(

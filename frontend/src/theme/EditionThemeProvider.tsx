@@ -130,6 +130,9 @@ export function EditionThemeProvider({
   );
 }
 
+// The hook is deliberately colocated with its provider so consumers cannot bind
+// to a different context instance during product-edition switching.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useEditionTheme(): EditionThemeContextValue {
   return useContext(EditionThemeContext);
 }

@@ -9,20 +9,21 @@ from pathlib import Path
 from typing import Any
 
 CONTRACT_PATH = Path("distribution/desktop/edition-coexistence.v1.json")
+BRAND_CONTRACT_PATH = Path("brand/editions.json")
 EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
 EDITION_LABELS = {
     "universal": "Universal",
     "sim": "Sim",
     "lab": "Lab",
     "field": "Field",
-    "autonomy": "Autonomy",
+    "autonomy": "Agent",
 }
 DISPLAY_NAMES = {
     "universal": "DroneDream",
     "sim": "DroneDream · SIM",
     "lab": "DroneDream · LAB",
     "field": "DroneDream · FIELD",
-    "autonomy": "DroneDream · AUTONOMY",
+    "autonomy": "DroneDream · AGENT",
 }
 
 
@@ -47,6 +48,20 @@ def _unique(editions: list[dict[str, Any]], field: str) -> None:
     values = [edition[field] for edition in editions]
     if len(set(values)) != len(values):
         raise DesktopEditionCoexistenceError(f"desktop edition {field} values collide")
+
+
+def _load_brand_editions(root: Path) -> dict[str, Any]:
+    path = root / BRAND_CONTRACT_PATH
+    if path.is_symlink() or not path.is_file():
+        raise DesktopEditionCoexistenceError("edition brand contract is unavailable")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise DesktopEditionCoexistenceError("edition brand contract is invalid") from error
+    editions = document.get("editions") if isinstance(document, dict) else None
+    if not isinstance(editions, dict):
+        raise DesktopEditionCoexistenceError("edition brand contract is invalid")
+    return editions
 
 
 def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
@@ -133,7 +148,8 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
         "credentialVaultNamespace",
         "webViewDataNamespace",
         "brandEditionId",
-        "canonicalWindowsIcon",
+        "canonicalMark",
+        "generatedWindowsIcon",
     }
     for field in (
         "artifactFileName",
@@ -151,16 +167,25 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
         "customProtocol",
         "credentialVaultNamespace",
         "webViewDataNamespace",
+        "canonicalMark",
+        "generatedWindowsIcon",
     ):
         _unique(editions, field)
-    brand_manifest = json.loads(
-        (root / "brand/generated/brand-assets.v1.json").read_text(encoding="utf-8")
-    )
-    brand_assets = {item["path"]: item for item in brand_manifest["assets"]}
+    brand_editions = _load_brand_editions(root)
     for edition in editions:
         edition_id = edition["editionId"]
         label = EDITION_LABELS[edition_id]
         _require_exact_keys(edition, edition_keys, f"desktop edition {edition_id}")
+        brand_edition = brand_editions.get(edition_id)
+        brand_mark = brand_edition.get("mark") if isinstance(brand_edition, dict) else None
+        if (
+            not isinstance(brand_mark, dict)
+            or not isinstance(brand_mark.get("path"), str)
+            or not isinstance(brand_mark.get("sha256"), str)
+        ):
+            raise DesktopEditionCoexistenceError(
+                f"desktop edition {edition_id} brand contract is invalid"
+            )
         expected = {
             "artifactFileName": f"DroneDream-{label}-1.0.0.exe",
             "installerProductName": f"DroneDream-{label}",
@@ -183,24 +208,27 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
             "credentialVaultNamespace": f"DroneDream/Auth/{edition_id}/v1",
             "webViewDataNamespace": f"io.dronedream.desktop.{edition_id}",
             "brandEditionId": edition_id,
-            "canonicalWindowsIcon": f"brand/generated/{edition_id}/windows/icon.ico",
+            "canonicalMark": brand_mark["path"],
+            "generatedWindowsIcon": (
+                f"desktop/src-tauri/gen/brand/{edition_id}/windows/icon.ico"
+            ),
         }
         for field, value in expected.items():
             if edition[field] != value:
                 raise DesktopEditionCoexistenceError(
                     f"desktop edition {edition_id} {field} drifted"
                 )
-        icon_path = root / edition["canonicalWindowsIcon"]
-        manifest_icon = brand_assets.get(edition["canonicalWindowsIcon"])
+        mark_relative = Path(edition["canonicalMark"])
+        mark_path = root / mark_relative
         if (
-            icon_path.is_symlink()
-            or not icon_path.is_file()
-            or not isinstance(manifest_icon, dict)
-            or manifest_icon.get("format") != "ICO"
-            or sha256_file(icon_path) != manifest_icon.get("sha256")
+            mark_relative.is_absolute()
+            or ".." in mark_relative.parts
+            or mark_path.is_symlink()
+            or not mark_path.is_file()
+            or sha256_file(mark_path) != brand_mark["sha256"]
         ):
             raise DesktopEditionCoexistenceError(
-                f"desktop edition {edition_id} canonical icon drifted"
+                f"desktop edition {edition_id} canonical mark drifted"
             )
 
     verification = document["stateMachineVerification"]

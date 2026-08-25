@@ -105,8 +105,27 @@ export function autonomyHarnessRequest(
   workspace: AutonomyWorkspaceState,
   naturalLanguage: string,
 ): AutonomyHarnessInspectRequest {
-  const localizationSources = workspace.aircraft.sensors
-    .filter((sensor) => sensor === "gps" || sensor === "vio");
+  const aircraftRuntimeCandidate = workspace.aircraft.agentCoreRuntimeContract;
+  const aircraftRuntime = aircraftRuntimeCandidate
+      && aircraftRuntimeCandidate.assetId === workspace.aircraft.agentCoreAssetId
+      && aircraftRuntimeCandidate.contentSha256 === workspace.aircraft.agentCoreContentSha256
+    ? aircraftRuntimeCandidate
+    : null;
+  const mapRuntimeCandidate = workspace.mapPack.agentCoreRuntimeContract;
+  const mapRuntime = mapRuntimeCandidate
+      && mapRuntimeCandidate.assetId === workspace.mapPack.agentCoreAssetId
+      && mapRuntimeCandidate.contentSha256 === workspace.mapPack.agentCoreContentSha256
+    ? mapRuntimeCandidate
+    : null;
+  const sensorContract = aircraftRuntime?.sensors ?? workspace.aircraft.sensors;
+  const localizationSources = sensorContract.filter((sensor) => {
+    const normalized = sensor.toLowerCase().replaceAll("-", "_");
+    return normalized === "gps"
+      || normalized === "gnss"
+      || normalized === "vio"
+      || normalized === "visual_inertial_odometry"
+      || normalized === "odometry";
+  });
   return {
     schema_version: "dronedream.autonomy.harness-inspect.v1",
     edition,
@@ -121,13 +140,21 @@ export function autonomyHarnessRequest(
       qualification_receipt_id: workspace.aircraft.qualificationReceiptId,
       capabilities: {
         body_radius_m: autonomyAircraftRadiusM(workspace.aircraft),
-        dry_mass_kg: workspace.aircraft.dryMassKg,
-        maximum_takeoff_mass_kg: workspace.aircraft.maximumTakeoffMassKg,
-        maximum_thrust_n: workspace.aircraft.maximumThrustN,
-        maximum_speed_mps: workspace.aircraft.maximumSpeedMps,
-        maximum_acceleration_mps2: workspace.aircraft.maximumAccelerationMps2,
-        maximum_pickup_payload_kg: workspace.aircraft.maximumPickupPayloadKg,
-        reserve_battery_percent: workspace.aircraft.reserveBatteryPercent,
+        dry_mass_kg: aircraftRuntime?.dryMassKg ?? workspace.aircraft.dryMassKg,
+        maximum_takeoff_mass_kg: aircraftRuntime?.maximumTakeoffMassKg ?? workspace.aircraft.maximumTakeoffMassKg,
+        maximum_thrust_n: aircraftRuntime ? null : workspace.aircraft.maximumThrustN,
+        maximum_speed_mps: aircraftRuntime?.maximumSpeedMps ?? workspace.aircraft.maximumSpeedMps,
+        maximum_acceleration_mps2: aircraftRuntime?.maximumAccelerationMps2 ?? workspace.aircraft.maximumAccelerationMps2,
+        maximum_pickup_payload_kg: aircraftRuntime?.maximumPickupPayloadKg ?? workspace.aircraft.maximumPickupPayloadKg,
+        reserve_battery_percent: aircraftRuntime?.reserveBatteryPercent ?? workspace.aircraft.reserveBatteryPercent,
+        qualified_range_m: aircraftRuntime?.qualifiedRangeM ?? null,
+        body_height_m: aircraftRuntime?.bodyHeightM ?? workspace.aircraft.bodyHeightM,
+        coordinate_frame: aircraftRuntime?.coordinateFrame ?? null,
+        vehicle_class: aircraftRuntime?.vehicleClass ?? null,
+        sensor_contract: sensorContract,
+        simulation_targets: aircraftRuntime?.simulationTargets.map((target) => (
+          `${target.targetId}:${target.simulator}:${target.simulatorVersion}:${target.rosDistribution ?? "none"}:${target.autopilot}`
+        )) ?? null,
         localization_sources: localizationSources,
       },
     },
@@ -140,27 +167,45 @@ export function autonomyHarnessRequest(
       content_hash: workspace.mapPack.contentHash,
       qualification_receipt_id: workspace.mapPack.qualificationReceiptId,
       capabilities: {
-        representation: workspace.mapPack.representation,
-        coordinate_frame: workspace.mapPack.coordinateFrame,
-        resolution_m: workspace.mapPack.resolutionM,
-        floor_count: workspace.mapPack.floorCount,
-        bounds_x_m: workspace.mapPack.boundsM.x,
-        bounds_y_m: workspace.mapPack.boundsM.y,
-        bounds_z_m: workspace.mapPack.boundsM.z,
-        confidence_percent: workspace.mapPack.confidencePercent,
-        live_updates: workspace.mapPack.liveUpdates,
-        origin_latitude: workspace.mapPack.origin.latitude,
-        origin_longitude: workspace.mapPack.origin.longitude,
-        origin_altitude_m: workspace.mapPack.origin.altitudeM,
-        semantic_layers: workspace.mapPack.semanticLayers,
-        planning_layers: workspace.mapPack.planningLayers,
-        compiler_scene_id: workspace.mapPack.compilerSceneId,
+        representation: mapRuntime ? null : workspace.mapPack.representation,
+        coordinate_frame: mapRuntime?.coordinateFrame ?? workspace.mapPack.coordinateFrame,
+        resolution_m: mapRuntime ? null : workspace.mapPack.resolutionM,
+        floor_count: mapRuntime ? null : workspace.mapPack.floorCount,
+        bounds_x_m: mapRuntime ? null : workspace.mapPack.boundsM.x,
+        bounds_y_m: mapRuntime ? null : workspace.mapPack.boundsM.y,
+        bounds_z_m: mapRuntime ? null : workspace.mapPack.boundsM.z,
+        navigation_minimum_m: mapRuntime
+          ? `${mapRuntime.navigationBoundsM.minimum.x},${mapRuntime.navigationBoundsM.minimum.y},${mapRuntime.navigationBoundsM.minimum.z}`
+          : null,
+        navigation_maximum_m: mapRuntime
+          ? `${mapRuntime.navigationBoundsM.maximum.x},${mapRuntime.navigationBoundsM.maximum.y},${mapRuntime.navigationBoundsM.maximum.z}`
+          : null,
+        navigation_span_m: mapRuntime
+          ? `${mapRuntime.navigationBoundsM.span.x},${mapRuntime.navigationBoundsM.span.y},${mapRuntime.navigationBoundsM.span.z}`
+          : null,
+        topology_node_count: mapRuntime?.nodeCount ?? null,
+        topology_edge_count: mapRuntime?.edgeCount ?? null,
+        named_entity_count: mapRuntime?.namedEntityCount ?? null,
+        simulation_targets: mapRuntime?.simulationTargets.map((target) => (
+          `${target.targetId}:${target.simulator}:${target.simulatorVersion}:${target.rosDistribution ?? "none"}:${target.autopilot}`
+        )) ?? null,
+        confidence_percent: mapRuntime ? null : workspace.mapPack.confidencePercent,
+        live_updates: mapRuntime ? null : workspace.mapPack.liveUpdates,
+        origin_latitude: mapRuntime ? null : workspace.mapPack.origin.latitude,
+        origin_longitude: mapRuntime ? null : workspace.mapPack.origin.longitude,
+        origin_altitude_m: mapRuntime ? null : workspace.mapPack.origin.altitudeM,
+        semantic_layers: mapRuntime?.semanticLayers ?? workspace.mapPack.semanticLayers,
+        planning_layers: mapRuntime ? null : workspace.mapPack.planningLayers,
+        compiler_scene_id: mapRuntime ? null : workspace.mapPack.compilerSceneId,
       },
     },
   };
 }
 
-function localIssues(request: AutonomyHarnessInspectRequest): {
+function localIssues(
+  request: AutonomyHarnessInspectRequest,
+  agentCorePairVerified = false,
+): {
   aircraft: string[];
   map: string[];
 } {
@@ -173,45 +218,85 @@ function localIssues(request: AutonomyHarnessInspectRequest): {
     aircraft.push("aircraft.qualification-receipt.missing");
   }
   if (!request.aircraft.content_hash) aircraft.push("aircraft.content-hash.missing");
-  aircraft.push("aircraft.qualification-registry.unavailable");
+  if (!agentCorePairVerified) {
+    aircraft.push("aircraft.qualification-registry.unavailable");
+  }
   const localization = request.aircraft.capabilities.localization_sources;
-  if (!Array.isArray(localization) || localization.length === 0) {
+  if (!agentCorePairVerified && (!Array.isArray(localization) || localization.length === 0)) {
     aircraft.push("aircraft.localization-source.missing");
   }
   if (request.map_pack.status !== "qualified") map.push("map.pack.not-qualified");
   if (!request.map_pack.content_hash) map.push("map.content-hash.missing");
   if (!request.map_pack.qualification_receipt_id) map.push("map.qualification-receipt.missing");
-  map.push("map.qualification-registry.unavailable");
+  if (!agentCorePairVerified) {
+    map.push("map.qualification-registry.unavailable");
+  }
   const planningLayers = request.map_pack.capabilities.planning_layers;
   if (
-    !Array.isArray(planningLayers)
-    || !planningLayers.includes("collision-geometry")
-    || !planningLayers.includes("occupancy")
+    !agentCorePairVerified
+    && (
+      !Array.isArray(planningLayers)
+      || !planningLayers.includes("collision-geometry")
+      || !planningLayers.includes("occupancy")
+    )
   ) {
     map.push("map.collision-layers.missing");
   }
-  if (!request.map_pack.capabilities.compiler_scene_id) map.push("map.compiler-scene.unbound");
+  if (!agentCorePairVerified && !request.map_pack.capabilities.compiler_scene_id) {
+    map.push("map.compiler-scene.unbound");
+  }
   return { aircraft, map };
 }
 
-export async function localAutonomyHarnessInspection(
-  request: AutonomyHarnessInspectRequest,
-): Promise<AutonomyHarnessInspectResponse> {
-  const issues = localIssues(request);
-  const blockers = [...new Set([...issues.aircraft, ...issues.map])].sort();
-  const planningReady = blockers.length === 0;
-  const receipt = (toolId: string, toolIssues: string[], evidence: Record<string, string | number | boolean | string[] | null>) => ({
+export interface VerifiedAutonomyAssetPairEvidence {
+  authority: "agent-core";
+  job_id: string;
+  qualification_id: string;
+  evidence_sha256: string;
+  map_asset_id: string;
+  map_content_sha256: string;
+  vehicle_asset_id: string;
+  vehicle_content_sha256: string;
+  runtime_evidence_sha256: string;
+}
+
+function inspectionReceipt(
+  toolId: string,
+  toolIssues: string[],
+  evidence: Record<string, string | number | boolean | string[] | null>,
+) {
+  return {
     tool_id: toolId,
     tool_version: "1.0.0",
     outcome: toolIssues.length ? "blocked" as const : "accepted" as const,
     evidence,
     issue_codes: toolIssues,
-  });
+  };
+}
+
+async function harnessInspection(
+  request: AutonomyHarnessInspectRequest,
+  issues: { aircraft: string[]; map: string[] },
+  verifiedPair: VerifiedAutonomyAssetPairEvidence | null,
+): Promise<AutonomyHarnessInspectResponse> {
+  const blockers = [...new Set([...issues.aircraft, ...issues.map])].sort();
+  const planningReady = blockers.length === 0;
+  const pairEvidence: Record<string, string | number | boolean | string[] | null> = verifiedPair
+    ? {
+        qualification_authority: verifiedPair.authority,
+        qualification_job_id: verifiedPair.job_id,
+        qualification_id: verifiedPair.qualification_id,
+        qualification_evidence_sha256: verifiedPair.evidence_sha256,
+        runtime_evidence_sha256: verifiedPair.runtime_evidence_sha256,
+      }
+    : {};
   return {
     schema_version: "dronedream.autonomy.harness-context.v1",
     prompt_version: "dronedream.autonomy.system.v1",
     tool_registry_version: "dronedream.autonomy.tools.v1",
-    context_sha256: await autonomyCanonicalSha256({ request, blockers }),
+    context_sha256: await autonomyCanonicalSha256(
+      verifiedPair ? { request, blockers, verified_asset_pair: verifiedPair } : { request, blockers },
+    ),
     status: planningReady ? "draft" : "needs_assets",
     planning_ready: planningReady,
     blockers,
@@ -223,20 +308,32 @@ export async function localAutonomyHarnessInspection(
       ? [...INSPECTION_TOOLS, ...PLANNING_TOOLS]
       : [...INSPECTION_TOOLS],
     tool_receipts: [
-      receipt("vehicle.inspect_binding", issues.aircraft, {
+      inspectionReceipt("vehicle.inspect_binding", issues.aircraft, {
         asset_id: request.aircraft.asset_id,
         version: request.aircraft.version,
         status: request.aircraft.status,
+        ...(verifiedPair ? {
+          agent_core_asset_id: verifiedPair.vehicle_asset_id,
+          content_sha256: verifiedPair.vehicle_content_sha256,
+          ...pairEvidence,
+        } : {}),
       }),
-      receipt("map.inspect_binding", issues.map, {
+      inspectionReceipt("map.inspect_binding", issues.map, {
         asset_id: request.map_pack.asset_id,
         version: request.map_pack.version,
         status: request.map_pack.status,
+        ...(verifiedPair ? {
+          agent_core_asset_id: verifiedPair.map_asset_id,
+          content_sha256: verifiedPair.map_content_sha256,
+          ...pairEvidence,
+        } : {}),
       }),
-      receipt("mission.validate_asset_readiness", blockers, {
+      inspectionReceipt("mission.validate_asset_readiness", blockers, {
         one_aircraft_bound: true,
         one_map_bound: true,
         planning_ready: planningReady,
+        paired_qualification_verified: verifiedPair !== null,
+        ...pairEvidence,
       }),
     ],
     repair_policy: {
@@ -247,6 +344,19 @@ export async function localAutonomyHarnessInspection(
       may_relax_safety_constraints: false,
     },
   };
+}
+
+export async function localAutonomyHarnessInspection(
+  request: AutonomyHarnessInspectRequest,
+): Promise<AutonomyHarnessInspectResponse> {
+  return harnessInspection(request, localIssues(request), null);
+}
+
+export async function verifiedAutonomyHarnessInspection(
+  request: AutonomyHarnessInspectRequest,
+  evidence: VerifiedAutonomyAssetPairEvidence,
+): Promise<AutonomyHarnessInspectResponse> {
+  return harnessInspection(request, localIssues(request, true), evidence);
 }
 
 export function autonomyModelContext(

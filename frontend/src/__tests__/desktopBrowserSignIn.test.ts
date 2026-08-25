@@ -6,10 +6,14 @@ import {
   clearBrowserAuthVault,
   restoreBrowserAuthVault,
 } from "../desktop/bridge";
-import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
+import {
+  adoptBrowserAuthSession,
+  shouldClearBrowserAuthVaultAfterAdoptionError,
+} from "../features/auth/browserAuth";
 import {
   cancelDesktopBrowserSignIn,
   completeDesktopBrowserSignIn,
+  restoreDesktopBrowserSession,
 } from "../features/auth/desktopBrowserSignIn";
 import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
 
@@ -21,6 +25,7 @@ vi.mock("../desktop/bridge", () => ({
 }));
 vi.mock("../features/auth/browserAuth", () => ({
   adoptBrowserAuthSession: vi.fn(),
+  shouldClearBrowserAuthVaultAfterAdoptionError: vi.fn(),
 }));
 vi.mock("../features/auth/desktopAuthActivation", () => ({
   activateDesktopAuthSession: vi.fn(),
@@ -53,6 +58,8 @@ describe("desktop browser sign-in transaction", () => {
     vi.mocked(clearBrowserAuthVault).mockReset();
     vi.mocked(restoreBrowserAuthVault).mockReset();
     vi.mocked(adoptBrowserAuthSession).mockReset();
+    vi.mocked(shouldClearBrowserAuthVaultAfterAdoptionError).mockReset();
+    vi.mocked(shouldClearBrowserAuthVaultAfterAdoptionError).mockReturnValue(false);
     vi.mocked(activateDesktopAuthSession).mockReset();
   });
 
@@ -70,6 +77,28 @@ describe("desktop browser sign-in transaction", () => {
     expect(clearBrowserAuthVault).not.toHaveBeenCalled();
   });
 
+  it("silently restores a saved session without opening the browser", async () => {
+    vi.mocked(restoreBrowserAuthVault).mockResolvedValue(SESSION);
+    vi.mocked(adoptBrowserAuthSession).mockResolvedValue(undefined);
+
+    await expect(restoreDesktopBrowserSession()).resolves.toBe(true);
+
+    expect(activateDesktopAuthSession).toHaveBeenCalledOnce();
+    expect(beginBrowserAuth).not.toHaveBeenCalled();
+    expect(adoptBrowserAuthSession).toHaveBeenCalledWith(SESSION, {
+      signal: undefined,
+    });
+  });
+
+  it("leaves browser sign-in idle when no saved session exists", async () => {
+    vi.mocked(restoreBrowserAuthVault).mockResolvedValue(null);
+
+    await expect(restoreDesktopBrowserSession()).resolves.toBe(false);
+
+    expect(beginBrowserAuth).not.toHaveBeenCalled();
+    expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
+  });
+
   it("opens PKCE in the browser only when no restorable session exists", async () => {
     vi.mocked(restoreBrowserAuthVault).mockResolvedValue(null);
     vi.mocked(beginBrowserAuth).mockResolvedValue(SESSION);
@@ -83,14 +112,54 @@ describe("desktop browser sign-in transaction", () => {
     });
   });
 
-  it("removes only the unusable edition grant when WebView adoption fails", async () => {
+  it("removes only a deterministically unusable edition grant", async () => {
     vi.mocked(restoreBrowserAuthVault).mockResolvedValue(null);
     vi.mocked(beginBrowserAuth).mockResolvedValue(SESSION);
     vi.mocked(adoptBrowserAuthSession).mockRejectedValue(new Error("invalid session"));
+    vi.mocked(shouldClearBrowserAuthVaultAfterAdoptionError).mockReturnValue(true);
     vi.mocked(clearBrowserAuthVault).mockResolvedValue(true);
 
     await expect(completeDesktopBrowserSignIn("en")).rejects.toThrow("invalid session");
     expect(clearBrowserAuthVault).toHaveBeenCalledOnce();
+  });
+
+  it("preserves a fresh browser grant when adoption fails transiently", async () => {
+    const transientError = new Error("Service unavailable.");
+    vi.mocked(restoreBrowserAuthVault).mockResolvedValue(null);
+    vi.mocked(beginBrowserAuth).mockResolvedValue(SESSION);
+    vi.mocked(adoptBrowserAuthSession).mockRejectedValue(transientError);
+
+    await expect(completeDesktopBrowserSignIn("en")).rejects.toBe(transientError);
+
+    expect(shouldClearBrowserAuthVaultAfterAdoptionError)
+      .toHaveBeenCalledWith(transientError);
+    expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+  });
+
+  it("clears a deterministically unusable session during silent restoration", async () => {
+    const rejectedSession = new Error("The saved session is no longer authorized.");
+    vi.mocked(restoreBrowserAuthVault).mockResolvedValue(SESSION);
+    vi.mocked(adoptBrowserAuthSession).mockRejectedValue(rejectedSession);
+    vi.mocked(shouldClearBrowserAuthVaultAfterAdoptionError).mockReturnValue(true);
+    vi.mocked(clearBrowserAuthVault).mockResolvedValue(true);
+
+    await expect(restoreDesktopBrowserSession()).rejects.toBe(rejectedSession);
+
+    expect(clearBrowserAuthVault).toHaveBeenCalledOnce();
+    expect(beginBrowserAuth).not.toHaveBeenCalled();
+  });
+
+  it("preserves the vault when silent restoration cannot reach the account service", async () => {
+    const transientError = new Error("Failed to fetch");
+    vi.mocked(restoreBrowserAuthVault).mockResolvedValue(SESSION);
+    vi.mocked(adoptBrowserAuthSession).mockRejectedValue(transientError);
+
+    await expect(restoreDesktopBrowserSession()).rejects.toBe(transientError);
+
+    expect(shouldClearBrowserAuthVaultAfterAdoptionError)
+      .toHaveBeenCalledWith(transientError);
+    expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+    expect(beginBrowserAuth).not.toHaveBeenCalled();
   });
 
   it("cancels vault restoration before any session can be adopted", async () => {

@@ -8,6 +8,7 @@
     "core:window:allow-destroy",
     "updater:default",
     "process:allow-restart",
+    "dialog:allow-open",
     {
       "identifier": "opener:allow-open-url",
       "allow": [

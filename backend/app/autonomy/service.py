@@ -54,6 +54,12 @@ class AutonomyCompileError(ValueError):
         self.status_code = status_code
 
 
+def _localized(locale: Literal["en", "zh-CN"], english: str, chinese: str) -> str:
+    """Select independently authored display text while keeping protocol IDs stable."""
+
+    return chinese if locale == "zh-CN" else english
+
+
 def runtime_profile_for(request: AutonomyCompileRequest) -> OnboardRuntimeProfile:
     """Describe the runtime boundary without claiming that hardware is connected."""
 
@@ -74,22 +80,96 @@ def runtime_profile_for(request: AutonomyCompileRequest) -> OnboardRuntimeProfil
         authority = False
 
     localization_role = (
-        "Consumes the qualified School Map and PX4 Gazebo GPS state; no camera or VIO stream "
-        "is attached to the official vehicle."
+        _localized(
+            request.locale,
+            (
+                "Consumes the qualified School Map and PX4 Gazebo GPS state; no camera or "
+                "VIO stream is attached to the official vehicle."
+            ),
+            "读取已验证的 School Map 与 PX4 Gazebo GPS 状态；正式机型未接入相机或 VIO 数据流。",
+        )
         if request.perception_mode == "map"
-        else "Accepts versioned VIO, SLAM, map and vision observations."
+        else _localized(
+            request.locale,
+            "Accepts versioned VIO, SLAM, map and vision observations.",
+            "接收带版本标识的 VIO、SLAM、地图和视觉观测。",
+        )
     )
     localization_rate_hz = 10.0 if request.perception_mode == "map" else 30.0
     component_specs: tuple[tuple[RuntimeComponentId, str, float], ...] = (
-        ("mission_executive", "Runs the bounded mission state machine.", 20.0),
+        (
+            "mission_executive",
+            _localized(
+                request.locale,
+                "Runs the bounded mission state machine.",
+                "运行有边界的任务状态机。",
+            ),
+            20.0,
+        ),
         ("perception_vio_slam", localization_role, localization_rate_hz),
-        ("world_model", "Maintains obstacle, gate, terrain and payload state.", 20.0),
-        ("global_planner", "Builds the route corridor between mission checkpoints.", 2.0),
-        ("local_planner", "Repairs the trajectory inside the approved corridor.", 20.0),
-        ("trajectory_tracker", "Converts a qualified trajectory to PX4 setpoint contracts.", 20.0),
-        ("px4_bridge", "Separates simulator, HITL shadow and locked aircraft transports.", 20.0),
-        ("safety_supervisor", "Checks live clearance and overrides with abort decisions.", 5.0),
-        ("evidence_recorder", "Hash-chains accepted observations and decisions.", 20.0),
+        (
+            "world_model",
+            _localized(
+                request.locale,
+                "Maintains obstacle, gate, terrain and payload state.",
+                "维护障碍物、门、地形和载荷状态。",
+            ),
+            20.0,
+        ),
+        (
+            "global_planner",
+            _localized(
+                request.locale,
+                "Builds the route corridor between mission checkpoints.",
+                "生成任务检查点之间的全局路线走廊。",
+            ),
+            2.0,
+        ),
+        (
+            "local_planner",
+            _localized(
+                request.locale,
+                "Repairs the trajectory inside the approved corridor.",
+                "在已批准的走廊内修复局部航迹。",
+            ),
+            20.0,
+        ),
+        (
+            "trajectory_tracker",
+            _localized(
+                request.locale,
+                "Converts a qualified trajectory to PX4 setpoint contracts.",
+                "把已验证航迹转换为 PX4 设定点合同。",
+            ),
+            20.0,
+        ),
+        (
+            "px4_bridge",
+            _localized(
+                request.locale,
+                "Separates simulator, HITL shadow and locked aircraft transports.",
+                "隔离仿真、HITL 影子模式与锁定真机的传输通道。",
+            ),
+            20.0,
+        ),
+        (
+            "safety_supervisor",
+            _localized(
+                request.locale,
+                "Checks live clearance and overrides with abort decisions.",
+                "实时检查净空，并在必要时覆盖为中止决策。",
+            ),
+            5.0,
+        ),
+        (
+            "evidence_recorder",
+            _localized(
+                request.locale,
+                "Hash-chains accepted observations and decisions.",
+                "将已接受的观测与决策写入哈希证据链。",
+            ),
+            20.0,
+        ),
     )
     components = [
         RuntimeComponent(
@@ -115,7 +195,11 @@ def _select_scene(request: AutonomyCompileRequest) -> str:
         if request.scene_id not in SCENES:
             raise AutonomyCompileError(
                 "UNKNOWN_AUTONOMY_SCENE",
-                "The requested terrain scene is not registered.",
+                _localized(
+                    request.locale,
+                    "The requested terrain scene is not registered.",
+                    "所请求的地形场景尚未注册。",
+                ),
                 404,
             )
         return request.scene_id
@@ -201,71 +285,146 @@ def _steps(
     scene_id: str,
     profile: SchoolMissionProfile,
     pickup_payload_kg: float,
+    locale: Literal["en", "zh-CN"],
 ) -> list[MissionStep]:
     if scene_id == "forest-gate-inspection":
         return [
-            MissionStep(order=1, action="takeoff", label="Launch into the vegetation corridor"),
+            MissionStep(
+                order=1,
+                action="takeoff",
+                label=_localized(locale, "Launch into the vegetation corridor", "起飞进入植被走廊"),
+            ),
             MissionStep(
                 order=2,
                 action="pass_gate",
-                label="Pass three gates through their geometric centers",
+                label=_localized(
+                    locale,
+                    "Pass three gates through their geometric centers",
+                    "依次从三座训练门的几何中心穿过",
+                ),
             ),
-            MissionStep(order=3, action="land", label="Complete the inspection hover and land"),
+            MissionStep(
+                order=3,
+                action="land",
+                label=_localized(
+                    locale, "Complete the inspection hover and land", "完成巡检悬停并降落"
+                ),
+            ),
         ]
     if scene_id == "service-corridor-dock":
         return [
-            MissionStep(order=1, action="takeoff", label="Launch in the service corridor"),
+            MissionStep(
+                order=1,
+                action="takeoff",
+                label=_localized(locale, "Launch in the service corridor", "在服务走廊内起飞"),
+            ),
             MissionStep(
                 order=2,
                 action="transit",
-                label="Follow the narrow collision-free corridor around blind corners",
+                label=_localized(
+                    locale,
+                    "Follow the narrow collision-free corridor around blind corners",
+                    "沿无碰撞的狭窄走廊通过盲角",
+                ),
             ),
-            MissionStep(order=3, action="land", label="Dock on the marked target"),
+            MissionStep(
+                order=3,
+                action="land",
+                label=_localized(locale, "Dock on the marked target", "在标记目标上精准降落"),
+            ),
         ]
     if profile == "coffee":
         return [
-            MissionStep(order=1, action="takeoff", label="Launch from the third-floor office"),
+            MissionStep(
+                order=1,
+                action="takeoff",
+                label=_localized(locale, "Launch from the third-floor office", "从三楼办公室起飞"),
+            ),
             MissionStep(
                 order=2,
                 action="traverse_stairs",
-                label="Descend the narrow stairwell through two landings",
+                label=_localized(
+                    locale,
+                    "Descend the narrow stairwell through two landings",
+                    "穿过两个楼梯平台，下行狭窄楼梯间",
+                ),
             ),
             MissionStep(
                 order=3,
                 action="transit",
-                label="Exit to the courtyard and avoid trees, signs, poles and buildings",
+                label=_localized(
+                    locale,
+                    "Exit to the courtyard and avoid trees, signs, poles and buildings",
+                    "飞出教学楼进入庭院，避开树木、标牌、立柱和建筑物",
+                ),
             ),
             MissionStep(
                 order=4,
                 action="pickup",
-                label="Acquire the coffee at the docking target",
+                label=_localized(
+                    locale, "Acquire the coffee at the docking target", "在取货目标点拿取咖啡"
+                ),
                 payload_delta_kg=pickup_payload_kg,
             ),
             MissionStep(
                 order=5,
                 action="return",
-                label="Replan with the loaded vehicle envelope and return upstairs",
+                label=_localized(
+                    locale,
+                    "Replan with the loaded vehicle envelope and return upstairs",
+                    "根据载荷后的飞行包络重新规划并返回楼上",
+                ),
             ),
-            MissionStep(order=6, action="land", label="Land at the original launch point"),
+            MissionStep(
+                order=6,
+                action="land",
+                label=_localized(locale, "Land at the original launch point", "在原起飞点降落"),
+            ),
         ]
     if profile == "gates":
         return [
-            MissionStep(order=1, action="takeoff", label="Launch onto the campus gate course"),
+            MissionStep(
+                order=1,
+                action="takeoff",
+                label=_localized(
+                    locale, "Launch onto the campus gate course", "起飞进入校园训练门路线"
+                ),
+            ),
             MissionStep(
                 order=2,
                 action="pass_gate",
-                label="Pass the three training gates through their geometric centers",
+                label=_localized(
+                    locale,
+                    "Pass the three training gates through their geometric centers",
+                    "依次从三座训练门的几何中心穿过",
+                ),
             ),
-            MissionStep(order=3, action="land", label="Land at the east course goal"),
+            MissionStep(
+                order=3,
+                action="land",
+                label=_localized(locale, "Land at the east course goal", "在训练路线东侧终点降落"),
+            ),
         ]
     return [
-        MissionStep(order=1, action="takeoff", label="Launch from the third-floor office"),
+        MissionStep(
+            order=1,
+            action="takeoff",
+            label=_localized(locale, "Launch from the third-floor office", "从三楼办公室起飞"),
+        ),
         MissionStep(
             order=2,
             action="traverse_stairs",
-            label="Traverse the teaching wing and descend both switchback stair flights",
+            label=_localized(
+                locale,
+                "Traverse the teaching wing and descend both switchback stair flights",
+                "穿过教学楼并下行两段折返楼梯",
+            ),
         ),
-        MissionStep(order=3, action="land", label="Land outside the teaching entrance"),
+        MissionStep(
+            order=3,
+            action="land",
+            label=_localized(locale, "Land outside the teaching entrance", "在教学楼入口外降落"),
+        ),
     ]
 
 
@@ -336,7 +495,10 @@ def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | 
     ]
 
 
-def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
+def _task_graph(
+    steps: list[MissionStep],
+    locale: Literal["en", "zh-CN"],
+) -> MissionTaskGraph:
     """Expand intent into an auditable, fail-closed execution graph.
 
     The language model can describe goals, but every motion segment is gated by
@@ -345,6 +507,9 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
     """
 
     nodes: list[MissionTaskNode] = []
+
+    def text(english: str, chinese: str) -> str:
+        return _localized(locale, english, chinese)
 
     def append_node(
         task_id: str,
@@ -379,54 +544,74 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
 
     previous = append_node(
         "preflight-pack-identity",
-        "Bind the immutable Vehicle Pack, firmware identity and control adapter",
+        text(
+            "Bind the immutable Vehicle Pack, firmware identity and control adapter",
+            "绑定不可变的机型包、固件身份与控制适配器",
+        ),
         depends_on=[],
         executor="mission_executive",
         risk="critical",
         max_retries=0,
         timeout_s=15.0,
         fallback="abort",
-        expected_output="Vehicle, firmware and adapter identities match the mission contract",
+        expected_output=text(
+            "Vehicle, firmware and adapter identities match the mission contract",
+            "机型、固件与适配器身份均与任务合同一致",
+        ),
         completion_evidence=["vehicle-pack.digest", "firmware.identity", "adapter.identity"],
         status="ready",
     )
     previous = append_node(
         "preflight-sensors",
-        "Verify required sensor calibration, time synchronization and stream health",
+        text(
+            "Verify required sensor calibration, time synchronization and stream health",
+            "验证所需传感器的校准、时间同步和数据流健康状态",
+        ),
         depends_on=[previous],
         executor="perception",
         risk="critical",
         max_retries=1,
         timeout_s=30.0,
         fallback="abort",
-        expected_output=(
-            "Every required localization and obstacle stream is healthy and synchronized"
+        expected_output=text(
+            "Every required localization and obstacle stream is healthy and synchronized",
+            "全部定位与避障数据流均健康且已同步",
         ),
         completion_evidence=["sensor.calibration", "clock.offset", "stream.health"],
     )
     previous = append_node(
         "preflight-flight-envelope",
-        "Validate mass, center of gravity, thrust, energy reserve and braking envelope",
+        text(
+            "Validate mass, center of gravity, thrust, energy reserve and braking envelope",
+            "验证质量、重心、推力、能量预留与制动包络",
+        ),
         depends_on=[previous],
         executor="mission_executive",
         risk="critical",
         max_retries=0,
         timeout_s=20.0,
         fallback="abort",
-        expected_output="A task-specific flight-envelope qualification receipt",
+        expected_output=text(
+            "A task-specific flight-envelope qualification receipt",
+            "生成针对本任务的飞行包络资格回执",
+        ),
         completion_evidence=["mass.total", "cg.bound", "thrust.margin", "battery.reserve"],
     )
     previous = append_node(
         "world-map-binding",
-        "Bind the selected Map Pack, coordinate frame, semantic entities and geofence",
+        text(
+            "Bind the selected Map Pack, coordinate frame, semantic entities and geofence",
+            "绑定所选地图包、坐标系、语义实体与地理围栏",
+        ),
         depends_on=[previous],
         executor="global_planner",
         risk="high",
         max_retries=1,
         timeout_s=30.0,
         fallback="hold",
-        expected_output=(
-            "A versioned world frame with grounded mission entities and hard boundaries"
+        expected_output=text(
+            "A versioned world frame with grounded mission entities and hard boundaries",
+            "生成带版本的世界坐标系，并绑定任务实体和不可越界边界",
         ),
         completion_evidence=[
             "map-pack.digest",
@@ -437,14 +622,20 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
     )
     previous = append_node(
         "world-localization",
-        "Establish bounded localization and initialize the live obstacle world model",
+        text(
+            "Establish bounded localization and initialize the live obstacle world model",
+            "建立有界定位并初始化实时障碍物世界模型",
+        ),
         depends_on=[previous],
         executor="perception",
         risk="critical",
         max_retries=2,
         timeout_s=45.0,
         fallback="hold",
-        expected_output="Localization covariance and observable free-space satisfy launch limits",
+        expected_output=text(
+            "Localization covariance and observable free-space satisfy launch limits",
+            "定位协方差与可观测自由空间满足起飞限制",
+        ),
         completion_evidence=[
             "localization.covariance",
             "free-space.snapshot",
@@ -453,15 +644,19 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
     )
     previous = append_node(
         "plan-global-corridor",
-        "Generate the global route corridor and a payload-aware return alternative",
+        text(
+            "Generate the global route corridor and a payload-aware return alternative",
+            "生成全局路线走廊与考虑载荷的备用返航路线",
+        ),
         depends_on=[previous],
         executor="global_planner",
         risk="high",
         max_retries=3,
         timeout_s=60.0,
         fallback="hold",
-        expected_output=(
-            "Primary and contingency corridors satisfy map, clearance and energy constraints"
+        expected_output=text(
+            "Primary and contingency corridors satisfy map, clearance and energy constraints",
+            "主路线与备用路线均满足地图、净空和能量约束",
         ),
         completion_evidence=["corridor.primary", "corridor.contingency", "energy.projection"],
     )
@@ -489,14 +684,20 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         fallback: SafetyAction = "land" if step.action in {"return", "land"} else "hold"
         previous = append_node(
             f"{prefix}-observe",
-            f"Refresh perception and confirm the local world before: {step.label}",
+            text(
+                f"Refresh perception and confirm the local world before: {step.label}",
+                f"执行“{step.label}”前刷新感知并确认局部环境",
+            ),
             depends_on=[previous],
             executor="perception",
             risk=risk_by_action[step.action],
             max_retries=3,
             timeout_s=20.0,
             fallback="hold",
-            expected_output="A time-bounded local obstacle and semantic-target snapshot",
+            expected_output=text(
+                "A time-bounded local obstacle and semantic-target snapshot",
+                "生成时间有效的局部障碍物与语义目标快照",
+            ),
             completion_evidence=[
                 "perception.sequence",
                 "local-map.age",
@@ -505,15 +706,19 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         )
         previous = append_node(
             f"{prefix}-plan",
-            f"Plan or repair the local trajectory segment for: {step.label}",
+            text(
+                f"Plan or repair the local trajectory segment for: {step.label}",
+                f"为“{step.label}”规划或修复局部航迹段",
+            ),
             depends_on=[previous],
             executor="global_planner" if step.action == "return" else "local_planner",
             risk=risk_by_action[step.action],
             max_retries=3,
             timeout_s=45.0,
             fallback="hold",
-            expected_output=(
-                "A collision-free, time-parameterized segment inside the approved corridor"
+            expected_output=text(
+                "A collision-free, time-parameterized segment inside the approved corridor",
+                "在已批准走廊内生成无碰撞、带时间参数的航迹段",
             ),
             completion_evidence=[
                 "trajectory.revision",
@@ -523,14 +728,20 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
         )
         previous = append_node(
             f"{prefix}-qualify",
-            f"Check geometry, dynamics, energy and safety policy for: {step.label}",
+            text(
+                f"Check geometry, dynamics, energy and safety policy for: {step.label}",
+                f"检查“{step.label}”的几何、动力学、能量与安全策略",
+            ),
             depends_on=[previous],
             executor="mission_executive",
             risk="critical" if step.action in {"takeoff", "land", "pickup"} else "high",
             max_retries=1,
             timeout_s=15.0,
             fallback=fallback,
-            expected_output="The proposed segment passes every deterministic execution gate",
+            expected_output=text(
+                "The proposed segment passes every deterministic execution gate",
+                "候选航迹段通过全部确定性执行门禁",
+            ),
             completion_evidence=["dynamics.acceptance", "energy.margin", "safety.acceptance"],
         )
         previous = append_node(
@@ -542,29 +753,39 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
             max_retries=1 if step.action in {"takeoff", "land"} else 2,
             timeout_s=120.0 if step.action in {"transit", "traverse_stairs", "return"} else 45.0,
             fallback=fallback,
-            expected_output=f"Controller-accepted completion of {step.action}",
+            expected_output=text(
+                f"Controller-accepted completion of {step.action}",
+                f"控制器确认完成动作：{step.label}",
+            ),
             completion_evidence=["pose.trace", "clearance.minimum", "controller.acceptance"],
         )
         previous = append_node(
             f"{prefix}-verify",
-            f"Verify completion evidence and settle the task state for: {step.label}",
+            text(
+                f"Verify completion evidence and settle the task state for: {step.label}",
+                f"验证“{step.label}”的完成证据并确认任务状态",
+            ),
             depends_on=[previous],
             executor="mission_executive",
             risk="high" if step.action in {"pickup", "land"} else "medium",
             max_retries=2,
             timeout_s=20.0,
             fallback=fallback,
-            expected_output=(
-                "Completion evidence is consistent, current and attributable to this task"
+            expected_output=text(
+                "Completion evidence is consistent, current and attributable to this task",
+                "完成证据一致、时效有效且可归因到本任务",
             ),
             completion_evidence=["task.result", "task.evidence", "world-state.revision"],
         )
         if step.action == "pickup":
             previous = append_node(
                 f"{prefix}-recompute-envelope",
-                (
-                    "Confirm payload attachment and recompute mass, center of gravity, thrust "
-                    "and return energy"
+                text(
+                    (
+                        "Confirm payload attachment and recompute mass, center of gravity, "
+                        "thrust and return energy"
+                    ),
+                    "确认载荷已经挂载，并重新计算质量、重心、推力与返航能量",
                 ),
                 depends_on=[previous],
                 executor="mission_executive",
@@ -572,7 +793,10 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
                 max_retries=1,
                 timeout_s=25.0,
                 fallback="land",
-                expected_output="The loaded aircraft remains inside its qualified return envelope",
+                expected_output=text(
+                    "The loaded aircraft remains inside its qualified return envelope",
+                    "载荷后的无人机仍处于已验证的返航包络内",
+                ),
                 completion_evidence=[
                     "payload.confirmed",
                     "mass.loaded",
@@ -582,26 +806,38 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
             )
     previous = append_node(
         "postflight-state",
-        "Confirm landing, disarm the vehicle and close command authority",
+        text(
+            "Confirm landing, disarm the vehicle and close command authority",
+            "确认降落、解除无人机武装并关闭指令权限",
+        ),
         depends_on=[previous],
         executor="px4_bridge",
         risk="critical",
         max_retries=1,
         timeout_s=20.0,
         fallback="abort",
-        expected_output="Landed and disarmed state with actuator authority revoked",
+        expected_output=text(
+            "Landed and disarmed state with actuator authority revoked",
+            "无人机已降落、已解除武装且执行器权限已撤销",
+        ),
         completion_evidence=["vehicle.landed", "vehicle.disarmed", "authority.revoked"],
     )
     append_node(
         "postflight-evidence",
-        "Seal mission results, anomalies, task revisions and replay evidence",
+        text(
+            "Seal mission results, anomalies, task revisions and replay evidence",
+            "封存任务结果、异常、任务修订与回放证据",
+        ),
         depends_on=[previous],
         executor="mission_executive",
         risk="low",
         max_retries=2,
         timeout_s=20.0,
         fallback="hold",
-        expected_output="A hash-chained mission evidence head",
+        expected_output=text(
+            "A hash-chained mission evidence head",
+            "生成任务哈希证据链头",
+        ),
         completion_evidence=[
             "mission.result",
             "task-graph.revisions",
@@ -609,7 +845,11 @@ def _task_graph(steps: list[MissionStep]) -> MissionTaskGraph:
             "evidence.chain-head",
         ],
     )
-    return MissionTaskGraph(nodes=nodes, active_node_ids=["preflight-pack-identity"])
+    return MissionTaskGraph(
+        nodes=nodes,
+        active_node_ids=["preflight-pack-identity"],
+        change_reason=text("compiled", "已完成编译"),
+    )
 
 
 def _route_metrics(points: list[RoutePoint]) -> tuple[float, float]:
@@ -668,33 +908,59 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
             validated_signed_pack_count=VALIDATED_SIGNED_PACK_COUNT,
             blockers=[],
             required_next_steps=[
-                "Confirm the launch, run the fixed PX4/Gazebo mission, and retain its "
-                "evidence receipt."
+                _localized(
+                    request.locale,
+                    (
+                        "Confirm the launch, run the fixed PX4/Gazebo mission, and retain its "
+                        "evidence receipt."
+                    ),
+                    "确认起飞，运行已冻结的 PX4/Gazebo 任务，并保留其证据回执。",
+                )
             ],
         )
     if blockers:
         if target == "simulation":
             required.extend(
                 [
-                    (
-                        "Adjust payload, speed, acceleration, or the vehicle envelope until "
-                        "all trajectory feasibility checks pass."
+                    _localized(
+                        request.locale,
+                        (
+                            "Adjust payload, speed, acceleration, or the vehicle envelope until "
+                            "all trajectory feasibility checks pass."
+                        ),
+                        "调整载荷、速度、加速度或机型包络，直到全部航迹可行性检查通过。",
                     ),
-                    (
-                        "Recompile the same simulation mission and review every reported "
-                        "geometry or dynamics issue before qualification."
+                    _localized(
+                        request.locale,
+                        (
+                            "Recompile the same simulation mission and review every reported "
+                            "geometry or dynamics issue before qualification."
+                        ),
+                        "重新编译同一个仿真任务，并在资格认证前检查全部几何或动力学问题。",
                     ),
                 ]
             )
         else:
             required.extend(
                 [
-                    (
-                        "Complete and sign the simulation qualification for the identical "
-                        "mission contract."
+                    _localized(
+                        request.locale,
+                        (
+                            "Complete and sign the simulation qualification for the identical "
+                            "mission contract."
+                        ),
+                        "为完全相同的任务合同完成并签署仿真资格认证。",
                     ),
-                    "Bind a validated signed Vehicle Pack and firmware identity.",
-                    "Obtain a short-lived operator confirmation after live preflight checks.",
+                    _localized(
+                        request.locale,
+                        "Bind a validated signed Vehicle Pack and firmware identity.",
+                        "绑定已验证且已签名的机型包与固件身份。",
+                    ),
+                    _localized(
+                        request.locale,
+                        "Obtain a short-lived operator confirmation after live preflight checks.",
+                        "完成实时起飞前检查后，获取短时有效的操作员确认。",
+                    ),
                 ]
             )
         return ExecutionPolicy(
@@ -711,7 +977,13 @@ def _policy(request: AutonomyCompileRequest, feasible: bool) -> ExecutionPolicy:
         can_execute=False,
         validated_signed_pack_count=VALIDATED_SIGNED_PACK_COUNT,
         blockers=["runtime.execution-adapter.not-bound"],
-        required_next_steps=["Bind the audited runtime adapter before enabling execution."],
+        required_next_steps=[
+            _localized(
+                request.locale,
+                "Bind the audited runtime adapter before enabling execution.",
+                "启用执行前，先绑定经过审计的运行时适配器。",
+            )
+        ],
     )
 
 
@@ -728,8 +1000,13 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         )
     perception = _select_perception(request)
     mission_profile = school_mission_profile(request, scene_id)
-    steps = _steps(scene_id, mission_profile, request.vehicle.pickup_payload_kg)
-    task_graph = _task_graph(steps)
+    steps = _steps(
+        scene_id,
+        mission_profile,
+        request.vehicle.pickup_payload_kg,
+        request.locale,
+    )
+    task_graph = _task_graph(steps, request.locale)
     profile_path = (
         _school_reference_path(mission_profile) if scene_id == "school-campus-v1" else None
     )
@@ -766,7 +1043,11 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             ValidationIssue(
                 code="vehicle.loaded-mass-exceeds-mtom",
                 severity="error",
-                message="Post-pickup mass exceeds the configured maximum takeoff mass.",
+                message=_localized(
+                    request.locale,
+                    "Post-pickup mass exceeds the configured maximum takeoff mass.",
+                    "取物后的总质量超过已配置的最大起飞质量。",
+                ),
             )
         )
     if thrust_to_weight < MIN_THRUST_TO_WEIGHT:
@@ -774,8 +1055,13 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             ValidationIssue(
                 code="vehicle.thrust-margin-insufficient",
                 severity="error",
-                message=(
-                    f"Post-pickup thrust-to-weight must remain at least {MIN_THRUST_TO_WEIGHT:.2f}."
+                message=_localized(
+                    request.locale,
+                    (
+                        "Post-pickup thrust-to-weight must remain at least "
+                        f"{MIN_THRUST_TO_WEIGHT:.2f}."
+                    ),
+                    f"取物后的推重比必须不低于 {MIN_THRUST_TO_WEIGHT:.2f}。",
                 ),
             )
         )
@@ -784,8 +1070,10 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             ValidationIssue(
                 code="trajectory.braking-envelope-exceeds-clearance",
                 severity="error",
-                message=(
-                    "The stopping envelope is larger than the scene's verified minimum clearance."
+                message=_localized(
+                    request.locale,
+                    "The stopping envelope is larger than the scene's verified minimum clearance.",
+                    "制动包络大于场景已验证的最小净空。",
                 ),
             )
         )
@@ -794,9 +1082,13 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             ValidationIssue(
                 code="perception.static-map-no-live-obstacle-update",
                 severity="warning",
-                message=(
-                    "Map-only operation cannot qualify dynamic-obstacle response; use vision "
-                    "or fusion for hardware handoff."
+                message=_localized(
+                    request.locale,
+                    (
+                        "Map-only operation cannot qualify dynamic-obstacle response; use vision "
+                        "or fusion for hardware handoff."
+                    ),
+                    "仅使用地图无法验证动态避障响应；移交真机前应使用视觉或融合感知。",
                 ),
             )
         )
@@ -805,9 +1097,13 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
             ValidationIssue(
                 code="perception.no-global-return-map",
                 severity="warning",
-                message=(
-                    "Vision-only return depends on retained route memory and relocalization at "
-                    "each stair landing."
+                message=_localized(
+                    request.locale,
+                    (
+                        "Vision-only return depends on retained route memory and relocalization "
+                        "at each stair landing."
+                    ),
+                    "仅视觉返航依赖保留的路线记忆，并需要在每个楼梯平台重新定位。",
                 ),
             )
         )
@@ -815,9 +1111,13 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         ValidationIssue(
             code="planner.reference-corridor-verified",
             severity="info",
-            message=(
-                "The route uses a bounded reference corridor with speed limits and "
-                "payload-aware return checks."
+            message=_localized(
+                request.locale,
+                (
+                    "The route uses a bounded reference corridor with speed limits and "
+                    "payload-aware return checks."
+                ),
+                "路线使用带速度限制的有界参考走廊，并包含考虑载荷的返航检查。",
             ),
         )
     )
@@ -825,6 +1125,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
 
     canonical = {
         "edition": request.edition,
+        "locale": request.locale,
         "execution_target": request.execution_target,
         "intent": request.natural_language,
         "scene_id": scene_id,
@@ -846,6 +1147,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
     contract = MissionContract(
         contract_id=f"mission-{digest[:20]}",
         edition=request.edition,
+        locale=request.locale,
         execution_target=request.execution_target,
         scene_id=scene_id,
         perception_mode=perception,
@@ -853,18 +1155,34 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
         steps=steps,
         task_graph=task_graph,
         immutable_safety_rules=[
-            (
-                "A language or vision model may propose mission goals but cannot issue "
-                "actuator commands."
+            _localized(
+                request.locale,
+                (
+                    "A language or vision model may propose mission goals but cannot issue "
+                    "actuator commands."
+                ),
+                "语言或视觉模型可以提出任务目标，但不能直接发出执行器指令。",
             ),
-            ("Every trajectory must pass geometry, dynamics, payload and edition-policy checks."),
-            (
-                "Loss of localization, command link or safety clearance transitions execution "
-                "to hold or abort."
+            _localized(
+                request.locale,
+                "Every trajectory must pass geometry, dynamics, payload and edition-policy checks.",
+                "每条航迹都必须通过几何、动力学、载荷与软件版本策略检查。",
             ),
-            (
-                "Hardware execution requires an independently signed simulation qualification "
-                "and operator challenge."
+            _localized(
+                request.locale,
+                (
+                    "Loss of localization, command link or safety clearance transitions "
+                    "execution to hold or abort."
+                ),
+                "定位、指令链路或安全净空丢失时，执行必须转入悬停或中止。",
+            ),
+            _localized(
+                request.locale,
+                (
+                    "Hardware execution requires an independently signed simulation "
+                    "qualification and operator challenge."
+                ),
+                "真机执行必须具备独立签名的仿真资格认证和操作员确认。",
             ),
         ],
     )

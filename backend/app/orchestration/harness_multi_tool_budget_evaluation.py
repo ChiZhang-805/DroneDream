@@ -351,6 +351,7 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
                 db,
                 user=user,
                 req=request,
+                allow_internal_test_backend=True,
             )
             job_id = job.id
             db.commit()
@@ -550,9 +551,7 @@ def _verify_plan_trace(
     raw_history = trace.get("provider_visible_history")
     accounting = trace.get("accounting")
     if not isinstance(raw_history, list) or not isinstance(accounting, dict):
-        raise ValueError(
-            f"multi-tool block {block_index} {arm_name} trace accounting is invalid"
-        )
+        raise ValueError(f"multi-tool block {block_index} {arm_name} trace accounting is invalid")
     history = [HarnessGenerationPlanMemory.model_validate(row) for row in raw_history]
     verified_generation_count = _nonnegative_int(
         trace.get("verified_generation_count"),
@@ -617,10 +616,8 @@ def _verify_arm_row(
     )
     failure_count = _nonnegative_int(arm.get("failure_count"), field="failure_count")
     if (
-        arm.get("configured_max_iterations")
-        != HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS
-        or arm.get("configured_max_total_trials")
-        != HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS
+        arm.get("configured_max_iterations") != HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS
+        or arm.get("configured_max_total_trials") != HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS
         or dispatched > HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS
         or completed > dispatched
         or candidates < 1
@@ -723,9 +720,7 @@ def _verify_multi_tool_artifact_semantics(
         ):
             raise ValueError("multi-tool evaluation block identity or budget drifted")
         arms = block.get("arms")
-        if not isinstance(arms, list) or len(arms) != len(
-            HARNESS_MULTI_TOOL_BUDGET_EVAL_ARMS
-        ):
+        if not isinstance(arms, list) or len(arms) != len(HARNESS_MULTI_TOOL_BUDGET_EVAL_ARMS):
             raise ValueError("multi-tool evaluation block arms are incomplete")
         verified_arms = [
             _verify_arm_row(
@@ -796,9 +791,7 @@ def verify_harness_multi_tool_budget_artifact(
     if not isinstance(payload, dict):
         raise ValueError("multi-tool artifact must be an object")
     artifact = payload
-    artifact_unsigned = {
-        key: value for key, value in artifact.items() if key != "artifact_sha256"
-    }
+    artifact_unsigned = {key: value for key, value in artifact.items() if key != "artifact_sha256"}
     seed_blocks = artifact.get("seed_blocks")
     expected_budget = {
         "max_iterations": HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS,
@@ -822,8 +815,7 @@ def verify_harness_multi_tool_budget_artifact(
         or artifact.get("real_provider_calls") != 0
         or artifact.get("network_calls") != 0
         or artifact.get("real_credentials_used") is not False
-        or artifact.get("evidence_class")
-        != "synthetic_mock_equal_budget_dispatcher_evaluation"
+        or artifact.get("evidence_class") != "synthetic_mock_equal_budget_dispatcher_evaluation"
         or artifact.get("llm_quality_claim_permitted") is not False
         or artifact.get("optimizer_superiority_claim_permitted") is not False
         or artifact.get("causal_harness_benefit_claim_permitted") is not False

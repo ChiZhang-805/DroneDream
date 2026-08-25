@@ -4,6 +4,8 @@ import { StrictMode } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { BrowserAuthSession } from "../desktop/bridge";
+
 const optionalAuthState = vi.hoisted(() => ({
   current: null as null | {
     configured: boolean;
@@ -48,7 +50,10 @@ const browserAuthMocks = vi.hoisted(() => ({
     supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
     publishableKey: "public-test-key-for-browser-auth",
   } as { supabaseUrl: string; publishableKey: string } | null,
-  adoptSession: vi.fn(async () => undefined),
+  adoptSession: vi.fn<
+    (session: BrowserAuthSession, options?: { signal?: AbortSignal }) => Promise<void>
+  >(async () => undefined),
+  shouldClearVault: vi.fn(() => false),
 }));
 const validBrowserSession = {
   protocolVersion: "desktop-browser-auth-pkce-v1",
@@ -94,6 +99,7 @@ vi.mock("../features/auth/supabaseClient", async (importOriginal) => {
 
 vi.mock("../features/auth/browserAuth", () => ({
   adoptBrowserAuthSession: browserAuthMocks.adoptSession,
+  shouldClearBrowserAuthVaultAfterAdoptionError: browserAuthMocks.shouldClearVault,
 }));
 
 vi.mock("../desktop/runtimeSessionContract", async (importOriginal) => {
@@ -505,6 +511,8 @@ afterEach(() => {
   };
   browserAuthMocks.adoptSession.mockReset();
   browserAuthMocks.adoptSession.mockResolvedValue(undefined);
+  browserAuthMocks.shouldClearVault.mockReset();
+  browserAuthMocks.shouldClearVault.mockReturnValue(false);
   runtimeSessionContractMocks.verify.mockReset();
   runtimeSessionContractMocks.verify.mockImplementation(async (report) => report);
   vi.restoreAllMocks();
@@ -538,10 +546,10 @@ describe("DesktopSetup", () => {
     expect(screen.queryByText("Validate Windows, virtualization, memory, and disk"))
       .not.toBeInTheDocument();
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }, { timeout: 7_000 })).toBeEnabled();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
@@ -572,9 +580,9 @@ describe("DesktopSetup", () => {
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(screen.getByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
   });
 
@@ -600,10 +608,10 @@ describe("DesktopSetup", () => {
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(screen.getByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }))
       .toBeEnabled();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
   });
 
@@ -641,7 +649,7 @@ describe("DesktopSetup", () => {
     expect(screen.getAllByText(/older than the desktop sign-in protocol/i))
       .toHaveLength(2);
     expect(screen.queryByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .not.toHaveAttribute("aria-valuenow", "100");
@@ -667,7 +675,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     await userEvent.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }));
 
     expect(screen.getByRole("button", { name: "Waiting for browser sign-in…" }))
@@ -692,16 +700,16 @@ describe("DesktopSetup", () => {
     renderPage();
 
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
-    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).toHaveBeenCalledTimes(3);
 
     await act(async () => {
       window.dispatchEvent(new Event("focus"));
       await Promise.resolve();
     });
 
-    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).toHaveBeenCalledTimes(3);
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
   });
@@ -723,7 +731,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     const signIn = await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     });
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
@@ -761,7 +769,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     await user.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }));
 
     await waitFor(() => {
@@ -777,7 +785,7 @@ describe("DesktopSetup", () => {
     });
   });
 
-  it("restores only this edition vault before opening a new browser transaction", async () => {
+  it("silently restores only this edition vault before offering a new browser transaction", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
@@ -795,10 +803,6 @@ describe("DesktopSetup", () => {
     window.__TAURI__ = { core: { invoke } };
 
     renderPage();
-    await userEvent.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
-    }));
-
     await waitFor(() => {
       expect(browserAuthMocks.adoptSession).toHaveBeenCalledWith(validBrowserSession, {
         signal: expect.any(AbortSignal),
@@ -808,7 +812,44 @@ describe("DesktopSetup", () => {
     expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
   });
 
-  it("clears the edition vault when the WebView refuses a returned session", async () => {
+  it("still restores a valid edition vault when React StrictMode replays effects", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "restore_browser_auth_vault") return validBrowserSession;
+      if (command === "cancel_browser_auth") return true;
+      if (command === "begin_browser_auth") {
+        throw new Error("A restored session must not start another browser transaction.");
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage(
+      "en",
+      noInstallerRuntimeIntent,
+      noInstallerAutoStart,
+      true,
+    );
+
+    await waitFor(() => {
+      const completedAdoption = browserAuthMocks.adoptSession.mock.calls.find(
+        ([session, options]) =>
+          session.editionId === validBrowserSession.editionId
+          && session.attemptIdHash === validBrowserSession.attemptIdHash
+          && options?.signal?.aborted === false,
+      );
+      expect(completedAdoption).toBeDefined();
+    });
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+  });
+
+  it("clears an unusable edition vault quietly and leaves explicit sign-in available", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
@@ -817,6 +858,7 @@ describe("DesktopSetup", () => {
     browserAuthMocks.adoptSession.mockRejectedValueOnce(
       new Error("session binding mismatch"),
     );
+    browserAuthMocks.shouldClearVault.mockReturnValueOnce(true);
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
@@ -827,17 +869,15 @@ describe("DesktopSetup", () => {
     window.__TAURI__ = { core: { invoke } };
 
     renderPage();
-    await userEvent.click(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
-    }));
-
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("clear_browser_auth_vault", undefined);
     });
-    expect(screen.getByText(
+    expect(await screen.findByRole("button", {
+      name: "Sign in and enter DroneDream",
+    })).toBeEnabled();
+    expect(screen.queryByText(
       "The browser sign-in did not complete. Start it again when you are ready.",
-    ))
-      .toBeInTheDocument();
+    )).not.toBeInTheDocument();
     expect(screen.queryByText("Workspace ready"))
       .not.toBeInTheDocument();
   });
@@ -876,12 +916,12 @@ describe("DesktopSetup", () => {
     renderPage();
 
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
     expect(screen.getByTestId("current-route")).toHaveTextContent("/");
 
     await userEvent.click(screen.getByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     }));
 
     await waitFor(() => {
@@ -915,7 +955,7 @@ describe("DesktopSetup", () => {
     const update = await screen.findByRole("button", {
       name: "Version 1.0.1 is available. Click to update.",
     });
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "0");
@@ -948,7 +988,7 @@ describe("DesktopSetup", () => {
     renderPage();
 
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter tuning workspace",
+      name: "Sign in and enter DroneDream",
     })).toBeEnabled();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
@@ -978,7 +1018,7 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("dialog", { name: "Setup needs attention" }))
       .not.toBeInTheDocument();
     expect(screen.getByText("Checking system")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "0");
@@ -1020,7 +1060,7 @@ describe("DesktopSetup", () => {
       expect(screen.getByRole("dialog", { name: "Setup needs attention" }))
         .toBeInTheDocument();
     });
-    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" }))
       .not.toBeInTheDocument();
   });
 
@@ -2512,7 +2552,7 @@ describe("DesktopSetup", () => {
       .toHaveAttribute("aria-valuenow", "0");
     expect(screen.queryByRole("button", { name: "Repair and restart runtime" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sign in and enter tuning workspace" }))
+    expect(screen.queryByRole("button", { name: "Sign in and enter DroneDream" }))
       .not.toBeInTheDocument();
     expect(invoke).not.toHaveBeenCalledWith("repair_runtime", undefined);
   });
@@ -2545,7 +2585,7 @@ describe("DesktopSetup", () => {
     );
 
     expect(await screen.findByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Sign in and enter tuning workspace" }))
+    expect(await screen.findByRole("button", { name: "Sign in and enter DroneDream" }))
       .toBeEnabled();
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();
@@ -2605,7 +2645,7 @@ describe("DesktopSetup", () => {
       .toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sign in and enter tuning workspace" }))
+    expect(screen.queryByRole("button", { name: "Sign in and enter DroneDream" }))
       .not.toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("start_runtime", undefined);
   });

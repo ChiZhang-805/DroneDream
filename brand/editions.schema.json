@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/editions.json",
+  "title": "DroneDream edition brand system",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "separator", "safety", "editions"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-edition-brand-system"},
+    "separator": {"const": "·"},
+    "safety": {
+      "type": "object",
+      "required": ["presentationOnly", "grantsHardwareAuthority"],
+      "properties": {
+        "presentationOnly": {"const": true},
+        "grantsHardwareAuthority": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "editions": {
+      "type": "object",
+      "required": ["universal", "sim", "lab", "field", "autonomy"],
+      "minProperties": 5,
+      "maxProperties": 5
+    }
+  },
+  "additionalProperties": false
+}

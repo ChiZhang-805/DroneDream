@@ -171,6 +171,7 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
     println!("cargo:rustc-check-cfg=cfg(dronedream_hardware_domain)");
     println!("cargo:rustc-check-cfg=cfg(dronedream_lab)");
     println!("cargo:rustc-check-cfg=cfg(dronedream_field)");
+    println!("cargo:rustc-check-cfg=cfg(dronedream_agent)");
     if matches!(
         edition_id.as_str(),
         "universal" | "lab" | "field" | "autonomy"
@@ -183,6 +184,10 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
     if edition_id == "field" {
         println!("cargo:rustc-cfg=dronedream_field");
     }
+    // Every desktop edition exposes the AGENT workspace. Compile the same
+    // private sidecar bridge into all five products so SIM, LAB, FIELD and
+    // Universal never degrade into a presentation-only shell.
+    println!("cargo:rustc-cfg=dronedream_agent");
     edition_profile
 }
 

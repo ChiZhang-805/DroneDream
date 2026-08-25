@@ -103,6 +103,8 @@ const OPTIONAL_AUTH_FALLBACK: AuthContextValue = {
 };
 const AVATAR_STORAGE_PREFIX = "drone-dream:account-avatar:";
 const MAX_AVATAR_DATA_URL_LENGTH = 600_000;
+const PROFILE_AVATAR_BUCKET = "profile-avatars";
+const PROFILE_AVATAR_FILE = "avatar.jpg";
 
 function shouldDeferDesktopAuth(): boolean {
   // Tauri uses a hash router and initially mounts the provider at `/` before
@@ -117,11 +119,57 @@ function avatarStorageKey(userId: string): string {
   return `${AVATAR_STORAGE_PREFIX}${userId}`;
 }
 
+function avatarObjectPath(userId: string): string {
+  return `${userId}/${PROFILE_AVATAR_FILE}`;
+}
+
+function avatarPublicUrl(supabaseUrl: string, userId: string): string {
+  const url = new URL(
+    `/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/${encodeURIComponent(userId)}/${PROFILE_AVATAR_FILE}`,
+    supabaseUrl,
+  );
+  url.searchParams.set("v", Date.now().toString());
+  return url.toString();
+}
+
+function avatarJpegBlob(avatarDataUrl: string): Blob {
+  const prefix = "data:image/jpeg;base64,";
+  if (!avatarDataUrl.startsWith(prefix)) {
+    throw new Error("The selected profile photo must be a JPEG image.");
+  }
+  let decoded: string;
+  try {
+    decoded = window.atob(avatarDataUrl.slice(prefix.length));
+  } catch {
+    throw new Error("The selected profile photo could not be decoded.");
+  }
+  const bytes = new Uint8Array(decoded.length);
+  for (let index = 0; index < decoded.length; index += 1) {
+    bytes[index] = decoded.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: "image/jpeg" });
+}
+
+function cacheAvatarForUser(userId: string, avatarUrl: string | null): void {
+  try {
+    if (avatarUrl) {
+      window.localStorage.setItem(avatarStorageKey(userId), avatarUrl);
+    } else {
+      window.localStorage.removeItem(avatarStorageKey(userId));
+    }
+  } catch {
+    // The server copy and authenticated user metadata are authoritative. A
+    // hardened WebView may disable localStorage without blocking the upload.
+  }
+}
+
 function localAvatarForUser(userId: string): string | null {
   if (typeof window === "undefined") return null;
   try {
     const stored = window.localStorage.getItem(avatarStorageKey(userId));
-    return stored?.startsWith("data:image/") ? stored : null;
+    return stored?.startsWith("data:image/") || stored?.startsWith("https://")
+      ? stored
+      : null;
   } catch {
     // Storage can be disabled by a hardened browser or WebView policy. A local
     // avatar is optional and must never prevent the authenticated session from
@@ -471,16 +519,109 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("The selected profile photo could not be saved.");
     }
 
-    const key = avatarStorageKey(currentAccount.id);
-    if (avatarDataUrl) {
-      window.localStorage.setItem(key, avatarDataUrl);
-    } else {
-      window.localStorage.removeItem(key);
+    if (docsPreview) {
+      cacheAvatarForUser(currentAccount.id, avatarDataUrl);
+      setAccount((current) =>
+        current ? { ...current, avatarUrl: avatarDataUrl } : current,
+      );
+      return;
     }
+
+    const configuration = browserAuthConfiguration();
+    if (!configuration) {
+      throw new Error("Cloud account access is not configured for this build.");
+    }
+    const objectPath = avatarObjectPath(currentAccount.id);
+    const nextAvatarUrl = avatarDataUrl
+      ? avatarPublicUrl(configuration.supabaseUrl, currentAccount.id)
+      : null;
+
+    if (isDesktopRuntime()) {
+      const accessToken = getAuthAccessToken();
+      if (!accessToken) {
+        throw new Error("Sign in before changing the profile photo.");
+      }
+      const objectUrl = new URL(
+        `/storage/v1/object/${PROFILE_AVATAR_BUCKET}/${encodeURIComponent(currentAccount.id)}/${PROFILE_AVATAR_FILE}`,
+        configuration.supabaseUrl,
+      ).toString();
+      let objectResponse: Response;
+      try {
+        objectResponse = await fetch(objectUrl, {
+          method: avatarDataUrl ? "POST" : "DELETE",
+          headers: {
+            apikey: configuration.publishableKey,
+            Authorization: `Bearer ${accessToken}`,
+            ...(avatarDataUrl
+              ? { "Content-Type": "image/jpeg", "x-upsert": "true" }
+              : {}),
+          },
+          ...(avatarDataUrl ? { body: avatarJpegBlob(avatarDataUrl) } : {}),
+        });
+      } catch {
+        throw new Error(
+          "The profile photo could not be uploaded. Check your connection and try again.",
+        );
+      }
+      if (!objectResponse.ok && !(avatarDataUrl === null && objectResponse.status === 404)) {
+        throw new Error("The profile photo could not be uploaded.");
+      }
+      let metadataResponse: Response;
+      try {
+        metadataResponse = await fetch(
+          `${configuration.supabaseUrl}/auth/v1/user`,
+          {
+            method: "PUT",
+            headers: {
+              apikey: configuration.publishableKey,
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ data: { avatar_url: nextAvatarUrl } }),
+          },
+        );
+      } catch {
+        throw new Error(
+          "The profile photo was uploaded, but the account could not be updated. Try saving it again.",
+        );
+      }
+      if (!metadataResponse.ok) {
+        throw new Error("The profile photo metadata could not be saved.");
+      }
+    } else {
+      const client = requireClient();
+      if (avatarDataUrl) {
+        const { error: uploadError } = await client.storage
+          .from(PROFILE_AVATAR_BUCKET)
+          .upload(objectPath, avatarJpegBlob(avatarDataUrl), {
+            cacheControl: "3600",
+            contentType: "image/jpeg",
+            upsert: true,
+          });
+        if (uploadError) throw uploadError;
+      } else {
+        const { error: removeError } = await client.storage
+          .from(PROFILE_AVATAR_BUCKET)
+          .remove([objectPath]);
+        if (removeError) throw removeError;
+      }
+      const { data, error } = await client.auth.updateUser({
+        data: { avatar_url: nextAvatarUrl },
+      });
+      if (error) throw error;
+      const { data: sessionData, error: sessionError } =
+        await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      cacheAvatarForUser(currentAccount.id, nextAvatarUrl);
+      adoptUser(data.user, sessionData.session?.access_token ?? null);
+      return;
+    }
+
+    cacheAvatarForUser(currentAccount.id, nextAvatarUrl);
     setAccount((current) =>
-      current ? { ...current, avatarUrl: avatarDataUrl } : current,
+      current ? { ...current, avatarUrl: nextAvatarUrl } : current,
     );
-  }, [account]);
+  }, [account, adoptUser, docsPreview]);
 
   const signOut = useCallback(async () => {
     let vaultClearFailed = false;

@@ -23,8 +23,8 @@
   "brand": {
     "editionId": "universal",
     "displayName": "DroneDream",
-    "manifest": "brand/brand-editions.v1.json",
-    "windowsIcon": "brand/generated/universal/windows/icon.ico",
+    "manifest": "brand/editions.json",
+    "windowsIcon": "desktop/src-tauri/gen/brand/universal/windows/icon.ico",
     "presentationOnly": true,
     "grantsHardwareAuthority": false
   },
@@ -38,7 +38,11 @@
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
-        "sha256": "3ec889dced66f1d54bdf94c16a95497aab3ff02ccf5eb6decec034fb8f7d3c12"
+        "sha256": "3ea948a9ba8cd24cab665b1c220de28873a3ae7b30f595253c38395a03d6d9ee"
+      },
+      {
+        "path": "frontend/src/components/SettingsUpdateCenter.tsx",
+        "sha256": "64736b9d706bc87cd5057cf2cc6ba87a38179908a2d896c8ac39e2104c0dca02"
       },
       {
         "path": "frontend/src/components/DroneLaunchScene.tsx",
@@ -54,7 +58,7 @@
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
-        "sha256": "70efc100a3859fe440601b51be8786ff70d8eecf70994e465f3e807584414e28"
+        "sha256": "7af5cf6dcf1e0756b7da9ca6a10375f23ccee8c37e7b090b45942fe350168898"
       },
       {
         "path": "frontend/src/theme/editionTheme.ts",
@@ -62,10 +66,10 @@
       }
     ],
     "visualEvidence": {
-      "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json",
-      "sha256": "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4",
-      "subjectCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
-      "caseCount": 6,
+      "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/software-ui-layout-receipt.json",
+      "sha256": "f5bce9cc9a166be53c790cbd22e2b6e5f2f5a91ea3c81f7600a9be53b2d73700",
+      "subjectCommit": "7cf37d728211a92bbcbb411c3ce8cca904d4c38a",
+      "caseCount": 7,
       "locales": ["en", "zh-CN"],
       "viewportWidths": [390, 760, 1440],
       "coveredSettingsTabs": ["general", "memory", "model"],
@@ -104,7 +108,8 @@
       "shareTargets": ["sim", "lab", "field", "autonomy"],
       "transport": "file-based-draft-envelope",
       "automaticReceiverInstallation": false,
-      "modelHarnessStartsOnExchange": false,
+      "modelHarnessStartsOnImport": false,
+      "unqualifiedAssetCanExecute": false,
       "grantsSimulationExecution": false,
       "grantsHardwareAuthority": false,
       "sourceFiles": [

@@ -1,24 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
+  ChevronUp,
+  Gauge,
   History,
+  LogOut,
   PackageCheck,
   RadioTower,
   RefreshCw,
+  Settings as SettingsIcon,
   ShieldCheck,
   SlidersHorizontal,
   Wrench,
 } from "lucide-react";
 
+import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
 import {
   discoverFieldDevices,
   isDesktopRuntime,
   type FieldDeviceDiscoveryReport,
   type FieldParameterSnapshot,
-  type HardwareDomainEdition,
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
+import {
+  getManagedModelUsage,
+  remainingAllowanceRatio,
+  type ManagedModelUsageSnapshot,
+} from "../features/settings/cloudModelAccess";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
+import { localeSafeError } from "../i18n/I18nProvider";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
 import {
   FieldAdapterCenter,
@@ -27,6 +37,7 @@ import {
 import { FieldAssistantWorkspace } from "./FieldAssistantWorkspace";
 import { FieldPreflightWorkspace } from "./FieldPreflightWorkspace";
 import { FieldRecoveryWorkspace } from "./FieldRecoveryWorkspace";
+import { FieldSettingsDialog } from "./FieldSettingsDialog";
 import { FieldTuningWorkspace } from "./FieldTuningWorkspace";
 import {
   evaluateFieldSafety,
@@ -53,15 +64,22 @@ const COPY = {
     packs: "Validated packs",
     quorum: "Quorum",
     locked: "Locked",
+    settings: "Settings",
+    remainingAllowance: "Token",
+    account: "Account",
+    openAccountMenu: "Open account menu",
+    signOut: "Sign out",
+    signOutFailed: "Sign out failed. Try again.",
     page: {
-      device: ["Device & adapters", "Discover hardware without opening a transport, then select the matching protocol adapter."],
-      compatibility: ["Compatibility", "Match the Vehicle Pack, controller, firmware, and adapter before any controlled test."],
-      tuning: ["Autonomous tuning", "Model proposes candidates; Harness constrains trials, evidence, holdout, and rollback."],
-      recovery: ["Snapshots & rollback", "Capture parameter state and prepare a content-bound recovery transaction."],
-      operations: ["Preflight & control", "Review zone, operator confirmation, takeover, and emergency controls."],
+      device: "Device & adapters",
+      compatibility: "Compatibility",
+      tuning: "Autonomous tuning",
+      recovery: "Snapshots & rollback",
+      operations: "Preflight & control",
     },
     scan: "Discover",
     scanning: "Scanning",
+    scanFailed: "Device discovery failed.",
     scanUnavailableField: "Available in the installed Field app",
     scanUnavailableLab: "Available in the installed Lab app",
     source: "Source",
@@ -87,6 +105,12 @@ const COPY = {
       "firmware-drift": "Firmware drift",
       "recognized-unvalidated": "Unvalidated",
     },
+    catalogStatus: {
+      validated: "Validated",
+      "contract-only": "Contract only",
+      planned: "Planned",
+      "integrated-contract": "Integrated contract",
+    },
   },
   "zh-CN": {
     skip: "跳到工作区",
@@ -102,15 +126,22 @@ const COPY = {
     packs: "已验证机型包",
     quorum: "仲裁",
     locked: "已锁定",
+    settings: "设置",
+    remainingAllowance: "Token",
+    account: "账户",
+    openAccountMenu: "打开账户菜单",
+    signOut: "退出登录",
+    signOutFailed: "退出登录失败，请重试。",
     page: {
-      device: ["设备与适配器", "在不打开传输端口的前提下发现硬件，并选择匹配的协议适配器。"],
-      compatibility: ["兼容性", "受控测试前，确认机型包、飞控、固件和适配器一致。"],
-      tuning: ["自主调优", "Model 提出候选，Harness 约束试验、证据、留出验证与回滚。"],
-      recovery: ["快照与回滚", "采集参数状态，并准备内容绑定的恢复事务。"],
-      operations: ["飞前与控制", "检查区域、操作员确认、接管与紧急控制。"],
+      device: "设备与适配器",
+      compatibility: "兼容性",
+      tuning: "自主调优",
+      recovery: "快照与回滚",
+      operations: "飞前与控制",
     },
     scan: "发现设备",
     scanning: "正在扫描",
+    scanFailed: "设备发现失败。",
     scanUnavailableField: "仅在已安装的 Field 应用中可用",
     scanUnavailableLab: "仅在已安装的 Lab 应用中可用",
     source: "来源",
@@ -135,6 +166,12 @@ const COPY = {
       "unknown-device": "未知设备",
       "firmware-drift": "固件漂移",
       "recognized-unvalidated": "未验证",
+    },
+    catalogStatus: {
+      validated: "已验证",
+      "contract-only": "仅完成接口约定",
+      planned: "计划中",
+      "integrated-contract": "接口已集成",
     },
   },
 } as const;
@@ -165,6 +202,13 @@ function savedLocale(): FieldLocale {
   }
 }
 
+function fieldPlanName(value: string | undefined): "Free" | "Plus" | "Pro" {
+  const normalized = value?.trim().toLocaleLowerCase();
+  if (normalized === "plus") return "Plus";
+  if (normalized === "pro") return "Pro";
+  return "Free";
+}
+
 export interface FieldAppProps {
   initialLocale?: FieldLocale;
   initialObservationState?: FieldObservationState;
@@ -177,22 +221,15 @@ export interface FieldAppProps {
 function FieldPageHeading({
   icon: Icon,
   title,
-  body,
-  edition,
 }: {
   icon: typeof RadioTower;
   title: string;
-  body: string;
-  edition: HardwareDomainEdition;
 }) {
   return (
     <header className="field-page-heading">
       <div>
-        <span className="field-page-eyebrow"><Icon aria-hidden="true" />{
-          edition === "lab" ? "LAB · HARDWARE" : edition === "autonomy" ? "AUTONOMY · HARDWARE" : "FIELD"
-        }</span>
+        <Icon aria-hidden="true" />
         <h1>{title}</h1>
-        <p>{body}</p>
       </div>
     </header>
   );
@@ -222,7 +259,18 @@ function FieldWorkspace({
   const [deviceScanError, setDeviceScanError] = useState<string | null>(null);
   const [readOnlyEvidence, setReadOnlyEvidence] = useState<FieldReadOnlyProtocolEvidence | null>(null);
   const [latestSnapshot, setLatestSnapshot] = useState<FieldParameterSnapshot | null>(null);
+  const [settingsWorkspaceOpen, setSettingsWorkspaceOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsSurfaceTabId>("general");
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [signOutPending, setSignOutPending] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
+  const [managedUsage, setManagedUsage] = useState<ManagedModelUsageSnapshot | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const applicationSurfaceRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const settingsCloseRef = useRef<HTMLButtonElement>(null);
+  const auth = useOptionalAuth();
   const copy = COPY[locale];
   const navigationLabel = embeddedInLab ? copy.navLab : copy.navField;
   const scanUnavailable = embeddedInLab
@@ -235,6 +283,29 @@ function FieldWorkspace({
   const selectedController = selectedPack.controllers.find(
     (controller) => controllerKey(controller.vendor, controller.model) === selectedControllerKey,
   ) ?? selectedPack.controllers[0];
+  const tokenPercent = managedUsage
+    ? Math.round(remainingAllowanceRatio(
+        managedUsage.usage.remaining_ai_credits,
+        managedUsage.plan.included_ai_credits,
+      ))
+    : null;
+  const accountPlan = fieldPlanName(managedUsage?.plan.name);
+
+  useEffect(() => {
+    if (!auth?.account) {
+      setManagedUsage(null);
+      return undefined;
+    }
+    let active = true;
+    void getManagedModelUsage().then((usage) => {
+      if (active) setManagedUsage(usage);
+    }).catch(() => {
+      if (active) setManagedUsage(null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [auth?.account?.id]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -257,9 +328,75 @@ function FieldWorkspace({
     if (focusOnMount) pageRef.current?.focus({ preventScroll: true });
   }, [focusOnMount]);
 
+  useEffect(() => {
+    const applicationSurface = applicationSurfaceRef.current;
+    if (!applicationSurface) return undefined;
+    const previousInert = applicationSurface.inert;
+    applicationSurface.inert = settingsWorkspaceOpen;
+    return () => {
+      applicationSurface.inert = previousInert;
+    };
+  }, [settingsWorkspaceOpen]);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      accountMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    });
+    const closeOnOutsidePointer = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (accountMenuRef.current?.contains(target) || settingsButtonRef.current?.contains(target)) return;
+      setAccountMenuOpen(false);
+      setSignOutError(false);
+      window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setAccountMenuOpen(false);
+      setSignOutError(false);
+      window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+    };
+    document.addEventListener("mousedown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accountMenuOpen]);
+
   const selectPage = (page: FieldPageId) => {
     setActivePage(page);
     requestAnimationFrame(() => pageRef.current?.focus({ preventScroll: true }));
+  };
+
+  const openSettingsWorkspace = (tab: SettingsSurfaceTabId = "general") => {
+    setAccountMenuOpen(false);
+    setSignOutError(false);
+    setSettingsInitialTab(tab);
+    setSettingsWorkspaceOpen(true);
+  };
+
+  const closeSettingsWorkspace = () => {
+    setSettingsWorkspaceOpen(false);
+    window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+  };
+
+  const signOut = async () => {
+    if (!auth?.account || signOutPending) return;
+    setSignOutPending(true);
+    setSignOutError(false);
+    try {
+      await auth.signOut();
+      setAccountMenuOpen(false);
+      window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+    } catch {
+      setSignOutError(true);
+    } finally {
+      setSignOutPending(false);
+    }
   };
 
   const scanDevices = useCallback(async () => {
@@ -268,17 +405,20 @@ function FieldWorkspace({
     try {
       setDeviceReport(await discoverFieldDevices());
     } catch (error) {
-      setDeviceScanError(error instanceof Error ? error.message : String(error));
+      setDeviceScanError(localeSafeError(error, locale, {
+        zh: COPY["zh-CN"].scanFailed,
+        en: COPY.en.scanFailed,
+      }));
     } finally {
       setDeviceScanBusy(false);
     }
-  }, []);
+  }, [locale]);
 
   const renderDevicePage = () => {
-    const [title, body] = copy.page.device;
+    const title = copy.page.device;
     return (
       <div className="field-page field-device-page">
-        <FieldPageHeading icon={RadioTower} title={title} body={body} edition={presentationEdition} />
+        <FieldPageHeading icon={RadioTower} title={title} />
         <div className="field-device-dashboard">
           <section className="field-compact-panel field-device-observation-panel">
             <div className="field-panel-toolbar">
@@ -322,10 +462,10 @@ function FieldWorkspace({
   };
 
   const renderCompatibilityPage = () => {
-    const [title, body] = copy.page.compatibility;
+    const title = copy.page.compatibility;
     return (
       <div className="field-page field-compatibility-page">
-        <FieldPageHeading icon={PackageCheck} title={title} body={body} edition={presentationEdition} />
+        <FieldPageHeading icon={PackageCheck} title={title} />
         <section className="field-compact-panel field-compatibility-controls" data-authority="false">
           <label><span>{copy.selectedPack}</span><select value={selectedPackId} onChange={(event) => {
             const pack = FIELD_CATALOG.vehiclePacks.find((candidate) => candidate.packId === event.target.value) ?? FIRST_FIELD_PACK;
@@ -338,7 +478,7 @@ function FieldWorkspace({
         </section>
         <section className="field-compact-panel field-registry-panel">
           <header><strong>{copy.registry}</strong><span>{FIELD_CATALOG.vehiclePacks.length}</span></header>
-          <div className="field-table-scroll"><table aria-label={copy.registry}><thead><tr><th>{copy.pack}</th><th>{copy.controller}</th><th>{copy.tier}</th><th>{copy.adapter}</th></tr></thead><tbody>{FIELD_CATALOG.vehiclePacks.map((pack) => <tr key={pack.packId}><td><strong>{pack.displayName[locale]}</strong><small>{pack.manufacturer}</small></td><td>{pack.controllers.map((controller) => controller.model).join(", ")}</td><td><span className="field-status-pill">{pack.validationTier}</span></td><td>{pack.adapterStatus}</td></tr>)}</tbody></table></div>
+          <div className="field-table-scroll"><table aria-label={copy.registry}><thead><tr><th>{copy.pack}</th><th>{copy.controller}</th><th>{copy.tier}</th><th>{copy.adapter}</th></tr></thead><tbody>{FIELD_CATALOG.vehiclePacks.map((pack) => <tr key={pack.packId}><td><strong>{pack.displayName[locale]}</strong><small>{pack.manufacturer}</small></td><td>{pack.controllers.map((controller) => controller.model).join(", ")}</td><td><span className="field-status-pill">{copy.catalogStatus[pack.validationTier as keyof typeof copy.catalogStatus] ?? pack.validationTier}</span></td><td>{copy.catalogStatus[pack.adapterStatus as keyof typeof copy.catalogStatus] ?? pack.adapterStatus}</td></tr>)}</tbody></table></div>
         </section>
       </div>
     );
@@ -351,15 +491,15 @@ function FieldWorkspace({
     if (activePage === "device") return renderDevicePage();
     if (activePage === "compatibility") return renderCompatibilityPage();
     if (activePage === "tuning") {
-      const [title, body] = copy.page.tuning;
-      return <div className="field-page"><FieldPageHeading icon={SlidersHorizontal} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldTuningWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
+      const title = copy.page.tuning;
+      return <div className="field-page"><FieldPageHeading icon={SlidersHorizontal} title={title} /><div className="field-page-component"><FieldTuningWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
     }
     if (activePage === "recovery") {
-      const [title, body] = copy.page.recovery;
-      return <div className="field-page"><FieldPageHeading icon={History} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldRecoveryWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} device={deviceReport?.devices[0]} evidence={readOnlyEvidence ?? undefined} onSnapshotCreated={setLatestSnapshot} /></div></div>;
+      const title = copy.page.recovery;
+      return <div className="field-page"><FieldPageHeading icon={History} title={title} /><div className="field-page-component"><FieldRecoveryWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} device={deviceReport?.devices[0]} evidence={readOnlyEvidence ?? undefined} onSnapshotCreated={setLatestSnapshot} /></div></div>;
     }
-    const [title, body] = copy.page.operations;
-    return <div className="field-page"><FieldPageHeading icon={ShieldCheck} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldPreflightWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
+    const title = copy.page.operations;
+    return <div className="field-page"><FieldPageHeading icon={ShieldCheck} title={title} /><div className="field-page-component"><FieldPreflightWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
   };
 
   return (
@@ -370,18 +510,112 @@ function FieldWorkspace({
       data-validated-pack-count={decision.validatedPackCount}
       data-quorum={decision.threeLayerQuorum}
     >
-      <a className="field-skip-link" href="#field-page">{copy.skip}</a>
-      <div className="field-layout">
-        <aside className="field-sidebar">
-          {!embeddedInConsole ? (
-            <nav aria-label={navigationLabel}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
-          ) : null}
-          <div className="field-sidebar-status" title={`${copy.packs}: 0`}><Wrench aria-hidden="true" /><div><span>{copy.packs}</span><strong>0</strong></div><small>{copy.locked}</small></div>
-        </aside>
-        <main className="field-main" id="field-page">
-          <div ref={pageRef} className="field-active-page" tabIndex={-1} data-page={activePage}>{renderActivePage()}</div>
-        </main>
+      <div
+        ref={applicationSurfaceRef}
+        className="field-application-surface"
+        aria-hidden={settingsWorkspaceOpen || undefined}
+      >
+        <a className="field-skip-link" href="#field-page">{copy.skip}</a>
+        <div className="field-layout">
+          <aside className="field-sidebar">
+            {!embeddedInConsole ? (
+              <nav aria-label={navigationLabel}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
+            ) : null}
+            <div className="field-sidebar-footer">
+              <div className="field-sidebar-status" title={`${copy.packs}: 0`}><Wrench aria-hidden="true" /><div><span>{copy.packs}</span><strong>0</strong></div><small>{copy.locked}</small></div>
+              {!embeddedInLab && !embeddedInConsole ? (
+                <>
+                  <button
+                    ref={settingsButtonRef}
+                    type="button"
+                    className="field-sidebar-settings"
+                    aria-label={copy.openAccountMenu}
+                    title={copy.openAccountMenu}
+                    aria-haspopup="menu"
+                    aria-expanded={accountMenuOpen}
+                    onClick={() => {
+                      setSignOutError(false);
+                      setAccountMenuOpen((open) => !open);
+                    }}
+                  >
+                    {auth?.account?.avatarUrl ? (
+                      <img src={auth.account.avatarUrl} alt="" />
+                    ) : (
+                      <span className="field-sidebar-settings-avatar" aria-hidden="true">
+                        {auth?.account?.displayName?.trim().charAt(0).toUpperCase() || <SettingsIcon />}
+                      </span>
+                    )}
+                    <span className="field-sidebar-account-copy">
+                      <strong>{auth?.account?.displayName || copy.settings}</strong>
+                      <small>{accountPlan}</small>
+                    </span>
+                    <ChevronUp aria-hidden="true" />
+                  </button>
+                  {accountMenuOpen ? (
+                    <div
+                      ref={accountMenuRef}
+                      className="account-menu-popover"
+                      role="menu"
+                      aria-label={copy.account}
+                    >
+                      <button
+                        type="button"
+                        className="account-menu-row"
+                        role="menuitem"
+                        onClick={() => openSettingsWorkspace("model")}
+                      >
+                        <Gauge aria-hidden="true" strokeWidth={1.8} />
+                        <span>{copy.remainingAllowance}</span>
+                        <strong>{tokenPercent === null ? "—" : `${tokenPercent}%`}</strong>
+                      </button>
+                      <button
+                        type="button"
+                        className="account-menu-row"
+                        role="menuitem"
+                        onClick={() => openSettingsWorkspace("general")}
+                      >
+                        <SettingsIcon aria-hidden="true" strokeWidth={1.8} />
+                        <span>{copy.settings}</span>
+                      </button>
+                      {auth?.account ? (
+                        <button
+                          type="button"
+                          className="account-menu-row"
+                          role="menuitem"
+                          disabled={signOutPending}
+                          onClick={() => void signOut()}
+                        >
+                          <LogOut aria-hidden="true" strokeWidth={1.8} />
+                          <span>{copy.signOut}</span>
+                        </button>
+                      ) : null}
+                      {signOutError ? <p role="alert">{copy.signOutFailed}</p> : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </aside>
+          <main className="field-main" id="field-page">
+            <div ref={pageRef} className="field-active-page" tabIndex={-1} data-page={activePage}>{renderActivePage()}</div>
+          </main>
+        </div>
       </div>
+      {settingsWorkspaceOpen ? (
+        <div className="app-shell field-settings-workspace-context">
+          <div className="settings-workspace-host field-settings-workspace-host">
+            <FieldSettingsDialog
+              key={settingsInitialTab}
+              closeRef={settingsCloseRef}
+              initialTab={settingsInitialTab}
+              locale={locale}
+              onClose={closeSettingsWorkspace}
+              onLocaleChange={setLocale}
+              presentation="workspace"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

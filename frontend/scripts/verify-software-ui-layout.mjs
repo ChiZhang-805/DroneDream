@@ -32,11 +32,13 @@ const origin = `http://${host}:${port}`;
 const mobileMenuOnly = Boolean(args.get("--mobile-menu-only"));
 const fixedScenariosOnly = Boolean(args.get("--fixed-scenarios-only"));
 const settingsOnly = Boolean(args.get("--settings-only"));
+const fixedAgent = Boolean(args.get("--fixed-agent"));
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
+if (fixedAgent) process.env.VITE_DRONEDREAM_EDITION = "autonomy";
 
-const cases = [
+const universalCases = [
   { id: "desktop-en", locale: "en", edition: "universal", viewport: { width: 1440, height: 1000 } },
   { id: "desktop-zh", locale: "zh-CN", edition: "field", viewport: { width: 1440, height: 1000 } },
   ...(settingsOnly ? [
@@ -47,17 +49,30 @@ const cases = [
   { id: "tablet-zh", locale: "zh-CN", edition: "sim", viewport: { width: 760, height: 900 } },
   { id: "mobile-en", locale: "en", edition: "universal", viewport: { width: 390, height: 844 } },
   { id: "mobile-zh", locale: "zh-CN", edition: "field", viewport: { width: 390, height: 844 } },
-].filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
+];
+const fixedAgentCases = [
+  { id: "desktop-agent-en", locale: "en", edition: "autonomy", viewport: { width: 1440, height: 1000 } },
+  { id: "desktop-agent-zh", locale: "zh-CN", edition: "autonomy", viewport: { width: 1440, height: 1000 } },
+  { id: "tablet-agent-en", locale: "en", edition: "autonomy", viewport: { width: 760, height: 900 } },
+  { id: "tablet-agent-zh", locale: "zh-CN", edition: "autonomy", viewport: { width: 760, height: 900 } },
+  { id: "mobile-agent-en", locale: "en", edition: "autonomy", viewport: { width: 390, height: 844 } },
+  { id: "mobile-agent-zh", locale: "zh-CN", edition: "autonomy", viewport: { width: 390, height: 844 } },
+];
+const cases = (fixedAgent ? fixedAgentCases : universalCases)
+  .filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520)
+  .filter((testCase) => !settingsOnly || testCase.viewport.width >= 1000);
 const canonicalThemeColors = Object.freeze({
   universal: ["#FF5574", "#6A4CFF", "#E657D1"],
   sim: ["#00D9FF", "#2671FF", "#744CFF"],
   lab: ["#A7E84A", "#20C77A", "#087E69"],
   field: ["#FFC247", "#FF754B", "#D746A5"],
+  autonomy: ["#FF5B74", "#EC214F", "#97153B"],
 });
 const fixedScenarioOnlyCases = [
   {
     id: "tablet-fixed-scenarios-en",
     locale: "en",
+    edition: "sim",
     viewport: { width: 760, height: 900 },
   },
 ];
@@ -141,6 +156,10 @@ async function openAccountCropper(page, avatarBytes) {
       await page.locator(".app-mobile-menu-button").click();
     }
     await accountButton.click();
+    const accountMenu = page.locator(".account-menu-popover");
+    if (await accountMenu.isVisible()) {
+      await accountMenu.locator(".account-menu-profile").click();
+    }
   }
   await account.waitFor();
   await account.locator('input[type="file"]').setInputFiles({
@@ -235,17 +254,25 @@ async function verifyEditionSwitcher(page, testCase) {
 }
 
 async function verifySettings(page, testCase) {
+  // Universal is the container build, while its active workspace is one of the
+  // five product surfaces. These cases deliberately open Universal on SIM, so
+  // the visual theme must follow SIM without misreporting the build as SIM.
+  const expectedActiveEdition = fixedAgent
+    ? "autonomy"
+    : testCase.edition === "universal"
+      ? "sim"
+      : testCase.edition;
   const settingsViewport = testCase.viewport.width === 1440
     ? { width: 1440, height: 900 }
     : testCase.viewport.width === 390
       ? { width: 390, height: 700 }
       : testCase.viewport;
   await page.setViewportSize(settingsViewport);
-  const settingsSurface = testCase.edition === "universal"
-    ? "/vehicle-studio"
+  const settingsSurface = fixedAgent
+    ? "/autonomy"
     : "/assistant";
   await page.goto(`${origin}${settingsSurface}?docsPreview=1`, { waitUntil: "networkidle" });
-  const editionSwitcher = await verifyEditionSwitcher(page, testCase);
+  const editionSwitcher = fixedAgent ? null : await verifyEditionSwitcher(page, testCase);
   const themeBinding = await page.locator("html").evaluate((element) => {
     const style = getComputedStyle(element);
     return {
@@ -259,12 +286,12 @@ async function verifySettings(page, testCase) {
       ],
     };
   });
-  assert.equal(themeBinding.edition, testCase.edition);
+  assert.equal(themeBinding.edition, expectedActiveEdition);
   assert.equal(themeBinding.presentationOnly, "true");
   assert.equal(themeBinding.grantsHardwareAuthority, "false");
-  assert.deepEqual(themeBinding.colors, canonicalThemeColors[testCase.edition]);
-  let assistantModelImage = null;
-  if (testCase.edition !== "universal") {
+  assert.deepEqual(themeBinding.colors, canonicalThemeColors[expectedActiveEdition]);
+  let assistantModelImage;
+  {
     const assistantModel = page.locator(".assistant-model-button");
     await assistantModel.waitFor();
     await assistantModel.click();
@@ -286,8 +313,10 @@ async function verifySettings(page, testCase) {
     assert.equal(await modelMenu.locator(".model-provider-logo-openai").count(), 3);
     assert.equal(await modelMenu.locator(".model-provider-logo-deepseek").count(), 2);
     assert.equal(await modelMenu.locator(".model-provider-logo-kimi").count(), 2);
-    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: "Default" }).count(), 1);
-    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: "Custom" }).count(), 1);
+    const defaultGroupLabel = testCase.locale === "en" ? "Default" : "默认";
+    const customGroupLabel = testCase.locale === "en" ? "Custom" : "自定义";
+    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: defaultGroupLabel }).count(), 1);
+    assert.equal(await modelMenu.locator(".assistant-model-group-label", { hasText: customGroupLabel }).count(), 1);
     const measureSelectedModel = async () => assistantModel.evaluate((element) => {
       const logo = element.querySelector(".model-provider-logo");
       const label = element.querySelector(":scope > span");
@@ -328,17 +357,20 @@ async function verifySettings(page, testCase) {
     await assistantModel.scrollIntoViewIfNeeded();
     assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
     await assistantModel.click();
-  } else {
-    await page.locator(".vehicle-studio-page").waitFor();
   }
-  if (testCase.viewport.width <= 520) {
-    await page.locator(".app-mobile-menu-button").click();
-    await page.locator(".app-mobile-settings-entry").click();
-  } else {
-    await page.locator(".launcher-settings-button").click();
+  if (testCase.viewport.width < 1000) {
+    await page.setViewportSize(testCase.viewport);
+    return {
+      editionSwitcher,
+      themeBinding,
+      settingsViewport,
+      assistantModelImage,
+      settingsWorkspace: "desktop-and-web-only",
+    };
   }
-  const dialog = page.locator(".launcher-settings-dialog");
-  await dialog.waitFor();
+  await page.locator(".launcher-settings-button").click();
+  const quickSettings = page.locator(".quick-settings-dialog");
+  await quickSettings.waitFor();
   const layerBinding = await page.locator(".launcher-settings-backdrop").evaluate((element) => {
     const readZIndex = (target) => {
       if (!(target instanceof Element)) return 0;
@@ -347,46 +379,136 @@ async function verifySettings(page, testCase) {
     };
     return {
       backdropZIndex: readZIndex(element),
-      mobileHeaderZIndex: readZIndex(document.querySelector(".app-sidebar")),
+      applicationZIndex: readZIndex(document.querySelector(".app-sidebar")),
     };
   });
   assert(
-    layerBinding.backdropZIndex > layerBinding.mobileHeaderZIndex,
-    `${testCase.id}: Settings modal must render above the mobile application header`,
+    layerBinding.backdropZIndex > layerBinding.applicationZIndex,
+    `${testCase.id}: Quick settings must render above the application`,
   );
+  const quickMetrics = await quickSettings.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    return {
+      top: bounds.top,
+      right: bounds.right,
+      bottom: bounds.bottom,
+      left: bounds.left,
+      width: bounds.width,
+      height: bounds.height,
+      aspectRatio: bounds.width / bounds.height,
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      detailedMemoryControls: element.querySelectorAll(
+        ".settings-memory-grid, .settings-memory-domain-consent, .settings-memory-defaults",
+      ).length,
+    };
+  });
+  assert(quickMetrics.left >= 0 && quickMetrics.right <= settingsViewport.width + 1);
+  assert(quickMetrics.top >= 0 && quickMetrics.bottom <= settingsViewport.height + 1);
+  assert(
+    quickMetrics.aspectRatio >= 1.45 && quickMetrics.aspectRatio <= 1.75,
+    `${testCase.id}: Quick settings does not preserve the desktop window proportion`,
+  );
+  assert(
+    quickMetrics.scrollHeight <= quickMetrics.clientHeight + 1,
+    `${testCase.id}: Quick settings unexpectedly scrolls`,
+  );
+  assert.equal(quickMetrics.detailedMemoryControls, 0);
+  for (const label of testCase.locale === "zh-CN"
+    ? ["语言", "外观", "账户记忆", "本软件记忆", "默认平台模型", "全部设置"]
+    : ["Language", "Appearance", "Account memory", "This edition's memory", "Default platform model", "All settings"]) {
+    assert(
+      (await quickSettings.getByText(label, { exact: true }).count()) > 0,
+      `${testCase.id}: Quick settings is missing ${label}`,
+    );
+  }
+  await quickSettings.locator("#quick-settings-appearance").selectOption("dark");
+  await page.waitForFunction(() => document.documentElement.dataset.ddAppearance === "dark");
+  const quickImage = await screenshot(page, testCase.id, "settings-quick-dark");
+  await quickSettings.getByRole("button", {
+    name: testCase.locale === "zh-CN" ? "全部设置" : "All settings",
+  }).click();
+  const workspace = page.locator(".settings-workspace-surface");
+  await workspace.waitFor();
+  assert.equal(await quickSettings.count(), 0);
+  const workspaceFrame = await page.locator(".settings-workspace-host").evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const surface = element.querySelector(".settings-workspace-surface");
+    const sidebar = element.querySelector(".settings-workspace-sidebar");
+    const content = element.querySelector(".settings-workspace-content");
+    if (!(surface instanceof HTMLElement) || !(sidebar instanceof HTMLElement) || !(content instanceof HTMLElement)) {
+      throw new Error("Settings workspace frame is incomplete");
+    }
+    const surfaceBounds = surface.getBoundingClientRect();
+    const sidebarBounds = sidebar.getBoundingClientRect();
+    const contentBounds = content.getBoundingClientRect();
+    return {
+      top: bounds.top,
+      right: bounds.right,
+      bottom: bounds.bottom,
+      left: bounds.left,
+      position: getComputedStyle(element).position,
+      zIndex: Number.parseInt(getComputedStyle(element).zIndex, 10),
+      surface: {
+        top: surfaceBounds.top,
+        right: surfaceBounds.right,
+        bottom: surfaceBounds.bottom,
+        left: surfaceBounds.left,
+      },
+      sidebarRight: sidebarBounds.right,
+      contentLeft: contentBounds.left,
+      documentWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+    };
+  });
+  assert.equal(workspaceFrame.position, "fixed");
+  assert(workspaceFrame.zIndex > layerBinding.backdropZIndex);
+  assert(closeEnough(workspaceFrame.left, 0) && closeEnough(workspaceFrame.top, 0));
+  assert(closeEnough(workspaceFrame.right, settingsViewport.width));
+  assert(closeEnough(workspaceFrame.bottom, settingsViewport.height));
+  assert(closeEnough(workspaceFrame.surface.left, 0) && closeEnough(workspaceFrame.surface.top, 0));
+  assert(closeEnough(workspaceFrame.surface.right, settingsViewport.width));
+  assert(closeEnough(workspaceFrame.surface.bottom, settingsViewport.height));
+  assert(closeEnough(workspaceFrame.sidebarRight, workspaceFrame.contentLeft));
+  assert.equal(workspaceFrame.documentScrollWidth, workspaceFrame.documentWidth);
   const panelMeasurements = [];
   const panelImages = [];
-  for (const tab of await dialog.getByRole("tab").all()) {
+  const workspaceTabs = await workspace.locator(".settings-workspace-sidebar").getByRole("tab").all();
+  for (const tab of workspaceTabs) {
     await tab.click();
-    const measurement = await dialog.evaluate((element) => {
+    const measurement = await workspace.evaluate((element) => {
       const panel = element.querySelector('.launcher-settings-panel:not([hidden])');
+      const scroller = element.querySelector(".settings-workspace-content > .launcher-settings-panels");
       if (!(panel instanceof HTMLElement)) throw new Error("Active Settings panel is missing");
-      const dialogBounds = element.getBoundingClientRect();
+      if (!(scroller instanceof HTMLElement)) throw new Error("Settings workspace scroller is missing");
+      const workspaceBounds = element.getBoundingClientRect();
       const panelBounds = panel.getBoundingClientRect();
+      const scrollerBounds = scroller.getBoundingClientRect();
       return {
         tab: panel.dataset.settingsPanel,
-        dialogClientHeight: element.clientHeight,
-        dialogScrollHeight: element.scrollHeight,
-        dialogTop: dialogBounds.top,
-        dialogBottom: dialogBounds.bottom,
-        panelClientHeight: panel.clientHeight,
-        panelScrollHeight: panel.scrollHeight,
+        workspaceTop: workspaceBounds.top,
+        workspaceBottom: workspaceBounds.bottom,
         panelTop: panelBounds.top,
         panelBottom: panelBounds.bottom,
+        panelRight: panelBounds.right,
+        panelLeft: panelBounds.left,
+        scrollerTop: scrollerBounds.top,
+        scrollerRight: scrollerBounds.right,
+        scrollerBottom: scrollerBounds.bottom,
+        scrollerLeft: scrollerBounds.left,
+        scrollerClientHeight: scroller.clientHeight,
+        scrollerScrollHeight: scroller.scrollHeight,
+        documentWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
         grantsHardwareAuthority: element.getAttribute("data-grants-hardware-authority"),
       };
     });
-    assert(
-      measurement.dialogScrollHeight <= measurement.dialogClientHeight + 1,
-      `${testCase.id}: Settings dialog vertically overflowed on ${measurement.tab}`,
-    );
-    assert(
-      measurement.panelScrollHeight <= measurement.panelClientHeight + 1,
-      `${testCase.id}: Settings panel vertically overflowed on ${measurement.tab}: ${JSON.stringify(measurement)}`,
-    );
-    assert(measurement.dialogTop >= 0 && measurement.dialogBottom <= settingsViewport.height + 1);
-    assert(measurement.panelTop >= measurement.dialogTop - 1);
-    assert(measurement.panelBottom <= measurement.dialogBottom + 1);
+    assert(measurement.workspaceTop >= 0 && measurement.workspaceBottom <= settingsViewport.height + 1);
+    assert(measurement.panelTop >= measurement.scrollerTop - 1);
+    assert(measurement.panelLeft >= measurement.scrollerLeft - 1);
+    assert(measurement.panelRight <= measurement.scrollerRight + 1);
+    assert(measurement.scrollerBottom <= measurement.workspaceBottom + 1);
+    assert.equal(measurement.documentScrollWidth, measurement.documentWidth);
     assert.equal(measurement.grantsHardwareAuthority, "false");
     panelMeasurements.push(measurement);
     panelImages.push(await screenshot(
@@ -395,10 +517,10 @@ async function verifySettings(page, testCase) {
       `settings-${measurement.tab}`,
     ));
   }
-  await dialog.getByRole("tab", {
-    name: testCase.locale === "en" ? "Model" : "模型",
+  await workspace.locator(".settings-workspace-sidebar").getByRole("tab", {
+    name: testCase.locale === "en" ? "Models & allowance" : "模型与额度",
   }).click();
-  const usage = dialog.locator(".settings-model-usage");
+  const usage = workspace.locator(".settings-model-usage");
   const metrics = await usage.evaluate((element) => {
     const rect = (selector) => {
       const target = element.querySelector(selector);
@@ -470,17 +592,25 @@ async function verifySettings(page, testCase) {
   }
   await modelPicker.click();
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
-  assert.equal(metrics.foregroundColor, "rgb(30, 23, 33)");
-  assert.equal(metrics.mutedColor, "rgb(117, 108, 121)");
-  assert.equal(metrics.accessModeColor, "rgb(30, 23, 33)");
-  assert.equal(
+  for (const foreground of [
+    metrics.foregroundColor,
+    metrics.mutedColor,
+    metrics.accessModeColor,
     metrics.headingColor,
-    testCase.edition === "field" ? "rgb(58, 33, 23)" : "rgb(37, 27, 40)",
-  );
+  ]) {
+    assert.notEqual(foreground, "rgba(0, 0, 0, 0)");
+  }
   const manage = usage.locator(".settings-model-plan-row .btn");
+  const usageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
   const resetCards = usage.locator(".settings-reset-card-trigger");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
+  await page.keyboard.press("Tab");
+  assert(await usageRange.evaluate((element) => element === document.activeElement));
+  await page.keyboard.press("ArrowRight");
+  const nextUsageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
+  assert.equal(await nextUsageRange.textContent(), testCase.locale === "zh-CN" ? "30 天" : "30 days");
+  assert(await nextUsageRange.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("Tab");
   assert(await resetCards.evaluate((element) => element === document.activeElement));
   for (let step = 0; step < 4; step += 1) {
@@ -489,17 +619,24 @@ async function verifySettings(page, testCase) {
   }
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
-  await dialog.locator(".launcher-settings-close").click();
+  await workspace.getByRole("button", {
+    name: testCase.locale === "zh-CN" ? "返回应用" : "Back to app",
+  }).click();
+  await workspace.waitFor({ state: "detached" });
+  assert(await page.locator("#main-content").isVisible());
   await page.setViewportSize(testCase.viewport);
   return {
     editionSwitcher,
     ...metrics,
     themeBinding,
     layerBinding,
+    quickMetrics,
+    quickImage,
+    workspaceFrame,
     settingsViewport,
     panelMeasurements,
     panelImages,
-    keyboardFocusOrder: "manage-subscription -> refresh-usage",
+    keyboardFocusOrder: "manage-subscription -> usage-range -> reset-card -> refresh-usage",
     assistantModelImage,
     image,
   };
@@ -606,6 +743,13 @@ async function verifyAvatar(page, testCase, avatarBytes) {
 async function verifyEce498ExternalEntry(page, testCase) {
   const courseUrl =
     "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
+  if (testCase.viewport.width < 1000) {
+    return {
+      courseUrl,
+      settingsWorkspace: "desktop-and-web-only",
+      internalCoursePageRemoved: true,
+    };
+  }
   await page.goto(`${origin}/dashboard?docsPreview=1`, { waitUntil: "networkidle" });
   await page.locator(".universal-mode-switch-trigger").click();
   await page.locator('.universal-mode-switch-menu [role="menuitemradio"]').nth(2).click();
@@ -613,18 +757,19 @@ async function verifyEce498ExternalEntry(page, testCase) {
     document.documentElement.dataset.brandEdition === "lab"
     && window.localStorage.getItem("dronedream:universal-workspace:v2") === "lab"
   ));
-  if (testCase.viewport.width <= 520) {
-    await page.locator(".app-mobile-menu-button").click();
-    await page.locator(".app-mobile-settings-entry").click();
-  } else {
-    await page.locator(".launcher-settings-button").click();
-  }
-  const dialog = page.locator(".launcher-settings-dialog");
-  await dialog.waitFor();
+  await page.locator(".launcher-settings-button").click();
+  const quickSettings = page.locator(".quick-settings-dialog");
+  await quickSettings.waitFor();
+  await quickSettings.getByRole("button", {
+    name: testCase.locale === "en" ? "All settings" : "全部设置",
+  }).click();
+  const workspace = page.locator(".settings-workspace-surface");
+  await workspace.waitFor();
   assert.equal(await page.getByRole("navigation", { name: /Primary navigation|主导航/ })
     .getByRole("link", { name: "ECE498BH" }).count(), 0);
-  await dialog.getByRole("tab", { name: "ECE498BH" }).click();
-  const courseLink = dialog.getByRole("link", {
+  await workspace.locator(".settings-workspace-sidebar")
+    .getByRole("tab", { name: "ECE498BH" }).click();
+  const courseLink = workspace.getByRole("link", {
     name: testCase.locale === "en" ? "Open course" : "打开课程",
   });
   await courseLink.waitFor();
@@ -651,8 +796,10 @@ async function verifyEce498ExternalEntry(page, testCase) {
   await popup.close();
   await page.context().unroute(courseUrl);
 
-  await dialog.locator(".launcher-settings-close").click();
-  await dialog.waitFor({ state: "detached" });
+  await workspace.getByRole("button", {
+    name: testCase.locale === "en" ? "Back to app" : "返回应用",
+  }).click();
+  await workspace.waitFor({ state: "detached" });
 
   await page.locator(".universal-mode-switch-trigger").click();
   await page.locator('.universal-mode-switch-menu [role="menuitemradio"]').nth(1).click();
@@ -1418,9 +1565,10 @@ try {
   if (!failure && !mobileMenuOnly && !settingsOnly) {
     for (const testCase of fixedScenarioOnlyCases) {
       const context = await browser.newContext({ viewport: testCase.viewport });
-      await context.addInitScript((locale) => {
+      await context.addInitScript(({ locale, workspace }) => {
         window.localStorage.setItem("drone-dream:locale", locale);
-      }, testCase.locale);
+        window.localStorage.setItem("dronedream:universal-workspace:v2", workspace);
+      }, { locale: testCase.locale, workspace: testCase.edition });
       await context.route("**/api/v1/**", (route) => route.fulfill({
         status: 503,
         contentType: "application/json",

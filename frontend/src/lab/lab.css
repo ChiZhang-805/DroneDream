@@ -27,20 +27,12 @@
 
 .lab-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.55fr);
   align-items: end;
   gap: 1rem;
   padding: 1rem 1.4rem;
   border-bottom: 1px solid #dfe3e6;
   background: #ffffff;
-}
-
-.lab-eyebrow {
-  margin: 0 0 0.45rem;
-  color: var(--lab-deep-green);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0;
 }
 
 .lab-header h1 {
@@ -60,7 +52,7 @@
 
 .lab-status-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border: 1px solid #dfe3e6;
   border-radius: 6px;
   background: #f9fafb;
@@ -250,7 +242,7 @@
   display: grid;
   grid-template-columns: 2rem minmax(0, 1fr);
   gap: 0.85rem;
-  align-items: start;
+  align-items: center;
 }
 
 .lab-tool-intro > svg {
@@ -270,13 +262,6 @@
   letter-spacing: 0;
 }
 
-.lab-tool-intro p {
-  max-width: 58rem;
-  margin: 0.38rem 0 0;
-  color: #606970;
-  line-height: 1.5;
-}
-
 .lab-calibration {
   display: flex;
   flex-direction: column;
@@ -286,17 +271,16 @@
 .lab-role-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid #d8dde0;
-  border-radius: 6px;
-  background: #ffffff;
+  border-block: 1px solid #d8dde0;
+  background: transparent;
 }
 
 .lab-role-strip > span {
-  display: grid;
-  grid-template-columns: 1.6rem minmax(0, 1fr);
-  gap: 0.18rem 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   min-width: 0;
-  padding: 0.85rem 1rem;
+  padding: 0.58rem 0.85rem;
   border-right: 1px solid #e1e5e7;
 }
 
@@ -305,10 +289,9 @@
 }
 
 .lab-role-strip svg {
-  grid-row: 1 / 3;
-  width: 1.35rem;
-  height: 1.35rem;
-  align-self: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
   color: var(--lab-deep-green);
 }
 
@@ -318,12 +301,12 @@
 }
 
 .lab-role-strip strong {
+  margin-left: auto;
   overflow-wrap: anywhere;
   font-size: 0.86rem;
 }
 
 .lab-role-strip .is-denied {
-  background: #fff5f6;
   color: #9b2945;
 }
 
@@ -896,11 +879,6 @@
   height: 1.8rem;
 }
 
-.lab-empty-evidence p {
-  max-width: 36rem;
-  margin: 0;
-}
-
 .lab-evidence-preview {
   border: 1px solid #d7dce0;
   border-radius: 6px;
@@ -1058,90 +1036,6 @@
   padding-left: 1.2rem;
 }
 
-@media (max-height: 1000px) {
-  .lab-header {
-    gap: 1rem;
-    padding: 1rem 1.4rem 0.85rem;
-  }
-
-  .lab-header h1 {
-    font-size: 1.55rem;
-  }
-
-  .lab-subtitle {
-    margin-top: 0.4rem;
-    font-size: 0.85rem;
-    line-height: 1.35;
-  }
-
-  .lab-status-summary > span {
-    min-height: 3.5rem;
-    padding: 0.55rem 0.7rem;
-  }
-
-  .lab-workspace-switch {
-    padding: 0.75rem 1.4rem 0;
-  }
-
-  .lab-workspace-switch button {
-    min-height: 3.8rem;
-    padding: 0.55rem 0.8rem;
-  }
-
-  .lab-switch-notice {
-    padding: 0.45rem 1.4rem 0.7rem;
-  }
-
-  .lab-view-tabs {
-    padding: 0 1.4rem;
-  }
-
-  .lab-view-tabs button {
-    min-height: 2.75rem;
-  }
-
-  .lab-tool {
-    min-height: 0;
-    gap: 0.8rem;
-    padding: 0.85rem 1.4rem 1.1rem;
-  }
-
-  .lab-setup-layout,
-  .lab-calibration {
-    gap: 0.75rem;
-  }
-
-  .lab-tool-intro p {
-    margin-top: 0.2rem;
-    font-size: 0.78rem;
-    line-height: 1.3;
-  }
-
-  .lab-role-strip > span {
-    padding: 0.55rem 0.7rem;
-  }
-
-  .lab-evidence-bridge {
-    gap: 0.5rem;
-    padding: 0.7rem;
-  }
-
-  .lab-evidence-bridge-inputs > div,
-  .lab-evidence-bridge-binding {
-    padding: 0.5rem;
-  }
-
-  .lab-calibration-controls {
-    gap: 0.65rem;
-    padding: 0.7rem;
-  }
-
-  .lab-empty-evidence {
-    min-height: 6rem;
-    padding: 0.8rem;
-  }
-}
-
 @media (max-width: 1000px) {
   .lab-header {
     grid-template-columns: 1fr;
@@ -1246,14 +1140,12 @@
   }
 
   .lab-subtitle,
-  .lab-workspace-switch small,
-  .lab-tool-intro p,
-  .lab-empty-evidence p {
+  .lab-workspace-switch small {
     display: none;
   }
 
   .lab-status-summary {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .lab-status-summary > span {

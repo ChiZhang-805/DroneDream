@@ -2,12 +2,11 @@ import { useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import { FileCheck2, GitCompareArrows, ShieldX, Upload } from "lucide-react";
 
-import { useI18n } from "../i18n/I18nProvider";
-import { LabEvidencePreviewError, parseLabEvidencePreview } from "./evidencePreview";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
+import { parseLabEvidencePreview } from "./evidencePreview";
 import type { LabEvidencePreview } from "./evidencePreview";
 import {
   FIELD_PRODUCT_SOURCE,
-  FieldEvidenceBridgeError,
   evaluateSimFieldBridge,
   parseFieldHarnessReceipt,
 } from "./fieldEvidenceBridge";
@@ -38,15 +37,15 @@ const COPY = {
     title: "SIM / FIELD 证据桥",
     sim: "SIM 候选参数",
     field: "FIELD 真实观测",
-    importSim: "导入 SIM receipt",
-    importField: "导入 FIELD receipt",
+    importSim: "导入 SIM 回执",
+    importField: "导入 FIELD 回执",
     missing: "尚未绑定",
     verified: "完整性已核验",
-    waiting: "等待两侧 receipt",
+    waiting: "等待两侧回执",
     matched: "候选链路已匹配 · 需要指标归一化",
     denied: "证据不匹配 · 已拒绝",
     source: "Field 来源",
-    holdout: "Holdout",
+    holdout: "留出验证",
     candidate: "候选参数",
     snapshot: "快照",
     blockers: "剩余门禁",
@@ -80,7 +79,10 @@ export function LabEvidenceBridgePanel() {
       setError(null);
     } catch (caught) {
       setSimulation(null);
-      setError(caught instanceof LabEvidencePreviewError ? caught.message : copy.error);
+      setError(localeSafeError(caught, locale, {
+        zh: COPY["zh-CN"].error,
+        en: COPY.en.error,
+      }));
     }
   }
 
@@ -93,7 +95,10 @@ export function LabEvidenceBridgePanel() {
       setError(null);
     } catch (caught) {
       setField(null);
-      setError(caught instanceof FieldEvidenceBridgeError ? caught.message : copy.error);
+      setError(localeSafeError(caught, locale, {
+        zh: COPY["zh-CN"].error,
+        en: COPY.en.error,
+      }));
     }
   }
 

@@ -31,6 +31,15 @@ export interface ManagedModelUsageTotals {
   credit_policy_version: number;
 }
 
+export function remainingAllowanceRatio(
+  remainingCredits: number,
+  includedCredits: number,
+): number {
+  if (!Number.isFinite(remainingCredits) || !Number.isFinite(includedCredits)) return 0;
+  if (includedCredits <= 0) return 0;
+  return Math.min(100, Math.max(0, remainingCredits / includedCredits * 100));
+}
+
 export interface ManagedModelUsageRequest {
   request_id: string;
   purpose: ManagedModelGrantScope;
@@ -45,6 +54,15 @@ export interface ManagedModelUsageRequest {
   usage_estimated: boolean;
   created_at: string;
   settled_at: string | null;
+}
+
+export interface ManagedModelUsageDay {
+  date: string;
+  consumed_ai_credits: number;
+  request_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
 }
 
 export interface ManagedAllowanceResetCard {
@@ -69,6 +87,7 @@ export interface ManagedModelUsageSnapshot {
   };
   usage: ManagedModelUsageTotals;
   recent_requests: ManagedModelUsageRequest[];
+  daily_usage?: ManagedModelUsageDay[];
   allowance_reset_cards?: ManagedAllowanceResetCard[];
 }
 

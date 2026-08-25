@@ -99,7 +99,7 @@ async function measure(page) {
       };
     };
     const dashboardBody = box(".dashboard-body");
-    const recentCard = box(".dashboard-body > .section-card:last-child");
+    const recentCard = box(".dashboard-recent-jobs");
     const tableHeaders = Array.from(
       document.querySelectorAll(".dashboard-recent-jobs-content thead th"),
       (header) => getComputedStyle(header).position,
@@ -118,7 +118,7 @@ async function measure(page) {
       dashboardPage: box(".dashboard-page"),
       dashboardBody,
       recentCard,
-      recentCardBody: box(".dashboard-body > .section-card:last-child > .section-card-body"),
+      recentCardBody: box(".dashboard-recent-jobs-content"),
       recentContent: box(".dashboard-recent-jobs-content"),
       recentTableWrapper: box(".dashboard-recent-jobs-content .data-table-wrapper"),
       emptyState: box(".dashboard-empty-jobs"),
@@ -232,7 +232,7 @@ try {
     });
 
     await page.goto(`${origin}/console/dashboard?docsPreview=1`, { waitUntil: "networkidle" });
-    await page.locator(".dashboard-recent-jobs-content").waitFor();
+    await page.locator(".dashboard-recent-jobs").waitFor();
     await page.locator(testCase.populated ? ".dashboard-recent-jobs-content tbody tr" : ".dashboard-empty-jobs").first().waitFor();
     const initial = await measure(page);
     const violations = containmentViolations(initial);
@@ -248,16 +248,19 @@ try {
         && internalScroll.lastRowVisible
         && internalScroll.stickyHeaderStable
       : initial.emptyState
-        && initial.recentContent
-        && initial.emptyState.height >= initial.recentContent.height - 1
-        && initial.emptyState.height >= 180;
+        && initial.recentCard
+        && initial.recentCard.height <= 72
+        && initial.emptyState.height <= initial.recentCard.height;
+    const viewportContract = testCase.populated
+      ? initial.bodyBottomGap !== null
+        && Math.abs(initial.bodyBottomGap) <= 1
+        && initial.viewportBottomGap !== null
+        && initial.viewportBottomGap <= 64
+      : true;
     const passed = initial.language === testCase.locale
       && initial.edition === testCase.edition
       && violations.length === 0
-      && initial.bodyBottomGap !== null
-      && Math.abs(initial.bodyBottomGap) <= 1
-      && initial.viewportBottomGap !== null
-      && initial.viewportBottomGap <= 64
+      && viewportContract
       && scrollContract
       && consoleErrors.length === 0
       && pageErrors.length === 0;
@@ -273,7 +276,7 @@ try {
 const evidence = {
   schemaVersion: 1,
   label,
-  expected: "Recent jobs fills the remaining dashboard viewport and scrolls only inside the card",
+  expected: "Populated recent jobs scrolls within the remaining viewport; an empty dashboard uses one compact status row",
   stylesheetSha256: await sha256File(path.join(frontendRoot, "src", "styles.css")),
   verifierSha256: await sha256File(path.join(frontendRoot, "scripts", "verify-dashboard-layout.mjs")),
   passed: results.every((result) => result.passed),

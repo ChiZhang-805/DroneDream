@@ -42,20 +42,17 @@ if ((Split-Path -Leaf $installerPath) -cne "DroneDream-Universal-1.0.0.exe") {
     throw "Unexpected Universal Website handoff filename."
 }
 
-$canonicalIcon = Join-Path $repoRoot "brand\generated\universal\windows\icon.ico"
-$canonicalPng = Join-Path $repoRoot "brand\generated\universal\windows\32x32.png"
-$tauriIcon = Join-Path $repoRoot "desktop\src-tauri\icons\icon.ico"
+$canonicalIcon = Join-Path $repoRoot "desktop\src-tauri\gen\brand\universal\windows\icon.ico"
+$canonicalPng = Join-Path $repoRoot "desktop\src-tauri\gen\brand\universal\windows\32x32.png"
 $canonicalIconSha256 = (Get-FileHash -LiteralPath $canonicalIcon -Algorithm SHA256).Hash.ToLowerInvariant()
 $canonicalPngSha256 = (Get-FileHash -LiteralPath $canonicalPng -Algorithm SHA256).Hash.ToLowerInvariant()
-$tauriIconSha256 = (Get-FileHash -LiteralPath $tauriIcon -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($canonicalIconSha256 -cne "88223fab6c2b0d493aaedab932c04d40def4da58e28f6d670adbfd745a6ca8ba" -or
-    $canonicalPngSha256 -cne "acd4ef1fc198bf157c73c26edfb6c2814d46286857b69bfbd857a7328243d19f" -or
-    $tauriIconSha256 -cne $canonicalIconSha256) {
-    throw "Universal canonical and Tauri icon bytes are not the approved purple asset."
+if ($canonicalIconSha256 -cne "d607a304ef09156ec7041744726791dedc9f96625f081676ace654e652536090" -or
+    $canonicalPngSha256 -cne "b8d2ffc18d31749e13d917f5a04b016ba92b1c9045f3e2f00e327e8a7bbc977e") {
+    throw "Generated Universal icon bytes are not the approved pink-purple-blue asset."
 }
 foreach ($path in @(
-    "brand/generated/universal/windows/icon.ico",
-    "desktop/src-tauri/icons/icon.ico"
+    "brand/editions.json",
+    "brand/icons/universal-mark.png"
 )) {
     & git -C $repoRoot diff --quiet $ProductSourceCommit -- $path
     if ($LASTEXITCODE -ne 0) {

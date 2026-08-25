@@ -70,7 +70,7 @@ jobs:
           OAUTH_SIM: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_SIM }}
           OAUTH_LAB: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_LAB }}
           OAUTH_FIELD: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_FIELD }}
-          OAUTH_AUTONOMY: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY }}
+          OAUTH_AUTONOMY: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_AGENT || vars.DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY }}
         run: |
           $releaseTag = if ($env:GITHUB_REF_TYPE -eq "tag") {
             $env:GITHUB_REF_NAME
@@ -161,13 +161,6 @@ jobs:
           cache-dependency-path: |
             frontend/package-lock.json
             desktop/package-lock.json
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: backend/pyproject.toml
 
       - name: Set up Rust 1.97.0
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # action snapshot, 2026-07-10
@@ -267,7 +260,9 @@ jobs:
 
       - name: Verify pinned NSIS template
         shell: pwsh
-        run: ./desktop/scripts/verify-nsis-template.ps1
+        run: |
+          ./desktop/scripts/verify-nsis-template.ps1
+          ./desktop/scripts/verify-installer-removal-wait.ps1
 
       - name: Validate SignPath release configuration
         if: ${{ steps.release.outputs.is_release == 'true' }}
@@ -719,9 +714,10 @@ jobs:
               }
             }
           }
-          if (Test-Path -LiteralPath $installDirFull) {
-            throw "Silent uninstaller left the installation directory behind: $installDirFull"
-          }
+          ./desktop/scripts/wait-path-removal.ps1 `
+            -LiteralPath $installDirFull `
+            -TimeoutSeconds 30 `
+            -PollIntervalMilliseconds 250
           if (-not (Test-Path -LiteralPath $diagnosticSentinel -PathType Leaf)) {
             throw "Ordinary uninstall erased app diagnostic state without explicit consent"
           }

@@ -75,7 +75,13 @@ DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL
 DRONEDREAM_OAUTH_CLIENT_ID_SIM
 DRONEDREAM_OAUTH_CLIENT_ID_LAB
 DRONEDREAM_OAUTH_CLIENT_ID_FIELD
+DRONEDREAM_OAUTH_CLIENT_ID_AGENT
 ```
+
+The fifth product keeps `/desktop-auth/autonomy/callback` as its stable
+protocol identifier, but its canonical build variable is
+`DRONEDREAM_OAUTH_CLIENT_ID_AGENT`. Local builds may still read the legacy
+`DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY` alias during the visible product rename.
 
 Backend runtime variables:
 

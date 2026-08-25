@@ -19,6 +19,15 @@ pub(crate) struct RuntimeKeepalive {
 }
 
 impl RuntimeKeepalive {
+    #[cfg(target_os = "windows")]
+    fn take_owned_child(&self) -> Result<Option<ContainedChild>, String> {
+        let mut guard = self
+            .inner
+            .lock()
+            .map_err(|_| "DroneDreamRuntime keepalive state is unavailable.".to_string())?;
+        Ok(guard.take())
+    }
+
     /// Keep the dedicated DroneDream distribution alive while the desktop app
     /// is open. This command is fixed, shell-free, and cannot target the
     /// user's other WSL distributions.
@@ -67,11 +76,7 @@ impl RuntimeKeepalive {
     /// it never issues a global WSL shutdown.
     #[cfg(target_os = "windows")]
     pub(crate) fn release(&self) -> Result<(), String> {
-        let mut guard = self
-            .inner
-            .lock()
-            .map_err(|_| "DroneDreamRuntime keepalive state is unavailable.".to_string())?;
-        guard.take();
+        self.take_owned_child()?;
         Ok(())
     }
 
@@ -90,7 +95,14 @@ impl RuntimeKeepalive {
     /// explicit exit decision.
     #[cfg(target_os = "windows")]
     fn terminate_for_exit(&self) -> Result<(), String> {
-        self.release()?;
+        // The launcher must remain immediately closable on a bare machine. If
+        // this app never started a Runtime keepalive, there is no owned Runtime
+        // session to terminate and invoking `wsl.exe --terminate` would add a
+        // needless timeout (or interfere with an externally managed session).
+        let Some(owned_child) = self.take_owned_child()? else {
+            return Ok(());
+        };
+        drop(owned_child);
         let mut command = windows_command("wsl.exe");
         command.args(terminate_wsl_args());
         let output = command_output(
@@ -167,6 +179,17 @@ mod tests {
     fn exit_termination_targets_only_the_dedicated_runtime() {
         assert_eq!(terminate_wsl_args(), ["--terminate", "DroneDreamRuntime"]);
         assert!(!terminate_wsl_args().contains(&"--shutdown"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn exit_without_an_owned_runtime_is_an_immediate_noop() {
+        let keepalive = RuntimeKeepalive::default();
+        let started = Instant::now();
+
+        keepalive.terminate_for_exit().unwrap();
+
+        assert!(started.elapsed() < Duration::from_secs(1));
     }
 
     #[cfg(target_os = "windows")]

@@ -200,7 +200,7 @@ def test_desktop_bridge_preserves_user_ownership_boundary(
         b'{"track_type":"circle","start_point":{"x":0,"y":0},"altitude_m":5,'
         b'"wind":{"north":0,"east":0,"south":0,"west":0},'
         b'"sensor_noise_level":"medium","objective_profile":"robust",'
-        b'"optimizer_strategy":"heuristic","simulator_backend":"mock"}'
+        b'"optimizer_strategy":"none","simulator_backend":"real_cli"}'
     )
     created = client.post(
         "/api/v1/jobs",

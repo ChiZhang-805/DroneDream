@@ -140,7 +140,7 @@ def _candidate(
         "sim": "DroneDream-Sim",
         "lab": "DroneDream-Lab",
         "field": "DroneDream-Field",
-        "autonomy": "DroneDream-Autonomy",
+        "autonomy": "DroneDream-Agent",
     }[edition_id]
     filename = f"{product_name}-{version}.exe"
     release_tag = f"desktop-{edition_id}-v{version}-build-{build_number}"
@@ -413,7 +413,7 @@ def test_future_immutable_release_accepts_autonomy_product_identity(
     )
 
     assert result["edition_id"] == "autonomy"
-    assert result["file_name"] == "DroneDream-Autonomy-1.0.1.exe"
+    assert result["file_name"] == "DroneDream-Agent-1.0.1.exe"
 
 
 def test_future_immutable_release_allows_equal_semver_but_rejects_downgrade(

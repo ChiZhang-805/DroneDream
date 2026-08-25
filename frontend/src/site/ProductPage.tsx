@@ -80,7 +80,7 @@ const copy: Record<Locale, {
         ],
       },
       autonomy: {
-        title: "DroneDream · AUTONOMY",
+        title: "DroneDream · AGENT",
         features: [
           "Natural-language mission control",
           "Structured mission plans",
@@ -90,9 +90,9 @@ const copy: Record<Locale, {
           "Evidence-bound safety gates",
         ],
         screenshots: [
-          { src: "/docs/en/tuning-chat.png", alt: "AUTONOMY mission conversation" },
-          { src: "/docs/en/flight-setup.png", alt: "AUTONOMY mission setup" },
-          { src: "/docs/en/dashboard.png", alt: "AUTONOMY qualification evidence" },
+          { src: "/docs/en/tuning-chat.png", alt: "AGENT mission conversation" },
+          { src: "/docs/en/flight-setup.png", alt: "AGENT mission setup" },
+          { src: "/docs/en/dashboard.png", alt: "AGENT qualification evidence" },
         ],
       },
     },
@@ -132,12 +132,12 @@ const copy: Record<Locale, {
         ],
       },
       autonomy: {
-        title: "DroneDream · AUTONOMY",
+        title: "DroneDream · AGENT",
         features: ["自然语言任务控制", "结构化任务计划", "多模型 Harness 循环", "运行时插件组合", "ROS 2 与 Gazebo 接入", "证据约束安全门控"],
         screenshots: [
-          { src: "/docs/zh-CN/tuning-chat.png", alt: "AUTONOMY 任务对话" },
-          { src: "/docs/zh-CN/flight-setup.png", alt: "AUTONOMY 任务设置" },
-          { src: "/docs/zh-CN/dashboard.png", alt: "AUTONOMY 资格证据" },
+          { src: "/docs/zh-CN/tuning-chat.png", alt: "AGENT 任务对话" },
+          { src: "/docs/zh-CN/flight-setup.png", alt: "AGENT 任务设置" },
+          { src: "/docs/zh-CN/dashboard.png", alt: "AGENT 资格证据" },
         ],
       },
     },

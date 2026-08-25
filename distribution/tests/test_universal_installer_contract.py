@@ -13,6 +13,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/universal-1.0.0.v1.json"
 INTEGRATED_WORKSPACES = ROOT / "distribution/universal/integrated-workspaces.v2.json"
+EXTERNAL_ASSET_QUALIFICATION = (
+    ROOT / "distribution/shared/external-asset-qualification.v1.json"
+)
 OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
 FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
@@ -163,6 +166,10 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     }
     assert profile["brand"]["presentationOnly"] is True  # type: ignore[index]
     assert profile["brand"]["grantsHardwareAuthority"] is False  # type: ignore[index]
+    assert profile["brand"]["manifest"] == "brand/editions.json"  # type: ignore[index]
+    assert profile["brand"]["windowsIcon"] == (  # type: ignore[index]
+        "desktop/src-tauri/gen/brand/universal/windows/icon.ico"
+    )
     shared_ui = profile["sharedUiContract"]
     assert shared_ui["contractId"] == "dronedream-shared-edition-ui/v1"  # type: ignore[index]
     assert shared_ui["donorCommit"] == (  # type: ignore[index]
@@ -181,9 +188,9 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "integrated-in-universal"
     )
     visual = shared_ui["visualEvidence"]  # type: ignore[index]
-    assert visual["subjectCommit"] == "4933e214a57a048099d8f0bdd11c9748b620ac3e"
+    assert visual["subjectCommit"] == "7cf37d728211a92bbcbb411c3ce8cca904d4c38a"
     assert visual["subjectCommit"] != shared_ui["donorCommit"]
-    assert visual["caseCount"] == 6
+    assert visual["caseCount"] == 7
     assert visual["locales"] == ["en", "zh-CN"]
     assert visual["viewportWidths"] == [390, 760, 1440]
     assert visual["coveredSettingsTabs"] == ["general", "memory", "model"]
@@ -191,7 +198,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "pending-exact-desktop-runtime-red-validation"
     )
     source_files = shared_ui["sourceFiles"]  # type: ignore[index]
-    assert len(source_files) == 7
+    assert len(source_files) == 8
     for source_file in source_files:
         path = ROOT / source_file["path"]
         assert path.is_file()
@@ -260,7 +267,11 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert vehicle_studio["productSourceCommit"] == (
         "b2fdade2afcfa20e1f117eafabb537aafa6f067f"
     )
-    for source_file in vehicle_studio["sourceFiles"]:
+    assert qualification["contract"] == str(
+        EXTERNAL_ASSET_QUALIFICATION.relative_to(ROOT)
+    ).replace("\\", "/")
+    assert len(qualification["sourceFiles"]) == 10
+    for source_file in qualification["sourceFiles"]:
         path = ROOT / source_file["path"]
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == source_file["sha256"]
@@ -274,11 +285,11 @@ def test_universal_overlay_uses_mother_brand_and_canonical_windows_icon() -> Non
     overlay = _json(OVERLAY)
     assert overlay["productName"] == "DroneDream-Universal"
     assert overlay["app"]["windows"][0]["title"] == "DroneDream"  # type: ignore[index]
-    assert "../../brand/generated/universal/windows/icon.ico" in overlay["bundle"]["icon"]  # type: ignore[index]
+    assert "gen/brand/universal/windows/icon.ico" in overlay["bundle"]["icon"]  # type: ignore[index]
     nsis = overlay["bundle"]["windows"]["nsis"]  # type: ignore[index]
     assert nsis == {
-        "installerIcon": "../../brand/generated/universal/windows/icon.ico",
-        "uninstallerIcon": "../../brand/generated/universal/windows/icon.ico",
+        "installerIcon": "gen/brand/universal/windows/icon.ico",
+        "uninstallerIcon": "gen/brand/universal/windows/icon.ico",
     }
     resources = overlay["bundle"]["resources"]  # type: ignore[index]
     assert resources["../../distribution/desktop/edition-coexistence.v1.json"] == (  # type: ignore[index]

@@ -64,7 +64,7 @@ describe("UniversalModeSwitch", () => {
     expect(onChange).toHaveBeenCalledWith("lab");
 
     fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream · AUTONOMY" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream · AGENT" }));
     expect(onChange).toHaveBeenCalledWith("autonomy");
 
     fireEvent.click(trigger);

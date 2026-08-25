@@ -108,11 +108,42 @@ struct ManagerCapabilities {
 pub(crate) struct EnginePackStatus {
     supported: bool,
     update_required: bool,
+    runtime_base_upgrade_available: bool,
     embedded_pack_id: String,
     embedded_source_commit: String,
     installed_pack_id: Option<String>,
     installed_source_commit: Option<String>,
     message: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RuntimeBaseUpgradeAction {
+    available: bool,
+    message: String,
+}
+
+fn runtime_base_upgrade_action(
+    incompatibility: &str,
+    candidate: Result<bool, String>,
+) -> RuntimeBaseUpgradeAction {
+    match candidate {
+        Ok(true) => RuntimeBaseUpgradeAction {
+            available: true,
+            message: incompatibility.to_string(),
+        },
+        Ok(false) => RuntimeBaseUpgradeAction {
+            available: false,
+            message: format!(
+                "{incompatibility} The signed Runtime Base channel does not currently contain a newer build, so no upgrade action is available."
+            ),
+        },
+        Err(error) => RuntimeBaseUpgradeAction {
+            available: false,
+            message: format!(
+                "{incompatibility} A signed newer Runtime Base candidate could not be verified: {error}"
+            ),
+        },
+    }
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -325,7 +356,7 @@ fn runtime_execution_paths_current() -> bool {
 }
 
 #[cfg(target_os = "windows")]
-fn ensure_manager_idle(label: &str) -> Result<(), String> {
+pub(crate) fn ensure_manager_idle(label: &str) -> Result<(), String> {
     let output = wsl_output(
         MANAGER_PATH,
         &["--check-idle"],
@@ -403,6 +434,7 @@ fn status() -> Result<EnginePackStatus, String> {
         return Ok(EnginePackStatus {
             supported: true,
             update_required: false,
+            runtime_base_upgrade_available: false,
             embedded_pack_id: embedded.pack_id,
             embedded_source_commit: embedded.source_commit,
             installed_pack_id: None,
@@ -413,33 +445,44 @@ fn status() -> Result<EnginePackStatus, String> {
             ),
         });
     }
-    crate::runtime::validate_installed_runtime_ownership()?;
+    let (runtime_build_id, runtime_version) =
+        crate::runtime::validate_installed_runtime_ownership()?;
     if !manager_available() {
+        let upgrade = runtime_base_upgrade_action(
+            "The installed Runtime Base predates Engine Pack updates and must be upgraded once.",
+            crate::runtime_installer::runtime_upgrade_candidate_available(
+                &runtime_build_id,
+                &runtime_version,
+            ),
+        );
         return Ok(EnginePackStatus {
             supported: false,
             update_required: true,
+            runtime_base_upgrade_available: upgrade.available,
             embedded_pack_id: embedded.pack_id,
             embedded_source_commit: embedded.source_commit,
             installed_pack_id: None,
             installed_source_commit: None,
-            message: Some(
-                "The installed Runtime Base predates Engine Pack updates and must be upgraded once."
-                    .to_string(),
-            ),
+            message: Some(upgrade.message),
         });
     }
     if !manager_supports_manifest_schema(embedded_identity.schema_version) {
+        let upgrade = runtime_base_upgrade_action(
+            "The installed Runtime Base must be upgraded before it can verify this Engine Pack.",
+            crate::runtime_installer::runtime_upgrade_candidate_available(
+                &runtime_build_id,
+                &runtime_version,
+            ),
+        );
         return Ok(EnginePackStatus {
             supported: false,
             update_required: true,
+            runtime_base_upgrade_available: upgrade.available,
             embedded_pack_id: embedded.pack_id,
             embedded_source_commit: embedded.source_commit,
             installed_pack_id: None,
             installed_source_commit: None,
-            message: Some(
-                "The installed Runtime Base must be upgraded before it can verify this Engine Pack."
-                    .to_string(),
-            ),
+            message: Some(upgrade.message),
         });
     }
     let receipt = installed_receipt()?;
@@ -467,6 +510,7 @@ fn status() -> Result<EnginePackStatus, String> {
     Ok(EnginePackStatus {
         supported: true,
         update_required: pack_update_required || !execution_paths_current,
+        runtime_base_upgrade_available: false,
         embedded_pack_id: embedded.pack_id,
         embedded_source_commit: embedded.source_commit,
         installed_pack_id,
@@ -484,6 +528,7 @@ fn status() -> Result<EnginePackStatus, String> {
     Ok(EnginePackStatus {
         supported: false,
         update_required: false,
+        runtime_base_upgrade_available: false,
         embedded_pack_id: embedded.pack_id,
         embedded_source_commit: embedded.source_commit,
         installed_pack_id: None,
@@ -754,6 +799,28 @@ mod tests {
 
         let duplicate = br#"{"schemaVersion":1,"kind":"dronedream-engine-pack-manager-capabilities","readableManifestSchemaVersions":[1,2,2],"currentManifestSchemaVersion":2}"#;
         assert!(parse_manager_capabilities(duplicate, 2).is_err());
+    }
+
+    #[test]
+    fn runtime_base_upgrade_is_actionable_only_with_a_verified_newer_candidate() {
+        let incompatibility =
+            "The installed Runtime Base must be upgraded before it can verify this Engine Pack.";
+
+        let available = runtime_base_upgrade_action(incompatibility, Ok(true));
+        assert!(available.available);
+        assert_eq!(available.message, incompatibility);
+
+        let equal_release = runtime_base_upgrade_action(incompatibility, Ok(false));
+        assert!(!equal_release.available);
+        assert!(equal_release
+            .message
+            .contains("does not currently contain a newer build"));
+
+        let channel_failure =
+            runtime_base_upgrade_action(incompatibility, Err("download failed".to_string()));
+        assert!(!channel_failure.available);
+        assert!(channel_failure.message.contains("could not be verified"));
+        assert!(channel_failure.message.contains("download failed"));
     }
 
     fn release_identity(

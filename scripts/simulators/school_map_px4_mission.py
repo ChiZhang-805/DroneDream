@@ -89,6 +89,7 @@ DESIGNATED_PAD_CONTACT_TOLERANCE_M = 0.002
 DESIGNATED_PAD_CONTACT_HORIZONTAL_RADIUS_M = 0.45
 DESIGNATED_PAD_CONTACT_VERTICAL_RADIUS_M = 0.08
 MAX_LIVE_ABORT_REQUEST_BYTES = 4096
+MAX_RUNTIME_CONTROL_REQUEST_BYTES = 512 * 1024
 
 
 @dataclass(frozen=True)
@@ -930,11 +931,15 @@ def _payload_retention_measurements(
 
 
 def _prepare_run_directory(run_dir: Path) -> None:
-    """Admit an empty run directory or the bounded early-abort control file."""
+    """Admit an empty run directory or bounded early runtime control files."""
 
     if run_dir.exists():
+        admitted_control_files = {
+            "live_abort.request.json",
+            "runtime_control.request.json",
+        }
         unexpected = [
-            path.name for path in run_dir.iterdir() if path.name != "live_abort.request.json"
+            path.name for path in run_dir.iterdir() if path.name not in admitted_control_files
         ]
         if unexpected:
             raise FileExistsError(
@@ -943,6 +948,9 @@ def _prepare_run_directory(run_dir: Path) -> None:
         early_abort = run_dir / "live_abort.request.json"
         if early_abort.exists():
             _read_live_abort_request(early_abort)
+        early_control = run_dir / "runtime_control.request.json"
+        if early_control.exists():
+            _read_runtime_control_request(early_control)
     run_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -962,6 +970,65 @@ def _read_live_abort_request(path: Path) -> tuple[str, bool]:
     if not isinstance(world_paused, bool):
         raise RuntimeError("live abort world_paused flag is invalid")
     return reason.strip(), world_paused
+
+
+def _read_runtime_control_request(
+    path: Path,
+) -> tuple[int, str, list[WorldPoint] | None, list[str] | None]:
+    if path.stat().st_size > MAX_RUNTIME_CONTROL_REQUEST_BYTES:
+        raise RuntimeError("runtime control request is oversized")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("runtime control request is invalid") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("runtime control request is invalid")
+    if payload.get("schema_version") != "dronedream.autonomy.runtime-control.v1":
+        raise RuntimeError("runtime control schema is unsupported")
+    revision = payload.get("revision")
+    mission_revision = payload.get("mission_revision")
+    action = payload.get("action")
+    contract_id = payload.get("contract_id")
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
+        raise RuntimeError("runtime control revision is invalid")
+    if (
+        isinstance(mission_revision, bool)
+        or not isinstance(mission_revision, int)
+        or mission_revision < 1
+    ):
+        raise RuntimeError("runtime control mission revision is invalid")
+    if action not in {"hold", "resume", "replace_route"}:
+        raise RuntimeError("runtime control action is invalid")
+    if not isinstance(contract_id, str) or not 8 <= len(contract_id) <= 160:
+        raise RuntimeError("runtime control contract id is invalid")
+    raw_route = payload.get("route")
+    if action != "replace_route":
+        if raw_route is not None:
+            raise RuntimeError("runtime hold or resume request must not include a route")
+        return revision, action, None, None
+    if not isinstance(raw_route, list) or not 2 <= len(raw_route) <= 10_000:
+        raise RuntimeError("runtime replacement route is invalid")
+    route: list[WorldPoint] = []
+    phases: list[str] = []
+    allowed_phases = {"launch", "transit", "stairs", "gate", "pickup", "return", "land"}
+    for index, point in enumerate(raw_route):
+        if not isinstance(point, dict):
+            raise RuntimeError(f"runtime replacement route point {index} is invalid")
+        coordinates: list[float] = []
+        for axis in ("x", "y", "z"):
+            raw = point.get(axis)
+            if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+                raise RuntimeError(f"runtime replacement route point {index}.{axis} is invalid")
+            value = float(raw)
+            if not math.isfinite(value):
+                raise RuntimeError(f"runtime replacement route point {index}.{axis} is invalid")
+            coordinates.append(value)
+        phase = point.get("phase")
+        if phase not in allowed_phases:
+            raise RuntimeError(f"runtime replacement route point {index}.phase is invalid")
+        route.append((coordinates[0], coordinates[1], coordinates[2]))
+        phases.append(str(phase))
+    return revision, action, route, phases
 
 
 def _prepare_run(
@@ -1434,6 +1501,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             executor_path = REPOSITORY_ROOT / "scripts/simulators/px4_offboard_track_executor.py"
             abort_file = run_dir / "live_abort.request.json"
+            runtime_control_file = run_dir / "runtime_control.request.json"
             executor_args = [
                 sys.executable,
                 str(executor_path),
@@ -1449,6 +1517,8 @@ def main(argv: list[str] | None = None) -> int:
                 WORLD_NAME,
                 "--abort-file",
                 str(abort_file),
+                "--runtime-control-file",
+                str(runtime_control_file),
                 "--setpoint-rate-hz",
                 f"{setpoint_rate_hz:g}",
                 "--takeoff-timeout-seconds",
@@ -1485,12 +1555,32 @@ def main(argv: list[str] | None = None) -> int:
             scene = get_scene("school-campus-v1")
             if scene is None or len(scene.reference_path) != len(route):
                 raise RuntimeError("School Map live route metadata is unavailable")
+            route_phases = [point.phase for point in scene.reference_path]
+            runtime_control_revision = 0
+            runtime_control_action: str | None = None
             while executor_process.poll() is None:
                 if time.monotonic() >= executor_deadline:
                     live_abort_reason = "executor_wall_timeout"
                 latest = recorder.latest_sample
                 if latest is not None and live_abort_reason is None:
                     center = latest.envelope_center
+                    if runtime_control_file.is_file():
+                        (
+                            candidate_revision,
+                            candidate_action,
+                            replacement_route,
+                            replacement_phases,
+                        ) = _read_runtime_control_request(runtime_control_file)
+                        if candidate_revision > runtime_control_revision:
+                            if replacement_route is not None and replacement_phases is not None:
+                                prefix_end = min(route_progress_index + 1, len(route))
+                                route = [*route[:prefix_end], *replacement_route]
+                                route_phases = [
+                                    *route_phases[:prefix_end],
+                                    *replacement_phases,
+                                ]
+                            runtime_control_revision = candidate_revision
+                            runtime_control_action = candidate_action
                     route_progress_index = _monotonic_route_progress_index(
                         center,
                         route,
@@ -1513,7 +1603,11 @@ def main(argv: list[str] | None = None) -> int:
                             {
                                 "schema_version": "dronedream.school-map-mission-live.v1",
                                 "status": "running",
-                                "phase": scene.reference_path[route_progress_index].phase,
+                                "phase": (
+                                    "holding"
+                                    if runtime_control_action == "hold"
+                                    else route_phases[route_progress_index]
+                                ),
                                 "route_index": route_progress_index,
                                 "route_waypoint_count": len(route),
                                 "progress": route_progress_index / max(1, len(route) - 1),
@@ -1527,15 +1621,21 @@ def main(argv: list[str] | None = None) -> int:
                                     else False
                                 ),
                                 "abort_reason": live_abort_reason,
+                                "runtime_control_revision": runtime_control_revision,
+                                "runtime_control_action": runtime_control_action,
                             },
                         )
                         last_live_status_write = time.monotonic()
                         last_live_status_sample = latest
+                    pickup_index = next(
+                        (index for index, phase in enumerate(route_phases) if phase == "pickup"),
+                        None,
+                    )
                     if (
                         payload_spawn_evidence is None
-                        and route_progress_index >= len(route) // 2
-                        and math.dist(center, route[len(route) // 2])
-                        <= PICKUP_PAYLOAD_SPAWN_RADIUS_M
+                        and pickup_index is not None
+                        and route_progress_index >= pickup_index
+                        and math.dist(center, route[pickup_index]) <= PICKUP_PAYLOAD_SPAWN_RADIUS_M
                     ):
                         pickup_pause = _set_world_paused(gz_binary, env, paused=True)
                         if not pickup_pause["accepted"]:

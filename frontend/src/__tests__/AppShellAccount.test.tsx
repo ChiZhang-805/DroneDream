@@ -21,7 +21,6 @@ function renderWorkspace(initialEntry = "/assistant") {
         children: [
           { path: "assistant", element: <div>Assistant workspace</div> },
           { path: "autonomy", element: <div>Autonomy workspace</div> },
-          { path: "vehicle-studio", element: <div>Vehicle Studio workspace</div> },
         ],
       },
     ],
@@ -55,36 +54,6 @@ function useMobileViewport(): void {
 }
 
 describe("workspace account entry", () => {
-  it("identifies the Universal-only modeling surface instead of the last professional workspace", () => {
-    window.localStorage.setItem("drone-dream:locale", "en");
-    window.localStorage.setItem("dronedream:universal-workspace:v2", "field");
-    const { router } = renderWorkspace("/vehicle-studio");
-
-    const selector = screen.getByRole("button", { name: "Switch DroneDream edition" });
-    expect(selector).toHaveTextContent("DroneDream");
-    fireEvent.click(selector);
-    expect(screen.getByRole("menuitemradio", { name: "DroneDream" }))
-      .toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("menuitemradio", { name: /DroneDream.*FIELD/ }))
-      .toHaveAttribute("aria-checked", "false");
-    expect(document.documentElement).toHaveAttribute("data-brand-edition", "universal");
-    expect(document.documentElement).toHaveAttribute("data-theme-grants-hardware-authority", "false");
-
-    router.dispose();
-  });
-
-  it("keeps AUTONOMY vehicle drafts inside the active AUTONOMY workspace", () => {
-    window.localStorage.setItem("drone-dream:locale", "en");
-    window.localStorage.setItem("dronedream:universal-workspace:v2", "autonomy");
-    const { router } = renderWorkspace("/vehicle-studio");
-
-    const selector = screen.getByRole("button", { name: "Switch DroneDream edition" });
-    expect(selector).toHaveTextContent("AUTONOMY");
-    expect(document.documentElement).toHaveAttribute("data-brand-edition", "autonomy");
-
-    router.dispose();
-  });
-
   it("shows an honest local profile when cloud auth is not configured", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { router } = renderWorkspace();
@@ -116,8 +85,6 @@ describe("workspace account entry", () => {
     expect(links).toHaveLength(6);
     expect(screen.queryByRole("link", { name: "SIM" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Vehicle Studio" }))
-      .not.toBeInTheDocument();
     links.forEach((link) => {
       expect(link.querySelector(".app-nav-entry > svg")).not.toBeNull();
     });
@@ -140,8 +107,7 @@ describe("workspace account entry", () => {
 
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Autonomy",
-      "Vehicle Studio",
+      "Agent",
       "Dashboard",
       "Run History",
       "Scenarios",
@@ -150,7 +116,7 @@ describe("workspace account entry", () => {
     selectEdition(/DroneDream.*SIM/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Autonomy",
+      "Agent",
       "Experiment",
       "Dashboard",
       "Scenarios",
@@ -160,7 +126,7 @@ describe("workspace account entry", () => {
     selectEdition(/DroneDream.*LAB/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Autonomy",
+      "Agent",
       "Experiment",
       "Lab workspace",
       "Hardware Lab",
@@ -171,7 +137,7 @@ describe("workspace account entry", () => {
     selectEdition(/DroneDream.*FIELD/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Autonomy",
+      "Agent",
       "Device & Vehicle",
       "Tuning Plan",
       "Safety & Recovery",
@@ -179,17 +145,16 @@ describe("workspace account entry", () => {
     ]);
     expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
 
-    selectEdition(/DroneDream.*AUTONOMY/);
+    selectEdition(/DroneDream.*AGENT/);
     expect(navigationLabels()).toEqual([
       "Tuning Chat",
-      "Autonomy",
-      "Vehicle Studio",
+      "Agent",
       "Run History",
     ]);
     expect(Array.from(
       container.querySelectorAll<HTMLElement>(".app-nav-section-label"),
       (label) => label.textContent?.trim(),
-    )).toEqual(["Autonomous tasks", "Workspace", "Records"]);
+    )).toEqual(["Autonomous tasks", "Records"]);
 
     router.dispose();
   });
@@ -211,22 +176,27 @@ describe("workspace account entry", () => {
     expect(panel).not.toHaveAttribute("hidden");
     expect(within(panel!).getByRole("button", { name: "Account" }))
       .toHaveTextContent("Local user");
-    expect(within(panel!).getAllByRole("link")).toHaveLength(6);
+    expect(within(panel!).getAllByRole("link")).toHaveLength(5);
     expect(within(panel!).queryByRole("link", { name: "SIM" }))
       .not.toBeInTheDocument();
 
-    fireEvent.click(within(panel!).getByRole("button", { name: "Settings" }));
+    const settingsEntry = within(panel!).getByRole("button", { name: "Settings" });
+    fireEvent.click(settingsEntry);
     expect(panel).toHaveAttribute("hidden");
-    expect(screen.getByRole("dialog", { name: "Settings" })).toBeVisible();
+    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    expect(quickSettings).toBeVisible();
     expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "ECE498BH" }));
-    expect(screen.getByRole("link", { name: "Open course" }))
+    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
+
+    const workspace = await screen.findByRole("region", { name: "Settings" });
+    fireEvent.click(within(workspace).getByRole("tab", { name: "ECE498BH" }));
+    expect(within(workspace).getByRole("link", { name: "Open course" }))
       .toHaveAttribute(
         "href",
         "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
       );
-    fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
-    await waitFor(() => expect(trigger).toHaveFocus());
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
+    await waitFor(() => expect(settingsEntry).toHaveFocus());
 
     fireEvent.click(trigger);
     fireEvent.keyDown(document, { key: "Escape" });

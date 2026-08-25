@@ -237,7 +237,7 @@ function Assert-UniversalInstalled {
         (Join-Path $installDirectory "distribution\desktop\edition-runtime-update-families.v1.json"),
         (Join-Path $installDirectory "distribution\safety\edition-execution-gate.v1.json"),
         (Join-Path $installDirectory "distribution\vehicle-packs\registry.v1.json"),
-        (Join-Path $installDirectory "brand\brand-editions.v1.json"),
+        (Join-Path $installDirectory "brand\editions.json"),
         (Join-Path $installDirectory "icons\DroneDream.ico"),
         (Join-Path $installDirectory "WebView2Loader.dll")
     )) {

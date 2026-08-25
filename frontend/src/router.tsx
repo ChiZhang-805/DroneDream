@@ -13,7 +13,6 @@ import {
   BUILD_HAS_FIELD_WORKSPACE,
   BUILD_HAS_LAB_WORKSPACE,
   BUILD_HAS_SIM_WORKSPACE,
-  BUILD_HAS_VEHICLE_STUDIO,
   editionLandingPath,
 } from "./edition";
 
@@ -24,9 +23,10 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
     desktopRuntime && !desktopVisualQa
       ? () => getDesktopStartupGateSession().status === "ready"
         ? null
-        : redirect(`/dashboard?settings=runtime&required=${feature}`)
+        : redirect(`/desktop/setup?required=${feature}`)
       : undefined;
   const fallbackPath = editionLandingPath();
+  const entryPath = desktopRuntime ? "/desktop/setup" : fallbackPath;
 
   return [
     {
@@ -35,7 +35,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
       children: [
         {
           index: true,
-          element: <Navigate to={fallbackPath} replace />,
+          element: <Navigate to={entryPath} replace />,
         },
         ...(BUILD_HAS_SIM_WORKSPACE ? [{
           path: "sim",
@@ -123,6 +123,17 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
               },
             },
             {
+              path: "plugins",
+              lazy: async () => {
+                const { AutonomyPlugins } = await import("./pages/AutonomyPlugins");
+                return { Component: AutonomyPlugins };
+              },
+            },
+            {
+              path: "plugins/harness",
+              element: <Navigate to="/autonomy/plugins" replace />,
+            },
+            {
               path: "mission",
               lazy: async () => {
                 const { AutonomyMissionRedirect } = await import("./pages/AutonomyPlatform");
@@ -138,20 +149,16 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             },
             {
               path: "evidence",
-              lazy: async () => {
-                const { AutonomyEvidence } = await import("./pages/AutonomyPlatform");
-                return { Component: AutonomyEvidence };
-              },
+              element: <Navigate to="/autonomy" replace />,
             },
           ],
         },
-        ...(BUILD_HAS_VEHICLE_STUDIO ? [{
+        {
           path: "vehicle-studio",
-          lazy: async () => {
-            const { VehicleStudio } = await import("./pages/VehicleStudio");
-            return { Component: VehicleStudio };
-          },
-        }] : []),
+          // Preserve old bookmarks without loading the retired modeler. Legacy
+          // drafts remain readable through the qualified aircraft repository.
+          element: <Navigate to="/autonomy/aircraft?source=legacy-vehicle-studio" replace />,
+        },
         {
           path: "admin",
           lazy: async () => {
@@ -205,7 +212,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: UniversalFieldApp };
           },
         }] : []),
-        { path: "*", loader: () => redirect(fallbackPath) },
+        { path: "*", loader: () => redirect(entryPath) },
       ],
     },
   ];
@@ -216,8 +223,9 @@ export function createAppRouter(desktopRuntime = isDesktopRuntime()) {
   // A packaged Tauri app has no HTTP server to resolve a console route after a
   // WebView reload. Hash history keeps every asset request on index.html while
   // the hosted web app retains clean browser URLs and normal deep links. The
-  // desktop index now opens the same edition landing surface as the website;
-  // /desktop/setup remains an explicit Runtime install and repair destination.
+  // Every packaged-desktop cold start enters the launcher first. The launcher
+  // owns Runtime install/repair, the 0-100 readiness proof, and browser sign-in;
+  // the hosted web app continues to enter the edition landing surface directly.
   if (desktopRuntime) return createHashRouter(routes);
   const pathname = window.location.pathname;
   const basename =

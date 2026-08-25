@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dronedream.local/schemas/component-update-catalog.v1.json",
+  "$id": "https://dronedream.local/schemas/component-update-catalog.v2.json",
   "title": "DroneDream signed component update catalog",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "kind", "catalogSequence", "generatedAt", "expiresAt", "components"],
   "properties": {
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"const": 2},
     "kind": {"const": "dronedream-component-update-catalog"},
     "catalogSequence": {"type": "integer", "minimum": 1},
     "generatedAt": {"type": "string", "format": "date-time"},
@@ -18,14 +18,21 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "componentId", "version", "releaseSequence", "policy", "packId",
-          "editionProfiles", "manifest", "archive"
+          "componentId", "version", "releaseSequence", "urgency", "installMode",
+          "dependencies", "packId", "editionProfiles", "manifest", "archive"
         ],
         "properties": {
           "componentId": {"enum": ["capability-pack", "asset-pack"]},
           "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
           "releaseSequence": {"type": "integer", "minimum": 1},
-          "policy": {"enum": ["recommended", "required"]},
+          "urgency": {"enum": ["required", "recommended", "optional"]},
+          "installMode": {"enum": ["automatic", "user-confirmed"]},
+          "dependencies": {
+            "type": "array",
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/dependency"}
+          },
           "packId": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
           "editionProfiles": {
             "type": "array",
@@ -34,14 +41,46 @@
             "uniqueItems": true,
             "items": {"enum": ["unified-sim-lab", "sim-only", "field-lightweight", "autonomy-full"]}
           },
-          "manifest": {"$ref": "#/$defs/artifact"},
-          "archive": {"$ref": "#/$defs/artifact"}
-        }
+          "manifest": {"$ref": "#/$defs/manifestArtifact"},
+          "archive": {"$ref": "#/$defs/archiveArtifact"}
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {"componentId": {"const": "asset-pack"}},
+              "required": ["componentId"]
+            },
+            "then": {
+              "properties": {
+                "installMode": {"const": "user-confirmed"}
+              }
+            }
+          }
+        ]
       }
     }
   },
   "$defs": {
-    "artifact": {
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["componentId", "minimumReleaseSequence"],
+      "properties": {
+        "componentId": {"enum": ["capability-pack", "asset-pack"]},
+        "minimumReleaseSequence": {"type": "integer", "minimum": 1}
+      }
+    },
+    "manifestArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sizeBytes", "sha256"],
+      "properties": {
+        "url": {"type": "string", "format": "uri", "pattern": "^https://"},
+        "sizeBytes": {"type": "integer", "minimum": 1, "maximum": 1048576},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "archiveArtifact": {
       "type": "object",
       "additionalProperties": false,
       "required": ["url", "sizeBytes", "sha256"],

@@ -1,9 +1,9 @@
-# DroneDream canonical edition brand donor
+# DroneDream brand assets
 
-This directory is the repository-owned source of truth for the shared
-DroneDream geometry and the Universal, SIM, LAB, and FIELD visual identities.
-The approved concept PNGs under the planning worktree are review inputs only;
-no production build reads from `work/`.
+`icons/` is the only editable release icon source. It contains exactly two
+transparent PNG files for each of the five products: a bat mark and a
+bat-plus-wordmark lockup. The ten files, their dimensions, hashes, visible
+names, palettes, and safety boundaries are fixed by `editions.json`.
 
 `brand-editions.v1.json` freezes the names, centered-dot lockup contract,
 palettes, surfaces, export dimensions, font source, and the presentation-only
@@ -26,14 +26,22 @@ to the public site so brand regeneration cannot replace it.
 `generated/brand-assets.v1.json` binds every canonical output to exact source,
 generator, locked requirements, font, bytes, dimensions, and SHA-256.
 
-Generate or verify all checked-in assets with:
+Windows PNG/ICO files and the browser favicon are deterministic build
+derivatives. They are generated into ignored temporary paths and removed after
+the build; they must never be checked in as additional brand designs.
+
+Validate all canonical assets:
 
 ```text
-python scripts/build-brand-assets.py
 python scripts/build-brand-assets.py --check
 ```
 
-The generated Windows ICO is the common executable, installer, Start Menu, and
-desktop-shortcut icon input for its edition. Wiring an icon into an installer
-still requires that edition's own build and release validation. The presence
-of a LAB or FIELD color token never grants hardware authority.
+Generate one edition's temporary Windows assets and favicon:
+
+```text
+python scripts/build-brand-assets.py --edition universal
+```
+
+The visible fifth-edition name is `DroneDream · AGENT`; `autonomy` remains an
+internal compatibility identifier only. Brand assets are presentation inputs
+and never grant simulation or hardware authority.

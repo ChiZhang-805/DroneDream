@@ -28,6 +28,7 @@ if ($cliVersion -cne "2.11.4") {
 }
 
 $config = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
+$universalIcon = "gen/brand/universal/windows/icon.ico"
 if ($config.bundle.windows.nsis.template -cne "nsis/installer.nsi") {
     throw "Tauri config does not select the vendored NSIS template"
 }
@@ -39,14 +40,14 @@ if ($customLanguages.English -cne "nsis/languages/English.nsh" -or
     $customLanguages.SimpChinese -cne "nsis/languages/SimpChinese.nsh") {
     throw "The installer must use DroneDream-owned English and Simplified Chinese maintenance copy"
 }
-if ($config.bundle.resources.'icons/icon.ico' -cne "icons/DroneDream.ico") {
-    throw "The installed shortcut icon must use the dedicated DroneDream wing-mark resource"
+if ($universalIcon -cnotin @($config.bundle.icon)) {
+    throw "The desktop executable must embed the generated Universal icon"
 }
 $universalOverlay = Get-Content -LiteralPath $universalOverlayPath -Raw | ConvertFrom-Json
-$universalIcon = "../../brand/generated/universal/windows/icon.ico"
-if ($universalOverlay.bundle.windows.nsis.installerIcon -cne $universalIcon -or
+if ($universalIcon -cnotin @($universalOverlay.bundle.icon) -or
+    $universalOverlay.bundle.windows.nsis.installerIcon -cne $universalIcon -or
     $universalOverlay.bundle.windows.nsis.uninstallerIcon -cne $universalIcon) {
-    throw "Universal NSIS installer and uninstaller must embed the canonical Universal icon"
+    throw "Universal executable, installer, and uninstaller must embed the generated icon"
 }
 
 $template = Get-Content -LiteralPath $templatePath -Raw
@@ -413,17 +414,6 @@ if (-not $editionIdentity.Contains($editionShortcut) -or
 if ($editionIdentity -match 'CreateShortcut[^\r\n]+DroneDream\.ico' -or
     $installerHook -match 'CreateShortcut[^\r\n]+DroneDream\.ico') {
     throw "Shortcuts must not use the shared legacy icon resource"
-}
-
-$officialBrandIconPath = Join-Path $repoRoot "docs\assets\drone-dream-icon.png"
-$desktopBrandIconPath = Join-Path $repoRoot "desktop\src-tauri\app-icon.png"
-$shortcutBrandIconPath = Join-Path $repoRoot "desktop\src-tauri\icons\icon.ico"
-if ((Get-FileHash -LiteralPath $officialBrandIconPath -Algorithm SHA256).Hash -cne
-    (Get-FileHash -LiteralPath $desktopBrandIconPath -Algorithm SHA256).Hash) {
-    throw "The desktop application icon no longer matches the official DroneDream wing mark"
-}
-if ((Get-Item -LiteralPath $shortcutBrandIconPath).Length -le 0) {
-    throw "The bundled Windows shortcut icon is empty"
 }
 
 # Desktop removal and Runtime removal are intentionally separate products.

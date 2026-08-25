@@ -108,7 +108,7 @@ def _resolve_backend_override(
     2. The job's ``simulator_backend_requested`` column — Phase 8 per-job
        UI selection.
     3. ``None`` — the :func:`~app.simulator.factory.get_simulator_adapter`
-       default (``mock``).
+       product default (``real_cli``).
     """
 
     if env_backend:

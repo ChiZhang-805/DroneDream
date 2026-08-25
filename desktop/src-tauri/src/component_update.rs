@@ -20,12 +20,14 @@ use std::time::Duration;
 
 #[cfg(target_os = "windows")]
 use crate::process::{command_output, windows_command};
+#[cfg(target_os = "windows")]
+use crate::runtime_installer::RuntimeInstaller;
 
 const DEFAULT_CATALOG_URL: &str = env!("DRONEDREAM_PRODUCTION_COMPONENT_CATALOG_URL");
 const TRUSTED_KEYRING: &str =
     include_str!("../../../distribution/desktop/component-release-public-keys.json");
 const COMPILED_EDITION_PROFILE: &str = env!("DRONEDREAM_EDITION_PROFILE");
-const CATALOG_DOMAIN_PREFIX: &[u8] = b"DroneDream component catalog v1\0";
+const CATALOG_DOMAIN_PREFIX: &[u8] = b"DroneDream component catalog v2\0";
 const MAX_CATALOG_BYTES: u64 = 1024 * 1024;
 const MAX_SIGNATURE_BYTES: u64 = 64 * 1024;
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
@@ -79,11 +81,20 @@ struct CatalogComponent {
     component_id: String,
     version: String,
     release_sequence: u64,
-    policy: String,
+    urgency: String,
+    install_mode: String,
+    dependencies: Vec<CatalogDependency>,
     pack_id: String,
     edition_profiles: Vec<String>,
     manifest: CatalogArtifact,
     archive: CatalogArtifact,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CatalogDependency {
+    component_id: String,
+    minimum_release_sequence: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -148,7 +159,9 @@ pub(crate) struct ComponentUpdateCandidate {
     component_id: String,
     version: String,
     release_sequence: u64,
-    policy: String,
+    urgency: String,
+    install_mode: String,
+    dependencies: Vec<CatalogDependency>,
     pack_id: String,
     installed_version: Option<String>,
     installed_release_sequence: u64,
@@ -298,7 +311,7 @@ fn parse_and_verify_catalog(
 }
 
 fn validate_catalog(catalog: &ComponentCatalog, now: DateTime<Utc>) -> Result<(), String> {
-    if catalog.schema_version != 1
+    if catalog.schema_version != 2
         || catalog.kind != "dronedream-component-update-catalog"
         || catalog.catalog_sequence == 0
         || catalog.components.len() > 2
@@ -321,7 +334,15 @@ fn validate_catalog(catalog: &ComponentCatalog, now: DateTime<Utc>) -> Result<()
                 component.component_id.as_str(),
                 "capability-pack" | "asset-pack"
             )
-            || !matches!(component.policy.as_str(), "recommended" | "required")
+            || !matches!(
+                component.urgency.as_str(),
+                "required" | "recommended" | "optional"
+            )
+            || !matches!(
+                component.install_mode.as_str(),
+                "automatic" | "user-confirmed"
+            )
+            || (component.component_id == "asset-pack" && component.install_mode == "automatic")
             || component.release_sequence == 0
             || !component.pack_id.starts_with("sha256:")
             || !is_lower_hex(component.pack_id.trim_start_matches("sha256:"), 64)
@@ -332,7 +353,7 @@ fn validate_catalog(catalog: &ComponentCatalog, now: DateTime<Utc>) -> Result<()
         }
         validate_semver(&component.version)?;
         if component.edition_profiles.is_empty()
-            || component.edition_profiles.len() > 3
+            || component.edition_profiles.len() > 4
             || component
                 .edition_profiles
                 .iter()
@@ -348,6 +369,19 @@ fn validate_catalog(catalog: &ComponentCatalog, now: DateTime<Utc>) -> Result<()
         {
             return Err("Component catalog edition profiles are invalid.".to_string());
         }
+        let mut dependency_ids = BTreeSet::new();
+        if component.dependencies.len() > 1
+            || component.dependencies.iter().any(|dependency| {
+                !matches!(
+                    dependency.component_id.as_str(),
+                    "capability-pack" | "asset-pack"
+                ) || dependency.component_id == component.component_id
+                    || dependency.minimum_release_sequence == 0
+                    || !dependency_ids.insert(dependency.component_id.as_str())
+            })
+        {
+            return Err("Component catalog dependencies are invalid.".to_string());
+        }
         for artifact in [&component.manifest, &component.archive] {
             validate_https_url(&artifact.url)?;
             if artifact.size_bytes == 0
@@ -359,6 +393,19 @@ fn validate_catalog(catalog: &ComponentCatalog, now: DateTime<Utc>) -> Result<()
         }
         if component.manifest.size_bytes > MAX_MANIFEST_BYTES {
             return Err("Component manifest exceeds the native verification limit.".to_string());
+        }
+    }
+    for component in &catalog.components {
+        for dependency in &component.dependencies {
+            if catalog.components.iter().any(|candidate| {
+                candidate.component_id == dependency.component_id
+                    && candidate
+                        .dependencies
+                        .iter()
+                        .any(|nested| nested.component_id == component.component_id)
+            }) {
+                return Err("Component catalog dependency cycle was rejected.".to_string());
+            }
         }
     }
     Ok(())
@@ -525,7 +572,9 @@ fn build_report(catalog: ComponentCatalog, state: InstalledState) -> ComponentUp
                 component_id: candidate.component_id.clone(),
                 version: candidate.version.clone(),
                 release_sequence: candidate.release_sequence,
-                policy: candidate.policy.clone(),
+                urgency: candidate.urgency.clone(),
+                install_mode: candidate.install_mode.clone(),
+                dependencies: candidate.dependencies.clone(),
                 pack_id: candidate.pack_id.clone(),
                 installed_version: installed.map(|value| value.version.clone()),
                 installed_release_sequence,
@@ -666,47 +715,129 @@ fn download_artifact(
             Err("Immutable component archive cache changed unexpectedly.".to_string())
         };
     }
-    let temporary = path.with_extension(format!("{}.part", uuid::Uuid::new_v4()));
-    let mut response = client
-        .get(&artifact.url)
-        .send()
-        .map_err(|error| format!("Unable to download component archive: {error}"))?;
-    checked_response(&response, artifact.size_bytes)?;
-    let mut file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&temporary)
-        .map_err(|error| format!("Unable to create component archive cache: {error}"))?;
-    let mut digest = Sha256::new();
-    let mut total = 0_u64;
-    let mut buffer = [0_u8; 1024 * 1024];
+    let filename = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "Component archive cache filename is invalid.".to_string())?;
+    let partial = path.with_file_name(format!("{filename}.part"));
+    let mut restarted_after_hash_failure = false;
     loop {
-        let read = response
-            .read(&mut buffer)
-            .map_err(|error| format!("Unable to read component archive: {error}"))?;
-        if read == 0 {
-            break;
+        let mut offset = prepare_partial_download(&partial, artifact.size_bytes)?;
+        if offset == artifact.size_bytes && offset > 0 {
+            if sha256_path(&partial)? == artifact.sha256 {
+                return fs::rename(&partial, path).map_err(|error| {
+                    format!("Unable to activate resumed component archive cache: {error}")
+                });
+            }
+            fs::remove_file(&partial)
+                .map_err(|error| format!("Unable to reset invalid component archive: {error}"))?;
+            if restarted_after_hash_failure {
+                return Err("Component archive failed signed SHA-256 verification.".to_string());
+            }
+            restarted_after_hash_failure = true;
+            continue;
         }
-        total = total
-            .checked_add(read as u64)
-            .ok_or_else(|| "Component archive size overflowed.".to_string())?;
-        if total > artifact.size_bytes {
-            let _ = fs::remove_file(&temporary);
-            return Err("Component archive exceeded its signed size.".to_string());
+
+        let requested_offset = offset;
+        let mut request = client.get(&artifact.url);
+        if requested_offset > 0 {
+            request = request.header(reqwest::header::RANGE, format!("bytes={requested_offset}-"));
         }
-        file.write_all(&buffer[..read])
-            .map_err(|error| format!("Unable to write component archive: {error}"))?;
-        digest.update(&buffer[..read]);
+        let mut response = request
+            .send()
+            .map_err(|error| format!("Unable to download component archive: {error}"))?;
+        checked_response(&response, artifact.size_bytes)?;
+        if requested_offset > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
+            let content_range = response
+                .headers()
+                .get(reqwest::header::CONTENT_RANGE)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| "Resumed component download lacks Content-Range.".to_string())?;
+            let expected_prefix = format!("bytes {requested_offset}-");
+            let expected_suffix = format!("/{}", artifact.size_bytes);
+            if !content_range.starts_with(&expected_prefix)
+                || !content_range.ends_with(&expected_suffix)
+            {
+                return Err("Resumed component download returned the wrong byte range.".to_string());
+            }
+        } else if requested_offset > 0 && response.status() == reqwest::StatusCode::OK {
+            fs::remove_file(&partial)
+                .map_err(|error| format!("Unable to restart component download: {error}"))?;
+            offset = 0;
+        } else if requested_offset > 0 {
+            return Err("Component service does not support a safe resumed download.".to_string());
+        } else if response.status() != reqwest::StatusCode::OK {
+            return Err("Component service returned an unexpected download response.".to_string());
+        }
+
+        let mut options = OpenOptions::new();
+        options.write(true);
+        if offset == 0 {
+            options.create_new(true);
+        } else {
+            options.append(true);
+        }
+        let mut file = options
+            .open(&partial)
+            .map_err(|error| format!("Unable to open partial component archive: {error}"))?;
+        let mut total = offset;
+        let mut buffer = [0_u8; 1024 * 1024];
+        loop {
+            let read = response
+                .read(&mut buffer)
+                .map_err(|error| format!("Unable to read component archive: {error}"))?;
+            if read == 0 {
+                break;
+            }
+            total = total
+                .checked_add(read as u64)
+                .ok_or_else(|| "Component archive size overflowed.".to_string())?;
+            if total > artifact.size_bytes {
+                let _ = fs::remove_file(&partial);
+                return Err("Component archive exceeded its signed size.".to_string());
+            }
+            file.write_all(&buffer[..read])
+                .map_err(|error| format!("Unable to write component archive: {error}"))?;
+        }
+        file.sync_all()
+            .map_err(|error| format!("Unable to persist component archive: {error}"))?;
+        drop(file);
+        if total != artifact.size_bytes {
+            return Err(format!(
+                "Component download paused at {total} of {} bytes and can be resumed.",
+                artifact.size_bytes
+            ));
+        }
+        if sha256_path(&partial)? != artifact.sha256 {
+            fs::remove_file(&partial)
+                .map_err(|error| format!("Unable to reset invalid component archive: {error}"))?;
+            if restarted_after_hash_failure {
+                return Err("Component archive failed signed SHA-256 verification.".to_string());
+            }
+            restarted_after_hash_failure = true;
+            continue;
+        }
+        return fs::rename(&partial, path)
+            .map_err(|error| format!("Unable to activate component archive cache: {error}"));
     }
-    file.sync_all()
-        .map_err(|error| format!("Unable to persist component archive: {error}"))?;
-    drop(file);
-    if total != artifact.size_bytes || hex::encode(digest.finalize()) != artifact.sha256 {
-        let _ = fs::remove_file(&temporary);
-        return Err("Component archive failed signed size or SHA-256 verification.".to_string());
+}
+
+fn prepare_partial_download(path: &Path, maximum: u64) -> Result<u64, String> {
+    if !path.exists() {
+        return Ok(0);
     }
-    fs::rename(&temporary, path)
-        .map_err(|error| format!("Unable to activate component archive cache: {error}"))
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|error| format!("Unable to inspect partial component archive: {error}"))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() || is_reparse_point(&metadata) {
+        return Err("Partial component archive cache path is unsafe.".to_string());
+    }
+    let offset = metadata.len();
+    if offset == 0 || offset > maximum {
+        fs::remove_file(path)
+            .map_err(|error| format!("Unable to reset partial component archive: {error}"))?;
+        return Ok(0);
+    }
+    Ok(offset)
 }
 
 fn sha256_path(path: &Path) -> Result<String, String> {
@@ -858,6 +989,19 @@ fn install_component_update_sync(
         return Err("Component pack is not compatible with this desktop edition.".to_string());
     }
     let state_key = component_id.trim_end_matches("-pack");
+    for dependency in &candidate.dependencies {
+        let dependency_key = dependency.component_id.trim_end_matches("-pack");
+        let installed_sequence = state
+            .components
+            .get(dependency_key)
+            .map_or(0, |installed| installed.release_sequence);
+        if installed_sequence < dependency.minimum_release_sequence {
+            return Err(format!(
+                "Component dependency {} sequence {} must be installed before {}.",
+                dependency.component_id, dependency.minimum_release_sequence, component_id
+            ));
+        }
+    }
     if let Some(installed) = state.components.get(state_key) {
         if candidate.release_sequence < installed.release_sequence {
             return Err("Component pack downgrade was rejected.".to_string());
@@ -908,6 +1052,37 @@ fn install_component_update_sync(
     let receipt_bytes = serde_json::to_vec_pretty(&receipt)
         .map_err(|_| "Unable to encode verified component receipt.".to_string())?;
     write_receipt_atomic(&receipt_path, &receipt_bytes)?;
+    #[cfg(target_os = "windows")]
+    {
+        crate::engine_pack::ensure_app_update_idle()?;
+        runtime_output(
+            "/usr/bin/systemctl",
+            &["stop", "dronedream-api.service"],
+            "Runtime API intake stop for component activation",
+        )?;
+        let activation = (|| {
+            crate::engine_pack::ensure_manager_idle("post-intake component update idle check")?;
+            activate_pack(
+                &manifest_path,
+                &archive_path,
+                &receipt_path,
+                candidate,
+                catalog.catalog_sequence,
+                &key_id,
+            )
+        })();
+        let restart = runtime_output(
+            "/usr/bin/systemctl",
+            &["start", "dronedream-api.service"],
+            "Runtime API intake recovery after component activation",
+        );
+        match (activation, restart) {
+            (Err(error), _) => return Err(error),
+            (Ok(()), Err(error)) => return Err(error),
+            (Ok(()), Ok(_)) => {}
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
     activate_pack(
         &manifest_path,
         &archive_path,
@@ -929,8 +1104,13 @@ fn install_component_update_sync(
 pub(crate) async fn install_component_update(
     component_id: String,
     catalog_url: Option<String>,
+    #[cfg(target_os = "windows")] installer: tauri::State<'_, RuntimeInstaller>,
 ) -> Result<ComponentInstallResult, String> {
+    #[cfg(target_os = "windows")]
+    let operation = installer.inner().prepare_installer_operation()?;
     tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(target_os = "windows")]
+        let _operation = operation;
         install_component_update_sync(
             &component_id,
             catalog_url.as_deref().unwrap_or(DEFAULT_CATALOG_URL),
@@ -986,7 +1166,7 @@ mod tests {
 
     fn catalog(now: DateTime<Utc>) -> ComponentCatalog {
         ComponentCatalog {
-            schema_version: 1,
+            schema_version: 2,
             kind: "dronedream-component-update-catalog".to_string(),
             catalog_sequence: 7,
             generated_at: (now - chrono::Duration::minutes(1)).to_rfc3339(),
@@ -995,7 +1175,9 @@ mod tests {
                 component_id: "capability-pack".to_string(),
                 version: "1.2.3".to_string(),
                 release_sequence: 9,
-                policy: "recommended".to_string(),
+                urgency: "recommended".to_string(),
+                install_mode: "user-confirmed".to_string(),
+                dependencies: Vec::new(),
                 pack_id: format!("sha256:{}", "a".repeat(64)),
                 edition_profiles: vec![env!("DRONEDREAM_EDITION_PROFILE").to_string()],
                 manifest: CatalogArtifact {
@@ -1053,5 +1235,60 @@ mod tests {
         assert_eq!(report.candidates.len(), 1);
         assert!(report.candidates[0].available);
         assert_eq!(report.candidates[0].installed_release_sequence, 8);
+    }
+
+    #[test]
+    fn accepts_orthogonal_delivery_policy_and_rejects_automatic_assets() {
+        let now = Utc::now();
+        let mut value = catalog(now);
+        value.components[0].urgency = "required".to_string();
+        value.components[0].install_mode = "automatic".to_string();
+        assert!(validate_catalog(&value, now).is_ok());
+
+        value.components[0].component_id = "asset-pack".to_string();
+        assert!(validate_catalog(&value, now).is_err());
+    }
+
+    #[test]
+    fn accepts_all_runtime_profiles_and_rejects_dependency_cycles() {
+        let now = Utc::now();
+        let mut value = catalog(now);
+        value.components[0].edition_profiles = vec![
+            "unified-sim-lab".to_string(),
+            "sim-only".to_string(),
+            "field-lightweight".to_string(),
+            "autonomy-full".to_string(),
+        ];
+        assert!(validate_catalog(&value, now).is_ok());
+
+        let mut asset = value.components[0].clone();
+        asset.component_id = "asset-pack".to_string();
+        asset.install_mode = "user-confirmed".to_string();
+        asset.dependencies = vec![CatalogDependency {
+            component_id: "capability-pack".to_string(),
+            minimum_release_sequence: 9,
+        }];
+        value.components[0].dependencies = vec![CatalogDependency {
+            component_id: "asset-pack".to_string(),
+            minimum_release_sequence: 9,
+        }];
+        value.components.push(asset);
+        assert!(validate_catalog(&value, now).is_err());
+    }
+
+    #[test]
+    fn zero_byte_partial_download_is_reset_before_create_new() {
+        let root = std::env::temp_dir().join(format!(
+            "dronedream-component-partial-test-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir(&root).unwrap();
+        let partial = root.join("component-pack.tar.gz.part");
+        File::create(&partial).unwrap();
+
+        assert_eq!(prepare_partial_download(&partial, 1024).unwrap(), 0);
+        assert!(!partial.exists());
+
+        fs::remove_dir(&root).unwrap();
     }
 }

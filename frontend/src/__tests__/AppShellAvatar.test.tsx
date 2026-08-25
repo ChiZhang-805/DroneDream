@@ -91,6 +91,13 @@ function loadCropImage(dialog: HTMLElement) {
   return image;
 }
 
+function openAccountDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "Account" }));
+  const menu = screen.getByRole("menu", { name: "Account" });
+  fireEvent.click(within(menu).getByRole("menuitem", { name: /Edit profile/u }));
+  return screen.getByRole("dialog", { name: "DroneDream account" });
+}
+
 describe("workspace profile photo editor", () => {
   afterEach(() => {
     authMock.updateAvatar.mockClear();
@@ -143,8 +150,7 @@ describe("workspace profile photo editor", () => {
     expect(screen.queryByRole("link", { name: /DroneDream.*SIM/ }))
       .not.toBeInTheDocument();
     expect(getUserMedia).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
-    const dialog = screen.getByRole("dialog", { name: "DroneDream account" });
+    const dialog = openAccountDialog();
 
     expect(within(dialog).getByText("Profile photo")).toBeVisible();
     expect(
@@ -169,8 +175,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { router } = renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
-    const dialog = screen.getByRole("dialog", { name: "DroneDream account" });
+    const dialog = openAccountDialog();
     const save = within(dialog).getByRole("button", { name: "Save username" });
     const signOut = within(dialog).getByRole("button", { name: "Sign out" });
 
@@ -203,8 +208,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { router } = renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
-    const dialog = screen.getByRole("dialog", { name: "DroneDream account" });
+    const dialog = openAccountDialog();
     fireEvent.click(within(dialog).getByRole("button", { name: "Use camera" }));
 
     expect(getUserMedia).not.toHaveBeenCalled();
@@ -220,7 +224,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { container, router } = renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    openAccountDialog();
     chooseTestPhoto(container);
 
     const cropDialog = screen.getByRole("dialog", { name: "Crop profile photo" });
@@ -254,7 +258,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { container, router } = renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    openAccountDialog();
     chooseTestPhoto(container);
     const cropDialog = screen.getByRole("dialog", { name: "Crop profile photo" });
     loadCropImage(cropDialog);
@@ -300,7 +304,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { container, router } = renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    openAccountDialog();
     chooseTestPhoto(container);
     const cropDialog = screen.getByRole("dialog", { name: "Crop profile photo" });
     loadCropImage(cropDialog);
@@ -343,7 +347,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { router } = renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    openAccountDialog();
     const accountDialog = screen.getByRole("dialog", { name: "DroneDream account" });
     fireEvent.click(within(accountDialog).getByRole("button", { name: "Use camera" }));
     const video = await waitFor(() => {
@@ -380,7 +384,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { container, router } = renderWorkspace();
 
-    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    openAccountDialog();
     chooseTestPhoto(container);
     const cropDialog = screen.getByRole("dialog", { name: "Crop profile photo" });
     const image = cropDialog.querySelector<HTMLImageElement>(".avatar-crop-viewport img");

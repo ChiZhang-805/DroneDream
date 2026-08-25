@@ -41,12 +41,78 @@ const plannerBinding: NonNullable<AutonomyCompileAssetContext["planner_binding"]
 
 function qualifiedWorkspace() {
   const workspace = defaultAutonomyWorkspace(new Date("2026-08-18T00:00:00.000Z"));
+  const qualificationReceiptId = `asset-qualification-${"1".repeat(24)}`;
+  const vehicleHash = "b".repeat(64);
+  const mapHash = "c".repeat(64);
   workspace.aircraft.status = "validated-unsigned";
-  workspace.aircraft.qualificationReceiptId = "vehicle-receipt-reset-race";
-  workspace.aircraft.qualificationContentHash = "b".repeat(64);
+  workspace.aircraft.qualificationReceiptId = qualificationReceiptId;
+  workspace.aircraft.qualificationContentHash = vehicleHash;
+  workspace.aircraft.agentCoreAssetId = "vehicle-reset-race";
+  workspace.aircraft.agentCoreContentSha256 = vehicleHash;
+  workspace.aircraft.agentCoreRuntimeContract = {
+    schemaVersion: 1,
+    assetId: "vehicle-reset-race",
+    contentSha256: vehicleHash,
+    coordinateFrame: "base_link_frd",
+    dryMassKg: workspace.aircraft.dryMassKg,
+    maximumTakeoffMassKg: workspace.aircraft.maximumTakeoffMassKg,
+    bodyRadiusM: 0.38,
+    bodyHeightM: workspace.aircraft.bodyHeightM,
+    maximumSpeedMps: workspace.aircraft.maximumSpeedMps,
+    maximumAccelerationMps2: workspace.aircraft.maximumAccelerationMps2,
+    qualifiedRangeM: 120,
+    reserveBatteryPercent: workspace.aircraft.reserveBatteryPercent,
+    maximumPickupPayloadKg: workspace.aircraft.maximumPickupPayloadKg,
+    sensors: [...workspace.aircraft.sensors],
+    vehicleClass: "multirotor",
+    simulationTargets: [{
+      targetId: "gazebo-harmonic-px4",
+      simulator: "gazebo-harmonic",
+      simulatorVersion: "8",
+      rosDistribution: "jazzy",
+      autopilot: "px4",
+      entrypoint: "launch/my_drone.launch.py",
+    }],
+  };
   workspace.mapPack.status = "qualified";
-  workspace.mapPack.contentHash = "c".repeat(64);
-  workspace.mapPack.qualificationReceiptId = "map-receipt-reset-race";
+  workspace.mapPack.contentHash = mapHash;
+  workspace.mapPack.qualificationReceiptId = qualificationReceiptId;
+  workspace.mapPack.agentCoreAssetId = "map-reset-race";
+  workspace.mapPack.agentCoreContentSha256 = mapHash;
+  workspace.mapPack.agentCoreRuntimeContract = {
+    schemaVersion: 1,
+    assetId: "map-reset-race",
+    contentSha256: mapHash,
+    coordinateFrame: "ENU",
+    nodeCount: 4,
+    edgeCount: 3,
+    namedEntityCount: 3,
+    navigationBoundsM: {
+      minimum: { x: -60, y: -45, z: 0 },
+      maximum: { x: 60, y: 45, z: 12.6 },
+      span: { x: 120, y: 90, z: 12.6 },
+    },
+    semanticLayers: ["free-space", "pickup-zones", "launch-zones"],
+    simulationTargets: [{
+      targetId: "gazebo-harmonic-px4",
+      simulator: "gazebo-harmonic",
+      simulatorVersion: "8",
+      rosDistribution: "jazzy",
+      autopilot: "px4",
+      entrypoint: "worlds/school_map.sdf",
+    }],
+  };
+  workspace.mapPack.sourceFiles = [{
+    name: "school-map.ddpkg",
+    bytes: 1024,
+    format: "ddpkg",
+    importedAt: "2026-08-18T00:00:00.000Z",
+    sha256: mapHash,
+    receiptId: qualificationReceiptId,
+    admission: "admitted",
+    parser: "agent-core",
+    layers: ["mesh", "semantic"],
+  }];
   workspace.mission.compiledPlan = {
     plannerBinding,
   } as AutonomyMissionPlanSnapshot;
@@ -56,6 +122,7 @@ function qualifiedWorkspace() {
 function previewForWorkspace(workspace: ReturnType<typeof qualifiedWorkspace>) {
   return createLocalAutonomyPreview("coffee", {
     edition: "universal",
+    locale: "en",
     execution_target: "simulation",
     natural_language: workspace.mission.intent,
     scene_id: "school-campus-v1",
@@ -121,6 +188,8 @@ function runtimeSessionFor(
     contract_id: compileResponse.contract.contract_id,
     execution_target: "simulation",
     phase: "ready",
+    mission_revision: 1,
+    interruption: null,
     bridge: "px4_gazebo",
     command_authority: true,
     created_at: "2026-08-18T00:00:00.000Z",

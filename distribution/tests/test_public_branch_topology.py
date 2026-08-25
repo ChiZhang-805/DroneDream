@@ -29,8 +29,7 @@ def test_public_repository_has_one_exact_eight_branch_contract() -> None:
     assert topology["kind"] == "dronedream-public-branch-topology"
     assert topology["requiredBranchCount"] == 8
     observed = {
-        branch["name"]: (branch["role"], branch["productId"])
-        for branch in topology["branches"]
+        branch["name"]: (branch["role"], branch["productId"]) for branch in topology["branches"]
     }
     assert observed == EXPECTED
 

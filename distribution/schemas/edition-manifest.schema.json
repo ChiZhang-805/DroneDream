@@ -38,7 +38,7 @@
     },
     "artifactBaseName": {
       "type": "string",
-      "pattern": "^DroneDream-(?:Sim|Lab|Field|Autonomy)-1\\.0\\.0\\.exe$"
+      "pattern": "^DroneDream-(?:Sim|Lab|Field|Agent)-1\\.0\\.0\\.exe$"
     },
     "capabilityPolicy": {
       "type": "object",

@@ -1,7 +1,10 @@
 import { Settings } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { DroneLaunchSceneCore } from "../components/DroneLaunchScene";
+import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
+import { useAuthOrLocal } from "../features/auth/AuthContext";
+import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 import { FieldAuthControl } from "./FieldAuthControl";
 import { FieldBrandLockup } from "./FieldBrandLockup";
 import { useFieldLocale } from "./FieldLocaleProvider";
@@ -43,6 +46,7 @@ const COPY = {
 } as const;
 
 function FieldLaunchScreen({
+  backgroundInactive,
   locale,
   progress,
   onEnter,
@@ -50,7 +54,9 @@ function FieldLaunchScreen({
   settingsOpen,
   onSettingsOpen,
   onSettingsClose,
+  onOpenSettingsWorkspace,
 }: {
+  backgroundInactive: boolean;
   locale: FieldLocale;
   progress: number;
   onEnter: () => void;
@@ -58,22 +64,74 @@ function FieldLaunchScreen({
   settingsOpen: boolean;
   onSettingsOpen: () => void;
   onSettingsClose: () => void;
+  onOpenSettingsWorkspace: (tab: SettingsSurfaceTabId) => void;
 }) {
   const copy = COPY[locale];
   const ready = progress === 100;
+  const launcherChromeRef = useRef<HTMLElement>(null);
+  const launcherMainRef = useRef<HTMLElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsCloseRef = useRef<HTMLButtonElement>(null);
-  const closeSettings = () => {
+  const closeSettings = useCallback(() => {
     onSettingsClose();
     window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
-  };
+  }, [onSettingsClose]);
+  useEffect(() => {
+    if (!settingsOpen) return undefined;
+    const frame = window.requestAnimationFrame(() => settingsCloseRef.current?.focus());
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeSettings();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = document.querySelector<HTMLElement>(".quick-settings-dialog");
+      if (!dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+      )];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeSettings, settingsOpen]);
+  useEffect(() => {
+    const inactive = settingsOpen || backgroundInactive;
+    const surfaces = [launcherChromeRef.current, launcherMainRef.current].filter(
+      (surface): surface is HTMLElement => Boolean(surface),
+    );
+    const previousOverflow = document.body.style.overflow;
+    for (const surface of surfaces) surface.inert = inactive;
+    if (inactive) document.body.style.overflow = "hidden";
+    return () => {
+      for (const surface of surfaces) surface.inert = false;
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [backgroundInactive, settingsOpen]);
   return (
     <div
       className="app-shell app-shell-launcher field-launcher"
       data-authority="false"
       data-launch-ready={ready ? "true" : "false"}
     >
-      <header className="launcher-chrome">
+      <header
+        ref={launcherChromeRef}
+        className="launcher-chrome"
+        aria-hidden={settingsOpen || backgroundInactive || undefined}
+      >
         <div className="launcher-brand" aria-label={copy.brand}>
           <FieldBrandLockup />
         </div>
@@ -95,7 +153,11 @@ function FieldLaunchScreen({
           </button>
         </div>
       </header>
-      <main className="launcher-main">
+      <main
+        ref={launcherMainRef}
+        className="launcher-main"
+        aria-hidden={settingsOpen || backgroundInactive || undefined}
+      >
         <div className="desktop-launcher">
           <div className="launcher-hero">
             <div className="launcher-hero-visual">
@@ -147,7 +209,7 @@ function FieldLaunchScreen({
       </main>
       {settingsOpen ? (
         <div
-          className="launcher-settings-backdrop"
+          className="launcher-settings-backdrop quick-settings-backdrop"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeSettings();
@@ -158,6 +220,8 @@ function FieldLaunchScreen({
             locale={locale}
             onClose={closeSettings}
             onLocaleChange={onLocaleChange}
+            onOpenWorkspace={onOpenSettingsWorkspace}
+            presentation="quick"
           />
         </div>
       ) : null}
@@ -167,17 +231,73 @@ function FieldLaunchScreen({
 
 export function FieldRoot() {
   const { locale, setLocale } = useFieldLocale();
+  const { account } = useAuthOrLocal();
   const [entered, setEntered] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [fieldWorkspaceLoaded, setFieldWorkspaceLoaded] = useState(false);
-  const progress = fieldWorkspaceLoaded ? 100 : 0;
+  const [settingsPresentation, setSettingsPresentation] = useState<
+    "closed" | "quick" | "workspace"
+  >("closed");
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsSurfaceTabId>("general");
+  const [progress, setProgress] = useState(0);
+  const settingsWorkspaceCloseRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     let active = true;
-    const fontsReady = "fonts" in document
-      ? document.fonts.ready.catch(() => undefined)
-      : Promise.resolve();
-    void Promise.all([fontsReady, import("./FieldApp")]).then(() => {
-      if (active) setFieldWorkspaceLoaded(true);
+    const minimumStageDurationMs = 600;
+    const wait = (milliseconds: number) => new Promise<void>((resolve) => {
+      window.setTimeout(resolve, milliseconds);
+    });
+    const nextFrame = () => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => resolve());
+    });
+    const advance = async (percent: number, check: () => Promise<void> | void) => {
+      const startedAt = performance.now();
+      await check();
+      await wait(Math.max(0, minimumStageDurationMs - (performance.now() - startedAt)));
+      if (!active) throw new DOMException("Field readiness cancelled", "AbortError");
+      setProgress(percent);
+    };
+    const run = async () => {
+      setProgress(0);
+      await advance(8, async () => {
+        await nextFrame();
+        await nextFrame();
+      });
+      await advance(20, async () => {
+        if ("fonts" in document) await document.fonts.ready;
+      });
+      let loadedModule: typeof import("./FieldApp") | null = null;
+      await advance(38, async () => {
+        loadedModule = await import("./FieldApp");
+      });
+      await advance(54, () => {
+        if (!loadedModule || typeof loadedModule.FieldApp !== "function") {
+          throw new Error("FIELD_WORKSPACE_MODULE_INVALID");
+        }
+      });
+      await advance(68, () => {
+        if (document.documentElement.dataset.brandEdition !== "field") {
+          throw new Error("FIELD_BRAND_CONTRACT_MISSING");
+        }
+      });
+      await advance(80, () => {
+        const style = getComputedStyle(document.documentElement);
+        if (!style.getPropertyValue("--dd-brand-start").trim()) {
+          throw new Error("FIELD_THEME_CONTRACT_MISSING");
+        }
+      });
+      await advance(91, () => {
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+        if (!context) throw new Error("FIELD_3D_RUNTIME_UNAVAILABLE");
+        context.getExtension("WEBGL_lose_context")?.loseContext();
+      });
+      await advance(100, nextFrame);
+    };
+    void run().catch((reason: unknown) => {
+      if (active && !(reason instanceof DOMException && reason.name === "AbortError")) {
+        // Readiness fails closed at 0%. The launcher never reveals a sign-in
+        // action until every product, localization, theme and 3D gate passes.
+        setProgress(0);
+      }
     });
     return () => {
       active = false;
@@ -191,15 +311,44 @@ export function FieldRoot() {
       </Suspense>
     );
   }
+  const openSettingsWorkspace = (tab: SettingsSurfaceTabId) => {
+    setSettingsInitialTab(tab);
+    setSettingsPresentation("workspace");
+  };
+  const closeSettingsWorkspace = () => {
+    setSettingsPresentation("closed");
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(".launcher-settings-button")?.focus();
+    });
+  };
   return (
-    <FieldLaunchScreen
-      locale={locale}
-      progress={progress}
-      onEnter={() => setEntered(true)}
-      onLocaleChange={setLocale}
-      settingsOpen={settingsOpen}
-      onSettingsOpen={() => setSettingsOpen(true)}
-      onSettingsClose={() => setSettingsOpen(false)}
-    />
+    <ModelAccessProvider accountScope={`field:${account?.id ?? "local"}`}>
+      <FieldLaunchScreen
+        backgroundInactive={settingsPresentation === "workspace"}
+        locale={locale}
+        progress={progress}
+        onEnter={() => setEntered(true)}
+        onLocaleChange={setLocale}
+        settingsOpen={settingsPresentation === "quick"}
+        onSettingsOpen={() => setSettingsPresentation("quick")}
+        onSettingsClose={() => setSettingsPresentation("closed")}
+        onOpenSettingsWorkspace={openSettingsWorkspace}
+      />
+      {settingsPresentation === "workspace" ? (
+        <div className="app-shell field-settings-workspace-context">
+          <div className="settings-workspace-host field-settings-workspace-host">
+            <FieldSettingsDialog
+              key={settingsInitialTab}
+              closeRef={settingsWorkspaceCloseRef}
+              initialTab={settingsInitialTab}
+              locale={locale}
+              onClose={closeSettingsWorkspace}
+              onLocaleChange={setLocale}
+              presentation="workspace"
+            />
+          </div>
+        </div>
+      ) : null}
+    </ModelAccessProvider>
   );
 }

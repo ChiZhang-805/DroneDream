@@ -33,6 +33,7 @@ from app.simulator.base import (
     FAILURE_UNSTABLE,
 )
 from app.simulator.factory import UnknownSimulatorBackendError
+from app.simulator.real_cli import RealCliSimulatorAdapter
 
 # --- Helpers ---------------------------------------------------------------
 
@@ -395,11 +396,11 @@ def test_real_stub_can_be_configured_to_raise():
 # --- Factory --------------------------------------------------------------
 
 
-def test_factory_defaults_to_mock(monkeypatch):
+def test_factory_defaults_to_real_cli(monkeypatch):
     monkeypatch.delenv("SIMULATOR_BACKEND", raising=False)
     adapter = get_simulator_adapter()
-    assert isinstance(adapter, MockSimulatorAdapter)
-    assert adapter.backend_name == "mock"
+    assert isinstance(adapter, RealCliSimulatorAdapter)
+    assert adapter.backend_name == "real_cli"
 
 
 def test_factory_respects_env_var(monkeypatch):
@@ -427,6 +428,11 @@ def test_factory_rejects_test_only_stub_outside_test_environment(monkeypatch):
 
 def test_factory_explicit_arg_wins_over_env(monkeypatch):
     monkeypatch.setenv("SIMULATOR_BACKEND", "real_stub")
+    monkeypatch.setattr(
+        simulator_factory,
+        "get_settings",
+        lambda: SimpleNamespace(app_env="test"),
+    )
     adapter = get_simulator_adapter("mock")
     assert isinstance(adapter, MockSimulatorAdapter)
 

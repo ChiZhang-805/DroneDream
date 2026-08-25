@@ -34,6 +34,12 @@ const authMock = vi.hoisted(() => {
       },
     };
   });
+  const uploadAvatar = vi.fn(async () => ({ data: { path: "user-1/avatar.jpg" }, error: null }));
+  const removeAvatar = vi.fn(async () => ({ data: [], error: null }));
+  const storageFrom = vi.fn(() => ({
+    upload: uploadAvatar,
+    remove: removeAvatar,
+  }));
   return {
     state,
     getSession,
@@ -60,6 +66,9 @@ const authMock = vi.hoisted(() => {
       }
       return { data: { user: state.user }, error: null };
     }),
+    uploadAvatar,
+    removeAvatar,
+    storageFrom,
     unsubscribe: vi.fn(),
     emitAuthStateChange: (event: string, session: unknown) => {
       stateChangeCallback?.(event, session);
@@ -86,6 +95,9 @@ vi.mock("../features/auth/supabaseClient", () => ({
       signOut: authMock.signOut,
       updateUser: authMock.updateUser,
     },
+    storage: {
+      from: authMock.storageFrom,
+    },
   },
 }));
 
@@ -111,6 +123,9 @@ function AccountProbe() {
         type="button"
         onClick={() =>
           void auth.updateAvatar("data:image/jpeg;base64,ZmFrZS1hdmF0YXI=")
+            .catch((error: unknown) => {
+              setAvatarError(error instanceof Error ? error.message : String(error));
+            })
         }
       >
         Change avatar
@@ -228,6 +243,9 @@ describe("AuthContext account profile", () => {
       user_metadata: {},
     };
     authMock.updateUser.mockClear();
+    authMock.uploadAvatar.mockClear();
+    authMock.removeAvatar.mockClear();
+    authMock.storageFrom.mockClear();
     authMock.getSession.mockClear();
     authMock.onAuthStateChange.mockClear();
     authMock.signInWithPassword.mockClear();
@@ -239,6 +257,7 @@ describe("AuthContext account profile", () => {
     authMock.unsubscribe.mockClear();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     delete window.__TAURI__;
     window.history.replaceState(null, "", "/");
     window.localStorage.clear();
@@ -262,6 +281,7 @@ describe("AuthContext account profile", () => {
   });
 
   it("defaults to the email prefix and lets the user save a custom username", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_777_777_777_777);
     render(
       <AuthProvider>
         <AccountProbe />
@@ -283,13 +303,50 @@ describe("AuthContext account profile", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Change avatar" }));
+    const remoteAvatar =
+      "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg?v=1777777777777";
     await waitFor(() => {
       expect(screen.getByLabelText("avatar"))
-        .toHaveTextContent("data:image/jpeg;base64,ZmFrZS1hdmF0YXI=");
+        .toHaveTextContent(remoteAvatar);
+    });
+    expect(authMock.storageFrom).toHaveBeenCalledWith("profile-avatars");
+    expect(authMock.uploadAvatar).toHaveBeenCalledWith(
+      "user-1/avatar.jpg",
+      expect.any(Blob),
+      {
+        cacheControl: "3600",
+        contentType: "image/jpeg",
+        upsert: true,
+      },
+    );
+    expect(authMock.updateUser).toHaveBeenCalledWith({
+      data: { avatar_url: remoteAvatar },
     });
     expect(
       window.localStorage.getItem("drone-dream:account-avatar:user-1"),
-    ).toBe("data:image/jpeg;base64,ZmFrZS1hdmF0YXI=");
+    ).toBe(remoteAvatar);
+  });
+
+  it("keeps docs-preview avatar changes local and never contacts cloud storage", async () => {
+    window.history.replaceState(null, "", "/assistant?docsPreview=1");
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByLabelText("username"))
+      .toHaveTextContent("DroneDream Pilot");
+    fireEvent.click(screen.getByRole("button", { name: "Change avatar" }));
+
+    const avatar = "data:image/jpeg;base64,ZmFrZS1hdmF0YXI=";
+    await waitFor(() => {
+      expect(screen.getByLabelText("avatar")).toHaveTextContent(avatar);
+    });
+    expect(authMock.storageFrom).not.toHaveBeenCalled();
+    expect(authMock.updateUser).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("drone-dream:account-avatar:docs-preview"))
+      .toBe(avatar);
   });
 
   it("uses passwords for sign-in and sets the password only after email-code verification", async () => {
@@ -564,6 +621,83 @@ describe("AuthContext account profile", () => {
     );
     expect(authMock.updateUser).not.toHaveBeenCalled();
     expect(authMock.getSession).not.toHaveBeenCalled();
+  });
+
+  it("uploads a desktop avatar with the adopted token and persists its shared URL", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_888_888_888_888);
+    const request = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", request);
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    adoptDesktopAccount();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Change avatar" }));
+
+    const remoteAvatar =
+      "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg?v=1888888888888";
+    await waitFor(() => {
+      expect(screen.getByLabelText("avatar")).toHaveTextContent(remoteAvatar);
+    });
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      "https://accounts.example.test/storage/v1/object/profile-avatars/user-1/avatar.jpg",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          apikey: "public-browser-key",
+          Authorization: "Bearer session-token",
+          "Content-Type": "image/jpeg",
+          "x-upsert": "true",
+        },
+        body: expect.any(Blob),
+      }),
+    );
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      "https://accounts.example.test/auth/v1/user",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ data: { avatar_url: remoteAvatar } }),
+      }),
+    );
+    expect(authMock.updateUser).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("drone-dream:account-avatar:user-1"))
+      .toBe(remoteAvatar);
+  });
+
+  it("replaces a raw desktop fetch failure with a useful avatar error", async () => {
+    const request = vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    vi.stubGlobal("fetch", request);
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    adoptDesktopAccount();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Change avatar" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("avatar-error")).toHaveTextContent(
+        "The profile photo could not be uploaded. Check your connection and try again.",
+      );
+    });
+    expect(screen.getByLabelText("avatar")).toHaveTextContent("");
+    expect(window.localStorage.getItem("drone-dream:account-avatar:user-1"))
+      .toBeNull();
   });
 
   it("adopts an authenticated account when optional avatar storage is unavailable", async () => {

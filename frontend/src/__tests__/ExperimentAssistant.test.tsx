@@ -8,7 +8,10 @@ import {
   createEmptyAssistantDraft,
   persistAssistantDraft,
 } from "../features/experiment/assistantDraft";
-import { registerExperimentWorkspace } from "../features/experiment/workspaceRegistry";
+import {
+  listExperimentWorkspaces,
+  registerExperimentWorkspace,
+} from "../features/experiment/workspaceRegistry";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { ExperimentAssistant } from "../pages/ExperimentAssistant";
@@ -40,6 +43,22 @@ function renderAssistant(edition: BrandEditionId = "sim") {
 function assistantResponse(): ExperimentAssistantTurnResponse {
   return {
     schema_version: "1.0",
+    lifecycle_stage: "proposal",
+    model_entrypoint_role: "control_tuning_draft_compiler",
+    creates_job: false,
+    runtime_execution_performed: false,
+    next_required_stage: "review_and_submit_job",
+    model_harness_domain: "optimization.control_tuning",
+    memory_domain: "optimization.control_tuning",
+    control_plane: {
+      plugin_selection_effect: "contract_only",
+      plugin_runtime_receipt_ids: [],
+    },
+    harness_input_sha256: "0".repeat(64),
+    harness_output: {
+      lifecycle_stage: "proposal",
+      runtime_execution_performed: false,
+    },
     experiment_summary:
       "Tune an x500 on a five metre circular track at three metres altitude.",
     accepted_patches: [
@@ -151,6 +170,7 @@ describe("conversational experiment drafting", () => {
   it("compiles a turn into the shared V3 draft without persisting the API key", async () => {
     vi.spyOn(apiClient, "compileExperimentAssistantTurn").mockImplementation(
       async (request) => {
+        expect(request.conversation_id).toMatch(/^[A-Za-z0-9_-]{8,128}$/u);
         expect(request.current_parameters).toEqual(
           expect.arrayContaining([
             expect.objectContaining({ name: "MPC_XY_P", selected: true }),
@@ -453,6 +473,50 @@ describe("conversational experiment drafting", () => {
       .toMatch(/^[0-9a-f]{64}$/u);
     expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
       .not.toContain('{"track_type":"circle","altitude_m":3}');
+  });
+
+  it("keeps a legacy server-side modeling result in chat without creating an AGENT artifact", async () => {
+    const blocked = assistantResponse();
+    blocked.experiment_summary = "Vehicle modeling is not available in DroneDream · AGENT.";
+    blocked.assistant_message = blocked.experiment_summary;
+    blocked.orchestration = {
+      run_id: "workflow-blocked-agent-vehicle",
+      conversation_id: "conversation-blocked-agent",
+      tenant_id: "local",
+      organization_id: null,
+      workspace_id: "workspace-blocked-agent",
+      edition: "autonomy",
+      artifact_id: "artifact-blocked-agent-vehicle",
+      artifact_version: 1,
+      product_link: "/vehicle-studio",
+      artifact_kind: "universal_vehicle_model",
+      artifact_payload: {
+        status: "blocked",
+        blockers: ["edition.autonomy.task.vehicle_modeling.denied"],
+      },
+      sequence: 1,
+      intent: "vehicle_modeling",
+      workflow: [{ step: "scope", label: "Check product boundary", status: "needs_input" }],
+    };
+    vi.spyOn(apiClient, "compileExperimentAssistantTurn").mockResolvedValue(blocked);
+    renderAssistant("autonomy");
+
+    fireEvent.change(screen.getByLabelText("Describe your experiment…"), {
+      target: { value: "Build a new aircraft model." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText((content) =>
+      content.startsWith(blocked.experiment_summary),
+    )).toBeVisible();
+    await waitFor(() => {
+      const workspaces = listExperimentWorkspaces("local", "autonomy");
+      expect(workspaces).toHaveLength(1);
+      expect(workspaces[0]).toMatchObject({
+        assistantArtifactKind: null,
+        vehicleDraftId: null,
+      });
+    });
   });
 
   it("clears the conversation and shared experiment draft only after confirmation", async () => {

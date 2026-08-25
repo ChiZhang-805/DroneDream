@@ -1,19 +1,18 @@
 import { createContext, useContext } from "react";
 
-export type ModelProvider = "openai" | "qwen" | "deepseek" | "kimi" | "custom";
-export type ManagedModelProvider = Exclude<ModelProvider, "custom">;
+import {
+  type ManagedModelProvider,
+  type ModelApiProtocol,
+  type ModelProvider,
+} from "./modelProviderCatalog";
+
+export { modelProviderLabel } from "./modelProviderCatalog";
+export type {
+  ManagedModelProvider,
+  ModelApiProtocol,
+  ModelProvider,
+} from "./modelProviderCatalog";
 export type ModelAccessMode = "platform" | "byok";
-
-export function modelProviderLabel(provider: ModelProvider): string {
-  return {
-    openai: "OpenAI",
-    qwen: "Qwen",
-    deepseek: "DeepSeek",
-    kimi: "Kimi",
-    custom: "Custom",
-  }[provider];
-}
-
 export interface ModelAccessSettings {
   accessMode: ModelAccessMode;
   managedProvider: ManagedModelProvider;
@@ -21,7 +20,13 @@ export interface ModelAccessSettings {
   provider: ModelProvider;
   apiKey: string;
   model: string;
+  displayName: string;
   baseUrl: string;
+  protocol: ModelApiProtocol;
+  /** Opaque identifier only; the credential itself remains in AGENT Core's OS vault. */
+  agentCoreProfileId: string | null;
+  /** Stable model selector returned by AGENT Core, for example custom:cmp-... */
+  agentCoreSelectionId: string | null;
 }
 
 export interface ModelAccessProfile extends ModelAccessSettings {

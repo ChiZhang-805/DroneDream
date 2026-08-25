@@ -14,11 +14,41 @@ from typing import Final, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-EditionId = Literal["universal", "sim", "lab", "field", "autonomy"]
+from app.model_harness.control_plane import (
+    HarnessControlPlaneReceipt,
+    HarnessInputEnvelope,
+    HarnessOutputEnvelope,
+    compile_control_plane_receipt,
+    control_plane_catalog,
+    harness_input_sha256,
+    validate_output_against_control_plane,
+)
+from app.model_harness.domains import (
+    DOMAIN_SCHEMA_VERSION,
+    FIXED_KERNEL_RESPONSIBILITIES,
+    LONG_TERM_MEMORY_AUTHORITY,
+    MEMORY_PRECEDENCE,
+    PLUGIN_SEAMS,
+    RAW_CONVERSATION_RETENTION,
+    TASK_MODEL_HARNESS_DOMAINS,
+    EditionId,
+    FixedKernelResponsibility,
+    MemoryDomain,
+    MemoryPrecedenceLayer,
+    ModelHarnessDomain,
+    PluginSeam,
+    resolve_task_domains,
+)
+from app.model_harness.runtime import (
+    HarnessRuntimeHandler,
+    runtime_catalog,
+    runtime_handler,
+)
+
 TaskType = Literal[
     "control_tuning",
     "mission_autonomy",
-    "vehicle_modeling",
+    "asset_import_qualification",
     "simulation_experiment",
     "cross_edition_workflow",
     "hardware_validation",
@@ -64,10 +94,10 @@ TASK_PROMPT_CONTRACTS: Final[dict[TaskType, str]] = {
         "Pack, then require geometry, dynamics, energy, perception, recovery, and approval "
         "checks."
     ),
-    "vehicle_modeling": (
-        "Compile an editable aircraft model draft with components, transforms, mass "
-        "properties, constraints, interference checks, and export qualification; do not "
-        "invent measured physics."
+    "asset_import_qualification": (
+        "Compile a source-bound import and qualification plan for an externally authored "
+        "map, world, or aircraft asset. Preserve source identity, normalize frames and units, "
+        "and require deterministic geometry, physics, ROS 2, Gazebo, PX4, and evidence gates."
     ),
     "simulation_experiment": (
         "Compile a repeatable simulator study with frozen firmware, vehicle, world, seeds, "
@@ -104,16 +134,29 @@ EDITION_TASKS: Final[dict[EditionId, frozenset[TaskType]]] = {
         {
             "control_tuning",
             "mission_autonomy",
-            "vehicle_modeling",
+            "asset_import_qualification",
             "simulation_experiment",
             "cross_edition_workflow",
+            "hardware_validation",
+            "calibration",
+            "sim_to_real",
+            "real_to_sim",
+            "field_task",
         }
     ),
-    "sim": frozenset({"control_tuning", "mission_autonomy", "simulation_experiment"}),
+    "sim": frozenset(
+        {
+            "control_tuning",
+            "mission_autonomy",
+            "asset_import_qualification",
+            "simulation_experiment",
+        }
+    ),
     "lab": frozenset(
         {
             "control_tuning",
             "mission_autonomy",
+            "asset_import_qualification",
             "simulation_experiment",
             "hardware_validation",
             "calibration",
@@ -121,8 +164,12 @@ EDITION_TASKS: Final[dict[EditionId, frozenset[TaskType]]] = {
             "real_to_sim",
         }
     ),
-    "field": frozenset({"control_tuning", "mission_autonomy", "field_task"}),
-    "autonomy": frozenset({"mission_autonomy", "vehicle_modeling", "simulation_experiment"}),
+    "field": frozenset(
+        {"control_tuning", "mission_autonomy", "asset_import_qualification", "field_task"}
+    ),
+    "autonomy": frozenset(
+        {"mission_autonomy", "asset_import_qualification", "simulation_experiment"}
+    ),
 }
 
 TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
@@ -151,10 +198,27 @@ TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
         "editions": ("universal", "sim", "lab", "field", "autonomy"),
         "description": "Inspect a qualified Vehicle Pack and capability envelope.",
     },
-    "vehicle.model_draft": {
+    "asset.source.inspect": {
+        "authority": "read",
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
+        "description": (
+            "Inspect source-tool identity, format, files, hashes, frames, and declared units."
+        ),
+    },
+    "asset.package.normalize": {
         "authority": "proposal",
-        "editions": ("universal", "autonomy"),
-        "description": "Propose a structured editable vehicle model.",
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
+        "description": (
+            "Propose a deterministic Asset IR and ddpkg normalization plan "
+            "without altering the source."
+        ),
+    },
+    "asset.qualification.plan": {
+        "authority": "proposal",
+        "editions": ("universal", "sim", "lab", "field", "autonomy"),
+        "description": (
+            "Plan geometry, physics, ROS 2, Gazebo, PX4, and evidence qualification gates."
+        ),
     },
     "map.inspect": {
         "authority": "read",
@@ -185,22 +249,22 @@ TOOL_REGISTRY: Final[dict[str, ToolDefinition]] = {
     },
     "calibration.evaluate": {
         "authority": "proposal",
-        "editions": ("lab",),
+        "editions": ("universal", "lab"),
         "description": "Evaluate calibration evidence against frozen acceptance bounds.",
     },
     "hardware.preflight": {
         "authority": "read",
-        "editions": ("lab", "field"),
+        "editions": ("universal", "lab", "field"),
         "description": "Inspect signed aircraft, operator, containment, link, and emergency state.",
     },
     "hardware.shadow_bind": {
         "authority": "proposal",
-        "editions": ("lab", "field"),
+        "editions": ("universal", "lab", "field"),
         "description": "Prepare a non-authoritative HITL or shadow binding.",
     },
     "hardware.dispatch": {
         "authority": "hardware",
-        "editions": ("field",),
+        "editions": ("universal", "field"),
         "description": (
             "Reserved adapter requiring a separate live authorization receipt; never callable "
             "by this compiler."
@@ -229,10 +293,11 @@ TASK_TOOLS: Final[dict[TaskType, tuple[str, ...]]] = {
         "trajectory.plan",
         "evidence.record",
     ),
-    "vehicle_modeling": (
+    "asset_import_qualification": (
         "context.inspect",
-        "vehicle.model_draft",
-        "vehicle.inspect",
+        "asset.source.inspect",
+        "asset.package.normalize",
+        "asset.qualification.plan",
         "evidence.record",
     ),
     "simulation_experiment": (
@@ -294,11 +359,23 @@ class _Strict(BaseModel):
 class WorkflowContextItem(_Strict):
     key: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_.-]*$")
     value: str = Field(max_length=4_000)
-    source: Literal["user", "workspace", "asset_receipt", "prior_summary"] = "workspace"
+    source: Literal[
+        "user",
+        "workspace",
+        "asset_receipt",
+        "prior_summary",
+        "account_memory",
+    ] = "workspace"
 
 
 class TaskWorkflowCompileRequest(_Strict):
     request_id: str = Field(min_length=8, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+    conversation_id: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_.:-]+$",
+    )
     edition: EditionId
     requested_task_type: RequestedTaskType = "auto_detect"
     message: str = Field(min_length=1, max_length=12_000)
@@ -347,9 +424,25 @@ class TaskWorkflowContract(_Strict):
     contract_id: str
     owner_binding_sha256: str = Field(min_length=64, max_length=64)
     request_id: str
+    task_id: str
+    thread_id: str
+    lifecycle_stage: Literal["compile_only"] = "compile_only"
+    model_execution_performed: Literal[False] = False
+    runtime_execution_performed: Literal[False] = False
     edition: EditionId
+    locale: Literal["en", "zh-CN"]
     task_type: TaskType
     routing_source: Literal["explicit", "auto_detect"]
+    domain_schema_version: Literal["dronedream.model-harness-domains.v1"] = DOMAIN_SCHEMA_VERSION
+    model_harness_domain: ModelHarnessDomain
+    memory_domain: MemoryDomain
+    memory_precedence: tuple[MemoryPrecedenceLayer, ...] = MEMORY_PRECEDENCE
+    raw_conversation_retention: Literal["task_instance_only"] = RAW_CONVERSATION_RETENTION
+    long_term_memory_authority: Literal["advisory_only"] = LONG_TERM_MEMORY_AUTHORITY
+    control_plane: HarnessControlPlaneReceipt
+    runtime_handler: HarnessRuntimeHandler
+    harness_input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    harness_output: HarnessOutputEnvelope
     status: WorkflowStatus
     system_prompt_registry_version: Literal["dronedream.workflow-prompts.v1"] = (
         SYSTEM_PROMPT_REGISTRY_VERSION
@@ -370,6 +463,15 @@ class TaskWorkflowContract(_Strict):
 class TaskWorkflowCatalog(_Strict):
     prompt_registry_version: str
     tool_registry_version: str
+    domain_schema_version: Literal["dronedream.model-harness-domains.v1"] = DOMAIN_SCHEMA_VERSION
+    task_model_harness_domains: dict[str, ModelHarnessDomain]
+    fixed_kernel: tuple[FixedKernelResponsibility, ...] = FIXED_KERNEL_RESPONSIBILITIES
+    plugin_seams: tuple[PluginSeam, ...] = PLUGIN_SEAMS
+    memory_precedence: tuple[MemoryPrecedenceLayer, ...] = MEMORY_PRECEDENCE
+    raw_conversation_retention: Literal["task_instance_only"] = RAW_CONVERSATION_RETENTION
+    long_term_memory_authority: Literal["advisory_only"] = LONG_TERM_MEMORY_AUTHORITY
+    control_plane: dict[str, object]
+    runtime: dict[str, object]
     edition_tasks: dict[EditionId, list[TaskType]]
     tools: dict[str, dict[str, object]]
 
@@ -379,7 +481,27 @@ _KEYWORDS: Final[tuple[tuple[TaskType, tuple[str, ...]], ...]] = (
     ("real_to_sim", ("real-to-sim", "real2sim", "真机到仿真", "回灌仿真")),
     ("hardware_validation", ("hardware validation", "bench test", "hitl", "真机验证", "台架")),
     ("calibration", ("calibrat", "标定", "校准", "外参", "内参")),
-    ("vehicle_modeling", ("vehicle model", "airframe", "cad", "无人机建模", "机型建模", "机架")),
+    (
+        "asset_import_qualification",
+        (
+            "asset import",
+            "asset qualification",
+            "blender",
+            "onshape",
+            "solidworks",
+            "urdf",
+            "sdf",
+            "dae",
+            "gltf",
+            "fbx",
+            "外部资产",
+            "资产导入",
+            "资格认证",
+            "地图导入",
+            "世界导入",
+            "无人机模型导入",
+        ),
+    ),
     (
         "mission_autonomy",
         (
@@ -426,7 +548,11 @@ def _context_receipt(request: TaskWorkflowCompileRequest) -> tuple[str, int]:
     return hashlib.sha256(encoded).hexdigest(), len(encoded)
 
 
-def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[WorkflowStep]:
+def _task_steps(
+    task_type: TaskType,
+    eligible_tool_ids: set[str],
+    locale: Literal["en", "zh-CN"],
+) -> list[WorkflowStep]:
     specific: dict[TaskType, tuple[str, str, str, RiskLevel]] = {
         "control_tuning": (
             "Bind firmware, parameter catalog, scenarios, objectives, constraints, and budget",
@@ -440,11 +566,12 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
             "task-graph.receipt",
             "critical",
         ),
-        "vehicle_modeling": (
-            "Generate an editable component hierarchy and physical-property draft",
-            "vehicle.model_draft",
-            "vehicle-model.draft",
-            "medium",
+        "asset_import_qualification": (
+            "Bind the external source and define deterministic normalization "
+            "and qualification gates",
+            "asset.qualification.plan",
+            "external-asset-qualification.plan",
+            "high",
         ),
         "simulation_experiment": (
             "Freeze the simulator, world, vehicle, seeds, disturbances, and metrics",
@@ -490,6 +617,50 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         ),
     }
     title, primary_tool, evidence, risk = specific[task_type]
+    if locale == "zh-CN":
+        title = {
+            "control_tuning": "绑定固件、参数目录、场景、目标、约束与预算",
+            "mission_autonomy": "将任务图绑定到合格无人机、地图实体与恢复规则",
+            "asset_import_qualification": "绑定外部资产来源，并定义确定性的规范化与资格认证门槛",
+            "simulation_experiment": "冻结仿真器、世界、无人机、随机种子、扰动与指标",
+            "cross_edition_workflow": "定义相互独立的 SIM、LAB 与 FIELD 晋级门槛",
+            "hardware_validation": "绑定已签名的硬件身份、隔离环境、操作员与回滚方案",
+            "calibration": "绑定参考来源、可观测性、校准目标与验收边界",
+            "sim_to_real": "测量仿真到现实的差距，并要求硬件在环与受控飞行晋级",
+            "real_to_sim": "将采集的证据转换为经过隔离的模型更新",
+            "field_task": "绑定真机、地图、地理围栏、人工接管、链路丢失与中止策略",
+        }[task_type]
+
+    common_titles = {
+        "understand": (
+            "Classify the request and extract only explicit constraints",
+            "识别任务类型，并仅提取用户明确给出的约束",
+        ),
+        "plan": (
+            "Generate a structured proposal using only eligible tools",
+            "仅使用具备资格的工具生成结构化方案",
+        ),
+        "validate": (
+            "Run deterministic schema, physics, policy, and evidence checks",
+            "执行确定性的结构、物理、安全策略与证据检查",
+        ),
+        "approve": (
+            "Request explicit approval for any cost, simulation submission, or hardware handoff",
+            "对费用、仿真提交或硬件交接请求明确确认",
+        ),
+        "execute": (
+            "Dispatch only through the edition-specific runtime adapter",
+            "仅通过当前版本专用的运行时适配器执行",
+        ),
+        "evidence": (
+            "Record outcomes, deviations, failures, and replay evidence",
+            "记录结果、偏差、失败信息与可回放证据",
+        ),
+    }
+
+    def localized_title(key: str) -> str:
+        english, chinese = common_titles[key]
+        return chinese if locale == "zh-CN" else english
 
     def eligible_tools(*authorities: str) -> list[str]:
         return [
@@ -504,7 +675,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="01-understand",
             phase="understand",
-            title="Classify the request and extract only explicit constraints",
+            title=localized_title("understand"),
             executor="model",
             risk="low",
             tool_ids=["intent.classify"],
@@ -526,7 +697,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="03-plan",
             phase="plan",
-            title="Generate a structured proposal using only eligible tools",
+            title=localized_title("plan"),
             executor="model",
             risk=risk,
             tool_ids=model_tools[:4],
@@ -537,7 +708,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="04-validate",
             phase="validate",
-            title="Run deterministic schema, physics, policy, and evidence checks",
+            title=localized_title("validate"),
             executor="deterministic_service",
             risk="critical" if risk == "critical" else "high",
             tool_ids=eligible_tools("read", "simulation")[:4],
@@ -548,9 +719,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="05-approve",
             phase="approve",
-            title=(
-                "Request explicit approval for any cost, simulation submission, or hardware handoff"
-            ),
+            title=localized_title("approve"),
             executor="operator",
             risk="critical"
             if task_type in {"hardware_validation", "sim_to_real", "field_task"}
@@ -563,7 +732,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="06-execute",
             phase="execute",
-            title="Dispatch only through the edition-specific runtime adapter",
+            title=localized_title("execute"),
             executor="runtime_adapter",
             risk="critical",
             tool_ids=eligible_tools("simulation"),
@@ -578,7 +747,7 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
         WorkflowStep(
             step_id="07-evidence",
             phase="evidence",
-            title="Record outcomes, deviations, failures, and replay evidence",
+            title=localized_title("evidence"),
             executor="deterministic_service",
             risk="medium",
             tool_ids=["evidence.record"] if "evidence.record" in eligible_tool_ids else [],
@@ -590,6 +759,8 @@ def _task_steps(task_type: TaskType, eligible_tool_ids: set[str]) -> list[Workfl
 
 
 def _artifact_route(task_type: TaskType, edition: EditionId) -> tuple[str, str]:
+    if task_type == "asset_import_qualification":
+        return "external_asset_qualification_plan", "/autonomy"
     if task_type == "simulation_experiment":
         return {
             "universal": ("universal_simulation_experiment", "/jobs/new"),
@@ -601,7 +772,6 @@ def _artifact_route(task_type: TaskType, edition: EditionId) -> tuple[str, str]:
     return {
         "control_tuning": ("tuning_experiment", "/jobs/new"),
         "mission_autonomy": ("autonomy_mission_plan", "/autonomy"),
-        "vehicle_modeling": ("universal_vehicle_model", "/vehicle-studio"),
         "cross_edition_workflow": ("universal_cross_edition_workflow", "/dashboard"),
         "hardware_validation": ("lab_hardware_validation", "/lab"),
         "calibration": ("lab_calibration_workflow", "/lab"),
@@ -615,12 +785,64 @@ def compile_task_workflow(
     owner_id: str, request: TaskWorkflowCompileRequest
 ) -> TaskWorkflowContract:
     owner_binding = hashlib.sha256(f"task-workflow:{owner_id}".encode()).hexdigest()
+    tenant_binding = hashlib.sha256(
+        f"task-workflow-tenant:personal:{owner_id}".encode()
+    ).hexdigest()
     if request.requested_task_type == "auto_detect":
         routing_source: Literal["explicit", "auto_detect"] = "auto_detect"
         task_type = classify_task(request.message, request.edition)
     else:
         routing_source = "explicit"
         task_type = request.requested_task_type
+    domains = resolve_task_domains(task_type, source_edition=request.edition)
+    control_plane_receipt = compile_control_plane_receipt(domains.model_harness_domain)
+    conversation_key = request.conversation_id or (f"legacy-workflow:{request.edition}:{task_type}")
+    thread_binding = hashlib.sha256(
+        f"{owner_binding}:conversation:{conversation_key}".encode()
+    ).hexdigest()
+    task_binding = hashlib.sha256(f"{thread_binding}:task:{task_type}".encode()).hexdigest()
+    task_id = f"workflow-task:{task_binding[:24]}"
+    thread_id = f"workflow-thread:{thread_binding[:24]}"
+    harness_input = HarnessInputEnvelope(
+        request_id=request.request_id,
+        task_id=task_id,
+        thread_id=thread_id,
+        owner_binding_sha256=owner_binding,
+        tenant_binding_sha256=tenant_binding,
+        source_edition=request.edition,
+        domain=domains.model_harness_domain,
+        control_plane_selection_sha256=control_plane_receipt.selection_sha256,
+        current_request={
+            "message": request.message,
+            "conversation_id": request.conversation_id,
+            "requested_task_type": request.requested_task_type,
+            "locale": request.locale,
+            "requested_tool_ids": list(request.requested_tool_ids),
+        },
+        session_context={
+            "conversation_summary": request.conversation_summary,
+            "context": [item.model_dump(mode="json") for item in request.context],
+        },
+    )
+    # From this point forward, the compiler consumes only the validated envelope.
+    # This prevents a parallel unbound request path from reaching workflow logic.
+    request = TaskWorkflowCompileRequest.model_validate(
+        {
+            "request_id": harness_input.request_id,
+            "conversation_id": harness_input.current_request.get("conversation_id"),
+            "edition": harness_input.source_edition,
+            **harness_input.current_request,
+            **harness_input.session_context,
+        }
+    )
+    routed_from_envelope = (
+        classify_task(request.message, request.edition)
+        if request.requested_task_type == "auto_detect"
+        else request.requested_task_type
+    )
+    if routed_from_envelope != task_type:
+        raise ValueError("Harness input changed task routing after validation")
+
     blockers: list[str] = []
     if task_type not in EDITION_TASKS[request.edition]:
         blockers.append(f"edition.{request.edition}.task.{task_type}.denied")
@@ -648,12 +870,57 @@ def compile_task_workflow(
     context_sha, context_bytes = _context_receipt(request)
     prompt_version = f"dronedream.{task_type}.system.v1"
     artifact_kind, product_path = _artifact_route(task_type, request.edition)
-    steps = _task_steps(task_type, set(eligible))
+    selected_runtime_handler = runtime_handler(domains.model_harness_domain)
+    steps = _task_steps(task_type, set(eligible), request.locale)
+    input_sha256 = harness_input_sha256(harness_input)
+    workflow_status: WorkflowStatus = "blocked" if blockers else "draft"
+    harness_output = HarnessOutputEnvelope(
+        request_id=request.request_id,
+        task_id=harness_input.task_id,
+        domain=domains.model_harness_domain,
+        control_plane_selection_sha256=control_plane_receipt.selection_sha256,
+        input_envelope_sha256=input_sha256,
+        status=workflow_status,
+        lifecycle_stage="compile_only",
+        structured_result={
+            "result_type": "task_workflow_contract",
+            "lifecycle_stage": "compile_only",
+            "model_execution_performed": False,
+            "runtime_execution_performed": False,
+            "task_type": task_type,
+            "artifact_kind": artifact_kind,
+            "product_path": product_path,
+            "blockers": sorted(set(blockers)),
+        },
+        model_call_count=0,
+        repair_cycle_count=0,
+    )
+    validate_output_against_control_plane(
+        control_plane_receipt,
+        harness_output,
+        input_envelope=harness_input,
+    )
     seed = {
         "owner": owner_binding,
         "request_id": request.request_id,
+        "task_id": task_id,
+        "thread_id": thread_id,
+        "lifecycle_stage": "compile_only",
+        "model_execution_performed": False,
+        "runtime_execution_performed": False,
         "edition": request.edition,
+        "locale": request.locale,
         "task_type": task_type,
+        "domain_schema_version": DOMAIN_SCHEMA_VERSION,
+        "model_harness_domain": domains.model_harness_domain,
+        "memory_domain": domains.memory_domain,
+        "memory_precedence": MEMORY_PRECEDENCE,
+        "raw_conversation_retention": RAW_CONVERSATION_RETENTION,
+        "long_term_memory_authority": LONG_TERM_MEMORY_AUTHORITY,
+        "control_plane": control_plane_receipt.model_dump(mode="json"),
+        "runtime_handler": selected_runtime_handler.model_dump(mode="json"),
+        "harness_input_sha256": input_sha256,
+        "harness_output": harness_output.model_dump(mode="json"),
         "message_sha256": hashlib.sha256(request.message.encode()).hexdigest(),
         "context_sha256": context_sha,
         "prompt": {
@@ -672,10 +939,19 @@ def compile_task_workflow(
         contract_id=f"twf_{contract_sha[:24]}",
         owner_binding_sha256=owner_binding,
         request_id=request.request_id,
+        task_id=task_id,
+        thread_id=thread_id,
         edition=request.edition,
+        locale=request.locale,
         task_type=task_type,
         routing_source=routing_source,
-        status="blocked" if blockers else "draft",
+        model_harness_domain=domains.model_harness_domain,
+        memory_domain=domains.memory_domain,
+        control_plane=control_plane_receipt,
+        runtime_handler=selected_runtime_handler,
+        harness_input_sha256=input_sha256,
+        harness_output=harness_output,
+        status=workflow_status,
         system_prompt_version=prompt_version,
         context_sha256=context_sha,
         context_bytes=context_bytes,
@@ -693,6 +969,11 @@ def workflow_catalog() -> TaskWorkflowCatalog:
     return TaskWorkflowCatalog(
         prompt_registry_version=SYSTEM_PROMPT_REGISTRY_VERSION,
         tool_registry_version=TOOL_REGISTRY_VERSION,
+        task_model_harness_domains={
+            task: TASK_MODEL_HARNESS_DOMAINS[task] for task in TASK_MODEL_HARNESS_DOMAINS
+        },
+        control_plane=control_plane_catalog(),
+        runtime=runtime_catalog(),
         edition_tasks={edition: sorted(tasks) for edition, tasks in EDITION_TASKS.items()},
         tools={key: dict(value) for key, value in TOOL_REGISTRY.items()},
     )

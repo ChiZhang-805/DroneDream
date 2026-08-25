@@ -158,6 +158,9 @@ def test_continuation_creates_bounded_child_and_preserves_parent(
     assert child["provider_turn_cap"] == 0
     assert child["exploration_budget"] == _budget()
     assert child["baseline_parameters"]["kp_xy"] == 1.25
+    assert child["model_harness_domain"] == "optimization.control_tuning"
+    assert child["control_plane"]["domain"] == "optimization.control_tuning"
+    assert child["control_plane"]["selection_sha256"] == parent["control_plane"]["selection_sha256"]
 
     training = next(case for case in child["scenario_suite"]["cases"] if not case["holdout"])
     holdout = next(case for case in child["scenario_suite"]["cases"] if case["holdout"])
@@ -298,9 +301,7 @@ def test_model_continuation_requires_fresh_binding_and_never_copies_parent_secre
     assert created.status_code == 200, created.text
     child_id = created.json()["data"]["id"]
     with SessionLocal() as db:
-        child_secrets = list(
-            db.query(models.JobSecret).filter(models.JobSecret.job_id == child_id)
-        )
+        child_secrets = list(db.query(models.JobSecret).filter(models.JobSecret.job_id == child_id))
         assert len(child_secrets) == 1
         assert child_secrets[0].encrypted_api_key != parent_secret_token
         assert secrets.decrypt_secret(child_secrets[0].encrypted_api_key) == "fresh-child-key"

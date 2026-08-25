@@ -1,0 +1,68 @@
+{
+  "$schema": "./editions.schema.json",
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-brand-system",
+  "separator": "·",
+  "safety": {
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "editions": {
+    "universal": {
+      "assetKey": "universal",
+      "productName": "DroneDream",
+      "editionLabel": null,
+      "gradientStops": ["#FF5574", "#6A4CFF", "#E657D1"],
+      "mark": {"path": "brand/icons/universal-mark.png", "width": 1024, "height": 1024, "sha256": "ee1c84e6e147347ac4eb333b726f765ef2c7007d106003a4d608a3f3241cdf5a"},
+      "lockup": {"path": "brand/icons/universal-lockup.png", "width": 1749, "height": 220, "sha256": "d94fb40e32321a101b9e2483dd9a69f23aa4260b8c05094e2bba23a5fd8c91dd"}
+    },
+    "sim": {
+      "assetKey": "sim",
+      "productName": "DroneDream · SIM",
+      "editionLabel": "SIM",
+      "gradientStops": ["#00D9FF", "#2671FF", "#744CFF"],
+      "wordmarkEndX": 1748,
+      "separatorStartX": 1802,
+      "separatorEndX": 1851,
+      "editionLabelStartX": 1905,
+      "mark": {"path": "brand/icons/sim-mark.png", "width": 1024, "height": 1024, "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa"},
+      "lockup": {"path": "brand/icons/sim-lockup.png", "width": 2337, "height": 218, "sha256": "f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e"}
+    },
+    "lab": {
+      "assetKey": "lab",
+      "productName": "DroneDream · LAB",
+      "editionLabel": "LAB",
+      "gradientStops": ["#A7E84A", "#20C77A", "#087E69"],
+      "wordmarkEndX": 1748,
+      "separatorStartX": 1807,
+      "separatorEndX": 1858,
+      "editionLabelStartX": 1917,
+      "mark": {"path": "brand/icons/lab-mark.png", "width": 1024, "height": 1024, "sha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806"},
+      "lockup": {"path": "brand/icons/lab-lockup.png", "width": 2386, "height": 218, "sha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94"}
+    },
+    "field": {
+      "assetKey": "field",
+      "productName": "DroneDream · FIELD",
+      "editionLabel": "FIELD",
+      "gradientStops": ["#FFC247", "#FF754B", "#D746A5"],
+      "wordmarkEndX": 1748,
+      "separatorStartX": 1807,
+      "separatorEndX": 1858,
+      "editionLabelStartX": 1917,
+      "mark": {"path": "brand/icons/field-mark.png", "width": 1024, "height": 1024, "sha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5"},
+      "lockup": {"path": "brand/icons/field-lockup.png", "width": 2581, "height": 218, "sha256": "e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa"}
+    },
+    "autonomy": {
+      "assetKey": "agent",
+      "productName": "DroneDream · AGENT",
+      "editionLabel": "AGENT",
+      "gradientStops": ["#FF5B74", "#EC214F", "#97153B"],
+      "wordmarkEndX": 1748,
+      "separatorStartX": 1807,
+      "separatorEndX": 1858,
+      "editionLabelStartX": 1917,
+      "mark": {"path": "brand/icons/agent-mark.png", "width": 1024, "height": 1024, "sha256": "675188a785e56e2e1d81fb42627de18cca460018f83ee12baa389ef7b4e1d72e"},
+      "lockup": {"path": "brand/icons/agent-lockup.png", "width": 2718, "height": 218, "sha256": "6d86d5a1a7d29f861a87acf51937f7c33eb2a4c6681479e2b121ccf403373ffb"}
+    }
+  }
+}

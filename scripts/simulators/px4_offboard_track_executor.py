@@ -46,6 +46,7 @@ MIN_HOVER_DURATION_SECONDS = 1.0
 MAX_HOVER_DURATION_SECONDS = 300.0
 MAX_WAYPOINT_HOLD_SECONDS = 10.0
 MAX_ABORT_REQUEST_BYTES = 4096
+MAX_RUNTIME_CONTROL_BYTES = 512 * 1024
 ABORT_POLL_INTERVAL_SECONDS = 0.05
 BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS = 15.0
 RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
@@ -112,6 +113,15 @@ class SetpointSchedulePlan:
     schedule: list[Setpoint]
     track_start_index: int
     track_end_index: int
+
+
+@dataclass(frozen=True)
+class RuntimeControlRequest:
+    revision: int
+    action: str
+    mission_revision: int
+    contract_id: str
+    route: list[TrackPoint] | None
 
 
 @dataclass(frozen=True)
@@ -517,6 +527,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--vehicle", required=True)
     parser.add_argument("--world", required=True)
     parser.add_argument("--abort-file", type=Path)
+    parser.add_argument("--runtime-control-file", type=Path)
     parser.add_argument(
         "--connection",
         default=os.environ.get("PX4_OFFBOARD_CONNECTION", "udp://:14540"),
@@ -1175,6 +1186,111 @@ def _raise_if_external_abort_requested(path: Path | None) -> None:
     raise ExternalSafetyAbort(reason, world_paused=world_paused)
 
 
+def _read_runtime_control_request(path: Path) -> RuntimeControlRequest:
+    if path.stat().st_size > MAX_RUNTIME_CONTROL_BYTES:
+        raise RuntimeError("runtime control request is oversized")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("runtime control request is invalid") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("runtime control request is invalid")
+    if payload.get("schema_version") != "dronedream.autonomy.runtime-control.v1":
+        raise RuntimeError("runtime control schema is unsupported")
+    revision = payload.get("revision")
+    mission_revision = payload.get("mission_revision")
+    action = payload.get("action")
+    contract_id = payload.get("contract_id")
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
+        raise RuntimeError("runtime control revision is invalid")
+    if (
+        isinstance(mission_revision, bool)
+        or not isinstance(mission_revision, int)
+        or mission_revision < 1
+    ):
+        raise RuntimeError("runtime control mission revision is invalid")
+    if action not in {"hold", "resume", "replace_route"}:
+        raise RuntimeError("runtime control action is invalid")
+    if not isinstance(contract_id, str) or not 8 <= len(contract_id) <= 160:
+        raise RuntimeError("runtime control contract id is invalid")
+    route_payload = payload.get("route")
+    route: list[TrackPoint] | None = None
+    if action == "replace_route":
+        if (
+            not isinstance(route_payload, list)
+            or not 2 <= len(route_payload) <= MAX_REFERENCE_TRACK_POINTS
+        ):
+            raise RuntimeError("runtime replacement route is invalid")
+        route = []
+        for index, point in enumerate(route_payload):
+            if not isinstance(point, dict):
+                raise RuntimeError(f"runtime replacement route point {index} is invalid")
+            speed = point.get("speed_limit_mps")
+            try:
+                route.append(
+                    TrackPoint(
+                        x=_finite_float(point.get("x"), f"runtime route point {index}.x"),
+                        y=_finite_float(point.get("y"), f"runtime route point {index}.y"),
+                        z=_finite_float(point.get("z"), f"runtime route point {index}.z"),
+                        speed_limit_mps=(
+                            None
+                            if speed is None
+                            else _finite_float(
+                                speed,
+                                f"runtime route point {index}.speed_limit_mps",
+                            )
+                        ),
+                    )
+                )
+            except ValueError as exc:
+                raise RuntimeError(
+                    f"runtime replacement route point {index} is invalid: {exc}"
+                ) from exc
+        if any(
+            point.speed_limit_mps is not None and not 0.0 < point.speed_limit_mps <= 10.0
+            for point in route
+        ):
+            raise RuntimeError("runtime replacement route speed limit is invalid")
+    elif route_payload is not None:
+        raise RuntimeError("runtime hold or resume request must not include a route")
+    return RuntimeControlRequest(
+        revision=revision,
+        action=action,
+        mission_revision=mission_revision,
+        contract_id=contract_id,
+        route=route,
+    )
+
+
+def _runtime_replan_schedule(
+    current: Setpoint,
+    route: list[TrackPoint],
+    params: ControllerParams,
+    rate_hz: float,
+) -> list[Setpoint]:
+    start = TrackPoint(
+        x=current.north_m,
+        y=current.east_m,
+        z=-current.down_m,
+    )
+    schedule = _build_motion_setpoints(
+        start,
+        route,
+        params,
+        rate_hz,
+        max_samples=MAX_SETPOINTS,
+    )
+    if not schedule:
+        raise RuntimeError("runtime replacement route produced no motion setpoints")
+    if schedule[0] != current:
+        schedule.insert(0, current)
+    final = schedule[-1]
+    schedule.extend(final for _ in range(max(2, int(rate_hz * 0.5))))
+    if len(schedule) > MAX_SETPOINTS:
+        raise RuntimeError(f"runtime replacement schedule exceeds {MAX_SETPOINTS} setpoints")
+    return schedule
+
+
 def load_reference_track(path: Path) -> list[TrackPoint]:
     return load_reference_track_plan(path).points
 
@@ -1555,7 +1671,10 @@ async def _wait_for_takeoff_stability(
     vertical_speed_tolerance_m_s: float,
     evidence: dict[str, Any],
     abort_check: Callable[[], None] | None = None,
-) -> None:
+    runtime_control_check: (
+        Callable[[Setpoint], Awaitable[RuntimeControlRequest | None]] | None
+    ) = None,
+) -> tuple[RuntimeControlRequest | None, Setpoint]:
     for label, value, allow_zero in (
         ("timeout_seconds", timeout_seconds, False),
         ("sample_rate_hz", sample_rate_hz, False),
@@ -1581,6 +1700,12 @@ async def _wait_for_takeoff_stability(
     stable_since: float | None = None
     origin_down_m = target.down_m if takeoff_origin is None else takeoff_origin.down_m
     vertical_distance_m = target.down_m - origin_down_m
+    last_commanded = Setpoint(
+        north_m=target.north_m,
+        east_m=target.east_m,
+        down_m=origin_down_m,
+        yaw_deg=target.yaw_deg,
+    )
     evidence.update(
         {
             "schema_version": "dronedream.takeoff_gate.v2",
@@ -1625,6 +1750,12 @@ async def _wait_for_takeoff_stability(
     while True:
         if abort_check is not None:
             abort_check()
+        if runtime_control_check is not None:
+            runtime_control = await runtime_control_check(last_commanded)
+            if runtime_control is not None and runtime_control.action == "replace_route":
+                evidence["status"] = "interrupted_by_runtime_replan"
+                evidence["runtime_control_revision"] = runtime_control.revision
+                return runtime_control, last_commanded
         now = time.monotonic()
         remaining = deadline - now
         if remaining <= 0:
@@ -1657,6 +1788,7 @@ async def _wait_for_takeoff_stability(
             down_m=commanded_down_m,
             yaw_deg=target.yaw_deg,
         )
+        last_commanded = commanded
         try:
             sample = await _await_with_setpoint_keepalive(
                 client,
@@ -1723,7 +1855,7 @@ async def _wait_for_takeoff_stability(
         if within_limits and stable_duration >= stable_window_seconds:
             evidence["status"] = "achieved"
             evidence["achieved_stable_window_s"] = stable_duration
-            return
+            return None, commanded
 
         await asyncio.sleep(min(sample_interval_seconds, max(0.0, deadline - time.monotonic())))
 
@@ -2001,6 +2133,8 @@ async def run_executor(
     takeoff_vertical_speed_tolerance_m_s: float = 0.25,
     world: str = "default",
     abort_file: Path | None = None,
+    runtime_control_file: Path | None = None,
+    controller_params: ControllerParams | None = None,
     wind_activator: Callable[..., dict[str, Any]] = _activate_gazebo_wind_profile,
 ) -> None:
     if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
@@ -2019,6 +2153,8 @@ async def run_executor(
         )
     if not schedule:
         raise ValueError("setpoint schedule is empty")
+    if runtime_control_file is not None and controller_params is None:
+        raise ValueError("controller_params are required when runtime control is enabled")
     for index, setpoint in enumerate(schedule):
         for field_name in ("north_m", "east_m", "down_m", "yaw_deg"):
             _finite_float(
@@ -2049,6 +2185,7 @@ async def run_executor(
             "land": "not_requested" if not land_after else "not_needed",
             "close": "pending",
         },
+        "runtime_controls": [],
     }
     takeoff_gate = timing["takeoff_gate"]
     cleanup = timing["cleanup"]
@@ -2076,6 +2213,13 @@ async def run_executor(
     gps_last_tick = -1
     gps_off = False
     battery_takeoff_gate_parameters: dict[str, dict[str, float]] | None = None
+    dt = 1.0 / rate_hz
+    runtime_control_revision = 0
+    runtime_control_ack_path = (
+        runtime_control_file.with_name("runtime_control.ack.json")
+        if runtime_control_file is not None
+        else None
+    )
     if isinstance(gps_profile, dict):
         runtime_profile_details = _require_runtime_details(
             runtime_profile,
@@ -2095,6 +2239,82 @@ async def run_executor(
 
     def check_external_abort() -> None:
         _raise_if_external_abort_requested(abort_file)
+
+    def write_runtime_control_ack(
+        control: RuntimeControlRequest,
+        state: str,
+        **details: Any,
+    ) -> None:
+        if runtime_control_ack_path is None:
+            return
+        _write_json_atomic(
+            runtime_control_ack_path,
+            {
+                "schema_version": "dronedream.autonomy.runtime-control-ack.v1",
+                "revision": control.revision,
+                "mission_revision": control.mission_revision,
+                "contract_id": control.contract_id,
+                "state": state,
+                "applied_at": time.time(),
+                **details,
+            },
+        )
+
+    async def check_takeoff_runtime_control(
+        hold_setpoint: Setpoint,
+    ) -> RuntimeControlRequest | None:
+        """Apply operator hold before the original takeoff target can advance."""
+
+        nonlocal runtime_control_revision, last_commanded_setpoint
+        if runtime_control_file is None or not runtime_control_file.is_file():
+            return None
+        control = _read_runtime_control_request(runtime_control_file)
+        if control.revision <= runtime_control_revision:
+            return None
+        hold_started: float | None = None
+        while control.action == "hold":
+            runtime_control_revision = control.revision
+            hold_started = hold_started or time.monotonic()
+            last_commanded_setpoint = hold_setpoint
+            write_runtime_control_ack(control, "holding", phase="takeoff_gate")
+            await _await_with_abort_polling(
+                client.set_position_ned(hold_setpoint),
+                abort_check=check_external_abort,
+            )
+            await _await_with_abort_polling(
+                asyncio.sleep(dt),
+                abort_check=check_external_abort,
+            )
+            next_control = _read_runtime_control_request(runtime_control_file)
+            if next_control.revision <= runtime_control_revision:
+                continue
+            control = next_control
+        if hold_started is not None:
+            timing["runtime_controls"].append(
+                {
+                    "revision": runtime_control_revision,
+                    "action": "hold",
+                    "phase": "takeoff_gate",
+                    "held_seconds": time.monotonic() - hold_started,
+                    "applied_t": hold_started - exec_start,
+                }
+            )
+        if control.action == "replace_route":
+            return control
+        if control.action == "resume":
+            runtime_control_revision = control.revision
+            write_runtime_control_ack(control, "resumed", phase="takeoff_gate")
+            timing["runtime_controls"].append(
+                {
+                    "revision": control.revision,
+                    "mission_revision": control.mission_revision,
+                    "contract_id": control.contract_id,
+                    "action": "resume",
+                    "phase": "takeoff_gate",
+                    "applied_t": time.monotonic() - exec_start,
+                }
+            )
+        return None
 
     try:
         check_external_abort()
@@ -2210,22 +2430,65 @@ async def run_executor(
         timing["offboard_start_t"] = time.monotonic() - exec_start
         _log(log_path, "offboard started")
 
-        await _wait_for_takeoff_stability(
-            client,
-            schedule[0],
-            takeoff_origin=takeoff_origin,
-            climb_rate_m_s=takeoff_climb_rate_m_s,
-            timeout_seconds=takeoff_timeout_seconds,
-            sample_rate_hz=rate_hz,
-            stable_window_seconds=takeoff_stable_window_seconds,
-            horizontal_tolerance_m=takeoff_horizontal_tolerance_m,
-            vertical_tolerance_m=takeoff_vertical_tolerance_m,
-            horizontal_speed_tolerance_m_s=takeoff_horizontal_speed_tolerance_m_s,
-            vertical_speed_tolerance_m_s=takeoff_vertical_speed_tolerance_m_s,
-            evidence=takeoff_gate,
-            abort_check=check_external_abort,
-        )
-        last_commanded_setpoint = schedule[0]
+        takeoff_target = schedule[0]
+        takeoff_origin_for_gate = takeoff_origin
+        while True:
+            runtime_replan, stabilized_setpoint = await _wait_for_takeoff_stability(
+                client,
+                takeoff_target,
+                takeoff_origin=takeoff_origin_for_gate,
+                climb_rate_m_s=takeoff_climb_rate_m_s,
+                timeout_seconds=takeoff_timeout_seconds,
+                sample_rate_hz=rate_hz,
+                stable_window_seconds=takeoff_stable_window_seconds,
+                horizontal_tolerance_m=takeoff_horizontal_tolerance_m,
+                vertical_tolerance_m=takeoff_vertical_tolerance_m,
+                horizontal_speed_tolerance_m_s=takeoff_horizontal_speed_tolerance_m_s,
+                vertical_speed_tolerance_m_s=takeoff_vertical_speed_tolerance_m_s,
+                evidence=takeoff_gate,
+                abort_check=check_external_abort,
+                runtime_control_check=check_takeoff_runtime_control,
+            )
+            last_commanded_setpoint = stabilized_setpoint
+            if runtime_replan is None:
+                break
+            if runtime_replan.route is None or controller_params is None:
+                raise RuntimeError("runtime replacement route is missing its controller contract")
+            replacement = _runtime_replan_schedule(
+                stabilized_setpoint,
+                runtime_replan.route,
+                controller_params,
+                rate_hz,
+            )
+            schedule = replacement
+            track_start = 0
+            track_end = len(replacement) - 1
+            timing["setpoint_count"] = len(replacement)
+            runtime_control_revision = runtime_replan.revision
+            timing["runtime_controls"].append(
+                {
+                    "revision": runtime_replan.revision,
+                    "mission_revision": runtime_replan.mission_revision,
+                    "contract_id": runtime_replan.contract_id,
+                    "action": "replace_route",
+                    "phase": "takeoff_gate",
+                    "remaining_setpoints": len(replacement),
+                    "applied_t": time.monotonic() - exec_start,
+                }
+            )
+            write_runtime_control_ack(
+                runtime_replan,
+                "route_replaced",
+                phase="takeoff_gate",
+                remaining_setpoints=len(replacement),
+            )
+            attempts = timing.setdefault("takeoff_gate_attempts", [])
+            if isinstance(attempts, list):
+                attempts.append(takeoff_gate)
+            takeoff_gate = {"status": "not_started_after_runtime_replan"}
+            timing["takeoff_gate"] = takeoff_gate
+            takeoff_target = replacement[0]
+            takeoff_origin_for_gate = None
         timing["takeoff_stable_t"] = time.monotonic() - exec_start
         _log(log_path, "takeoff telemetry gate achieved stable hover")
 
@@ -2276,12 +2539,116 @@ async def run_executor(
                 label="battery takeoff-gate control details",
             )
 
-        dt = 1.0 / rate_hz
         event_loop = asyncio.get_running_loop()
         start = event_loop.time()
         track_deadline = start + track_timeout_seconds
-        for idx, setpoint in enumerate(schedule):
+        idx = 0
+        while idx < len(schedule):
             check_external_abort()
+            setpoint = schedule[idx]
+            if runtime_control_file is not None and runtime_control_file.is_file():
+                control = _read_runtime_control_request(runtime_control_file)
+                if control.revision > runtime_control_revision:
+                    hold_started: float | None = None
+                    while control.action == "hold":
+                        runtime_control_revision = control.revision
+                        hold_started = hold_started or event_loop.time()
+                        if runtime_control_ack_path is not None:
+                            _write_json_atomic(
+                                runtime_control_ack_path,
+                                {
+                                    "schema_version": "dronedream.autonomy.runtime-control-ack.v1",
+                                    "revision": control.revision,
+                                    "mission_revision": control.mission_revision,
+                                    "contract_id": control.contract_id,
+                                    "state": "holding",
+                                    "applied_at": time.time(),
+                                },
+                            )
+                        hold_setpoint = last_commanded_setpoint or schedule[max(0, idx - 1)]
+                        await _await_with_abort_polling(
+                            client.set_position_ned(hold_setpoint),
+                            abort_check=check_external_abort,
+                        )
+                        await _await_with_abort_polling(
+                            asyncio.sleep(dt),
+                            abort_check=check_external_abort,
+                        )
+                        next_control = _read_runtime_control_request(runtime_control_file)
+                        if next_control.revision <= runtime_control_revision:
+                            continue
+                        control = next_control
+                    if hold_started is not None:
+                        held_seconds = event_loop.time() - hold_started
+                        start += held_seconds
+                        track_deadline += held_seconds
+                    if control.action == "replace_route":
+                        if control.route is None or controller_params is None:
+                            raise RuntimeError(
+                                "runtime replacement route is missing its controller contract"
+                            )
+                        current_setpoint = last_commanded_setpoint or schedule[max(0, idx - 1)]
+                        replacement = _runtime_replan_schedule(
+                            current_setpoint,
+                            control.route,
+                            controller_params,
+                            rate_hz,
+                        )
+                        schedule[idx:] = replacement
+                        track_end = len(schedule) - 1
+                        setpoint = schedule[idx]
+                        start = event_loop.time() - idx * dt
+                        track_deadline = max(
+                            track_deadline,
+                            event_loop.time() + len(replacement) * dt + 30.0,
+                        )
+                        runtime_control_revision = control.revision
+                        timing["runtime_controls"].append(
+                            {
+                                "revision": control.revision,
+                                "mission_revision": control.mission_revision,
+                                "contract_id": control.contract_id,
+                                "action": "replace_route",
+                                "remaining_setpoints": len(replacement),
+                                "applied_t": time.monotonic() - exec_start,
+                            }
+                        )
+                        if runtime_control_ack_path is not None:
+                            _write_json_atomic(
+                                runtime_control_ack_path,
+                                {
+                                    "schema_version": "dronedream.autonomy.runtime-control-ack.v1",
+                                    "revision": control.revision,
+                                    "mission_revision": control.mission_revision,
+                                    "contract_id": control.contract_id,
+                                    "state": "route_replaced",
+                                    "remaining_setpoints": len(replacement),
+                                    "applied_at": time.time(),
+                                },
+                            )
+                    elif control.action == "resume":
+                        runtime_control_revision = control.revision
+                        timing["runtime_controls"].append(
+                            {
+                                "revision": control.revision,
+                                "mission_revision": control.mission_revision,
+                                "contract_id": control.contract_id,
+                                "action": "resume",
+                                "applied_t": time.monotonic() - exec_start,
+                            }
+                        )
+                        if runtime_control_ack_path is not None:
+                            _write_json_atomic(
+                                runtime_control_ack_path,
+                                {
+                                    "schema_version": "dronedream.autonomy.runtime-control-ack.v1",
+                                    "revision": control.revision,
+                                    "mission_revision": control.mission_revision,
+                                    "contract_id": control.contract_id,
+                                    "state": "resumed",
+                                    "applied_at": time.time(),
+                                },
+                            )
             if idx == track_start and isinstance(battery_profile, dict):
                 conditioning_started = event_loop.time()
                 battery_details = await _await_with_abort_polling(
@@ -2400,6 +2767,7 @@ async def run_executor(
                 if timeout_scope.expired():
                     raise TimeoutError(f"track timeout after {track_timeout_seconds:g}s") from None
                 raise
+            idx += 1
 
         if isinstance(gps_profile, dict):
             gps_control = _require_runtime_details(
@@ -2733,6 +3101,8 @@ def main(argv: list[str] | None = None) -> int:
                 takeoff_vertical_speed_tolerance_m_s=(args.takeoff_vertical_speed_tolerance_m_s),
                 world=args.world,
                 abort_file=args.abort_file,
+                runtime_control_file=args.runtime_control_file,
+                controller_params=params,
                 wind_activator=_activate_gazebo_wind_profile,
             )
         )

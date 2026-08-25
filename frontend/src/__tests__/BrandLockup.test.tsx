@@ -1,10 +1,10 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import fieldLockup from "../../../brand/commercial/field-lockup.png";
-import labLockup from "../../../brand/commercial/lab-lockup.png";
-import simLockup from "../../../brand/commercial/sim-lockup.png";
-import universalLockup from "../../../brand/commercial/universal-lockup.png";
+import fieldLockup from "../../../brand/icons/field-lockup.png";
+import labLockup from "../../../brand/icons/lab-lockup.png";
+import simLockup from "../../../brand/icons/sim-lockup.png";
+import universalLockup from "../../../brand/icons/universal-lockup.png";
 import { BrandLockup } from "../components/BrandLockup";
 
 describe("BrandLockup", () => {

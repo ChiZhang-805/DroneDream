@@ -1157,7 +1157,7 @@ describe("NewJob experiment wizard", () => {
     renderPage();
 
     expect(screen.getByText("Template catalog v1")).toBeVisible();
-    expect(screen.getByTestId("route-preview")).toBeInTheDocument();
+    expect(screen.queryByTestId("route-preview")).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Apply to draft: Hover basics" }),
     );

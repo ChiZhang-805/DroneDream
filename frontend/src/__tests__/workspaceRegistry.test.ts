@@ -429,20 +429,37 @@ describe("experiment workspace registry", () => {
       .toBe("/assistant?experiment=server-sim-draft");
   });
 
-  it("routes Universal assistant artifacts to their own editors", () => {
+  it("routes Universal legacy vehicle artifacts to the external repository", () => {
     const vehicleWorkspaceId = "universal-vehicle";
     const simulationWorkspaceId = "universal-simulation";
     saveWorkspaceDraft(vehicleWorkspaceId, "Vehicle model");
     saveWorkspaceDraft(simulationWorkspaceId, "Universal simulation");
-    registerExperimentWorkspace({
-      id: vehicleWorkspaceId,
-      ownerId: OWNER_A,
-      edition: "universal",
-      name: "Vehicle model",
-      source: "assistant",
-      assistantArtifactKind: "universal_vehicle_model",
-      vehicleDraftId: "vehicle-draft-42",
-    });
+    window.localStorage.setItem(
+      `drone-dream:experiment-workspaces:v3:${encodeURIComponent(OWNER_A)}`,
+      JSON.stringify({
+        schemaVersion: 3,
+        items: [{
+          id: vehicleWorkspaceId,
+          ownerId: OWNER_A,
+          tenantId: OWNER_A,
+          organizationId: null,
+          edition: "universal",
+          name: "Vehicle model",
+          source: "assistant",
+          status: "draft",
+          activeStep: 1,
+          completedSteps: [0],
+          jobId: null,
+          pinned: false,
+          archived: false,
+          assistantArtifactKind: "universal_vehicle_model",
+          vehicleDraftId: "vehicle-draft-42",
+          order: 0,
+          createdAt: "2026-08-01T00:00:00.000Z",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+        }],
+      }),
+    );
     registerExperimentWorkspace({
       id: simulationWorkspaceId,
       ownerId: OWNER_A,
@@ -457,27 +474,58 @@ describe("experiment workspace registry", () => {
     const vehicle = workspaces.find(({ id }) => id === vehicleWorkspaceId);
     const simulation = workspaces.find(({ id }) => id === simulationWorkspaceId);
     expect(vehicle && experimentWorkspacePath(vehicle))
-      .toBe("/vehicle-studio?draft=vehicle-draft-42");
+      .toBe("/autonomy/aircraft");
     expect(simulation && experimentWorkspacePath(simulation))
       .toBe(`/jobs/new?experiment=${simulationWorkspaceId}`);
   });
 
-  it("routes AUTONOMY vehicle drafts to its editable Vehicle Studio", () => {
+  it("routes legacy AUTONOMY vehicle drafts to its external aircraft repository", () => {
     saveWorkspaceDraft("autonomy-vehicle", "Mission aircraft");
-    registerExperimentWorkspace({
-      id: "autonomy-vehicle",
-      ownerId: OWNER_A,
-      edition: "autonomy",
-      name: "Mission aircraft",
-      source: "assistant",
-      assistantArtifactKind: "universal_vehicle_model",
-      vehicleDraftId: "autonomy-draft-42",
-    });
+    window.localStorage.setItem(
+      `drone-dream:experiment-workspaces:v3:${encodeURIComponent(OWNER_A)}`,
+      JSON.stringify({
+        schemaVersion: 3,
+        items: [{
+          id: "autonomy-vehicle",
+          ownerId: OWNER_A,
+          tenantId: OWNER_A,
+          organizationId: null,
+          edition: "autonomy",
+          name: "Mission aircraft",
+          source: "assistant",
+          status: "draft",
+          activeStep: 1,
+          completedSteps: [0],
+          jobId: null,
+          pinned: false,
+          archived: false,
+          assistantArtifactKind: "universal_vehicle_model",
+          vehicleDraftId: "autonomy-draft-42",
+          order: 0,
+          createdAt: "2026-08-01T00:00:00.000Z",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+        }],
+      }),
+    );
 
     const workspace = listExperimentWorkspaces(OWNER_A, "autonomy")
       .find(({ id }) => id === "autonomy-vehicle");
     expect(workspace && experimentWorkspacePath(workspace))
-      .toBe("/vehicle-studio?draft=autonomy-draft-42");
+      .toBe("/autonomy/aircraft");
+  });
+
+  it("rejects new AGENT vehicle-model artifacts without deleting legacy history", () => {
+    expect(() => registerExperimentWorkspace({
+      id: "autonomy-new-vehicle",
+      ownerId: OWNER_A,
+      edition: "autonomy",
+      name: "New vehicle model",
+      source: "assistant",
+      assistantArtifactKind: "universal_vehicle_model",
+      vehicleDraftId: "autonomy-new-draft",
+    })).toThrow(/cannot move between editions/u);
+
+    expect(listExperimentWorkspaces(OWNER_A, "autonomy")).toEqual([]);
   });
 
   it("migrates the legacy unscoped registry into SIM only", () => {

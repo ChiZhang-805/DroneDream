@@ -60,6 +60,102 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     assert job["first_qualified_freeze_receipt_id"] is None
     assert job["continue_exploration_requested"] is False
     assert job["holdout_policy_version"] == "legacy-visible-v0"
+    receipt = job["control_plane"]
+    assert job["model_harness_domain"] == "optimization.control_tuning"
+    assert job["memory_domain"] == "optimization.control_tuning"
+    assert receipt["schema_version"] == "dronedream.model-harness-control-plane.v1"
+    assert receipt["domain"] == "optimization.control_tuning"
+    assert receipt["selection_sha256"]
+    assert {plugin["slot"] for plugin in receipt["selected_plugins"]} == {
+        "model_provider",
+        "optimizer",
+        "validator",
+    }
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        persisted = db.get(models.Job, job["id"])
+        assert persisted is not None
+        assert persisted.model_harness_control_plane_json == receipt
+        assert persisted.model_harness_control_plane_selection_sha256 == receipt["selection_sha256"]
+        bound_events = {
+            event.event_type: event.payload_json
+            for event in persisted.events
+            if event.event_type in {"job_created", "job_queued"}
+        }
+        assert set(bound_events) == {"job_created", "job_queued"}
+        for payload in bound_events.values():
+            assert payload is not None
+            assert payload["model_harness_domain"] == receipt["domain"]
+            assert payload["control_plane_schema_version"] == receipt["schema_version"]
+            assert payload["control_plane_selection_sha256"] == receipt["selection_sha256"]
+
+
+def test_job_control_plane_receipt_tampering_fails_closed(client: TestClient) -> None:
+    created = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        persisted = db.get(models.Job, created["id"])
+        assert persisted is not None
+        tampered = dict(persisted.model_harness_control_plane_json)
+        tampered["effective_maximum_model_calls"] = 1
+        persisted.model_harness_control_plane_json = tampered
+        db.commit()
+
+    response = client.get(f"/api/v1/jobs/{created['id']}")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "MODEL_HARNESS_CONTROL_PLANE_RECEIPT_INVALID"
+
+
+def test_job_control_plane_event_binding_tampering_fails_closed(
+    client: TestClient,
+) -> None:
+    created = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        event = (
+            db.query(models.JobEvent)
+            .filter_by(
+                job_id=created["id"],
+                event_type="job_created",
+            )
+            .one()
+        )
+        tampered = dict(event.payload_json or {})
+        tampered["control_plane_selection_sha256"] = "0" * 64
+        event.payload_json = tampered
+        db.commit()
+
+    response = client.get(f"/api/v1/jobs/{created['id']}")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "MODEL_HARNESS_CONTROL_PLANE_RECEIPT_INVALID"
+
+
+def test_job_control_plane_independent_binding_tampering_fails_closed(
+    client: TestClient,
+) -> None:
+    created = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        persisted = db.get(models.Job, created["id"])
+        assert persisted is not None
+        persisted.model_harness_control_plane_selection_sha256 = "0" * 64
+        db.commit()
+
+    response = client.post(f"/api/v1/jobs/{created['id']}/rerun")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "MODEL_HARNESS_CONTROL_PLANE_RECEIPT_INVALID"
 
 
 def test_rerun_preserves_bounded_completion_contract(client: TestClient) -> None:
@@ -498,6 +594,23 @@ def test_list_jobs_paginates(client: TestClient) -> None:
     assert data["page_size"] == 20
     assert len(data["items"]) == 3
     assert all(item["status"] == "QUEUED" for item in data["items"])
+
+
+def test_list_jobs_eager_loads_control_plane_event_bindings(client: TestClient) -> None:
+    for _ in range(3):
+        response = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD)
+        assert response.status_code == 200, response.text
+
+    from sqlalchemy import inspect
+    from sqlalchemy.orm.attributes import NO_VALUE
+
+    from app.db import SessionLocal
+    from app.services import jobs as job_service
+
+    with SessionLocal() as db:
+        items, total = job_service.list_jobs(db)
+        assert total == 3
+        assert all(inspect(item).attrs.events.loaded_value is not NO_VALUE for item in items)
 
 
 def test_get_job_detail(client: TestClient) -> None:

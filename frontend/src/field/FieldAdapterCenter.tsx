@@ -25,6 +25,7 @@ import {
   type FieldMavlinkTelemetryProbeReceipt,
   type FieldProtocolFrameInspection,
 } from "../desktop/bridge";
+import { localeSafeError } from "../i18n/I18nProvider";
 import type { FieldLocale } from "./catalog";
 import { hardwareDomainEdition } from "./hardwareDomain";
 
@@ -33,7 +34,6 @@ const CATALOG_SHA256 = "5b1a7b9f5bd64624b6d4af7b0745e1ba4b1babca63fab0ba765ca97e
 const COPY = {
   en: {
     title: "Protocol adapters",
-    body: "Enable source-bound open-protocol frame inspection and bounded read-only serial telemetry without adding proprietary SDKs to the base app.",
     refresh: "Refresh adapter state",
     offline: "Native adapter installation is available in the installed Field app.",
     loadError: "The native adapter catalog could not be verified.",
@@ -80,7 +80,6 @@ const COPY = {
   },
   "zh-CN": {
     title: "协议适配器",
-    body: "在不把专有 SDK 塞入基础应用的前提下，启用源绑定开放协议帧检查和有时间上限的只读串口遥测。",
     refresh: "刷新适配器状态",
     offline: "原生适配器安装仅在已安装的 Field 应用中可用。",
     loadError: "无法验证原生适配器目录。",
@@ -194,11 +193,14 @@ export function FieldAdapterCenter({
     try {
       setCatalog(await getFieldAdapterCatalog());
     } catch (reason) {
-      setError(`${copy.loadError} ${reason instanceof Error ? reason.message : String(reason)}`);
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].loadError,
+        en: COPY.en.loadError,
+      }));
     } finally {
       setLoading(false);
     }
-  }, [copy.loadError, desktop]);
+  }, [desktop, locale]);
 
   useEffect(() => {
     void loadCatalog();
@@ -215,11 +217,14 @@ export function FieldAdapterCenter({
       });
       setCatalog(await getFieldAdapterCatalog());
     } catch (reason) {
-      setError(`${copy.installError} ${reason instanceof Error ? reason.message : String(reason)}`);
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].installError,
+        en: COPY.en.installError,
+      }));
     } finally {
       setBusyAdapterId(null);
     }
-  }, [copy.installError, desktop]);
+  }, [desktop, locale]);
 
   const installedCount = useMemo(
     () => catalog.entries.filter((entry) => entry.installed).length,
@@ -250,7 +255,10 @@ export function FieldAdapterCenter({
       }
       setCatalog(await getFieldAdapterCatalog());
     } catch (reason) {
-      setError(`${copy.installError} ${reason instanceof Error ? reason.message : String(reason)}`);
+      setError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].installError,
+        en: COPY.en.installError,
+      }));
       try {
         setCatalog(await getFieldAdapterCatalog());
       } catch {
@@ -259,7 +267,7 @@ export function FieldAdapterCenter({
     } finally {
       setBusyAdapterId(null);
     }
-  }, [busyAdapterId, copy.installError, desktop, pendingManagedAdapters]);
+  }, [busyAdapterId, desktop, locale, pendingManagedAdapters]);
   const installedMavlinkAdapters = useMemo(
     () => catalog.entries.filter((entry) => (
       entry.installed
@@ -303,13 +311,20 @@ export function FieldAdapterCenter({
         deviceObservationId: `offline-frame:${result.frameSha256.slice(0, 32)}`,
       });
     } catch (reason) {
-      setInspectorError(
-        `${copy.inspectorError} ${reason instanceof Error ? reason.message : String(reason)}`,
-      );
+      setInspectorError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].inspectorError,
+        en: COPY.en.inspectorError,
+      }));
     } finally {
       setInspectorBusy(false);
     }
-  }, [copy.inspectorError, desktop, frameBase64, onReadOnlyEvidence, selectedInspectorAdapter]);
+  }, [
+    desktop,
+    frameBase64,
+    locale,
+    onReadOnlyEvidence,
+    selectedInspectorAdapter,
+  ]);
 
   const probeTelemetry = useCallback(async () => {
     if (
@@ -338,17 +353,18 @@ export function FieldAdapterCenter({
         deviceObservationId: result.observationId,
       });
     } catch (reason) {
-      setTelemetryError(
-        `${copy.telemetryError} ${reason instanceof Error ? reason.message : String(reason)}`,
-      );
+      setTelemetryError(localeSafeError(reason, locale, {
+        zh: COPY["zh-CN"].telemetryError,
+        en: COPY.en.telemetryError,
+      }));
     } finally {
       setTelemetryBusy(false);
       setReadOnlyConfirmed(false);
     }
   }, [
     baudRate,
-    copy.telemetryError,
     desktop,
+    locale,
     onReadOnlyEvidence,
     readOnlyConfirmed,
     selectedDevice,
@@ -383,7 +399,6 @@ export function FieldAdapterCenter({
       <header>
         <div>
           <h2 id="field-adapter-title">{copy.title}</h2>
-          <p>{copy.body}</p>
         </div>
         <PackageOpen aria-hidden="true" />
       </header>

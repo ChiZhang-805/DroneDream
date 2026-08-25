@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="brand/commercial/universal-lockup.png" alt="DroneDream" width="640" />
+  <img src="brand/icons/universal-lockup.png" alt="DroneDream" width="640" />
 </p>
 
 <p align="center">
@@ -45,7 +45,7 @@ language across the rest of the experience.
 
 | Product or track | Purpose | Branch |
 | --- | --- | --- |
-| Universal | Unified modeling, orchestration, and presentation-only switching across SIM, LAB, FIELD, and AUTONOMY. | [`codex/software`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software) |
+| Universal | Unified orchestration and presentation-only switching across SIM, LAB, FIELD, and AGENT. | [`codex/software`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software) |
 | SIM | Simulation-only Model + Harness workflows for PX4 SITL, Gazebo, repeatable experiments, and evidence. | [`codex/software-sim`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-sim) |
 | LAB | Bidirectional simulation and hardware validation, including Sim-to-Real and Real-to-Sim workflows. | [`codex/software-lab`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-lab) |
 | FIELD | Fail-closed real-device discovery, bounded tuning, preflight, operations, and rollback. | [`codex/software-field`](https://github.com/ChiZhang-805/DroneDream/tree/codex/software-field) |

@@ -34,7 +34,13 @@ vi.mock("../desktop/bridge", () => ({
   installComponentUpdate: installComponentUpdateMock,
 }));
 
-import { appUpdateIsRequired, useAppUpdater } from "../desktop/updater";
+import {
+  appUpdateIsRequired,
+  isNoPublishedDesktopUpdate,
+  orderComponentUpdates,
+  selectManualComponentUpdates,
+  useAppUpdater,
+} from "../desktop/updater";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -102,6 +108,30 @@ describe("useAppUpdater", () => {
       body: "update-policy: recommended",
       rawJson: { updatePolicy: "required" },
     })).toBe(true);
+  });
+
+  it("treats an unpublished desktop channel as current without hiding real updater errors", async () => {
+    const unpublished = new Error("Could not fetch a valid release JSON from the remote");
+    expect(isNoPublishedDesktopUpdate(unpublished)).toBe(true);
+    expect(isNoPublishedDesktopUpdate(new Error("network unavailable"))).toBe(false);
+
+    checkMock.mockRejectedValue(unpublished);
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+
+    expect(hook.result.current.error).toBeNull();
+    expect(getEnginePackStatusMock).toHaveBeenCalledOnce();
+    hook.unmount();
+  });
+
+  it("keeps genuine desktop updater failures visible", async () => {
+    checkMock.mockRejectedValue(new Error("network unavailable"));
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("error"));
+
+    expect(hook.result.current.error).toBe("network unavailable");
+    hook.unmount();
   });
 
   it("discards a stale check that finishes after a newer request", async () => {
@@ -240,6 +270,7 @@ describe("useAppUpdater", () => {
     getEnginePackStatusMock.mockResolvedValue({
       supported: false,
       updateRequired: true,
+      runtimeBaseUpgradeAvailable: true,
       embeddedPackId: `sha256:${"3".repeat(64)}`,
       embeddedSourceCommit: "4".repeat(40),
       installedPackId: null,
@@ -254,6 +285,36 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
+  it("keeps an unavailable Runtime Base upgrade non-blocking and skips component mutation", async () => {
+    vi.stubEnv("VITE_COMPONENT_UPDATE_CATALOG_ENABLED", "true");
+    checkMock.mockResolvedValue(null);
+    getEnginePackStatusMock.mockResolvedValue({
+      supported: false,
+      updateRequired: true,
+      runtimeBaseUpgradeAvailable: false,
+      embeddedPackId: `sha256:${"3".repeat(64)}`,
+      embeddedSourceCommit: "4".repeat(40),
+      installedPackId: null,
+      installedSourceCommit: null,
+      message: "The signed Runtime Base channel does not contain a newer build.",
+    });
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+
+    expect(hook.result.current.updateRequired).toBe(false);
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.enginePack).toMatchObject({
+      supported: false,
+      updateRequired: true,
+      runtimeBaseUpgradeAvailable: false,
+    });
+    expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
+    expect(checkMock).toHaveBeenCalledOnce();
+    expect(checkComponentUpdatesMock).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
   it("surfaces signed component updates only after the app and Engine Pack are current", async () => {
     vi.stubEnv("VITE_COMPONENT_UPDATE_CATALOG_ENABLED", "true");
     checkMock.mockResolvedValue(null);
@@ -265,7 +326,9 @@ describe("useAppUpdater", () => {
         componentId: "capability-pack",
         version: "1.2.0",
         releaseSequence: 12,
-        policy: "required",
+        urgency: "required",
+        installMode: "user-confirmed",
+        dependencies: [],
         packId: `sha256:${"5".repeat(64)}`,
         installedVersion: "1.1.0",
         installedReleaseSequence: 11,
@@ -294,7 +357,12 @@ describe("useAppUpdater", () => {
           componentId: "asset-pack",
           version: "2.0.0",
           releaseSequence: 20,
-          policy: "recommended",
+          urgency: "recommended",
+          installMode: "user-confirmed",
+          dependencies: [{
+            componentId: "capability-pack",
+            minimumReleaseSequence: 12,
+          }],
           packId: `sha256:${"6".repeat(64)}`,
           installedVersion: null,
           installedReleaseSequence: 0,
@@ -304,7 +372,9 @@ describe("useAppUpdater", () => {
           componentId: "capability-pack",
           version: "1.2.0",
           releaseSequence: 12,
-          policy: "recommended",
+          urgency: "recommended",
+          installMode: "user-confirmed",
+          dependencies: [],
           packId: `sha256:${"5".repeat(64)}`,
           installedVersion: "1.1.0",
           installedReleaseSequence: 11,
@@ -335,5 +405,79 @@ describe("useAppUpdater", () => {
     expect(checkComponentUpdatesMock).toHaveBeenCalledTimes(2);
     expect(hook.result.current.status).toBe("current");
     hook.unmount();
+  });
+
+  it("installs signed automatic capability updates without silently downloading assets", async () => {
+    vi.stubEnv("VITE_COMPONENT_UPDATE_CATALOG_ENABLED", "true");
+    checkMock.mockResolvedValue(null);
+    const automatic = {
+      catalogSequence: 6,
+      generatedAt: "2026-08-16T00:00:00Z",
+      expiresAt: "2026-08-23T00:00:00Z",
+      candidates: [{
+        componentId: "capability-pack",
+        version: "1.3.0",
+        releaseSequence: 13,
+        urgency: "recommended",
+        installMode: "automatic",
+        dependencies: [],
+        packId: `sha256:${"8".repeat(64)}`,
+        installedVersion: "1.2.0",
+        installedReleaseSequence: 12,
+        available: true,
+      }],
+    };
+    checkComponentUpdatesMock
+      .mockResolvedValueOnce(automatic)
+      .mockResolvedValueOnce({ ...automatic, candidates: [] });
+    installComponentUpdateMock.mockResolvedValue({
+      componentId: "capability-pack",
+      packId: `sha256:${"8".repeat(64)}`,
+      version: "1.3.0",
+      releaseSequence: 13,
+      activated: true,
+    });
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+
+    expect(installComponentUpdateMock).toHaveBeenCalledWith(
+      "capability-pack",
+      undefined,
+    );
+    hook.unmount();
+  });
+
+  it("keeps urgency separate from delivery and resolves signed dependencies", () => {
+    const capability = {
+      componentId: "capability-pack" as const,
+      version: "1.2.0",
+      releaseSequence: 12,
+      urgency: "recommended" as const,
+      installMode: "user-confirmed" as const,
+      dependencies: [],
+      packId: `sha256:${"5".repeat(64)}`,
+      installedVersion: "1.1.0",
+      installedReleaseSequence: 11,
+      available: true,
+    };
+    const asset = {
+      ...capability,
+      componentId: "asset-pack" as const,
+      urgency: "required" as const,
+      dependencies: [{
+        componentId: "capability-pack" as const,
+        minimumReleaseSequence: 12,
+      }],
+    };
+    const optional = { ...capability, urgency: "optional" as const };
+
+    expect(orderComponentUpdates([asset, capability])).toEqual([
+      "capability-pack",
+      "asset-pack",
+    ]);
+    expect(selectManualComponentUpdates([asset, capability]).map((item) => item.componentId))
+      .toEqual(["asset-pack", "capability-pack"]);
+    expect(selectManualComponentUpdates([optional])).toEqual([optional]);
   });
 });

@@ -241,7 +241,7 @@ if ($hasEdition) {
         sim = "DroneDream-Sim"
         lab = "DroneDream-Lab"
         field = "DroneDream-Field"
-        autonomy = "DroneDream-Autonomy"
+        autonomy = "DroneDream-Agent"
     }
     $edition = [string]$metadata.edition
     $buildNumber = [long]$metadata.buildNumber
