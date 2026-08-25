@@ -11,6 +11,7 @@
     "masterName",
     "separator",
     "geometry",
+    "websiteFavicon",
     "font",
     "artifactContract",
     "editions",
@@ -32,6 +33,34 @@
         "sourcePath": {"const": "brand/source/drone-dream-mark-master.png"},
         "preserveWhiteFlightPath": {"const": true},
         "recolorMode": {"const": "shared-alpha-and-neutral-detail-mask-v1"}
+      }
+    },
+    "websiteFavicon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourcePath",
+        "sourceSha256",
+        "dimensions",
+        "canonicalOutputPath",
+        "approvalBasis"
+      ],
+      "properties": {
+        "sourcePath": {"const": "brand/source/approved/website-favicon-64.png"},
+        "sourceSha256": {
+          "const": "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7"
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": {"const": 64},
+            "height": {"const": 64}
+          }
+        },
+        "canonicalOutputPath": {"const": "frontend/public/drone-favicon.png"},
+        "approvalBasis": {"const": "mainland-preview-approved-v1"}
       }
     },
     "font": {

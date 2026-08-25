@@ -32,6 +32,9 @@ APPROVED_PREVIEW_PATH = (
     / "approved"
     / "edition-brand-centered-separator-approved-preview.png"
 )
+APPROVED_WEBSITE_FAVICON_PATH = (
+    REPO / "brand" / "source" / "approved" / "website-favicon-64.png"
+)
 
 EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
 
@@ -100,6 +103,14 @@ def load_contract() -> dict[str, Any]:
         != {"method": "equal-alpha-edge-gaps", "tolerancePx": 0}
     ):
         raise BrandBuildError("large-label approval identity drifted")
+    if contract.get("websiteFavicon") != {
+        "sourcePath": APPROVED_WEBSITE_FAVICON_PATH.relative_to(REPO).as_posix(),
+        "sourceSha256": "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7",
+        "dimensions": {"width": 64, "height": 64},
+        "canonicalOutputPath": "frontend/public/drone-favicon.png",
+        "approvalBasis": "mainland-preview-approved-v1",
+    }:
+        raise BrandBuildError("approved website favicon identity drifted")
     return contract
 
 
@@ -114,6 +125,7 @@ def require_inputs() -> None:
             FONT_LICENSE_PATH,
             REQUIREMENTS_PATH,
             APPROVED_PREVIEW_PATH,
+            APPROVED_WEBSITE_FAVICON_PATH,
         )
         if not path.is_file()
     ]
@@ -476,6 +488,19 @@ def add_image(outputs: dict[Path, bytes], path: str, image: Image.Image) -> byte
 def build_outputs() -> dict[Path, bytes]:
     require_inputs()
     contract = load_contract()
+    website_favicon = contract["websiteFavicon"]
+    website_favicon_payload = APPROVED_WEBSITE_FAVICON_PATH.read_bytes()
+    if sha256_bytes(website_favicon_payload) != website_favicon["sourceSha256"]:
+        raise BrandBuildError("approved website favicon hash drifted")
+    with Image.open(io.BytesIO(website_favicon_payload)) as favicon_source:
+        expected_favicon = website_favicon["dimensions"]
+        if (
+            favicon_source.format != "PNG"
+            or favicon_source.mode != "RGBA"
+            or favicon_source.size
+            != (expected_favicon["width"], expected_favicon["height"])
+        ):
+            raise BrandBuildError("approved website favicon format drifted")
     approved_preview = APPROVED_PREVIEW_PATH.read_bytes()
     if sha256_bytes(approved_preview) != contract["approval"]["largeLabelReviewPreviewSha256"]:
         raise BrandBuildError("approved large-label review preview hash drifted")
@@ -609,15 +634,12 @@ def build_outputs() -> dict[Path, bytes]:
         preview_bytes = add_image(outputs, "brand/generated/edition-brand-preview.png", preview)
 
     universal_mark = marks["universal"]
-    universal_favicon = recolor_mark(
-        favicon_master, tuple(contract["editions"]["universal"]["gradientStops"])
-    ).resize((64, 64), Image.Resampling.LANCZOS)
     universal_primary = lockups[("universal", "primary")]
     universal_compact = lockups[("universal", "compact")]
+    outputs[REPO / website_favicon["canonicalOutputPath"]] = website_favicon_payload
     for path, image in (
         ("docs/assets/drone-dream-icon.png", universal_mark),
         ("frontend/src/assets/drone-dream-mark.png", universal_mark),
-        ("frontend/public/drone-favicon.png", universal_favicon),
         ("desktop/src-tauri/app-icon.png", universal_mark),
         ("docs/assets/brand/drone-dream-lockup-primary.png", universal_primary),
         ("docs/assets/brand/drone-dream-lockup-compact.png", universal_compact),
@@ -735,6 +757,14 @@ def build_outputs() -> dict[Path, bytes]:
             "path": SOURCE_PATH.relative_to(REPO).as_posix(),
             "bytes": SOURCE_PATH.stat().st_size,
             "sha256": sha256_bytes(SOURCE_PATH.read_bytes()),
+        },
+        "websiteFavicon": {
+            "sourcePath": website_favicon["sourcePath"],
+            "bytes": len(website_favicon_payload),
+            "sha256": website_favicon["sourceSha256"],
+            "dimensions": website_favicon["dimensions"],
+            "canonicalOutputPath": website_favicon["canonicalOutputPath"],
+            "approvalBasis": website_favicon["approvalBasis"],
         },
         "font": {
             "path": FONT_PATH.relative_to(REPO).as_posix(),
