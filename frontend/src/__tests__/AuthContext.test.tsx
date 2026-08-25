@@ -103,6 +103,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
 
 function AccountProbe() {
   const auth = useAuth();
+  const [avatarError, setAvatarError] = useState("");
   const [registrationError, setRegistrationError] = useState("");
   const [recoveryError, setRecoveryError] = useState("");
   return (
@@ -110,6 +111,7 @@ function AccountProbe() {
       <output aria-label="username">{auth.account?.displayName ?? ""}</output>
       <output aria-label="email">{auth.account?.email ?? ""}</output>
       <output aria-label="avatar">{auth.account?.avatarUrl ?? ""}</output>
+      <output aria-label="avatar-error">{avatarError}</output>
       <output aria-label="registration-error">{registrationError}</output>
       <output aria-label="recovery-error">{recoveryError}</output>
       <output aria-label="password-recovery">{String(auth.passwordRecovery)}</output>
