@@ -4070,3 +4070,23 @@ body:has(.field-app),
     border-top: 1px solid var(--field-soft-line);
   }
 }
+
+.field-sidebar-settings .field-sidebar-account-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.05rem;
+  text-align: left;
+}
+
+.field-sidebar-account-copy strong,
+.field-sidebar-account-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-sidebar-account-copy small {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+}

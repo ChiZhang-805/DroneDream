@@ -131,10 +131,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             },
             {
               path: "plugins/harness",
-              lazy: async () => {
-                const { AutonomyHarness } = await import("./pages/AutonomyHarness");
-                return { Component: AutonomyHarness };
-              },
+              element: <Navigate to="/autonomy/plugins" replace />,
             },
             {
               path: "mission",
@@ -152,10 +149,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             },
             {
               path: "evidence",
-              lazy: async () => {
-                const { AutonomyEvidence } = await import("./pages/AutonomyPlatform");
-                return { Component: AutonomyEvidence };
-              },
+              element: <Navigate to="/autonomy" replace />,
             },
           ],
         },

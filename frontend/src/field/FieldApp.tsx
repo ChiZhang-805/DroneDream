@@ -22,6 +22,11 @@ import {
   type FieldParameterSnapshot,
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
+import {
+  getManagedModelUsage,
+  remainingAllowanceRatio,
+  type ManagedModelUsageSnapshot,
+} from "../features/settings/cloudModelAccess";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 import { localeSafeError } from "../i18n/I18nProvider";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
@@ -60,7 +65,7 @@ const COPY = {
     quorum: "Quorum",
     locked: "Locked",
     settings: "Settings",
-    remainingAllowance: "Remaining allowance",
+    remainingAllowance: "Token",
     account: "Account",
     openAccountMenu: "Open account menu",
     signOut: "Sign out",
@@ -122,7 +127,7 @@ const COPY = {
     quorum: "仲裁",
     locked: "已锁定",
     settings: "设置",
-    remainingAllowance: "剩余额度",
+    remainingAllowance: "Token",
     account: "账户",
     openAccountMenu: "打开账户菜单",
     signOut: "退出登录",
@@ -197,6 +202,13 @@ function savedLocale(): FieldLocale {
   }
 }
 
+function fieldPlanName(value: string | undefined): "Free" | "Plus" | "Pro" {
+  const normalized = value?.trim().toLocaleLowerCase();
+  if (normalized === "plus") return "Plus";
+  if (normalized === "pro") return "Pro";
+  return "Free";
+}
+
 export interface FieldAppProps {
   initialLocale?: FieldLocale;
   initialObservationState?: FieldObservationState;
@@ -252,6 +264,7 @@ function FieldWorkspace({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [signOutPending, setSignOutPending] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
+  const [managedUsage, setManagedUsage] = useState<ManagedModelUsageSnapshot | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const applicationSurfaceRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -270,6 +283,29 @@ function FieldWorkspace({
   const selectedController = selectedPack.controllers.find(
     (controller) => controllerKey(controller.vendor, controller.model) === selectedControllerKey,
   ) ?? selectedPack.controllers[0];
+  const tokenPercent = managedUsage
+    ? Math.round(remainingAllowanceRatio(
+        managedUsage.usage.remaining_ai_credits,
+        managedUsage.plan.included_ai_credits,
+      ))
+    : null;
+  const accountPlan = fieldPlanName(managedUsage?.plan.name);
+
+  useEffect(() => {
+    if (!auth?.account) {
+      setManagedUsage(null);
+      return undefined;
+    }
+    let active = true;
+    void getManagedModelUsage().then((usage) => {
+      if (active) setManagedUsage(usage);
+    }).catch(() => {
+      if (active) setManagedUsage(null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [auth?.account?.id]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -509,7 +545,10 @@ function FieldWorkspace({
                         {auth?.account?.displayName?.trim().charAt(0).toUpperCase() || <SettingsIcon />}
                       </span>
                     )}
-                    <span>{auth?.account?.displayName || copy.settings}</span>
+                    <span className="field-sidebar-account-copy">
+                      <strong>{auth?.account?.displayName || copy.settings}</strong>
+                      <small>{accountPlan}</small>
+                    </span>
                     <ChevronUp aria-hidden="true" />
                   </button>
                   {accountMenuOpen ? (
@@ -527,6 +566,7 @@ function FieldWorkspace({
                       >
                         <Gauge aria-hidden="true" strokeWidth={1.8} />
                         <span>{copy.remainingAllowance}</span>
+                        <strong>{tokenPercent === null ? "—" : `${tokenPercent}%`}</strong>
                       </button>
                       <button
                         type="button"

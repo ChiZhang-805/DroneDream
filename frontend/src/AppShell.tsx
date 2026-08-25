@@ -1507,7 +1507,7 @@ function SettingsDialog({
   if (presentation === "quick") {
     const quickCopy = interfaceLocale === "zh-CN"
       ? {
-          title: "快捷设置",
+          title: "设置",
           language: "语言",
           appearance: "外观",
           accountMemory: "账户记忆",
@@ -1521,7 +1521,7 @@ function SettingsDialog({
           custom: "自定义",
         }
       : {
-          title: "Quick settings",
+          title: "Settings",
           language: "Language",
           appearance: "Appearance",
           accountMemory: "Account memory",
@@ -1559,8 +1559,8 @@ function SettingsDialog({
           </button>
         </header>
         <div className="quick-settings-grid">
-          <fieldset className="quick-settings-item quick-settings-language">
-            <legend>{quickCopy.language}</legend>
+          <div className="quick-settings-item quick-settings-language">
+            <span>{quickCopy.language}</span>
             <div role="group" aria-label={t("app.interfaceLanguage")}>
               {SETTINGS_LOCALES.map((option) => (
                 <button
@@ -1575,7 +1575,7 @@ function SettingsDialog({
                 </button>
               ))}
             </div>
-          </fieldset>
+          </div>
           <label className="quick-settings-item" htmlFor="quick-settings-appearance">
             <span>{quickCopy.appearance}</span>
             <select
@@ -1626,28 +1626,29 @@ function SettingsDialog({
                   }))}
                 />
               </div>
-              <label className="quick-settings-item" htmlFor="quick-settings-model">
+              <div className="quick-settings-item quick-settings-model">
                 <span>{quickCopy.model}</span>
-                <select
-                  id="quick-settings-model"
-                  value={selectedModel}
+                <AssistantModelPicker
+                  ariaLabel={quickCopy.model}
+                  chooseModelLabel={quickCopy.model}
+                  defaultGroupLabel={interfaceLocale === "zh-CN" ? "平台模型" : "Platform models"}
+                  customGroupLabel={interfaceLocale === "zh-CN" ? "自定义" : "Custom"}
+                  addCustomModelLabel={interfaceLocale === "zh-CN" ? "添加模型" : "Add model"}
+                  temporarilyUnavailableLabel={interfaceLocale === "zh-CN" ? "暂不可用" : "Unavailable"}
+                  defaultModels={availableModels}
+                  customProfiles={[]}
+                  selectedDefault={availableModels.find((model) => `${model.provider}:${model.model}` === selectedModel) ?? null}
+                  selectedCustomId={null}
                   disabled={availableModels.length === 0}
-                  onChange={(event) => {
-                    const selected = availableModels.find(
-                      (model) => `${model.provider}:${model.model}` === event.target.value,
-                    );
-                    if (!selected) return;
+                  showCustomSection={false}
+                  onSelectDefault={(selected) => {
                     selectAccessMode("platform");
                     selectManagedModel(selected.provider, selected.model);
                   }}
-                >
-                  {availableModels.map((model) => (
-                    <option key={`${model.provider}:${model.model}`} value={`${model.provider}:${model.model}`}>
-                      {model.display_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  onSelectCustom={() => undefined}
+                  onOpenSettings={() => onOpenAllSettings?.("model")}
+                />
+              </div>
             </>
           ) : null}
           {access.desktopRuntime ? (
@@ -2723,9 +2724,9 @@ const ACCOUNT_COPY = {
     account: "Account",
     localUser: "Local user",
     localWorkspace: "Local workspace",
-    cloudWorkspace: "Cloud workspace",
+    cloudWorkspace: "Free",
     editProfile: "Edit profile",
-    remainingAllowance: "Remaining allowance",
+    remainingAllowance: "Token",
     allowanceUnavailable: "Unavailable",
     loadingAllowance: "Loading…",
     settings: "Settings",
@@ -2800,9 +2801,9 @@ const ACCOUNT_COPY = {
     account: "账号",
     localUser: "本地用户",
     localWorkspace: "本地工作区",
-    cloudWorkspace: "云端工作区",
+    cloudWorkspace: "Free",
     editProfile: "编辑账户",
-    remainingAllowance: "剩余额度",
+    remainingAllowance: "Token",
     allowanceUnavailable: "暂不可用",
     loadingAllowance: "读取中…",
     settings: "设置",
@@ -2860,16 +2861,45 @@ function AccountAvatar({
   );
 }
 
+function normalizedPlanName(value: string | null | undefined): "Free" | "Plus" | "Pro" {
+  const plan = value?.trim().toLocaleLowerCase() ?? "";
+  if (plan.includes("pro")) return "Pro";
+  if (plan.includes("plus")) return "Plus";
+  return "Free";
+}
+
+function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {
+  const [plan, setPlan] = useState<"Free" | "Plus" | "Pro">("Free");
+
+  useEffect(() => {
+    if (!authenticated) {
+      setPlan("Free");
+      return undefined;
+    }
+    let active = true;
+    void getManagedModelUsage()
+      .then((snapshot) => {
+        if (active) setPlan(normalizedPlanName(snapshot.plan.name));
+      })
+      .catch(() => {
+        if (active) setPlan("Free");
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticated]);
+
+  return <>{plan}</>;
+}
+
 function AccountMenuPopover({
   menuRef,
   onClose,
-  onOpenProfile,
   onOpenAllowance,
   onOpenSettings,
 }: {
   menuRef: RefObject<HTMLDivElement>;
   onClose: () => void;
-  onOpenProfile: () => void;
   onOpenAllowance: () => void;
   onOpenSettings: () => void;
 }) {
@@ -2881,7 +2911,6 @@ function AccountMenuPopover({
   const [usageState, setUsageState] = useState<"loading" | "ready" | "error">("loading");
   const [signOutPending, setSignOutPending] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
-  const formatter = new Intl.NumberFormat(accountLocale === "zh-CN" ? "zh-CN" : "en");
 
   useEffect(() => {
     let active = true;
@@ -2923,27 +2952,16 @@ function AccountMenuPopover({
 
   return (
     <div ref={menuRef} className="account-menu-popover" role="menu" aria-label={copy.account}>
-      <button type="button" className="account-menu-profile" role="menuitem" onClick={onOpenProfile}>
-        <AccountAvatar account={auth.account} className="account-menu-avatar" />
-        <span>
-          <strong>{auth.account?.displayName ?? copy.localUser}</strong>
-          <small>{usage?.plan.name ?? copy.editProfile}</small>
-        </span>
-      </button>
-      <button type="button" className="account-menu-allowance" role="menuitem" onClick={onOpenAllowance}>
-        <span className="account-menu-row-heading">
-          <span><Gauge aria-hidden="true" strokeWidth={1.8} />{copy.remainingAllowance}</span>
-          <strong>
-            {usageState === "loading"
-              ? copy.loadingAllowance
-              : usage
-                ? formatter.format(usage.usage.remaining_ai_credits)
-                : copy.allowanceUnavailable}
-          </strong>
-        </span>
-        <span className="account-menu-allowance-track" role="progressbar" aria-valuemin={0} aria-valuemax={usage?.plan.included_ai_credits ?? 0} aria-valuenow={usage?.usage.remaining_ai_credits ?? 0}>
-          <i style={{ width: `${ratio}%` }} />
-        </span>
+      <button type="button" className="account-menu-row account-menu-token" role="menuitem" onClick={onOpenAllowance}>
+        <Gauge aria-hidden="true" strokeWidth={1.8} />
+        <span>{copy.remainingAllowance}</span>
+        <strong>
+          {usageState === "loading"
+            ? "…"
+            : usageState === "ready" && usage
+              ? `${Math.round(ratio)}%`
+              : "—"}
+        </strong>
       </button>
       <button type="button" className="account-menu-row" role="menuitem" onClick={onOpenSettings}>
         <Settings aria-hidden="true" strokeWidth={1.8} />
@@ -4606,10 +4624,6 @@ function AppShellContent() {
               <AccountMenuPopover
                 menuRef={accountMenuRef}
                 onClose={() => setAccountMenuOpen(false)}
-                onOpenProfile={() => {
-                  setAccountMenuOpen(false);
-                  setAccountOpen(true);
-                }}
                 onOpenAllowance={() => {
                   openSettingsWorkspace("model", "account");
                 }}
@@ -4649,9 +4663,7 @@ function AppShellContent() {
                   {auth.account?.displayName ?? accountCopy.localUser}
                 </strong>
                 <small>
-                  {auth.account
-                    ? accountCopy.cloudWorkspace
-                    : accountCopy.localWorkspace}
+                  <AccountPlanLabel authenticated={Boolean(auth.account)} />
                 </small>
               </span>
             </button>
@@ -4746,12 +4758,6 @@ function AppShellContent() {
         <main id="main-content" className={`app-main${experimentWizardMode ? " app-main-wizard" : ""}`} tabIndex={-1}>
           <Outlet key={activeThemeEdition} />
         </main>
-        <footer className="app-footer">
-          <div className="app-footer-content">
-            <span>{t("app.author")}: Chi Zhang</span>
-            <span>{t("app.contact")}: cz005623@gmail.com</span>
-          </div>
-        </footer>
       </div>
       {settingsWorkspace}
       {exitGuard}

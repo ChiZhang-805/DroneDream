@@ -20,12 +20,12 @@ export type InterfaceLocale = Locale;
 const launcherCopy = launcherCopyForEdition(BUILD_EDITION);
 
 const enTranslations = {
-    "app.conversation": "Tuning Chat",
+    "app.conversation": "Chatbot",
     "app.dashboard": "Dashboard",
     "app.newExperiment": "Experiment",
     "app.history": "Run History",
     "app.fixedScenarios": "Scenarios",
-    "app.autonomyLab": "Agent",
+    "app.autonomyLab": "Autonomy",
     "app.experimentBuilder": "Experiment",
     "app.labValidation": "Evidence Review",
     "app.fieldDeviceSetup": "Device & Vehicle",

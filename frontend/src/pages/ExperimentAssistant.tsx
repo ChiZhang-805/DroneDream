@@ -1195,7 +1195,10 @@ export function ExperimentAssistant() {
                 >
                   <span className="assistant-example-heading">
                     <AssistantTemplateIcon index={index} />
-                    <strong>{example.title}</strong>
+                    <span>
+                      <strong>{example.title}</strong>
+                      <small>{example.body}</small>
+                    </span>
                   </span>
                 </button>
               ))}

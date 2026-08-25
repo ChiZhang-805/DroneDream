@@ -85,7 +85,7 @@ const DEFAULT_MEMORY_SCOPES: Record<MemoryScopeKey, boolean> = {
 const COPY = {
   en: {
     title: "Settings",
-    quickTitle: "Quick settings",
+    quickTitle: "Settings",
     close: "Close settings",
     back: "Back to app",
     allSettings: "All settings",
@@ -145,7 +145,7 @@ const COPY = {
   },
   "zh-CN": {
     title: "设置",
-    quickTitle: "快捷设置",
+    quickTitle: "设置",
     close: "关闭设置",
     back: "返回应用",
     allSettings: "全部设置",
@@ -414,8 +414,8 @@ export function FieldSettingsDialog({
           </button>
         </header>
         <div className="quick-settings-grid">
-          <fieldset className="quick-settings-item quick-settings-language">
-            <legend>{copy.language}</legend>
+          <div className="quick-settings-item quick-settings-language">
+            <span>{copy.language}</span>
             <div role="group" aria-label={copy.language}>
               {SETTINGS_LOCALES.map((option) => (
                 <button
@@ -430,7 +430,7 @@ export function FieldSettingsDialog({
                 </button>
               ))}
             </div>
-          </fieldset>
+          </div>
           <label className="quick-settings-item" htmlFor="field-quick-settings-appearance">
             <span>{copy.interface}</span>
             <select

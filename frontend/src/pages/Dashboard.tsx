@@ -207,8 +207,7 @@ function DashboardBody({
 
   return (
     <div className="dashboard-body">
-      <section className="dashboard-status-summary" aria-labelledby="dashboard-status-summary-title">
-        <h2 id="dashboard-status-summary-title">{t("dashboard.statusSummary")}</h2>
+      <section className="dashboard-status-summary" aria-label={t("dashboard.statusSummary")}>
         <div className="metric-grid">
           <MetricCard
             label={t("dashboard.totalJobs")}
@@ -246,7 +245,6 @@ function DashboardBody({
       <section className={`dashboard-recent-jobs${recentJobs.length === 0 ? " is-empty" : ""}`} aria-labelledby="dashboard-recent-jobs-title">
         <header>
           <h2 id="dashboard-recent-jobs-title">{t("dashboard.recentJobs")}</h2>
-          {recentJobs.length === 0 ? <span className="dashboard-empty-jobs" aria-label={t("dashboard.recentJobs")}>—</span> : null}
           <Link to="/history" className="dashboard-view-all">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 12h13M14 7l5 5-5 5" />

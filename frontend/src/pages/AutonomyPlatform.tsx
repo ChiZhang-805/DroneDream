@@ -29,10 +29,14 @@ import {
   ScanLine,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Upload,
-  Video,
+  Play,
+  Square,
+  VideoOff,
   Waypoints,
   Weight,
+  X,
 } from "lucide-react";
 import {
   useCallback,
@@ -65,7 +69,6 @@ import {
   normalizeAutonomyWorkspace,
   saveAutonomyWorkspace,
   type AutonomyConversationMessage,
-  type AutonomyEvidenceRecord,
   type AutonomyMapPack,
   type AutonomyWorkspaceState,
 } from "../features/autonomy/workspaceStore";
@@ -79,7 +82,6 @@ import {
 } from "../features/autonomy/assetLibraryStore";
 import {
   autonomyAssetPairQualified,
-  autonomyExecutionAuthority,
   autonomyMapPackQualified,
   planAutonomyMission,
   type AutonomyPlanningModel,
@@ -133,11 +135,9 @@ import {
   managedModelAvailableForAssistant,
 } from "../features/settings/cloudModelAccess";
 import { useModelAccess } from "../features/settings/ModelAccessContext";
-import { isManagedModelProvider } from "../features/settings/modelProviderCatalog";
 import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type { AutonomyAssetConnector } from "../types/api";
-import { AutonomyLab } from "./AutonomyLab";
 
 type WorkspaceContext = {
   edition: BrandEditionId;
@@ -160,11 +160,12 @@ type WorkspaceContext = {
   agentCorePlugins: AgentCorePluginEntry[];
   missionComposerDraft: string;
   setMissionComposerDraft: Dispatch<SetStateAction<string>>;
+  removeAsset: (kind: "aircraft" | "map" | "external", id: string, contentSha256?: string | null) => void;
 };
 
 const IGNORE_EXTERNAL_ASSET: WorkspaceContext["registerExternalAsset"] = () => null;
 
-type AutonomySectionId = "overview" | "aircraft" | "maps" | "plugins" | "live" | "evidence";
+type AutonomySectionId = "overview" | "aircraft" | "maps" | "plugins" | "live";
 
 const SECTION_ICONS = {
   overview: Orbit,
@@ -172,7 +173,6 @@ const SECTION_ICONS = {
   maps: Layers3,
   plugins: Blocks,
   live: Airplay,
-  evidence: FileClock,
 } as const;
 
 const SECTION_COPY = {
@@ -182,8 +182,7 @@ const SECTION_COPY = {
     maps: "Maps",
     plugins: "Plugins",
     live: "Live",
-    evidence: "Evidence",
-    title: "AGENT",
+    title: "Autonomy",
   },
   zh: {
     overview: "总览",
@@ -191,8 +190,7 @@ const SECTION_COPY = {
     maps: "地图",
     plugins: "插件",
     live: "实时运行",
-    evidence: "证据回放",
-    title: "AGENT",
+    title: "自主任务",
   },
 } as const;
 
@@ -205,16 +203,6 @@ function updatedWorkspace(
   patch: Partial<AutonomyWorkspaceState>,
 ): AutonomyWorkspaceState {
   return { ...workspace, ...patch };
-}
-
-function formatTime(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
 
 const ASSET_QUALIFICATION_REQUIRED_INPUTS = new Set([
@@ -455,9 +443,11 @@ function AgentCoreQualificationEvidenceDetails({
 export function AutonomyAssetConnectorPanel({
   kind,
   chinese,
+  compact = false,
 }: {
   kind: "map" | "vehicle";
   chinese: boolean;
+  compact?: boolean;
 }) {
   const outletWorkspace = useOutletContext<WorkspaceContext | null>();
   const assetLibrary = outletWorkspace?.assetLibrary ?? { externalAssets: [] };
@@ -548,6 +538,26 @@ export function AutonomyAssetConnectorPanel({
       setImporting(false);
     }
   };
+  if (compact) {
+    return (
+      <div className="autonomy-repository-import">
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => void importAsset("file")}
+          disabled={importing || catalogState !== "ready"}
+        >
+          <Upload aria-hidden="true" />
+          {importing
+            ? (chinese ? "正在导入" : "Importing")
+            : kind === "vehicle"
+              ? (chinese ? "导入无人机" : "Import aircraft")
+              : (chinese ? "导入地图" : "Import map")}
+        </button>
+        {importError ? <span role="alert">{importError}</span> : null}
+      </div>
+    );
+  }
   const submitCompanionResult = async (job: AgentCoreAssetImportJob) => {
     setImporting(true);
     setImportError(null);
@@ -1448,20 +1458,78 @@ export function AutonomyPlatform() {
     }));
   }, [assetLibrary.maps, persist, workspace]);
 
+  const removeAsset = useCallback((
+    kind: "aircraft" | "map" | "external",
+    id: string,
+    contentSha256: string | null = null,
+  ) => {
+    if (kind === "external") {
+      setAssetLibrary((current) => saveAutonomyAssetLibrary(ownerId, edition, {
+        ...current,
+        externalAssets: current.externalAssets.filter((asset) => (
+          asset.id !== id || (contentSha256 && asset.contentSha256 !== contentSha256)
+        )),
+      }));
+      return;
+    }
+    const defaults = defaultAutonomyWorkspace();
+    const removingCurrent = kind === "aircraft"
+      ? workspace.aircraft.id === id
+      : workspace.mapPack.id === id;
+    const nextWorkspace = removingCurrent
+      ? normalizeAutonomyWorkspace(updatedWorkspace(workspace, kind === "aircraft"
+        ? {
+            aircraft: defaults.aircraft,
+            mission: {
+              ...workspace.mission,
+              aircraftProfileId: defaults.aircraft.id,
+              compiledPlan: null,
+              updatedAt: new Date().toISOString(),
+            },
+          }
+        : {
+            mapPack: defaults.mapPack,
+            mission: {
+              ...workspace.mission,
+              mapPackId: defaults.mapPack.id,
+              compiledPlan: null,
+              updatedAt: new Date().toISOString(),
+            },
+          }))
+      : workspace;
+    const savedWorkspace = removingCurrent
+      ? saveAutonomyWorkspace(ownerId, edition, nextWorkspace)
+      : workspace;
+    if (removingCurrent) setWorkspace(savedWorkspace);
+    setAssetLibrary((current) => saveAutonomyAssetLibrary(
+      ownerId,
+      edition,
+      withCurrentAutonomyAssets({
+        ...current,
+        aircraft: kind === "aircraft"
+          ? current.aircraft.filter((asset) => asset.id !== id)
+          : current.aircraft,
+        maps: kind === "map"
+          ? current.maps.filter((asset) => asset.id !== id)
+          : current.maps,
+      }, savedWorkspace),
+    ));
+  }, [edition, ownerId, workspace]);
+
   const sections: Array<{ id: AutonomySectionId; to: string }> = [
     { id: "overview", to: "/autonomy" },
     { id: "aircraft", to: "/autonomy/aircraft" },
     { id: "maps", to: "/autonomy/maps" },
     { id: "plugins", to: "/autonomy/plugins" },
     { id: "live", to: "/autonomy/live" },
-    { id: "evidence", to: "/autonomy/evidence" },
   ];
   const currentSectionPath = normalizedAutonomyPath(location.pathname);
+  const currentSection = sections.find((section) => section.to === currentSectionPath)?.id ?? "overview";
 
   return (
     <div className="autonomy-platform-page">
       <header className="autonomy-platform-header">
-        <h1>{copy.title}</h1>
+        <h1>{copy[currentSection]}</h1>
         <nav className="autonomy-section-switch" aria-label={copy.title}>
           {sections.map(({ id, to }) => {
             const Icon = SECTION_ICONS[id];
@@ -1511,6 +1579,7 @@ export function AutonomyPlatform() {
           agentCorePlugins,
           missionComposerDraft,
           setMissionComposerDraft,
+          removeAsset,
         } satisfies WorkspaceContext} />
       </main>
     </div>
@@ -1980,7 +2049,10 @@ export function AutonomyOverview() {
                 >
                   <span className="assistant-example-heading">
                     <AutonomyTemplateIcon index={index} />
-                    <strong>{example.title}</strong>
+                    <span>
+                      <strong>{example.title}</strong>
+                      <small>{example.body}</small>
+                    </span>
                   </span>
                 </button>
               ))}
@@ -2181,29 +2253,6 @@ export function AutonomyOverview() {
   );
 }
 
-const SEMANTIC_LABELS: Record<AutonomyMapPack["semanticLayers"][number], { zh: string; en: string }> = {
-  "free-space": { zh: "可通行空间", en: "Free space" },
-  stairs: { zh: "楼梯", en: "Stairs" },
-  doors: { zh: "门", en: "Doors" },
-  gates: { zh: "出入口", en: "Gates" },
-  people: { zh: "人员", en: "People" },
-  "pickup-zones": { zh: "取件区", en: "Pickup zones" },
-  "launch-zones": { zh: "起降区", en: "Launch zones" },
-  rooms: { zh: "房间", en: "Rooms" },
-  corridors: { zh: "走廊", en: "Corridors" },
-  roads: { zh: "道路", en: "Roads" },
-  vegetation: { zh: "植被", en: "Vegetation" },
-  "street-furniture": { zh: "道路设施", en: "Street furniture" },
-};
-
-const PLANNING_LAYER_LABELS: Record<AutonomyMapPack["planningLayers"][number], { zh: string; en: string }> = {
-  "collision-geometry": { zh: "碰撞几何", en: "Collision geometry" },
-  occupancy: { zh: "占据栅格", en: "Occupancy" },
-  esdf: { zh: "三维 ESDF", en: "3D ESDF" },
-  "dynamic-overlay": { zh: "动态叠加层", en: "Dynamic overlay" },
-  confidence: { zh: "置信度", en: "Confidence" },
-};
-
 const MAP_REPRESENTATION_LABELS: Record<AutonomyMapPack["representation"], { zh: string; en: string }> = {
   "hybrid-3d": { zh: "混合三维", en: "Hybrid 3D" },
   mesh: { zh: "网格", en: "Mesh" },
@@ -2216,178 +2265,145 @@ function mapRepresentationLabel(value: AutonomyMapPack["representation"], chines
   return chinese ? MAP_REPRESENTATION_LABELS[value].zh : MAP_REPRESENTATION_LABELS[value].en;
 }
 
-function mapLiveUpdateLabel(value: AutonomyMapPack["liveUpdates"], chinese: boolean): string {
-  const labels: Record<AutonomyMapPack["liveUpdates"], { zh: string; en: string }> = {
-    "vision-slam": { zh: "视觉 SLAM", en: "Vision SLAM" },
-    "depth-fusion": { zh: "深度融合", en: "Depth fusion" },
-    "lidar-fusion": { zh: "LiDAR 融合", en: "LiDAR fusion" },
-    fixed: { zh: "固定地图", en: "Fixed map" },
-  };
-  return chinese ? labels[value].zh : labels[value].en;
-}
-
-function externalAssetForProfile(
-  library: AutonomyAssetLibrary,
-  assetId: string | null | undefined,
-  contentSha256: string | null | undefined,
-): AutonomyExternalAssetReference | null {
-  if (!assetId || !contentSha256) return null;
-  return library.externalAssets.find((asset) => (
-    asset.id === assetId && asset.contentSha256 === contentSha256
-  )) ?? null;
-}
-
-function qualificationStateLabel(qualified: boolean, chinese: boolean): string {
-  return qualified
-    ? chinese ? "已通过真实仿真认证" : "Real-simulation qualified"
-    : chinese ? "等待导入与认证" : "Import and qualification required";
-}
-
 export function AutonomyAircraft() {
-  const { chinese, workspace, assetLibrary, selectAircraft } = useAutonomyWorkspace();
-  const aircraft = workspace.aircraft;
-  const qualified = isAutonomyAircraftAssetQualified(aircraft);
-  const source = externalAssetForProfile(
-    assetLibrary,
-    aircraft.agentCoreAssetId,
-    aircraft.agentCoreContentSha256,
-  );
-  const sourceLabel = source?.sourceApplication || aircraft.manufacturer || "—";
-  const sourceVersion = source
-    ? [source.sourceFormat.toUpperCase(), source.version].filter(Boolean).join(" · ")
-    : "—";
-  const repositoryAircraft = assetLibrary.aircraft.filter((candidate) => (
-    isAutonomyAircraftAssetQualified(candidate)
-    && candidate.qualificationReceiptId === workspace.mapPack.qualificationReceiptId
-  ));
+  const { chinese, workspace, assetLibrary, selectAircraft, removeAsset } = useAutonomyWorkspace();
+  const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const defaultAircraftId = defaultAutonomyWorkspace().aircraft.id;
+  const externalAircraft = assetLibrary.externalAssets.filter((asset) => asset.kind === "vehicle");
+  const openAircraftDetails = (aircraft: AutonomyWorkspaceState["aircraft"]) => setDetails({
+    title: aircraft.name,
+    rows: [
+      [chinese ? "制造商" : "Manufacturer", aircraft.manufacturer || "—"],
+      [chinese ? "机架" : "Airframe", aircraft.airframe || "—"],
+      [chinese ? "飞控" : "Flight controller", aircraft.flightController || "—"],
+      [chinese ? "版本" : "Version", `v${aircraft.version}`],
+      [chinese ? "传感器" : "Sensors", aircraft.sensors.join(" · ") || "—"],
+    ],
+  });
 
   return (
-    <section className="autonomy-config-page autonomy-config-page-continuous">
-      <div className="autonomy-config-main">
-        <AutonomyAssetConnectorPanel kind="vehicle" chinese={chinese} />
-        <AutonomyAssetQualificationPanel chinese={chinese} />
-        <section className="autonomy-config-card">
-          <header>
-            <Navigation2 aria-hidden="true" />
-            <h2>{chinese ? "无人机仓库" : "Aircraft repository"}</h2>
-            <div className="autonomy-asset-toolbar">
-              <select
-                aria-label={chinese ? "已保存无人机" : "Saved aircraft"}
-                value={qualified ? aircraft.id : ""}
-                onChange={(event) => selectAircraft(event.target.value)}
-              >
-                {!qualified ? <option value="">{chinese ? "尚未绑定合格无人机" : "No qualified aircraft bound"}</option> : null}
-                {repositoryAircraft.map((item) => (
-                  <option value={item.id} key={item.id}>{item.name} · v{item.version}</option>
-                ))}
-              </select>
-            </div>
-            <em className={qualified ? "is-ready" : ""}>
-              {qualificationStateLabel(qualified, chinese)}
-            </em>
-          </header>
-          {qualified ? (
-            <div className="autonomy-form-grid is-three">
-              <label><span>{chinese ? "名称" : "Name"}</span><input readOnly value={aircraft.name} /></label>
-              <label><span>{chinese ? "来源" : "Source"}</span><input readOnly value={sourceLabel} /></label>
-              <label><span>{chinese ? "格式与版本" : "Format and version"}</span><input readOnly value={sourceVersion} /></label>
-              <label><span>{chinese ? "资产成熟度" : "Asset maturity"}</span><input readOnly value={source?.maturity.replaceAll("_", " ") ?? "—"} /></label>
-              <label className="is-wide"><span>{chinese ? "资产标识" : "Asset ID"}</span><input readOnly value={aircraft.agentCoreAssetId ?? ""} /></label>
-              <label className="is-wide"><span>{chinese ? "内容哈希" : "Content hash"}</span><input readOnly value={aircraft.agentCoreContentSha256 ?? ""} /></label>
-              <label className="is-wide"><span>{chinese ? "认证凭据" : "Qualification receipt"}</span><input readOnly value={aircraft.qualificationReceiptId ?? ""} /></label>
-            </div>
-          ) : null}
-        </section>
+    <section className="autonomy-repository-page">
+      <div className="autonomy-repository-toolbar">
+        <p>{chinese ? "双击卡片查看详情" : "Double-click a card for details"}</p>
+        <AutonomyAssetConnectorPanel kind="vehicle" chinese={chinese} compact />
       </div>
+      <div className="autonomy-repository-grid" aria-label={chinese ? "无人机仓库" : "Aircraft repository"}>
+        {assetLibrary.aircraft.map((aircraft) => (
+          <article key={aircraft.id} data-selected={workspace.aircraft.id === aircraft.id}>
+            <button
+              type="button"
+              className="autonomy-repository-card-surface"
+              onClick={() => selectAircraft(aircraft.id)}
+              onDoubleClick={() => openAircraftDetails(aircraft)}
+            >
+              <span className="autonomy-repository-preview is-aircraft"><Navigation2 aria-hidden="true" /></span>
+              <span className="autonomy-repository-copy">
+                <strong>{aircraft.name}</strong>
+                <small>{[aircraft.manufacturer, aircraft.airframe].filter(Boolean).join(" · ")}</small>
+              </span>
+            </button>
+            {aircraft.id !== defaultAircraftId ? (
+              <button
+                type="button"
+                className="autonomy-repository-delete"
+                aria-label={chinese ? `删除 ${aircraft.name}` : `Delete ${aircraft.name}`}
+                onClick={() => removeAsset("aircraft", aircraft.id)}
+              ><Trash2 aria-hidden="true" /></button>
+            ) : null}
+          </article>
+        ))}
+        {externalAircraft.map((asset) => (
+          <article key={`${asset.id}:${asset.contentSha256}`}>
+            <button
+              type="button"
+              className="autonomy-repository-card-surface"
+              onDoubleClick={() => setDetails({
+                title: asset.name,
+                rows: [
+                  [chinese ? "来源" : "Source", asset.sourceApplication || "—"],
+                  [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()],
+                  [chinese ? "版本" : "Version", asset.version || "—"],
+                  [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")],
+                ],
+              })}
+            >
+              <span className="autonomy-repository-preview is-aircraft is-imported"><Navigation2 aria-hidden="true" /></span>
+              <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
+            </button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
+          </article>
+        ))}
+      </div>
+      {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
   );
 }
 
 export function AutonomyMaps() {
-  const { chinese, workspace, assetLibrary, selectMap } = useAutonomyWorkspace();
-  const mapPack = workspace.mapPack;
-  const qualified = autonomyMapPackQualified(mapPack);
-  const source = externalAssetForProfile(
-    assetLibrary,
-    mapPack.agentCoreAssetId,
-    mapPack.agentCoreContentSha256,
-  );
-  const semanticLayers = mapPack.semanticLayers
-    .map((layer) => chinese ? SEMANTIC_LABELS[layer].zh : SEMANTIC_LABELS[layer].en)
-    .join(" · ");
-  const planningLayers = mapPack.planningLayers
-    .map((layer) => chinese ? PLANNING_LAYER_LABELS[layer].zh : PLANNING_LAYER_LABELS[layer].en)
-    .join(" · ");
-  const bounds = [mapPack.boundsM.x, mapPack.boundsM.y, mapPack.boundsM.z]
-    .map((value) => Number.isFinite(value) ? value.toFixed(1) : "—")
-    .join(" × ");
-  const repositoryMaps = assetLibrary.maps.filter((candidate) => (
-    autonomyMapPackQualified(candidate)
-    && candidate.qualificationReceiptId === workspace.aircraft.qualificationReceiptId
-  ));
+  const { chinese, workspace, assetLibrary, selectMap, removeAsset } = useAutonomyWorkspace();
+  const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const defaultMapId = defaultAutonomyWorkspace().mapPack.id;
+  const externalMaps = assetLibrary.externalAssets.filter((asset) => asset.kind === "map" || asset.kind === "world");
+  const openMapDetails = (mapPack: AutonomyMapPack) => setDetails({
+    title: mapPack.name,
+    rows: [
+      [chinese ? "类型" : "Type", mapRepresentationLabel(mapPack.representation, chinese)],
+      [chinese ? "坐标系" : "Coordinate frame", mapPack.coordinateFrame],
+      [chinese ? "分辨率" : "Resolution", `${mapPack.resolutionM} m`],
+      [chinese ? "楼层" : "Floors", String(mapPack.floorCount)],
+      [chinese ? "版本" : "Version", `v${mapPack.version}`],
+    ],
+  });
 
   return (
-    <section className="autonomy-config-page autonomy-config-page-continuous autonomy-maps-page">
-      <div className="autonomy-config-main">
-        <AutonomyAssetConnectorPanel kind="map" chinese={chinese} />
-        <AutonomyAssetQualificationPanel chinese={chinese} />
-        <section className="autonomy-config-card">
-          <header>
-            <Layers3 aria-hidden="true" />
-            <h2>{chinese ? "地图仓库" : "Map repository"}</h2>
-            <div className="autonomy-asset-toolbar">
-              <select
-                aria-label={chinese ? "已保存地图" : "Saved maps"}
-                value={qualified ? mapPack.id : ""}
-                onChange={(event) => selectMap(event.target.value)}
-              >
-                {!qualified ? <option value="">{chinese ? "尚未绑定合格地图" : "No qualified map bound"}</option> : null}
-                {repositoryMaps.map((item) => (
-                  <option value={item.id} key={item.id}>{item.name}</option>
-                ))}
-              </select>
-            </div>
-            <em className={qualified ? "is-ready" : ""}>
-              {qualificationStateLabel(qualified, chinese)}
-            </em>
-          </header>
-          {qualified ? (
-            <div className="autonomy-form-grid is-four">
-              <label className="is-wide"><span>{chinese ? "名称" : "Name"}</span><input readOnly value={mapPack.name} /></label>
-              <label><span>{chinese ? "三维表示" : "3D representation"}</span><input readOnly value={mapRepresentationLabel(mapPack.representation, chinese)} /></label>
-              <label><span>{chinese ? "坐标系" : "Coordinate frame"}</span><input readOnly value={mapPack.coordinateFrame} /></label>
-              <label><span>{chinese ? "分辨率" : "Resolution"}</span><input readOnly value={String(mapPack.resolutionM) + " m"} /></label>
-              <label><span>{chinese ? "空间范围" : "Bounds"}</span><input readOnly value={bounds + " m"} /></label>
-              <label><span>{chinese ? "楼层数" : "Floors"}</span><input readOnly value={String(mapPack.floorCount)} /></label>
-              <label><span>{chinese ? "实时更新" : "Live updates"}</span><input readOnly value={mapLiveUpdateLabel(mapPack.liveUpdates, chinese)} /></label>
-              <label><span>{chinese ? "来源" : "Source"}</span><input readOnly value={source?.sourceApplication ?? "—"} /></label>
-              <label className="is-wide"><span>{chinese ? "语义图层" : "Semantic layers"}</span><input readOnly value={semanticLayers || "—"} /></label>
-              <label className="is-wide"><span>{chinese ? "规划图层" : "Planning layers"}</span><input readOnly value={planningLayers || "—"} /></label>
-              <label className="is-wide"><span>{chinese ? "资产标识" : "Asset ID"}</span><input readOnly value={mapPack.agentCoreAssetId ?? ""} /></label>
-              <label className="is-wide"><span>{chinese ? "内容哈希" : "Content hash"}</span><input readOnly value={mapPack.agentCoreContentSha256 ?? ""} /></label>
-              <label className="is-wide"><span>{chinese ? "认证凭据" : "Qualification receipt"}</span><input readOnly value={mapPack.qualificationReceiptId ?? ""} /></label>
-            </div>
-          ) : null}
-        </section>
-        {qualified ? (
-          <section className="autonomy-config-card">
-            <header><Database aria-hidden="true" /><h2>{chinese ? "资产来源" : "Asset provenance"}</h2></header>
-            <div className="autonomy-map-assets">
-              {mapPack.sourceFiles.map((file, index) => (
-                <div key={file.sha256 || String(index)} data-admission={file.admission}>
-                  <HardDrive aria-hidden="true" />
-                  <span>
-                    <strong>{file.name}</strong>
-                    <small>{file.format.toUpperCase()} · {file.parser ?? source?.sourceApplication ?? (chinese ? "外部来源" : "External source")}</small>
-                    {file.sha256 ? <code>{file.sha256}</code> : null}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+    <section className="autonomy-repository-page">
+      <div className="autonomy-repository-toolbar">
+        <p>{chinese ? "双击卡片查看详情" : "Double-click a card for details"}</p>
+        <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact />
       </div>
+      <div className="autonomy-repository-grid" aria-label={chinese ? "地图仓库" : "Map repository"}>
+        {assetLibrary.maps.map((mapPack) => (
+          <article key={mapPack.id} data-selected={workspace.mapPack.id === mapPack.id}>
+            <button type="button" className="autonomy-repository-card-surface" onClick={() => selectMap(mapPack.id)} onDoubleClick={() => openMapDetails(mapPack)}>
+              <span className="autonomy-repository-preview is-map"><Layers3 aria-hidden="true" /></span>
+              <span className="autonomy-repository-copy"><strong>{mapPack.name}</strong><small>{mapRepresentationLabel(mapPack.representation, chinese)} · v{mapPack.version}</small></span>
+            </button>
+            {mapPack.id !== defaultMapId ? <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button> : null}
+          </article>
+        ))}
+        {externalMaps.map((asset) => (
+          <article key={`${asset.id}:${asset.contentSha256}`}>
+            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({ title: asset.name, rows: [[chinese ? "来源" : "Source", asset.sourceApplication || "—"], [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()], [chinese ? "版本" : "Version", asset.version || "—"], [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")]] })}>
+              <span className="autonomy-repository-preview is-map is-imported"><Layers3 aria-hidden="true" /></span>
+              <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
+            </button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
+          </article>
+        ))}
+      </div>
+      {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
+  );
+}
+
+function RepositoryDetailsDialog({
+  chinese,
+  details,
+  onClose,
+}: {
+  chinese: boolean;
+  details: { title: string; rows: Array<[string, string]> };
+  onClose: () => void;
+}) {
+  return (
+    <div className="autonomy-repository-dialog-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <section className="autonomy-repository-dialog" role="dialog" aria-modal="true" aria-label={details.title}>
+        <header><h2>{details.title}</h2><button type="button" onClick={onClose} aria-label={chinese ? "关闭" : "Close"}><X aria-hidden="true" /></button></header>
+        <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      </section>
+    </div>
   );
 }
 
@@ -2457,7 +2473,7 @@ export function AutonomyMission() {
   );
 }
 
-function AgentCoreLiveMission({
+export function AgentCoreLiveMission({
   chinese,
   workspace,
   planningModel,
@@ -2640,96 +2656,126 @@ function AgentCoreLiveMission({
 }
 
 export function AutonomyLive() {
-  const { chinese, workspace, persist } = useAutonomyWorkspace();
+  const { chinese, workspace } = useAutonomyWorkspace();
   const auth = useOptionalAuth();
   const edition = useEditionTheme().id;
-  const storedPlanningModel = workspace.mission.planningModel;
-  const planningModel: AutonomyPlanningModel | null = storedPlanningModel.accessMode === "byok"
-    ? {
-        accessMode: "byok",
-        provider: storedPlanningModel.provider,
-        model: storedPlanningModel.model,
-        agentCoreProfileId: storedPlanningModel.agentCoreProfileId ?? null,
-        agentCoreSelectionId: storedPlanningModel.agentCoreSelectionId ?? null,
-      }
-    : isManagedModelProvider(storedPlanningModel.provider)
-      ? {
-          accessMode: "platform",
-          provider: storedPlanningModel.provider,
-          model: storedPlanningModel.model,
-        }
-      : null;
-  const recordEvidence = useCallback((record: AutonomyEvidenceRecord) => {
-    const evidence = [record, ...workspace.evidence.filter((item) => item.id !== record.id)].slice(0, 50);
-    persist(updatedWorkspace(workspace, { evidence }));
-  }, [persist, workspace]);
-  const executionAuthority = autonomyExecutionAuthority(
+  const conversationId = workspace.mission.conversationId;
+  const binding = useMemo(() => ({
     edition,
-    workspace.mission.compiledPlan?.source,
-  );
-  if (executionAuthority === "agent-core" && planningModel) {
-    return <AgentCoreLiveMission chinese={chinese} workspace={workspace} planningModel={planningModel} accountId={auth?.account?.id ?? null} />;
-  }
-  if (!publicDemoConsole) {
-    return (
-      <section className="agent-core-live-mission is-blocked" role="alert">
-        <header>
-          <span><ShieldCheck aria-hidden="true" /></span>
-          <div>
-            <small>ROS 2 · Gazebo · PX4 SITL</small>
-            <h2>{chinese ? "AGENT Core 执行已闭锁" : "AGENT Core execution is blocked"}</h2>
-          </div>
-          <em data-state="blocked">{chinese ? "需要重新规划" : "Replanning required"}</em>
-        </header>
-        <p className="agent-core-live-warning">
-          <ShieldCheck aria-hidden="true" />
-          {chinese
-            ? "当前任务不是由本机 AGENT Core 生成的哈希绑定合同，不能切换到其他执行引擎。请返回任务对话，在运行环境就绪后重新生成计划。"
-            : "This mission is not a hash-bound contract prepared by the local AGENT Core. It cannot fall back to another execution engine. Return to mission chat and replan after the runtime is ready."}
-        </p>
-        <Link className="btn btn-primary" to="/assistant">
-          <Sparkles aria-hidden="true" />{chinese ? "返回任务对话" : "Return to mission chat"}
-        </Link>
-      </section>
-    );
-  }
-  return (
-    <AutonomyLab
-      embedded
-      workspace={workspace}
-      planningModel={planningModel}
-      accountId={auth?.account?.id ?? null}
-      onWorkspaceChange={persist}
-      onRunCompleted={recordEvidence}
-    />
-  );
-}
+    accountId: auth?.account?.id ?? null,
+    conversationId: conversationId || "",
+  }), [auth?.account?.id, conversationId, edition]);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sources, setSources] = useState<Array<{ id: string; label: string; kind: "simulation" | "camera"; url?: string }>>([]);
+  const [sourceId, setSourceId] = useState("");
+  const [playing, setPlaying] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-export function AutonomyEvidence() {
-  const { chinese, workspace } = useAutonomyWorkspace();
-  const snapshots = [
-    { icon: Navigation2, label: chinese ? "机型快照" : "Aircraft snapshot", value: workspace.aircraft.name, time: workspace.aircraft.updatedAt },
-    { icon: Layers3, label: chinese ? "地图资料" : "Map profile", value: workspace.mapPack.name, time: workspace.mapPack.updatedAt },
-    { icon: Waypoints, label: chinese ? "任务合同" : "Mission contract", value: workspace.mission.id, time: workspace.mission.updatedAt },
-  ];
+  useEffect(() => {
+    if (!conversationId) {
+      setSessionActive(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const thread = await getBoundAgentCoreThread(binding);
+        if (!cancelled) setSessionActive(Boolean(thread && ["executing", "holding", "landing"].includes(thread.state)));
+      } catch {
+        if (!cancelled) setSessionActive(false);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 1_500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [binding, conversationId]);
+
+  useEffect(() => {
+    if (!sessionActive) {
+      setSources([]);
+      setSourceId("");
+      setPlaying(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const discover = async () => {
+      const discovered: Array<{ id: string; label: string; kind: "simulation" | "camera"; url?: string }> = [];
+      const simulationUrl = import.meta.env.VITE_GAZEBO_VIEWER_URL?.trim();
+      if (simulationUrl) discovered.push({ id: "simulation", label: chinese ? "仿真画面" : "Simulation", kind: "simulation", url: simulationUrl });
+      try {
+        const devices = await navigator.mediaDevices?.enumerateDevices();
+        (devices ?? []).filter((device) => device.kind === "videoinput").forEach((device, index) => {
+          discovered.push({ id: device.deviceId, label: device.label || `${chinese ? "摄像头" : "Camera"} ${index + 1}`, kind: "camera" });
+        });
+      } catch {
+        // A running simulation can still be viewed when camera discovery is unavailable.
+      }
+      if (cancelled) return;
+      setSources(discovered);
+      setSourceId((current) => discovered.some((source) => source.id === current) ? current : discovered[0]?.id ?? "");
+    };
+    void discover();
+    navigator.mediaDevices?.addEventListener?.("devicechange", discover);
+    return () => {
+      cancelled = true;
+      navigator.mediaDevices?.removeEventListener?.("devicechange", discover);
+    };
+  }, [chinese, sessionActive]);
+
+  const stop = useCallback(() => {
+    stream?.getTracks().forEach((track) => track.stop());
+    setStream(null);
+    setPlaying(false);
+  }, [stream]);
+
+  useEffect(() => () => stream?.getTracks().forEach((track) => track.stop()), [stream]);
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = stream;
+  }, [stream]);
+
+  const selectedSource = sources.find((source) => source.id === sourceId) ?? null;
+  const play = async () => {
+    if (!selectedSource) return;
+    if (selectedSource.kind === "camera") {
+      try {
+        const nextStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: selectedSource.id } }, audio: false });
+        setStream(nextStream);
+      } catch {
+        setPlaying(false);
+        return;
+      }
+    }
+    setPlaying(true);
+  };
+
   return (
-    <section className="autonomy-evidence-page">
-      <div className="autonomy-evidence-bindings">
-        {snapshots.map(({ icon: Icon, label, value, time }) => <article key={label}><Icon aria-hidden="true" /><span><small>{label}</small><strong>{value}</strong></span><time>{formatTime(time)}</time></article>)}
+    <section className="autonomy-live-viewer">
+      <div className="autonomy-live-screen" data-playing={playing}>
+        {playing && selectedSource?.kind === "simulation" && selectedSource.url ? <iframe src={selectedSource.url} title={selectedSource.label} allow="autoplay; fullscreen" /> : null}
+        {playing && selectedSource?.kind === "camera" ? <video ref={videoRef} autoPlay playsInline muted /> : null}
+        {!playing ? <div className="autonomy-live-off"><VideoOff aria-hidden="true" /><span>{chinese ? "无画面" : "No signal"}</span></div> : null}
       </div>
-      {workspace.evidence.length ? <div className="autonomy-evidence-runs">
-        {workspace.evidence.map((record) => <article key={record.id}>
-          <header><FileClock aria-hidden="true" /><strong>{record.contractId}</strong><em>{record.source.toUpperCase()}</em></header>
-          <p>{record.missionIntent}</p>
-          <dl><div><dt>{chinese ? "无人机" : "Aircraft"}</dt><dd>{record.aircraftName} · v{record.aircraftVersion}</dd></div><div><dt>{chinese ? "地图资料" : "Map profile"}</dt><dd>{record.mapName}</dd></div><div><dt>{chinese ? "观测" : "Observations"}</dt><dd>{record.observationCount}</dd></div><div><dt>{chinese ? "任务图" : "Task graph"}</dt><dd>r{record.taskGraphRevision}</dd></div><div><dt>{chinese ? "决策" : "Decisions"}</dt><dd>{record.decisionCount}</dd></div><div><dt>{chinese ? "跟踪实体" : "Tracked entities"}</dt><dd>{record.trackedEntityCount}</dd></div><div><dt>{chinese ? "证据链" : "Evidence chain"}</dt><dd>{record.evidenceChainHead.slice(0, 18)}</dd></div></dl>
-          <time>{formatTime(record.completedAt)}</time>
-        </article>)}
-      </div> : <div className="autonomy-evidence-empty">
-        <FileClock aria-hidden="true" />
-        <h2>{chinese ? "尚无已完成的运行证据" : "No completed runtime evidence"}</h2>
-        <div><span>{chinese ? "任务合同" : "Mission Contract"}</span><ChevronRight /><span>{chinese ? "观测" : "Observations"}</span><ChevronRight /><span>{chinese ? "决策" : "Decisions"}</span><ChevronRight /><span>{chinese ? "回放" : "Replay"}</span></div>
-        <Link className="btn btn-primary" to="/autonomy/live"><Video aria-hidden="true" />{chinese ? "打开实时运行" : "Open Live Mission"}</Link>
-      </div>}
+      <div className="autonomy-live-controls">
+        <button type="button" onClick={() => playing ? stop() : void play()} disabled={!selectedSource} aria-label={playing ? (chinese ? "停止" : "Stop") : (chinese ? "播放" : "Play")}>
+          {playing ? <Square aria-hidden="true" /> : <Play aria-hidden="true" />}
+        </button>
+        <select
+          value={sourceId}
+          disabled={sources.length <= 1}
+          aria-label={chinese ? "画面来源" : "Video source"}
+          onChange={(event) => {
+            stop();
+            setSourceId(event.target.value);
+          }}
+        >
+          {!sources.length ? <option value="">{chinese ? "无可用画面" : "No source"}</option> : null}
+          {sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}
+        </select>
+      </div>
     </section>
   );
 }
