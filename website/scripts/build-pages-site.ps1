@@ -36,8 +36,8 @@ if ($hasEdition) {
         throw "Unsupported Pages release edition: $edition"
     }
     if ($buildNumber -le 0) { throw "Pages release buildNumber must be positive." }
-    $expectedFileName = "$($editionProducts[$edition])-$version.exe"
-    $expectedReleaseTag = "desktop-$edition-v$version-build-$buildNumber"
+    $expectedFileName = "$($editionProducts[$edition])_${version}_x64-setup.exe"
+    $expectedReleaseTag = "five-edition-v$version-build-$buildNumber"
 } else {
     $expectedFileName = "DroneDream_${version}_x64-setup.exe"
     $expectedReleaseTag = $null

@@ -13,13 +13,15 @@ export type WebsiteRelease = {
 declare const __DRONEDREAM_RELEASE__: WebsiteRelease;
 
 const developmentFallbackRelease: WebsiteRelease = {
+  edition: "universal",
+  buildNumber: 1732,
   version: "1.0.0",
-  fileName: "DroneDream_1.0.0_x64-setup.exe",
-  downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
-  checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream_1.0.0_x64-setup.exe.sha256",
-  sha256: "84b6b5a25cfe0cd110d214b7849032624b93b2c529eca1f9923658aee93fe813",
-  sizeBytes: 12_888_384,
-  publishedAt: "2026-08-12",
+  fileName: "DroneDream-Universal_1.0.0_x64-setup.exe",
+  downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1732/DroneDream-Universal_1.0.0_x64-setup.exe",
+  checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1732/DroneDream-Universal_1.0.0_x64-setup.exe.sha256",
+  sha256: "725d15c3dfb9a591cf11a759d02319186156f84e203d56d2bb1237b3130f5a7a",
+  sizeBytes: 83_106_080,
+  publishedAt: "2026-08-26",
 };
 
 export const fallbackRelease: WebsiteRelease =
@@ -109,8 +111,8 @@ export function isWebsiteRelease(value: unknown): value is WebsiteRelease {
       release.buildNumber <= 0
     ) return false;
     const edition = release.edition as keyof typeof editionProducts;
-    expectedFileName = `${editionProducts[edition]}-${validatedRelease.version}.exe`;
-    expectedTag = `desktop-${edition}-v${validatedRelease.version}-build-${release.buildNumber}`;
+    expectedFileName = `${editionProducts[edition]}_${validatedRelease.version}_x64-setup.exe`;
+    expectedTag = `five-edition-v${validatedRelease.version}-build-${release.buildNumber}`;
   } else {
     expectedFileName = `DroneDream_${validatedRelease.version}_x64-setup.exe`;
   }

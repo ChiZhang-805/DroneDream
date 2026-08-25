@@ -1,53 +1,53 @@
-import autonomyMark from "../../../brand/commercial/autonomy-mark.png";
-import fieldMark from "../../../brand/commercial/field-mark.png";
-import labMark from "../../../brand/commercial/lab-mark.png";
-import simMark from "../../../brand/commercial/sim-mark.png";
-import universalMark from "../../../brand/commercial/universal-mark.png";
+import autonomyMark from "../../../brand/icons/agent-mark.png";
+import fieldMark from "../../../brand/icons/field-mark.png";
+import labMark from "../../../brand/icons/lab-mark.png";
+import simMark from "../../../brand/icons/sim-mark.png";
+import universalMark from "../../../brand/icons/universal-mark.png";
 
 export type HeaderDownloadId = "universal" | "sim" | "lab" | "field" | "autonomy";
 
 const RELEASE_BASE =
-  "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1718";
+  "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1732";
 
 export const headerDownloadCatalog = [
   {
     id: "universal",
     label: "DroneDream Universal",
     fileName: "DroneDream-Universal_1.0.0_x64-setup.exe",
-    sizeBytes: 83_254_673,
-    sha256: "5a1dd4db9ede017676ae14ba7c89d636be2a314f817b3a73d8ea857a5ac25ac4",
+    sizeBytes: 83_106_080,
+    sha256: "725d15c3dfb9a591cf11a759d02319186156f84e203d56d2bb1237b3130f5a7a",
     mark: universalMark,
   },
   {
     id: "sim",
     label: "DroneDream SIM",
     fileName: "DroneDream-Sim_1.0.0_x64-setup.exe",
-    sizeBytes: 82_682_197,
-    sha256: "b6e8356562ec22dc3fbfb8536ea909aa7d3b6866eff04f7ff6287f50c666b81a",
+    sizeBytes: 82_543_483,
+    sha256: "a236139b59942558a527bb44f25d111f20f14fdd5d1454f42074abbcb3b29fcd",
     mark: simMark,
   },
   {
     id: "lab",
     label: "DroneDream LAB",
     fileName: "DroneDream-Lab_1.0.0_x64-setup.exe",
-    sizeBytes: 83_203_849,
-    sha256: "92523737c950373ee31ae6d96c5fe3eaaaffa516ee6e5e71187ddeac3f9c4ec5",
+    sizeBytes: 83_064_924,
+    sha256: "9d5f0d4619756912d1faaeb83e8128925a16dc471d9d683f23fdc7f2dc381854",
     mark: labMark,
   },
   {
     id: "field",
     label: "DroneDream FIELD",
     fileName: "DroneDream-Field_1.0.0_x64-setup.exe",
-    sizeBytes: 82_924_622,
-    sha256: "ce2dd4d71d793e385b99b2563b1d0d47cc60d8b65120d9921df00af3bfc6f77c",
+    sizeBytes: 82_791_388,
+    sha256: "891d77fe29f3c1e9a2458ea35f8b848ae356372bbb64f5055040aaf9cf16720d",
     mark: fieldMark,
   },
   {
     id: "autonomy",
     label: "DroneDream AGENT",
     fileName: "DroneDream-Agent_1.0.0_x64-setup.exe",
-    sizeBytes: 83_120_585,
-    sha256: "a091bb37e512a01cebedadf48dd3bb5e8b28857303219cc107c9fb64a74090fd",
+    sizeBytes: 82_992_131,
+    sha256: "735c8d3f4d398b2ad5234d1d44e34fa1d8fe45b562a6b0dbde0da873d843c714",
     mark: autonomyMark,
   },
 ].map((download) => ({
