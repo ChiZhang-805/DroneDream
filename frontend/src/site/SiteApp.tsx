@@ -16,6 +16,7 @@ import {
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
+import { headerDownloadCatalog } from "./downloadCatalog";
 import { ManualPage } from "./ManualPage";
 import { OAuthConsentPage } from "./OAuthConsentPage";
 import { authorizationIdFromLocation } from "./oauthConsentPolicy";
@@ -74,6 +75,15 @@ const content = {
     menu: "Open navigation",
     closeMenu: "Close navigation",
     downloadShort: "Download",
+    downloadMenuTitle: "Choose your DroneDream edition",
+    downloadMenuHint: "Windows 10 / 11 · x64 · Version 1.0.0",
+    downloadDescriptions: {
+      universal: "The complete workspace for cross-product orchestration",
+      sim: "Repeatable PX4 and Gazebo simulation experiments",
+      lab: "Simulation-to-hardware validation and calibration",
+      field: "Guarded real-device operation and field tuning",
+      autonomy: "Natural-language autonomous mission workflows",
+    },
     console: "Console",
     organization: "Manage organization",
     accountPlan: "Plan",
@@ -280,6 +290,15 @@ const content = {
     menu: "打开导航",
     closeMenu: "关闭导航",
     downloadShort: "下载",
+    downloadMenuTitle: "选择适合你的 DroneDream 版本",
+    downloadMenuHint: "Windows 10 / 11 · x64 · 版本 1.0.0",
+    downloadDescriptions: {
+      universal: "用于跨产品协同与编排的完整工作台",
+      sim: "可重复运行的 PX4 与 Gazebo 仿真实验",
+      lab: "仿真到硬件的双向验证与标定",
+      field: "带安全边界的实机运行与现场调参",
+      autonomy: "通过自然语言完成自主任务工作流",
+    },
     console: "控制台",
     organization: "企业管理",
     accountPlan: "套餐",
@@ -515,6 +534,14 @@ function DownloadIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" />
+    </svg>
+  );
+}
+
+function DownloadChevronIcon() {
+  return (
+    <svg className="site-header-download-chevron" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="m3.5 6 4.5 4 4.5-4" />
     </svg>
   );
 }
@@ -821,6 +848,7 @@ export function SiteApp() {
     useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
@@ -842,6 +870,8 @@ export function SiteApp() {
   } | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const downloadButtonRef = useRef<HTMLButtonElement>(null);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
   const authDialogRef = useRef<HTMLElement>(null);
   const authCloseRef = useRef<HTMLButtonElement>(null);
@@ -1071,6 +1101,29 @@ export function SiteApp() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node
+        && !downloadMenuRef.current?.contains(event.target)
+      ) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setDownloadMenuOpen(false);
+      downloadButtonRef.current?.focus();
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [downloadMenuOpen]);
+
   const currentPhase = copy.demoPhases[activePhase];
   const displaySize = useMemo(() => formatBinarySize(release.sizeBytes), [release.sizeBytes]);
 
@@ -1096,7 +1149,10 @@ export function SiteApp() {
       ?.focus();
   };
 
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = () => {
+    setMenuOpen(false);
+    setDownloadMenuOpen(false);
+  };
   const openAccount = (mode: AuthMode = "sign-in") => {
     setAuthMode(mode);
     setAuthCode("");
@@ -1108,6 +1164,7 @@ export function SiteApp() {
     setAuthError(null);
     setAuthNotice(null);
     setMenuOpen(false);
+    setDownloadMenuOpen(false);
     setAuthOpen(true);
   };
 
@@ -1388,10 +1445,64 @@ export function SiteApp() {
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z" /></svg>
             {copy.language}
           </button>
-          <a className="site-header-download" href={release.downloadUrl} download={release.fileName}>
-            <DownloadIcon />
-            {copy.downloadShort}
-          </a>
+          <div
+            ref={downloadMenuRef}
+            className={`site-download-picker${downloadMenuOpen ? " is-open" : ""}`}
+          >
+            <button
+              ref={downloadButtonRef}
+              type="button"
+              className="site-header-download"
+              aria-expanded={downloadMenuOpen}
+              aria-haspopup="menu"
+              aria-controls="site-download-menu"
+              onClick={() => {
+                setMenuOpen(false);
+                setDownloadMenuOpen((open) => !open);
+              }}
+            >
+              <DownloadIcon />
+              <span className="site-header-download-label">{copy.downloadShort}</span>
+              <DownloadChevronIcon />
+            </button>
+            {downloadMenuOpen ? (
+              <div
+                id="site-download-menu"
+                className="site-download-menu"
+                role="menu"
+                aria-label={copy.downloadMenuTitle}
+              >
+                <div className="site-download-menu-heading">
+                  <strong>{copy.downloadMenuTitle}</strong>
+                  <span>{copy.downloadMenuHint}</span>
+                </div>
+                <div className="site-download-menu-options">
+                  {headerDownloadCatalog.map((download) => (
+                    <a
+                      key={download.id}
+                      className="site-download-option"
+                      href={download.downloadUrl}
+                      download={download.fileName}
+                      role="menuitem"
+                      data-edition={download.id}
+                      data-sha256={download.sha256}
+                      onClick={() => setDownloadMenuOpen(false)}
+                    >
+                      <img src={download.mark} alt="" aria-hidden="true" />
+                      <span className="site-download-option-copy">
+                        <strong>{download.label}</strong>
+                        <span>{copy.downloadDescriptions[download.id]}</span>
+                      </span>
+                      <span className="site-download-option-meta">
+                        {formatBinarySize(download.sizeBytes)}
+                        <DownloadIcon />
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button
             ref={menuButtonRef}
             type="button"
@@ -1399,7 +1510,10 @@ export function SiteApp() {
             aria-label={menuOpen ? copy.closeMenu : copy.menu}
             aria-expanded={menuOpen}
             aria-controls="site-navigation"
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => {
+              setDownloadMenuOpen(false);
+              setMenuOpen((open) => !open);
+            }}
           >
             <span />
             <span />
