@@ -19,7 +19,10 @@ smaller PNG, favicon, and ICO outputs remain deterministic derivatives of the
 unchanged marks. The retired small-label lockups have been deleted; only the
 approved large-edition-label centered lockups are canonical release inputs.
 `source/` also contains the Universal mother-brand master and the OFL-licensed
-Space Grotesk input.
+Space Grotesk input. The public website favicon is intentionally independent
+from the Universal application mark: the exact user-approved mainland-preview
+PNG lives at `source/approved/website-favicon-64.png` and is copied byte-for-byte
+to the public site so brand regeneration cannot replace it.
 `generated/brand-assets.v1.json` binds every canonical output to exact source,
 generator, locked requirements, font, bytes, dimensions, and SHA-256.
 

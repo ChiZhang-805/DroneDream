@@ -100,6 +100,13 @@ CANONICAL_ICO_HASHES = {
     "field": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",
     "autonomy": "a8a1eb24801bf3ab07503e0c669f0ef6b6c5cf71af1fd160c8e3806324c0a138",
 }
+WEBSITE_FAVICON = {
+    "sourcePath": "brand/source/approved/website-favicon-64.png",
+    "sourceSha256": "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7",
+    "dimensions": {"width": 64, "height": 64},
+    "canonicalOutputPath": "frontend/public/drone-favicon.png",
+    "approvalBasis": "mainland-preview-approved-v1",
+}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -123,6 +130,12 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
         "presentationOnly": True,
         "grantsHardwareAuthority": False,
     }
+    assert contract["websiteFavicon"] == WEBSITE_FAVICON
+    approved_favicon = ROOT / WEBSITE_FAVICON["sourcePath"]
+    assert sha256(approved_favicon) == WEBSITE_FAVICON["sourceSha256"]
+    with Image.open(approved_favicon) as image:
+        assert image.size == (64, 64)
+        assert image.mode == "RGBA"
     assert contract["approval"] == {
         "handoffSha256": ("9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"),
         "conceptAssetsAreReleaseAssets": False,
@@ -250,6 +263,14 @@ def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
     assert manifest["grantsHardwareAuthority"] is False
     assert manifest["conceptAssetsAreReleaseAssets"] is False
     assert manifest["brandVersion"] == "1.2.0"
+    assert manifest["websiteFavicon"] == {
+        "sourcePath": WEBSITE_FAVICON["sourcePath"],
+        "bytes": (ROOT / WEBSITE_FAVICON["sourcePath"]).stat().st_size,
+        "sha256": WEBSITE_FAVICON["sourceSha256"],
+        "dimensions": WEBSITE_FAVICON["dimensions"],
+        "canonicalOutputPath": WEBSITE_FAVICON["canonicalOutputPath"],
+        "approvalBasis": WEBSITE_FAVICON["approvalBasis"],
+    }
     assert manifest["largeLabelApproval"] == {
         "canonicalSources": True,
         "reviewPreviewPath": (
@@ -357,6 +378,9 @@ def test_all_editions_preserve_shared_white_flight_path_and_exact_mirrors() -> N
     assert all(path.read_bytes() == expected for path in universal_mirrors)
     assert (ROOT / "desktop/src-tauri/icons/icon.ico").read_bytes() == (
         ROOT / "brand/generated/universal/windows/icon.ico"
+    ).read_bytes()
+    assert (ROOT / WEBSITE_FAVICON["canonicalOutputPath"]).read_bytes() == (
+        ROOT / WEBSITE_FAVICON["sourcePath"]
     ).read_bytes()
 
 
