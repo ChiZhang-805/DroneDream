@@ -249,11 +249,25 @@ function Remove-GeneratedSourceOutputs {
         "desktop/src-tauri/binaries",
         "desktop/src-tauri/agent-core-resources"
     )
-    & git -C $repoRoot clean -fdx -- @paths | Out-Host
+    $trackedPaths = @($paths | Where-Object {
+        & git -C $repoRoot ls-files --error-unmatch -- $_ 2>$null | Out-Null
+        $LASTEXITCODE -eq 0
+    })
+    $generatedPaths = @($paths | Where-Object { $_ -notin $trackedPaths })
+
+    if ($generatedPaths.Count -ne 0) {
+        & git -C $repoRoot clean -fdx -- @generatedPaths | Out-Host
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "Generated source-output cleanup failed."
     }
-    foreach ($path in $paths) {
+    if ($trackedPaths.Count -ne 0) {
+        & git -C $repoRoot checkout-index --force -- @trackedPaths
+        if ($LASTEXITCODE -ne 0) {
+            throw "Tracked generated source-output restoration failed."
+        }
+    }
+    foreach ($path in $generatedPaths) {
         if (Test-Path -LiteralPath (Join-Path $repoRoot $path)) {
             throw "Generated source output remains after cleanup: $path"
         }
