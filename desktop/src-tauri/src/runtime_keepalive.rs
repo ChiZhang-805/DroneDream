@@ -141,8 +141,14 @@ fn terminate_wsl_args() -> [&'static str; 2] {
 
 #[tauri::command]
 pub(crate) async fn stop_runtime_for_exit(
+    app: tauri::AppHandle,
     keepalive: tauri::State<'_, RuntimeKeepalive>,
 ) -> Result<(), String> {
+    // NSIS replaces every packaged executable, including the AGENT Core
+    // sidecar. Stop it explicitly before the updater terminates the desktop
+    // process; RunEvent::Exit is not guaranteed to run after NSIS closes the
+    // old executable, and a surviving sidecar would keep its own file locked.
+    crate::agent_core::stop(&app);
     let keepalive = keepalive.inner().clone();
     tauri::async_runtime::spawn_blocking(move || keepalive.terminate_for_exit())
         .await

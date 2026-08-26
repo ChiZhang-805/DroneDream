@@ -350,11 +350,6 @@ export function useAppUpdater() {
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
     let enginePack: EnginePackStatus | null = null;
     try {
-      // The installed app's embedded Engine Pack is part of its executable
-      // contract. Reconcile it before advertising a newer app so a user who
-      // defers that app update still runs the engine paired with this build.
-      enginePack = await ensureEnginePackCurrent(generation);
-      if (!enginePack || generation !== checkGenerationRef.current) return;
       const previousUpdate = updateRef.current;
       updateRef.current = null;
       updateDownloadedRef.current = false;
@@ -369,19 +364,25 @@ export function useAppUpdater() {
         return;
       }
       updateRef.current = update;
-      if (!update) {
-        await reconcileComponentPacks(generation, enginePack);
+      if (update) {
+        // A desktop update is the recovery path for a stale updater or an
+        // Engine Pack contract that the installed build cannot reconcile.
+        // Advertise it before touching optional component state so that a
+        // recoverable component failure can never strand the application.
+        setState({
+          status: "available",
+          availableVersion: update.version,
+          updateRequired: appUpdateIsRequired(update),
+          progress: null,
+          error: null,
+          enginePack: null,
+          componentUpdates: null,
+        });
         return;
       }
-      setState({
-        status: "available",
-        availableVersion: update.version,
-        updateRequired: appUpdateIsRequired(update),
-        progress: null,
-        error: null,
-        enginePack,
-        componentUpdates: null,
-      });
+      enginePack = await ensureEnginePackCurrent(generation);
+      if (!enginePack || generation !== checkGenerationRef.current) return;
+      await reconcileComponentPacks(generation, enginePack);
     } catch (error) {
       if (generation !== checkGenerationRef.current) return;
       // Tauri reports an endpoint that has no published channel manifest as
@@ -389,6 +390,8 @@ export function useAppUpdater() {
       // launcher failure. Network, parsing, signature and platform errors keep
       // their explicit error state below.
       if (isNoPublishedDesktopUpdate(error)) {
+        enginePack = await ensureEnginePackCurrent(generation);
+        if (!enginePack || generation !== checkGenerationRef.current) return;
         await reconcileComponentPacks(generation, enginePack);
         return;
       }

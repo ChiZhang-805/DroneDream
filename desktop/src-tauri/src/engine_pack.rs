@@ -679,6 +679,24 @@ pub(crate) async fn install_embedded_engine_pack(
             let descriptor_wsl = windows_path_to_wsl(&descriptor_path)?;
             let reconciler_wsl = windows_path_to_wsl(&reconciler_path)?;
             let execution_paths_need_reconciliation = !runtime_execution_paths_current();
+            // The first Engine Pack on a migrated Runtime has no `current`
+            // symlink yet. Publish the verified release before asking the
+            // reconciler to validate that symlink and switch runtime.env onto
+            // it. The manager keeps the legacy execution path healthy during
+            // this one-time transition.
+            let output = wsl_output(
+                MANAGER_PATH,
+                &[
+                    "--descriptor",
+                    descriptor_wsl.as_str(),
+                    "--archive",
+                    archive_wsl.as_str(),
+                ],
+                Duration::from_secs(420),
+                "Engine Pack activation",
+            )?;
+            serde_json::from_slice::<serde_json::Value>(&output)
+                .map_err(|error| format!("Engine Pack activation receipt was invalid: {error}"))?;
             if execution_paths_need_reconciliation {
                 ensure_manager_idle("pre-reconciliation Engine Pack idle check")?;
                 wsl_output(
@@ -689,6 +707,12 @@ pub(crate) async fn install_embedded_engine_pack(
                 )?;
                 let reconciliation = (|| {
                     ensure_manager_idle("post-intake Engine Pack idle check")?;
+                    wsl_output(
+                        "/usr/bin/systemctl",
+                        &["stop", "dronedream-worker.service"],
+                        Duration::from_secs(20),
+                        "Runtime worker stop",
+                    )?;
                     let receipt = wsl_output(
                         "/opt/dronedream/venv/bin/python",
                         &[
@@ -715,44 +739,32 @@ pub(crate) async fn install_embedded_engine_pack(
                             "Runtime execution path reconciliation was not verified.".to_string()
                         );
                     }
+                    wsl_output(
+                        "/usr/bin/systemctl",
+                        &[
+                            "start",
+                            "dronedream-api.service",
+                            "dronedream-worker.service",
+                        ],
+                        Duration::from_secs(20),
+                        "Runtime service restart",
+                    )?;
                     Ok(())
                 })();
                 if let Err(error) = reconciliation {
                     let _ = wsl_output(
                         "/usr/bin/systemctl",
-                        &["start", "dronedream-api.service"],
+                        &[
+                            "start",
+                            "dronedream-api.service",
+                            "dronedream-worker.service",
+                        ],
                         Duration::from_secs(20),
-                        "Runtime API intake recovery",
+                        "Runtime service recovery",
                     );
                     return Err(error);
                 }
             }
-            let output = match wsl_output(
-                MANAGER_PATH,
-                &[
-                    "--descriptor",
-                    descriptor_wsl.as_str(),
-                    "--archive",
-                    archive_wsl.as_str(),
-                ],
-                Duration::from_secs(420),
-                "Engine Pack activation",
-            ) {
-                Ok(output) => output,
-                Err(error) => {
-                    if execution_paths_need_reconciliation {
-                        let _ = wsl_output(
-                            "/usr/bin/systemctl",
-                            &["start", "dronedream-api.service"],
-                            Duration::from_secs(20),
-                            "Runtime API intake recovery",
-                        );
-                    }
-                    return Err(error);
-                }
-            };
-            serde_json::from_slice::<serde_json::Value>(&output)
-                .map_err(|error| format!("Engine Pack activation receipt was invalid: {error}"))?;
             let updated = status()?;
             if updated.update_required {
                 return Err("Engine Pack activation did not publish the embedded pack.".to_string());

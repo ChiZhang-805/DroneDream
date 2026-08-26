@@ -3969,7 +3969,6 @@ function AppShellContent() {
     }
     if (
       (updater.status === "available" && updater.updateRequired) ||
-      updater.status === "engineError" ||
       ([
         "componentAvailable",
         "componentUpdateDeferred",

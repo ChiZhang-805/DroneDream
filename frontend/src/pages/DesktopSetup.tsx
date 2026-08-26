@@ -397,7 +397,6 @@ export function DesktopSetup() {
   const updaterBlocksWorkspace =
     updaterBusy ||
     (updater.status === "available" && updater.updateRequired) ||
-    updater.status === "engineError" ||
     ([
       "componentAvailable",
       "componentUpdateDeferred",
@@ -406,7 +405,6 @@ export function DesktopSetup() {
     updater.status === "runtimeBaseRequired";
   const updaterActionRequired =
     (updater.status === "available" && updater.updateRequired) ||
-    updater.status === "engineError" ||
     ([
       "componentAvailable",
       "componentUpdateDeferred",
@@ -674,7 +672,6 @@ export function DesktopSetup() {
     }
     if (
       (updater.status === "available" && updater.updateRequired) ||
-      updater.status === "engineError" ||
       ([
         "componentAvailable",
         "componentUpdateDeferred",
