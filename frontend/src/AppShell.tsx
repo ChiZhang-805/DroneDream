@@ -677,7 +677,37 @@ function AllowanceUsageHistory({
         empty: "No usage in this period",
         chart: "Model usage chart",
       };
-  const visibleDays = days.slice(-range);
+  const usageByDate = new Map(days.map((day) => [day.date, day]));
+  const utcToday = new Date();
+  const today = new Date(Date.UTC(
+    utcToday.getUTCFullYear(),
+    utcToday.getUTCMonth(),
+    utcToday.getUTCDate(),
+  ));
+  const emptyDay = (value: Date): ManagedModelUsageDay => ({
+    date: value.toISOString().slice(0, 10),
+    consumed_ai_credits: 0,
+    request_count: 0,
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
+  });
+  const trailingDays = (count: number): ManagedModelUsageDay[] =>
+    Array.from({ length: count }, (_, index) => {
+      const value = new Date(today);
+      value.setUTCDate(today.getUTCDate() - (count - index - 1));
+      const placeholder = emptyDay(value);
+      return usageByDate.get(placeholder.date) ?? placeholder;
+    });
+  const calendarYear = today.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(calendarYear, 0, 1));
+  const nextYear = new Date(Date.UTC(calendarYear + 1, 0, 1));
+  const yearDays: ManagedModelUsageDay[] = [];
+  for (let value = new Date(yearStart); value < nextYear; value.setUTCDate(value.getUTCDate() + 1)) {
+    const placeholder = emptyDay(value);
+    yearDays.push(usageByDate.get(placeholder.date) ?? placeholder);
+  }
+  const visibleDays = range === 365 ? yearDays : trailingDays(range);
   const number = new Intl.NumberFormat(locale);
   const date = new Intl.DateTimeFormat(locale, range === 365
     ? { year: "numeric", month: "2-digit", day: "2-digit" }
@@ -690,6 +720,15 @@ function AllowanceUsageHistory({
     `${copy.requests}: ${number.format(day.request_count)}`,
   ].join(" · ");
   const hasUsage = visibleDays.some((day) => day.consumed_ai_credits > 0);
+  const linePoints = range === 30
+    ? visibleDays.map((day, index) => {
+        const x = visibleDays.length <= 1 ? 0 : (index / (visibleDays.length - 1)) * 300;
+        const y = maxCredits <= 0 ? 96 : 96 - (day.consumed_ai_credits / maxCredits) * 88;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      }).join(" ")
+    : "";
+  const leadingYearCells = (yearStart.getUTCDay() + 6) % 7;
+  const monthFormatter = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
 
   return (
     <section className="settings-allowance-history">
@@ -728,16 +767,27 @@ function AllowanceUsageHistory({
             ))}
         </div>
       </header>
-      {visibleDays.length === 0 ? (
-        <p className="settings-allowance-empty">{copy.empty}</p>
-      ) : range === 365 ? (
-        <div className="settings-allowance-heatmap" role="img" aria-label={copy.chart} data-testid="settings-allowance-chart">
-          {visibleDays.map((day) => {
-            const intensity = maxCredits <= 0
-              ? 0
-              : Math.max(1, Math.min(4, Math.ceil((day.consumed_ai_credits / maxCredits) * 4)));
-            return <i key={day.date} data-intensity={intensity} title={tooltip(day)} aria-hidden="true" />;
-          })}
+      {range === 365 ? (
+        <div className="settings-allowance-year">
+          <div className="settings-allowance-year-heading" aria-hidden="true">
+            <strong>{calendarYear}</strong>
+            <div>
+              {Array.from({ length: 12 }, (_, month) => (
+                <span key={month}>{monthFormatter.format(new Date(Date.UTC(calendarYear, month, 1)))}</span>
+              ))}
+            </div>
+          </div>
+          <div className="settings-allowance-heatmap" role="img" aria-label={`${calendarYear} ${copy.chart}`} data-testid="settings-allowance-chart">
+            {Array.from({ length: leadingYearCells }, (_, index) => (
+              <i key={`leading-${index}`} data-placeholder="true" aria-hidden="true" />
+            ))}
+            {visibleDays.map((day) => {
+              const intensity = maxCredits <= 0
+                ? 0
+                : Math.max(1, Math.min(4, Math.ceil((day.consumed_ai_credits / maxCredits) * 4)));
+              return <i key={day.date} data-intensity={intensity} title={tooltip(day)} aria-hidden="true" />;
+            })}
+          </div>
         </div>
       ) : (
         <div className={`settings-allowance-bars${range === 30 ? " is-30" : ""}`} role="img" aria-label={copy.chart} data-testid="settings-allowance-chart">
@@ -747,9 +797,14 @@ function AllowanceUsageHistory({
               <small>{date.format(new Date(`${day.date}T00:00:00Z`))}</small>
             </span>
           ))}
+          {range === 30 ? (
+            <svg className="settings-allowance-trend" viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+              <polyline points={linePoints} />
+            </svg>
+          ) : null}
         </div>
       )}
-      {!hasUsage && visibleDays.length > 0 ? <p className="settings-allowance-empty">{copy.empty}</p> : null}
+      {!hasUsage ? <p className="settings-allowance-empty">{copy.empty}</p> : null}
     </section>
   );
 }
@@ -1473,7 +1528,7 @@ function SettingsDialog({
     { id: "memory", label: settingsCopy.tabs[1] },
     {
       id: "model",
-      label: interfaceLocale === "zh-CN" ? "模型与额度" : "Models & allowance",
+      label: interfaceLocale === "zh-CN" ? "模型" : "Models",
       disabled: !auth.account,
     },
     { id: "course", label: "ECE498BH" },

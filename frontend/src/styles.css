@@ -21490,6 +21490,427 @@ body {
   outline: none;
 }
 
+/* Full settings workspace: use the available canvas and keep every setting in
+   one predictable vertical reading order. Icons remain unboxed. */
+.settings-workspace-host .settings-workspace-surface {
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.settings-workspace-content > .launcher-settings-heading {
+  padding: 1.35rem 1.75rem 0.9rem;
+}
+
+.settings-workspace-content > .launcher-settings-panels {
+  padding: 0 1.75rem 2rem;
+}
+
+.settings-workspace-content .launcher-settings-panel {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.settings-workspace-content .settings-general-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-workspace-content .settings-general-card {
+  width: 100%;
+  min-height: 4.4rem;
+  display: grid;
+  grid-template-columns: minmax(170px, 220px) minmax(0, 1fr);
+  align-items: start;
+  gap: 1.25rem;
+  padding: 0.9rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-card-heading {
+  min-height: 2.65rem;
+  display: flex;
+  align-items: center;
+}
+
+.settings-workspace-content .settings-card-heading svg,
+.settings-workspace-content .settings-memory-scope-grid svg,
+.settings-workspace-sidebar .launcher-settings-tabs button svg {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-language-card .launcher-language-options,
+.settings-workspace-content .settings-interface-card .settings-appearance-options {
+  min-height: 2.65rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-rows: auto !important;
+  gap: 0.5rem;
+}
+
+.settings-workspace-content .settings-interface-card .settings-appearance-options {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.settings-workspace-content .settings-language-card .launcher-language-options button,
+.settings-workspace-content .settings-interface-card .settings-appearance-options button {
+  min-height: 2.65rem;
+  padding: 0.38rem 0.55rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+}
+
+.settings-workspace-content .settings-language-card .launcher-language-options button.selected,
+.settings-workspace-content .settings-interface-card .settings-appearance-options button.selected {
+  border-bottom-color: var(--dd-brand-start);
+  background: color-mix(in srgb, var(--dd-brand-start) 7%, transparent);
+  box-shadow: none;
+  color: var(--text);
+}
+
+.settings-workspace-content .launcher-language-icon,
+.settings-workspace-content .launcher-language-icon-east {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-notification-card {
+  display: grid;
+  grid-template-columns: minmax(170px, 220px) minmax(0, 1fr);
+  grid-template-rows: repeat(8, auto);
+  align-items: stretch;
+  gap: 0 1.25rem;
+}
+
+.settings-workspace-content .settings-notification-card .settings-card-heading {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: start;
+}
+
+.settings-workspace-content .settings-notification-card .settings-toggle-row {
+  grid-column: 2;
+}
+
+.settings-workspace-content .settings-toggle-row,
+.settings-workspace-content .settings-memory-switches > .settings-toggle-row,
+.settings-workspace-content .settings-memory-scope-grid .settings-toggle-row {
+  min-height: 2.65rem;
+  padding: 0.45rem 0.2rem;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-memory-heading {
+  min-height: 2.8rem;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-workspace-content .settings-memory-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: auto;
+}
+
+.settings-workspace-content .settings-memory-heading > span,
+.settings-workspace-content .settings-model-heading > span {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-workspace-content .settings-memory-body,
+.settings-workspace-content .settings-memory-defaults {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: auto;
+}
+
+.settings-workspace-content .settings-memory-body,
+.settings-workspace-content .settings-memory-switches,
+.settings-workspace-content .settings-memory-defaults,
+.settings-workspace-content .settings-memory-switches > *,
+.settings-workspace-content .settings-memory-defaults > * {
+  flex: 0 0 auto;
+}
+
+.settings-workspace-content .settings-memory-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-memory-scope-grid,
+.settings-workspace-content .settings-memory-domain-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.settings-workspace-content .settings-memory-domain-consent {
+  min-height: 2.65rem;
+  grid-template-columns: minmax(170px, 1fr) minmax(120px, auto) minmax(120px, auto);
+  gap: 1rem;
+  padding: 0 0.2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.settings-workspace-content .settings-memory-domain-consent > span {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.settings-workspace-content .settings-memory-domain-consent .settings-toggle-row {
+  min-height: 2.6rem;
+  border-bottom: 0;
+}
+
+.settings-workspace-content .settings-memory-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-memory-grid label {
+  min-height: 3.25rem;
+  display: grid;
+  grid-template-columns: minmax(170px, 220px) minmax(260px, 520px);
+  grid-template-rows: auto;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.45rem 0.2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.settings-workspace-content .settings-memory-grid label > span {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.settings-workspace-content .settings-memory-actions {
+  min-height: 3.4rem;
+  padding-top: 0.65rem;
+}
+
+.settings-workspace-content .settings-model-panel {
+  gap: 0;
+  height: auto;
+}
+
+.settings-workspace-content .settings-model-heading {
+  min-height: 2.8rem;
+  justify-content: flex-end;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-workspace-content .settings-model-heading h3 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.settings-workspace-content .settings-model-access-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-workspace-content .settings-model-access-mode > button {
+  min-height: 3.3rem;
+  padding: 0.6rem 0.2rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-workspace-content .settings-model-access-mode > button.selected {
+  border-bottom-color: var(--dd-brand-start);
+  background: color-mix(in srgb, var(--dd-brand-start) 6%, transparent);
+  box-shadow: none;
+}
+
+.settings-workspace-content .settings-model-usage {
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-managed-model-row,
+.settings-workspace-content .settings-model-plan-row,
+.settings-workspace-content .settings-model-quota-heading,
+.settings-workspace-content .settings-model-reset-row,
+.settings-workspace-content .settings-model-usage-footer {
+  min-height: 3.3rem;
+  padding: 0.55rem 0.2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.settings-workspace-content .settings-model-usage-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-workspace-content .settings-model-usage-grid > div {
+  min-height: 2.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.2rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-reset-card-icon,
+.settings-workspace-content [class*="settings-reset-card-icon-"] {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-allowance-history {
+  min-height: 12.5rem;
+  padding: 0.8rem 0.2rem;
+}
+
+.settings-allowance-bars {
+  position: relative;
+  height: 148px;
+  padding: 0.5rem 0.2rem 0;
+  border-left: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: repeating-linear-gradient(
+    to top,
+    transparent 0,
+    transparent calc(25% - 1px),
+    color-mix(in srgb, var(--border) 36%, transparent) 25%
+  );
+}
+
+.settings-allowance-bars > span {
+  position: relative;
+  z-index: 2;
+}
+
+.settings-allowance-trend {
+  position: absolute;
+  z-index: 3;
+  inset: 0.5rem 0.2rem 20px;
+  width: calc(100% - 0.4rem);
+  height: calc(100% - 20px - 0.5rem);
+  overflow: visible;
+  pointer-events: none;
+}
+
+.settings-allowance-trend polyline {
+  fill: none;
+  stroke: var(--dd-brand-end);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.settings-allowance-year {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.settings-allowance-year-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.settings-allowance-year-heading > div {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.2rem;
+}
+
+.settings-allowance-year-heading span {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-allowance-heatmap {
+  grid-template-columns: none;
+  grid-auto-columns: minmax(5px, 1fr);
+  height: 112px;
+  padding: 0.35rem 0 0.2rem;
+  border-left: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.settings-allowance-heatmap i[data-placeholder="true"] {
+  visibility: hidden;
+}
+
+@media (max-width: 980px) {
+  .settings-workspace-host .settings-workspace-surface {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  .settings-workspace-content > .launcher-settings-heading,
+  .settings-workspace-content > .launcher-settings-panels {
+    padding-inline: 1.1rem;
+  }
+
+  .settings-workspace-content .settings-general-card,
+  .settings-workspace-content .settings-notification-card {
+    grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
+  }
+
+  .settings-workspace-content .settings-interface-card .settings-appearance-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
 .assistant-examples,
 .autonomy-command-examples {
   width: min(100%, 68rem);

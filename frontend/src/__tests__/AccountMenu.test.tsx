@@ -158,23 +158,24 @@ describe("sidebar account menu", () => {
     window.localStorage.clear();
   });
 
-  it("shows the authoritative remaining allowance and opens the Models & allowance workspace", async () => {
+  it("shows the authoritative remaining Token percentage and opens the Models workspace", async () => {
     const { router } = renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Workspace count 0" }));
     fireEvent.click(screen.getByRole("button", { name: "Account" }));
 
     const menu = screen.getByRole("menu", { name: "Account" });
-    expect(await within(menu).findByText("12,000,000")).toBeVisible();
-    expect(within(menu).getByText("Pro")).toBeVisible();
-    expect(within(menu).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "12000000");
+    expect(await within(menu).findByText("80%")).toBeVisible();
+    expect(within(menu).queryByText("Pro")).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("progressbar")).not.toBeInTheDocument();
 
-    fireEvent.click(within(menu).getByRole("menuitem", { name: /Remaining allowance/ }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /Token/ }));
     const settings = screen.getByRole("region", { name: "Settings" });
-    expect(within(settings).getByRole("tab", { name: "Models & allowance" })).toHaveAttribute("aria-selected", "true");
+    expect(within(settings).getByRole("tab", { name: "Models" })).toHaveAttribute("aria-selected", "true");
     const sevenDays = await within(settings).findByText("7 days");
     expect(sevenDays.closest("button")).toHaveAttribute("aria-selected", "true");
     fireEvent.click(within(settings).getByRole("tab", { name: "1 year" }));
     expect(within(settings).getByTestId("settings-allowance-chart")).toHaveClass("settings-allowance-heatmap");
+    expect(within(settings).getByText(String(new Date().getUTCFullYear()))).toBeVisible();
     fireEvent.click(within(settings).getByRole("button", { name: "Back to app" }));
     expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Workspace count 1" })).toBeVisible();
@@ -186,7 +187,7 @@ describe("sidebar account menu", () => {
     const { router } = renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 
-    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     expect(within(quickSettings).getByText("Language")).toBeVisible();
     expect(within(quickSettings).getByText("Appearance")).toBeVisible();
     expect(within(quickSettings).getByText("Account memory")).toBeVisible();
@@ -203,7 +204,7 @@ describe("sidebar account menu", () => {
     fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
     const workspace = await screen.findByRole("region", { name: "Settings" });
     expect(within(workspace).getByRole("tab", { name: "General" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByRole("dialog", { name: "Quick settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Settings" })).not.toBeInTheDocument();
     await waitFor(() => expect(
       preferenceMock.saveMemoryConsent.mock.calls.some(([, consent]) => consent.memory_enabled),
     ).toBe(true));
@@ -220,7 +221,7 @@ describe("sidebar account menu", () => {
   it("opens the full workspace even when a pending preference save is offline", async () => {
     const { router } = renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     const accountMemory = within(quickSettings).getByRole("checkbox", { name: "Account memory" });
     await waitFor(() => expect(accountMemory).toBeEnabled());
     preferenceMock.savePreferences.mockRejectedValueOnce(new Error("offline"));
@@ -264,7 +265,7 @@ describe("sidebar account menu", () => {
     const { router } = renderApp();
     try {
       fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-      const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+      const quickSettings = screen.getByRole("dialog", { name: "Settings" });
       const accountMemory = within(quickSettings).getByRole("checkbox", { name: "Account memory" });
       const editionMemory = within(quickSettings).getByRole("checkbox", { name: "This edition's memory" });
       await waitFor(() => expect(accountMemory).toBeEnabled());
@@ -332,7 +333,7 @@ describe("sidebar account menu", () => {
     const { router } = renderApp();
     try {
       fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-      const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+      const quickSettings = screen.getByRole("dialog", { name: "Settings" });
       expect(within(quickSettings).getByRole("checkbox", { name: "Account memory" }))
         .toBeDisabled();
 
@@ -352,18 +353,9 @@ describe("sidebar account menu", () => {
     }
   });
 
-  it("opens profile editing from the avatar row and signs out from the menu", async () => {
+  it("signs out from the compact account menu", async () => {
     const { router } = renderApp();
     const account = screen.getByRole("button", { name: "Account" });
-    fireEvent.click(account);
-    fireEvent.click(screen.getByRole("menuitem", { name: /Pilot/ }));
-    const dialog = screen.getByRole("dialog", { name: "DroneDream account" });
-    expect(dialog).toBeVisible();
-    expect(within(dialog).getAllByRole("button", { name: "Choose from computer" }))
-      .toHaveLength(2);
-
-    fireEvent.click(screen.getByRole("button", { name: "Close account" }));
-    await waitFor(() => expect(account).toHaveFocus());
     fireEvent.click(account);
     fireEvent.click(screen.getByRole("menuitem", { name: "Sign out" }));
     await waitFor(() => expect(authMock.signOut).toHaveBeenCalledTimes(1));

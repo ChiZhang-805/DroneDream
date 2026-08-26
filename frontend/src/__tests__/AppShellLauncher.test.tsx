@@ -116,7 +116,7 @@ function renderLauncher() {
 
 function openQuickSettings() {
   fireEvent.click(screen.getByRole("button", { name: /Settings|设置/ }));
-  return screen.getByRole("dialog", { name: /Quick settings|快捷设置/ });
+  return screen.getByRole("dialog", { name: /Settings|设置/ });
 }
 
 async function openSettingsWorkspace() {
@@ -300,7 +300,7 @@ describe("desktop launcher chrome", () => {
     expect(settings).toHaveAttribute("aria-expanded", "true");
     expect(document.body).toHaveStyle({ overflow: "hidden" });
     expect(document.querySelector(".launcher-main")).toHaveProperty("inert", true);
-    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     expect(quickSettings).toBeInTheDocument();
     expect(within(quickSettings).queryByText("DroneDream")).not.toBeInTheDocument();
     expect(within(quickSettings).queryByText("Interface language")).not.toBeInTheDocument();
@@ -320,7 +320,7 @@ describe("desktop launcher chrome", () => {
     await waitFor(() => {
       expect(window.localStorage.getItem("drone-dream:locale")).toBe("zh-CN");
     });
-    const chineseQuickSettings = screen.getByRole("dialog", { name: "快捷设置" });
+    const chineseQuickSettings = screen.getByRole("dialog", { name: "设置" });
     expect(within(chineseQuickSettings).getByRole("button", { name: "English" })).toBeInTheDocument();
     expect(within(chineseQuickSettings).getByRole("button", { name: "简体中文" })).toBeInTheDocument();
     fireEvent.click(within(chineseQuickSettings).getByRole("button", { name: "全部设置" }));
@@ -328,7 +328,7 @@ describe("desktop launcher chrome", () => {
     const workspace = await screen.findByRole("region", { name: "设置" });
     expect(within(workspace).getByRole("tablist", { name: "设置" }))
       .toHaveAttribute("aria-orientation", "vertical");
-    fireEvent.click(within(workspace).getByRole("tab", { name: "模型与额度" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "模型" }));
     expect(within(workspace).getByRole("button", { name: /默认模型/ }))
       .toHaveAttribute("aria-pressed", "true");
     expect(within(workspace).getByRole("link", { name: "管理订阅" }))
@@ -356,7 +356,7 @@ describe("desktop launcher chrome", () => {
     const { router } = renderLauncher();
 
     const workspace = await openSettingsWorkspace();
-    const modelTab = within(workspace).getByRole("tab", { name: "Models & allowance" });
+    const modelTab = within(workspace).getByRole("tab", { name: "Models" });
     expect(modelTab).toBeVisible();
     expect(modelTab).toBeDisabled();
     expect(modelTab).toHaveAttribute("aria-disabled", "true");
@@ -387,7 +387,7 @@ describe("desktop launcher chrome", () => {
     const { router } = renderLauncher();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    const dialog = screen.getByRole("dialog", { name: "Quick settings" });
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
     const close = within(dialog).getByRole("button", { name: "Close settings" });
     await waitFor(() => expect(close).toHaveFocus());
 
