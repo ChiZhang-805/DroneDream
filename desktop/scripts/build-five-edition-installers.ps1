@@ -250,8 +250,7 @@ function Remove-GeneratedSourceOutputs {
         "desktop/src-tauri/agent-core-resources"
     )
     $trackedPaths = @($paths | Where-Object {
-        & git -C $repoRoot ls-files --error-unmatch -- $_ 2>$null | Out-Null
-        $LASTEXITCODE -eq 0
+        @(& git -C $repoRoot ls-files -- $_ 2>$null).Count -gt 0
     })
     $generatedPaths = @($paths | Where-Object { $_ -notin $trackedPaths })
 
