@@ -42,14 +42,23 @@ if (!files.includes("index.html")) {
 // These routes are the common website-console contract. SimOverview used to
 // be a separately named chunk, but its content now lives in the shared console
 // shell; checking that historical filename would reject a valid current build.
-for (const name of [
+const sharedConsoleChunks = [
   "AutonomyPlatform",
   "Dashboard",
-  "ExperimentAssistant",
   "FixedScenarios",
   "History",
   "NewJobRoute",
-]) requireChunk(name);
+];
+for (const name of sharedConsoleChunks) requireChunk(name);
+
+// The AGENT edition intentionally folds the former ExperimentAssistant route
+// into AutonomyPlatform so its sidebar exposes one Chatbot entry. The other
+// editions still ship the standalone assistant route.
+if (edition === "autonomy") {
+  forbidChunk("ExperimentAssistant");
+} else {
+  requireChunk("ExperimentAssistant");
+}
 
 const labChunks = ["LabSetup", "LabHardwareWorkspace", "LabValidationWorkspace"];
 
