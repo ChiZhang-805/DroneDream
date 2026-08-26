@@ -3796,6 +3796,15 @@ body:has(.field-app),
   min-height: 700px;
 }
 
+.field-settings-workspace-context,
+.field-settings-workspace-host,
+.field-settings-workspace-host .settings-workspace-surface,
+.field-settings-workspace-host .settings-workspace-sidebar,
+.field-settings-workspace-host .settings-workspace-content {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+}
+
 @media (max-width: 1100px) {
   .field-layout {
     grid-template-columns: 78px minmax(0, 1fr);

@@ -186,6 +186,32 @@ function metadataAvatar(user: User): string | null {
     : null;
 }
 
+function resolvedAvatarForUser(user: User): string | null {
+  const metadata = metadataAvatar(user);
+  const cached = localAvatarForUser(user.id);
+  const configuration = browserAuthConfiguration();
+
+  // The public object is the durable source shared by every DroneDream
+  // edition. Rebuild its URL from the current Supabase project instead of
+  // allowing an old per-WebView cache entry to shadow the uploaded avatar.
+  if (
+    configuration &&
+    [metadata, cached].some((candidate) =>
+      candidate?.includes(`/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/`),
+    )
+  ) {
+    const canonical = avatarPublicUrl(configuration.supabaseUrl, user.id);
+    cacheAvatarForUser(user.id, canonical);
+    return canonical;
+  }
+
+  if (metadata) {
+    cacheAvatarForUser(user.id, metadata);
+    return metadata;
+  }
+  return cached;
+}
+
 function accountFromUser(user: User | null): DroneDreamAccount | null {
   if (!user) return null;
   const rawName =
@@ -201,7 +227,7 @@ function accountFromUser(user: User | null): DroneDreamAccount | null {
     id: user.id,
     email: user.email ?? null,
     displayName,
-    avatarUrl: localAvatarForUser(user.id) ?? metadataAvatar(user),
+    avatarUrl: resolvedAvatarForUser(user),
   };
 }
 

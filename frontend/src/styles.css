@@ -22460,3 +22460,492 @@ body {
     border-left: 1px solid #e2dbe5;
   }
 }
+
+/* 2026-08 settings and account polish. The active edition owns the surface
+   colors: Universal pink, SIM blue, LAB green, FIELD amber and AGENT red. */
+.settings-workspace-host,
+.settings-workspace-host .settings-workspace-surface,
+.settings-workspace-host .settings-workspace-sidebar,
+.settings-workspace-host .settings-workspace-content {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+}
+
+.settings-workspace-host .settings-workspace-surface {
+  grid-template-columns: clamp(240px, 15vw, 286px) minmax(0, 1fr);
+}
+
+.settings-workspace-host .settings-workspace-sidebar {
+  align-self: stretch;
+  padding: 1.75rem 1.25rem 1.2rem;
+  overflow: hidden;
+}
+
+.settings-workspace-sidebar h2 {
+  font-size: 1.48rem;
+  line-height: 1.2;
+}
+
+.settings-workspace-sidebar .launcher-settings-tabs button,
+.settings-workspace-back {
+  min-height: 3.25rem;
+  gap: 0.8rem;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.96rem;
+  font-weight: 690;
+}
+
+.settings-workspace-sidebar .launcher-settings-tabs button svg,
+.settings-workspace-back svg {
+  width: 1.28rem;
+  height: 1.28rem;
+}
+
+.settings-workspace-back {
+  margin-top: auto;
+}
+
+.settings-workspace-content {
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+.settings-workspace-content > .launcher-settings-heading {
+  padding: 1.55rem clamp(1.75rem, 3.6vw, 4rem) 1rem;
+}
+
+.settings-workspace-content > .launcher-settings-heading h2 {
+  font-size: clamp(1.65rem, 2vw, 2rem);
+}
+
+.settings-workspace-content > .launcher-settings-panels {
+  padding: 0 clamp(1.75rem, 3.6vw, 4rem) 2.5rem;
+}
+
+.settings-workspace-content .settings-card-heading,
+.settings-workspace-content .settings-toggle-row,
+.settings-workspace-content .settings-memory-domain-consent,
+.settings-workspace-content .settings-memory-grid label,
+.settings-workspace-content .settings-managed-model-row,
+.settings-workspace-content .settings-model-plan-row,
+.settings-workspace-content .settings-model-quota-heading,
+.settings-workspace-content .settings-model-reset-row,
+.settings-workspace-content .settings-model-usage-footer,
+.settings-workspace-content .field-settings-safety > div {
+  font-size: 0.96rem;
+}
+
+.settings-workspace-content .settings-card-heading svg,
+.settings-workspace-content .settings-memory-scope-grid svg,
+.settings-workspace-content .settings-course-mark svg {
+  width: 1.28rem;
+  height: 1.28rem;
+}
+
+.settings-workspace-content .settings-course-mark,
+.settings-workspace-content .settings-course-overview > span,
+.settings-workspace-content .settings-course-overview > i {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-workspace-content .settings-toggle-row,
+.settings-workspace-content .settings-memory-switches > .settings-toggle-row,
+.settings-workspace-content .settings-memory-scope-grid .settings-toggle-row {
+  min-height: 3.15rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.settings-workspace-content .settings-toggle-row > input,
+.settings-workspace-content .settings-toggle-row > i {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.settings-workspace-content .settings-memory-domain-consent {
+  min-height: 3.15rem;
+  grid-template-columns: minmax(220px, 1fr) minmax(140px, auto) minmax(140px, auto);
+}
+
+.settings-workspace-content .settings-memory-grid label {
+  min-height: 3.75rem;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 56%);
+  align-items: center;
+}
+
+.settings-workspace-content .settings-memory-grid input,
+.settings-workspace-content .settings-memory-grid select {
+  width: 100%;
+  max-width: none;
+  justify-self: end;
+  font-size: 0.98rem;
+}
+
+.settings-workspace-content .settings-course-editions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.settings-workspace-content .settings-course-editions article,
+.settings-workspace-content .settings-course-editions article:nth-child(4),
+.settings-workspace-content .settings-course-editions article:nth-child(5) {
+  grid-column: 1 !important;
+  min-height: 5.25rem;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.45fr) minmax(0, 1fr) minmax(150px, auto);
+  align-items: center;
+  gap: 1.4rem;
+  padding: 0.8rem 0.2rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-memory-panel .settings-toggle-row:has(input:disabled),
+.settings-workspace-content .settings-memory-panel input:disabled,
+.settings-workspace-content .settings-memory-panel select:disabled {
+  opacity: 0.9;
+}
+
+:root[data-dd-appearance="dark"] .settings-workspace-content .settings-memory-panel .settings-toggle-row:has(input:disabled),
+:root[data-dd-appearance="dark"] .settings-workspace-content .settings-memory-panel .settings-toggle-row:has(input:disabled) span,
+:root[data-dd-appearance="dark"] .settings-workspace-content .settings-memory-panel input:disabled,
+:root[data-dd-appearance="dark"] .settings-workspace-content .settings-memory-panel select:disabled {
+  color: #dce3f2;
+}
+
+.settings-workspace-content .settings-course-editions p {
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  -webkit-line-clamp: unset;
+}
+
+.settings-workspace-content .settings-course-edition-link {
+  min-width: 150px;
+  min-height: 2.65rem;
+  font-size: 0.86rem;
+}
+
+.settings-runtime-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-runtime-heading {
+  min-height: 4rem;
+  align-items: center;
+  padding: 0.35rem 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-runtime-heading h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.settings-runtime-status {
+  min-height: 4.5rem;
+  margin: 0;
+  padding: 0.75rem 0.2rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-runtime-status-icon,
+.settings-runtime-step-icon {
+  display: grid;
+  width: 1.6rem;
+  height: 1.6rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-runtime-status-icon svg,
+.settings-runtime-step-icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.settings-runtime-check-steps,
+.settings-runtime-diagnostics {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-runtime-check-steps > li {
+  min-height: 3.6rem;
+  display: grid;
+  grid-template-columns: 1.6rem minmax(190px, 0.34fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.6rem 0.2rem;
+  color: var(--text);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+}
+
+.settings-runtime-check-steps strong {
+  font-size: 0.96rem;
+}
+
+.settings-runtime-check-steps small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-runtime-check-steps em {
+  font-size: 0.83rem;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.settings-runtime-check-steps > li[data-state="success"],
+.settings-runtime-status-healthy {
+  color: #45efa0;
+}
+
+.settings-runtime-check-steps > li[data-state="error"],
+.settings-runtime-status-error,
+.settings-runtime-status-warning {
+  color: #ff6f86;
+}
+
+.settings-runtime-check-steps > li[data-state="checking"] {
+  color: #ffffff;
+}
+
+.settings-runtime-check-steps > li[data-state="pending"] {
+  color: var(--text-dim);
+}
+
+.settings-runtime-check-steps .is-spinning,
+.settings-runtime-status-icon .is-spinning {
+  animation: settings-runtime-spin 0.8s linear infinite;
+}
+
+@keyframes settings-runtime-spin {
+  to { transform: rotate(360deg); }
+}
+
+.settings-runtime-diagnostics {
+  padding: 0.7rem 0.2rem;
+  color: #ff8a9b;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+}
+
+.settings-runtime-diagnostics li + li {
+  margin-top: 0.35rem;
+}
+
+/* Light and dark appearances use the current edition's surface tokens rather
+   than collapsing every product into the same blue settings canvas. */
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-host,
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-surface,
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-content {
+  color: #1f1824;
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 76%, #ffffff);
+}
+
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-sidebar {
+  color: #1f1824;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 17%, #e5dfe8);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 92%, #ffffff);
+}
+
+:root[data-dd-appearance="light"] .account-menu-popover {
+  color: #201724;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 18%, #e8e2ea);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 88%, #ffffff);
+}
+
+:root[data-dd-appearance="light"] .account-menu-popover button,
+:root[data-dd-appearance="light"] .account-menu-popover .account-menu-row > strong,
+:root[data-dd-appearance="light"] .account-menu-popover svg {
+  color: #201724;
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host {
+  --bg: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, #05070d);
+  --bg-elev: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, #0d1222);
+  --bg-elev-2: color-mix(in srgb, var(--dd-brand-dark-surface) 62%, #151b30);
+  --border: color-mix(in srgb, var(--dd-brand-middle) 24%, #2b344b);
+  --border-strong: color-mix(in srgb, var(--dd-brand-middle) 38%, #35415e);
+  --text: #ffffff;
+  --text-dim: #edf1fb;
+  --text-muted: #c5cde0;
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-surface,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-content {
+  color: #ffffff;
+  background: var(--bg);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-sidebar {
+  color: #ffffff;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, #0b1020);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host h2,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host h3,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host h4,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host strong,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host label,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host button,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host dt,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host dd {
+  color: #ffffff;
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host small,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host p,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host label > span {
+  color: #cbd3e6;
+}
+
+:root[data-dd-appearance="dark"] .account-menu-popover {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 36%, #3a3146);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 86%, #110d18);
+}
+
+:root[data-dd-appearance="dark"] .account-menu-popover button,
+:root[data-dd-appearance="dark"] .account-menu-popover .account-menu-row,
+:root[data-dd-appearance="dark"] .account-menu-popover .account-menu-row > strong,
+:root[data-dd-appearance="dark"] .account-menu-popover svg {
+  color: #ffffff;
+}
+
+/* The appearance preference applies to the product workspace too. Each
+   edition keeps its own deep surface instead of reverting to the shared light
+   canvas after Settings closes. */
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) {
+  color-scheme: dark;
+  --bg: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, #05070d);
+  --bg-elev: color-mix(in srgb, var(--dd-brand-dark-surface) 70%, #101522);
+  --bg-elev-2: color-mix(in srgb, var(--dd-brand-dark-surface) 58%, #181e2d);
+  --bg-subtle: color-mix(in srgb, var(--dd-brand-dark-surface) 50%, #202638);
+  --border: color-mix(in srgb, var(--dd-brand-middle) 22%, #31384c);
+  --border-strong: color-mix(in srgb, var(--dd-brand-middle) 36%, #424b63);
+  --text: #ffffff;
+  --text-muted: #c5cde0;
+  --text-dim: #edf1fa;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 90% 4%, color-mix(in srgb, var(--dd-brand-start) 18%, transparent), transparent 32rem),
+    radial-gradient(circle at 8% 94%, color-mix(in srgb, var(--dd-brand-middle) 12%, transparent), transparent 34rem),
+    var(--bg);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-sidebar {
+  color: #ffffff;
+  border-right-color: var(--border);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 86%, #0b0e18);
+  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.16);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-header {
+  color: #ffffff;
+  border-bottom-color: var(--border);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 78%, #111521);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-settings-button,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .launcher-settings-button,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .launcher-settings-button {
+  color: var(--text);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-main,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-main:has(.experiment-assistant-page),
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-main:has(.autonomy-platform-page) {
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 76% 10%, color-mix(in srgb, var(--dd-brand-middle) 16%, transparent), transparent 30rem),
+    var(--bg);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav button,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav-section-label,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-button,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-header-title,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-empty-state h1,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .autonomy-platform-page {
+  color: #ffffff;
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a:hover,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a.active {
+  color: #ffffff;
+  background: color-mix(in srgb, var(--dd-brand-middle) 24%, var(--bg-elev-2));
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-examples,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-examples button,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-composer,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .autonomy-command-composer,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .section-card,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .metric-card,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .artifact-card,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .data-table-wrapper {
+  color: #ffffff;
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 42%, var(--bg-elev));
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) input,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) textarea,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) select {
+  color: #ffffff;
+  border-color: var(--border);
+  background: var(--bg-elev);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) input::placeholder,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) textarea::placeholder,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-example-heading small,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-copy small {
+  color: #c5cde0;
+}
+
+@media (max-width: 980px) {
+  .settings-workspace-content .settings-course-editions article,
+  .settings-workspace-content .settings-course-editions article:nth-child(4),
+  .settings-workspace-content .settings-course-editions article:nth-child(5) {
+    grid-template-columns: minmax(230px, 0.5fr) minmax(0, 1fr);
+  }
+
+  .settings-workspace-content .settings-course-edition-link {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}

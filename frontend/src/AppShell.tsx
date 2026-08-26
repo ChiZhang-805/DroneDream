@@ -17,6 +17,9 @@ import {
   BrainCircuit,
   Camera,
   ChevronRight,
+  Circle,
+  CircleCheckBig,
+  CircleX,
   CircleUserRound,
   Download,
   FlaskConical,
@@ -28,6 +31,7 @@ import {
   LayoutDashboard,
   LogIn,
   LogOut,
+  LoaderCircle,
   MailCheck,
   MapPinned,
   Menu,
@@ -939,6 +943,7 @@ function AccountScopedModelAccessProvider() {
 }
 
 type RuntimeHealthLevel = "unknown" | "healthy" | "warning" | "error";
+type RuntimeCheckVisualState = "pending" | "checking" | "success" | "error";
 
 const COMPONENT_STATE_KEY: Record<RuntimeComponentState, TranslationKey> = {
   ready: "desktop.component.ready",
@@ -1528,12 +1533,114 @@ function SettingsDialog({
     ...(access.desktopRuntime
       ? [{
           id: "runtime",
-          label: interfaceLocale === "zh-CN" ? "Runtime 与更新" : "Runtime & updates",
+          label: "Runtime",
         } as const]
       : []),
   ];
   const level = runtimeHealthLevel(access);
   const snapshot = access.snapshot;
+  const runtimeCheckStepCount = 5 + (snapshot?.runtime.components.length ?? 0);
+  const [runtimeCheckStepIndex, setRuntimeCheckStepIndex] = useState(0);
+  useEffect(() => {
+    if (!access.isChecking) {
+      setRuntimeCheckStepIndex(0);
+      return undefined;
+    }
+    setRuntimeCheckStepIndex(0);
+    const timer = window.setInterval(() => {
+      setRuntimeCheckStepIndex((current) =>
+        Math.min(current + 1, Math.max(0, runtimeCheckStepCount - 1)),
+      );
+    }, 700);
+    return () => window.clearInterval(timer);
+  }, [access.isChecking, runtimeCheckStepCount]);
+  const runtimeCheckCopy = interfaceLocale === "zh-CN"
+    ? {
+        title: "环境检查",
+        operatingSystem: "操作系统",
+        memory: "系统内存",
+        wsl: "WSL 支持",
+        installed: "Runtime 安装",
+        running: "Runtime 服务",
+        pending: "等待检查",
+        checking: "正在检查",
+        success: "检查通过",
+        failed: "检查失败",
+      }
+    : {
+        title: "Environment check",
+        operatingSystem: "Operating system",
+        memory: "System memory",
+        wsl: "WSL support",
+        installed: "Runtime installation",
+        running: "Runtime service",
+        pending: "Waiting",
+        checking: "Checking",
+        success: "Ready",
+        failed: "Needs attention",
+      };
+  const checkedState = (
+    index: number,
+    result: boolean | null,
+  ): RuntimeCheckVisualState => {
+    if (access.isChecking && index === runtimeCheckStepIndex) return "checking";
+    if (result === null) return "pending";
+    return result ? "success" : "error";
+  };
+  const prerequisiteSnapshot = snapshot?.prerequisites ?? null;
+  const runtimeSnapshot = snapshot?.runtime ?? null;
+  const runtimeCheckSteps = [
+    {
+      id: "operating-system",
+      label: runtimeCheckCopy.operatingSystem,
+      detail: prerequisiteSnapshot?.windows?.caption ?? prerequisiteSnapshot?.platform ?? null,
+      result: prerequisiteSnapshot
+        ? prerequisiteSnapshot.supported && Boolean(prerequisiteSnapshot.windows)
+        : null,
+    },
+    {
+      id: "memory",
+      label: runtimeCheckCopy.memory,
+      detail: prerequisiteSnapshot?.memory
+        ? `${(prerequisiteSnapshot.memory.totalBytes / 1_073_741_824).toFixed(1)} GB`
+        : null,
+      result: prerequisiteSnapshot
+        ? Boolean(
+            prerequisiteSnapshot.memory &&
+            prerequisiteSnapshot.memory.totalBytes >= MINIMUM_MEMORY_BYTES,
+          )
+        : null,
+    },
+    {
+      id: "wsl",
+      label: runtimeCheckCopy.wsl,
+      detail: prerequisiteSnapshot?.wsl.distributions.map((item) => item.name).join(", ") || null,
+      result: prerequisiteSnapshot
+        ? prerequisiteSnapshot.wsl.executableAvailable
+        : null,
+    },
+    {
+      id: "runtime-installed",
+      label: runtimeCheckCopy.installed,
+      detail: runtimeSnapshot?.version ?? null,
+      result: runtimeSnapshot ? runtimeSnapshot.installed : null,
+    },
+    {
+      id: "runtime-running",
+      label: runtimeCheckCopy.running,
+      detail: runtimeSnapshot?.runtimeName ?? null,
+      result: runtimeSnapshot ? runtimeSnapshot.running : null,
+    },
+    ...(runtimeSnapshot?.components ?? []).map((component) => ({
+      id: `component-${component.id}`,
+      label: component.label,
+      detail: component.detail ?? component.version ?? null,
+      result: component.status === "ready",
+    })),
+  ].map((step, index) => ({
+    ...step,
+    state: checkedState(index, step.result),
+  }));
   const details: string[] = [];
   if (snapshot) {
     const { prerequisites, runtime } = snapshot;
@@ -1567,15 +1674,6 @@ function SettingsDialog({
         : level === "error"
           ? t("settings.runtime.error")
           : t("settings.runtime.unknown");
-  const statusIcon = access.isChecking
-    ? "…"
-    : level === "healthy"
-      ? "✓"
-      : level === "warning"
-        ? "!"
-        : level === "error"
-          ? "×"
-          : "?";
   const lastChecked = access.lastFullCheckAt
     ? new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
         dateStyle: "short",
@@ -1592,7 +1690,7 @@ function SettingsDialog({
           accountMemory: "账户记忆",
           editionMemory: "本软件记忆",
           model: "默认平台模型",
-          runtime: "Runtime 与更新",
+          runtime: "Runtime",
           allSettings: "全部设置",
           dark: "深色",
           light: "浅色",
@@ -1606,7 +1704,7 @@ function SettingsDialog({
           accountMemory: "Account memory",
           editionMemory: "This edition's memory",
           model: "Default platform model",
-          runtime: "Runtime & updates",
+          runtime: "Runtime",
           allSettings: "All settings",
           dark: "Dark",
           light: "Light",
@@ -2544,7 +2642,7 @@ function SettingsDialog({
           <section className="settings-runtime-panel" aria-labelledby="settings-runtime-title">
           <div className="settings-runtime-heading">
             <div>
-              <h3 id="settings-runtime-title">{t("settings.runtime.title")}</h3>
+              <h3 id="settings-runtime-title">{runtimeCheckCopy.title}</h3>
             </div>
             <button
               type="button"
@@ -2562,26 +2660,55 @@ function SettingsDialog({
             role="status"
             aria-live="polite"
           >
-            <span className="settings-runtime-status-icon" aria-hidden="true">{statusIcon}</span>
+            <span className="settings-runtime-status-icon" aria-hidden="true">
+              {access.isChecking ? (
+                <LoaderCircle className="is-spinning" />
+              ) : level === "healthy" ? (
+                <CircleCheckBig />
+              ) : level === "error" || level === "warning" ? (
+                <CircleX />
+              ) : (
+                <Circle />
+              )}
+            </span>
             <div>
               <strong>{statusLabel}</strong>
               <small>{t("settings.runtime.lastChecked")}: {lastChecked}</small>
             </div>
           </div>
+          <ol className="settings-runtime-check-steps" aria-label={runtimeCheckCopy.title}>
+            {runtimeCheckSteps.map((step) => {
+              const visualLabel = step.state === "checking"
+                ? runtimeCheckCopy.checking
+                : step.state === "success"
+                  ? runtimeCheckCopy.success
+                  : step.state === "error"
+                    ? runtimeCheckCopy.failed
+                    : runtimeCheckCopy.pending;
+              return (
+                <li key={step.id} data-state={step.state}>
+                  <span className="settings-runtime-step-icon" aria-hidden="true">
+                    {step.state === "checking" ? (
+                      <LoaderCircle className="is-spinning" />
+                    ) : step.state === "success" ? (
+                      <CircleCheckBig />
+                    ) : step.state === "error" ? (
+                      <CircleX />
+                    ) : (
+                      <Circle />
+                    )}
+                  </span>
+                  <strong>{step.label}</strong>
+                  {step.detail ? <small>{step.detail}</small> : <span aria-hidden="true" />}
+                  <em>{visualLabel}</em>
+                </li>
+              );
+            })}
+          </ol>
           {!access.isChecking && level !== "healthy" && uniqueDetails.length > 0 ? (
-            <details className="settings-runtime-details">
-              <summary>{t("settings.runtime.viewDetails")}</summary>
-              <div className="settings-runtime-details-scroll">
-                <ul>
-                  {uniqueDetails.slice(0, 4).map((detail) => <li key={detail}>{detail}</li>)}
-                  {uniqueDetails.length > 4 ? (
-                    <li>{locale === "zh-CN"
-                      ? `另有 ${uniqueDetails.length - 4} 项诊断信息`
-                      : `${uniqueDetails.length - 4} more diagnostic items`}</li>
-                  ) : null}
-                </ul>
-              </div>
-            </details>
+            <ul className="settings-runtime-diagnostics" aria-label={t("settings.runtime.viewDetails")}>
+              {uniqueDetails.map((detail) => <li key={detail}>{detail}</li>)}
+            </ul>
           ) : null}
           <SettingsUpdateCenter
             onOpenRuntimeBase={() => {
