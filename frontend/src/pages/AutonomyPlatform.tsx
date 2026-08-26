@@ -7,6 +7,7 @@ import {
   Camera,
   Check,
   ChevronRight,
+  Circle,
   CircleCheck,
   CircleUserRound,
   Cpu,
@@ -100,6 +101,9 @@ import {
   getAgentCoreAssetQualificationJob,
   getAgentCoreAssetQualificationJobIssues,
   getAgentCoreExecutionEvidence,
+  getAgentCoreLiveFrame,
+  getAgentCoreLiveSources,
+  getAgentCoreLiveTelemetry,
   getAgentCoreRuntimeStatus,
   listAgentCoreAssetImportJobs,
   listAgentCoreAssetSourceAdapters,
@@ -117,6 +121,8 @@ import {
   type AgentCoreAssetSourceAdapter,
   type AgentCoreAssetVersion,
   type AgentCoreExecutionEvidence,
+  type AgentCoreLiveSource,
+  type AgentCoreLiveTelemetry,
   type AgentCorePluginEntry,
 } from "../features/autonomy/agentCore";
 import {
@@ -2661,6 +2667,53 @@ export function AgentCoreLiveMission({
   );
 }
 
+type LiveSource = AgentCoreLiveSource | {
+  id: string;
+  kind: "camera";
+  label: string;
+  transport: "media-device";
+  mode: "hardware";
+  ready: true;
+};
+
+function recordingMimeType() {
+  return [
+    "video/mp4;codecs=avc1",
+    "video/mp4",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ].find((value) => MediaRecorder.isTypeSupported(value)) ?? "";
+}
+
+async function blobBase64(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("RECORDING_READ_FAILED"));
+    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function persistLiveRecording(blob: Blob, fileName: string) {
+  const core = (window as Window & {
+    __TAURI__?: { core?: { invoke(command: string, args?: Record<string, unknown>): Promise<unknown> } };
+  }).__TAURI__?.core;
+  if (core) {
+    const value = await core.invoke("save_live_recording", {
+      request: { fileName, bodyBase64: await blobBase64(blob) },
+    });
+    return String((value as { path?: unknown })?.path ?? fileName);
+  }
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2_000);
+  return fileName;
+}
+
 export function AutonomyLive() {
   const { chinese, workspace } = useAutonomyWorkspace();
   const auth = useOptionalAuth();
@@ -2671,25 +2724,41 @@ export function AutonomyLive() {
     accountId: auth?.account?.id ?? null,
     conversationId: conversationId || "",
   }), [auth?.account?.id, conversationId, edition]);
-  const [sessionActive, setSessionActive] = useState(false);
-  const [sources, setSources] = useState<Array<{ id: string; label: string; kind: "simulation" | "camera"; url?: string }>>([]);
+  const [threadId, setThreadId] = useState("");
+  const [coreSources, setCoreSources] = useState<AgentCoreLiveSource[]>([]);
+  const [deviceSources, setDeviceSources] = useState<LiveSource[]>([]);
   const [sourceId, setSourceId] = useState("");
   const [playing, setPlaying] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [telemetry, setTelemetry] = useState<AgentCoreLiveTelemetry | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recorderStreamRef = useRef<MediaStream | null>(null);
+  const sources = useMemo<LiveSource[]>(() => [...coreSources, ...deviceSources], [coreSources, deviceSources]);
 
   useEffect(() => {
     if (!conversationId) {
-      setSessionActive(false);
+      setThreadId("");
+      setCoreSources([]);
       return undefined;
     }
     let cancelled = false;
     const refresh = async () => {
       try {
         const thread = await getBoundAgentCoreThread(binding);
-        if (!cancelled) setSessionActive(Boolean(thread && ["executing", "holding", "landing"].includes(thread.state)));
+        if (!cancelled) {
+          const boundId = thread?.thread_id ?? "";
+          setThreadId(boundId);
+          if (!boundId) setCoreSources([]);
+        }
       } catch {
-        if (!cancelled) setSessionActive(false);
+        if (!cancelled) {
+          setThreadId("");
+          setCoreSources([]);
+        }
       }
     };
     void refresh();
@@ -2701,28 +2770,26 @@ export function AutonomyLive() {
   }, [binding, conversationId]);
 
   useEffect(() => {
-    if (!sessionActive) {
-      setSources([]);
-      setSourceId("");
-      setPlaying(false);
-      return undefined;
-    }
     let cancelled = false;
     const discover = async () => {
-      const discovered: Array<{ id: string; label: string; kind: "simulation" | "camera"; url?: string }> = [];
-      const simulationUrl = import.meta.env.VITE_GAZEBO_VIEWER_URL?.trim();
-      if (simulationUrl) discovered.push({ id: "simulation", label: chinese ? "仿真画面" : "Simulation", kind: "simulation", url: simulationUrl });
+      const discovered: LiveSource[] = [];
       try {
         const devices = await navigator.mediaDevices?.enumerateDevices();
         (devices ?? []).filter((device) => device.kind === "videoinput").forEach((device, index) => {
-          discovered.push({ id: device.deviceId, label: device.label || `${chinese ? "摄像头" : "Camera"} ${index + 1}`, kind: "camera" });
+          discovered.push({
+            id: `device-${device.deviceId}`,
+            label: device.label || `${chinese ? "摄像头" : "Camera"} ${index + 1}`,
+            kind: "camera",
+            transport: "media-device",
+            mode: "hardware",
+            ready: true,
+          });
         });
       } catch {
-        // A running simulation can still be viewed when camera discovery is unavailable.
+        // Simulation and adapter-registered sources remain available without camera permission.
       }
       if (cancelled) return;
-      setSources(discovered);
-      setSourceId((current) => discovered.some((source) => source.id === current) ? current : discovered[0]?.id ?? "");
+      setDeviceSources(discovered);
     };
     void discover();
     navigator.mediaDevices?.addEventListener?.("devicechange", discover);
@@ -2730,11 +2797,39 @@ export function AutonomyLive() {
       cancelled = true;
       navigator.mediaDevices?.removeEventListener?.("devicechange", discover);
     };
-  }, [chinese, sessionActive]);
+  }, [chinese]);
+
+  useEffect(() => {
+    if (!threadId) return undefined;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const catalog = await getAgentCoreLiveSources(threadId);
+        if (!cancelled) setCoreSources(catalog.sources);
+      } catch {
+        if (!cancelled) setCoreSources([]);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 900);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [threadId]);
+
+  useEffect(() => {
+    setSourceId((current) => sources.some((source) => source.id === current)
+      ? current
+      : sources[0]?.id ?? "");
+    if (!sources.length) setPlaying(false);
+  }, [sources]);
 
   const stop = useCallback(() => {
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
     stream?.getTracks().forEach((track) => track.stop());
     setStream(null);
+    setTelemetry(null);
     setPlaying(false);
   }, [stream]);
 
@@ -2746,9 +2841,10 @@ export function AutonomyLive() {
   const selectedSource = sources.find((source) => source.id === sourceId) ?? null;
   const play = async () => {
     if (!selectedSource) return;
-    if (selectedSource.kind === "camera") {
+    if (selectedSource.transport === "media-device") {
       try {
-        const nextStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: selectedSource.id } }, audio: false });
+        const deviceId = selectedSource.id.slice("device-".length);
+        const nextStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } }, audio: false });
         setStream(nextStream);
       } catch {
         setPlaying(false);
@@ -2758,16 +2854,161 @@ export function AutonomyLive() {
     setPlaying(true);
   };
 
+  useEffect(() => {
+    if (!playing || selectedSource?.transport !== "agent-core-frame" || !threadId) return undefined;
+    let cancelled = false;
+    let busy = false;
+    const draw = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const frame = await getAgentCoreLiveFrame(threadId);
+        const bitmap = await createImageBitmap(frame);
+        const canvas = canvasRef.current;
+        if (canvas && !cancelled) {
+          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+          }
+          canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+        }
+        bitmap.close();
+      } catch {
+        // The camera sensor may need a short warm-up after Gazebo starts.
+      } finally {
+        busy = false;
+      }
+    };
+    void draw();
+    const timer = window.setInterval(() => void draw(), 120);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [playing, selectedSource?.transport, threadId]);
+
+  useEffect(() => {
+    if (!playing || selectedSource?.kind !== "gps") {
+      setTelemetry(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const value = selectedSource.transport === "agent-core-telemetry" && threadId
+          ? await getAgentCoreLiveTelemetry(threadId)
+          : selectedSource.url
+            ? await fetch(selectedSource.url, { cache: "no-store" }).then((response) => {
+              if (!response.ok) throw new Error("GPS_SOURCE_UNAVAILABLE");
+              return response.json() as Promise<AgentCoreLiveTelemetry>;
+            })
+            : null;
+        if (!cancelled) setTelemetry(value);
+      } catch {
+        if (!cancelled) setTelemetry(null);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 400);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [playing, selectedSource, threadId]);
+
+  const geographicPosition = useMemo(() => {
+    if (!telemetry) return null;
+    if (telemetry.coordinate_frame === "wgs84" && typeof telemetry.latitude === "number" && typeof telemetry.longitude === "number") {
+      return { latitude: telemetry.latitude, longitude: telemetry.longitude, altitudeM: telemetry.altitude_m ?? null };
+    }
+    const origin = workspace.mapPack.origin;
+    if (typeof origin.latitude !== "number" || typeof origin.longitude !== "number") return null;
+    const north = telemetry.north_m ?? 0;
+    const east = telemetry.east_m ?? 0;
+    const latitude = origin.latitude + north / 111_320;
+    const longitude = origin.longitude + east / (111_320 * Math.max(0.01, Math.cos(origin.latitude * Math.PI / 180)));
+    return { latitude, longitude, altitudeM: (origin.altitudeM ?? 0) + (telemetry.up_m ?? 0) };
+  }, [telemetry, workspace.mapPack.origin]);
+
+  const toggleRecording = async () => {
+    if (recording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    if (!playing || !selectedSource) return;
+    let capture: MediaStream | null = null;
+    let ownsCapture = false;
+    if (selectedSource.transport === "media-device") capture = stream;
+    if (selectedSource.transport === "agent-core-frame") capture = canvasRef.current?.captureStream(15) ?? null;
+    if (!capture && videoRef.current) {
+      capture = (videoRef.current as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream?.() ?? null;
+    }
+    if (!capture && navigator.mediaDevices?.getDisplayMedia) {
+      capture = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      ownsCapture = true;
+    }
+    if (!capture) {
+      setRecordingStatus(chinese ? "当前画面无法录制" : "This source cannot be recorded");
+      return;
+    }
+    const mimeType = recordingMimeType();
+    const chunks: Blob[] = [];
+    const recorder = new MediaRecorder(capture, mimeType ? { mimeType } : undefined);
+    recorderRef.current = recorder;
+    recorderStreamRef.current = ownsCapture ? capture : null;
+    recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+    recorder.onerror = () => setRecordingStatus(chinese ? "录制失败" : "Recording failed");
+    recorder.onstop = async () => {
+      setRecording(false);
+      recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recorderStreamRef.current = null;
+      const type = recorder.mimeType || mimeType || "video/webm";
+      const blob = new Blob(chunks, { type });
+      if (!blob.size) return;
+      const extension = type.includes("mp4") ? "mp4" : "webm";
+      const fileName = `DroneDream-${new Date().toISOString().replace(/[:.]/gu, "-")}.${extension}`;
+      try {
+        const saved = await persistLiveRecording(blob, fileName);
+        setRecordingStatus(`${chinese ? "已保存" : "Saved"}: ${saved}`);
+      } catch {
+        setRecordingStatus(chinese ? "保存录像失败" : "Unable to save recording");
+      }
+    };
+    recorder.start(1_000);
+    setRecordingStatus("");
+    setRecording(true);
+  };
+
+  useEffect(() => () => recorderStreamRef.current?.getTracks().forEach((track) => track.stop()), []);
+
   return (
     <section className="autonomy-live-viewer">
       <div className="autonomy-live-screen" data-playing={playing}>
-        {playing && selectedSource?.kind === "simulation" && selectedSource.url ? <iframe src={selectedSource.url} title={selectedSource.label} allow="autoplay; fullscreen" /> : null}
-        {playing && selectedSource?.kind === "camera" ? <video ref={videoRef} autoPlay playsInline muted /> : null}
+        {playing && selectedSource?.transport === "agent-core-frame" ? <canvas ref={canvasRef} aria-label={selectedSource.label} /> : null}
+        {playing && selectedSource?.kind === "gps" ? (
+          <div className="autonomy-live-map" data-ready={Boolean(telemetry)}>
+            <div className="autonomy-live-map-grid" />
+            {telemetry ? <MapPin className="autonomy-live-map-marker" aria-hidden="true" /> : null}
+            <div className="autonomy-live-coordinates">
+              {geographicPosition
+                ? <><strong>{geographicPosition.latitude.toFixed(6)}, {geographicPosition.longitude.toFixed(6)}</strong><span>{geographicPosition.altitudeM?.toFixed(1) ?? "—"} m</span></>
+                : telemetry
+                  ? <><strong>E {(telemetry.east_m ?? 0).toFixed(1)} · N {(telemetry.north_m ?? 0).toFixed(1)}</strong><span>{(telemetry.up_m ?? 0).toFixed(1)} m</span></>
+                  : <span>{chinese ? "等待定位" : "Waiting for position"}</span>}
+            </div>
+          </div>
+        ) : null}
+        {playing && selectedSource?.transport === "video" && selectedSource.url ? <video ref={videoRef} src={selectedSource.url} autoPlay playsInline muted controls={false} /> : null}
+        {playing && selectedSource?.transport === "image" && selectedSource.url ? <img src={selectedSource.url} alt={selectedSource.label} /> : null}
+        {playing && selectedSource?.transport === "media-device" ? <video ref={videoRef} autoPlay playsInline muted /> : null}
         {!playing ? <div className="autonomy-live-off"><VideoOff aria-hidden="true" /><span>{chinese ? "无画面" : "No signal"}</span></div> : null}
       </div>
       <div className="autonomy-live-controls">
-        <button type="button" onClick={() => playing ? stop() : void play()} disabled={!selectedSource} aria-label={playing ? (chinese ? "停止" : "Stop") : (chinese ? "播放" : "Play")}>
+        <button className="autonomy-live-play" type="button" onClick={() => playing ? stop() : void play()} disabled={!selectedSource} aria-label={playing ? (chinese ? "停止" : "Stop") : (chinese ? "播放" : "Play")}>
           {playing ? <Square aria-hidden="true" /> : <Play aria-hidden="true" />}
+        </button>
+        <button className="autonomy-live-record" type="button" onClick={() => void toggleRecording()} disabled={!playing} data-recording={recording} aria-label={recording ? (chinese ? "停止录制" : "Stop recording") : (chinese ? "开始录制" : "Record")}>
+          {recording ? <Square aria-hidden="true" /> : <Circle aria-hidden="true" />}
         </button>
         <select
           value={sourceId}
@@ -2782,6 +3023,7 @@ export function AutonomyLive() {
           {sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}
         </select>
       </div>
+      {recordingStatus ? <p className="autonomy-live-recording-status" aria-live="polite">{recordingStatus}</p> : null}
     </section>
   );
 }

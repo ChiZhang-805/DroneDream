@@ -563,6 +563,39 @@ export interface AgentCoreRuntimeStatus {
   issue: string | null;
 }
 
+export type AgentCoreLiveSourceKind = "simulation" | "camera" | "gps";
+
+export interface AgentCoreLiveSource {
+  id: string;
+  kind: AgentCoreLiveSourceKind;
+  label: string;
+  transport: "agent-core-frame" | "agent-core-telemetry" | "video" | "image" | "json";
+  mode: "simulation" | "hardware";
+  ready: boolean;
+  url?: string;
+}
+
+export interface AgentCoreLiveSourceCatalog {
+  schema_version: "dronedream.live-source-catalog.v1";
+  thread_id: string;
+  mode: "simulation" | "hardware" | "idle";
+  sources: AgentCoreLiveSource[];
+}
+
+export interface AgentCoreLiveTelemetry {
+  schema_version: "dronedream.live-telemetry.v1";
+  mode: "simulation" | "hardware";
+  coordinate_frame: "gazebo-enu" | "wgs84";
+  elapsed_s?: number;
+  east_m?: number;
+  north_m?: number;
+  up_m?: number;
+  latitude?: number;
+  longitude?: number;
+  altitude_m?: number;
+  updated_at_unix_ms: number;
+}
+
 export interface AgentCoreExecutionReceipt {
   execution_id: string;
   state: "executing";
@@ -914,6 +947,21 @@ export function createAgentCoreThread(payload: {
 
 export function getAgentCoreThread(threadId: string): Promise<AgentCoreThread> {
   return requestJson(`/v1/threads/${encodeURIComponent(threadId)}`);
+}
+
+export function getAgentCoreLiveSources(threadId: string): Promise<AgentCoreLiveSourceCatalog> {
+  return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/live-sources`);
+}
+
+export async function getAgentCoreLiveFrame(threadId: string): Promise<Blob> {
+  const bytes = await requestBytes(`/v1/threads/${encodeURIComponent(threadId)}/live-frame`);
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return new Blob([copy.buffer], { type: "image/png" });
+}
+
+export function getAgentCoreLiveTelemetry(threadId: string): Promise<AgentCoreLiveTelemetry> {
+  return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/live-telemetry`);
 }
 
 export async function uploadAgentCoreAttachment(

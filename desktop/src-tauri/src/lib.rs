@@ -26,6 +26,7 @@ mod hardware_domain;
 mod installer_handoff;
 #[cfg(dronedream_lab)]
 mod lab_calibration;
+mod live_recording;
 mod preferences;
 mod prerequisites;
 #[cfg(target_os = "windows")]
@@ -138,6 +139,7 @@ pub fn run() {
         distribution_plan::validate_distribution_plan,
         desktop_api_bridge::desktop_api_request,
         desktop_api_bridge::desktop_download_artifact,
+        live_recording::save_live_recording,
         runtime_keepalive::stop_runtime_for_exit,
         component_update::check_component_updates,
         component_update::install_component_update,
@@ -191,6 +193,7 @@ pub fn run() {
         distribution_plan::validate_distribution_plan,
         desktop_api_bridge::desktop_api_request,
         desktop_api_bridge::desktop_download_artifact,
+        live_recording::save_live_recording,
         runtime_keepalive::stop_runtime_for_exit,
         component_update::check_component_updates,
         component_update::install_component_update,
@@ -244,6 +247,7 @@ pub fn run() {
         distribution_plan::validate_distribution_plan,
         desktop_api_bridge::desktop_api_request,
         desktop_api_bridge::desktop_download_artifact,
+        live_recording::save_live_recording,
         runtime_keepalive::stop_runtime_for_exit,
         component_update::check_component_updates,
         component_update::install_component_update,
@@ -298,6 +302,7 @@ pub fn run() {
         distribution_plan::validate_distribution_plan,
         desktop_api_bridge::desktop_api_request,
         desktop_api_bridge::desktop_download_artifact,
+        live_recording::save_live_recording,
         runtime_keepalive::stop_runtime_for_exit,
         component_update::check_component_updates,
         component_update::install_component_update,

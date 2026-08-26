@@ -22211,14 +22211,18 @@ body {
 }
 
 .autonomy-live-screen iframe,
-.autonomy-live-screen video {
+.autonomy-live-screen video,
+.autonomy-live-screen canvas,
+.autonomy-live-screen > img {
   width: 100%;
   height: 100%;
   display: block;
   border: 0;
-  object-fit: contain;
+  object-fit: cover;
   background: #000;
 }
+
+.autonomy-live-screen canvas { object-fit: contain; }
 
 .autonomy-live-off {
   position: absolute;
@@ -22233,9 +22237,9 @@ body {
 .autonomy-live-off svg { width: 3rem; height: 3rem; }
 
 .autonomy-live-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(3rem, 1fr) auto minmax(13rem, 1fr);
   align-items: center;
-  justify-content: center;
   gap: 0.7rem;
 }
 
@@ -22253,7 +22257,69 @@ body {
 
 .autonomy-live-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
 .autonomy-live-controls button svg { width: 1.45rem; height: 1.45rem; }
-.autonomy-live-controls select { min-width: 13rem; min-height: 2.45rem; border-radius: 7px; }
+.autonomy-live-controls .autonomy-live-play { justify-self: start; }
+.autonomy-live-controls .autonomy-live-record { justify-self: center; color: #ef365a; }
+.autonomy-live-controls .autonomy-live-record[data-recording="true"] { color: #d20f3e; }
+.autonomy-live-controls select { min-width: 13rem; min-height: 2.45rem; justify-self: end; border-radius: 7px; }
+
+.autonomy-live-recording-status {
+  max-width: 100%;
+  margin: -0.3rem 0 0;
+  overflow: hidden;
+  color: #796d7b;
+  font-size: 0.78rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-live-map {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(239, 54, 90, 0.13), transparent 32%),
+    linear-gradient(135deg, #11141a, #0b0c10);
+}
+
+.autonomy-live-map-grid {
+  position: absolute;
+  inset: -2px;
+  opacity: 0.32;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.14) 1px, transparent 1px);
+  background-size: 4rem 4rem;
+}
+
+.autonomy-live-map-marker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3.2rem;
+  height: 3.2rem;
+  color: #ff4165;
+  filter: drop-shadow(0 0 12px rgba(255, 65, 101, 0.55));
+  transform: translate(-50%, -100%);
+}
+
+.autonomy-live-coordinates {
+  position: absolute;
+  right: 1.15rem;
+  bottom: 1rem;
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+  color: #c9c9d1;
+}
+
+.autonomy-live-coordinates strong { color: #fff; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 700px) {
+  .autonomy-live-controls { grid-template-columns: auto auto minmax(0, 1fr); }
+  .autonomy-live-controls select { width: 100%; min-width: 0; }
+}
 
 .history-jobs-surface {
   overflow: hidden;

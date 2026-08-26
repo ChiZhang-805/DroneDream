@@ -204,6 +204,98 @@ class RuntimeManager:
             "issue": issue,
         }
 
+    def _configured_live_sources(self) -> list[dict[str, object]]:
+        """Load sources registered by local hardware adapters, never a static UI catalog."""
+
+        source_file = self.store.root / "live-sources.json"
+        if not source_file.is_file() or source_file.stat().st_size > 128 * 1024:
+            return []
+        try:
+            value = json.loads(source_file.read_text(encoding="utf-8"))
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return []
+        entries = value.get("sources", []) if isinstance(value, dict) else []
+        result: list[dict[str, object]] = []
+        for index, item in enumerate(entries):
+            if not isinstance(item, dict) or item.get("active") is not True:
+                continue
+            kind = str(item.get("kind", ""))
+            url = str(item.get("url", "")).strip()
+            if kind not in {"camera", "gps"} or not url.startswith(("http://", "https://")):
+                continue
+            identifier = re.sub(r"[^a-zA-Z0-9._-]", "-", str(item.get("id", index)))[:80]
+            result.append(
+                {
+                    "id": f"registered-{identifier}",
+                    "kind": kind,
+                    "label": str(item.get("label", "Camera" if kind == "camera" else "GPS"))[:120],
+                    "url": url,
+                    "transport": str(
+                        item.get("transport", "video" if kind == "camera" else "json")
+                    ),
+                    "mode": "hardware",
+                    "ready": True,
+                }
+            )
+        return result
+
+    def live_sources(self, thread_id: str) -> dict[str, object]:
+        with self._lock:
+            active = self._active_runs.get(thread_id)
+        sources: list[dict[str, object]] = []
+        if active is not None and active.process.poll() is None:
+            sources.extend(
+                (
+                    {
+                        "id": "gazebo-render",
+                        "kind": "simulation",
+                        "label": "Gazebo",
+                        "transport": "agent-core-frame",
+                        "mode": "simulation",
+                        "ready": (active.run_dir / "live-frame.png").is_file(),
+                    },
+                    {
+                        "id": "gazebo-position",
+                        "kind": "gps",
+                        "label": "Simulation position",
+                        "transport": "agent-core-telemetry",
+                        "mode": "simulation",
+                        "ready": (active.run_dir / "live-telemetry.json").is_file(),
+                    },
+                )
+            )
+        configured = self._configured_live_sources()
+        sources.extend(configured)
+        mode = "simulation" if active is not None else ("hardware" if configured else "idle")
+        return {
+            "schema_version": "dronedream.live-source-catalog.v1",
+            "thread_id": thread_id,
+            "mode": mode,
+            "sources": sources,
+        }
+
+    def live_frame(self, thread_id: str) -> Path | None:
+        with self._lock:
+            active = self._active_runs.get(thread_id)
+        if active is None or active.process.poll() is not None:
+            return None
+        path = active.run_dir / "live-frame.png"
+        return path if path.is_file() else None
+
+    def live_telemetry(self, thread_id: str) -> dict[str, object] | None:
+        with self._lock:
+            active = self._active_runs.get(thread_id)
+        if active is None or active.process.poll() is not None:
+            return None
+        path = active.run_dir / "live-telemetry.json"
+        if not path.is_file() or path.stat().st_size > 64 * 1024:
+            return None
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+        return value if isinstance(value, dict) else None
+
     def _set_setup_progress(
         self,
         phase: str,

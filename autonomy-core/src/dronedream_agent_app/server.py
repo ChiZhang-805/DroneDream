@@ -15,7 +15,17 @@ from pathlib import Path
 from typing import Annotated
 
 import uvicorn
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 from dronedream_agent_core.plugin_contracts import (
@@ -659,6 +669,32 @@ def create_app(
             )
         except (KeyError, ValueError, RuntimeBridgeError) as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
+
+    @app.get("/v1/threads/{thread_id}/live-sources", dependencies=[local])
+    def live_sources(thread_id: str) -> dict[str, object]:
+        return runtime_manager.live_sources(thread_id)
+
+    @app.get("/v1/threads/{thread_id}/live-frame", dependencies=[local])
+    def live_frame(thread_id: str) -> Response:
+        path = runtime_manager.live_frame(thread_id)
+        if path is None:
+            raise HTTPException(status_code=404, detail="LIVE_FRAME_NOT_READY")
+        try:
+            body = path.read_bytes()
+        except OSError as error:
+            raise HTTPException(status_code=404, detail="LIVE_FRAME_NOT_READY") from error
+        return Response(
+            content=body,
+            media_type="image/png",
+            headers={"Cache-Control": "no-store, max-age=0"},
+        )
+
+    @app.get("/v1/threads/{thread_id}/live-telemetry", dependencies=[local])
+    def live_telemetry(thread_id: str) -> dict[str, object]:
+        value = runtime_manager.live_telemetry(thread_id)
+        if value is None:
+            raise HTTPException(status_code=404, detail="LIVE_TELEMETRY_NOT_READY")
+        return value
 
     @app.post("/v1/threads/{thread_id}/runtime-message", dependencies=[local], status_code=202)
     def runtime_message(thread_id: str, payload: RuntimeMessageRequest) -> dict[str, object]:

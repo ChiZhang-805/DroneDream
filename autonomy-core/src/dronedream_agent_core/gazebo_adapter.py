@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import binascii
 import csv
 import hashlib
 import json
@@ -9,10 +10,12 @@ import math
 import os
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import threading
 import time
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +51,103 @@ def _write_json(path: Path, payload: object) -> None:
         json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _write_bytes_atomic(path: Path, payload: bytes) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_bytes(payload)
+    temporary.replace(path)
+
+
+def _png_chunk(name: bytes, payload: bytes) -> bytes:
+    return (
+        struct.pack(">I", len(payload))
+        + name
+        + payload
+        + struct.pack(">I", binascii.crc32(name + payload) & 0xFFFFFFFF)
+    )
+
+
+def _gazebo_image_png(message: Any) -> bytes:
+    """Encode Gazebo RGB/RGBA frames without adding a heavyweight image dependency."""
+
+    width = int(message.width)
+    height = int(message.height)
+    if width <= 0 or height <= 0 or width > 4096 or height > 2160:
+        raise ValueError("Gazebo live frame dimensions are invalid")
+    formats = {
+        3: (3, 2, False),  # RGB_INT8
+        4: (4, 6, False),  # RGBA_INT8
+        8: (3, 2, True),  # BGR_INT8
+        5: (4, 6, True),  # BGRA_INT8
+    }
+    channels, color_type, swap_red_blue = formats.get(
+        int(message.pixel_format_type), (0, 0, False)
+    )
+    if channels == 0:
+        raise ValueError("Gazebo live frame format is not supported")
+    row_bytes = width * channels
+    step = max(row_bytes, int(message.step or 0))
+    source = bytes(message.data)
+    if len(source) < step * height:
+        raise ValueError("Gazebo live frame payload is incomplete")
+    rows: list[bytes] = []
+    for row_index in range(height):
+        row = bytearray(source[row_index * step : row_index * step + row_bytes])
+        if swap_red_blue:
+            for offset in range(0, len(row), channels):
+                row[offset], row[offset + 2] = row[offset + 2], row[offset]
+        rows.append(b"\x00" + bytes(row))
+    header = struct.pack(">IIBBBBB", width, height, 8, color_type, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", header)
+        + _png_chunk(b"IDAT", zlib.compress(b"".join(rows), level=3))
+        + _png_chunk(b"IEND", b"")
+    )
+
+
+def _live_camera_sdf(
+    route_points: list[tuple[float, float, float]],
+) -> tuple[str, tuple[float, float, float]]:
+    xs = [point[0] for point in route_points]
+    ys = [point[1] for point in route_points]
+    zs = [point[2] for point in route_points]
+    target = (
+        (min(xs) + max(xs)) / 2,
+        (min(ys) + max(ys)) / 2,
+        (min(zs) + max(zs)) / 2,
+    )
+    span = max(max(xs) - min(xs), max(ys) - min(ys), 6.0)
+    camera = (
+        target[0] - span * 0.9,
+        target[1] - span * 0.9,
+        max(zs) + span * 0.7 + 3.0,
+    )
+    dx, dy, dz = (target[index] - camera[index] for index in range(3))
+    yaw = math.atan2(dy, dx)
+    pitch = math.atan2(-dz, math.hypot(dx, dy))
+    model = f"""<?xml version="1.0"?>
+<sdf version="1.10">
+  <model name="dronedream_live_camera">
+    <static>true</static>
+    <pose>0 0 0 0 {pitch:.12g} {yaw:.12g}</pose>
+    <link name="camera_link">
+      <sensor name="live_camera" type="camera">
+        <always_on>true</always_on>
+        <update_rate>12</update_rate>
+        <topic>/dronedream/live/camera</topic>
+        <camera>
+          <horizontal_fov>1.0472</horizontal_fov>
+          <image><width>1280</width><height>720</height><format>R8G8B8</format></image>
+          <clip><near>0.1</near><far>5000</far></clip>
+        </camera>
+      </sensor>
+    </link>
+  </model>
+</sdf>
+"""
+    return model, camera
 
 
 def _run(
@@ -385,6 +485,8 @@ def run_px4_gazebo_track(
     processes: list[subprocess.Popen[Any] | None] = []
     samples: list[tuple[float, float, float, float]] = []
     sample_lock = threading.Lock()
+    frame_lock = threading.Lock()
+    last_frame_at = 0.0
     abort_reason: str | None = None
     executor_return_code: int | None = None
     native_terminal_lifecycle: dict[str, object] | None = None
@@ -398,6 +500,7 @@ def run_px4_gazebo_track(
     system_packages = "/usr/lib/python3/dist-packages"
     if system_packages not in sys.path:
         sys.path.append(system_packages)
+    from gz.msgs10.image_pb2 import Image
     from gz.msgs10.pose_v_pb2 import Pose_V
     from gz.transport13 import Node as GazeboNode
 
@@ -406,15 +509,43 @@ def run_px4_gazebo_track(
     def on_pose(message: Any) -> None:
         for pose in message.pose:
             if pose.name == vehicle_name:
+                elapsed = time.monotonic() - started
+                east = float(pose.position.x)
+                north = float(pose.position.y)
+                up = float(pose.position.z)
                 with sample_lock:
-                    samples.append(
-                        (
-                            time.monotonic() - started,
-                            float(pose.position.x),
-                            float(pose.position.y),
-                            float(pose.position.z),
-                        )
-                    )
+                    samples.append((elapsed, east, north, up))
+                try:
+                    rendered = json.dumps(
+                        {
+                            "schema_version": "dronedream.live-telemetry.v1",
+                            "mode": "simulation",
+                            "coordinate_frame": "gazebo-enu",
+                            "elapsed_s": elapsed,
+                            "east_m": east,
+                            "north_m": north,
+                            "up_m": up,
+                            "updated_at_unix_ms": int(time.time() * 1000),
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                    _write_bytes_atomic(run_dir / "live-telemetry.json", rendered)
+                except OSError:
+                    pass
+                return
+
+    def on_live_frame(message: Any) -> None:
+        nonlocal last_frame_at
+        now = time.monotonic()
+        with frame_lock:
+            if now - last_frame_at < 0.08:
+                return
+            try:
+                payload = _gazebo_image_png(message)
+                _write_bytes_atomic(run_dir / "live-frame.png", payload)
+                last_frame_at = now
+            except (OSError, ValueError):
                 return
 
     try:
@@ -427,7 +558,7 @@ def run_px4_gazebo_track(
             (run_dir / "ros-observations.csv").open("w", encoding="utf-8") as ros_csv,
         ):
             gazebo = subprocess.Popen(
-                [gz_binary, "sim", "-r", "-s", str(world_sdf)],
+                [gz_binary, "sim", "-r", "-s", "--headless-rendering", str(world_sdf)],
                 env=env,
                 stdout=gazebo_log,
                 stderr=subprocess.STDOUT,
@@ -445,7 +576,29 @@ def run_px4_gazebo_track(
                 env=env,
             )
             _write_json(run_dir / "vehicle_spawn.json", spawn_evidence)
+            camera_sdf, camera_pose = _live_camera_sdf(route_points)
+            camera_sdf_path = run_dir / "live-camera.sdf"
+            camera_sdf_path.write_text(camera_sdf, encoding="utf-8")
+            camera_ready = False
+            try:
+                camera_spawn = _spawn_entity(
+                    gz_binary,
+                    world_name=world_name,
+                    entity_name="dronedream_live_camera",
+                    sdf_path=camera_sdf_path,
+                    pose=camera_pose,
+                    env=env,
+                )
+                camera_ready = True
+                _write_json(run_dir / "live-camera-spawn.json", camera_spawn)
+            except SimulationRuntimeError as error:
+                _write_json(
+                    run_dir / "live-camera-spawn.json",
+                    {"accepted": False, "issue": str(error)},
+                )
             gazebo_node.subscribe(Pose_V, f"/world/{world_name}/dynamic_pose/info", on_pose)
+            if camera_ready:
+                gazebo_node.subscribe(Image, "/dronedream/live/camera", on_live_frame)
             abort_file = run_dir / "live_abort.request.json"
 
             bridge = subprocess.Popen(
