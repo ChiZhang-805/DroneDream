@@ -1,0 +1,1053 @@
+{
+  "schema_version": "dronedream.technical-report-claim-evidence-audit.v1",
+  "status": "passed",
+  "ledger": {
+    "path": "technical-report/claim-evidence-ledger.json",
+    "sha256": "520019577df8139c0f8c6384e19436a4db8ec08a119c39a01ef637c3ef23f8df"
+  },
+  "evidence_reference_manifest": {
+    "path": "technical-report/evidence-reference-manifest.json",
+    "sha256": "4637e4e71cf5969bd0564aba5e5a4e30a6dfaff40bf113ed2a5a160f322ee2ef"
+  },
+  "report_source": {
+    "path": "technical-report/body.tex",
+    "sha256": "089b5108abdabe7d2e0e57a1e1abc7bcab5d5b96d3dc44abeea5827631753597"
+  },
+  "claim_total": 55,
+  "claim_passed": 55,
+  "claim_failed": 0,
+  "assertion_total": 458,
+  "prohibited_literal_checks": 23,
+  "verified_sources": [
+    {
+      "id": "advanced_physics_actuator_failure_focused_junit",
+      "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+      "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/focused-tests.xml",
+      "sha256": "65e027756f66e7fe7df4ccdc2e172bf821be9fbd104b71ac5199eee939a924d5"
+    },
+    {
+      "id": "advanced_physics_actuator_failure_preflight_attempt_0",
+      "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+      "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/preflight-failure-attempt-0.json",
+      "sha256": "72471490aa92fb132ea01fb941557c2c8dbd3f4cb77d480fa9fc14c00a97df2d"
+    },
+    {
+      "id": "advanced_physics_actuator_failure_receipt",
+      "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+      "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/receipt.json",
+      "sha256": "5cc93ee5bfb75c53f95bdd925bb3121658d9ae93d6742d2b677d489112252cc6"
+    },
+    {
+      "id": "advanced_physics_closure_manifest",
+      "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+      "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.manifest.json",
+      "sha256": "5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3"
+    },
+    {
+      "id": "advanced_physics_closure_receipt",
+      "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+      "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.receipt.json",
+      "sha256": "1ee74f3b207d7c69e1d2cb6601bffa7d8a92f34181313c51ad22474c73995eda"
+    },
+    {
+      "id": "advanced_physics_closure_test_receipt",
+      "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+      "path": "artifacts/test-runs/advanced-physics-closure-f1e8fa8/test-receipt.json",
+      "sha256": "50994da3b3385fb81411499349ee02123a26cebfa0af39a8a464588ad29eeb79"
+    },
+    {
+      "id": "advanced_physics_gps_boundary_stderr",
+      "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stderr.log",
+      "sha256": "63e463e8965212091b5b1ec8ca6364ad4cf77f9b8fe251e9672325f2486aacc9"
+    },
+    {
+      "id": "advanced_physics_gps_boundary_stdout",
+      "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stdout.log",
+      "sha256": "2be653eba84ba88e4fffbd2da2b577709e9e0d749517361277036a8ae05c4e70"
+    },
+    {
+      "id": "advanced_physics_manifest",
+      "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.manifest.json",
+      "sha256": "599c2b8b89bedb525a36c00837e8f09e7b4598c4825a01cff2942c6c5825a923"
+    },
+    {
+      "id": "advanced_physics_receipt",
+      "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.receipt.json",
+      "sha256": "99e257fb56d46d9293ba9365ccae604ddd697802370b877360541628ebd1354f"
+    },
+    {
+      "id": "advanced_physics_runtime_negative_control_failure_lineage",
+      "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/failure-lineage.json",
+      "sha256": "882acd480bfca39591f0daa01faea73ac9780cd3a514cd362fe8a2a2629e00b5"
+    },
+    {
+      "id": "advanced_physics_runtime_negative_control_focused_junit",
+      "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/focused-tests.xml",
+      "sha256": "67d614764b213408833f50be63c0490e27c99dbcca41f349ab6281b605fc6b8c"
+    },
+    {
+      "id": "advanced_physics_runtime_negative_control_receipt",
+      "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/receipt.json",
+      "sha256": "2d6470fb085e638c52754f580d22a5d3d50d2f26000e584148557f3c505fdd8a"
+    },
+    {
+      "id": "advanced_physics_runtime_negative_control_scenario_applied",
+      "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/scenario_effects.applied.json",
+      "sha256": "7973680f267b2643690b998b84111ffb3887f1efc2cf556b09acd1d73a24846a"
+    },
+    {
+      "id": "backend_1204_full_log",
+      "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+      "path": "artifacts/test-runs/aurora-software-c1222c9-pytest.log",
+      "sha256": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f"
+    },
+    {
+      "id": "backend_1204_test_receipt",
+      "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+      "path": "artifacts/test-runs/aurora-software-c1222c9-receipt.json",
+      "sha256": "6bd9290fcd58a8210531405ce8959d6ef029b261a85aca409a2915c60eb07fb2"
+    },
+    {
+      "id": "backend_28_focused_log",
+      "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+      "path": "artifacts/test-runs/aurora-software-c1222c9-focused.log",
+      "sha256": "571ded85369e1747d9ae02f8dadb4b499e887168b8a5ca686edddc2248f10bbf"
+    },
+    {
+      "id": "cross_job_memory_contract_artifact",
+      "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+      "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.json",
+      "sha256": "aa1f22e72039e367991aec55ea7ad143994f0a5d6ed7f73bef9c5e5523e28281"
+    },
+    {
+      "id": "cross_job_memory_contract_manifest",
+      "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+      "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.manifest.json",
+      "sha256": "95d36063f94b8c9280d84db028a97d0b0da03687d67465da5979917f06b5efa7"
+    },
+    {
+      "id": "current_backend_regression_focused_log",
+      "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "path": "artifacts/test-runs/aurora-software-755c511/focused-suite.log",
+      "sha256": "6cf663090b5d649976072aeecb31508e252b9a02affe5a0155329521025efad0"
+    },
+    {
+      "id": "current_backend_regression_full_log",
+      "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "path": "artifacts/test-runs/aurora-software-755c511/full-suite.log",
+      "sha256": "a6b7d84a14fdb8f1dfb98591acdaca45230a15b3a60e52bf7104489d6e067958"
+    },
+    {
+      "id": "current_backend_regression_manifest",
+      "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "path": "artifacts/test-runs/aurora-software-755c511/attestation-manifest.json",
+      "sha256": "0e0e0df70087e2240aba7f76cfa72a8d17acc55a674033ec4475258e2ec13267"
+    },
+    {
+      "id": "current_backend_regression_receipt",
+      "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "path": "artifacts/test-runs/aurora-software-755c511/test-receipt.json",
+      "sha256": "113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10"
+    },
+    {
+      "id": "current_online_routing_artifact",
+      "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.json",
+      "sha256": "d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4"
+    },
+    {
+      "id": "current_online_routing_manifest",
+      "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.manifest.json",
+      "sha256": "6b625b8c0a6aa60282fa7c7be2f6b0ad8277b4610feb09c6c5e4b44222329307"
+    },
+    {
+      "id": "harness_component_outcome_ablation_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+      "sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82"
+    },
+    {
+      "id": "harness_contract_ablation_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+      "sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a"
+    },
+    {
+      "id": "harness_contract_design",
+      "ref_commit": "755c511539fe561207ca38ff5079f471a4110896",
+      "path": "docs/19-llm-tool-orchestration-harness.md",
+      "sha256": "8b433a7662fa73f6ecf8f458a66d2e5df56c25616c43dbe949bac3fa33fc87ea"
+    },
+    {
+      "id": "harness_fallback_outcome_campaign_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+      "sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d"
+    },
+    {
+      "id": "harness_phase_registry",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/app/orchestration/harness_context.py",
+      "sha256": "f081a8c12bf50dc330a4aad509bd3454999af519c1dc4ecaf9a03df3db0e1376"
+    },
+    {
+      "id": "multi_tool_budget_artifact",
+      "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+      "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.json",
+      "sha256": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d"
+    },
+    {
+      "id": "multi_tool_budget_generation_receipt",
+      "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+      "path": "artifacts/test-runs/harness-multi-tool-budget-evaluation-v1-generation-receipt.json",
+      "sha256": "611783c9388bfda9b21a47e02ab3e8147eec96a7219202859cdc97b63198b6da"
+    },
+    {
+      "id": "px4_physical_campaign_manifest",
+      "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+      "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.manifest.json",
+      "sha256": "4ac760428ead1506fb41ef4928df486a1b0983517a6aee846c2444e882090eda"
+    },
+    {
+      "id": "px4_physical_campaign_receipt",
+      "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+      "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.receipt.json",
+      "sha256": "8f7e1c953338ae87154b25822bf7c781921473cbcd76fd5874d79c178ef73dee"
+    },
+    {
+      "id": "px4_physical_obstacle_seed_41001_applied",
+      "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+      "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/obstacle-box-seed-41001/scenario_effects.applied.json",
+      "sha256": "248afedf045ed69678d048cd5fe86fd64035375bf3e895514374501e08a6c95d"
+    },
+    {
+      "id": "px4_physical_obstacle_seed_41002_applied",
+      "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+      "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/obstacle-box-seed-41002/scenario_effects.applied.json",
+      "sha256": "bf0651c813d12403459e75013d226a2cf93c7c40d07dc5ac5f4331d842d9154a"
+    },
+    {
+      "id": "px4_physical_wind_seed_41001_applied",
+      "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+      "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/wind-north-2mps-seed-41001/scenario_effects.applied.json",
+      "sha256": "2eba69493b1ab348e787b1abf21ec1144d09420e5311dffbe9cfce92abf5d943"
+    },
+    {
+      "id": "px4_physical_wind_seed_41002_applied",
+      "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+      "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/wind-north-2mps-seed-41002/scenario_effects.applied.json",
+      "sha256": "cec3663d6a5ec035a8bcc8178af4d119bc3b32127f05b0c2690ad28d9e525ba0"
+    },
+    {
+      "id": "routing_development_corpus_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+      "sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1"
+    },
+    {
+      "id": "routing_prompt_1_5_first_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-20260728.json",
+      "sha256": "fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf"
+    },
+    {
+      "id": "routing_prompt_1_5_rerun_raw",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.5-rerun-20260728.json",
+      "sha256": "9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571"
+    },
+    {
+      "id": "routing_prompt_1_6_archived_raw",
+      "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+      "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+      "sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4"
+    },
+    {
+      "id": "runtime_dependency_pins",
+      "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+      "path": "runtime/pins.env",
+      "sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5"
+    },
+    {
+      "id": "technical_report_evidence_bundle",
+      "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+      "path": "artifacts/technical-report/evidence-v9.json",
+      "sha256": "a2bed29533b321fa00086bf901f7c5ebbf35ab503e50cde4de568b3420e0a08a"
+    },
+    {
+      "id": "technical_report_evidence_v10_bundle",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/technical-report/evidence-v10.json",
+      "sha256": "27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89"
+    },
+    {
+      "id": "technical_report_evidence_v10_compatibility_junit",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/compatibility-tests.xml",
+      "sha256": "ec375b944d0203441cdc7d4af1b3f01b6c648bba19165b98c128bdb58ba795e6"
+    },
+    {
+      "id": "technical_report_evidence_v10_focused_junit",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/focused-tests.xml",
+      "sha256": "fc0a5b0a7fb9e0560643c9a18eefb22f852c225808f4d99b4d52ec3983e20a04"
+    },
+    {
+      "id": "technical_report_evidence_v10_manifest",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/technical-report/evidence-v10.manifest.json",
+      "sha256": "134d1ae0f0a96b7999755b0b2e4352c0ce1388bddc4f5f0adc9eb744cc302d4a"
+    },
+    {
+      "id": "technical_report_evidence_v10_test_receipt",
+      "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/test-receipt.json",
+      "sha256": "5284eca94d2d9bac657f696b4b6899720c4623caf75cbaf39eda09fb4738ae72"
+    },
+    {
+      "id": "website_release_truth_validation_receipt",
+      "ref_commit": "87e049cc426bec0f16ace8130bac672dbb778f22",
+      "path": "website/validation-receipts/website-release-truth-manual-validation-fd7e770.json",
+      "sha256": "034ef134858fe906cdb3c97aa263fa7c36c63a2c59b0216cb5f41ceebdd566f1"
+    },
+    {
+      "id": "website_typography_validation_receipt",
+      "ref_commit": "96aba5de2ff20ebe8f201f958c996c5685189619",
+      "path": "website/validation-receipts/website-download-copy-typography-validation-8710553.json",
+      "sha256": "bcfc6c50920ffce913161eb59d2a4805c34869be33edd85926c37a009c5725d6"
+    }
+  ],
+  "claims": [
+    {
+      "id": "current-backend-regression-receipt",
+      "report_locations": [
+        "Abstract",
+        "Section 8",
+        "Table 6",
+        "Conclusion",
+        "Appendix A.12"
+      ],
+      "source_id": "current_backend_regression_receipt",
+      "assertions": 9,
+      "body_literals": 5,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-backend-regression-attestation",
+      "report_locations": [
+        "Abstract",
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "current_backend_regression_manifest",
+      "assertions": 11,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-backend-full-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "current_backend_regression_full_log",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-backend-focused-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "current_backend_regression_focused_log",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "historical-v9-backend-validation-boundary",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "backend_1204_test_receipt",
+      "assertions": 9,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "backend-full-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "backend_1204_full_log",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "backend-focused-pytest-result",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "backend_28_focused_log",
+      "assertions": 1,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "cross-job-memory-evaluation",
+      "report_locations": [
+        "Section 3.2",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Table 9"
+      ],
+      "source_id": "cross_job_memory_contract_artifact",
+      "assertions": 10,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "cross-job-memory-contract",
+      "report_locations": [
+        "Abstract",
+        "Section 3.2",
+        "Section 8",
+        "Appendix A.3",
+        "Appendix A.5"
+      ],
+      "source_id": "cross_job_memory_contract_manifest",
+      "assertions": 6,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "website-validation-boundary",
+      "report_locations": [
+        "Section 8",
+        "Table 6"
+      ],
+      "source_id": "website_release_truth_validation_receipt",
+      "assertions": 14,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "website-latest-typography-validation",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "website_typography_validation_receipt",
+      "assertions": 10,
+      "body_literals": 7,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-online-routing-predictions",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Figure 2",
+        "Figure 4",
+        "Table 1",
+        "Section 8",
+        "Table 9"
+      ],
+      "source_id": "current_online_routing_artifact",
+      "assertions": 10,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-online-routing-campaign",
+      "report_locations": [
+        "Section 4.1",
+        "Section 8",
+        "Section 9",
+        "Table 9"
+      ],
+      "source_id": "current_online_routing_manifest",
+      "assertions": 10,
+      "body_literals": 5,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "archived-provider-routing",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Figure 2",
+        "Figure 4",
+        "Table 1"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 13,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "prompt-1-5-first-routing-history",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Section 7"
+      ],
+      "source_id": "routing_prompt_1_5_first_raw",
+      "assertions": 5,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "prompt-1-5-repeat-routing-history",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Section 7"
+      ],
+      "source_id": "routing_prompt_1_5_rerun_raw",
+      "assertions": 5,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "prompt-1-6-archived-routing-freeze",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Table 1",
+        "Figure 2",
+        "Figure 4"
+      ],
+      "source_id": "routing_prompt_1_6_archived_raw",
+      "assertions": 5,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "deterministic-policy-holdout",
+      "report_locations": [
+        "Abstract",
+        "Section 4.2",
+        "Table 2",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 6,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "source-contract-ablation",
+      "report_locations": [
+        "Abstract",
+        "Section 4.3",
+        "Figure 3",
+        "Table 3",
+        "Table 9"
+      ],
+      "source_id": "harness_contract_ablation_raw",
+      "assertions": 7,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "fallback-outcome-campaign",
+      "report_locations": [
+        "Abstract",
+        "Section 4.4",
+        "Table 4",
+        "Table 9"
+      ],
+      "source_id": "harness_fallback_outcome_campaign_raw",
+      "assertions": 9,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "component-outcome-ablation",
+      "report_locations": [
+        "Section 7",
+        "Table 7",
+        "Table 9"
+      ],
+      "source_id": "harness_component_outcome_ablation_raw",
+      "assertions": 11,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "synthetic-coverage-campaign",
+      "report_locations": [
+        "Section 4.6",
+        "Figure 5",
+        "Figure 6",
+        "Table 5",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 10,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "synthetic-generalization-campaign",
+      "report_locations": [
+        "Section 4.6",
+        "Section 7.1",
+        "Table 9"
+      ],
+      "source_id": "technical_report_evidence_bundle",
+      "assertions": 7,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "current-memory-contract-versions",
+      "report_locations": [
+        "Abstract",
+        "Section 3.2",
+        "Section 8",
+        "Appendix A.5"
+      ],
+      "source_id": "cross_job_memory_contract_manifest",
+      "assertions": 6,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "execution-gate-versions",
+      "report_locations": [
+        "Section 3.1",
+        "Section 8"
+      ],
+      "source_id": "harness_contract_design",
+      "assertions": 3,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "phase-qualified-tool-surface",
+      "report_locations": [
+        "Appendix A.5",
+        "Table 8"
+      ],
+      "source_id": "harness_phase_registry",
+      "assertions": 6,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-physical-campaign-matrix",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9"
+      ],
+      "source_id": "px4_physical_campaign_manifest",
+      "assertions": 23,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-physical-campaign-receipt",
+      "report_locations": [
+        "Section 4.8",
+        "Section 8"
+      ],
+      "source_id": "px4_physical_campaign_receipt",
+      "assertions": 6,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-physical-wind-readback",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8"
+      ],
+      "source_id": "px4_physical_wind_seed_41001_applied",
+      "assertions": 3,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-physical-obstacle-create",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8"
+      ],
+      "source_id": "px4_physical_obstacle_seed_41001_applied",
+      "assertions": 3,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-physical-wind-readback-seed-41002",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "px4_physical_wind_seed_41002_applied",
+      "assertions": 3,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-physical-obstacle-create-seed-41002",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "px4_physical_obstacle_seed_41002_applied",
+      "assertions": 3,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-physical-provenance-discrepancy",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "px4_physical_campaign_manifest",
+      "assertions": 1,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "px4-runtime-pin",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "runtime_dependency_pins",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-real-px4-campaign",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9"
+      ],
+      "source_id": "advanced_physics_manifest",
+      "assertions": 35,
+      "body_literals": 9,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-real-px4-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_receipt",
+      "assertions": 8,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-readiness-wait",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 9"
+      ],
+      "source_id": "advanced_physics_gps_boundary_stdout",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-readiness-timeout",
+      "report_locations": [
+        "Section 4.8"
+      ],
+      "source_id": "advanced_physics_gps_boundary_stderr",
+      "assertions": 1,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-battery-negative-control",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_receipt",
+      "assertions": 28,
+      "body_literals": 5,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-battery-failure-lineage",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_failure_lineage",
+      "assertions": 5,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-battery-scenario-effects",
+      "report_locations": [
+        "Section 4.8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_scenario_applied",
+      "assertions": 6,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-gps-battery-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_runtime_negative_control_focused_junit",
+      "assertions": 3,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "multi-tool-budget-contract",
+      "report_locations": [
+        "Section 4.5",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Table 9"
+      ],
+      "source_id": "multi_tool_budget_artifact",
+      "assertions": 16,
+      "body_literals": 7,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "multi-tool-budget-generation-history",
+      "report_locations": [
+        "Section 4.5",
+        "Section 8"
+      ],
+      "source_id": "multi_tool_budget_generation_receipt",
+      "assertions": 9,
+      "body_literals": 5,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-actuator-failure-probe",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_actuator_failure_receipt",
+      "assertions": 26,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-actuator-failure-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_actuator_failure_focused_junit",
+      "assertions": 3,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-actuator-failure-preflight-lineage",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_actuator_failure_preflight_attempt_0",
+      "assertions": 5,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-closure-manifest",
+      "report_locations": [
+        "Abstract",
+        "Section 4.8",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Appendix A.3",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_closure_manifest",
+      "assertions": 19,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-closure-receipt",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "advanced_physics_closure_receipt",
+      "assertions": 8,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "advanced-physics-closure-test-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "advanced_physics_closure_test_receipt",
+      "assertions": 9,
+      "body_literals": 2,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-provenance-closure",
+      "report_locations": [
+        "Abstract",
+        "Section 4.1",
+        "Section 8",
+        "Section 9",
+        "Reference 1",
+        "Table 9",
+        "Appendix A.12"
+      ],
+      "source_id": "technical_report_evidence_v10_bundle",
+      "assertions": 27,
+      "body_literals": 6,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-manifest",
+      "report_locations": [
+        "Section 8",
+        "Appendix A.12"
+      ],
+      "source_id": "technical_report_evidence_v10_manifest",
+      "assertions": 7,
+      "body_literals": 3,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-test-receipt",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_test_receipt",
+      "assertions": 7,
+      "body_literals": 4,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-compatibility-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_compatibility_junit",
+      "assertions": 3,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    },
+    {
+      "id": "technical-report-evidence-v10-focused-junit",
+      "report_locations": [
+        "Section 8"
+      ],
+      "source_id": "technical_report_evidence_v10_focused_junit",
+      "assertions": 3,
+      "body_literals": 1,
+      "status": "passed",
+      "failures": []
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,905 @@
+{
+  "schema_version": "dronedream.technical-report-evidence-reference-manifest.v1",
+  "ownership": {
+    "report_owned_prefix": "technical-report/",
+    "raw_evidence_copied": false,
+    "software_owned_prefixes": [
+      "backend/",
+      "artifacts/technical-report/",
+      "artifacts/test-runs/"
+    ],
+    "website_owned_prefixes": [
+      "frontend/",
+      "website/"
+    ]
+  },
+  "software": {
+    "branch": "codex/software",
+    "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+    "provenance_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+    "branch_head": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+    "evidence_v10": {
+      "source_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+      "freeze_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+      "generated_at": "2026-07-28T23:54:28Z",
+      "schema_version": "dronedream.technical-report-evidence.v10",
+      "source_count": 39,
+      "csv_export_count": 3,
+      "compatibility_test_count": 70,
+      "tamper_test_count": 7,
+      "online_routing_current_for_evidence_2_9": false,
+      "release_ready": false,
+      "claim_class": "latest_exact_byte_provenance_navigation_ledger_without_release_readiness"
+    },
+    "documentation_alignment": {
+      "commit": "755c511539fe561207ca38ff5079f471a4110896",
+      "authority": "secondary_narrative_reference",
+      "experimental_evidence": false,
+      "authoritative_evidence_source": "evidence_v10_bundle_manifest_and_receipt"
+    },
+    "current_backend_regression": {
+      "subject_commit": "755c511539fe561207ca38ff5079f471a4110896",
+      "receipt_head": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+      "generated_at": "2026-07-29T00:28:51Z",
+      "exact_final_commit_run": true,
+      "full_passed": 1284,
+      "full_failed": 0,
+      "full_pytest_seconds": 831.79,
+      "focused_passed": 73,
+      "focused_failed": 0,
+      "focused_pytest_seconds": 29.73,
+      "openai_api_key_removed_before_run": true,
+      "provider_calls": 0,
+      "claim_class": "exact_source_offline_backend_regression_without_frontend_desktop_rust_release_or_physical_claim"
+    },
+    "cross_job_memory": {
+      "implementation_commit": "abb9002746e061af44a164fe749243d68d098e10",
+      "subject_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+      "receipt_head": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+      "evidence_schema_version": "2.8",
+      "prompt_template_version": "1.7",
+      "trace_schema_version": "1.4",
+      "retention_days": 90,
+      "claim_class": "observational_not_causal"
+    },
+    "online_routing": {
+      "implementation_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+      "evidence_head": "ef00362927475b2fc411a4d82084bbbae8846582",
+      "evidence_schema_version": "2.8",
+      "prompt_template_version": "1.7",
+      "tool_registry_version": "2.1",
+      "model_snapshot": "gpt-4.1-2025-04-14",
+      "provider_calls": 24,
+      "contract_current": false,
+      "qualification_scope": "archived_evidence_2_8_prompt_1_7",
+      "claim_class": "retained_online_development_routing_qualification_not_current_for_evidence_2_9"
+    },
+    "multi_tool_budget": {
+      "source_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+      "evidence_head": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+      "generated_at": "2026-07-28T17:53:02Z",
+      "evidence_schema_version": "2.9",
+      "tool_registry_version": "2.1",
+      "seed_blocks": 3,
+      "arm_runs": 6,
+      "accounted_calls": 12,
+      "provider_calls": 0,
+      "network_calls": 0,
+      "simulator_backend": "mock",
+      "claim_class": "offline_scripted_mock_equal_budget_plan_history_and_accounting_contract"
+    },
+    "physical_campaign": {
+      "subject_commit": "86273db6d827a790cb0a8b1472256b23e0a629d2",
+      "reachable_implementation_commit": "c373dc992d43ff921ea8a1db07fcc26591955576",
+      "reachable_runtime_observation_commit": "5f0f62c707c541aed7918e56a0170a7f67bd6ffb",
+      "evidence_head": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+      "handoff_declared_exporter_verifier_commit": "c373dc9e4964301a051d14d8e76d249481719c96",
+      "embedded_exporter_observer_commit": "5f0f62c789680e5e2d34c6513727199fabbd50d0",
+      "declared_commit_resolution": "unresolvable_in_fetched_repository",
+      "verified_binding_scope": "frozen_artifact_bytes_and_reachable_source_chain",
+      "tree_file_count": 159,
+      "tree_object_mismatch_count": 0
+    },
+    "advanced_physics": {
+      "subject_commit": "26b957efd985d0ac37702a8d2518e87ab65347c3",
+      "exporter_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+      "evidence_head": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+      "generated_at": "2026-07-28T20:39:54Z",
+      "evidence_class": "REAL_PX4_GAZEBO_ADVANCED_PHYSICS",
+      "claim_class": "dedicated_runtime_effect_injection_readback_and_three_successful_trajectories",
+      "tree_file_count": 114,
+      "tree_bytes": 9442999,
+      "tree_object_mismatch_count": 0,
+      "source_file_count": 1205,
+      "source_bytes": 305040238,
+      "retained_file_count": 111,
+      "retained_bytes": 8994710
+    },
+    "advanced_physics_runtime_negative_control": {
+      "implementation_commit": "fdf1250398567c6658ad5148efc1c302dede4a17",
+      "evidence_head": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+      "evidence_class": "REAL_PX4_GAZEBO_GPS_BATTERY_NEGATIVE_CONTROL",
+      "claim_class": "verified_injection_readback_and_completed_trial_with_failed_stability_acceptance",
+      "trial_success": true,
+      "pass_flag": false,
+      "applied_effect_count": 3,
+      "focused_test_count": 159
+    },
+    "advanced_physics_actuator_failure_probe": {
+      "implementation_commit": "793f02089413f2baa8ea78387cd1e9e078f02b83",
+      "evidence_head": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+      "evidence_class": "REAL_PX4_GAZEBO_ACTUATOR_FAILURE_INJECTION_READBACK",
+      "claim_class": "verified_sdf_and_joint_state_injection_without_trusted_flight_evaluation",
+      "trial_success": false,
+      "physical_effect_verified": true,
+      "focused_test_count": 138
+    },
+    "advanced_physics_closure": {
+      "subject_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+      "evidence_head": "83982f37899f8054e24a749af8e6469fedf48e8d",
+      "evidence_class": "REAL_PX4_GAZEBO_BUNDLED_EFFECT_CLOSURE",
+      "claim_class": "nine_of_nine_injection_readback_coverage_with_five_performance_successful_categories",
+      "verified_category_count": 9,
+      "performance_successful_category_count": 5,
+      "remaining_runtime_extension_count": 0,
+      "all_effects_performance_successful": false,
+      "real_aircraft_claim_permitted": false,
+      "focused_test_count": 52
+    },
+    "artifacts": [
+      {
+        "id": "technical_report_evidence_v10_bundle",
+        "path": "artifacts/technical-report/evidence-v10.json",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "27b6b1c96524dec4a48a553d19fb2c3844724597fa797dda11d6bf594a23bd89",
+        "canonical_sha256": "df6ef5e898519150dd306fa9550526a5c16b1b19bb5e1c2e67b3a9e5048d9e5b"
+      },
+      {
+        "id": "technical_report_evidence_v10_manifest",
+        "path": "artifacts/technical-report/evidence-v10.manifest.json",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "134d1ae0f0a96b7999755b0b2e4352c0ce1388bddc4f5f0adc9eb744cc302d4a"
+      },
+      {
+        "id": "technical_report_evidence_v10_digest",
+        "path": "artifacts/technical-report/evidence-v10.sha256",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "898c472934cc30fc2b26aa99b63095c273e49b348430b0aedaff983c8b26666c"
+      },
+      {
+        "id": "technical_report_evidence_v10_test_receipt",
+        "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/test-receipt.json",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "5284eca94d2d9bac657f696b4b6899720c4623caf75cbaf39eda09fb4738ae72",
+        "internal_receipt_sha256": "b9407556588e5c0a65d3e93f22e29d0fdd8fd4bb57f1b5cb1c890f94c7b9d98d"
+      },
+      {
+        "id": "technical_report_evidence_v10_compatibility_junit",
+        "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/compatibility-tests.xml",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "ec375b944d0203441cdc7d4af1b3f01b6c648bba19165b98c128bdb58ba795e6"
+      },
+      {
+        "id": "technical_report_evidence_v10_focused_junit",
+        "path": "artifacts/test-runs/technical-report-evidence-v10-9749244/focused-tests.xml",
+        "ref_commit": "a1f091f2edf1ae43233cd01e483bc3990c9aa279",
+        "file_sha256": "fc0a5b0a7fb9e0560643c9a18eefb22f852c225808f4d99b4d52ec3983e20a04"
+      },
+      {
+        "id": "technical_report_evidence_bundle",
+        "path": "artifacts/technical-report/evidence-v9.json",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "a2bed29533b321fa00086bf901f7c5ebbf35ab503e50cde4de568b3420e0a08a",
+        "canonical_sha256": "d33c308ce3b47138572c86bf7f45aa8e4a37901a0248a5d5e0d3cd71ce2bfa8a"
+      },
+      {
+        "id": "technical_report_evidence_manifest",
+        "path": "artifacts/technical-report/evidence-v9.manifest.json",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "3bc7bd0eac65cf5e8f9ef7e05c0f5e62403a7cf23c5be4f0905ae4b503847fc9"
+      },
+      {
+        "id": "backend_1204_test_receipt",
+        "path": "artifacts/test-runs/aurora-software-c1222c9-receipt.json",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "6bd9290fcd58a8210531405ce8959d6ef029b261a85aca409a2915c60eb07fb2",
+        "internal_receipt_sha256": "9d3b0cfd9c99a32ee9055741448797d3e5c72f894e0207650e37bd31da9eff9d",
+        "full_log_sha256": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f",
+        "focused_log_sha256": "571ded85369e1747d9ae02f8dadb4b499e887168b8a5ca686edddc2248f10bbf"
+      },
+      {
+        "id": "current_backend_regression_receipt",
+        "path": "artifacts/test-runs/aurora-software-755c511/test-receipt.json",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "113307a8ee6c722d0cd4e16e245373a5637dd0ec00ba8dbee274f6a57a897f10",
+        "internal_receipt_sha256": "15e2c97e62f9d75b60a315fd62ec93a7a2f38db401e8c8817146e4e7f1fdaafe"
+      },
+      {
+        "id": "current_backend_regression_manifest",
+        "path": "artifacts/test-runs/aurora-software-755c511/attestation-manifest.json",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "0e0e0df70087e2240aba7f76cfa72a8d17acc55a674033ec4475258e2ec13267"
+      },
+      {
+        "id": "current_backend_regression_checksums",
+        "path": "artifacts/test-runs/aurora-software-755c511/checksums.sha256",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "52f73accc5f582ba0ceffb3d75f29fd948a8d1e06d801e885a19d72ec300d1ad"
+      },
+      {
+        "id": "current_backend_regression_full_log",
+        "path": "artifacts/test-runs/aurora-software-755c511/full-suite.log",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "a6b7d84a14fdb8f1dfb98591acdaca45230a15b3a60e52bf7104489d6e067958"
+      },
+      {
+        "id": "current_backend_regression_focused_log",
+        "path": "artifacts/test-runs/aurora-software-755c511/focused-suite.log",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "6cf663090b5d649976072aeecb31508e252b9a02affe5a0155329521025efad0"
+      },
+      {
+        "id": "current_backend_regression_full_junit",
+        "path": "artifacts/test-runs/aurora-software-755c511/full-suite.xml",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "4b356f314e23db202c791e5b50b946e7cfae2aa30561aa8bc1db83ef358adef9"
+      },
+      {
+        "id": "current_backend_regression_focused_junit",
+        "path": "artifacts/test-runs/aurora-software-755c511/focused-suite.xml",
+        "ref_commit": "1e542b7bc63908e1d9775eb7e8cd2bd0e3cabb3e",
+        "file_sha256": "25f94a80a7b6efac04ea004a89f92e1e510af9540a063a8ced34bded917927a1"
+      },
+      {
+        "id": "cross_job_memory_contract_artifact",
+        "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.json",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "aa1f22e72039e367991aec55ea7ad143994f0a5d6ed7f73bef9c5e5523e28281",
+        "canonical_sha256": "e1abf46c2aa44e9be3f37b92ae2d41213235179f16dd7b9b7d794d850938c01a"
+      },
+      {
+        "id": "cross_job_memory_contract_manifest",
+        "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.manifest.json",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "95d36063f94b8c9280d84db028a97d0b0da03687d67465da5979917f06b5efa7",
+        "canonical_sha256": "b8d55e358d5642cb01be331f5318e4a048b871ccfe4606664202eeba4109ec85"
+      },
+      {
+        "id": "current_online_routing_artifact",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.json",
+        "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
+        "file_sha256": "d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4"
+      },
+      {
+        "id": "current_online_routing_manifest",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.manifest.json",
+        "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
+        "file_sha256": "6b625b8c0a6aa60282fa7c7be2f6b0ad8277b4610feb09c6c5e4b44222329307",
+        "canonical_sha256": "3ab3830ecf798b3e12845e249a07cde36add0ddcb34b727806f30eb34af4ed37"
+      },
+      {
+        "id": "multi_tool_budget_artifact",
+        "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.json",
+        "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+        "file_sha256": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d",
+        "canonical_sha256": "e5c27308a9be35a276ce845e872e186e613f5421c459bcddec726a461e480ef3"
+      },
+      {
+        "id": "multi_tool_budget_manifest",
+        "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.manifest.json",
+        "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+        "file_sha256": "db78d1c8c99938608dc27116138d3eef15788cd6da4461d0f530db7f9369226d",
+        "canonical_sha256": "3c49e2b96b3fffdd92383d6b978d4679f16e012e2a4a43e1c50b8b8a402aca72"
+      },
+      {
+        "id": "multi_tool_budget_csv",
+        "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.csv",
+        "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+        "file_sha256": "3911632e6dfe61056dae58852f1e9723a4beb3b953468c9ecf70263610a206a3"
+      },
+      {
+        "id": "multi_tool_budget_generation_receipt",
+        "path": "artifacts/test-runs/harness-multi-tool-budget-evaluation-v1-generation-receipt.json",
+        "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+        "file_sha256": "611783c9388bfda9b21a47e02ab3e8147eec96a7219202859cdc97b63198b6da"
+      },
+      {
+        "id": "px4_physical_campaign_manifest",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.manifest.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "4ac760428ead1506fb41ef4928df486a1b0983517a6aee846c2444e882090eda",
+        "canonical_sha256": "9440bb24f25dbf07149144c39ea9fc54d373a6c1145d9630a6f53216a9608941"
+      },
+      {
+        "id": "px4_physical_campaign_receipt",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.receipt.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "8f7e1c953338ae87154b25822bf7c781921473cbcd76fd5874d79c178ef73dee",
+        "internal_receipt_sha256": "4746dd220583d64babc5640b3bea12e607b9ca22c940ca462768be0dc1158b71"
+      },
+      {
+        "id": "px4_physical_runtime_manifest",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/runtime/runtime-manifest.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "244475ddb22217c9400c2bb3ef27fb4105a4121f1fa09267b36c04e827865d34"
+      },
+      {
+        "id": "px4_physical_runtime_observation",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/runtime/runtime-observation.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "a450d22ecf186088417f5c950c9b07592437d2e82f3c730d06edb6052e6ae849"
+      },
+      {
+        "id": "advanced_physics_manifest",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.manifest.json",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "599c2b8b89bedb525a36c00837e8f09e7b4598c4825a01cff2942c6c5825a923",
+        "canonical_sha256": "0cae86ded8d92c6c008ca89873d3234c9c98d745768f92d1142b12b1471e85ca"
+      },
+      {
+        "id": "advanced_physics_receipt",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.receipt.json",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "99e257fb56d46d9293ba9365ccae604ddd697802370b877360541628ebd1354f",
+        "internal_receipt_sha256": "0e83d002587590f349ed698710c265bf432a9eec4a9e3307851967ef9ecfd789"
+      },
+      {
+        "id": "advanced_physics_digest",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.sha256",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "35b84b7a6d85617e389aa860e5ba5ad30847a88b60265eeeaf8d6281a2f07d20"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_receipt",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/receipt.json",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "2d6470fb085e638c52754f580d22a5d3d50d2f26000e584148557f3c505fdd8a"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_failure_lineage",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/failure-lineage.json",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "882acd480bfca39591f0daa01faea73ac9780cd3a514cd362fe8a2a2629e00b5"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_ulog",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/px4_source.ulg",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "dc3b156e6ae6144263e493ec59b566ba3d7772a5ffdca8345c66218afec07f90"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_scenario_applied",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/scenario_effects.applied.json",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "7973680f267b2643690b998b84111ffb3887f1efc2cf556b09acd1d73a24846a"
+      },
+      {
+        "id": "advanced_physics_runtime_negative_control_focused_junit",
+        "path": "artifacts/test-runs/advanced-physics-runtime-working-tree-probe/attempt-18/focused-tests.xml",
+        "ref_commit": "2f1caae6fbb5b037e55a4b339dff6c590833f019",
+        "file_sha256": "67d614764b213408833f50be63c0490e27c99dbcca41f349ab6281b605fc6b8c"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_receipt",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/receipt.json",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "5cc93ee5bfb75c53f95bdd925bb3121658d9ae93d6742d2b677d489112252cc6"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_ulog",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/px4_source.ulg",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "fd01f02f7a97ee8ad3650e9687a6aa07a1197f46b76b19c1146fbe913f513f76"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_joint_log",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/actuator_failure_joint_state.log",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "f927dbb6561e912a80ae69e368cc65e14a5427640e5e83f8b933838e38e08e10"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_scenario_applied",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/scenario_effects.applied.json",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "8995d7b926c2745018a68159ef370e309c4b19370cbf1abca0b0e49c693d6458"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_focused_junit",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/focused-tests.xml",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "65e027756f66e7fe7df4ccdc2e172bf821be9fbd104b71ac5199eee939a924d5"
+      },
+      {
+        "id": "advanced_physics_actuator_failure_preflight_attempt_0",
+        "path": "artifacts/test-runs/advanced-physics-actuator-failure-working-tree-probe/attempt-1/preflight-failure-attempt-0.json",
+        "ref_commit": "2da6a4fdb2af8ac711dd4eb07e7aeaf08de91b53",
+        "file_sha256": "72471490aa92fb132ea01fb941557c2c8dbd3f4cb77d480fa9fc14c00a97df2d"
+      },
+      {
+        "id": "advanced_physics_closure_manifest",
+        "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.manifest.json",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "5345cd6b7fa78d927ee2da9491dfbfd20e8a8373593c110baa332436808bdba3",
+        "canonical_sha256": "7193e21ff826560e9e9f4d30453dc122d55fbee054397ff4a52f89deca15cb9f"
+      },
+      {
+        "id": "advanced_physics_closure_receipt",
+        "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.receipt.json",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "1ee74f3b207d7c69e1d2cb6601bffa7d8a92f34181313c51ad22474c73995eda",
+        "internal_receipt_sha256": "6f195b2908aa8673eab3bfee56c5e6cd1254b3535c3029e652f237d8a08edc10"
+      },
+      {
+        "id": "advanced_physics_closure_digest",
+        "path": "artifacts/technical-report/advanced-physics-closure-v2-f1e8fa8/advanced-physics-closure-v2.sha256",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "096aed94fe18253cc9c9ac45acb10b478cf3b38bc58930dddafc8e5909715a3f"
+      },
+      {
+        "id": "advanced_physics_closure_test_receipt",
+        "path": "artifacts/test-runs/advanced-physics-closure-f1e8fa8/test-receipt.json",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "50994da3b3385fb81411499349ee02123a26cebfa0af39a8a464588ad29eeb79"
+      },
+      {
+        "id": "advanced_physics_closure_focused_junit",
+        "path": "artifacts/test-runs/advanced-physics-closure-f1e8fa8/focused-tests.xml",
+        "ref_commit": "83982f37899f8054e24a749af8e6469fedf48e8d",
+        "file_sha256": "2b95be8b9ce7ad3369ae7f8d0c2b8148acb691286a95269db9ae4fde28cda01a"
+      }
+    ],
+    "source_references": [
+      {
+        "id": "technical_report_evidence_v10_core",
+        "path": "backend/app/orchestration/technical_report_evidence_v10.py",
+        "ref_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+        "file_sha256": "159eab14235b7e366045cec63acea1fb63a91e9cefe5da610a00085a5b292860",
+        "evidence_role": "Exact-byte provenance closure that preserves the v9, retained online-routing, offline Evidence 2.9, and advanced-physics evidence classes without pooling their claims."
+      },
+      {
+        "id": "technical_report_evidence_v10_exporter",
+        "path": "backend/scripts/export_technical_report_evidence_v10.py",
+        "ref_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+        "file_sha256": "beac18265dfb902bad2fe5abc0011d8da6e5e7ab741614cf0983e7bafcb1a041",
+        "evidence_role": "Source-bound v10 exporter and check path for the 39-source, three-CSV navigation ledger."
+      },
+      {
+        "id": "technical_report_evidence_v10_tests",
+        "path": "backend/tests/test_technical_report_evidence_v10.py",
+        "ref_commit": "97492448c36bef240e468a0cd53c3ba198cb6aae",
+        "file_sha256": "40f7096e9e6d263ce60de0198d0e10a80a4910af39159b8d3d6c99738115c0f4",
+        "evidence_role": "Focused tamper and compatibility assertions for v10 source lineage, release gates, and evidence-class separation."
+      },
+      {
+        "id": "multi_tool_budget_evaluator",
+        "path": "backend/scripts/evaluate_harness_multi_tool_budget.py",
+        "ref_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+        "file_sha256": "fd1e4e017109d39000ce8fb91738779d0e0e7c7efb7a9111a9f4db6aaae23cdb",
+        "evidence_role": "Source-bound offline evaluator and repository-root CLI fix for the Evidence 2.9 equal-budget scripted/mock closure."
+      },
+      {
+        "id": "multi_tool_budget_evaluator_tests",
+        "path": "backend/tests/test_harness_multi_tool_budget_evaluation.py",
+        "ref_commit": "136a1e3293efa6e53f3648e21fa8f7c6b5158d6f",
+        "file_sha256": "bdcb4bedc0d45f3d8832ff8cb6adfcfa8e4e8681e648b832fc07bdb4f4bc7eb1",
+        "evidence_role": "Exact-source regression coverage for deterministic generation, accounting, check mode, and repository-root CLI execution."
+      },
+      {
+        "id": "px4_gazebo_evidence_boundary",
+        "path": "docs/08-px4-gazebo.md",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "b8c58164b0efee355d90ac53cbded031e441d39cfc20a374f192db06212700fd",
+        "evidence_role": "Pinned PX4/Gazebo implementation, smoke evidence, and customer-Runtime qualification boundary."
+      },
+      {
+        "id": "harness_engineering_v10_alignment",
+        "path": "docs/17-harness-engineering.md",
+        "ref_commit": "755c511539fe561207ca38ff5079f471a4110896",
+        "file_sha256": "dc1b464a8df86e40c37dc0a5dbf0ad65ce2848c55ec1d625d05ff2afd8ea026b",
+        "evidence_role": "Secondary narrative alignment with v10 boundaries; this document is not a new experiment or authoritative evidence source."
+      },
+      {
+        "id": "harness_contract_design",
+        "path": "docs/19-llm-tool-orchestration-harness.md",
+        "ref_commit": "755c511539fe561207ca38ff5079f471a4110896",
+        "file_sha256": "8b433a7662fa73f6ecf8f458a66d2e5df56c25616c43dbe949bac3fa33fc87ea",
+        "evidence_role": "Secondary contract and v10 narrative alignment; authoritative experimental fields remain bound to v10 and their original receipts."
+      },
+      {
+        "id": "harness_phase_registry",
+        "path": "backend/app/orchestration/harness_context.py",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "f081a8c12bf50dc330a4aad509bd3454999af519c1dc4ecaf9a03df3db0e1376",
+        "evidence_role": "Executable tool-role registry and deterministic phase compatibility matrix."
+      },
+      {
+        "id": "runtime_dependency_pins",
+        "path": "runtime/pins.env",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5",
+        "evidence_role": "Pinned PX4 and simulator dependency identities."
+      },
+      {
+        "id": "technical_report_evaluation_protocol",
+        "path": "docs/20-technical-report-evaluation.md",
+        "ref_commit": "755c511539fe561207ca38ff5079f471a4110896",
+        "file_sha256": "a33739d11af0bbe043c816b695b72c2b7e1440d4ebf0ae309dc3c1549f996888",
+        "evidence_role": "Secondary v10-aligned evaluation-unit and publication protocol; it is not a new experiment or release receipt."
+      },
+      {
+        "id": "technical_report_evidence_v9_digest",
+        "path": "artifacts/technical-report/evidence-v9.sha256",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "a51663279617db3d40221134f24822486a0e13e72475723b0b9e27a1647587fe",
+        "evidence_role": "Read-only digest binding the Evidence v9 bundle and manifest file hashes."
+      },
+      {
+        "id": "backend_1204_full_log",
+        "path": "artifacts/test-runs/aurora-software-c1222c9-pytest.log",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f",
+        "evidence_role": "Exact-source backend full-suite log; its pytest summary distinguishes 854.71 seconds from the receipt wall interval."
+      },
+      {
+        "id": "backend_28_focused_log",
+        "path": "artifacts/test-runs/aurora-software-c1222c9-focused.log",
+        "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+        "file_sha256": "571ded85369e1747d9ae02f8dadb4b499e887168b8a5ca686edddc2248f10bbf",
+        "evidence_role": "Exact-source focused log for cross-Job memory, routing holdout, and Evidence v9 export checks."
+      },
+      {
+        "id": "cross_job_memory_implementation",
+        "path": "backend/app/orchestration/experience_memory.py",
+        "ref_commit": "abb9002746e061af44a164fe749243d68d098e10",
+        "file_sha256": "22fdef212d46d94a0f20481aa3108ee683102c34064e053a05132fe05c437db3",
+        "evidence_role": "Reachable implementation of eligibility, retention, revocation, exact-family retrieval, and provider-safe projection."
+      },
+      {
+        "id": "cross_job_memory_evaluator",
+        "path": "backend/app/orchestration/harness_cross_job_memory_evaluation.py",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "5bc6a787ac3a2ca1d1283eb4a7dffeade5693c080443441edbc17ec8d5ef5243",
+        "evidence_role": "Deterministic in-memory SQLite evaluator for the ten frozen cross-Job contract fixtures."
+      },
+      {
+        "id": "cross_job_memory_source_tests",
+        "path": "backend/tests/test_harness_experience_memory.py",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "a8f1471cba27de5b90ea8ddc96be1b4c1def31d275a47a3d34ca7cee58667c81",
+        "evidence_role": "Exact-source implementation tests for admission, retrieval, revocation, deletion cascade, and fail-closed drift behavior."
+      },
+      {
+        "id": "cross_job_memory_evaluation_tests",
+        "path": "backend/tests/test_harness_cross_job_memory_evaluation.py",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "561469d9c1ca3036d9ca002e919039721dcc9ed91cdbbdcc21788bc202125052",
+        "evidence_role": "Exact-source tests for deterministic export, isolation cases, provider projection, and canonical hashes."
+      },
+      {
+        "id": "technical_report_evidence_v9_exporter",
+        "path": "backend/scripts/export_technical_report_evidence.py",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "150e84e452564499aba7ea55d971f7084df1c526a620875f39c22953d91442ba",
+        "evidence_role": "Exact-source exporter that binds Evidence v9 to 25 frozen source objects."
+      },
+      {
+        "id": "harness_contract_ablation_raw",
+        "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a",
+        "evidence_role": "Read-only frozen row source for Table 3; the report neither owns nor copies this software evidence."
+      },
+      {
+        "id": "harness_fallback_outcome_campaign_raw",
+        "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d",
+        "evidence_role": "Read-only frozen row source for Table 4; the report neither owns nor copies this software evidence."
+      },
+      {
+        "id": "harness_component_outcome_ablation_raw",
+        "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82",
+        "evidence_role": "Read-only frozen row source for Table 7; the report neither owns nor copies this software evidence."
+      },
+      {
+        "id": "routing_development_corpus_raw",
+        "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1",
+        "evidence_role": "Read-only acceptable-tool corpus used to independently regrade the three preserved provider freezes."
+      },
+      {
+        "id": "routing_prompt_1_5_first_raw",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-20260728.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf",
+        "evidence_role": "Read-only first Prompt 1.5 provider freeze; independently regraded at 19/24 and unqualified."
+      },
+      {
+        "id": "routing_prompt_1_5_rerun_raw",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.5-rerun-20260728.json",
+        "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+        "file_sha256": "9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571",
+        "evidence_role": "Read-only second Prompt 1.5 provider freeze; independently regraded at 21/24 and qualified."
+      },
+      {
+        "id": "routing_prompt_1_6_archived_raw",
+        "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+        "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+        "file_sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4",
+        "evidence_role": "Read-only archived Evidence 2.7 / Prompt 1.6 provider freeze; independently regraded at 24/24 as historical development-routing qualification, not causal prompt lift and not Evidence 2.8."
+      },
+      {
+        "id": "online_routing_provider_client",
+        "path": "backend/app/orchestration/llm_parameter_proposer.py",
+        "ref_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+        "file_sha256": "257fd6a96e2dbc5a98b775e22f08b0fec37730217db261b2135145b41103fed7",
+        "evidence_role": "Exact-source OpenAI client path that forwards the frozen temperature, top_p, and seed controls; the seed is not treated as a provider determinism guarantee."
+      },
+      {
+        "id": "online_routing_campaign_runner",
+        "path": "backend/scripts/run_harness_routing_campaign.py",
+        "ref_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+        "file_sha256": "811c8a2096196e41ea51217e598206dbffc73834e62dd84d3751be198211b106",
+        "evidence_role": "Exact-source 24-call campaign runner that writes the frozen current-contract prediction artifact."
+      },
+      {
+        "id": "online_routing_campaign_tests",
+        "path": "backend/tests/test_harness_routing_campaign.py",
+        "ref_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+        "file_sha256": "bf76be3e364802c39a481594fce5b96cb77fb13333da77c07c37d54b01db6fb9",
+        "evidence_role": "Exact-source campaign tests for generation-control forwarding, output handling, and frozen-contract validation."
+      },
+      {
+        "id": "online_routing_qualification_contract",
+        "path": "backend/app/orchestration/harness_evaluation.py",
+        "ref_commit": "aeffaae01a8106f74ff811b39ec26d9d2203d1f6",
+        "file_sha256": "79e8bd62a99b375cdcb59e1f56d8c88a6c83ece5dd945bed1b96982f1a49e58b",
+        "evidence_role": "Exact-source qualification rule: at least 75 percent overall, 15 percentage points over the best constant, and two-thirds in every routing category."
+      },
+      {
+        "id": "px4_physical_campaign_digest",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.sha256",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "a9cc7b89f9ffea22d5dfe4257b5ccfb8ec8f39d7620a641eb3f531b8de996b51",
+        "evidence_role": "Read-only digest binding the physical campaign manifest and receipt file hashes."
+      },
+      {
+        "id": "px4_physical_wind_seed_41001_applied",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/wind-north-2mps-seed-41001/scenario_effects.applied.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "2eba69493b1ab348e787b1abf21ec1144d09420e5311dffbe9cfce92abf5d943",
+        "evidence_role": "Read-only seed-41001 steady-wind effect read-back with exact Gazebo ENU vector and generated-world SDF binding."
+      },
+      {
+        "id": "px4_physical_wind_seed_41002_applied",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/wind-north-2mps-seed-41002/scenario_effects.applied.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "cec3663d6a5ec035a8bcc8178af4d119bc3b32127f05b0c2690ad28d9e525ba0",
+        "evidence_role": "Read-only seed-41002 steady-wind effect read-back with exact Gazebo ENU vector and generated-world SDF binding."
+      },
+      {
+        "id": "px4_physical_obstacle_seed_41001_applied",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/obstacle-box-seed-41001/scenario_effects.applied.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "248afedf045ed69678d048cd5fe86fd64035375bf3e895514374501e08a6c95d",
+        "evidence_role": "Read-only seed-41001 static-obstacle entity-creation acknowledgement and SDF hash."
+      },
+      {
+        "id": "px4_physical_obstacle_seed_41002_applied",
+        "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/obstacle-box-seed-41002/scenario_effects.applied.json",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "bf0651c813d12403459e75013d226a2cf93c7c40d07dc5ac5f4331d842d9154a",
+        "evidence_role": "Read-only seed-41002 static-obstacle entity-creation acknowledgement and SDF hash."
+      },
+      {
+        "id": "px4_physical_campaign_core",
+        "path": "backend/app/simulator/physical_campaign_evidence.py",
+        "ref_commit": "c373dc992d43ff921ea8a1db07fcc26591955576",
+        "file_sha256": "f9b5c5c98117ec6e84b4a1cb91f54b4c027e79c61d7521ab8b117caf07c1f79d",
+        "evidence_role": "Reachable implementation source for export, retention, and offline verification of the physical campaign."
+      },
+      {
+        "id": "px4_physical_campaign_export_cli",
+        "path": "backend/scripts/export_physical_campaign_evidence.py",
+        "ref_commit": "c373dc992d43ff921ea8a1db07fcc26591955576",
+        "file_sha256": "b0bb0c5c3a0daf8189956d5ab76e77ad9736349b18e7d2928f1e4df0b3689e97",
+        "evidence_role": "Reachable exporter CLI source used by the physical campaign publication chain."
+      },
+      {
+        "id": "px4_physical_runtime_observer_source",
+        "path": "backend/scripts/observe_px4_runtime.py",
+        "ref_commit": "5f0f62c707c541aed7918e56a0170a7f67bd6ffb",
+        "file_sha256": "251e8d7f8f6049aafe93b38b2f0821beac9d26594d1196e9fef8a5fcc1d9ca96",
+        "evidence_role": "Reachable Runtime observation source after host-name omission correction."
+      },
+      {
+        "id": "px4_physical_campaign_source_tests",
+        "path": "backend/tests/test_physical_campaign_evidence.py",
+        "ref_commit": "c373dc992d43ff921ea8a1db07fcc26591955576",
+        "file_sha256": "d60affeab92e6489e25a7a03771a5f4b78abfa877578942dcb391949b3e9645c",
+        "evidence_role": "Reachable focused source tests for deterministic Runtime observation, retention, failures, and attempt-4 diagnostic classification."
+      },
+      {
+        "id": "px4_physical_campaign_bundle_verifier",
+        "path": "backend/tests/test_physical_campaign_evidence_bundle.py",
+        "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+        "file_sha256": "b2c6ed7acd4941a13ce02316713ae814f8fc6474f1243d6799b9783420862d0d",
+        "evidence_role": "Exact-source offline artifact verifier test at the physical evidence head."
+      },
+      {
+        "id": "advanced_physics_evidence_core",
+        "path": "backend/app/simulator/advanced_physics_evidence.py",
+        "ref_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+        "file_sha256": "6c9c495d984a9fd6baee0338053f7e7676abb0ce923acd245e69fbe6cb6d20d8",
+        "evidence_role": "Exact exporter and verifier implementation for the retained advanced-physics real-PX4 bundle, inventory, canonical hashes, and failure boundaries."
+      },
+      {
+        "id": "advanced_physics_export_cli",
+        "path": "backend/scripts/export_advanced_physics_evidence.py",
+        "ref_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+        "file_sha256": "f1f3eaf652fb4e4d8e5692565fa2da65d807196ff303f7ccf44461034e8755c2",
+        "evidence_role": "Exact-source deterministic export, check, and verify CLI for the advanced-physics evidence bundle."
+      },
+      {
+        "id": "advanced_physics_source_tests",
+        "path": "backend/tests/test_advanced_physics_evidence.py",
+        "ref_commit": "06cfdeb4438be59a24510738ab135b06fdde373a",
+        "file_sha256": "b0714f411fd0762d36351958ff38eec1d653eb07f2609786dbe1a9297180a5cc",
+        "evidence_role": "Exact-source focused tests for the advanced-physics attempt matrix, retention, deterministic export, and boundary validation."
+      },
+      {
+        "id": "advanced_physics_gps_boundary_stdout",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stdout.log",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "2be653eba84ba88e4fffbd2da2b577709e9e0d749517361277036a8ae05c4e70",
+        "evidence_role": "Authoritative file-backed GPS readiness-boundary stdout retaining the fixed 30-second readiness wait."
+      },
+      {
+        "id": "advanced_physics_gps_boundary_stderr",
+        "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stderr.log",
+        "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+        "file_sha256": "63e463e8965212091b5b1ec8ca6364ad4cf77f9b8fe251e9672325f2486aacc9",
+        "evidence_role": "Authoritative file-backed GPS readiness-boundary stderr retaining the exact 30.0-second PX4 readiness timeout."
+      },
+      {
+        "id": "advanced_physics_closure_core",
+        "path": "backend/app/simulator/advanced_physics_closure_evidence.py",
+        "ref_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+        "file_sha256": "a2cde779d00a213dfe367e6e06155f59e8a276c907dfd7fadbd8f024eb608e00",
+        "evidence_role": "Exact-byte aggregator that binds the four frozen real-PX4/Gazebo source classes into the nine-category closure ledger without changing their performance denominators."
+      },
+      {
+        "id": "advanced_physics_closure_export_cli",
+        "path": "backend/scripts/export_advanced_physics_closure.py",
+        "ref_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+        "file_sha256": "2faf0cae629e9df1a55760082156b4b3502931ab80013173fb142122733aa013",
+        "evidence_role": "Exact-source export and check CLI for the advanced-physics closure v2 manifest, receipt, and digest."
+      },
+      {
+        "id": "advanced_physics_closure_tests",
+        "path": "backend/tests/test_advanced_physics_closure_evidence.py",
+        "ref_commit": "f1e8fa855ebe95bf5ce208d62da7a3a46bba6228",
+        "file_sha256": "087a07eb824d63fd95144efd33d107adaa601137f01cb1451bed398a9e3aa7f4",
+        "evidence_role": "Exact-source regression coverage for source-byte binding, category coverage, performance boundaries, and closure sidecars."
+      }
+    ]
+  },
+  "website": {
+    "branch": "codex/website",
+    "subject_commit": "87105531e0f591662c724dcbbe96f3adbfa4a321",
+    "attestation_commit": "96aba5de2ff20ebe8f201f958c996c5685189619",
+    "artifacts": [
+      {
+        "id": "website_release_truth_validation_receipt",
+        "path": "website/validation-receipts/website-release-truth-manual-validation-fd7e770.json",
+        "ref_commit": "87e049cc426bec0f16ace8130bac672dbb778f22",
+        "subject_commit": "fd7e7702dd2e8d86cedda86790b5d93b048463da",
+        "file_sha256": "034ef134858fe906cdb3c97aa263fa7c36c63a2c59b0216cb5f41ceebdd566f1",
+        "file_bytes": 12188,
+        "shared_build_manifest_sha256": "de5b462b9a975dd8c8015ad570b58edb45d8b85d128083ae3d942d48a074fbae",
+        "shared_sha256sums_sha256": "51e520a74fec34bd929d21d4daddf4438ad7b411fe7874b19e693cb38dfc2f19"
+      },
+      {
+        "id": "website_typography_validation_receipt",
+        "path": "website/validation-receipts/website-download-copy-typography-validation-8710553.json",
+        "ref_commit": "96aba5de2ff20ebe8f201f958c996c5685189619",
+        "subject_commit": "87105531e0f591662c724dcbbe96f3adbfa4a321",
+        "file_sha256": "bcfc6c50920ffce913161eb59d2a4805c34869be33edd85926c37a009c5725d6",
+        "file_bytes": 9278,
+        "previous_receipt_sha256": "034ef134858fe906cdb3c97aa263fa7c36c63a2c59b0216cb5f41ceebdd566f1",
+        "shared_build_manifest_sha256": "c90541a88623451cf144ab96ccfe21b25173c26242fbf5ea132a2eb08456a926",
+        "shared_sha256sums_sha256": "5a8700c587fc8601099bc0258e4b0a8a32ca4c63ace4150295c6cb620946ac00"
+      }
+    ]
+  },
+  "merge_prerequisites": [],
+  "migration_provenance": {
+    "external_source_read_only": true,
+    "external_source_root": "C:/Users/zju20/Documents/Codex/2026-07-25/files-mentioned-by-the-user-drone/work/technical-report-latex",
+    "initial_byte_verification": [
+      {
+        "path": "main.tex",
+        "source_sha256": "2878e1bef3b2142b72d453b8791b8132df53084506ff73a93ce6b2e362a26594",
+          "modified_after_migration": true,
+          "current_hash_serialization": "utf8_lf",
+          "current_sha256": "6981361b0475add3f53c8d917720f7d32243843107a8830ad7368f80d3146ccd"
+      },
+      {
+        "path": "body.tex",
+        "source_sha256": "25f64fa554d7d2e35a0d3dc796a5e4e6d424cd0d77c5cc9a375583a264b902cf",
+          "modified_after_migration": true,
+          "current_hash_serialization": "utf8_lf",
+          "current_sha256": "16bab9d4f8c6865f11e5487cd7d348fe1e5a4769035ad934daef72a8dd36635b"
+      },
+      {
+        "path": "media/github-mark.png",
+        "source_sha256": "581c35d9f3c3a10bba201f63a43ac59173e7b89b0bd2ff9070179205e2ffc26f",
+        "modified_after_migration": false
+      },
+      {
+        "path": "media/media/image1.png",
+        "source_sha256": "6294b431f37fcf05590bf499bd77d57631c417f12333da2ff74a076e788b7672",
+        "modified_after_migration": false
+      },
+      {
+        "path": "media/media/image3.png",
+        "source_sha256": "9620414d6481a8604f2e7ac3abbd4465ce8e4965b2534a80aafb594fc3f14c53",
+        "modified_after_migration": true,
+        "current_sha256": "336b360a0f3f4295c426a40d30a17a2f04db192da4c5d2fe569543bc1ac50fbd",
+        "generator": "technical-report/scripts/generate_architecture_figure.py",
+        "reason": "Regenerated to remove clipped Outcome Memory label."
+      },
+      {
+        "path": "media/media/image4.png",
+        "source_sha256": "ad6bc5cdd1ed798a7796bc9271ad13209a8995add77164b63df68480dbcd752b",
+        "modified_after_migration": true,
+        "current_sha256": "59f102ce6fa9234a0994261f8eb7459b1f9fb5426ce922e3659f03a9af6557e5",
+        "generator": "technical-report/scripts/generate_data_figures.py",
+        "reason": "Regenerated from the current online-routing freeze and the frozen v9 archive to compare current 23/24 and archived 24/24 selection rates without a causal prompt claim."
+      },
+      {
+        "path": "media/media/image5.png",
+        "source_sha256": "b82ba193787bb56f860988f087e18ae96ecee11526093ab911c15408a56889d4",
+        "modified_after_migration": true,
+        "current_sha256": "7f0a2e57270d1a268cf973061de61fe2822ecce15a53aca35c50dda667c28d54",
+        "generator": "technical-report/scripts/generate_data_figures.py",
+        "reason": "Regenerated from the frozen v9 evidence bundle with a taller repository-owned layout that prevents Figure 3 label crowding; its provider rows remain historical."
+      },
+      {
+        "path": "media/media/image6.png",
+          "source_sha256": "2675fc9964d7f24a0fcdc892ad758d33151772fcc5a1339603435f0f71ff18f5",
+          "modified_after_migration": true,
+          "current_sha256": "3b47710123838dcc8e1cde273d454f459421a15fa208eebe27aed96cd2915966",
+          "generator": "technical-report/scripts/generate_data_figures.py",
+          "reason": "Regenerated from the current 24-call online-routing freeze with larger tool labels and a taller report-owned layout."
+      },
+      {
+        "path": "media/media/image7.png",
+          "source_sha256": "60d29c9551538c2926d61a631ecd44e2eb7ad819a5074d21301673afd76888b2",
+          "modified_after_migration": true,
+          "current_sha256": "b272974682f66d95ec013fc2bf98c8bbe01d27b9d1c6e5ce1a9396c4406c086f",
+          "generator": "technical-report/scripts/generate_data_figures.py",
+          "reason": "Regenerated from the frozen v9 evidence bundle with larger scenario labels and preserved chart spacing."
+      },
+      {
+        "path": "media/media/image8.png",
+          "source_sha256": "23c4ee6cb0ffd2779b9851ce9a43068aba37ebb56cc3defedd9157e889a67c55",
+          "modified_after_migration": true,
+          "current_sha256": "46f2b6f6242545582a22bb46ea9ed069ac08360cae596c8920484bfee5531661",
+          "generator": "technical-report/scripts/generate_data_figures.py",
+          "reason": "Regenerated from the frozen v9 evidence bundle with larger cell, axis, and colorbar labels and no overlap."
+      },
+      {
+        "path": "scripts/audit_latex_report.py",
+        "external_source_path": "C:/Users/zju20/Documents/Codex/2026-07-25/files-mentioned-by-the-user-drone/work/audit_latex_report.py",
+        "source_sha256": "15dca6941e5eb191fbcee42941824475ba39b26c44b7b79ccf084784792c858c",
+          "modified_after_migration": true,
+          "current_hash_serialization": "utf8_lf",
+          "current_sha256": "da3ae4f2dc84508780c2e8c719b20eccf636f7107e81acbf498b29d7e6ab518e"
+      }
+    ]
+  }
+}

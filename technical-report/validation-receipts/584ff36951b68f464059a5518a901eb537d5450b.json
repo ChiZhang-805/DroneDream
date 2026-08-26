@@ -1,0 +1,372 @@
+{
+  "schema_version": "dronedream.technical-report-validation-receipt.v4",
+  "subject_commit": "584ff36951b68f464059a5518a901eb537d5450b",
+  "parent_software_head": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+  "branch": "codex/technical-report",
+  "serialization": {
+    "json_encoding": "utf-8",
+    "json_newline": "lf",
+    "final_newline": true
+  },
+  "source_tree": {
+    "file_count": 23,
+    "canonical_sha256": "0124489e71b7f090652dfe291c313712af6d4e594f19275724cfb10a1cbe2a9c",
+    "files": [
+      {
+        "path": "technical-report/.gitattributes",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "2900551e86fa40edfca725c9c5ffe19a3ee4371b"
+      },
+      {
+        "path": "technical-report/.gitignore",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "567609b1234a9b8806c5a05da6c866e480aa148d"
+      },
+      {
+        "path": "technical-report/README.md",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "5a26b73f56096e57c4b5156605e99e9793dcf763"
+      },
+      {
+        "path": "technical-report/body.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "3e56571368e0145a2af72bd54b5f91d57a9dcca4"
+      },
+      {
+        "path": "technical-report/claim-evidence-ledger.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "1728705b06ebb6690b2284ba89f0074129441d35"
+      },
+      {
+        "path": "technical-report/evidence-reference-manifest.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "6e07ff1cd8c0866a042073a2bbf89c0722d91a0c"
+      },
+      {
+        "path": "technical-report/main.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "a2fc04124a343d9de94baec38dffdf257274a550"
+      },
+      {
+        "path": "technical-report/media/github-mark.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "15dcc3db3956993cb3e820187343cfb8a91dc872"
+      },
+      {
+        "path": "technical-report/media/media/image1.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4085ba4935d3e3cf40b5f485865d8185874d6a69"
+      },
+      {
+        "path": "technical-report/media/media/image3.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "039b35f9843decdb83a46b4eaa7fc1b179959a12"
+      },
+      {
+        "path": "technical-report/media/media/image4.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "42d99b03ec335b7f59033a5c39b7164c5523a09a"
+      },
+      {
+        "path": "technical-report/media/media/image5.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "7bdaddae08bf4291e4f43bf165401563aed9ecff"
+      },
+      {
+        "path": "technical-report/media/media/image6.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "8e495bd883826ead7131fc8e4a3f7aa95e2936f4"
+      },
+      {
+        "path": "technical-report/media/media/image7.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "dea34d0091e5ede9640056267af9b970b48e86e1"
+      },
+      {
+        "path": "technical-report/media/media/image8.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "e027ba5d2042eab6f34bf80c778836ea53fa3645"
+      },
+      {
+        "path": "technical-report/scripts/audit_latex_report.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "82941819e7dab693f5ba9c7171167b8fe58b62ea"
+      },
+      {
+        "path": "technical-report/scripts/build_report.ps1",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "d0347be87004e7e145ed852b2150f6ec66779163"
+      },
+      {
+        "path": "technical-report/scripts/create_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "354cc5200a6fe0c9c69716e4b655592e7bc58495"
+      },
+      {
+        "path": "technical-report/scripts/generate_architecture_figure.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4e8526b8b809b2c4f54cd89254bd87453e5f2181"
+      },
+      {
+        "path": "technical-report/scripts/generate_data_figures.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "0c96cc88bfc9c589818a6f68cd3ea46dccbf13c5"
+      },
+      {
+        "path": "technical-report/scripts/verify_claim_evidence.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "196b4b555d72240f24dafe94936e8bddd643b3ef"
+      },
+      {
+        "path": "technical-report/scripts/verify_evidence_reference_manifest.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "65924001ac1036ef1224d9618bb00a9256c35517"
+      },
+      {
+        "path": "technical-report/scripts/verify_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "e5baf69de4564a8454501e6babb58c4e89bd20ee"
+      }
+    ]
+  },
+  "evidence_reference_manifest": {
+    "path": "technical-report/evidence-reference-manifest.json",
+    "sha256": "a54c13e812d9831bd3c03b646c126fc0c59efdd08ef3f500f03bd52bbc7e4c96",
+    "software_subject": "742b12467efc9b37b7e4a2fa3ac73b7578f21385",
+    "software_provenance": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+    "software_head": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+    "website_subject": "a64f995093e13c74318219cd0f91ad2d03016f31",
+    "website_attestation": "943f3b65187247fe67eed76bc698b262adb06994",
+    "website_prerequisite": 88
+  },
+  "pdf": {
+    "path": "technical-report/output/DroneDream_AURORA_Technical_Report.pdf",
+    "sha256": "1e4ef539184adebac5a856fcc87c42d690b45087dbc219b9cf6ba24ebe446458",
+    "bytes": 751701,
+    "pages": 14
+  },
+  "audit": {
+    "path": "technical-report/output/latex-audit.json",
+    "sha256": "dd6bbaa68b0820d05ca8b260cf549c7512ce6cf85409fab65bf23b33c8ed5086",
+    "audited_blocks": 70,
+    "explanatory_body": {
+      "total": 41,
+      "passed_80": 41,
+      "failed_80": 0,
+      "failure_locations": []
+    },
+    "short_list_items": {
+      "total": 29,
+      "passed_90": 29,
+      "failed_90": 0,
+      "maximum_lines": 3,
+      "failure_locations": [],
+      "above_3_lines": []
+    },
+    "reasonable_exceptions": {
+      "definition": "Headings, display formulas, code blocks, figure captions, table captions, and references do not use either rendered last-line gate; list items use the separate short-list policy.",
+      "inventory": {
+        "headings": 28,
+        "list_items": 29,
+        "display_formulas": 0,
+        "code_blocks": 0,
+        "figure_captions": 6,
+        "table_captions": 9,
+        "references": 33
+      }
+    },
+    "unlocated": [],
+    "cross_page_splits": [],
+    "bottom_failures": [],
+    "gray_text_runs": 0,
+    "internal_links": 51,
+    "external_links": 33
+  },
+  "claim_evidence": {
+    "ledger": {
+      "path": "technical-report/claim-evidence-ledger.json",
+      "sha256": "d2fa4a51e9a4021949c1473f78c0ec9197cc7004ed778329f77baa6fc943eb21"
+    },
+    "audit": {
+      "path": "technical-report/output/claim-evidence-audit.json",
+      "sha256": "202ba5fb9d9fa49eca284da48e95067e8f1bd33843e4d394afb7790f484b7f31",
+      "claims": 16,
+      "passed": 16,
+      "failed": 0,
+      "assertions": 110,
+      "verified_sources": [
+        {
+          "id": "harness_component_outcome_ablation_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+          "sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82"
+        },
+        {
+          "id": "harness_contract_ablation_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+          "sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a"
+        },
+        {
+          "id": "harness_contract_design",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "docs/19-llm-tool-orchestration-harness.md",
+          "sha256": "129676c4e6d58bb8f61fdd335da31d4c55c04cf89e4c27dcc21bce8adbe5c267"
+        },
+        {
+          "id": "harness_fallback_outcome_campaign_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+          "sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d"
+        },
+        {
+          "id": "harness_phase_registry",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/app/orchestration/harness_context.py",
+          "sha256": "f081a8c12bf50dc330a4aad509bd3454999af519c1dc4ecaf9a03df3db0e1376"
+        },
+        {
+          "id": "px4_gazebo_evidence_boundary",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "docs/08-px4-gazebo.md",
+          "sha256": "b8c58164b0efee355d90ac53cbded031e441d39cfc20a374f192db06212700fd"
+        },
+        {
+          "id": "routing_development_corpus_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+          "sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1"
+        },
+        {
+          "id": "routing_prompt_1_5_first_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-20260728.json",
+          "sha256": "fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf"
+        },
+        {
+          "id": "routing_prompt_1_5_rerun_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.5-rerun-20260728.json",
+          "sha256": "9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571"
+        },
+        {
+          "id": "routing_prompt_1_6_current_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+          "sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4"
+        },
+        {
+          "id": "runtime_dependency_pins",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "runtime/pins.env",
+          "sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5"
+        },
+        {
+          "id": "technical_report_evidence_bundle",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "artifacts/technical-report/evidence-v7.json",
+          "sha256": "93232a2f0027503c24cfe4a8a1768d518f436cd35a3db72e788fc42f5eb45c55"
+        },
+        {
+          "id": "website_validation_receipt",
+          "ref_commit": "943f3b65187247fe67eed76bc698b262adb06994",
+          "path": "website/validation-receipts/a64f995093e13c74318219cd0f91ad2d03016f31.json",
+          "sha256": "6f0fc8bafb092cee5f1f05c484f60d9f73a88ba1d7f0b4e16f564a65506569f9"
+        }
+      ]
+    }
+  },
+  "compile_log": {
+    "sha256": "6962be714dfe167125280a5d742ac1d1cf0d7f4f73a1f0eee08a2154fa4f4e2a",
+    "warning_counts": {
+      "overfull": 0,
+      "latex_warning": 0,
+      "package_warning": 0,
+      "undefined_control_sequence": 0,
+      "undefined_references": 0
+    },
+    "underfull_boxes": 0
+  },
+  "visual_review": {
+    "status": "passed",
+    "render_dpi": 150,
+    "inspected_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14
+    ],
+    "page_bottoms_inspected": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14
+    ],
+    "defects_fixed": [
+      {
+        "page": 1,
+        "issue": "The DroneDream lockup was centered instead of aligned to the upper-left report margin.",
+        "resolution": "Left-aligned the lockup, enlarged the title and Abstract heading, and rechecked the full page."
+      },
+      {
+        "page": 6,
+        "issue": "Table 3 split across pages and Figure 3 labels were vertically crowded near the zero bar.",
+        "resolution": "Made Table 3 indivisible, increased Figure 3 height and row spacing, and offset the zero label."
+      },
+      {
+        "page": 12,
+        "issue": "References used two columns and retained an explanatory paragraph below the heading.",
+        "resolution": "Removed the paragraph and rendered all references in one readable column."
+      }
+    ],
+    "remaining_blocking_defects": []
+  },
+  "reproduction": {
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File technical-report/scripts/build_report.ps1",
+    "receipt": "python technical-report/scripts/create_report_validation_receipt.py --repository . --subject-commit <source-commit> --pdf technical-report/output/DroneDream_AURORA_Technical_Report.pdf --audit technical-report/output/latex-audit.json --claim-audit technical-report/output/claim-evidence-audit.json --claim-ledger technical-report/claim-evidence-ledger.json --log technical-report/build/main.log --manifest technical-report/evidence-reference-manifest.json --output technical-report/validation-receipts/<source-commit>.json --visual-review-passed",
+    "claim_evidence": "python technical-report/scripts/verify_claim_evidence.py --repository . --ledger technical-report/claim-evidence-ledger.json --manifest technical-report/evidence-reference-manifest.json --body technical-report/body.tex --output technical-report/output/claim-evidence-audit.json"
+  }
+}

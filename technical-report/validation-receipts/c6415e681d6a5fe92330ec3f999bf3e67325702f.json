@@ -1,0 +1,304 @@
+{
+  "schema_version": "dronedream.technical-report-validation-receipt.v3",
+  "subject_commit": "c6415e681d6a5fe92330ec3f999bf3e67325702f",
+  "parent_software_head": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+  "branch": "codex/technical-report",
+  "serialization": {
+    "json_encoding": "utf-8",
+    "json_newline": "lf",
+    "final_newline": true
+  },
+  "source_tree": {
+    "file_count": 22,
+    "canonical_sha256": "b02f4eb96e0097c706d2007e51311af60654762f925abda44378537bb228e3d5",
+    "files": [
+      {
+        "path": "technical-report/.gitattributes",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "2900551e86fa40edfca725c9c5ffe19a3ee4371b"
+      },
+      {
+        "path": "technical-report/.gitignore",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "567609b1234a9b8806c5a05da6c866e480aa148d"
+      },
+      {
+        "path": "technical-report/README.md",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "0d1041efddb53eb1a98391d5e16442e62cff4e8c"
+      },
+      {
+        "path": "technical-report/body.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "ea2da269e06965e676a0c0880f6545bdf9021367"
+      },
+      {
+        "path": "technical-report/claim-evidence-ledger.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "d2831698a581a3674988a9571aedb67298e1761e"
+      },
+      {
+        "path": "technical-report/evidence-reference-manifest.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "5d034be1e848c642cfe21cb898f4a350a2ce40f2"
+      },
+      {
+        "path": "technical-report/main.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "c8fc45f7e30473ec8323d56ef4e0b09b2036836c"
+      },
+      {
+        "path": "technical-report/media/github-mark.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "15dcc3db3956993cb3e820187343cfb8a91dc872"
+      },
+      {
+        "path": "technical-report/media/media/image1.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4085ba4935d3e3cf40b5f485865d8185874d6a69"
+      },
+      {
+        "path": "technical-report/media/media/image3.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "039b35f9843decdb83a46b4eaa7fc1b179959a12"
+      },
+      {
+        "path": "technical-report/media/media/image4.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "f14342feb9137a2b7da30e0c666c6e53e51ed11d"
+      },
+      {
+        "path": "technical-report/media/media/image5.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "171f8fd78fc97b81246bd27f974c5e02c35dedaa"
+      },
+      {
+        "path": "technical-report/media/media/image6.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "82eda2ac22e1f8d43edeafe4a249d8da9bb868b4"
+      },
+      {
+        "path": "technical-report/media/media/image7.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4c0d7c6451991a9c64bca474378639c0f2dfcf57"
+      },
+      {
+        "path": "technical-report/media/media/image8.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "956477afda3c9ac2ca44b3bc511757e27942661d"
+      },
+      {
+        "path": "technical-report/scripts/audit_latex_report.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "6a4a84103a29f8cfa610168bf5b3e77d1a37dbd3"
+      },
+      {
+        "path": "technical-report/scripts/build_report.ps1",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "25447deb09341200a803a7ddf6ac21225367f291"
+      },
+      {
+        "path": "technical-report/scripts/create_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "246cffc5aebb4f86f13a483d4f8b5eff99f2cbc2"
+      },
+      {
+        "path": "technical-report/scripts/generate_architecture_figure.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4e8526b8b809b2c4f54cd89254bd87453e5f2181"
+      },
+      {
+        "path": "technical-report/scripts/verify_claim_evidence.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "7ca5da5fe9e2080b595511a503ff6e89cf8a784c"
+      },
+      {
+        "path": "technical-report/scripts/verify_evidence_reference_manifest.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "836d0a845baa458c9ab8749ff2f71ce69724ba5d"
+      },
+      {
+        "path": "technical-report/scripts/verify_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "39d5707ce37f327f69ec2d8d75de34eced0b1840"
+      }
+    ]
+  },
+  "evidence_reference_manifest": {
+    "path": "technical-report/evidence-reference-manifest.json",
+    "sha256": "4d0e7a420b60372a483c5afd34252b8aed81c7275fa7836943bc42cc02908a9f",
+    "software_subject": "0429b4244fc1fd912bd211e80821ebdbabb8ae5d",
+    "software_provenance": "738157c586561ec1e5466a997cd04758263c967b",
+    "software_head": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+    "website_subject": "a64f995093e13c74318219cd0f91ad2d03016f31",
+    "website_attestation": "943f3b65187247fe67eed76bc698b262adb06994",
+    "website_prerequisite": 88
+  },
+  "pdf": {
+    "path": "technical-report/output/DroneDream_AURORA_Technical_Report.pdf",
+    "sha256": "9949493198c82e98e277bf3d8d021798b9d4fefca522253c335a5d2c7cdb8f19",
+    "bytes": 760626,
+    "pages": 13
+  },
+  "audit": {
+    "path": "technical-report/output/latex-audit.json",
+    "sha256": "8edf2278b1c5e5fc09bf9c2a7b4e993e4f5208b970bcc6c48a01ce240f9bd488",
+    "audited_blocks": 71,
+    "explanatory_body": {
+      "total": 44,
+      "passed_80": 44,
+      "failed_80": 0,
+      "failure_locations": []
+    },
+    "reasonable_exceptions": {
+      "definition": "Headings, list items, display formulas, code blocks, figure captions, table captions, and references do not use the explanatory-body last-line gate.",
+      "inventory": {
+        "headings": 28,
+        "list_items": 27,
+        "display_formulas": 0,
+        "code_blocks": 0,
+        "figure_captions": 6,
+        "table_captions": 9,
+        "references": 33
+      }
+    },
+    "unlocated": [],
+    "cross_page_splits": [],
+    "bottom_failures": [],
+    "gray_text_runs": 0,
+    "internal_links": 51,
+    "external_links": 33
+  },
+  "claim_evidence": {
+    "ledger": {
+      "path": "technical-report/claim-evidence-ledger.json",
+      "sha256": "99cf20a817af38e18ec932f63c32451fdce23162beccc1db7ef8295546e4b3d4"
+    },
+    "audit": {
+      "path": "technical-report/output/claim-evidence-audit.json",
+      "sha256": "0c956ec5d4ecfd9666bfb3ad99c12deb149ae182ab726b492f95ebf8cfd03d9d",
+      "claims": 13,
+      "passed": 13,
+      "failed": 0,
+      "assertions": 80,
+      "verified_sources": [
+        {
+          "id": "harness_contract_design",
+          "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+          "path": "docs/19-llm-tool-orchestration-harness.md",
+          "sha256": "05c17b0f1663d637939adbd2a708f575db2b2bbd25803a6b0b7413bbf3b0f664"
+        },
+        {
+          "id": "harness_phase_registry",
+          "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+          "path": "backend/app/orchestration/harness_context.py",
+          "sha256": "0dab5fae5b19b76bd18a205d83cd7abff3c2160083082751c676017e2a3a5aa3"
+        },
+        {
+          "id": "px4_gazebo_evidence_boundary",
+          "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+          "path": "docs/08-px4-gazebo.md",
+          "sha256": "b8c58164b0efee355d90ac53cbded031e441d39cfc20a374f192db06212700fd"
+        },
+        {
+          "id": "runtime_dependency_pins",
+          "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+          "path": "runtime/pins.env",
+          "sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5"
+        },
+        {
+          "id": "technical_report_evidence_bundle",
+          "ref_commit": "a0040d49e9f089513b30b24e807a8f39c3bbf458",
+          "path": "artifacts/technical-report/evidence.json",
+          "sha256": "99eeeb9c87e2b14b67b54d2af35d16ea001d6ae987bff1a91ad426783d8cdfb7"
+        },
+        {
+          "id": "website_validation_receipt",
+          "ref_commit": "943f3b65187247fe67eed76bc698b262adb06994",
+          "path": "website/validation-receipts/a64f995093e13c74318219cd0f91ad2d03016f31.json",
+          "sha256": "6f0fc8bafb092cee5f1f05c484f60d9f73a88ba1d7f0b4e16f564a65506569f9"
+        }
+      ]
+    }
+  },
+  "compile_log": {
+    "sha256": "0bab0508e1b90797571b779e8b36a50ad031cdc40e9ccf4e16059d20664348c5",
+    "warning_counts": {
+      "overfull": 0,
+      "latex_warning": 0,
+      "package_warning": 0,
+      "undefined_control_sequence": 0,
+      "undefined_references": 0
+    },
+    "underfull_boxes": 4
+  },
+  "visual_review": {
+    "status": "passed",
+    "render_dpi": 150,
+    "inspected_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "page_bottoms_inspected": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "defects_fixed": [
+      {
+        "page": 3,
+        "issue": "Outcome Memory label was clipped in the migrated architecture figure.",
+        "resolution": "Regenerated the report-owned figure with fitted text and verified the replacement render."
+      }
+    ],
+    "remaining_blocking_defects": []
+  },
+  "reproduction": {
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File technical-report/scripts/build_report.ps1",
+    "receipt": "python technical-report/scripts/create_report_validation_receipt.py --repository . --subject-commit <source-commit> --pdf technical-report/output/DroneDream_AURORA_Technical_Report.pdf --audit technical-report/output/latex-audit.json --claim-audit technical-report/output/claim-evidence-audit.json --claim-ledger technical-report/claim-evidence-ledger.json --log technical-report/build/main.log --manifest technical-report/evidence-reference-manifest.json --output technical-report/validation-receipts/<source-commit>.json --visual-review-passed",
+    "claim_evidence": "python technical-report/scripts/verify_claim_evidence.py --repository . --ledger technical-report/claim-evidence-ledger.json --manifest technical-report/evidence-reference-manifest.json --body technical-report/body.tex --output technical-report/output/claim-evidence-audit.json"
+  }
+}

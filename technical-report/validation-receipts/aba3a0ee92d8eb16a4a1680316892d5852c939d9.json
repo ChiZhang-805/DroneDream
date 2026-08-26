@@ -1,0 +1,625 @@
+{
+  "schema_version": "dronedream.technical-report-validation-receipt.v7",
+  "subject_commit": "aba3a0ee92d8eb16a4a1680316892d5852c939d9",
+  "parent_software_head": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+  "branch": "codex/technical-report",
+  "serialization": {
+    "json_encoding": "utf-8",
+    "json_newline": "lf",
+    "final_newline": true
+  },
+  "source_tree": {
+    "file_count": 23,
+    "canonical_sha256": "2cd537495fbb3288441b52bb7fed3dab17c8aaa4165feafffe1b2bb863bc160f",
+    "files": [
+      {
+        "path": "technical-report/.gitattributes",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "2900551e86fa40edfca725c9c5ffe19a3ee4371b"
+      },
+      {
+        "path": "technical-report/.gitignore",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "2c4abec2c4aa0acddcdf2e28a85084879f6f17fc"
+      },
+      {
+        "path": "technical-report/README.md",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "908c3466b638e1b78106544c7084ac7bc1b5e214"
+      },
+      {
+        "path": "technical-report/body.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "d9359a41d8586d41e43c758db3caf035d7559982"
+      },
+      {
+        "path": "technical-report/claim-evidence-ledger.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "20fd0f3813f6a34be5eee174c258770841f6ddcf"
+      },
+      {
+        "path": "technical-report/evidence-reference-manifest.json",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "7550b4e347cd24a969fcc9d9242a72053cd0023d"
+      },
+      {
+        "path": "technical-report/main.tex",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "155340cb27b836e05b02f5f9311359e7a7259b75"
+      },
+      {
+        "path": "technical-report/media/github-mark.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "15dcc3db3956993cb3e820187343cfb8a91dc872"
+      },
+      {
+        "path": "technical-report/media/media/image1.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4085ba4935d3e3cf40b5f485865d8185874d6a69"
+      },
+      {
+        "path": "technical-report/media/media/image3.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "039b35f9843decdb83a46b4eaa7fc1b179959a12"
+      },
+      {
+        "path": "technical-report/media/media/image4.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "503f02e576a896cb3ce439779cb3c262045935d8"
+      },
+      {
+        "path": "technical-report/media/media/image5.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "7bdaddae08bf4291e4f43bf165401563aed9ecff"
+      },
+      {
+        "path": "technical-report/media/media/image6.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "cfafeb7cb3fda255808f169e64573e3a5ad4604e"
+      },
+      {
+        "path": "technical-report/media/media/image7.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "1d315e1766427c7df38dd8e91e790f8e132521fe"
+      },
+      {
+        "path": "technical-report/media/media/image8.png",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "dd385ea6fb2815472cd37514bd450d36e6a79e48"
+      },
+      {
+        "path": "technical-report/scripts/audit_latex_report.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "65d22b0d2897b5c57d85a39091364dc5383a3b09"
+      },
+      {
+        "path": "technical-report/scripts/build_report.ps1",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "c2e3ed07304134e4c57e8b8817b85a25fb068aa5"
+      },
+      {
+        "path": "technical-report/scripts/create_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "afb91deb540ea5701cef642b90f7dbb3b120854d"
+      },
+      {
+        "path": "technical-report/scripts/generate_architecture_figure.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "4e8526b8b809b2c4f54cd89254bd87453e5f2181"
+      },
+      {
+        "path": "technical-report/scripts/generate_data_figures.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "2abf6cbbb12585f7f727d874228f81f0aa7151ab"
+      },
+      {
+        "path": "technical-report/scripts/verify_claim_evidence.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "738fa3e80ff0bcd1d7cf36d2b112cd5ed220f6dd"
+      },
+      {
+        "path": "technical-report/scripts/verify_evidence_reference_manifest.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "38f01680a22492036e54de8db58f04bdbe09b877"
+      },
+      {
+        "path": "technical-report/scripts/verify_report_validation_receipt.py",
+        "mode": "100644",
+        "type": "blob",
+        "git_object": "c9418399e3ae15cf0ad72fce894e455e63cf4993"
+      }
+    ]
+  },
+  "evidence_reference_manifest": {
+    "path": "technical-report/evidence-reference-manifest.json",
+    "sha256": "9b48ca3215dcab3eccd9e3eb0cbe52bafac992a6450cb4b204d77e1241daa3e4",
+    "software_subject": "c1222c9215e01a56351f6588af0d2b8694bca831",
+    "software_provenance": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+    "software_head": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+    "website_subject": "87105531e0f591662c724dcbbe96f3adbfa4a321",
+    "website_attestation": "96aba5de2ff20ebe8f201f958c996c5685189619",
+    "website_prerequisite": 88
+  },
+  "pdf": {
+    "path": "technical-report/output/DroneDream_AURORA_Technical_Report.pdf",
+    "sha256": "8c96d605ffce1ef4a846a70c71fcedd7040e2006c1deacb0d3cc6b2a5cda38a8",
+    "bytes": 819033,
+    "pages": 20
+  },
+  "audit": {
+    "path": "technical-report/output/latex-audit.json",
+    "sha256": "3e50ab1e8dad438d9a6cb67e20b4885aeb71fbe6bfea8ded256dc91c117f4a01",
+    "audited_blocks": 97,
+    "explanatory_body": {
+      "total": 61,
+      "passed_80": 61,
+      "failed_80": 0,
+      "failure_locations": []
+    },
+    "short_list_items": {
+      "total": 15,
+      "passed_90": 15,
+      "failed_90": 0,
+      "maximum_lines": 3,
+      "failure_locations": [],
+      "above_3_lines": [
+        {
+          "index": 20,
+          "page": 5,
+          "lines": 4,
+          "text": "COMPLETED is admitted as successful optimizer evidence only when a usable metric and modern receipt bind the exact Candidate, Trial, scenario, objective direction, and execution provenance; a terminal label without that complete chain remains unavailable for optimizer learning, final selection, export, or any later performance statement in release."
+        },
+        {
+          "index": 21,
+          "page": 5,
+          "lines": 4,
+          "text": "FAILED with a trusted domain failure code is admitted as a non-success because it may identify an infeasible or unsafe simulated parameter region without being mislabeled as infrastructure failure; the failed attempt stays in the optimization denominator with its scenario and Candidate identity intact through every later aggregate and arm comparison."
+        },
+        {
+          "index": 22,
+          "page": 5,
+          "lines": 4,
+          "text": "Infrastructure faults, cancellation, malformed evidence, and conflicting terminal states are quarantined and cannot update search or routing memory under any later decision path or replay; each rejected row retains a stable quarantine reason and remains visible to operational diagnostics and independent evidence accounting without later relabeling."
+        },
+        {
+          "index": 41,
+          "page": 11,
+          "lines": 4,
+          "text": "Execution boundary — the dedicated Runtime records 6/6 successful, passing Trials for exactly two seeds and three x500 scenarios; this verifies the retained matrix, not a wider reliability distribution, optimizer advantage, released customer-performance claim, or cross-scenario reliability estimate across independently repeated installations and audits."
+        },
+        {
+          "index": 44,
+          "page": 11,
+          "lines": 4,
+          "text": "Injection boundary — both wind runs retain ENU (0, 2, 0) m/s read-back, and both obstacle runs retain successful create replies plus the same SDF hash; obstacle placement outside the circle track tests injection only and supplies no collision-avoidance result or collision-response evidence under alternative obstacle placements or trajectories or winds."
+        },
+        {
+          "index": 46,
+          "page": 12,
+          "lines": 4,
+          "text": "Qualification boundary — customer admission must repeat the campaign in the signed Runtime and pin vehicle/world assets, controller schema, scenarios, seeds, budgets, baseline arms, and failure taxonomy in one versioned receipt. Acceptance also requires independent outcome recomputation on a separately provisioned installation."
+        },
+        {
+          "index": 47,
+          "page": 12,
+          "lines": 4,
+          "text": "Denominator rule — retain every timeout and failed Trial; a missing receipt stays unavailable rather than being interpreted as a safe or successful run, and aggregate rates must preserve that disposition across every arm, scenario, seed block, and independently recomputed publication table without dropping unavailable runs from the denominator or seed."
+        },
+        {
+          "index": 51,
+          "page": 12,
+          "lines": 4,
+          "text": "Primary outcomes bind frozen holdout loss, feasible-campaign rate, baseline improvement, time-to-target, and terminal failure rate to every reported arm and seed block, with paired uncertainty and effect size computed from the retained scenario-level comparison units. These units govern preregistered acceptance and arm-to-arm inference at release."
+        },
+        {
+          "index": 52,
+          "page": 12,
+          "lines": 4,
+          "text": "Secondary outcomes: wall time, model tokens and cost, router latency, recovery success, scenario-wise regret, and artifact completeness for every frozen comparison arm and seed block, reported alongside termination cause and evidence eligibility so efficiency cannot hide a higher failure burden or incomplete audit surface at publication time or review."
+        },
+        {
+          "index": 53,
+          "page": 12,
+          "lines": 4,
+          "text": "Use at least five independent seeds for engineering diagnostics and preferably ten for report-level comparisons across every reported arm; freeze seed blocks before final execution and publish paired scenario-level uncertainty before making any superiority or repeatability claim across the preregistered final-test matrix and all baseline arms in scope."
+        },
+        {
+          "index": 54,
+          "page": 12,
+          "lines": 4,
+          "text": "Keep timeouts, crashes, infeasible terminations, and failed Trials in the denominator under their predeclared terminal categories; never impute a successful loss, discard a difficult seed, or replace a missing receipt with an optimistic outcome, and never reclassify an unavailable execution after completed-arm results or rankings become visible during audit."
+        },
+        {
+          "index": 62,
+          "page": 13,
+          "lines": 4,
+          "text": "No result in this report establishes real-aircraft safety, certification, or direct simulation-to-reality transfer; those claims require separately governed hardware evidence, operational risk controls, and accepted flight testing outside the present software-contract scope and do not inherit assurance from the mock, WSL, or policy-only artifacts reported here."
+        },
+        {
+          "index": 64,
+          "page": 13,
+          "lines": 4,
+          "text": "Evidence 2.9 exercises equal-budget scripted multi-tool planning and accounting over three seed blocks, six arm runs, and 12/12 accounted calls on a mock backend with zero provider or network calls. It cannot establish real LLM planning quality, optimizer superiority, physical fidelity, real flight, or causal Harness benefit under any release."
+        },
+        {
+          "index": 67,
+          "page": 14,
+          "lines": 4,
+          "text": "The current 16-case policy holdout verifies deterministic eligibility only; its published labels are not permanently blind and require a future concealed benchmark with sealed labels, preregistered scoring, independent custody, and a frozen separation between development examples and final evaluation cases under external final-test custody and audit."
+        },
+        {
+          "index": 68,
+          "page": 14,
+          "lines": 4,
+          "text": "The source-contract ablation demonstrates named guard behavior, not causal optimization-quality lift; each weakened comparator changes a software protection under constructed probes and therefore cannot estimate controller performance, simulator fidelity, or benefit under real execution noise across matched scenario and seed blocks with uncertainty."
+        },
+        {
+          "index": 69,
+          "page": 14,
+          "lines": 4,
+          "text": "The frozen four-arm mock ablation changes protocol behavior in 15/15 full-arm comparisons, but its 5/5 receipt-only-memory isolations remain inconclusive; the scripted policy does not authorize a causal performance claim outside a physical, matched-budget, multi-seed intervention with independent outcome recomputation and retained failures."
+        },
+        {
+          "index": 70,
+          "page": 14,
+          "lines": 4,
+          "text": "The 10/10 fallback result verifies deterministic recovery on a frozen mock protocol, not that AURORA improves objective value beyond recovery equivalence or supports causal attribution; all arms converge on the same deterministic portfolio, so the retained comparison isolates dispatch recovery rather than optimization quality or causal lift."
+        },
+        {
+          "index": 71,
+          "page": 14,
+          "lines": 4,
+          "text": "The ten-scenario campaign is synthetic mock evidence used to exercise orchestration and evidence flow; it is not physical scenario coverage, vehicle-dynamics validation, disturbance fidelity, or a substitute for signed-Runtime PX4/Gazebo outcomes. It cannot qualify vehicle dynamics, disturbance realism, or control quality in the signed Runtime."
+        },
+        {
+          "index": 72,
+          "page": 14,
+          "lines": 4,
+          "text": "The dedicated Runtime matrix has only two seeds per nominal, wind, and static-obstacle scenario. The obstacle is outside the nominal track, so creation proves injection rather than avoidance; signed customer Runtime repetition and wider seed blocks remain necessary before reliability, customer acceptance, or statistical generalization across installations."
+        },
+        {
+          "index": 73,
+          "page": 14,
+          "lines": 4,
+          "text": "The advanced-effects success subset contains three repeats of seed 42001, not independent seed blocks. Two GPS-noise attempts end at the 30.0-second readiness boundary, one file-backed attempt fails on PX4 ownership, and three earlier preflights lack machine artifacts. These records cannot be pooled with the six-Trial scenario matrix or recast as a larger success rate, and the bundle claims no Gazebo version."
+        },
+        {
+          "index": 76,
+          "page": 14,
+          "lines": 4,
+          "text": "External baselines such as expert manual tuning or PX4 AutoTune must be included only when controller, vehicle, track, budget, metrics, and failure accounting are genuinely aligned; unmatched access to resets, prior knowledge, simulator time, or terminal exclusions must be reported as a protocol difference rather than hidden inside a pooled ranking."
+        }
+      ]
+    },
+    "reasonable_exceptions": {
+      "definition": "Headings, display formulas, code blocks, figure captions, table captions, and references do not use either rendered last-line gate; list items use the separate short-list policy.",
+      "inventory": {
+        "headings": 34,
+        "list_items": 36,
+        "display_formulas": 0,
+        "code_blocks": 0,
+        "figure_captions": 6,
+        "table_captions": 9,
+        "references": 33
+      }
+    },
+    "unlocated": [],
+    "cross_page_splits": [],
+    "bottom_failures": [],
+    "gray_text_runs": 0,
+    "internal_links": 51,
+    "external_links": 33
+  },
+  "claim_evidence": {
+    "ledger": {
+      "path": "technical-report/claim-evidence-ledger.json",
+      "sha256": "927ffbae7299e94daf4cd70bf486d5af40fe2fce140a836e3c55e04a29367b46"
+    },
+    "audit": {
+      "path": "technical-report/output/claim-evidence-audit.json",
+      "sha256": "4c91fea1807714acd2cb0d9103c1ad53d24c006110e58b5bb6303dce19ac2c20",
+      "claims": 36,
+      "passed": 36,
+      "failed": 0,
+      "assertions": 277,
+      "verified_sources": [
+        {
+          "id": "advanced_physics_gps_boundary_stderr",
+          "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+          "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stderr.log",
+          "sha256": "63e463e8965212091b5b1ec8ca6364ad4cf77f9b8fe251e9672325f2486aacc9"
+        },
+        {
+          "id": "advanced_physics_gps_boundary_stdout",
+          "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+          "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/attempts/gps-readiness-boundary-attempt-2/stdout.log",
+          "sha256": "2be653eba84ba88e4fffbd2da2b577709e9e0d749517361277036a8ae05c4e70"
+        },
+        {
+          "id": "advanced_physics_manifest",
+          "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+          "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.manifest.json",
+          "sha256": "599c2b8b89bedb525a36c00837e8f09e7b4598c4825a01cff2942c6c5825a923"
+        },
+        {
+          "id": "advanced_physics_receipt",
+          "ref_commit": "d14bf9c0d453599b2bc9733be8c4159fef67c220",
+          "path": "artifacts/technical-report/advanced-physics-real-px4-v1-26b957e/advanced-physics-real-px4-v1.receipt.json",
+          "sha256": "99e257fb56d46d9293ba9365ccae604ddd697802370b877360541628ebd1354f"
+        },
+        {
+          "id": "backend_1204_full_log",
+          "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+          "path": "artifacts/test-runs/aurora-software-c1222c9-pytest.log",
+          "sha256": "e12a1503ebde1400c882a90f1b49d4fb5fb274300f4f193db9e3a051c70d6e5f"
+        },
+        {
+          "id": "backend_1204_test_receipt",
+          "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+          "path": "artifacts/test-runs/aurora-software-c1222c9-receipt.json",
+          "sha256": "6bd9290fcd58a8210531405ce8959d6ef029b261a85aca409a2915c60eb07fb2"
+        },
+        {
+          "id": "backend_28_focused_log",
+          "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+          "path": "artifacts/test-runs/aurora-software-c1222c9-focused.log",
+          "sha256": "571ded85369e1747d9ae02f8dadb4b499e887168b8a5ca686edddc2248f10bbf"
+        },
+        {
+          "id": "cross_job_memory_contract_artifact",
+          "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+          "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.json",
+          "sha256": "aa1f22e72039e367991aec55ea7ad143994f0a5d6ed7f73bef9c5e5523e28281"
+        },
+        {
+          "id": "cross_job_memory_contract_manifest",
+          "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+          "path": "backend/evaluation_artifacts/harness-cross-job-memory-contract-v1.manifest.json",
+          "sha256": "95d36063f94b8c9280d84db028a97d0b0da03687d67465da5979917f06b5efa7"
+        },
+        {
+          "id": "current_online_routing_artifact",
+          "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.json",
+          "sha256": "d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4"
+        },
+        {
+          "id": "current_online_routing_manifest",
+          "ref_commit": "ef00362927475b2fc411a4d82084bbbae8846582",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.8-prompt-1.7-20260728.manifest.json",
+          "sha256": "6b625b8c0a6aa60282fa7c7be2f6b0ad8277b4610feb09c6c5e4b44222329307"
+        },
+        {
+          "id": "harness_component_outcome_ablation_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-component-outcome-ablation-v2.json",
+          "sha256": "1da1e7cda9b817f31e71eb3b760fb0538ac1bd3d389038d2cb0ba0fc6c732d82"
+        },
+        {
+          "id": "harness_contract_ablation_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-contract-ablation-v2.json",
+          "sha256": "8fc1340179d10c974ca9f53b0a8d97e4459c54bc39932518ee6c8c66fa3ab88a"
+        },
+        {
+          "id": "harness_contract_design",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "docs/19-llm-tool-orchestration-harness.md",
+          "sha256": "129676c4e6d58bb8f61fdd335da31d4c55c04cf89e4c27dcc21bce8adbe5c267"
+        },
+        {
+          "id": "harness_fallback_outcome_campaign_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-fallback-outcome-campaign-v1.json",
+          "sha256": "3aa707b3cdd40fe099000c89c3499dc595b38cf6a40d1306875bf5ecd2f1dd7d"
+        },
+        {
+          "id": "harness_phase_registry",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/app/orchestration/harness_context.py",
+          "sha256": "f081a8c12bf50dc330a4aad509bd3454999af519c1dc4ecaf9a03df3db0e1376"
+        },
+        {
+          "id": "multi_tool_budget_artifact",
+          "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+          "path": "backend/evaluation_artifacts/harness-multi-tool-budget-evaluation-v1.json",
+          "sha256": "b20060eb76bfe4b0e5fbbbbcfe6484126a469bcc552b47c0a51cfc76a436ea5d"
+        },
+        {
+          "id": "multi_tool_budget_generation_receipt",
+          "ref_commit": "15603c6f3c1e421dc20802ed0b8dfcfaf7ac49e8",
+          "path": "artifacts/test-runs/harness-multi-tool-budget-evaluation-v1-generation-receipt.json",
+          "sha256": "611783c9388bfda9b21a47e02ab3e8147eec96a7219202859cdc97b63198b6da"
+        },
+        {
+          "id": "px4_physical_campaign_manifest",
+          "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+          "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.manifest.json",
+          "sha256": "4ac760428ead1506fb41ef4928df486a1b0983517a6aee846c2444e882090eda"
+        },
+        {
+          "id": "px4_physical_campaign_receipt",
+          "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+          "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/px4-physical-campaign-v1.receipt.json",
+          "sha256": "8f7e1c953338ae87154b25822bf7c781921473cbcd76fd5874d79c178ef73dee"
+        },
+        {
+          "id": "px4_physical_obstacle_seed_41001_applied",
+          "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+          "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/obstacle-box-seed-41001/scenario_effects.applied.json",
+          "sha256": "248afedf045ed69678d048cd5fe86fd64035375bf3e895514374501e08a6c95d"
+        },
+        {
+          "id": "px4_physical_obstacle_seed_41002_applied",
+          "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+          "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/obstacle-box-seed-41002/scenario_effects.applied.json",
+          "sha256": "bf0651c813d12403459e75013d226a2cf93c7c40d07dc5ac5f4331d842d9154a"
+        },
+        {
+          "id": "px4_physical_wind_seed_41001_applied",
+          "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+          "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/wind-north-2mps-seed-41001/scenario_effects.applied.json",
+          "sha256": "2eba69493b1ab348e787b1abf21ec1144d09420e5311dffbe9cfce92abf5d943"
+        },
+        {
+          "id": "px4_physical_wind_seed_41002_applied",
+          "ref_commit": "3b09951bbea2e5f1c64197b0347a0ed529172192",
+          "path": "artifacts/technical-report/px4-physical-campaign-v1-5f0f62c/trials/wind-north-2mps-seed-41002/scenario_effects.applied.json",
+          "sha256": "cec3663d6a5ec035a8bcc8178af4d119bc3b32127f05b0c2690ad28d9e525ba0"
+        },
+        {
+          "id": "routing_development_corpus_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/tests/fixtures/harness_routing_eval_v1.jsonl",
+          "sha256": "83ba07b0574f90c0ed989c118670c444e28fc3da5dea3b4d0e5917c964a54ed1"
+        },
+        {
+          "id": "routing_prompt_1_5_first_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-20260728.json",
+          "sha256": "fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf"
+        },
+        {
+          "id": "routing_prompt_1_5_rerun_raw",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.5-rerun-20260728.json",
+          "sha256": "9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571"
+        },
+        {
+          "id": "routing_prompt_1_6_archived_raw",
+          "ref_commit": "c1222c9215e01a56351f6588af0d2b8694bca831",
+          "path": "backend/evaluation_artifacts/harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json",
+          "sha256": "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4"
+        },
+        {
+          "id": "runtime_dependency_pins",
+          "ref_commit": "1bf83ccd83913c5e66c2916e5250ccf5b27cad6f",
+          "path": "runtime/pins.env",
+          "sha256": "4e0d095295b181390c8942f067307c342d42f06cc58ae30f1cb415e400136cf5"
+        },
+        {
+          "id": "technical_report_evidence_bundle",
+          "ref_commit": "8102ffecb37b1f1b0e25c80d6b02db05325ca986",
+          "path": "artifacts/technical-report/evidence-v9.json",
+          "sha256": "a2bed29533b321fa00086bf901f7c5ebbf35ab503e50cde4de568b3420e0a08a"
+        },
+        {
+          "id": "website_release_truth_validation_receipt",
+          "ref_commit": "87e049cc426bec0f16ace8130bac672dbb778f22",
+          "path": "website/validation-receipts/website-release-truth-manual-validation-fd7e770.json",
+          "sha256": "034ef134858fe906cdb3c97aa263fa7c36c63a2c59b0216cb5f41ceebdd566f1"
+        },
+        {
+          "id": "website_typography_validation_receipt",
+          "ref_commit": "96aba5de2ff20ebe8f201f958c996c5685189619",
+          "path": "website/validation-receipts/website-download-copy-typography-validation-8710553.json",
+          "sha256": "bcfc6c50920ffce913161eb59d2a4805c34869be33edd85926c37a009c5725d6"
+        }
+      ]
+    }
+  },
+  "compile_log": {
+    "sha256": "9fc546ead9e45551ffc17479774289ec367de67458a318d588174c258268e147",
+    "warning_counts": {
+      "overfull": 0,
+      "latex_warning": 0,
+      "package_warning": 0,
+      "undefined_control_sequence": 0,
+      "undefined_references": 0
+    },
+    "underfull_boxes": 0
+  },
+  "visual_review": {
+    "status": "passed",
+    "render_dpi": 150,
+    "inspected_pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "page_bottoms_inspected": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "defects_fixed": [
+      {
+        "page": 1,
+        "issue": "The DroneDream lockup was centered instead of aligned to the upper-left report margin.",
+        "resolution": "Left-aligned the lockup, enlarged the title and Abstract heading, and rechecked the full page."
+      },
+      {
+        "page": 7,
+        "issue": "Table 3 split across pages and Figure 3 labels were vertically crowded near the zero bar.",
+        "resolution": "Made Table 3 indivisible, increased Figure 3 height and row spacing, and offset the zero label."
+      },
+      {
+        "page": 20,
+        "issue": "References used two columns and retained an explanatory paragraph below the heading.",
+        "resolution": "Removed the paragraph and rendered all references in one readable column."
+      }
+    ],
+    "remaining_blocking_defects": []
+  },
+  "reproduction": {
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File technical-report/scripts/build_report.ps1",
+    "receipt": "python technical-report/scripts/create_report_validation_receipt.py --repository . --subject-commit <source-commit> --pdf technical-report/output/DroneDream_AURORA_Technical_Report.pdf --audit technical-report/output/latex-audit.json --claim-audit technical-report/output/claim-evidence-audit.json --claim-ledger technical-report/claim-evidence-ledger.json --log technical-report/build/main.log --manifest technical-report/evidence-reference-manifest.json --output technical-report/validation-receipts/<source-commit>.json --visual-review-passed",
+    "claim_evidence": "python technical-report/scripts/verify_claim_evidence.py --repository . --ledger technical-report/claim-evidence-ledger.json --manifest technical-report/evidence-reference-manifest.json --body technical-report/body.tex --output technical-report/output/claim-evidence-audit.json"
+  }
+}
