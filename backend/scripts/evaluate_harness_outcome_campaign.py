@@ -17,22 +17,18 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.orchestration.harness_outcome_campaign import (  # noqa: E402
     build_harness_outcome_campaign,
+    verify_harness_outcome_campaign,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 DEFAULT_JSON_OUTPUT = (
-    BACKEND_ROOT
-    / "evaluation_artifacts"
-    / "harness-fallback-outcome-campaign-v1.json"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-outcome-campaign-v1.json"
 )
 DEFAULT_CSV_OUTPUT = (
-    BACKEND_ROOT
-    / "evaluation_artifacts"
-    / "harness-fallback-outcome-campaign-v1.csv"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-outcome-campaign-v1.csv"
 )
 DEFAULT_SHA256_OUTPUT = (
-    BACKEND_ROOT
-    / "evaluation_artifacts"
-    / "harness-fallback-outcome-campaign-v1.sha256"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-outcome-campaign-v1.sha256"
 )
 
 CSV_FIELDS = (
@@ -78,9 +74,7 @@ def _csv_rows(artifact: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for block in artifact["block_rows"]:
         direct_hash = next(
-            arm["outcome_sha256"]
-            for arm in block["arms"]
-            if arm["arm"] == "direct_portfolio"
+            arm["outcome_sha256"] for arm in block["arms"] if arm["arm"] == "direct_portfolio"
         )
         for arm in block["arms"]:
             outcome = arm["outcome"]
@@ -97,9 +91,7 @@ def _csv_rows(artifact: dict[str, Any]) -> list[dict[str, Any]]:
                     "optimization_outcome": outcome["optimization_outcome"],
                     "candidate_count": budget["candidate_count"],
                     "trial_count": budget["trial_count"],
-                    "configured_max_total_trials": budget[
-                        "configured_max_total_trials"
-                    ],
+                    "configured_max_total_trials": budget["configured_max_total_trials"],
                     "dispatched_trials": budget["dispatched_trials"],
                     "completed_trials": budget["completed_trials"],
                     "winner_candidate_key": (
@@ -107,13 +99,11 @@ def _csv_rows(artifact: dict[str, Any]) -> list[dict[str, Any]]:
                     ),
                     "holdout_loss": outcome["holdout_loss"],
                     "failure_count": outcome["failure_count"],
-                    "evidence_completeness_rate": outcome[
-                        "evidence_completeness"
-                    ]["completeness_rate"],
+                    "evidence_completeness_rate": outcome["evidence_completeness"][
+                        "completeness_rate"
+                    ],
                     "outcome_sha256": arm["outcome_sha256"],
-                    "exact_match_to_direct_portfolio": (
-                        arm["outcome_sha256"] == direct_hash
-                    ),
+                    "exact_match_to_direct_portfolio": (arm["outcome_sha256"] == direct_hash),
                 }
             )
     return rows
@@ -137,11 +127,11 @@ def render_harness_outcome_campaign_files(
     json_name: str,
     csv_name: str,
 ) -> tuple[bytes, bytes, bytes]:
+    artifact = verify_harness_outcome_campaign(artifact)
     json_payload = _json_bytes(artifact)
     csv_payload = _csv_bytes(artifact)
     manifest = (
-        f"{_sha256(json_payload)}  {json_name}\n"
-        f"{_sha256(csv_payload)}  {csv_name}\n"
+        f"{_sha256(json_payload)}  {json_name}\n{_sha256(csv_payload)}  {csv_name}\n"
     ).encode("ascii")
     return json_payload, csv_payload, manifest
 
@@ -154,7 +144,7 @@ def write_harness_outcome_campaign_files(
     check: bool = False,
     artifact: dict[str, Any] | None = None,
 ) -> dict[str, str]:
-    campaign = artifact or build_harness_outcome_campaign()
+    campaign = build_harness_outcome_campaign() if artifact is None else artifact
     json_payload, csv_payload, manifest = render_harness_outcome_campaign_files(
         campaign,
         json_name=json_path.name,
@@ -173,13 +163,10 @@ def write_harness_outcome_campaign_files(
         ]
         if mismatches:
             raise ValueError(
-                "Harness outcome campaign artifacts are stale: "
-                + ", ".join(mismatches)
+                "Harness outcome campaign artifacts are stale: " + ", ".join(mismatches)
             )
     else:
-        for path, payload in outputs:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(payload)
+        write_new_evidence_files(outputs, label="Harness outcome-campaign evidence")
     return {
         "artifact_sha256": str(campaign["artifact_sha256"]),
         "json_file_sha256": _sha256(json_payload),

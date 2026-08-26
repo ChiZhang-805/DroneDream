@@ -8,7 +8,8 @@ Type=simple
 User=dronedream
 Group=dronedream
 EnvironmentFile=/etc/dronedream/runtime.env
-WorkingDirectory=/opt/dronedream/source
+WorkingDirectory=/opt/dronedream/engine/current
+Environment=PYTHONPATH=/opt/dronedream/engine/current/backend:/opt/dronedream/engine/current/worker
 ExecStart=/opt/dronedream/venv/bin/drone-dream-worker
 Restart=on-failure
 RestartSec=3

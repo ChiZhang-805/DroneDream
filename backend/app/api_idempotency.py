@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -76,6 +76,90 @@ class MutationGate:
         # The domain mutation and its replay receipt become visible together.
         self.db.commit()
         return response
+
+
+@dataclass(frozen=True)
+class MutationInspection:
+    """Read-only, user-scoped state for manual uncertain-request reconciliation."""
+
+    state: Literal["not_found", "in_progress", "completed"]
+    idempotency_key_sha256: str
+    operation: str
+    request_hash: str | None = None
+    resource_type: str | None = None
+    resource_id: str | None = None
+    response_status: int | None = None
+
+
+def inspect_mutation(
+    db: Session,
+    *,
+    user: models.User,
+    operation: str,
+    idempotency_key: str,
+) -> MutationInspection:
+    """Inspect one owned mutation receipt without replaying its operation."""
+
+    key = _canonical_key(idempotency_key)
+    if key is None:
+        raise _http_error(
+            422,
+            "IDEMPOTENCY_KEY_INVALID",
+            "Idempotency-Key must be a canonical UUID.",
+        )
+    if not user.id:
+        raise _http_error(
+            500,
+            "IDEMPOTENCY_IDENTITY_UNAVAILABLE",
+            "The authenticated user identity is unavailable.",
+        )
+    key_hash = hashlib.sha256(key.encode("ascii")).hexdigest()
+    record = db.scalar(
+        select(models.ApiIdempotencyRecord).where(
+            models.ApiIdempotencyRecord.user_id == user.id,
+            models.ApiIdempotencyRecord.idempotency_key_hash == key_hash,
+        )
+    )
+    if record is None:
+        return MutationInspection(
+            state="not_found",
+            idempotency_key_sha256=key_hash,
+            operation=operation,
+        )
+    if record.operation != operation:
+        raise _http_error(
+            409,
+            "IDEMPOTENCY_CONFLICT",
+            "This Idempotency-Key belongs to a different operation.",
+        )
+    if record.status == "IN_PROGRESS":
+        return MutationInspection(
+            state="in_progress",
+            idempotency_key_sha256=key_hash,
+            operation=operation,
+            request_hash=record.request_hash,
+        )
+    if (
+        record.status != "COMPLETED"
+        or record.response_json is None
+        or record.resource_type is None
+        or record.resource_id is None
+        or record.response_status is None
+    ):
+        raise _http_error(
+            409,
+            "IDEMPOTENCY_RECEIPT_INVALID",
+            "The mutation receipt cannot support read-only reconciliation.",
+        )
+    return MutationInspection(
+        state="completed",
+        idempotency_key_sha256=key_hash,
+        operation=operation,
+        request_hash=record.request_hash,
+        resource_type=record.resource_type,
+        resource_id=record.resource_id,
+        response_status=record.response_status,
+    )
 
 
 def begin_mutation(
@@ -165,4 +249,4 @@ def begin_mutation(
     )
 
 
-__all__ = ["MutationGate", "begin_mutation"]
+__all__ = ["MutationGate", "MutationInspection", "begin_mutation", "inspect_mutation"]

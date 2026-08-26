@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-field-donor-audit",
+  "editionId": "lab",
+  "auditMode": "read-only-path-level",
+  "fieldDonor": {
+    "branch": "codex/software-field",
+    "productSource": "45e897faca6b48773f0a49d2f4d74ec67ae967fe",
+    "tree": "bd513282437004fde4464a33b498c5e98a01e5f3",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "originExactAtHandoff": true
+  },
+  "semanticFindings": {
+    "acceptedReceiptKind": "dronedream-field-harness-job-receipt",
+    "acceptedExecutionMode": "offline-evidence-replay-no-device-io",
+    "recordedEvidenceOnly": true,
+    "hardwareValidationClaimed": false,
+    "fieldSourceCopiedIntoLab": false,
+    "fieldNoSimulationInstallerPolicyAppliedToLab": false,
+    "labRetainsSimulationPayload": true
+  },
+  "identityJoin": {
+    "verifiedNow": [
+      "field product source",
+      "Field receipt JCS hash",
+      "Engine Pack content identity",
+      "Vehicle Pack identity",
+      "selected candidate hash",
+      "observation hash",
+      "snapshot hash",
+      "final independent holdout"
+    ],
+    "stillRequired": [
+      "exact SIM product donor",
+      "SIM controller and firmware identity bindings",
+      "metric normalization receipt",
+      "validated Vehicle Pack",
+      "native/backend/runtime safety quorum",
+      "operator confirmation for any later dangerous action"
+    ]
+  },
+  "decision": {
+    "simToRealCalibration": "deny",
+    "realToSimCalibration": "deny",
+    "qualificationIssue": "deny",
+    "hardwareWrite": "deny",
+    "unlock": "deny",
+    "arm": "deny",
+    "flight": "deny",
+    "reason": "Field recorded evidence is accepted, but the SIM donor and cross-domain metric/identity bindings are incomplete."
+  }
+}

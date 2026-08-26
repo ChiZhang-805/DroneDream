@@ -1,0 +1,150 @@
+{
+  "analysis": {
+    "holdout_loss_direction": "lower_is_better",
+    "paired_seed_block_signs_reported": true,
+    "protocol_effect": "the direct intervention is activated and changes the routed tool sequence, realized outcome hash, or preregistered metrics",
+    "quality_benefit_requires": "full_aurora lower holdout loss in every seed block of the primary contrast with no contradictory paired sign",
+    "ties_use_absolute_tolerance": 1e-12,
+    "total_trials_direction": "lower_is_lower_realized_cost"
+  },
+  "arms": [
+    "full_aurora",
+    "no_decision_memory",
+    "no_observed_outcome_reflection",
+    "fixed_deterministic_portfolio"
+  ],
+  "budget": {
+    "driver_step_limit": 140,
+    "max_iterations": 4,
+    "max_total_trials": 120,
+    "realized_trial_count_is_an_outcome": true,
+    "same_declared_budget_for_every_arm": true
+  },
+  "claim_boundary": "Matched deterministic component intervention on MockSimulatorAdapter with a local scripted router and a pilot-informed four-generation budget. Results establish only protocol effects in these frozen synthetic seed blocks. They do not establish a general quality benefit, LLM superiority, PX4/Gazebo performance, physical fidelity, real-aircraft transfer, or flight safety.",
+  "claim_label": "SYNTHETIC_MOCK_PILOT_INFORMED",
+  "confirmatory_claim_permitted": false,
+  "evidence_class": "synthetic_mock_long_horizon_component_stress",
+  "initial_design": {
+    "baseline_parameters": {
+      "accel_limit": 4.0,
+      "disturbance_rejection": 0.5,
+      "kd_xy": 0.2,
+      "ki_xy": 0.05,
+      "kp_xy": 1.0,
+      "vel_limit": 5.0
+    },
+    "candidate_count": 1,
+    "kind": "shared_service_default_baseline",
+    "parameter_space": "legacy_six_parameter_domain",
+    "same_for_every_arm": true
+  },
+  "interventions": {
+    "fixed_deterministic_portfolio": "bypass model routing and use optimizer_portfolio directly",
+    "full_aurora": "no context intervention",
+    "no_decision_memory": "replace the provider-visible decision_memory tuple with empty",
+    "no_observed_outcome_reflection": "preserve decision receipts but replace verified reflection with unavailable and remove observed_outcome"
+  },
+  "manifest_sha256": "bbf3d39405fd9092d59cf5d0557d14616f8d4a8739e1865f7e2cf6fda811e1b2",
+  "metrics": [
+    "holdout_loss",
+    "optimizer_feasible_rate",
+    "trials_to_target",
+    "total_trials",
+    "terminal_failure_trials",
+    "recovered_trials",
+    "evidence_completeness_rate"
+  ],
+  "objective_contract": {
+    "constraints": [
+      {
+        "hard": true,
+        "metric": "max_error",
+        "operator": "lte",
+        "threshold": 3.0
+      }
+    ],
+    "objectives": [
+      {
+        "direction": "minimize",
+        "metric": "rmse"
+      }
+    ],
+    "robust_aggregation": "mean"
+  },
+  "parent_component_protocol_manifest_sha256": "28092e9a5114bd4a02c297246cde8467014e22553d93c028a19b08db678a5072",
+  "pilot_informed_protocol": true,
+  "primary_contrast": {
+    "comparison_arm": "no_observed_outcome_reflection",
+    "component": "observed_outcome_reflection",
+    "reference_arm": "full_aurora"
+  },
+  "runtime_contract": {
+    "evidence_schema_version": "2.7",
+    "live_model_calls": false,
+    "network_connect_guard": [
+      "socket.connect",
+      "socket.connect_ex",
+      "socket.create_connection"
+    ],
+    "physical_fidelity": false,
+    "prompt_template_version": "1.6",
+    "real_credentials_used": false,
+    "simulator_backend": "mock",
+    "tool_registry_version": "2.1"
+  },
+  "scenario_matrix": {
+    "common_random_numbers": true,
+    "holdout": [
+      {
+        "case": "combined-holdout",
+        "seed_offset": 99
+      }
+    ],
+    "training": [
+      {
+        "case": "nominal-training",
+        "seed_offset": 1
+      },
+      {
+        "case": "wind-training",
+        "seed_offset": 2
+      },
+      {
+        "case": "noise-training",
+        "seed_offset": 3
+      }
+    ]
+  },
+  "schema_version": "dronedream.harness-reflection-outcome-stress-manifest/v1",
+  "scripted_router_policy": {
+    "generation_1": "choose constrained_mobo when eligible; otherwise choose optimizer_portfolio",
+    "later_generation_with_verified_reflection": "choose turbo when eligible and the prior cohort has complete evidence, at least one feasible candidate, and zero domain failure Trials; otherwise choose optimizer_portfolio",
+    "later_generation_without_verified_reflection": "choose optimizer_portfolio",
+    "no_free_text_feedback": true
+  },
+  "secondary_contrasts": [
+    {
+      "comparison_arm": "no_decision_memory",
+      "component": "decision_memory_including_reflection",
+      "reference_arm": "full_aurora"
+    },
+    {
+      "comparison_arm": "fixed_deterministic_portfolio",
+      "component": "harness_router",
+      "reference_arm": "full_aurora"
+    }
+  ],
+  "seed_blocks": [
+    6100,
+    7200,
+    8300,
+    9400,
+    10500
+  ],
+  "time_to_target": {
+    "accounting": "all Trial rows through the complete target generation; otherwise right-censored at the arm total",
+    "metric": "training scalar_loss",
+    "relative_improvement": 0.05,
+    "target": "first generation containing a full-fidelity feasible optimizer candidate at least 5% better than the shared baseline"
+  }
+}

@@ -201,8 +201,24 @@ async def _read_all(
     values: dict[str, Number] = {}
     for name in names:
         definition = _require_parameter_definition(name, px4_version=px4_version)
-        value = await client.get_parameter(name, definition.value_type)
-        values[name] = int(value) if definition.value_type == "int" else float(value)
+        raw_value = await client.get_parameter(name, definition.value_type)
+        if (
+            isinstance(raw_value, bool)
+            or not isinstance(raw_value, int | float)
+            or not math.isfinite(float(raw_value))
+        ):
+            raise ParameterApplicationError(
+                f"invalid PX4 parameter readback for {name}: expected a finite "
+                f"{definition.value_type} value"
+            )
+        if definition.value_type == "int":
+            if not float(raw_value).is_integer():
+                raise ParameterApplicationError(
+                    f"invalid PX4 parameter readback for {name}: expected an integer value"
+                )
+            values[name] = int(raw_value)
+        else:
+            values[name] = float(raw_value)
     return values
 
 
@@ -447,8 +463,16 @@ async def verify_environment_parameters(
     px4_version: str | None = None,
     context: Mapping[str, object] | None = None,
     enforce_safe_bounds: bool = True,
+    reconcile_live_mismatches: bool = False,
 ) -> ParameterApplicationResult:
-    """Verify parameters injected at PX4 process start through environment vars."""
+    """Verify parameters injected at PX4 process start through environment vars.
+
+    Some airframe startup scripts apply vehicle defaults after PX4 consumes the
+    ``PX4_PARAM_*`` overrides. A real launcher may therefore opt into a narrow
+    post-start reconciliation pass for live-settable values. Reboot-required
+    parameters are never written live: a mismatch for one of those remains a
+    fail-closed startup error.
+    """
 
     normalized_version = normalize_px4_version(px4_version)
     normalized = validate_parameter_values(
@@ -494,7 +518,75 @@ async def verify_environment_parameters(
             verification={"verified": False, "error": str(exc)},
         )
         raise ParameterApplicationError(f"PX4 environment readback failed: {exc}") from exc
+    initial_applied = dict(applied)
+    initial_mismatches = _readback_mismatches(
+        normalized,
+        initial_applied,
+        px4_version=normalized_version,
+    )
+    reconciled_names: list[str] = []
+    reconciliation_rollback_errors: dict[str, str] = {}
+    if initial_mismatches and reconcile_live_mismatches:
+        reboot_mismatches: list[str] = []
+        for name in initial_mismatches:
+            definition = _require_parameter_definition(
+                name,
+                px4_version=normalized_version,
+            )
+            if definition.requires_reboot or definition.apply_policy == "reboot":
+                reboot_mismatches.append(name)
+        if not reboot_mismatches:
+            try:
+                for name in initial_mismatches:
+                    definition = _require_parameter_definition(
+                        name,
+                        px4_version=normalized_version,
+                    )
+                    # Track before awaiting: PX4 may commit a write even if the
+                    # acknowledgement is lost, so rollback must remain possible.
+                    reconciled_names.append(name)
+                    await client.set_parameter(name, normalized[name], definition.value_type)
+                applied = await _read_all(client, list(normalized), px4_version=normalized_version)
+            except Exception as exc:
+                reconciliation_rollback_errors = await _restore_parameters(
+                    client,
+                    initial_applied,
+                    reconciled_names,
+                    px4_version=normalized_version,
+                )
+                _write_evidence(
+                    evidence_dir,
+                    filename=APPLIED_EVIDENCE_NAME,
+                    kind="applied",
+                    values=applied,
+                    transport="environment",
+                    px4_version=normalized_version,
+                    context=context,
+                    status="error",
+                    verification={
+                        "verified": False,
+                        "error": str(exc),
+                        "stage": "post_airframe_live_reconciliation",
+                        "initial_readback": initial_applied,
+                        "initial_mismatches": initial_mismatches,
+                        "reconciled_parameters": reconciled_names,
+                        "rollback_attempted": bool(reconciled_names),
+                        "rollback_succeeded": bool(reconciled_names)
+                        and not reconciliation_rollback_errors,
+                        "rollback_errors": reconciliation_rollback_errors,
+                    },
+                )
+                raise ParameterApplicationError(
+                    f"PX4 post-airframe parameter reconciliation failed: {exc}"
+                ) from exc
     mismatches = _readback_mismatches(normalized, applied, px4_version=normalized_version)
+    if mismatches and reconciled_names:
+        reconciliation_rollback_errors = await _restore_parameters(
+            client,
+            initial_applied,
+            reconciled_names,
+            px4_version=normalized_version,
+        )
     _write_evidence(
         evidence_dir,
         filename=APPLIED_EVIDENCE_NAME,
@@ -504,7 +596,23 @@ async def verify_environment_parameters(
         px4_version=normalized_version,
         context=context,
         status="mismatch" if mismatches else "ok",
-        verification={"verified": not mismatches, "mismatches": mismatches},
+        verification={
+            "verified": not mismatches,
+            "mismatches": mismatches,
+            "initial_readback": initial_applied,
+            "initial_mismatches": initial_mismatches,
+            "reconciliation_transport": "mavsdk" if reconciled_names else "none",
+            "reconciled_parameters": reconciled_names,
+            **(
+                {
+                    "rollback_attempted": True,
+                    "rollback_succeeded": not reconciliation_rollback_errors,
+                    "rollback_errors": reconciliation_rollback_errors,
+                }
+                if mismatches and reconciled_names
+                else {}
+            ),
+        },
     )
     if mismatches:
         raise ParameterReadbackError(mismatches)
@@ -708,6 +816,7 @@ async def verify_environment_parameters_with_mavsdk(
     px4_version: str | None = None,
     context: Mapping[str, object] | None = None,
     enforce_safe_bounds: bool = True,
+    reconcile_live_mismatches: bool = False,
 ) -> ParameterApplicationResult:
     try:
         client = await connect_mavsdk_parameter_client(connection, timeout_seconds=timeout_seconds)
@@ -732,6 +841,7 @@ async def verify_environment_parameters_with_mavsdk(
             px4_version=px4_version,
             context=context,
             enforce_safe_bounds=enforce_safe_bounds,
+            reconcile_live_mismatches=reconcile_live_mismatches,
         )
     finally:
         client.close()

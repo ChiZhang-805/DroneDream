@@ -1,0 +1,30 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "goal_node": {
+      "title": "Goal Node",
+      "type": "string"
+    },
+    "require_flight_verified_edges": {
+      "default": false,
+      "title": "Require Flight Verified Edges",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "dronedream.route-query.v1",
+      "default": "dronedream.route-query.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "start_node": {
+      "title": "Start Node",
+      "type": "string"
+    }
+  },
+  "required": [
+    "start_node",
+    "goal_node"
+  ],
+  "title": "RouteQuery",
+  "type": "object"
+}

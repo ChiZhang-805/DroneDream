@@ -14,6 +14,15 @@ param(
     [ValidateSet("preserve", "install")]
     [string]$VhostMode = "preserve",
 
+    [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
+    [string]$EditionId = "universal",
+
+    [UInt64]$BuildNumber = 0,
+
+    [string]$InstallerHandoffRoot = "",
+
+    [string]$CargoTargetRoot = "",
+
     [switch]$SkipBuild
 )
 
@@ -181,11 +190,20 @@ $publicConfig = Join-Path $repositoryRoot `
 
 if (-not $SkipBuild) {
     $windowsPowerShell = (Get-Command powershell.exe -ErrorAction Stop).Source
-    Invoke-NativeCommand -CommandPath $windowsPowerShell -CommandArguments @(
+    $buildArguments = @(
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
-        '-File', $buildScript
+        '-File', $buildScript,
+        '-EditionId', $EditionId,
+        '-BuildNumber', [string]$BuildNumber
     )
+    if ($InstallerHandoffRoot) {
+        $buildArguments += @('-InstallerHandoffRoot', $InstallerHandoffRoot)
+    }
+    if ($CargoTargetRoot) {
+        $buildArguments += @('-CargoTargetRoot', $CargoTargetRoot)
+    }
+    Invoke-NativeCommand -CommandPath $windowsPowerShell -CommandArguments $buildArguments
 }
 
 $indexPath = Join-Path $siteDirectory 'index.html'
@@ -212,7 +230,28 @@ $installerSha256 = ([string]$metadata.sha256).ToLowerInvariant()
 if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
     throw "latest.json contains an invalid release version."
 }
-$expectedInstallerName = "DroneDream_${version}_x64-setup.exe"
+$hasEdition = $null -ne $metadata.PSObject.Properties['edition']
+$hasBuildNumber = $null -ne $metadata.PSObject.Properties['buildNumber']
+if ($hasEdition -xor $hasBuildNumber) {
+    throw "latest.json edition metadata is incomplete."
+}
+if ($hasEdition) {
+    $editionProducts = @{
+        universal = "DroneDream-Universal"
+        sim = "DroneDream-Sim"
+        lab = "DroneDream-Lab"
+        field = "DroneDream-Field"
+        autonomy = "DroneDream-Agent"
+    }
+    $edition = [string]$metadata.edition
+    $buildNumber = [long]$metadata.buildNumber
+    if (-not $editionProducts.ContainsKey($edition) -or $buildNumber -le 0) {
+        throw "latest.json contains invalid edition release metadata."
+    }
+    $expectedInstallerName = "$($editionProducts[$edition])-$version.exe"
+} else {
+    $expectedInstallerName = "DroneDream_${version}_x64-setup.exe"
+}
 if ($installerName -ne $expectedInstallerName -or
     $installerSha256 -notmatch '^[0-9a-f]{64}$' -or
     [string]$metadata.downloadUrl -ne "/downloads/$installerName" -or
@@ -305,6 +344,9 @@ try {
             $publicConfig
         )) {
         $scpArguments = @()
+        # Windows OpenSSH can stall while negotiating the default SFTP transport
+        # against this Baota host. The legacy SCP transport is deterministic here.
+        $scpArguments += '-O'
         $scpArguments += $sshOptions
         $scpArguments += $uploadPath
         $scpArguments += "${Remote}:$remoteDirectory/"

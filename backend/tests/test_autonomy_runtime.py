@@ -1,0 +1,680 @@
+from __future__ import annotations
+
+import pytest
+
+from app.autonomy.models import (
+    AutonomyCompileRequest,
+    RuntimeInterruptionRequest,
+    RuntimeObservation,
+    RuntimeOperatorCommand,
+    RuntimeReplanApplyRequest,
+    RuntimeSessionCreateRequest,
+    Vector3,
+)
+from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry
+from app.autonomy.school_map_artifact import (
+    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
+    school_map_stair_route_points,
+)
+from app.autonomy.service import compile_autonomy_mission
+
+
+def mission(target: str = "simulation") -> AutonomyCompileRequest:
+    return AutonomyCompileRequest.model_validate(
+        {
+            "edition": "lab" if target != "simulation" else "sim",
+            "execution_target": target,
+            "natural_language": "Fly through three gates and land at the goal.",
+            "scene_id": "forest-gate-inspection",
+            "perception_mode": "fusion",
+            "asset_context": {
+                "schema_version": "dronedream.autonomy.compile-assets.v1",
+                "harness_context_sha256": "a" * 64,
+                "aircraft": {
+                    "kind": "aircraft",
+                    "asset_id": "aircraft-test-x500",
+                    "name": "Test X500",
+                    "version": 1,
+                    "status": "validated-unsigned",
+                    "content_hash": "b" * 64,
+                    "qualification_receipt_id": "vehicle-receipt-test",
+                    "capabilities": {},
+                },
+                "map_pack": {
+                    "kind": "map",
+                    "asset_id": "map-test",
+                    "name": "Test map",
+                    "version": 1,
+                    "status": "qualified",
+                    "content_hash": "c" * 64,
+                    "qualification_receipt_id": "map-receipt-test",
+                    "capabilities": {},
+                },
+                "planner_binding": {
+                    "schema_version": "dronedream.autonomy.planner-binding.v1",
+                    "status": "draft",
+                    "run_id": "planner-run-test-001",
+                    "provider": "test",
+                    "model": "test-model",
+                    "artifact_sha256": "d" * 64,
+                    "goal": "Fly through three gates and land at the goal.",
+                    "aircraft_id": "aircraft-test-x500",
+                    "aircraft_version": 1,
+                    "map_id": "map-test",
+                    "map_version": 1,
+                    "context_sha256": "a" * 64,
+                    "task_graph": {
+                        "nodes": [
+                            {
+                                "node_id": "takeoff",
+                                "action": "takeoff",
+                                "target": "mission route",
+                                "depends_on": [],
+                                "success_evidence": ["airborne telemetry"],
+                            },
+                            {
+                                "node_id": "land",
+                                "action": "land",
+                                "target": "mission endpoint",
+                                "depends_on": ["takeoff"],
+                                "success_evidence": ["landed telemetry"],
+                            },
+                        ]
+                    },
+                },
+            },
+        }
+    )
+
+
+def observation(sequence: int, monotonic_ms: int, **updates: object) -> RuntimeObservation:
+    payload: dict[str, object] = {
+        "sequence": sequence,
+        "monotonic_ms": monotonic_ms,
+        "armed": True,
+        "landed": False,
+        "position_m": Vector3(x=1.0, y=2.0, z=1.5),
+        "velocity_mps": Vector3(x=0.4, y=0.0, z=0.0),
+        "localization_covariance_m2": 0.04,
+        "perception_age_ms": 40,
+        "minimum_clearance_m": 0.8,
+        "battery_percent": 82.0,
+        "link_ok": True,
+        "geofence_ok": True,
+        "payload_mass_kg": 0.0,
+        "mission_progress": 0.2,
+    }
+    payload.update(updates)
+    return RuntimeObservation.model_validate(payload)
+
+
+def test_runtime_profile_never_grants_hitl_or_hardware_authority() -> None:
+    simulation = compile_autonomy_mission(mission())
+    hitl = compile_autonomy_mission(mission("hitl"))
+    hardware = compile_autonomy_mission(mission("hardware"))
+
+    assert simulation.runtime_profile.mode == "simulation_contract"
+    assert simulation.runtime_profile.command_authority is True
+    assert hitl.runtime_profile.mode == "hitl_shadow"
+    assert hitl.runtime_profile.command_authority is False
+    assert hardware.runtime_profile.mode == "hardware_locked"
+    assert hardware.runtime_profile.command_authority is False
+    assert not any(
+        component.actuator_authority for component in hardware.runtime_profile.components
+    )
+
+
+def test_compile_locale_is_bound_to_contract_hash_and_structured_output() -> None:
+    english_request = mission()
+    chinese_request = english_request.model_copy(update={"locale": "zh-CN"})
+
+    english = compile_autonomy_mission(english_request)
+    chinese = compile_autonomy_mission(chinese_request)
+
+    assert english.contract.locale == "en"
+    assert chinese.contract.locale == "zh-CN"
+    assert english.contract.contract_id != chinese.contract.contract_id
+    assert english.contract.steps[0].label != chinese.contract.steps[0].label
+    assert "飞" in chinese.contract.steps[0].label
+    assert "模型" in chinese.contract.immutable_safety_rules[0]
+    assert chinese.contract.task_graph.change_reason == "已完成编译"
+    assert any("验证" in node.label for node in chinese.contract.task_graph.nodes)
+
+
+def test_compiler_expands_each_motion_into_perception_plan_qualification_and_evidence() -> None:
+    compiled = compile_autonomy_mission(mission())
+    graph = compiled.contract.task_graph
+    identifiers = {node.task_id for node in graph.nodes}
+
+    assert graph.active_node_ids == ["preflight-pack-identity"]
+    assert len(graph.nodes) == 23
+    assert len(identifiers) == len(graph.nodes)
+    for order, action in ((1, "takeoff"), (2, "pass-gate"), (3, "land")):
+        prefix = f"mission-{order:02d}-{action}"
+        for stage in ("observe", "plan", "qualify", "execute", "verify"):
+            assert f"{prefix}-{stage}" in identifiers
+    assert graph.nodes[-2].task_id == "postflight-state"
+    assert graph.nodes[-1].depends_on == ["postflight-state"]
+
+
+def test_pickup_requalifies_the_loaded_vehicle_before_return_planning() -> None:
+    coffee = mission().model_copy(
+        update={
+            "natural_language": "Fly from the office, pick up coffee, and return.",
+            "scene_id": "stairwell-coffee-return",
+        }
+    )
+    graph = compile_autonomy_mission(coffee).contract.task_graph
+    nodes = {node.task_id: node for node in graph.nodes}
+    payload_check = nodes["mission-04-pickup-recompute-envelope"]
+    return_observation = nodes["mission-05-return-observe"]
+
+    assert payload_check.risk == "critical"
+    assert payload_check.fallback == "land"
+    assert "return-energy.margin" in payload_check.completion_evidence
+    assert return_observation.depends_on == [payload_check.task_id]
+
+
+def test_model_bound_pickup_request_rejects_a_semantically_incomplete_planner_graph() -> None:
+    payload = mission().model_dump(mode="json")
+    payload["natural_language"] = "Pick up the takeout order and return to the office."
+
+    with pytest.raises(ValueError, match="pickup, return"):
+        AutonomyCompileRequest.model_validate(payload)
+
+
+def test_school_map_gate_intent_compiles_gate_steps_and_visual_route() -> None:
+    gate_mission = mission().model_copy(
+        update={
+            "natural_language": "Fly through all three circular gates and land at the goal.",
+            "scene_id": "school-campus-v1",
+        }
+    )
+    compiled = compile_autonomy_mission(gate_mission)
+
+    assert [step.action for step in compiled.contract.steps] == [
+        "takeoff",
+        "pass_gate",
+        "land",
+    ]
+    assert [point.phase for point in compiled.trajectory].count("gate") == 3
+    assert compiled.trajectory[0].x == pytest.approx(-24.8)
+    assert compiled.trajectory[-1].x == pytest.approx(48.0)
+    assert not any(step.action == "pickup" for step in compiled.contract.steps)
+
+
+def test_school_map_concrete_route_wins_over_generic_return_language() -> None:
+    gate_mission = mission().model_copy(
+        update={
+            "natural_language": "Pass all three circular gates and return to launch.",
+            "scene_id": "school-campus-v1",
+        }
+    )
+    stair_mission = mission().model_copy(
+        update={
+            "natural_language": "Descend the switchback stairs, then return upstairs.",
+            "scene_id": "school-campus-v1",
+        }
+    )
+
+    gate_compiled = compile_autonomy_mission(gate_mission)
+    stair_compiled = compile_autonomy_mission(stair_mission)
+
+    assert [step.action for step in gate_compiled.contract.steps] == [
+        "takeoff",
+        "pass_gate",
+        "land",
+    ]
+    assert [step.action for step in stair_compiled.contract.steps] == [
+        "takeoff",
+        "traverse_stairs",
+        "land",
+    ]
+
+
+def test_school_map_narrow_intent_compiles_switchback_stair_route() -> None:
+    narrow_mission = mission().model_copy(
+        update={
+            "natural_language": "Descend the narrow switchback stairs and land outside.",
+            "scene_id": "school-campus-v1",
+        }
+    )
+    compiled = compile_autonomy_mission(narrow_mission)
+
+    assert [step.action for step in compiled.contract.steps] == [
+        "takeoff",
+        "traverse_stairs",
+        "land",
+    ]
+    assert [point.phase for point in compiled.trajectory].count("stairs") == len(
+        school_map_stair_route_points("descending")
+    )
+    assert compiled.trajectory[0].z == pytest.approx(8.15)
+    assert max(point.z for point in compiled.trajectory) == pytest.approx(8.27)
+    assert compiled.trajectory[-1].z == pytest.approx(1.4)
+    assert compiled.trajectory[-2].x == pytest.approx(TEACHING_OPEN_DOOR_PAIR_CENTER_X)
+    assert compiled.trajectory[-1].x == pytest.approx(TEACHING_OPEN_DOOR_PAIR_CENTER_X)
+
+
+def test_legacy_service_corridor_keeps_its_transit_contract() -> None:
+    corridor_mission = mission().model_copy(
+        update={
+            "natural_language": "Follow the narrow service corridor and dock.",
+            "scene_id": "service-corridor-dock",
+        }
+    )
+
+    compiled = compile_autonomy_mission(corridor_mission)
+
+    assert [step.action for step in compiled.contract.steps] == [
+        "takeoff",
+        "transit",
+        "land",
+    ]
+    assert all(point.phase != "stairs" for point in compiled.trajectory)
+
+
+def test_runtime_session_is_idempotent_owner_scoped_and_replay_safe() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    request = RuntimeSessionCreateRequest(
+        mission=mission(),
+        client_request_id="request-runtime-001",
+    )
+    created = registry.create("user-a", request)
+    repeated = registry.create("user-a", request)
+    assert repeated.session_id == created.session_id
+
+    active = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(1, 100, mission_progress=0.2),
+    )
+    assert active.phase == "navigating"
+    assert active.decision.action == "continue"
+    assert active.observation_count == 1
+    assert active.evidence_chain_head != created.evidence_chain_head
+
+    with pytest.raises(AutonomyRuntimeError, match="sequence") as replay:
+        registry.observe("user-a", created.session_id, observation(1, 120))
+    assert replay.value.code == "AUTONOMY_OBSERVATION_REPLAYED"
+
+    with pytest.raises(AutonomyRuntimeError) as hidden:
+        registry.get("user-b", created.session_id)
+    assert hidden.value.status_code == 404
+
+
+def test_operator_message_holds_immediately_before_interpretation_and_is_idempotent() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-interruption",
+        ),
+    )
+    active = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(1, 100, mission_progress=0.35),
+    )
+    request = RuntimeInterruptionRequest(
+        client_request_id="interrupt-request-001",
+        instruction="The destination changed. Go to the guard booth instead.",
+    )
+
+    held = registry.interrupt("user-a", created.session_id, request)
+    repeated = registry.interrupt("user-a", created.session_id, request)
+
+    assert repeated == held
+    assert held.phase == "holding"
+    assert held.decision.codes == ["operator.interruption-hold"]
+    assert held.task_graph.active_node_ids == []
+    assert held.task_graph.revision == active.task_graph.revision + 1
+    assert held.interruption is not None
+    assert held.interruption.state == "holding_pending_interpretation"
+    assert held.interruption.snapshot_position_m == Vector3(x=1.0, y=2.0, z=1.5)
+    assert held.interruption.expected_task_graph_revision == held.task_graph.revision
+    assert held.interruption.instruction_sha256 != request.instruction
+    assert request.instruction not in held.model_dump_json()
+
+    still_held = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(2, 200, mission_progress=0.5),
+    )
+    assert still_held.phase == "holding"
+    assert still_held.task_graph.revision == held.task_graph.revision
+    assert still_held.decision.codes == ["operator.interruption-pending"]
+
+    with pytest.raises(AutonomyRuntimeError) as pending:
+        registry.command(
+            "user-a",
+            created.session_id,
+            RuntimeOperatorCommand(action="resume", reason="Continue the held mission."),
+        )
+    assert pending.value.code == "AUTONOMY_RUNTIME_REPLAN_PENDING"
+
+
+def test_operator_message_cannot_cancel_a_safety_landing() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-safety-landing",
+        ),
+    )
+    landing_observation = observation(1, 100, mission_progress=0.45).model_copy(
+        update={"geofence_ok": False},
+    )
+    landing = registry.observe("user-a", created.session_id, landing_observation)
+    assert landing.phase == "landing"
+    assert landing.decision.action == "land"
+
+    with pytest.raises(AutonomyRuntimeError) as locked:
+        registry.interrupt(
+            "user-a",
+            created.session_id,
+            RuntimeInterruptionRequest(
+                client_request_id="interrupt-request-during-landing",
+                instruction="Change the destination while landing.",
+            ),
+        )
+
+    assert locked.value.code == "AUTONOMY_INTERRUPTION_LANDING_LOCKED"
+    still_landing = registry.get("user-a", created.session_id)
+    assert still_landing.phase == "landing"
+    assert still_landing.interruption is None
+
+
+def test_runtime_replan_rejects_stale_or_cross_scene_changes() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-stale-replan",
+        ),
+    )
+    registry.observe("user-a", created.session_id, observation(1, 100))
+    held = registry.interrupt(
+        "user-a",
+        created.session_id,
+        RuntimeInterruptionRequest(
+            client_request_id="interrupt-request-stale",
+            instruction="Change the route.",
+        ),
+    )
+    assert held.interruption is not None
+    revised = mission().model_copy(
+        update={"natural_language": "Fly to the alternate gate and land at the goal."}
+    )
+
+    with pytest.raises(AutonomyRuntimeError) as stale:
+        registry.apply_replan(
+            "user-a",
+            created.session_id,
+            RuntimeReplanApplyRequest(
+                interruption_id=held.interruption.interruption_id,
+                expected_task_graph_revision=held.task_graph.revision + 1,
+                client_request_id="runtime-replan-stale-001",
+                operator_confirmed=True,
+                mission=revised,
+            ),
+        )
+    assert stale.value.code == "AUTONOMY_REPLAN_STALE_REVISION"
+
+    with pytest.raises(AutonomyRuntimeError) as scene_changed:
+        registry.apply_replan(
+            "user-a",
+            created.session_id,
+            RuntimeReplanApplyRequest(
+                interruption_id=held.interruption.interruption_id,
+                expected_task_graph_revision=held.task_graph.revision,
+                client_request_id="runtime-replan-scene-001",
+                operator_confirmed=True,
+                mission=revised.model_copy(update={"scene_id": "service-corridor-dock"}),
+            ),
+        )
+    assert scene_changed.value.code == "AUTONOMY_REPLAN_SCENE_CHANGED"
+
+
+def test_runtime_replan_atomically_replaces_the_held_graph() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-valid-replan",
+        ),
+    )
+    registry.observe("user-a", created.session_id, observation(1, 100))
+    held = registry.interrupt(
+        "user-a",
+        created.session_id,
+        RuntimeInterruptionRequest(
+            client_request_id="interrupt-request-valid",
+            instruction="Use the alternate gate and then land.",
+        ),
+    )
+    assert held.interruption is not None
+    request = RuntimeReplanApplyRequest(
+        interruption_id=held.interruption.interruption_id,
+        expected_task_graph_revision=held.task_graph.revision,
+        client_request_id="runtime-replan-valid-001",
+        operator_confirmed=True,
+        mission=mission().model_copy(
+            update={"natural_language": "Fly to the alternate gate and land at the goal."}
+        ),
+    )
+
+    replanned = registry.apply_replan("user-a", created.session_id, request)
+    repeated = registry.apply_replan("user-a", created.session_id, request)
+
+    assert repeated == replanned
+    assert replanned.contract_id != held.contract_id
+    assert replanned.phase == "replanning"
+    assert replanned.mission_revision == 2
+    assert replanned.task_graph.revision == held.task_graph.revision + 1
+    assert len(replanned.task_graph.active_node_ids) == 1
+    assert "takeoff" not in replanned.task_graph.active_node_ids[0]
+    assert not replanned.task_graph.active_node_ids[0].startswith("preflight-")
+    assert all(
+        node.status == "completed"
+        for node in replanned.task_graph.nodes
+        if node.task_id.startswith("preflight-") or "-takeoff-" in node.task_id
+    )
+    assert replanned.decision.codes == ["operator.replan-applied"]
+    assert replanned.interruption is not None
+    assert replanned.interruption.state == "applied"
+    assert replanned.interruption.interruption_id == held.interruption.interruption_id
+    assert replanned.decision_events[-1].code == "operator.replan-applied"
+
+
+def test_safety_supervisor_escalates_and_terminal_sessions_stop() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-002",
+        ),
+    )
+    held = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(1, 100, perception_age_ms=900),
+    )
+    assert held.phase == "holding"
+    assert held.decision.action == "hold"
+    assert "safety.perception-stale" in held.decision.codes
+
+    aborted = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(2, 200, emergency_stop=True),
+    )
+    assert aborted.phase == "aborted"
+    assert aborted.terminal is True
+    assert aborted.decision.action == "abort"
+
+    with pytest.raises(AutonomyRuntimeError) as terminal:
+        registry.observe("user-a", created.session_id, observation(3, 300))
+    assert terminal.value.code == "AUTONOMY_RUNTIME_TERMINAL"
+
+
+def test_thermal_stream_loss_holds_the_mission() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-thermal",
+        ),
+    )
+
+    held = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(
+            1,
+            100,
+            stream_health=[
+                {
+                    "stream_id": "thermal-front",
+                    "kind": "thermal",
+                    "status": "offline",
+                    "rate_hz": 0.0,
+                    "latency_ms": 0.0,
+                    "dropped_percent": 100.0,
+                    "source": "onboard",
+                }
+            ],
+        ),
+    )
+
+    assert held.phase == "holding"
+    assert held.decision.action == "hold"
+    assert "safety.perception-stream-offline" in held.decision.codes
+
+
+def test_non_simulation_session_creation_remains_denied() -> None:
+    registry = RuntimeSessionRegistry()
+    with pytest.raises(AutonomyRuntimeError) as denied:
+        registry.create(
+            "user-a",
+            RuntimeSessionCreateRequest(
+                mission=mission("hardware"),
+                client_request_id="request-runtime-003",
+            ),
+        )
+    assert denied.value.code == "AUTONOMY_RUNTIME_NOT_AUTHORIZED"
+    assert denied.value.status_code == 403
+
+
+def test_dynamic_person_inserts_a_bounded_recovery_branch() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-person",
+        ),
+    )
+    held = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(
+            1,
+            100,
+            perceived_entities=[
+                {
+                    "track_id": "person-17",
+                    "kind": "person",
+                    "position_m": {"x": 1.5, "y": 2.0, "z": 1.5},
+                    "velocity_mps": {"x": 0.2, "y": 0.0, "z": 0.0},
+                    "confidence": 0.96,
+                    "age_ms": 40,
+                    "safety_radius_m": 0.8,
+                    "source_stream": "front-depth",
+                }
+            ],
+            stream_health=[
+                {
+                    "stream_id": "front-depth",
+                    "kind": "depth",
+                    "status": "healthy",
+                    "rate_hz": 30.0,
+                    "latency_ms": 45.0,
+                    "dropped_percent": 0.1,
+                    "source": "onboard",
+                }
+            ],
+        ),
+    )
+
+    assert held.phase == "holding"
+    assert "safety.person-envelope" in held.decision.codes
+    assert held.perceived_entities[0].track_id == "person-17"
+    runtime_nodes = [node for node in held.task_graph.nodes if node.inserted_by == "runtime"]
+    assert {node.executor for node in runtime_nodes} == {
+        "mission_executive",
+        "local_planner",
+    }
+    assert any(node.status == "active" for node in runtime_nodes)
+    assert held.decision_events[-1].entity_ids == ["person-17"]
+
+    repaired = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(2, 200, mission_progress=0.25, local_replan_active=True),
+    )
+    assert repaired.phase == "replanning"
+    assert repaired.decision.action == "continue"
+    assert all(
+        node.status == "completed"
+        for node in repaired.task_graph.nodes
+        if node.inserted_by == "runtime"
+    )
+
+
+def test_runtime_graph_and_decision_log_remain_bounded_and_monotonic() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-bounds",
+        ),
+    )
+    entities = [
+        {
+            "track_id": f"person-{index:03d}",
+            "kind": "person",
+            "position_m": {"x": 20.0 + index, "y": 2.0, "z": 1.5},
+            "velocity_mps": {"x": 0.0, "y": 0.0, "z": 0.0},
+            "confidence": 0.9,
+            "age_ms": 20,
+            "safety_radius_m": 0.8,
+            "source_stream": "front-depth",
+        }
+        for index in range(80)
+    ]
+    bounded = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(1, 100, perceived_entities=entities),
+    )
+    assert len(bounded.task_graph.nodes) <= 128
+
+    current = bounded
+    for sequence in range(2, 108):
+        current = registry.observe(
+            "user-a",
+            created.session_id,
+            observation(sequence, sequence * 100, perceived_entities=[]),
+        )
+    revisions = [event.revision for event in current.decision_events]
+    assert len(revisions) == 100
+    assert revisions == sorted(set(revisions))
+    assert revisions[-1] == 108

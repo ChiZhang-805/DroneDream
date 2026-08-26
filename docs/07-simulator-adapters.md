@@ -36,13 +36,6 @@ DroneDream uses a pluggable simulator interface in `backend/app/simulator/`.
 
 - Real adapter requires environment bootstrapping and external dependencies.
 - Static obstacle injection has a verified bundled implementation in source.
-- Constant horizontal wind for the bundled `x500` family has a verified source
-  implementation: a Trial-local world/model overlay enables link wind,
-  publishes the compiled vector, and retains exact `wind_info` plus expanded
-  runtime-SDF read-back evidence. The dedicated WSL Runtime smoke passed against
-  pinned PX4 commit `6ea3539157ca358c70a515878b77077af7d4611d` and Gazebo
-  8.14.0; it is not a released customer capability until the rebuilt,
-  installer-delivered Runtime passes the same gate.
-- Gust/turbulence, sensor degradation, GPS dropout, battery, payload, and
-  actuator effects remain explicit Runtime extensions until their application
-  and read-back evidence are implemented and pass that gate.
+- Wind, sensor degradation, GPS dropout, battery, payload, and actuator effects
+  remain explicit Runtime extensions until their application and read-back
+  evidence are implemented and pass the Runtime smoke gate.

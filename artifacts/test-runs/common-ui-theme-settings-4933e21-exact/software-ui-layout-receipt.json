@@ -1,0 +1,756 @@
+{
+  "schema_version": 1,
+  "subject_commit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+  "subject_dirty": false,
+  "branch": "codex/software",
+  "browser": "Microsoft Edge (Playwright msedge channel)",
+  "api_mode": "offline 503 fixture; no API key, backend write, or user photo",
+  "generated_at": "2026-08-06T16:45:49.788Z",
+  "cases": [
+    {
+      "case": {
+        "id": "desktop-en",
+        "locale": "en",
+        "edition": "universal",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 935.140625,
+          "right": 1109.21875,
+          "top": 406.234375,
+          "bottom": 444.21875,
+          "width": 174.078125
+        },
+        "refresh": {
+          "left": 986.375,
+          "right": 1109.21875,
+          "top": 583.140625,
+          "bottom": 615.515625,
+          "width": 122.84375
+        },
+        "period": {
+          "left": 330.78125,
+          "right": 974.375,
+          "top": 590.203125,
+          "bottom": 608.4375,
+          "width": 643.59375
+        },
+        "footer": {
+          "left": 330.78125,
+          "right": 1109.21875,
+          "top": 583.140625,
+          "bottom": 615.515625,
+          "width": 778.4375
+        },
+        "usage": {
+          "left": 315.390625,
+          "right": 1124.609375,
+          "top": 356.421875,
+          "bottom": 673.921875,
+          "width": 809.21875
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "managedModelOptions": 3,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(247, 242, 255)",
+        "mutedColor": "rgb(214, 183, 234)",
+        "accessModeColor": "rgb(247, 242, 255)",
+        "headingColor": "rgb(30, 23, 33)",
+        "themeBinding": {
+          "edition": "universal",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#FF5574",
+            "#6A4CFF",
+            "#E657D1"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 0
+        },
+        "settingsViewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/desktop-en-assistant-models.png",
+          "sha256": "0a791fe859d00ef5b4a576ecf58210f561d73580317b0b5b440ba80020edc921"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/desktop-en-settings.png",
+          "sha256": "e1269a83ee9c193e1ef58cefe840cc39c2b4c3dd7748c6971cb57ccd84af5f6c"
+        }
+      },
+      "scope": "settings-only",
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "desktop-zh",
+        "locale": "zh-CN",
+        "edition": "sim",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 1022.421875,
+          "right": 1109.21875,
+          "top": 406.234375,
+          "bottom": 444.21875,
+          "width": 86.796875
+        },
+        "refresh": {
+          "left": 1022.421875,
+          "right": 1109.21875,
+          "top": 583.140625,
+          "bottom": 618.515625,
+          "width": 86.796875
+        },
+        "period": {
+          "left": 330.78125,
+          "right": 1010.421875,
+          "top": 591.703125,
+          "bottom": 609.9375,
+          "width": 679.640625
+        },
+        "footer": {
+          "left": 330.78125,
+          "right": 1109.21875,
+          "top": 583.140625,
+          "bottom": 618.515625,
+          "width": 778.4375
+        },
+        "usage": {
+          "left": 315.390625,
+          "right": 1124.609375,
+          "top": 356.421875,
+          "bottom": 660.6875,
+          "width": 809.21875
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "managedModelOptions": 3,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(247, 242, 255)",
+        "mutedColor": "rgb(214, 183, 234)",
+        "accessModeColor": "rgb(247, 242, 255)",
+        "headingColor": "rgb(30, 23, 33)",
+        "themeBinding": {
+          "edition": "sim",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#00D9FF",
+            "#2671FF",
+            "#744CFF"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 0
+        },
+        "settingsViewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/desktop-zh-assistant-models.png",
+          "sha256": "d2d9677496ab187c367fc66922ae608ed8c06cf5bbdd43c1dc38992a5394ed1f"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/desktop-zh-settings.png",
+          "sha256": "76bee1ae4d45bb05f383fc7561bc69d8c5fa5923d8b2931b3bb3341b544dd959"
+        }
+      },
+      "scope": "settings-only",
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "tablet-en",
+        "locale": "en",
+        "edition": "lab",
+        "viewport": {
+          "width": 760,
+          "height": 900
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 551.140625,
+          "right": 725.21875,
+          "top": 406.234375,
+          "bottom": 444.21875,
+          "width": 174.078125
+        },
+        "refresh": {
+          "left": 602.375,
+          "right": 725.21875,
+          "top": 583.140625,
+          "bottom": 615.515625,
+          "width": 122.84375
+        },
+        "period": {
+          "left": 50.78125,
+          "right": 590.375,
+          "top": 590.203125,
+          "bottom": 608.4375,
+          "width": 539.59375
+        },
+        "footer": {
+          "left": 50.78125,
+          "right": 725.21875,
+          "top": 583.140625,
+          "bottom": 615.515625,
+          "width": 674.4375
+        },
+        "usage": {
+          "left": 35.390625,
+          "right": 740.609375,
+          "top": 356.421875,
+          "bottom": 673.921875,
+          "width": 705.21875
+        },
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "managedModelOptions": 3,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(247, 242, 255)",
+        "mutedColor": "rgb(214, 183, 234)",
+        "accessModeColor": "rgb(247, 242, 255)",
+        "headingColor": "rgb(30, 23, 33)",
+        "themeBinding": {
+          "edition": "lab",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#A7E84A",
+            "#20C77A",
+            "#087E69"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 0
+        },
+        "settingsViewport": {
+          "width": 760,
+          "height": 900
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/tablet-en-assistant-models.png",
+          "sha256": "f838415f087152eb61e780e319dcdac94c7b04d785c22590c1e00ffa15b02c95"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/tablet-en-settings.png",
+          "sha256": "f1c81e68e3dd62e3baf276958c03ad00a749b87672cda980fe6b50b75b8be6cb"
+        }
+      },
+      "scope": "settings-only",
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "tablet-zh",
+        "locale": "zh-CN",
+        "edition": "field",
+        "viewport": {
+          "width": 760,
+          "height": 900
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 638.421875,
+          "right": 725.21875,
+          "top": 406.234375,
+          "bottom": 444.21875,
+          "width": 86.796875
+        },
+        "refresh": {
+          "left": 638.421875,
+          "right": 725.21875,
+          "top": 583.140625,
+          "bottom": 618.515625,
+          "width": 86.796875
+        },
+        "period": {
+          "left": 50.78125,
+          "right": 626.421875,
+          "top": 591.703125,
+          "bottom": 609.9375,
+          "width": 575.640625
+        },
+        "footer": {
+          "left": 50.78125,
+          "right": 725.21875,
+          "top": 583.140625,
+          "bottom": 618.515625,
+          "width": 674.4375
+        },
+        "usage": {
+          "left": 35.390625,
+          "right": 740.609375,
+          "top": 356.421875,
+          "bottom": 660.6875,
+          "width": 705.21875
+        },
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "managedModelOptions": 3,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(247, 242, 255)",
+        "mutedColor": "rgb(214, 183, 234)",
+        "accessModeColor": "rgb(247, 242, 255)",
+        "headingColor": "rgb(30, 23, 33)",
+        "themeBinding": {
+          "edition": "field",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#FFC247",
+            "#FF754B",
+            "#D746A5"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 0
+        },
+        "settingsViewport": {
+          "width": 760,
+          "height": 900
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 648,
+            "dialogScrollHeight": 648,
+            "dialogTop": 125,
+            "dialogBottom": 775,
+            "panelClientHeight": 522,
+            "panelScrollHeight": 522,
+            "panelTop": 237.171875,
+            "panelBottom": 759.609375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/tablet-zh-assistant-models.png",
+          "sha256": "ca9b53e168d3d935e6e6954c63eae7f49ecf122693efc1db1cfca06522847397"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/tablet-zh-settings.png",
+          "sha256": "310261fbb2077dd546728a2bd0acfd300d5c901e06f83327e61ef220e5c37a02"
+        }
+      },
+      "scope": "settings-only",
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "mobile-en",
+        "locale": "en",
+        "edition": "universal",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 172.5,
+          "right": 346.578125,
+          "top": 308.71875,
+          "bottom": 346.703125,
+          "width": 174.078125
+        },
+        "refresh": {
+          "left": 223.734375,
+          "right": 346.578125,
+          "top": 532.8125,
+          "bottom": 565.1875,
+          "width": 122.84375
+        },
+        "period": {
+          "left": 43.421875,
+          "right": 211.734375,
+          "top": 539.875,
+          "bottom": 558.109375,
+          "width": 168.3125
+        },
+        "footer": {
+          "left": 43.421875,
+          "right": 346.578125,
+          "top": 532.8125,
+          "bottom": 565.1875,
+          "width": 303.15625
+        },
+        "usage": {
+          "left": 32.515625,
+          "right": 357.484375,
+          "top": 266.578125,
+          "bottom": 636.640625,
+          "width": 324.96875
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "managedModelOptions": 3,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(247, 242, 255)",
+        "mutedColor": "rgb(214, 183, 234)",
+        "accessModeColor": "rgb(247, 242, 255)",
+        "headingColor": "rgb(30, 23, 33)",
+        "themeBinding": {
+          "edition": "universal",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#FF5574",
+            "#6A4CFF",
+            "#E657D1"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 800
+        },
+        "settingsViewport": {
+          "width": 390,
+          "height": 700
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 540,
+            "panelScrollHeight": 540,
+            "panelTop": 127.296875,
+            "panelBottom": 667.484375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 540,
+            "panelScrollHeight": 540,
+            "panelTop": 127.296875,
+            "panelBottom": 667.484375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 540,
+            "panelScrollHeight": 540,
+            "panelTop": 127.296875,
+            "panelBottom": 667.484375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/mobile-en-assistant-models.png",
+          "sha256": "6873fe3f07e45405ad7f2bcec8477e3201cab1bf120404785a881e378c0db625"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/mobile-en-settings.png",
+          "sha256": "6d5ffc19798c734a5b2f1c2f5ecb112c301a5d3961a9580e1e3277f64b505b3b"
+        }
+      },
+      "scope": "settings-only",
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "mobile-zh",
+        "locale": "zh-CN",
+        "edition": "field",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      "settings": {
+        "manage": {
+          "left": 259.78125,
+          "right": 346.578125,
+          "top": 314.71875,
+          "bottom": 352.703125,
+          "width": 86.796875
+        },
+        "refresh": {
+          "left": 259.78125,
+          "right": 346.578125,
+          "top": 538.8125,
+          "bottom": 574.1875,
+          "width": 86.796875
+        },
+        "period": {
+          "left": 43.421875,
+          "right": 247.78125,
+          "top": 547.375,
+          "bottom": 565.609375,
+          "width": 204.359375
+        },
+        "footer": {
+          "left": 43.421875,
+          "right": 346.578125,
+          "top": 538.8125,
+          "bottom": 574.1875,
+          "width": 303.15625
+        },
+        "usage": {
+          "left": 32.515625,
+          "right": 357.484375,
+          "top": 272.578125,
+          "bottom": 632.34375,
+          "width": 324.96875
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "managedModelOptions": 3,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(247, 242, 255)",
+        "mutedColor": "rgb(214, 183, 234)",
+        "accessModeColor": "rgb(247, 242, 255)",
+        "headingColor": "rgb(30, 23, 33)",
+        "themeBinding": {
+          "edition": "field",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#FFC247",
+            "#FF754B",
+            "#D746A5"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 800
+        },
+        "settingsViewport": {
+          "width": 390,
+          "height": 700
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 540,
+            "panelScrollHeight": 540,
+            "panelTop": 127.296875,
+            "panelBottom": 667.484375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 540,
+            "panelScrollHeight": 540,
+            "panelTop": 127.296875,
+            "panelBottom": 667.484375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 540,
+            "panelScrollHeight": 540,
+            "panelTop": 127.296875,
+            "panelBottom": 667.484375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/mobile-zh-assistant-models.png",
+          "sha256": "afbbf27eaa76ffd02a03e22ab0dfde8e78f460368ca3f9364a4d411e6ad01102"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/mobile-zh-settings.png",
+          "sha256": "e5a306dcab823c8ee6f08be135d12dffa2e6d5500e9db96a9c542098c34f3f74"
+        }
+      },
+      "scope": "settings-only",
+      "pageErrors": [],
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

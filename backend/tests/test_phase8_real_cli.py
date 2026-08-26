@@ -8,10 +8,15 @@ import logging
 import sys
 import threading
 import time
+from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from app.orchestration.attempt_evidence import TrialAcceptedAttemptEvidenceV1
+from app.orchestration.qualification_receipts import compile_qualification_trial_evidence
+from app.simulator import real_cli as real_cli_module
 from app.simulator.artifact_schema import (
     _MAX_REFERENCE_POINTS,
     _MAX_TELEMETRY_SAMPLES,
@@ -23,13 +28,16 @@ from app.simulator.base import (
     FAILURE_CANCELLED,
     FAILURE_EXECUTION_TIMEOUT,
     FAILURE_INVALID_RESULT,
+    FAILURE_SIM_ERROR,
     FAILURE_UNVERIFIED_REPORT,
     ArtifactMetadata,
     JobConfig,
     TrialContext,
     TrialMetricsPayload,
 )
+from app.simulator.bounded_log_capture import receipt_path_for
 from app.simulator.px4_metric_evidence import (
+    Px4CoreMetricEvidenceV1,
     compile_px4_core_metric_evidence,
     compile_px4_evaluation_window_evidence,
     compile_px4_outcome_evidence,
@@ -40,12 +48,15 @@ from app.simulator.real_cli import (
     _MAX_RESULT_ARTIFACTS,
     _MAX_RESULT_BYTES,
     RealCliSimulatorAdapter,
+    _active_engine_pack_path,
     _build_command,
+    _build_simulator_environment,
     _effective_timeout_seconds,
     _load_result_payload,
     _parse_artifacts,
     _parse_metrics,
     _read_log_tail,
+    _run_directory,
     _sanitize_artifacts_for_trial,
     _trial_input_payload,
 )
@@ -93,6 +104,62 @@ def _valid_result(**overrides: object) -> dict[str, object]:
     }
     payload.update(overrides)
     return payload
+
+
+def test_real_px4_metric_can_form_a_passing_qualification_receipt(tmp_path: Path) -> None:
+    _raw, metrics, _artifacts, _telemetry = _px4_metric_evidence(tmp_path)
+    metric_snapshot = asdict(metrics)
+    artifact_evidence = {
+        "schema_id": "dronedream.trial-artifact-evidence/v1",
+        "trial_id": "trial-1",
+        "artifact_count": 1,
+        "sealed_artifact_count": 1,
+        "metadata_only_artifact_count": 0,
+        "artifacts": [{"artifact_id": "artifact-1", "content_sha256": "a" * 64}],
+    }
+
+    def sha256_id(value: object) -> str:
+        canonical = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        return "sha256:" + hashlib.sha256(canonical).hexdigest()
+
+    accepted = TrialAcceptedAttemptEvidenceV1(
+        trial_id="trial-1",
+        attempt_id="attempt-1",
+        attempt_count=1,
+        claim_evidence_id="sha256:" + "1" * 64,
+        outcome_evidence_id="sha256:" + "2" * 64,
+        terminal_status="COMPLETED",
+        outcome_class="success",
+        metric_sha256=sha256_id(metric_snapshot),
+        artifact_evidence_sha256=sha256_id(artifact_evidence),
+    )
+
+    receipt = compile_qualification_trial_evidence(
+        qualification_id="qlf-1",
+        trial_id="trial-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        holdout_contract_sha256="f" * 64,
+        phase="qualification",
+        ordinal=1,
+        accepted_attempt=accepted,
+        artifact_evidence=artifact_evidence,
+        metric_snapshot=metric_snapshot,
+        failure_code=None,
+        finalized_at=datetime(2026, 8, 4, tzinfo=timezone.utc),
+    )
+
+    assert receipt.terminal_status == "COMPLETED"
+    assert receipt.passed is True
+    assert receipt.evidence_complete is True
+    assert receipt.effect_readback_complete is True
+    assert receipt.safety_critical_failure is False
 
 
 def _write_result_simulator(script: Path, result: dict[str, object], *, exit_code: int = 0) -> None:
@@ -709,12 +776,209 @@ def test_real_cli_quarantines_structured_failure_claim(monkeypatch, tmp_path):
     assert "injected simulation_failed" in result.failure.reason
 
 
+def test_real_cli_admits_verified_actuator_link_stall_as_infrastructure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    simulator = tmp_path / "verified_link_stall.py"
+    simulator.write_text(
+        """
+import hashlib, json, pathlib, sys
+input_path = pathlib.Path(sys.argv[sys.argv.index('--input') + 1])
+output_path = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])
+payload = json.loads(input_path.read_text(encoding='utf-8'))
+identity = payload['execution_identity']
+ulog = output_path.parent / 'px4_source.ulg'
+ulog.write_bytes(b'verified-physical-log')
+ulog_sha = hashlib.sha256(ulog.read_bytes()).hexdigest()
+first_ulog = output_path.parent / 'actuator_link_transient_attempt_1.ulg'
+first_ulog.write_bytes(b'first-attempt-verified-physical-log')
+first_ulog_sha = hashlib.sha256(first_ulog.read_bytes()).hexdigest()
+health = {
+  'schema_id': 'dronedream.px4-actuator-link-health/v1',
+  'diagnostic_failure_code': 'SIMULATOR_ACTUATOR_LINK_STALLED',
+  'execution_identity': identity,
+  'ulog_sha256': ulog_sha,
+  'eligibility': {
+    'eligible': True, 'reasons': [], 'vehicle': 'x500',
+    'selected_px4_parameters': [], 'unexpected_px4_parameters': [],
+    'scenario_effect_ids': [], 'disqualifying_effect_ids': [],
+  },
+  'thresholds': {}, 'observations': {}, 'missing_series': [],
+  'stall_verified': True,
+}
+(output_path.parent / 'actuator_link_health.json').write_text(
+  json.dumps(health), encoding='utf-8')
+first_health = {**health, 'ulog_sha256': first_ulog_sha}
+first_health_path = output_path.parent / 'actuator_link_transient_attempt_1.health.json'
+first_health_path.write_text(json.dumps(first_health), encoding='utf-8')
+retry = {
+  'schema_id': 'dronedream.simulator-transient-retry/v1',
+  'execution_identity': identity,
+  'diagnostic_failure_code': 'SIMULATOR_ACTUATOR_LINK_STALLED',
+  'maximum_launcher_attempts': 2,
+  'retry_index': 1,
+  'first_attempt_health_ulog_sha256': first_ulog_sha,
+  'preserved_files': [
+    {'path': first_ulog.name, 'bytes': first_ulog.stat().st_size,
+     'sha256': first_ulog_sha},
+    {'path': first_health_path.name, 'bytes': first_health_path.stat().st_size,
+     'sha256': hashlib.sha256(first_health_path.read_bytes()).hexdigest()},
+  ],
+}
+(output_path.parent / 'actuator_link_transient_retry.json').write_text(
+  json.dumps(retry), encoding='utf-8')
+result = {
+  'schema_version': 'dronedream.trial_result.v2',
+  'execution_identity': identity,
+  'success': False,
+  'failure': {
+    'code': 'SIMULATOR_ACTUATOR_LINK_STALLED',
+    'reason': 'producer claim is admitted only with validated evidence',
+  },
+  'artifacts': [
+    {'artifact_type': 'px4_ulog', 'storage_path': str(ulog)},
+    {'artifact_type': 'actuator_link_health_json',
+     'storage_path': str(output_path.parent / 'actuator_link_health.json')},
+    {'artifact_type': 'sim_transient_px4_ulog',
+     'storage_path': str(first_ulog)},
+    {'artifact_type': 'sim_transient_health_json',
+     'storage_path': str(first_health_path)},
+    {'artifact_type': 'sim_transient_retry_json',
+     'storage_path': str(output_path.parent / 'actuator_link_transient_retry.json')},
+  ],
+}
+output_path.write_text(json.dumps(result), encoding='utf-8')
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{simulator}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path / "runs"))
+
+    def compile_fixture_evidence(*, ulog_path, execution_identity, eligibility):
+        health_name = (
+            "actuator_link_transient_attempt_1.health.json"
+            if Path(ulog_path).name == "actuator_link_transient_attempt_1.ulg"
+            else "actuator_link_health.json"
+        )
+        payload = json.loads((Path(ulog_path).parent / health_name).read_text(encoding="utf-8"))
+        assert payload["execution_identity"] == execution_identity
+        assert payload["eligibility"] == eligibility
+        return payload
+
+    monkeypatch.setattr(
+        real_cli_module,
+        "compile_actuator_link_health_evidence",
+        compile_fixture_evidence,
+    )
+
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+
+    assert result.success is False
+    assert result.failure is not None
+    assert result.failure.code == FAILURE_SIM_ERROR
+    assert "one allowed fresh launcher retry" in result.failure.reason
+    assert {artifact.artifact_type for artifact in result.artifacts} == {
+        "px4_ulog",
+        "actuator_link_health_json",
+        "sim_transient_px4_ulog",
+        "sim_transient_health_json",
+        "sim_transient_retry_json",
+    }
+
+
+def test_real_cli_rejects_retry_receipt_with_mismatched_first_ulog_digest(
+    tmp_path: Path,
+) -> None:
+    ctx = _ctx()
+    identity = {
+        "trial_id": ctx.trial_id,
+        "job_id": ctx.job_id,
+        "candidate_id": ctx.candidate_id,
+        "seed": ctx.seed,
+        "attempt_count": ctx.attempt_count,
+    }
+    current_ulog = tmp_path / "px4_source.ulg"
+    first_ulog = tmp_path / "actuator_link_transient_attempt_1.ulg"
+    current_ulog.write_bytes(b"current")
+    first_ulog.write_bytes(b"first")
+    current_sha = hashlib.sha256(current_ulog.read_bytes()).hexdigest()
+    first_sha = hashlib.sha256(first_ulog.read_bytes()).hexdigest()
+
+    def write_health(path: Path, ulog_sha256: str) -> None:
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_id": "dronedream.px4-actuator-link-health/v1",
+                    "diagnostic_failure_code": "SIMULATOR_ACTUATOR_LINK_STALLED",
+                    "execution_identity": identity,
+                    "ulog_sha256": ulog_sha256,
+                    "eligibility": {"eligible": True, "reasons": []},
+                    "thresholds": {},
+                    "observations": {},
+                    "missing_series": [],
+                    "stall_verified": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    current_health = tmp_path / "actuator_link_health.json"
+    first_health = tmp_path / "actuator_link_transient_attempt_1.health.json"
+    write_health(current_health, current_sha)
+    write_health(first_health, first_sha)
+    retry = tmp_path / "actuator_link_transient_retry.json"
+    retry.write_text(
+        json.dumps(
+            {
+                "schema_id": "dronedream.simulator-transient-retry/v1",
+                "execution_identity": identity,
+                "diagnostic_failure_code": "SIMULATOR_ACTUATOR_LINK_STALLED",
+                "maximum_launcher_attempts": 2,
+                "retry_index": 1,
+                "first_attempt_health_ulog_sha256": "0" * 64,
+                "preserved_files": [
+                    {
+                        "path": first_ulog.name,
+                        "bytes": first_ulog.stat().st_size,
+                        "sha256": first_sha,
+                    },
+                    {
+                        "path": first_health.name,
+                        "bytes": first_health.stat().st_size,
+                        "sha256": hashlib.sha256(first_health.read_bytes()).hexdigest(),
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    artifacts = [
+        ArtifactMetadata("px4_ulog", "Current ULog", str(current_ulog)),
+        ArtifactMetadata(
+            "actuator_link_health_json", "Current health", str(current_health)
+        ),
+        ArtifactMetadata("sim_transient_px4_ulog", "First ULog", str(first_ulog)),
+        ArtifactMetadata(
+            "sim_transient_health_json", "First health", str(first_health)
+        ),
+        ArtifactMetadata("sim_transient_retry_json", "Retry", str(retry)),
+    ]
+
+    assert not real_cli_module._has_verified_actuator_link_stall(
+        claimed_code="SIMULATOR_ACTUATOR_LINK_STALLED",
+        artifacts=artifacts,
+        ctx=ctx,
+    )
+
+
 @pytest.mark.parametrize(
     "claimed_code",
     [
         "TIMEOUT",
         "ADAPTER_UNAVAILABLE",
         "UNSTABLE_CANDIDATE",
+        "SIMULATOR_ACTUATOR_LINK_STALLED",
         "SOME_NEW_DOMAIN_FAILURE",
     ],
 )
@@ -860,6 +1124,61 @@ out.write_text(json.dumps({{
     assert "validation limit" in caplog.text
 
 
+def test_real_cli_drops_malformed_log_capture_receipt(monkeypatch, tmp_path, caplog):
+    fake = tmp_path / "fake_sim_bad_log_receipt.py"
+    fake.write_text(
+        """
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])
+receipt = out.parent / 'stdout.log.capture.json'
+receipt.write_text(json.dumps({
+    'schema_version': 'dronedream.log_capture_receipt.v1',
+    'stream': 'simulator_stdout',
+    'captured_file_name': 'stdout.log',
+    'cap_bytes': 16,
+    'raw_observed_bytes': 4,
+    'normalized_observed_bytes': 4,
+    'retained_bytes': 4,
+    'dropped_bytes_due_to_cap': 0,
+    'ansi_sequence_count': 0,
+    'ansi_control_bytes_removed': 0,
+    'prompt_redraws_collapsed': 0,
+    'utf8_replacement_count': 0,
+    'truncated': True,
+    'truncation_reason': None,
+    'observation_complete': True,
+    'observation_error': None,
+    'prior_observation_exact': True,
+    'incomplete_ansi_sequence': False,
+    'critical_lines': [],
+    'retained_sha256': '0' * 64,
+}))
+out.write_text(json.dumps({
+    'success': True,
+    'metrics': {
+        'rmse': 1.0, 'max_error': 1.0, 'overshoot_count': 0,
+        'completion_time': 1.0, 'score': 1.0,
+    },
+    'artifacts': [{
+        'artifact_type': 'log_capture_receipt_json',
+        'storage_path': str(receipt),
+        'mime_type': 'application/json',
+    }],
+}))
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{fake}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+
+    with caplog.at_level(logging.WARNING, logger="drone_dream.simulator.real_cli"):
+        result = RealCliSimulatorAdapter().run_trial(_ctx())
+
+    assert result.success is True
+    assert result.artifacts == []
+    assert "truncated must match" in caplog.text
+
+
 def test_real_cli_drops_cross_trial_artifact_inside_allowed_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -906,6 +1225,54 @@ def test_build_command_substitutes_paths_after_tokenization() -> None:
     assert argv[1].startswith("--literal={")
     assert argv[2] == f"--input={Path('C:/workspace with spaces/input.json')}"
     assert argv[-2:] == ["--output", str(Path("C:/workspace with spaces/output.json"))]
+
+
+def test_build_command_retargets_legacy_runtime_source_to_active_engine_pack() -> None:
+    argv = _build_command(
+        "/opt/dronedream/venv/bin/python "
+        "/opt/dronedream/source/scripts/simulators/px4_gazebo_runner.py",
+        Path("/tmp/input.json"),
+        Path("/tmp/output.json"),
+    )
+
+    assert argv[1] == (
+        "/opt/dronedream/engine/current/scripts/simulators/px4_gazebo_runner.py"
+    )
+    assert "/opt/dronedream/source" not in " ".join(argv)
+
+
+def test_simulator_child_environment_retargets_only_pack_owned_paths() -> None:
+    child = _build_simulator_environment(
+        {
+            "PX4_GAZEBO_WORKDIR": "/opt/dronedream/source",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                "/opt/dronedream/venv/bin/python "
+                "/opt/dronedream/source/scripts/simulators/local_px4_launch_wrapper.py"
+            ),
+            "PX4_OFFBOARD_EXECUTOR_COMMAND": (
+                "/opt/dronedream/venv/bin/python "
+                "/opt/dronedream/source/scripts/simulators/px4_offboard_track_executor.py"
+            ),
+            "PX4_CUSTOM_FIXTURE_PATH": "/opt/dronedream/source/user-controlled",
+            "OPENAI_API_KEY": "must-not-cross-the-process-boundary",
+        }
+    )
+
+    assert child["PX4_GAZEBO_WORKDIR"] == "/opt/dronedream/engine/current"
+    assert "/opt/dronedream/engine/current/scripts/simulators" in child[
+        "PX4_GAZEBO_LAUNCH_COMMAND"
+    ]
+    assert "/opt/dronedream/engine/current/scripts/simulators" in child[
+        "PX4_OFFBOARD_EXECUTOR_COMMAND"
+    ]
+    assert child["PX4_CUSTOM_FIXTURE_PATH"] == "/opt/dronedream/source/user-controlled"
+    assert "OPENAI_API_KEY" not in child
+
+
+def test_active_engine_pack_path_does_not_rewrite_similar_prefixes() -> None:
+    assert _active_engine_pack_path("/opt/dronedream/source-backup/script.py") == (
+        "/opt/dronedream/source-backup/script.py"
+    )
 
 
 def test_real_cli_timeout_scales_for_slow_simulation_with_bounded_multiplier() -> None:
@@ -1214,6 +1581,25 @@ def test_px4_metric_evidence_rejects_offboard_timing_mutation(
         )
 
 
+def test_px4_metric_evidence_does_not_mix_executor_and_telemetry_clocks(
+    tmp_path: Path,
+) -> None:
+    _raw, metrics, _artifacts, _ = _px4_metric_evidence(
+        tmp_path,
+        offboard_timing_payload={
+            "track_start_t": 0.1,
+            "track_end_t": 0.2,
+            "time_base": "executor_relative_seconds",
+        },
+    )
+    evidence = metrics.raw_metric_json["evaluation_window_evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["source"] == "telemetry_derived_refined"
+    assert evidence["raw_source"] == "telemetry_derived"
+    assert evidence["raw_start_time_s"] is None
+    assert evidence["raw_end_time_s"] is None
+
+
 def test_px4_metric_evidence_rejects_compiled_evidence_mutation(
     tmp_path: Path,
 ) -> None:
@@ -1231,6 +1617,97 @@ def test_px4_metric_evidence_rejects_compiled_evidence_mutation(
             metrics=metrics,
             artifacts=artifacts,
         )
+
+
+def test_px4_core_metric_model_rejects_mismatched_evidence_id(
+    tmp_path: Path,
+) -> None:
+    _raw, metrics, _artifacts, _ = _px4_metric_evidence(tmp_path)
+    evidence = metrics.raw_metric_json["px4_core_metric_evidence"]
+    assert isinstance(evidence, dict)
+
+    with pytest.raises(ValueError, match="core metric evidence ID"):
+        Px4CoreMetricEvidenceV1.model_validate(
+            {
+                **evidence,
+                "evidence_id": "sha256:" + "0" * 64,
+            }
+        )
+
+
+def test_stationary_hover_coverage_is_weighted_by_elapsed_time() -> None:
+    samples = [{"t": float(index), "x": 0.0, "y": 0.0, "z": 3.0} for index in range(9)]
+    samples.append({"t": 11.0, "x": 2.0, "y": 0.0, "z": 3.0})
+    contract = compile_telemetry_semantic_contract(
+        samples=samples,
+        source_bytes=b"irregular-hover-telemetry",
+        source_kind="launcher_json",
+        extraction_revision="test-hover-time-weighting-1.0",
+        synthetic=False,
+    )
+    telemetry_payload = {
+        "schema_version": TELEMETRY_SCHEMA_V2,
+        "samples": samples,
+        "semantic_contract": contract.model_dump(mode="json"),
+    }
+    reference_payload = {
+        "schema_version": "dronedream.reference_track.v1",
+        "track_type": "hover",
+        "reference_track": [
+            {"x": 0.0, "y": 0.0, "z": 3.0},
+            {"x": 0.0, "y": 0.0, "z": 3.0},
+        ],
+    }
+    evaluation_policy = px4_evaluation_policy_from_environment({})
+    window = compile_px4_evaluation_window_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        offboard_timing_payload=None,
+        policy=evaluation_policy,
+    )
+    core = compile_px4_core_metric_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        evaluation_start_index=window.start_index,
+        evaluation_end_index=window.end_index,
+    )
+    scenario_request = build_scenario_effect_request(
+        execution_identity={
+            "trial_id": "hover-time-weighting",
+            "job_id": "hover-time-weighting",
+            "candidate_id": "baseline",
+            "seed": 1,
+            "attempt_count": 1,
+        },
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+    _policy, outcome = compile_px4_outcome_evidence(
+        telemetry_payload=telemetry_payload,
+        reference_track_payload=reference_payload,
+        evaluation_policy=evaluation_policy,
+        evaluation_window_evidence=window,
+        core_metric_evidence=core,
+        scenario_effect_request_payload=scenario_request,
+        scenario_effect_evidence_payload=None,
+    )
+
+    assert outcome.evaluation_track_coverage == pytest.approx(9.5 / 11.0, abs=1e-6)
+    assert outcome.pass_flag is False
+
+
+@pytest.mark.parametrize("configured", ("0", "-3"))
+def test_px4_evaluation_policy_rejects_nonpositive_consecutive_samples(
+    configured: str,
+) -> None:
+    with pytest.raises(ValueError, match="must be positive"):
+        px4_evaluation_policy_from_environment({"PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES": configured})
 
 
 @pytest.mark.parametrize(
@@ -1631,6 +2108,127 @@ def _write_process_tree_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
     return parent, child, sentinel
 
 
+def test_posix_normal_exit_cleans_the_remaining_process_group(monkeypatch) -> None:
+    calls: list[tuple[int, int]] = []
+
+    def fake_killpg(process_group_id: int, signal_number: int) -> None:
+        calls.append((process_group_id, signal_number))
+        if signal_number == 0:
+            raise ProcessLookupError
+
+    monkeypatch.setattr(real_cli_module.os, "killpg", fake_killpg, raising=False)
+
+    real_cli_module._terminate_posix_process_group(4312)
+
+    assert calls == [
+        (4312, real_cli_module.signal.SIGTERM),
+        (4312, 0),
+    ]
+
+
+def test_process_start_failure_is_not_masked_by_posix_cleanup(monkeypatch, tmp_path) -> None:
+    def fail_to_start(*_args, **_kwargs):
+        raise FileNotFoundError("simulator executable is missing")
+
+    monkeypatch.setattr(real_cli_module.subprocess, "Popen", fail_to_start)
+    monkeypatch.setattr(real_cli_module.os, "name", "posix")
+
+    with pytest.raises(FileNotFoundError, match="simulator executable is missing"):
+        real_cli_module._execute_command(
+            ["missing-simulator"],
+            cwd=None,
+            env={},
+            timeout_seconds=1.0,
+            cancellation_event=None,
+            stdout_path=tmp_path / "stdout.log",
+            stderr_path=tmp_path / "stderr.log",
+        )
+
+
+def test_execute_command_bounds_and_normalizes_real_process_output(
+    monkeypatch, tmp_path
+) -> None:
+    emitter = tmp_path / "emit_process_output.py"
+    emitter.write_text(
+        """\
+import sys
+
+stream = sys.stdout.buffer
+for chunk in (b"\\x1b[", b"2K\\rpx", b"h> "):
+    stream.write(chunk)
+    stream.flush()
+stream.write(b"\\r")
+stream.write("PX4 ready 起飞\\n".encode("utf-8"))
+stream.write(b"A" * 256)
+stream.write(b"\\nFATAL actuator link failed after cap\\n")
+stream.flush()
+sys.stderr.buffer.write(b"ERROR simulator stderr diagnostic\\n")
+sys.stderr.buffer.flush()
+""",
+        encoding="utf-8",
+    )
+    stdout_path = tmp_path / "stdout.log"
+    stderr_path = tmp_path / "stderr.log"
+    monkeypatch.setattr(real_cli_module, "DEFAULT_AUXILIARY_LOG_CAP_BYTES", 96)
+
+    outcome = real_cli_module._execute_command(
+        [sys.executable, str(emitter)],
+        cwd=None,
+        env=dict(real_cli_module.os.environ),
+        timeout_seconds=5.0,
+        cancellation_event=None,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+    )
+
+    stdout = stdout_path.read_bytes()
+    stderr = stderr_path.read_bytes()
+    stdout_receipt = json.loads(receipt_path_for(stdout_path).read_text(encoding="utf-8"))
+    stderr_receipt = json.loads(receipt_path_for(stderr_path).read_text(encoding="utf-8"))
+    assert outcome.returncode == 0
+    assert len(stdout) == 96
+    assert b"\\x1b" not in stdout
+    assert b"pxh>" not in stdout
+    assert "PX4 ready 起飞" in stdout.decode("utf-8")
+    assert stderr == b"ERROR simulator stderr diagnostic\n"
+    assert stdout_receipt["raw_observed_bytes"] > stdout_receipt["retained_bytes"]
+    assert stdout_receipt["truncated"] is True
+    assert stdout_receipt["prompt_redraws_collapsed"] == 1
+    assert stdout_receipt["retained_sha256"] == hashlib.sha256(stdout).hexdigest()
+    assert any(
+        "FATAL actuator link failed after cap" in item["line"]
+        for item in stdout_receipt["critical_lines"]
+    )
+    assert stderr_receipt["truncated"] is False
+    assert stderr_receipt["retained_sha256"] == hashlib.sha256(stderr).hexdigest()
+
+
+def test_pre_cancelled_real_cli_attempt_never_starts_a_process(monkeypatch, tmp_path) -> None:
+    started = False
+
+    def unexpected_start(*_args, **_kwargs):
+        nonlocal started
+        started = True
+        raise AssertionError("cancelled simulator must not start")
+
+    cancellation = threading.Event()
+    cancellation.set()
+    monkeypatch.setattr(real_cli_module.subprocess, "Popen", unexpected_start)
+
+    with pytest.raises(real_cli_module._SimulatorCancelled):
+        real_cli_module._execute_command(
+            ["simulator"],
+            cwd=None,
+            env={},
+            timeout_seconds=1.0,
+            cancellation_event=cancellation,
+            stdout_path=tmp_path / "stdout.log",
+            stderr_path=tmp_path / "stderr.log",
+        )
+
+    assert started is False
+
+
 def test_real_cli_timeout_terminates_descendant_processes(monkeypatch, tmp_path) -> None:
     parent, child, sentinel = _write_process_tree_fixture(tmp_path)
     monkeypatch.setenv(
@@ -1699,6 +2297,56 @@ def test_keep_run_dirs_false_defers_cleanup_until_finalize(monkeypatch, tmp_path
     assert all(Path(artifact.storage_path).is_file() for artifact in result.artifacts)
     adapter.finalize_trial(ctx, result)
     assert not run_dir.exists()
+
+
+def test_shared_artifact_root_isolates_transient_run_cleanup(monkeypatch, tmp_path) -> None:
+    shared_root = tmp_path / "shared-artifacts"
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{_EXAMPLE_SIM}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(shared_root))
+    monkeypatch.setenv("ARTIFACT_ROOT", str(shared_root))
+    monkeypatch.setenv("REAL_SIMULATOR_KEEP_RUN_DIRS", "false")
+
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        adapter = RealCliSimulatorAdapter()
+        ctx = _ctx()
+        result = adapter.run_trial(ctx)
+        run_dir = (
+            shared_root
+            / "jobs"
+            / "_simulator_runs"
+            / "job-1"
+            / "trials"
+            / "trial-1"
+        )
+
+        assert result.success is True
+        assert run_dir.is_dir()
+        adapter.finalize_trial(ctx, result)
+        assert not run_dir.exists()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_shared_root_isolation_uses_current_environment_when_settings_reference_is_stale(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    shared_root = tmp_path / "shared-artifacts"
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(shared_root))
+    monkeypatch.setenv("ARTIFACT_ROOT", str(shared_root))
+
+    class StaleSettings:
+        default_artifact_root_path = tmp_path / "stale-artifacts"
+
+    monkeypatch.setattr(real_cli_module, "get_settings", lambda: StaleSettings())
+
+    run_dir = _run_directory(shared_root, _ctx())
+
+    assert run_dir.is_relative_to(shared_root.resolve())
+    assert "_simulator_runs" in run_dir.parts
 
 
 def test_real_cli_artifact_schema_doc_exists() -> None:

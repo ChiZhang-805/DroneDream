@@ -1,0 +1,75 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16,
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "constraints": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Constraints",
+      "type": "array"
+    },
+    "goal": {
+      "maxLength": 1000,
+      "minLength": 3,
+      "title": "Goal",
+      "type": "string"
+    },
+    "missing_critical_fields": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16,
+      "title": "Missing Critical Fields",
+      "type": "array"
+    },
+    "payload_action": {
+      "maxLength": 120,
+      "minLength": 3,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+      "title": "Payload Action",
+      "type": "string"
+    },
+    "return_entity": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Return Entity",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "dronedream.intent.v1",
+      "default": "dronedream.intent.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "start_entity": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Start Entity",
+      "type": "string"
+    },
+    "target_entity": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Target Entity",
+      "type": "string"
+    }
+  },
+  "required": [
+    "goal",
+    "start_entity",
+    "target_entity",
+    "return_entity",
+    "payload_action"
+  ],
+  "title": "IntentArtifact",
+  "type": "object"
+}

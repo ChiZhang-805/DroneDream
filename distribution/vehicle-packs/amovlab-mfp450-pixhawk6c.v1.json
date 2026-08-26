@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-vehicle-pack",
+  "packId": "amovlab-mfp450-pixhawk6c",
+  "packVersion": "1.0.0",
+  "displayName": {"en": "Amovlab MFP450 with Pixhawk 6C", "zh-CN": "阿木实验室 MFP450 + Pixhawk 6C"},
+  "manufacturer": "Amovlab",
+  "vehicleClass": "multicopter-medium",
+  "availabilityRegions": ["cn"],
+  "supportedEditions": ["lab", "field", "autonomy"],
+  "validationStatus": "planned",
+  "validationTier": "planned",
+  "autopilot": {
+    "family": "px4",
+    "adapterStatus": "planned",
+    "supportedFirmwareVersions": ["v1.16.0-contract-target"]
+  },
+  "controllers": [
+    {"vendor": "Holybro", "model": "Pixhawk 6C", "status": "planned", "regions": ["cn"]},
+    {"vendor": "Amovlab", "model": "ICF5", "status": "planned", "regions": ["cn"]}
+  ],
+  "components": {
+    "sim": {"status": "planned", "sourceIds": ["px4-autopilot"], "artifacts": []},
+    "hardware": {"status": "external", "sourceIds": ["px4-autopilot"], "artifacts": []},
+    "sensors": {"status": "planned", "sourceIds": [], "artifacts": []},
+    "validation": {"status": "planned", "sourceIds": [], "artifacts": []}
+  },
+  "safety": {
+    "capabilityPolicySha256": "ff15182466b2adf5e5134009096c55a6e110f8af2c247818735facc17874ccc3",
+    "frontendIsAuthority": false,
+    "hardwareActionsRequireValidatedTier": true,
+    "parameterBounds": [
+      {"name": "MPC_XY_P", "minimum": 0.6, "maximum": 1.3, "unit": "ratio"}
+    ]
+  },
+  "sourceBindings": [
+    {"sourceId": "px4-autopilot", "pinSha256": "739e8d3844614a4d9689a88a7dff38badcdb9882a30a1bc8c0662c764ac2eded"}
+  ],
+  "licenses": [
+    {"id": "px4-bsd-3-clause", "spdxExpression": "BSD-3-Clause", "noticePath": "licenses/PX4-BSD-3-Clause.txt", "redistribution": "not-distributed"}
+  ],
+  "integrity": {
+    "canonicalization": "RFC8785-JCS",
+    "payloadSha256": "752e0a304c7fc2feeb6c82a2e6e2133991b21fd060260e23f84b614c7b086b9f",
+    "signature": {"state": "not-issued", "algorithm": "Ed25519", "keyId": null, "detachedSignatureSha256": null}
+  },
+  "knownGaps": [
+    "The official product article states PX4 compatibility, but the first-sale ICF5/FMT configuration is not a PX4 validation receipt.",
+    "No exact sensor, simulator, HITL, or real-flight compatibility receipt exists."
+  ]
+}

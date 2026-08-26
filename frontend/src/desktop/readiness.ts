@@ -99,6 +99,17 @@ export function clearRuntimeAutoStartFailure(): void {
   }
 }
 
+/**
+ * Record that this app session already acquired the Runtime keepalive through
+ * an explicit native start/repair command. A subsequent forced status refresh
+ * may then reuse that lifetime instead of issuing duplicate maintenance.
+ */
+export function claimDesktopRuntimeLifetime(runtime: RuntimeStatusReport): void {
+  if (!isRuntimeFullyReady(runtime)) return;
+  runtimeLifetimeClaimed = true;
+  clearRuntimeAutoStartFailure();
+}
+
 function areDesktopPrerequisitesReady(
   prerequisites: SystemPrerequisiteReport | null,
 ): prerequisites is SystemPrerequisiteReport {
@@ -206,8 +217,9 @@ async function startRuntimeForSnapshot(
 
   if (!autoStart || !shouldAutoStart()) return snapshot;
 
-  // The full startup check claims the Runtime lifetime once. Later route
-  // guards reuse that result instead of probing or issuing another start.
+  // A successful probe can reuse the Runtime only after this app session has
+  // acquired its keepalive. An explicit launcher start records that claim via
+  // claimDesktopRuntimeLifetime before its forced follow-up refresh.
   if (snapshot.ready && runtimeLifetimeClaimed) return snapshot;
 
   if (runtimeStartInFlight) {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import io
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -27,6 +28,12 @@ def test_local_storage_roundtrip(tmp_path: Path, monkeypatch) -> None:
         "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
         11,
     )
+    copied = io.BytesIO()
+    assert storage.copy_to(uri, copied) == (
+        "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        11,
+    )
+    assert copied.getvalue() == b'{"ok":true}'
     with pytest.raises(ValueError, match="outside allowed roots"):
         storage.read_bytes(str(tmp_path.parent / "outside.json"))
     get_settings.cache_clear()
@@ -67,6 +74,7 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
         def __init__(self) -> None:
             self.uploaded: tuple[str, str, str] | None = None
             self.health_checked = False
+            self.bodies: list[_Body] = []
 
         def upload_file(self, filename: str, bucket: str, key: str, ExtraArgs=None):
             self.uploaded = (filename, bucket, key)
@@ -74,7 +82,9 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
         def get_object(self, Bucket: str, Key: str):
             assert Bucket == "bucket"
             assert Key == "prefix/jobs/j1/a.txt"
-            return {"Body": _Body()}
+            body = _Body()
+            self.bodies.append(body)
+            return {"Body": body}
 
         def head_object(self, Bucket: str, Key: str):
             assert Bucket == "bucket"
@@ -136,6 +146,21 @@ def test_s3_storage_fake_client(monkeypatch) -> None:
         "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5",
         7,
     )
+    copied = io.BytesIO()
+    assert storage.copy_to(uri, copied) == (
+        "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5",
+        7,
+    )
+    assert copied.getvalue() == b"payload"
+    assert all(body.closed for body in fake.bodies)
+
+    class _PartialDestination:
+        def write(self, content: bytes) -> int:
+            return max(0, len(content) - 1)
+
+    with pytest.raises(OSError, match="partial write"):
+        storage.copy_to(uri, _PartialDestination())  # type: ignore[arg-type]
+    assert all(body.closed for body in fake.bodies)
     assert storage.presign_download(uri, expires_seconds=120) == (
         "https://objects.example/signed"
     )

@@ -9,9 +9,16 @@ const outputArgumentIndex = process.argv.indexOf("--output");
 const outputPath = outputArgumentIndex >= 0
   ? process.argv[outputArgumentIndex + 1]
   : null;
+const editionConfigArgumentIndex = process.argv.indexOf("--edition-config");
+const editionConfigPath = editionConfigArgumentIndex >= 0
+  ? process.argv[editionConfigArgumentIndex + 1]
+  : null;
 
 if (outputArgumentIndex >= 0 && !outputPath) {
   throw new Error("--output requires a path");
+}
+if (editionConfigArgumentIndex >= 0 && !editionConfigPath) {
+  throw new Error("--edition-config requires a path");
 }
 
 function readText(path) {
@@ -30,6 +37,10 @@ if (!licenseText.startsWith("MIT License\n") && !licenseText.startsWith("MIT Lic
 const codeSigningPolicy = readText("CODE_SIGNING_POLICY.md");
 const privacyPolicy = readText("PRIVACY.md");
 const readme = readText("README.md");
+const llvmBuildScript = readText("desktop/scripts/build-windows-llvm.ps1");
+const msvcBuildScript = readText("desktop/scripts/build-windows-msvc.ps1");
+const updaterSignerScript = readText("desktop/scripts/invoke-tauri-updater-signer.ps1");
+const desktopReleaseWorkflow = readText(".github/workflows/desktop-installer.yml");
 for (const requiredText of [
   "Free code signing provided by [SignPath.io]",
   "certificate by [SignPath Foundation]",
@@ -39,6 +50,45 @@ for (const requiredText of [
 ]) {
   if (!codeSigningPolicy.includes(requiredText)) {
     fail(`CODE_SIGNING_POLICY.md is missing: ${requiredText}`);
+  }
+}
+if ([llvmBuildScript, msvcBuildScript, updaterSignerScript, desktopReleaseWorkflow].some((script) =>
+  /--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(script)
+)) {
+  fail("the updater key password must not be interpolated into a process argument");
+}
+if (!desktopReleaseWorkflow.includes("invoke-tauri-updater-signer.ps1")) {
+  fail("the formal desktop workflow must use the tested updater signer helper");
+}
+for (const [name, script] of [["MSVC", msvcBuildScript], ["LLVM fallback", llvmBuildScript]]) {
+  if (!script.includes("invoke-tauri-updater-signer.ps1")) {
+    fail(`the ${name} build must use the tested updater signer helper`);
+  }
+  const updaterSigningPreflightIndex = script.indexOf(
+    "verify-updater-signing-contract.ps1",
+  );
+  const desktopBuildInvocationIndex = script.indexOf(
+    "Invoke-CheckedNativeCommand `",
+  );
+  if (
+    updaterSigningPreflightIndex < 0
+    || desktopBuildInvocationIndex < 0
+    || updaterSigningPreflightIndex >= desktopBuildInvocationIndex
+  ) {
+    fail(`the updater signing contract must run before the ${name} desktop and NSIS build`);
+  }
+  if (script.includes("@updaterPasswordArguments")) {
+    fail(`the ${name} build contains the scalar updater-password splat regression`);
+  }
+}
+for (const requiredText of [
+  '[string[]]$signerArguments = @(',
+  '$signerArguments += "--password="',
+  '$signerArguments += "--"',
+  "& $NodeExecutable @signerArguments",
+]) {
+  if (!updaterSignerScript.includes(requiredText)) {
+    fail(`the updater signer helper is missing: ${requiredText}`);
   }
 }
 for (const requiredText of [
@@ -120,6 +170,30 @@ if (missingRustLicenses.length > 0) {
 }
 
 const tauriConfig = JSON.parse(readText("desktop/src-tauri/tauri.conf.json"));
+const editionConfig = editionConfigPath
+  ? JSON.parse(readFileSync(
+    isAbsolute(editionConfigPath)
+      ? editionConfigPath
+      : resolve(repositoryRoot, editionConfigPath),
+    "utf8",
+  ))
+  : null;
+if (editionConfig?.version && editionConfig.version !== tauriConfig.version) {
+  fail("edition Tauri config version must match the canonical product version");
+}
+if (editionConfig && !editionConfig.productName) {
+  fail("edition Tauri config must define its product name");
+}
+const mainWindow = tauriConfig.app?.windows?.find((window) => window.label === "main");
+if (!mainWindow) {
+  fail("canonical Tauri config is missing the main application window");
+}
+if (mainWindow.transparent !== false) {
+  fail("main application window must remain opaque to prevent native window-edge bleed");
+}
+if (mainWindow.backgroundColor !== "#ffffff") {
+  fail("main application window must define the white first-paint background");
+}
 const desktopCapability = JSON.parse(
   readText("desktop/src-tauri/capabilities/default.json"),
 );
@@ -132,6 +206,21 @@ for (const requiredPermission of [
     fail(`desktop capability is missing: ${requiredPermission}`);
   }
 }
+const openerPermission = desktopCapability.permissions?.find(
+  (permission) => permission && typeof permission === "object" &&
+    permission.identifier === "opener:allow-open-url",
+);
+if (!openerPermission || !Array.isArray(openerPermission.allow)) {
+  fail("desktop capability is missing its explicit external URL allowlist");
+}
+for (const requiredUrl of [
+  "https://getdronedream.com/pricing/",
+  "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+]) {
+  if (!openerPermission.allow.some((entry) => entry?.url === requiredUrl)) {
+    fail(`desktop external URL allowlist is missing: ${requiredUrl}`);
+  }
+}
 const inventory = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),
@@ -140,7 +229,7 @@ const inventory = {
     cwd: repositoryRoot,
     encoding: "utf8",
   }).trim(),
-  productName: tauriConfig.productName,
+  productName: editionConfig?.productName ?? tauriConfig.productName,
   productVersion: tauriConfig.version,
   repositoryLicense: "MIT",
   trackedSourceFiles: trackedFiles.length,

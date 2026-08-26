@@ -23,11 +23,20 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert data["features"]["llm_tool_harness"] == {
         "available": True,
         "decision_schema_version": "1.0",
-        "evidence_schema_version": "2.7",
+        "evidence_schema_version": "2.9",
         "tool_registry_version": "2.1",
-        "prompt_template_version": "1.5",
-        "trace_schema_version": "1.3",
+        "prompt_template_version": "1.7",
+        "trace_schema_version": "1.4",
         "tool_registry": "closed",
+        "cross_job_memory": {
+            "available": True,
+            "schema_version": "1.0",
+            "retrieval_policy_version": "1.0",
+            "scope": "same_authenticated_user",
+            "task_family_policy": "exact_structural_match",
+            "retention_days": 90,
+            "revocable": True,
+        },
     }
     assert data["simulators"]["authoritative"] is False
     assert data["optimizers"]["authoritative"] is False
@@ -62,6 +71,7 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
             "payload_changed",
             "battery_degraded",
             "actuator_delay",
+            "actuator_failure",
             "custom",
         ],
     }
@@ -73,14 +83,33 @@ def test_capabilities_reports_safe_defaults(client, monkeypatch) -> None:
     assert real_cli["max_concurrency_per_host_without_instance_allocator"] == 1
     assert real_cli["instance_allocation"] == "operator_managed"
     assert real_cli["bundled_runner_advanced_effects"] == [
+        "actuator_first_order_delay",
+        "actuator_hard_failure",
+        "battery_initial_state_and_voltage_sag",
+        "deterministic_seeded_gps_dropout",
+        "gust_and_turbulence",
         "obstacles",
+        "payload_mass_and_inertia",
+        "sensor_noise",
         "steady_wind",
     ]
     scenario_effects = real_cli["scenario_effect_contract"]
-    assert scenario_effects["physically_applied"] == ["obstacles", "steady_wind"]
+    assert scenario_effects["physically_applied"] == real_cli["bundled_runner_advanced_effects"]
     assert scenario_effects["obstacles"]["mechanism"] == "gazebo_entity_factory"
     assert scenario_effects["steady_wind"]["mechanism"] == "gazebo_wind_effects"
-    assert "probabilistic GPS dropout" in scenario_effects["requires_runtime_extension"]
+    assert scenario_effects["trial_local_sdf_profiles"]["mechanisms"] == [
+        "gazebo_wind_effects",
+        "sdformat_sensor_noise",
+        "sdformat_model_inertial",
+        "sdformat_actuator_dynamics",
+        "sdformat_actuator_hard_stop",
+        "gazebo_joint_state_publisher",
+    ]
+    assert scenario_effects["flight_timed_runtime_profiles"]["mechanisms"] == [
+        "mavsdk_sim_gps_used_plus_gps_info_telemetry",
+        "px4_battery_simulation",
+    ]
+    assert scenario_effects["requires_runtime_extension"] == []
     assert real_cli["unverified_effect_passthrough_opt_in"] is True
     assert data["optimizers"]["items"]["gpt"]["ready"] is False
     assert data["optimizers"]["items"]["gpt"]["prompt_schema_version"] == "2.3"

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-manifest",
+  "editionId": "autonomy",
+  "editionVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "displayName": {
+    "en": "DroneDream · AGENT",
+    "zh-CN": "DroneDream · AGENT"
+  },
+  "description": {
+    "en": "A natural-language autonomous mission workspace with structured planning, model-and-harness loops, pluginized tools, runtime holds, replanning, and evidence-gated simulation or hardware adoption.",
+    "zh-CN": "面向自然语言自主任务的工作区，提供结构化规划、模型与 Harness 循环、插件化工具、运行时安全悬停、在线重规划，以及由证据门约束的仿真或真机指令采纳。"
+  },
+  "implementationStatus": "integrated-contract",
+  "validationTier": "autonomy-runtime-contract",
+  "artifactBaseName": "DroneDream-Agent-1.0.0.exe",
+  "capabilityPolicy": {
+    "policyId": "core-capabilities",
+    "policyVersion": "1.0.0",
+    "sha256": "ff15182466b2adf5e5134009096c55a6e110f8af2c247818735facc17874ccc3"
+  },
+  "modules": {
+    "required": [
+      "desktop-core",
+      "engine-pack",
+      "runtime-core",
+      "runtime-simulation",
+      "simulator-gazebo-harmonic",
+      "simulator-px4-sitl",
+      "vehicle-pack-sim",
+      "vehicle-pack-validation"
+    ],
+    "optional": [
+      "hardware-bridge",
+      "qgroundcontrol-external",
+      "vehicle-pack-hardware"
+    ],
+    "forbidden": []
+  },
+  "capabilities": {
+    "enabledOrConditioned": [
+      "external.qgroundcontrol.launch",
+      "hardware.arm",
+      "hardware.discover",
+      "hardware.emergency-stop",
+      "hardware.flight",
+      "hardware.hitl.execute",
+      "hardware.parameter.read",
+      "hardware.parameter.write",
+      "hardware.preflight.execute",
+      "qualification.simulation.issue",
+      "qualification.trusted.consume",
+      "simulation.execute",
+      "simulation.parameter.write",
+      "simulation.vehicle.arm",
+      "updater.module.apply",
+      "vehicle-pack.install"
+    ],
+    "forbidden": []
+  },
+  "runtimeProfile": {
+    "profileId": "autonomy-full",
+    "currentAvailability": "integrated-contract",
+    "includesLargeSimulator": true
+  },
+  "qualification": {
+    "mayIssueSimulationReceipt": true,
+    "mayConsumeTrustedReceipt": true,
+    "hardwareActionRule": "trusted-sim-or-hitl-receipt-or-prescribed-preflight",
+    "receiptCompatibilityFailClosed": true
+  },
+  "sourcePolicy": {
+    "developmentBranch": "codex/software-agent",
+    "integrationBranch": "main",
+    "editionSourceDivergenceAllowed": false,
+    "hotfixMustReturnToCore": true,
+    "commonCoreHashRequired": true
+  },
+  "releaseChannel": {
+    "branch": "codex/software-agent",
+    "creationState": "long-lived-product-branch",
+    "promotionManifestRequired": true,
+    "forcePushAllowed": false
+  },
+  "knownGaps": [
+    "The current public integration has qualified contracts and testable simulation surfaces, but final product release still requires an exact signed installer, updater signature, build receipt, and headed edition-identity validation.",
+    "Real-aircraft commands remain fail-closed until the selected Vehicle Pack, map, localization, link, geofence, battery, operator approval, and runtime safety quorum all pass for the exact task revision.",
+    "A model-generated plan or plugin response never grants execution authority; the deterministic runtime gate remains authoritative."
+  ]
+}

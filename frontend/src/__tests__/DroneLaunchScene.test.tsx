@@ -4,12 +4,15 @@ import { afterEach, describe, expect, it } from "vitest";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import { getDroneStarflightPose } from "../components/droneStarflight";
 import { I18nProvider } from "../i18n/I18nProvider";
+import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 
-function renderScene(locale: "en" | "zh-CN") {
+function renderScene(locale: "en" | "zh-CN", edition: "universal" | "sim" | "lab" | "field" | "autonomy" = "universal") {
   window.localStorage.setItem("drone-dream:locale", locale);
   return render(
     <I18nProvider>
-      <DroneLaunchScene active />
+      <EditionThemeProvider edition={edition}>
+        <DroneLaunchScene active />
+      </EditionThemeProvider>
     </I18nProvider>,
   );
 }
@@ -21,12 +24,26 @@ function poseDistance(first: ReturnType<typeof getDroneStarflightPose>, second: 
 afterEach(() => window.localStorage.clear());
 
 describe("DroneLaunchScene localization", () => {
+  it("exposes the canonical 3D palette and preserves the no-authority boundary", () => {
+    const { container } = renderScene("en", "field");
+    const scene = container.querySelector(".drone-launch-scene");
+    expect(scene).toHaveAttribute("data-theme-edition", "field");
+    expect(scene).toHaveAttribute("data-theme-primary", "#ffc247");
+    expect(scene).toHaveAttribute("data-theme-secondary", "#ff754b");
+    expect(scene).toHaveAttribute("data-theme-tertiary", "#d746a5");
+    expect(scene).toHaveAttribute("data-theme-grants-hardware-authority", "false");
+  });
+
   it("renders an English-only telemetry overlay in English", () => {
     renderScene("en");
 
     expect(screen.getByText("PX4 / SITL")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Let Every Flight Flow Like a Dream" }))
-      .toBeInTheDocument();
+    const heading = screen.getByRole("heading", {
+      name: "Let Every Flight Flow Like a Dream",
+    });
+    expect(heading).toHaveAttribute("data-line-count", "2");
+    expect(heading.querySelectorAll(".drone-launch-tagline-line")).toHaveLength(2);
+    expect(heading).toHaveTextContent("Let Every Flight Flow Like a Dream");
     expect(screen.getByText("LINK ACTIVE")).toBeInTheDocument();
     expect(screen.getByText("ATTITUDE")).toBeInTheDocument();
     expect(screen.getByText(/HOLD/)).toBeInTheDocument();
@@ -38,8 +55,9 @@ describe("DroneLaunchScene localization", () => {
     renderScene("zh-CN");
 
     expect(screen.getByText("PX4 / 软件在环")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "蝶 梦 水 云 乡" }))
-      .toBeInTheDocument();
+    const heading = screen.getByRole("heading", { name: "蝶 梦 水 云 乡" });
+    expect(heading).toHaveAttribute("data-line-count", "1");
+    expect(heading.querySelectorAll(".drone-launch-tagline-line")).toHaveLength(1);
     expect(screen.getByText("链路已连接")).toBeInTheDocument();
     expect(screen.getByText("飞行姿态")).toBeInTheDocument();
     expect(screen.getByText(/悬停/)).toBeInTheDocument();

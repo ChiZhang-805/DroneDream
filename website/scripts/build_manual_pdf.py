@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
@@ -22,7 +22,6 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
-
 
 ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_DOCS = ROOT / "frontend" / "public" / "docs"
@@ -92,7 +91,10 @@ CONTENT = {
                 ),
                 "steps": [
                     ("Download", "Get the current Windows installer from getdronedream.com."),
-                    ("Install", "Choose an eligible NTFS drive and keep the recommended directory."),
+                    (
+                        "Install",
+                        "Choose an eligible NTFS drive and keep the recommended directory.",
+                    ),
                     ("Prepare", "Wait while the isolated runtime is imported and verified."),
                     ("Enter", "Open the workspace only after the green status reads Checked."),
                 ],
@@ -119,7 +121,10 @@ CONTENT = {
                 "bullets": [
                     "The assistant summarizes the intended study in engineering terms.",
                     "Known fields are placed into the draft with visible provenance.",
-                    "Missing parameter ranges and acceptance thresholds remain open for confirmation.",
+                    (
+                        "Missing parameter ranges and acceptance thresholds remain open for "
+                        "confirmation."
+                    ),
                     "The assistant cannot create a running job or bypass the five-step review.",
                 ],
             },
@@ -135,8 +140,14 @@ CONTENT = {
                 "steps": [
                     ("Flight Setup", "Choose the vehicle, world, objective weights, and track."),
                     ("Parameters", "Confirm each selected PX4 parameter and its search range."),
-                    ("Scenarios", "Define search, holdout, wind, noise, seeds, and vehicle effects."),
-                    ("Constraints & Budget", "Select a strategy and set trial and acceptance limits."),
+                    (
+                        "Scenarios",
+                        "Define search, holdout, wind, noise, seeds, and vehicle effects.",
+                    ),
+                    (
+                        "Constraints & Budget",
+                        "Select a strategy and set trial and acceptance limits.",
+                    ),
                     ("Review", "Audit the complete contract before creating the experiment."),
                 ],
             },
@@ -145,8 +156,8 @@ CONTENT = {
                 "title": "Edit a custom flight track",
                 "body": (
                     "The track editor pairs a plot with an equal-height coordinate table. Switch "
-                    "among XY, XZ, YZ, and 3D views, edit full X/Y/Z values, and use JSON import or "
-                    "export when a path is easier to generate with another tool."
+                    "among XY, XZ, YZ, and 3D views, edit full X/Y/Z values, and use JSON "
+                    "import or export when a path is easier to generate with another tool."
                 ),
                 "bullets": [
                     "Select a row to highlight the corresponding waypoint.",
@@ -165,14 +176,17 @@ CONTENT = {
                 "body": (
                     "Dashboard and Run History expose completed, failed, cancelled, and active "
                     "experiments. Filter by status, track, objective, strategy, or date, then open "
-                    "a result to inspect the metrics, scenarios, logs, artifacts, and configuration "
-                    "that produced the decision."
+                    "a result to inspect the metrics, scenarios, logs, artifacts, and "
+                    "configuration that produced the decision."
                 ),
                 "image": PUBLIC_DOCS / "en" / "dashboard.png",
                 "steps": [
                     ("Configuration", "Vehicle, firmware, route, ranges, constraints, and budget."),
                     ("Execution", "Scenario identity, seeds, manifests, logs, and artifacts."),
-                    ("Decision", "Feasibility, error, overshoot, settling, robustness, and trade-offs."),
+                    (
+                        "Decision",
+                        "Feasibility, error, overshoot, settling, robustness, and trade-offs.",
+                    ),
                 ],
                 "callout": (
                     "Compare only experiments whose scenario and metric contracts are compatible. "
@@ -183,15 +197,25 @@ CONTENT = {
                 "number": "7",
                 "title": "Accounts, data, and safety",
                 "body": (
-                    "Supabase identity and row-level policies isolate cloud account records. Public "
-                    "community topics are deliberately shared, while account settings and user-owned "
-                    "cloud data remain scoped to their owner. Local drafts stay available during the "
-                    "application session and are discarded after a confirmed exit."
+                    "Supabase identity and row-level policies isolate cloud account records. "
+                    "Public community topics are deliberately shared, while account settings "
+                    "and user-owned cloud data remain scoped to their owner. Local drafts stay "
+                    "available during the application session and are discarded after a "
+                    "confirmed exit."
                 ),
                 "bullets": [
-                    "Provider and model settings may be saved on the device, while the model API key remains only in session memory.",
-                    "API keys are never written into experiment drafts, run records, exports, or community posts.",
-                    "DroneDream assists engineering judgment; independent SITL validation and operator approval remain mandatory before hardware flight.",
+                    (
+                        "Provider and model settings may be saved on the device, while the model "
+                        "API key remains only in session memory."
+                    ),
+                    (
+                        "API keys are never written into experiment drafts, run records, exports, "
+                        "or community posts."
+                    ),
+                    (
+                        "DroneDream assists engineering judgment; independent SITL validation "
+                        "and operator approval remain mandatory before hardware flight."
+                    ),
                 ],
             },
         ],
@@ -305,9 +329,7 @@ CONTENT = {
                     "导入后检查所有坐标是否位于预期仿真空间。",
                     "3D 地面两个方向使用相同的真实单位和正方形网格。",
                 ],
-                "callout": (
-                    "轨迹延长时应增加更多正方形网格，不能把已有的地面网格拉成长方形。"
-                ),
+                "callout": ("轨迹延长时应增加更多正方形网格，不能把已有的地面网格拉成长方形。"),
             },
             {
                 "number": "6",
@@ -336,9 +358,15 @@ CONTENT = {
                     "确认退出后会被丢弃。"
                 ),
                 "bullets": [
-                    "供应商和模型设置可以保存在设备上，但模型 API Key 只停留在当前应用会话的内存中。",
+                    (
+                        "供应商和模型设置可以保存在设备上，但模型 API Key 只停留在当前应用"
+                        "会话的内存中。"
+                    ),
                     "API Key 不会被写入实验草稿、运行记录、导出文件或社区帖子。",
-                    "DroneDream 只辅助工程判断；真实飞行前仍然必须完成独立 SITL 验证并取得操作者确认。",
+                    (
+                        "DroneDream 只辅助工程判断；真实飞行前仍然必须完成独立 SITL 验证并"
+                        "取得操作者确认。"
+                    ),
                 ],
             },
         ],
@@ -611,7 +639,10 @@ def build(locale: str) -> Path:
             KeepTogether(
                 [
                     Paragraph(
-                        f'<font color="#cf43c8">{section["number"].zfill(2)}</font>  {section["title"]}',
+                        (
+                            f'<font color="#cf43c8">{section["number"].zfill(2)}</font>  '
+                            f"{section['title']}"
+                        ),
                         styles["h1"],
                     ),
                     Paragraph(section["body"], styles["body"]),
@@ -657,7 +688,7 @@ def build(locale: str) -> Path:
             story.append(bullets)
             if index < len(copy["sections"]) - 1 or section.get("callout"):
                 story.append(Spacer(1, 3 * mm))
-        if section.get("callout") and not (index == 0):
+        if section.get("callout") and index != 0:
             story.append(KeepTogether([callout(section["callout"], styles)]))
 
     doc.build(

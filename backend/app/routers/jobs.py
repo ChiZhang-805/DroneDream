@@ -6,15 +6,25 @@ import csv
 import io
 import json
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.api_idempotency import begin_mutation
+from app.api_idempotency import begin_mutation, inspect_mutation
 from app.auth import get_current_user
+from app.benchmarking.physical_stability_job_evidence import (
+    compile_physical_stability_job_evidence,
+)
 from app.db import get_db
+from app.orchestration.experience_memory import (
+    HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+    HARNESS_EXPERIENCE_RETENTION_DAYS,
+    HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION,
+    revoke_cross_job_experiences,
+)
 from app.orchestration.winner_freeze import (
     WinnerFreezeError,
     require_winner_freeze_receipt,
@@ -74,6 +84,60 @@ def create_job(
         _raise(err)
     response = ok(_job_payload_with_alias(job_service.to_job_schema(job)))
     return gate.complete(response, resource_type="job", resource_id=job.id)
+
+
+@router.get("/jobs/physical-stability-dispatches/{idempotency_key}")
+def inspect_physical_stability_dispatch(
+    idempotency_key: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Inspect a P5 create receipt without replaying the original POST."""
+
+    try:
+        parsed_key = UUID(idempotency_key)
+    except ValueError:
+        parsed_key = None
+    if parsed_key is None or parsed_key.version != 5 or str(parsed_key) != idempotency_key:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "PHYSICAL_STABILITY_IDEMPOTENCY_KEY_INVALID",
+                "message": "The dispatch key is not a canonical P5 version-5 UUID.",
+            },
+        )
+    inspection = inspect_mutation(
+        db,
+        user=user,
+        operation="jobs.create",
+        idempotency_key=idempotency_key,
+    )
+    payload: dict[str, object] = {
+        "schema_id": "dronedream.physical-stability-dispatch-inspection/v1",
+        "state": inspection.state,
+        "idempotency_key_sha256": inspection.idempotency_key_sha256,
+        "mutation_request_sha256": inspection.request_hash,
+        "observed_job_id": None,
+    }
+    if inspection.state == "completed":
+        if (
+            inspection.resource_type != "job"
+            or inspection.resource_id is None
+            or inspection.response_status != 200
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "PHYSICAL_STABILITY_DISPATCH_RECEIPT_INVALID",
+                    "message": "The dispatch receipt does not bind a Job.",
+                },
+            )
+        try:
+            job = job_service.get_job(db, inspection.resource_id, user=user)
+        except job_service.JobServiceError as err:
+            _raise(err)
+        payload["observed_job_id"] = job.id
+    return ok(payload)
 
 
 @router.get("/jobs")
@@ -181,6 +245,30 @@ def get_job(
     return ok(job_service.to_job_schema(job).model_dump(mode="json"))
 
 
+@router.get("/jobs/{job_id}/physical-stability-evidence")
+def get_physical_stability_evidence(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Return server-derived, byte-verified P5 terminal evidence only."""
+
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+        evidence = compile_physical_stability_job_evidence(job)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PHYSICAL_STABILITY_EVIDENCE_NOT_READY",
+                "message": "Physical stability evidence is incomplete or invalid.",
+            },
+        ) from err
+    return ok(evidence.model_dump(mode="json"))
+
+
 @router.patch("/jobs/{job_id}")
 def update_job(
     job_id: str,
@@ -258,6 +346,47 @@ def rerun_job(
     return gate.complete(response, resource_type="job", resource_id=job.id)
 
 
+@router.post("/jobs/{job_id}/continue-exploration")
+def continue_exploration(
+    job_id: str,
+    req: schemas.ContinueExplorationRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
+) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.continue_exploration",
+        idempotency_key=idempotency_key,
+        payload={
+            "job_id": job_id,
+            "control_version": control_version,
+            "request": req.model_dump(mode="json"),
+        },
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        child = job_service.continue_exploration(
+            db,
+            job_id,
+            req,
+            user=user,
+            expected_control_version=control_version,
+            commit=False,
+        )
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    response = ok(_job_payload_with_alias(job_service.to_job_schema(child)))
+    return gate.complete(response, resource_type="job", resource_id=child.id)
+
+
 @router.post("/jobs/{job_id}/cancel")
 def cancel_job(
     job_id: str,
@@ -313,6 +442,7 @@ def delete_job(
     )
     if gate.replay is not None:
         return gate.replay
+    deferred_artifact_cleanup: list[job_service.DeletedArtifactPayload] = []
     try:
         payload = job_service.delete_job(
             db,
@@ -320,12 +450,100 @@ def delete_job(
             user=user,
             commit=False,
             expected_control_version=control_version,
+            deferred_artifact_cleanup=deferred_artifact_cleanup,
         )
     except job_service.JobServiceError as err:
         db.rollback()
         _raise(err)
     response = ok(payload)
-    return gate.complete(response, resource_type="job", resource_id=job_id)
+    committed_response = gate.complete(
+        response,
+        resource_type="job",
+        resource_id=job_id,
+    )
+    job_service.cleanup_deleted_job_artifacts(deferred_artifact_cleanup)
+    return committed_response
+
+
+@router.delete("/jobs/{job_id}/harness-experiences")
+def revoke_job_harness_experiences(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, object]:
+    """Revoke retrievable cross-Job observations sourced from one owned Job."""
+
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="harness_experiences.revoke_job",
+        idempotency_key=idempotency_key,
+        payload={"job_id": job_id},
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    revoked = revoke_cross_job_experiences(
+        db,
+        user_id=user.id,
+        source_job_id=job.id,
+    )
+    response = ok(
+        {
+            "job_id": job.id,
+            "revoked_count": revoked,
+            "memory_schema_version": HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+            "retrieval_policy_version": (
+                HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION
+            ),
+            "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+        }
+    )
+    return gate.complete(
+        response,
+        resource_type="harness_experience_memory",
+        resource_id=job.id,
+    )
+
+
+@router.delete("/harness-experiences")
+def revoke_all_harness_experiences(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, object]:
+    """Revoke every still-active cross-Job observation owned by the caller."""
+
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="harness_experiences.revoke_all",
+        idempotency_key=idempotency_key,
+        payload={},
+    )
+    if gate.replay is not None:
+        return gate.replay
+    revoked = revoke_cross_job_experiences(db, user_id=user.id)
+    response = ok(
+        {
+            "revoked_count": revoked,
+            "memory_schema_version": HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+            "retrieval_policy_version": (
+                HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION
+            ),
+            "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+        }
+    )
+    return gate.complete(
+        response,
+        resource_type="harness_experience_memory",
+        resource_id=user.id,
+    )
 
 
 @router.get("/jobs/{job_id}/trials")

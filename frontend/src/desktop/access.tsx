@@ -27,6 +27,10 @@ export type DesktopRuntimeAccessStatus =
   | "ready"
   | "blocked";
 
+export interface DesktopRuntimeAccessRefreshOptions {
+  autoStart?: boolean;
+}
+
 export interface DesktopRuntimeAccess {
   desktopRuntime: boolean;
   status: DesktopRuntimeAccessStatus;
@@ -34,7 +38,7 @@ export interface DesktopRuntimeAccess {
   snapshot: DesktopReadinessSnapshot | null;
   lastFullCheckAt: number | null;
   isChecking: boolean;
-  refresh: () => Promise<void>;
+  refresh: (options?: DesktopRuntimeAccessRefreshOptions) => Promise<void>;
 }
 
 const BROWSER_ACCESS: DesktopRuntimeAccess = {
@@ -88,7 +92,9 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     setStatus(next.ready ? "ready" : next.autoStartFailed ? "startFailed" : "blocked");
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (
+    options: DesktopRuntimeAccessRefreshOptions = {},
+  ) => {
     if (!desktopRuntime) {
       setStatus("browser");
       return;
@@ -101,7 +107,7 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     let automaticStartAttempted = false;
     try {
       const snapshot = await ensureOverallDesktopReadiness({
-        autoStart: true,
+        autoStart: options.autoStart ?? true,
         force: true,
         shouldAutoStart: () => requestId.current === currentRequest,
         onStarting: () => {
@@ -136,11 +142,10 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
       return;
     }
 
-    // A full automatic check is allowed only on the setup screen, before the
-    // user enters the workspace. Dashboard, history, settings, and route
-    // changes must never start a probe. Inside the workspace, refresh() is the
-    // sole full-check entry point and is wired only to the explicit Settings
-    // button.
+    // A full automatic check and the one coordinated Runtime start are allowed
+    // only on the setup screen, before the user enters the workspace.
+    // Dashboard, history, settings, and route changes must never start a probe.
+    // Inside the workspace, refresh() remains the sole full-check entry point.
     if (initialPath.current !== "/desktop/setup" || getDesktopReadinessSession()) {
       setIsChecking(false);
       return;
@@ -151,7 +156,7 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     setIsChecking(true);
     let automaticStartAttempted = false;
     void ensureOverallDesktopReadiness({
-      autoStart: false,
+      autoStart: true,
       shouldAutoStart: () => requestId.current === currentRequest,
       onStarting: () => {
         automaticStartAttempted = true;

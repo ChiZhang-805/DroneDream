@@ -452,7 +452,7 @@ def _full_fidelity_observations(
     return tuple(
         item
         for item in observations
-        if item.requested_fidelity >= 1.0 - 1e-9
+        if item.requested_fidelity >= 1.0 - 1e-9 and item.fidelity >= 1.0 - 1e-9
     )
 
 

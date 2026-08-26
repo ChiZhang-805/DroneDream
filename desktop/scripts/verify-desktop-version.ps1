@@ -72,8 +72,11 @@ if ($previewMismatches.Count -ne 0) {
     throw "Localized desktop version labels disagree with $expected`: $previewVersions"
 }
 
-if ($ReleaseTag -and $ReleaseTag -cne "desktop-v$expected") {
-    throw "Release tag $ReleaseTag does not match desktop version $expected."
+if ($ReleaseTag) {
+    $editionTagPattern = "^desktop-(universal|sim|lab|field|autonomy)-v$([regex]::Escape($expected))-build-[1-9][0-9]*$"
+    if ($ReleaseTag -cnotmatch $editionTagPattern) {
+        throw "Release tag $ReleaseTag does not match desktop version $expected."
+    }
 }
 
 Write-Host "Desktop versions verified: $expected"

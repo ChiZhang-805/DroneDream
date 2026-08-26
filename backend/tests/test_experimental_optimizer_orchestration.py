@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -42,16 +41,13 @@ def experimental_ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterato
     from app import config as config_module
 
     config_module.get_settings.cache_clear()
-    for name in list(sys.modules):
-        if name == "app" or name.startswith("app."):
-            del sys.modules[name]
-
     import app.db as db_module
     import app.models as models_module
     import app.orchestration.runner as runner
     import app.schemas as schemas_module
     import app.services.jobs as jobs_service
 
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
     yield {
         "db": db_module,
@@ -137,6 +133,14 @@ def test_source_evidence_schema_upgrade_preserves_numerical_seed_projection() ->
     }
     modern = {
         **legacy,
+        "harness_orchestration": {
+            "schema_id": "dronedream.harness-candidate-orchestration/v1",
+            "decision_id": "a" * 32,
+            "revision_id": "b" * 32,
+            "call_id": "call_" + "c" * 24,
+            "tool_elapsed_ms": 12.5,
+            "tool_cpu_ms": 7.25,
+        },
         "optimizer_source_role": "native_optimizer",
         "optimizer_source_evidence_required": True,
         "optimizer_source_evidence": {
@@ -153,6 +157,53 @@ def test_source_evidence_schema_upgrade_preserves_numerical_seed_projection() ->
     }
 
     assert _optimizer_seed_metadata(modern) == legacy
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    (
+        ("score", -0.1),
+        ("crash_flag", True),
+        ("timeout_flag", True),
+        ("instability_flag", True),
+    ),
+)
+def test_experimental_history_rejects_invalid_or_contradictory_trial_metric(
+    field_name: str,
+    invalid_value: float | bool,
+) -> None:
+    from app.orchestration.experimental_optimizer import (
+        _authoritative_training_outcome_counts,
+    )
+
+    metric: dict[str, float | int | bool] = {
+        "rmse": 0.5,
+        "max_error": 0.75,
+        "completion_time": 8.0,
+        "score": 0.5,
+        "final_error": 0.1,
+        "overshoot_count": 0,
+        "crash_flag": False,
+        "timeout_flag": False,
+        "pass_flag": True,
+        "instability_flag": False,
+    }
+    metric[field_name] = invalid_value
+
+    counts = _authoritative_training_outcome_counts(
+        trial_evidence_rows=(
+            {
+                "status": "COMPLETED",
+                "failure_code": None,
+                "metric": metric,
+            },
+        ),
+        aggregate={},
+    )
+
+    assert counts is not None
+    assert counts["success"] == 0
+    assert counts["invalid_evidence"] == 1
 
 
 @pytest.mark.parametrize("strategy", STRATEGIES)
@@ -1254,20 +1305,14 @@ def test_direct_experimental_dispatch_rejects_outcome_contract_drift_before_writ
         )
         trial_count = len(
             list(
-                db.scalars(
-                    select(ctx["models"].Trial).where(
-                        ctx["models"].Trial.job_id == job.id
-                    )
-                )
+                db.scalars(select(ctx["models"].Trial).where(ctx["models"].Trial.job_id == job.id))
             )
         )
         job.min_pass_rate = 0.731
         monkeypatch.setattr(
             job_manager,
             "propose_experimental_generation",
-            lambda **_kwargs: pytest.fail(
-                "proposal generation ran after outcome-contract drift"
-            ),
+            lambda **_kwargs: pytest.fail("proposal generation ran after outcome-contract drift"),
         )
 
         with pytest.raises(OutcomeContractDriftError, match="no longer matches"):
@@ -1289,9 +1334,7 @@ def test_direct_experimental_dispatch_rejects_outcome_contract_drift_before_writ
             len(
                 list(
                     db.scalars(
-                        select(ctx["models"].Trial).where(
-                            ctx["models"].Trial.job_id == job.id
-                        )
+                        select(ctx["models"].Trial).where(ctx["models"].Trial.job_id == job.id)
                     )
                 )
             )
@@ -1447,6 +1490,55 @@ def test_pending_candidate_is_visible_but_excluded_from_bayesian_training(
         assert proposals[0].metadata["acquisition_representation"] == "scalar_loss"
         assert proposals[0].metadata["uses_scalar_loss"] is True
         assert proposals[0].parameters != pending.parameter_json
+
+
+def test_optimizer_history_rejects_candidate_missing_a_selected_parameter(
+    experimental_ctx: dict[str, Any],
+) -> None:
+    ctx = experimental_ctx
+    job_id = _create_job(ctx, "turbo")
+    from app.orchestration.experimental_optimizer import (
+        observations_for_job,
+        search_space_for_job,
+    )
+
+    with ctx["db"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        incomplete = ctx["models"].CandidateParameterSet(
+            job_id=job.id,
+            generation_index=1,
+            source_type="optimizer",
+            label="incomplete-history",
+            # This invariant controller value is valid extra context, but the
+            # selected MPC_XY_P coordinate is absent and must not be invented
+            # from the current baseline by the history adapter.
+            parameter_json={"MC_PITCHRATE_P": 0.15},
+            aggregated_score=0.2,
+            aggregated_metric_json={
+                "objective_values": {"rmse": 0.2},
+                "constraint_violations": {},
+                "scalar_loss": 0.2,
+                "feasible": True,
+            },
+            optimizer_metadata_json={"strategy": "turbo", "fidelity": 1.0},
+            trial_count=1,
+            completed_trial_count=1,
+            failed_trial_count=0,
+        )
+        search_space = search_space_for_job(
+            job,
+            baseline_parameters={"MPC_XY_P": 0.95},
+        )
+
+        assert (
+            observations_for_job(
+                job,
+                search_space=search_space,
+                candidates=[incomplete],
+            )
+            == ()
+        )
 
 
 def test_job_objective_preferences_reach_bayesian_vector_acquisition(
@@ -1862,18 +1954,35 @@ def test_legacy_mock_parameter_domain_can_reach_the_experimental_optimizer(
         assert all("kp_xy" in candidate.parameter_json for candidate in generated)
 
 
-def test_real_cli_experimental_optimizer_requires_explicit_px4_parameters(
+@pytest.mark.parametrize(
+    "optimizer_strategy",
+    [
+        "heuristic",
+        "gpt",
+        "llm_harness",
+        "cma_es",
+        "constrained_mobo",
+        "multi_fidelity_mobo",
+        "turbo",
+        "saasbo",
+        "surrogate_cma_es",
+        "bipop_cma_es",
+        "optimizer_portfolio",
+    ],
+)
+def test_real_cli_optimizer_requires_explicit_px4_parameters(
     experimental_ctx: dict[str, Any],
+    optimizer_strategy: str,
 ) -> None:
     schemas = experimental_ctx["schemas"]
 
     with pytest.raises(
         ValueError,
-        match="requires an explicit PX4 parameter_space",
+        match="requires a non-empty PX4 parameter_space",
     ):
         schemas.JobCreateRequest(
             simulator_backend="real_cli",
-            optimizer_strategy="turbo",
+            optimizer_strategy=optimizer_strategy,
             parameter_space=[],
             max_total_trials=100,
         )

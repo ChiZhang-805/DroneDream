@@ -1,6 +1,7 @@
 ; Vendored from tauri-apps/tauri tag tauri-v2.11.4.
 ; Upstream SHA-256 (UTF-8): 20f4ecc730defb71f1342eaeaec4021df13be3d843abba0effe88ea5835fa079
-; DroneDream changes are limited to the DRONEDREAM_* anchor macros below.
+; DroneDream changes are limited to documented DRONEDREAM_* anchors and
+; presentation-identity substitutions verified by verify-nsis-template.ps1.
 Unicode true
 ManifestDPIAware true
 ; Add in `dpiAwareness` `PerMonitorV2` to manifest for Windows 10 1607+ (note this should not affect lower versions since they should be able to ignore this and pick up `dpiAware` `true` set by `ManifestDPIAware true`)
@@ -73,13 +74,20 @@ ${StrLoc}
 !define ESTIMATEDSIZE "{{estimated_size}}"
 !define STARTMENUFOLDER "{{start_menu_folder}}"
 
+; Keep PRODUCTNAME as the internal installation identity. This include derives
+; the user-visible edition name and shortcut name without changing registry,
+; install-root, bundle, app-data, or updater ownership.
+!ifmacrodef DRONEDREAM_EDITION_IDENTITY_TABLE
+  !insertmacro DRONEDREAM_EDITION_IDENTITY_TABLE
+!endif
+
 Var PassiveMode
 Var UpdateMode
 Var NoShortcutMode
 Var WixMode
 Var OldMainBinaryName
 
-Name "${PRODUCTNAME}"
+Name "${DRONEDREAM_DISPLAYNAME}"
 BrandingText "${COPYRIGHT}"
 OutFile "${OUTFILE}"
 
@@ -90,8 +98,8 @@ OutFile "${OUTFILE}"
 InstallDir "${PLACEHOLDER_INSTALL_DIR}"
 
 VIProductVersion "${VERSIONWITHBUILD}"
-VIAddVersionKey "ProductName" "${PRODUCTNAME}"
-VIAddVersionKey "FileDescription" "${PRODUCTNAME}"
+VIAddVersionKey "ProductName" "${DRONEDREAM_DISPLAYNAME}"
+VIAddVersionKey "FileDescription" "${DRONEDREAM_DISPLAYNAME}"
 VIAddVersionKey "LegalCopyright" "${COPYRIGHT}"
 VIAddVersionKey "FileVersion" "${VERSION}"
 VIAddVersionKey "ProductVersion" "${VERSION}"
@@ -669,7 +677,7 @@ Section Install
     !insertmacro NSIS_HOOK_PREINSTALL
   !endif
 
-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
@@ -690,7 +698,7 @@ Section Install
   ; Create file associations
   {{#each file_associations as |association| ~}}
     {{#each association.ext as |ext| ~}}
-       !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${PRODUCTNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
+       !insertmacro APP_ASSOCIATE "{{ext}}" "{{or association.name ext}}" "{{association-description association.description ext}}" "$INSTDIR\${MAINBINARYNAME}.exe,0" "Open with ${DRONEDREAM_DISPLAYNAME}" "$INSTDIR\${MAINBINARYNAME}.exe $\"%1$\""
     {{/each}}
   {{/each}}
 
@@ -725,7 +733,7 @@ Section Install
   WriteRegStr SHCTX "${UNINSTKEY}" "MainBinaryName" "${MAINBINARYNAME}.exe"
 
   ; Registry information for add/remove programs
-  WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${PRODUCTNAME}"
+  WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"
   WriteRegStr SHCTX "${UNINSTKEY}" "DisplayIcon" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\""
   WriteRegStr SHCTX "${UNINSTKEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr SHCTX "${UNINSTKEY}" "Publisher" "${MANUFACTURER}"
@@ -810,7 +818,7 @@ Section Uninstall
     !insertmacro NSIS_HOOK_PREUNINSTALL
   !endif
 
-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"
 
   ; Delete the app directory and its content from disk
   ; Copy main executable
@@ -856,27 +864,36 @@ Section Uninstall
 
     ; Remove start menu shortcut
     !insertmacro MUI_STARTMENU_GETFOLDER Application $AppStartMenuFolder
-    !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
     Pop $0
     ${If} $0 = 1
-      !insertmacro UnpinShortcut "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
-      Delete "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
+      !insertmacro UnpinShortcut "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"
+      Delete "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"
       RMDir "$SMPROGRAMS\$AppStartMenuFolder"
     ${EndIf}
-    !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    !insertmacro IsShortcutTarget "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
     Pop $0
     ${If} $0 = 1
-      !insertmacro UnpinShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk"
-      Delete "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+      !insertmacro UnpinShortcut "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk"
+      Delete "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk"
     ${EndIf}
 
     ; Remove desktop shortcuts
-    !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
+    !insertmacro IsShortcutTarget "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
     Pop $0
     ${If} $0 = 1
-      !insertmacro UnpinShortcut "$DESKTOP\${PRODUCTNAME}.lnk"
-      Delete "$DESKTOP\${PRODUCTNAME}.lnk"
+      !insertmacro UnpinShortcut "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk"
+      Delete "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk"
     ${EndIf}
+
+    ; Early edition candidates used the internal PRODUCTNAME for shortcut
+    ; filenames. Remove only links proven to target this exact installation.
+    !ifmacrodef DRONEDREAM_REMOVE_INTERNAL_SHORTCUT
+      !insertmacro DRONEDREAM_REMOVE_INTERNAL_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
+      !insertmacro DRONEDREAM_REMOVE_INTERNAL_SHORTCUT "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+      !insertmacro DRONEDREAM_REMOVE_INTERNAL_SHORTCUT "$DESKTOP\${PRODUCTNAME}.lnk"
+      RMDir "$SMPROGRAMS\$AppStartMenuFolder"
+    !endif
   ${EndIf}
 
   ; Remove registry information for add/remove programs
@@ -943,6 +960,11 @@ Function un.SkipIfPassive
 FunctionEnd
 
 Function CreateOrUpdateStartMenuShortcut
+  !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT
+    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT dronedream_startmenu_entry
+    Return
+  !endif
+
   ; We used to use product name as MAINBINARYNAME
   ; migrate old shortcuts to target the new MAINBINARYNAME
   StrCpy $R0 0
@@ -985,6 +1007,11 @@ Function CreateOrUpdateStartMenuShortcut
 FunctionEnd
 
 Function CreateOrUpdateDesktopShortcut
+  !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT
+    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT dronedream_desktop_entry
+    Return
+  !endif
+
   ; We used to use product name as MAINBINARYNAME
   ; migrate old shortcuts to target the new MAINBINARYNAME
   !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"

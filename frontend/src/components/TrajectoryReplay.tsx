@@ -5,7 +5,7 @@ import { SectionCard } from "./SectionCard";
 import { Alert } from "./Alert";
 import { Loading, Empty } from "./States";
 import type { ReplayArtifacts } from "./trajectoryReplayUtils";
-import { useI18n } from "../i18n/I18nProvider";
+import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import {
   extractPoints,
   extractReferencePoints,
@@ -24,26 +24,20 @@ interface TrajectoryReplayProps {
   title?: string;
   artifacts: ReplayArtifacts;
   meta: ReplayMeta;
+  artifactLoadError?: string | null;
 }
 
 const SPEEDS = [0.5, 1, 2, 4] as const;
 
 type ReplayViewMode = "2d" | "3d";
 
-function statusTextForError(error: unknown, fallback: string): string {
-  if (error instanceof ApiClientError) {
-    return `${error.message} (${error.code})`;
-  }
-  if (error instanceof Error) return error.message;
-  return fallback;
-}
-
 export function TrajectoryReplay({
   title,
   artifacts,
   meta,
+  artifactLoadError,
 }: TrajectoryReplayProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [actualPoints, setActualPoints] = useState<ReplayPoint[] | null>(null);
   const [referencePoints, setReferencePoints] = useState<ReplayPoint[]>([]);
   const [referenceUnavailable, setReferenceUnavailable] = useState(false);
@@ -106,7 +100,12 @@ export function TrajectoryReplay({
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(statusTextForError(loadError, t("trajectory.errorFallback")));
+          const safeError = localeSafeError(loadError, locale, {
+            zh: t("trajectory.errorFallback"),
+            en: t("trajectory.errorFallback"),
+          });
+          const code = loadError instanceof ApiClientError ? loadError.code : null;
+          setError(code && !safeError.includes(code) ? `${safeError} (${code})` : safeError);
           setActualPoints([]);
         }
       }
@@ -117,25 +116,25 @@ export function TrajectoryReplay({
     return () => {
       cancelled = true;
     };
-  }, [artifacts.reference, primaryArtifact, t]);
+  }, [artifacts.reference, locale, primaryArtifact, t]);
 
   useEffect(() => {
     if (!isPlaying || !actualPoints || actualPoints.length <= 1) {
       return;
     }
-    const timer = window.setInterval(() => {
-      setPosition((prev) => {
-        const next = prev + 1;
-        if (next >= actualPoints.length - 1) {
-          setIsPlaying(false);
-          return actualPoints.length - 1;
-        }
-        return next;
-      });
-    }, Math.max(40, 220 / speed));
+    if (position >= actualPoints.length - 1) {
+      setIsPlaying(false);
+      return;
+    }
+    const currentTime = actualPoints[position].t;
+    const nextTime = actualPoints[position + 1].t;
+    const delayMs = Math.max(1, ((nextTime - currentTime) * 1000) / speed);
+    const timer = window.setTimeout(() => {
+      setPosition((previous) => Math.min(previous + 1, actualPoints.length - 1));
+    }, delayMs);
 
-    return () => window.clearInterval(timer);
-  }, [actualPoints, isPlaying, speed]);
+    return () => window.clearTimeout(timer);
+  }, [actualPoints, isPlaying, position, speed]);
 
   const primaryLabel = primaryArtifact?.display_name ?? primaryArtifact?.artifact_type;
 
@@ -171,7 +170,11 @@ export function TrajectoryReplay({
           : t("trajectory.description")
       }
     >
-      {!primaryArtifact ? (
+      {artifactLoadError ? (
+        <Alert tone="danger" title={t("artifacts.loadFailed")}>
+          {artifactLoadError}
+        </Alert>
+      ) : !primaryArtifact ? (
         <Empty
           title={t("trajectory.unavailable")}
           description={t("trajectory.unavailableDescription")}
@@ -247,7 +250,12 @@ export function TrajectoryReplay({
             <button
               type="button"
               className="btn"
-              onClick={() => setIsPlaying((p) => !p)}
+              onClick={() => {
+                if (!isPlaying && position >= actualPoints.length - 1) {
+                  setPosition(0);
+                }
+                setIsPlaying((playing) => !playing);
+              }}
               disabled={actualPoints.length <= 1}
             >
               {t(isPlaying ? "trajectory.pause" : "trajectory.play")}

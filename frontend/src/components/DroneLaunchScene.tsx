@@ -3,6 +3,8 @@ import * as THREE from "three";
 
 import { useI18n } from "../i18n/I18nProvider";
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
+import type { EditionTheme3D } from "../theme/editionTheme";
 import {
   DRONE_STARFLIGHT_DURATION_SECONDS,
   getDroneStarflightPose,
@@ -21,16 +23,52 @@ type DroneLaunchSceneProps = {
   active?: boolean;
   progress?: number | null;
   starflightControllerRef?: MutableRefObject<(() => void) | null>;
+  telemetryActiveLabel?: string;
+  telemetryStandbyLabel?: string;
+  telemetrySystemLabel?: string;
+  themeOverride?: EditionTheme3D;
   visualOffsetX?: number;
 };
+
+export type DroneLaunchSceneLabels = {
+  locale: "en" | "zh-CN";
+  tagline: string;
+  system: string;
+  active: string;
+  standby: string;
+  attitude: string;
+  hold: string;
+  cruise: string;
+};
+
+type DroneLaunchSceneCoreProps = Omit<
+  DroneLaunchSceneProps,
+  "telemetryActiveLabel" | "telemetryStandbyLabel" | "telemetrySystemLabel"
+> & {
+  labels: DroneLaunchSceneLabels;
+};
+
+function launchTaglineLines(labels: DroneLaunchSceneLabels) {
+  if (labels.locale !== "en") return [labels.tagline];
+
+  const words = labels.tagline.trim().split(/\s+/);
+  if (words.length < 2) return [labels.tagline];
+
+  const splitAt = Math.floor(words.length / 2);
+  return [words.slice(0, splitAt).join(" "), words.slice(splitAt).join(" ")];
+}
 
 const CARBON = 0x171827;
 const GRAPHITE = 0x30334a;
 const METAL = 0x697087;
-const CYAN = 0x68e8ff;
-const BLUE = 0x6d8cff;
-const VIOLET = 0x9b72ff;
-const MAGENTA = 0xf166d8;
+
+function rgba(color: number, alpha: number) {
+  const value = color.toString(16).padStart(6, "0");
+  const red = Number.parseInt(value.slice(0, 2), 16);
+  const green = Number.parseInt(value.slice(2, 4), 16);
+  const blue = Number.parseInt(value.slice(4, 6), 16);
+  return `rgba(${red},${green},${blue},${alpha})`;
+}
 
 function disposeScene(root: THREE.Object3D) {
   const geometries = new Set<THREE.BufferGeometry>();
@@ -67,7 +105,7 @@ function tubeBetween(
   return tube;
 }
 
-function buildDrone(accentGlowTexture: THREE.Texture | null) {
+function buildDrone(accentGlowTexture: THREE.Texture | null, theme: EditionTheme3D) {
   const drone = new THREE.Group();
   drone.name = "procedural-quadcopter";
 
@@ -99,21 +137,21 @@ function buildDrone(accentGlowTexture: THREE.Texture | null) {
     opacity: 0.92,
   });
   const magentaLight = new THREE.MeshBasicMaterial({
-    color: MAGENTA,
+    color: theme.tertiary,
     toneMapped: false,
   });
   const cyanLight = new THREE.MeshBasicMaterial({
-    color: CYAN,
+    color: theme.primary,
     toneMapped: false,
   });
   const cyanHotLight = new THREE.MeshBasicMaterial({
-    color: CYAN,
+    color: theme.primary,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false,
   });
   const magentaHotLight = new THREE.MeshBasicMaterial({
-    color: MAGENTA,
+    color: theme.tertiary,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false,
@@ -121,7 +159,7 @@ function buildDrone(accentGlowTexture: THREE.Texture | null) {
   const cyanGlow = accentGlowTexture
     ? new THREE.SpriteMaterial({
         map: accentGlowTexture,
-        color: CYAN,
+        color: theme.primary,
         transparent: true,
         opacity: 0.96,
         depthWrite: false,
@@ -132,7 +170,7 @@ function buildDrone(accentGlowTexture: THREE.Texture | null) {
   const magentaGlow = accentGlowTexture
     ? new THREE.SpriteMaterial({
         map: accentGlowTexture,
-        color: MAGENTA,
+        color: theme.tertiary,
         transparent: true,
         opacity: 0.94,
         depthWrite: false,
@@ -185,10 +223,10 @@ function buildDrone(accentGlowTexture: THREE.Texture | null) {
   addAccentGlow(new THREE.Vector3(0, 0.56, -0.25), cyanGlow, 1.65, 0.56);
   addAccentGlow(new THREE.Vector3(0, 0.565, -0.25), cyanGlow, 0.72, 0.22);
 
-  const cyanAccentLight = new THREE.PointLight(CYAN, 14, 3.5, 2);
+  const cyanAccentLight = new THREE.PointLight(theme.primary, 14, 3.5, 2);
   cyanAccentLight.position.set(-0.62, 0.12, -0.18);
   drone.add(cyanAccentLight);
-  const magentaAccentLight = new THREE.PointLight(MAGENTA, 14, 3.5, 2);
+  const magentaAccentLight = new THREE.PointLight(theme.tertiary, 14, 3.5, 2);
   magentaAccentLight.position.set(0.62, 0.12, 0.18);
   drone.add(magentaAccentLight);
 
@@ -201,7 +239,7 @@ function buildDrone(accentGlowTexture: THREE.Texture | null) {
   const rotors: THREE.Group[] = [];
 
   for (const [index, position] of motorPositions.entries()) {
-    const rotorColor = index % 2 === 0 ? CYAN : MAGENTA;
+    const rotorColor = index % 2 === 0 ? theme.primary : theme.tertiary;
     const rotorLightMaterial = index % 2 === 0 ? cyanLight : magentaLight;
     const rotorHotLightMaterial = index % 2 === 0 ? cyanHotLight : magentaHotLight;
     const rotorGlowMaterial = index % 2 === 0 ? cyanGlow : magentaGlow;
@@ -466,12 +504,13 @@ function buildGalacticDust(
   texture: THREE.Texture | null,
   random: () => number,
   count: number,
+  theme: EditionTheme3D,
 ) {
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
-  const cyan = new THREE.Color(CYAN);
-  const violet = new THREE.Color(VIOLET);
-  const magenta = new THREE.Color(MAGENTA);
+  const cyan = new THREE.Color(theme.primary);
+  const violet = new THREE.Color(theme.secondary);
+  const magenta = new THREE.Color(theme.tertiary);
   for (let index = 0; index < count; index += 1) {
     const distance = (random() - 0.5) * 18;
     positions[index * 3] = distance;
@@ -507,19 +546,23 @@ function buildGalacticDust(
   return { dust, material };
 }
 
-export function DroneLaunchScene({
+export function DroneLaunchSceneCore({
   active = false,
   progress = null,
   starflightControllerRef,
+  labels,
+  themeOverride,
   visualOffsetX = 0,
-}: DroneLaunchSceneProps) {
+}: DroneLaunchSceneCoreProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const attitudeValueRef = useRef<HTMLSpanElement>(null);
   const activeRef = useRef(active);
   const [fallback, setFallback] = useState(false);
   const [starflightActive, setStarflightActive] = useState(false);
-  const { locale, t } = useI18n();
   const reducedMotion = usePrefersReducedMotion();
+  const editionTheme = useEditionTheme();
+  const sceneTheme = themeOverride ?? editionTheme.three;
+  const lightAppearance = editionTheme.appearance === "light";
 
   useEffect(() => {
     activeRef.current = active;
@@ -556,7 +599,7 @@ export function DroneLaunchScene({
     renderer.shadowMap.autoUpdate = false;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.25;
+    renderer.toneMappingExposure = lightAppearance ? 1.05 : 1.25;
     renderer.domElement.className = "drone-launch-canvas";
     renderer.domElement.setAttribute("aria-hidden", "true");
     renderer.domElement.style.cursor = reducedMotion ? "default" : "crosshair";
@@ -588,7 +631,8 @@ export function DroneLaunchScene({
     renderer.domElement.addEventListener("webglcontextrestored", onContextRestored);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x090319, 0.042);
+    scene.background = lightAppearance ? new THREE.Color(0xffffff) : null;
+    scene.fog = new THREE.FogExp2(lightAppearance ? 0xffffff : sceneTheme.fog, 0.042);
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
     camera.position.set(5.3, 3.35, 7.5);
     camera.lookAt(0, 0.05, 0);
@@ -610,16 +654,16 @@ export function DroneLaunchScene({
       [1, "rgba(255,255,255,0)"],
     ], 256);
     const cyanNebulaTexture = makeRadialTexture([
-      [0, "rgba(105,238,255,0.62)"],
-      [0.2, "rgba(70,170,255,0.3)"],
-      [0.52, "rgba(78,70,190,0.13)"],
-      [1, "rgba(20,5,60,0)"],
+      [0, rgba(sceneTheme.primary, 0.62)],
+      [0.2, rgba(sceneTheme.secondary, 0.3)],
+      [0.52, rgba(sceneTheme.tertiary, 0.13)],
+      [1, rgba(sceneTheme.darkSurface, 0)],
     ], 256);
     const magentaNebulaTexture = makeRadialTexture([
-      [0, "rgba(255,108,221,0.56)"],
-      [0.24, "rgba(190,75,255,0.3)"],
-      [0.58, "rgba(70,45,165,0.12)"],
-      [1, "rgba(20,5,60,0)"],
+      [0, rgba(sceneTheme.tertiary, 0.56)],
+      [0.24, rgba(sceneTheme.secondary, 0.3)],
+      [0.58, rgba(sceneTheme.primary, 0.12)],
+      [1, rgba(sceneTheme.darkSurface, 0)],
     ], 256);
 
     const celestialBackdrop = new THREE.Group();
@@ -650,6 +694,7 @@ export function DroneLaunchScene({
       starTexture,
       random,
       440,
+      sceneTheme,
     );
     beaconStars.points.position.z = -1.6;
     celestialBackdrop.add(
@@ -684,24 +729,29 @@ export function DroneLaunchScene({
     magentaNebula.position.set(6.4, 1.8, -13.5);
     magentaNebula.scale.set(11.5, 7.8, 1);
     celestialBackdrop.add(magentaNebula);
+    celestialBackdrop.visible = !lightAppearance;
     scene.add(celestialBackdrop);
 
-    scene.add(new THREE.HemisphereLight(0xb9d8ff, 0x15051e, 2.1));
-    const key = new THREE.DirectionalLight(0xf5eaff, 5.2);
+    scene.add(new THREE.HemisphereLight(
+      lightAppearance ? 0xffffff : 0xb9d8ff,
+      lightAppearance ? 0xdcefff : 0x15051e,
+      lightAppearance ? 2.45 : 2.1,
+    ));
+    const key = new THREE.DirectionalLight(0xf5eaff, lightAppearance ? 4.1 : 5.2);
     key.position.set(4.5, 7, 5.5);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     key.shadow.camera.near = 0.1;
     key.shadow.camera.far = 24;
     scene.add(key);
-    const cyanRim = new THREE.PointLight(CYAN, 52, 13, 2);
+    const cyanRim = new THREE.PointLight(sceneTheme.primary, 52, 13, 2);
     cyanRim.position.set(-4, 1.2, 2.5);
     scene.add(cyanRim);
-    const magentaRim = new THREE.PointLight(MAGENTA, 54, 13, 2);
+    const magentaRim = new THREE.PointLight(sceneTheme.tertiary, 54, 13, 2);
     magentaRim.position.set(4, 1.6, -2.6);
     scene.add(magentaRim);
 
-    const { drone, rotors } = buildDrone(accentGlowTexture);
+    const { drone, rotors } = buildDrone(accentGlowTexture, sceneTheme);
     drone.rotation.y = -0.2;
     drone.position.y = 0.35;
     scene.add(drone);
@@ -709,11 +759,11 @@ export function DroneLaunchScene({
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(36, 36),
       new THREE.MeshStandardMaterial({
-        color: 0x0a0719,
+        color: lightAppearance ? 0xffffff : sceneTheme.darkSurface,
         roughness: 0.86,
         metalness: 0.15,
         transparent: true,
-        opacity: 0.44,
+        opacity: lightAppearance ? 0.96 : 0.44,
       }),
     );
     floor.rotation.x = -Math.PI / 2;
@@ -721,25 +771,30 @@ export function DroneLaunchScene({
     floor.receiveShadow = true;
     scene.add(floor);
 
-    const grid = new THREE.GridHelper(28, 56, MAGENTA, 0x34244f);
+    const grid = new THREE.GridHelper(28, 56, sceneTheme.tertiary, sceneTheme.gridMinor);
     grid.position.y = -1.23;
     const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
     gridMaterials.forEach((material) => {
       material.transparent = true;
-      material.opacity = 0.28;
+      material.opacity = lightAppearance ? 0.42 : 0.28;
       material.depthWrite = false;
     });
     scene.add(grid);
 
     const telemetryRing = new THREE.Group();
     for (const [radius, color, opacity] of [
-      [2.5, CYAN, 0.34],
-      [3.25, MAGENTA, 0.22],
-      [4.05, VIOLET, 0.14],
+      [2.5, sceneTheme.primary, 0.34],
+      [3.25, sceneTheme.tertiary, 0.22],
+      [4.05, sceneTheme.secondary, 0.14],
     ] as const) {
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(radius, 0.012, 8, 120),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: lightAppearance ? Math.min(0.62, opacity * 1.7) : opacity,
+          depthWrite: false,
+        }),
       );
       ring.rotation.x = Math.PI / 2;
       telemetryRing.add(ring);
@@ -761,7 +816,7 @@ export function DroneLaunchScene({
     const particles = new THREE.Points(
       particleGeometry,
       new THREE.PointsMaterial({
-        color: BLUE,
+        color: sceneTheme.secondary,
         size: 0.035,
         transparent: true,
         opacity: 0.52,
@@ -769,6 +824,7 @@ export function DroneLaunchScene({
         sizeAttenuation: true,
       }),
     );
+    particles.visible = !lightAppearance;
     scene.add(particles);
 
     const pointer = new THREE.Vector2();
@@ -1125,7 +1181,9 @@ export function DroneLaunchScene({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [reducedMotion, starflightControllerRef, visualOffsetX]);
+  }, [editionTheme.id, lightAppearance, reducedMotion, sceneTheme, starflightControllerRef, visualOffsetX]);
+
+  const taglineLines = launchTaglineLines(labels);
 
   return (
     <div
@@ -1133,23 +1191,36 @@ export function DroneLaunchScene({
       ref={hostRef}
       data-progress={progress ?? undefined}
       data-flight-state={starflightActive ? "starflight" : "hover"}
+      data-theme-edition={editionTheme.id}
+      data-theme-appearance={editionTheme.appearance}
+      data-scene-stars={lightAppearance ? "false" : "true"}
+      data-scene-particles={lightAppearance ? "false" : "true"}
+      data-reduced-motion={reducedMotion ? "true" : "false"}
+      data-theme-primary={`#${sceneTheme.primary.toString(16).padStart(6, "0")}`}
+      data-theme-secondary={`#${sceneTheme.secondary.toString(16).padStart(6, "0")}`}
+      data-theme-tertiary={`#${sceneTheme.tertiary.toString(16).padStart(6, "0")}`}
+      data-theme-grants-hardware-authority="false"
     >
       <div className="drone-launch-aura" aria-hidden="true" />
       <h1
-        className={`drone-launch-tagline drone-launch-tagline-${locale === "zh-CN" ? "zh" : "en"}${starflightActive ? " is-hidden" : ""}`}
+        className={`drone-launch-tagline drone-launch-tagline-${labels.locale === "zh-CN" ? "zh" : "en"}${starflightActive ? " is-hidden" : ""}`}
+        aria-label={labels.tagline}
+        data-line-count={taglineLines.length}
       >
-        {t("launcher.tagline")}
+        {taglineLines.map((line, index) => (
+          <span className="drone-launch-tagline-line" key={`${index}:${line}`}>
+            {line}{index < taglineLines.length - 1 ? " " : null}
+          </span>
+        ))}
       </h1>
       <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">
-        <span>{t("launcher.telemetry.system")}</span>
-        <strong>{active
-          ? t("launcher.telemetry.linkActive")
-          : t("launcher.telemetry.standby")}</strong>
+        <span>{labels.system}</span>
+        <strong>{active ? labels.active : labels.standby}</strong>
       </div>
       <div className="drone-launch-hud drone-launch-hud-right" aria-hidden="true">
-        <span>{t("launcher.telemetry.attitude")}</span>
+        <span>{labels.attitude}</span>
         <strong>
-          {t(starflightActive ? "launcher.telemetry.cruise" : "launcher.telemetry.hold")} ·{" "}
+          {starflightActive ? labels.cruise : labels.hold} ·{" "}
           <span ref={attitudeValueRef}>+0.0°</span>
         </strong>
       </div>
@@ -1163,5 +1234,29 @@ export function DroneLaunchScene({
         </div>
       ) : null}
     </div>
+  );
+}
+
+export function DroneLaunchScene({
+  telemetryActiveLabel,
+  telemetryStandbyLabel,
+  telemetrySystemLabel,
+  ...props
+}: DroneLaunchSceneProps) {
+  const { locale, t } = useI18n();
+  return (
+    <DroneLaunchSceneCore
+      {...props}
+      labels={{
+        locale,
+        tagline: t("launcher.tagline"),
+        system: telemetrySystemLabel ?? t("launcher.telemetry.system"),
+        active: telemetryActiveLabel ?? t("launcher.telemetry.linkActive"),
+        standby: telemetryStandbyLabel ?? t("launcher.telemetry.standby"),
+        attitude: t("launcher.telemetry.attitude"),
+        hold: t("launcher.telemetry.hold"),
+        cruise: t("launcher.telemetry.cruise"),
+      }}
+    />
   );
 }

@@ -95,8 +95,21 @@ from app.orchestration.acceptance import (
     criteria_for_job,
     evaluate_candidate,
 )
+from app.orchestration.cognitive_budget import CognitiveTurnPending
 from app.orchestration.events import record_event
+from app.orchestration.first_qualified import (
+    FirstQualifiedFreezeError,
+    freeze_first_qualified_candidate,
+    stage_first_qualified_dispatch_stop,
+)
 from app.orchestration.outcome_contract_guard import check_job_outcome_contract
+from app.orchestration.qualification import SEALED_QUALIFICATION_POLICY_VERSION
+from app.orchestration.qualification_coordinator import (
+    QualificationCoordinatorError,
+    advance_sealed_qualifications,
+    qualified_candidate_evidence_projection,
+)
+from app.orchestration.qualification_dispatch import sealed_contract_for_job
 
 logger = logging.getLogger("drone_dream.orchestration.aggregation")
 
@@ -107,6 +120,12 @@ _ITERATIVE_OPTIMIZERS = {
     "cma_es",
     *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
 }
+
+
+def _is_benchmark_bound(job: models.Job) -> bool:
+    """Return whether immutable campaign provenance owns proposal routing."""
+
+    return job.benchmark_run_binding is not None
 
 
 class FinalizationClaimLost(RuntimeError):
@@ -245,11 +264,11 @@ def _candidate_fidelity(candidate: object) -> float:
         return 1.0
     raw = metadata.get("requested_fidelity", metadata.get("fidelity", 1.0))
     if isinstance(raw, bool) or not isinstance(raw, str | int | float):
-        return 1.0
+        return 0.0
     try:
         fidelity = float(raw)
     except (TypeError, ValueError):
-        return 1.0
+        return 0.0
     return fidelity if math.isfinite(fidelity) and 0.0 < fidelity <= 1.0 else 0.0
 
 
@@ -269,6 +288,30 @@ def _configured_scenario_contract(
         raw_suite = getattr(job, "scenario_suite_json", None)
     except Exception:  # pragma: no cover - detached ORM state is not publishable
         return Counter(), False
+    typed_job = job if isinstance(job, models.Job) else None
+    if (
+        typed_job is not None
+        and typed_job.holdout_policy_version
+        == SEALED_QUALIFICATION_POLICY_VERSION
+    ):
+        try:
+            projection = qualified_candidate_evidence_projection(candidate)  # type: ignore[arg-type]
+            contract = sealed_contract_for_job(typed_job)
+        except QualificationCoordinatorError:
+            return Counter(), False
+        if projection is None or contract is None:
+            return Counter(), False
+        target = projection.get("qualification_target")
+        if isinstance(target, bool) or target not in {10, 20}:
+            return Counter(), False
+        expected = Counter(
+            [(item.case_id, False) for item in contract.screening]
+            + [
+                (item.case_id, True)
+                for item in contract.qualification[: int(target)]
+            ]
+        )
+        return expected, True
     if raw_suite is None:
         return None
     if not isinstance(raw_suite, dict):
@@ -314,6 +357,18 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     legacy optimizers, while experimental optimizers require an explicit result.
     """
 
+    job = getattr(candidate, "job", None)
+    sealed_projection: dict[str, Any] | None = None
+    if (
+        getattr(job, "holdout_policy_version", None)
+        == SEALED_QUALIFICATION_POLICY_VERSION
+    ):
+        try:
+            sealed_projection = qualified_candidate_evidence_projection(candidate)
+        except QualificationCoordinatorError:
+            return False
+        if sealed_projection is None:
+            return False
     if not candidate.is_baseline and _candidate_fidelity(candidate) < 1.0 - 1e-9:
         return False
     trial_count = _safe_candidate_count(candidate.trial_count)
@@ -367,7 +422,12 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     except Exception:  # pragma: no cover - detached ORM state is not publishable
         return False
     if has_trial_relationship and (
-        len(trials) != trial_count or any(not _trial_has_usable_metric(trial) for trial in trials)
+        len(trials) != trial_count
+        or any(
+            not _trial_has_usable_metric(trial)
+            or not _trial_metric_provenance_is_publishable(trial)
+            for trial in trials
+        )
     ):
         return False
 
@@ -407,13 +467,17 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
         or any(_trial_is_holdout(trial) for trial in trials)
     )
     if expects_holdout:
-        holdout_result = aggregate.get("holdout")
-        if not (
-            isinstance(holdout_result, dict)
-            and holdout_result.get("validation_status") == "passed"
-            and holdout_result.get("feasible") is True
-        ):
-            return False
+        if sealed_projection is not None:
+            if aggregate.get("sealed_qualification") != sealed_projection:
+                return False
+        else:
+            holdout_result = aggregate.get("holdout")
+            if not (
+                isinstance(holdout_result, dict)
+                and holdout_result.get("validation_status") == "passed"
+                and holdout_result.get("feasible") is True
+            ):
+                return False
     return True
 
 
@@ -450,7 +514,7 @@ def _metric_is_usable(metric: models.TrialMetric | None) -> bool:
         _finite_metric_number(metric.rmse) is not None
         and _finite_metric_number(metric.max_error) is not None
         and _finite_metric_number(metric.completion_time) is not None
-        and _finite_metric_number(metric.score, nonnegative=False) is not None
+        and _finite_metric_number(metric.score) is not None
         and _finite_metric_number(metric.final_error) is not None
         and isinstance(overshoot, int)
         and not isinstance(overshoot, bool)
@@ -464,14 +528,15 @@ def _metric_is_usable(metric: models.TrialMetric | None) -> bool:
                 metric.instability_flag,
             )
         )
+        and not (
+            metric.pass_flag
+            and (metric.crash_flag or metric.timeout_flag or metric.instability_flag)
+        )
     )
 
 
 def _required_metric_number(value: object, *, field_name: str) -> float:
-    numeric = _finite_metric_number(
-        value,
-        nonnegative=field_name != "score",
-    )
+    numeric = _finite_metric_number(value)
     if numeric is None:
         raise ValueError(f"trial metric {field_name} is missing or invalid")
     return numeric
@@ -486,6 +551,38 @@ def _required_overshoot_count(value: object) -> int:
 def _trial_has_usable_metric(trial: models.Trial) -> bool:
     return getattr(trial, "status", None) == "COMPLETED" and _metric_is_usable(
         getattr(trial, "metric", None)
+    )
+
+
+def _trial_metric_provenance_is_publishable(trial: models.Trial) -> bool:
+    """Keep synthetic PX4 plumbing checks out of published recommendations.
+
+    The PX4/Gazebo runner deliberately returns a successful TrialResult in
+    ``dry_run`` and ``site_dry_run`` modes so the adapter, storage, and evidence
+    plumbing can be exercised without launching a simulator.  Those metrics are
+    useful diagnostics, but they are not observations of a physical simulation
+    and must never rank a Candidate or become a frozen winner.
+
+    Generic/mock simulators do not emit PX4 outcome evidence and retain their
+    existing behaviour.  Once a metric claims the PX4 evidence schema, however,
+    provenance is fail-closed: only an explicit, boolean ``synthetic: false``
+    may be published.  For accepted physical attempts the complete raw metric
+    object is already content-bound by ``metric_sha256``.
+    """
+
+    metric = getattr(trial, "metric", None)
+    raw_metric = getattr(metric, "raw_metric_json", None)
+    if not isinstance(raw_metric, dict):
+        return True
+    if raw_metric.get("mode") in {"dry_run", "site_dry_run"}:
+        return False
+    px4_evidence = raw_metric.get("px4_outcome_evidence")
+    if px4_evidence is None:
+        return True
+    return (
+        isinstance(px4_evidence, dict)
+        and px4_evidence.get("schema_id") == "dronedream.px4-outcome-evidence/v1"
+        and px4_evidence.get("synthetic") is False
     )
 
 
@@ -1034,24 +1131,16 @@ def _aggregate_candidate(
             training_trials,
             field_name="score",
         )
-        if any(
-            value is None
-            for value in (
-                training_rmse_decision,
-                training_max_error_decision,
-                training_overshoot_decision,
-                training_completion_time_decision,
-                training_score_decision,
-            )
+        if (
+            training_rmse_decision is None
+            or training_max_error_decision is None
+            or training_overshoot_decision is None
+            or training_completion_time_decision is None
+            or training_score_decision is None
         ):
             raise RuntimeError(
                 "aggregation invariant violated: evaluated case lost compatibility metrics"
             )
-        assert training_rmse_decision is not None
-        assert training_max_error_decision is not None
-        assert training_overshoot_decision is not None
-        assert training_completion_time_decision is not None
-        assert training_score_decision is not None
         training_max_error_worst_decision = max(training_max_errors)
         agg.update(
             {
@@ -1260,6 +1349,9 @@ def _aggregate_candidate(
                     mode="json"
                 )
             agg["holdout"] = holdout_payload
+        sealed_qualification = qualified_candidate_evidence_projection(candidate)
+        if sealed_qualification is not None:
+            agg["sealed_qualification"] = sealed_qualification
         if outcome_contract is not None:
             ordered_training_trials = sorted(
                 training_trials,
@@ -1320,6 +1412,23 @@ def _is_eligible(candidate: models.CandidateParameterSet) -> bool:
     return candidate_is_publishable(candidate)
 
 
+def _candidate_selection_rank_key(
+    candidate: models.CandidateParameterSet,
+) -> tuple[float, ...]:
+    dispatch_ordinal = candidate.dispatch_ordinal
+    if dispatch_ordinal is None or dispatch_ordinal < 1:
+        dispatch_ordinal = 9_223_372_036_854_775_807
+    return (
+        *selection_order_key(
+            candidate.aggregated_metric_json,
+            candidate.aggregated_score,
+        ),
+        float(0 if not candidate.is_baseline else 1),
+        float(candidate.generation_index),
+        float(dispatch_ordinal),
+    )
+
+
 def _rank_and_select_best(
     candidates: list[models.CandidateParameterSet],
 ) -> models.CandidateParameterSet | None:
@@ -1337,17 +1446,7 @@ def _rank_and_select_best(
     if not scorable:
         return None
 
-    scorable.sort(
-        key=lambda c: (
-            *selection_order_key(
-                c.aggregated_metric_json,
-                c.aggregated_score,
-            ),
-            0 if not c.is_baseline else 1,
-            c.generation_index,
-            c.id,
-        )
-    )
+    scorable.sort(key=_candidate_selection_rank_key)
 
     for rank, candidate in enumerate(scorable, start=1):
         candidate.rank_in_job = rank
@@ -1363,10 +1462,15 @@ def _compile_current_winner_evidence(
     best: models.CandidateParameterSet,
     outcome_contract: OptimizationOutcomeContractV1,
 ) -> WinnerSelectionEvidenceV1:
+    evidence_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.aggregated_metric_json is not None
+    ]
     inputs: list[dict[str, object]] = []
     outcome_projections: dict[str, dict[str, Any]] = {}
     report_projections: dict[str, dict[str, Any]] = {}
-    for candidate in candidates:
+    for candidate in evidence_candidates:
         outcome = authoritative_candidate_trial_outcome_projection(
             candidate_id=candidate.id,
             generation_index=candidate.generation_index,
@@ -1413,7 +1517,7 @@ def _compile_current_winner_evidence(
     )
     if not winner_evidence_matches_current_candidates(
         evidence.model_dump(mode="json"),
-        candidates=candidates,
+        candidates=evidence_candidates,
         outcome_projections=outcome_projections,
         report_projections=report_projections,
     ):
@@ -1426,6 +1530,91 @@ def _compile_current_winner_evidence(
 # --- Finalization ----------------------------------------------------------
 
 
+def _candidate_trial_matrix_is_terminal(
+    candidate: models.CandidateParameterSet,
+    trials: list[models.Trial],
+) -> bool:
+    """Return whether the candidate's complete dispatched matrix is terminal."""
+
+    expected = _safe_candidate_count(candidate.trial_count)
+    return (
+        expected is not None
+        and expected > 0
+        and len(trials) == expected
+        and all(trial.status in _TERMINAL_TRIAL for trial in trials)
+    )
+
+
+def _candidate_aggregation_is_current(
+    candidate: models.CandidateParameterSet,
+    trials: list[models.Trial],
+) -> bool:
+    """Distinguish a sealed aggregate from a merely dispatched candidate.
+
+    An all-failed candidate legitimately has no aggregate JSON.  The persisted
+    completed/failed counters therefore form the processing marker instead of
+    truthiness of ``aggregated_metric_json`` alone.
+    """
+
+    if not _candidate_trial_matrix_is_terminal(candidate, trials):
+        return False
+    completed = _safe_candidate_count(candidate.completed_trial_count)
+    failed = _safe_candidate_count(candidate.failed_trial_count)
+    if completed is None or failed is None or completed + failed != len(trials):
+        return False
+    if completed == 0:
+        return candidate.aggregated_metric_json is None and candidate.aggregated_score is None
+    return isinstance(candidate.aggregated_metric_json, dict)
+
+
+def _job_has_unaggregated_ready_candidate(job: models.Job) -> bool:
+    trials_by_candidate: dict[str, list[models.Trial]] = {}
+    for trial in job.trials:
+        trials_by_candidate.setdefault(trial.candidate_id, []).append(trial)
+    return any(
+        _candidate_trial_matrix_is_terminal(
+            candidate,
+            trials_by_candidate.get(candidate.id, []),
+        )
+        and not _candidate_aggregation_is_current(
+            candidate,
+            trials_by_candidate.get(candidate.id, []),
+        )
+        for candidate in job.candidates
+    )
+
+
+def _release_partial_finalization_claim(
+    db: Session,
+    job: models.Job,
+    *,
+    finalization_claim: _FinalizationClaimToken,
+) -> None:
+    """Return a partially evaluated Job to the trial drain without new dispatch."""
+
+    _acquire_finalization_commit_fence(db, finalization_claim)
+    frozen = job.first_qualified_candidate_id is not None
+    job.status = "RUNNING"
+    job.current_phase = "safe_finalization" if frozen else "trial_execution"
+    _clear_finalization_claim(job)
+    record_event(
+        db,
+        job.id,
+        "candidate_aggregation_window_closed",
+        {
+            "first_qualified_frozen": frozen,
+            "running_trials_preserved": sum(
+                trial.status == "RUNNING" for trial in job.trials
+            ),
+            "pending_trials_remaining": sum(
+                trial.status == "PENDING" for trial in job.trials
+            ),
+        },
+    )
+    db.commit()
+    db.refresh(job)
+
+
 def finalize_job_if_ready(
     db: Session,
     job: models.Job,
@@ -1433,14 +1622,14 @@ def finalize_job_if_ready(
     finalization_claim: _FinalizationClaimToken,
     llm_client: object | None = None,
 ) -> bool:
-    """If every trial is terminal, aggregate candidates and finalize the job.
+    """Aggregate each complete candidate window and finalize when safe.
 
     For GPT jobs this method implements the iterative loop: after aggregating
-    the current generation it evaluates acceptance and, if neither accepted
-    nor budget-exhausted, dispatches the next LLM-proposed generation instead
-    of finalizing. The job is only marked terminal when either a candidate
-    passes acceptance, the acceptance criteria are not configured, or the
-    iteration/trial budget is exhausted.
+    a candidate whose complete scenario matrix is terminal, it can freeze the
+    first qualified candidate without waiting for unrelated parallel work.
+    Unclaimed work is cancelled while already-running physical Trials retain
+    adapter ownership for landing and terminal evidence.  A new generation is
+    considered only after the current Job trial set is fully terminal.
     """
 
     if job.status != "FINALIZING":
@@ -1455,8 +1644,7 @@ def finalize_job_if_ready(
     trials = list(job.trials)
     if not trials:
         return False
-    if not all(t.status in _TERMINAL_TRIAL for t in trials):
-        return False
+    all_trials_terminal = all(t.status in _TERMINAL_TRIAL for t in trials)
 
     baseline_id = job.baseline_candidate_id
     if baseline_id is None:
@@ -1479,8 +1667,34 @@ def finalize_job_if_ready(
         )
         return True
 
-    # Aggregate every candidate (baseline first so the baseline_agg variable
-    # is available for the report builder).
+    try:
+        qualification_advance = advance_sealed_qualifications(db, job=job)
+    except QualificationCoordinatorError as exc:
+        job_id = job.id
+        db.rollback()
+        db.expire_all()
+        failed_job = db.get(models.Job, job_id)
+        if failed_job is None:
+            return True
+        _fail_job(
+            db,
+            failed_job,
+            finalization_claim=finalization_claim,
+            code="QUALIFICATION_EVIDENCE_INVALID",
+            message=str(exc),
+        )
+        return True
+    if qualification_advance.dispatched_trials:
+        _release_partial_finalization_claim(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+        )
+        return False
+
+    # Aggregate only candidates whose complete dispatched matrix is terminal.
+    # A candidate can become ready while unrelated parallel work is still in
+    # flight; its evidence is immutable from this point onward.
     candidates = list(job.candidates)
     trials_by_candidate: dict[str, list[models.Trial]] = {}
     for t in trials:
@@ -1510,23 +1724,19 @@ def finalize_job_if_ready(
             ),
         )
         return True
-    baseline_agg = _aggregate_candidate(
-        baseline,
-        trials_by_candidate.get(baseline.id, []),
-        objective_config=objective_config,
-        scenario_suite=scenario_suite,
-        outcome_contract=outcome_contract,
-    )
     for candidate in candidates:
-        if candidate.id == baseline.id:
-            continue
-        _aggregate_candidate(
+        candidate_trials = trials_by_candidate.get(candidate.id, [])
+        if _candidate_trial_matrix_is_terminal(
             candidate,
-            trials_by_candidate.get(candidate.id, []),
-            objective_config=objective_config,
-            scenario_suite=scenario_suite,
-            outcome_contract=outcome_contract,
-        )
+            candidate_trials,
+        ) and not _candidate_aggregation_is_current(candidate, candidate_trials):
+            _aggregate_candidate(
+                candidate,
+                candidate_trials,
+                objective_config=objective_config,
+                scenario_suite=scenario_suite,
+                outcome_contract=outcome_contract,
+            )
 
     # Persist aggregation results before any report storage or LLM network I/O.
     # This releases SQLite's write lock while a provider or filesystem is slow.
@@ -1537,6 +1747,14 @@ def finalize_job_if_ready(
         db.rollback()
         return True
 
+    baseline_agg = baseline.aggregated_metric_json
+    if baseline_agg is None and not all_trials_terminal:
+        _release_partial_finalization_claim(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+        )
+        return False
     if baseline_agg is None:
         _fail_job(
             db,
@@ -1552,9 +1770,105 @@ def finalize_job_if_ready(
 
     criteria = criteria_for_job(job)
 
+    # Freeze "first" inside the same fenced aggregation window that produced
+    # the authoritative Candidate evidence.  Every fully-publishable candidate
+    # must also pass the user's preregistered acceptance criteria.  The freeze
+    # is committed before report filesystem I/O so a worker crash cannot cause
+    # another generation/provider call on resume.
+    qualified = (
+        [
+            (candidate, result)
+            for candidate in candidates
+            if candidate_is_publishable(candidate)
+            and (result := evaluate_candidate(candidate, criteria)).passed
+        ]
+        if any_criterion_set(criteria)
+        else []
+    )
+    try:
+        if job.completion_policy == "first_qualified_stop" and (
+            qualified or job.first_qualified_candidate_id is not None
+        ):
+            _acquire_finalization_commit_fence(db, finalization_claim)
+            receipt = freeze_first_qualified_candidate(
+                db,
+                job=job,
+                qualified=qualified,
+            )
+            if receipt is not None:
+                stage_first_qualified_dispatch_stop(db, job=job)
+                db.commit()
+                db.refresh(job)
+    except FirstQualifiedFreezeError as exc:
+        _fail_job(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+            code="FIRST_QUALIFIED_EVIDENCE_INVALID",
+            message=str(exc),
+        )
+        return True
+
+    # A first-qualified freeze cancels every still-unclaimed Trial, but a Trial
+    # already inside PX4/Gazebo keeps its adapter-owned landing/finalization
+    # path.  Do not publish a terminal Job until those physical attempts have
+    # produced terminal evidence.
+    all_trials_terminal = all(
+        trial.status in _TERMINAL_TRIAL for trial in job.trials
+    )
+    if not all_trials_terminal:
+        _release_partial_finalization_claim(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+        )
+        return False
+
+    # ``stage_first_qualified_dispatch_stop`` may have made previously queued
+    # candidate matrices terminal by cancelling them.  Synchronize their
+    # diagnostic counters before publishing the Job so history/API rows never
+    # show zero failures beside terminal cancelled Trials.
+    post_stop_aggregation = False
+    for candidate in candidates:
+        candidate_trials = trials_by_candidate.get(candidate.id, [])
+        if _candidate_trial_matrix_is_terminal(
+            candidate,
+            candidate_trials,
+        ) and not _candidate_aggregation_is_current(candidate, candidate_trials):
+            _aggregate_candidate(
+                candidate,
+                candidate_trials,
+                objective_config=objective_config,
+                scenario_suite=scenario_suite,
+                outcome_contract=outcome_contract,
+            )
+            post_stop_aggregation = True
+    if post_stop_aggregation:
+        _acquire_finalization_commit_fence(db, finalization_claim)
+        db.commit()
+        db.refresh(job)
+
+    # A sealed qualification matrix may be progressing while unrelated Trials
+    # remain in flight.  Preserve partial aggregates for observability, but do
+    # not dispatch another generation or publish a terminal Job until a sealed
+    # first-qualified receipt exists or the current matrices are all terminal.
+    if (
+        job.holdout_policy_version == SEALED_QUALIFICATION_POLICY_VERSION
+        and job.first_qualified_candidate_id is None
+        and not all_trials_terminal
+    ):
+        _release_partial_finalization_claim(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+        )
+        return False
+
     # Iterative optimizer loop (GPT / CMA-ES-style): possibly dispatch another
     # generation instead of finalizing.
-    if job.optimizer_strategy in _ITERATIVE_OPTIMIZERS:
+    if (
+        _is_benchmark_bound(job) or job.optimizer_strategy in _ITERATIVE_OPTIMIZERS
+    ) and job.first_qualified_candidate_id is None:
         if _try_continue_iterative_optimizer(
             db,
             job,
@@ -1707,6 +2021,44 @@ def finalize_job_if_ready(
     return True
 
 
+def _exploration_time_budget_exhausted(job: models.Job) -> bool:
+    if job.job_kind != "continue_exploration":
+        return False
+    budget = job.exploration_budget_json
+    if not isinstance(budget, dict):
+        return True
+    seconds = budget.get("additional_time_budget_seconds")
+    if isinstance(seconds, bool) or not isinstance(seconds, int) or seconds < 60:
+        return True
+    started = job.started_at or job.queued_at or job.created_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return _now() >= started.astimezone(timezone.utc) + timedelta(seconds=seconds)
+
+
+def _is_validated_exploration_improvement(
+    job: models.Job,
+    candidate: models.CandidateParameterSet,
+    criteria: AcceptanceCriteria,
+) -> bool:
+    """Require a strict objective improvement over the immutable child baseline."""
+
+    if candidate.is_baseline or not candidate_is_publishable(candidate):
+        return False
+    if not evaluate_candidate(candidate, criteria).passed:
+        return False
+    baseline = next((item for item in job.candidates if item.is_baseline), None)
+    if baseline is None or not candidate_is_publishable(baseline):
+        return False
+    return selection_order_key(
+        candidate.aggregated_metric_json,
+        candidate.aggregated_score,
+    ) < selection_order_key(
+        baseline.aggregated_metric_json,
+        baseline.aggregated_score,
+    )
+
+
 def _determine_terminal_state(
     job: models.Job,
     best: models.CandidateParameterSet,
@@ -1720,12 +2072,18 @@ def _determine_terminal_state(
     """
 
     result = evaluate_candidate(best, criteria)
+    if job.job_kind == "continue_exploration":
+        if _is_validated_exploration_improvement(job, best, criteria):
+            return "exploration_improved", "COMPLETED", None
+        if _exploration_time_budget_exhausted(job):
+            return "exploration_budget_exhausted", "COMPLETED", None
+        return "exploration_no_improvement", "COMPLETED", None
     if result.passed:
         return "success", "COMPLETED", None
     # No criteria set → treat completion as success by convention.
     if not any_criterion_set(criteria) and criteria.min_pass_rate <= (result.pass_rate + 1e-9):
         return "success", "COMPLETED", None
-    if job.optimizer_strategy in _ITERATIVE_OPTIMIZERS:
+    if _is_benchmark_bound(job) or job.optimizer_strategy in _ITERATIVE_OPTIMIZERS:
         # Iterative optimizer exhausted iteration/trial budget without finding
         # a passing candidate — report best-so-far as a completed run.
         if job.current_generation >= job.max_iterations:
@@ -1751,8 +2109,8 @@ def _try_continue_iterative_optimizer(
 
     * If any scored candidate (including baseline) passes acceptance, we stop
       and let the caller finalize as COMPLETED.
-    * If acceptance criteria are not configured, we don't proceed past the
-      baseline generation — the baseline is implicitly accepted.
+    * If every acceptance threshold is disabled, the optimizer keeps searching
+      until its configured iteration/trial budget or search space is exhausted.
     * Respects ``max_iterations`` and ``max_total_trials``.
     """
 
@@ -1760,18 +2118,31 @@ def _try_continue_iterative_optimizer(
     passed = any_criterion_set(criteria) and any(
         evaluate_candidate(c, criteria).passed for c in scored
     )
-    needs_verified_optimizer = job.optimizer_strategy in {
-        "llm_harness",
-        *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
-    } and not any(
+    benchmark_bound = _is_benchmark_bound(job)
+    needs_verified_optimizer = (
+        benchmark_bound
+        or job.optimizer_strategy
+        in {
+            "llm_harness",
+            *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+        }
+    ) and not any(
         candidate.source_type == "optimizer" and candidate_is_publishable(candidate)
         for candidate in candidates
     )
-    if passed and not needs_verified_optimizer:
+    if job.job_kind == "continue_exploration":
+        validated_improvement = any(
+            _is_validated_exploration_improvement(job, candidate, criteria)
+            for candidate in candidates
+        )
+        if validated_improvement or _exploration_time_budget_exhausted(job):
+            return False
+    elif passed and not needs_verified_optimizer:
         return False
     if job.current_generation >= job.max_iterations:
         return False
     from app.orchestration.job_manager import (
+        dispatch_next_benchmark_generation,
         dispatch_next_cma_es_generation,
         dispatch_next_experimental_generation,
         dispatch_next_harness_generation,
@@ -1783,7 +2154,27 @@ def _try_continue_iterative_optimizer(
     if llm_client is not None:
         client_cast = llm_client  # type: ignore[assignment]
 
-    if job.optimizer_strategy == "gpt":
+    if benchmark_bound:
+        benchmark_dispatch = dispatch_next_benchmark_generation(db, job)
+        if benchmark_dispatch.status in {"benchmark_blocked", "proposal_failed"}:
+            _fail_job(
+                db,
+                job,
+                finalization_claim=finalization_claim,
+                code=(benchmark_dispatch.error_code or "BENCHMARK_DISPATCH_FAILED").upper(),
+                message=benchmark_dispatch.error or "Benchmark proposal dispatch failed.",
+                outcome="benchmark_dispatch_failed",
+            )
+            return False
+        if benchmark_dispatch.status in {
+            "budget_exhausted",
+            "first_qualified_stop",
+            "max_iterations_reached",
+            "search_space_exhausted",
+            "wall_time_exhausted",
+        }:
+            return False
+    elif job.optimizer_strategy == "gpt":
         llm_dispatch = dispatch_next_llm_generation(db, job, client=client_cast)
         if llm_dispatch.status == "llm_error":
             _fail_job(
@@ -1815,6 +2206,7 @@ def _try_continue_iterative_optimizer(
             "budget_exhausted",
             "max_iterations_reached",
             "search_space_exhausted",
+            "stop_accepted",
         }:
             return False
     elif job.optimizer_strategy == "cma_es":
@@ -1989,7 +2381,20 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
             break
         examined.add(job.id)
         trials = list(job.trials)
-        if not trials or not all(t.status in _TERMINAL_TRIAL for t in trials):
+        if not trials:
+            continue
+        all_trials_terminal = all(
+            trial.status in _TERMINAL_TRIAL for trial in trials
+        )
+        has_ready_candidate = _job_has_unaggregated_ready_candidate(job)
+        # An expired FINALIZING claim must always be reclaimed.  Its previous
+        # owner may have committed a Candidate aggregate and crashed before the
+        # freeze or before returning the Job to RUNNING.
+        if (
+            not all_trials_terminal
+            and not has_ready_candidate
+            and job.status != "FINALIZING"
+        ):
             continue
         claim = _FinalizationClaimToken(
             job_id=job.id,
@@ -2048,6 +2453,28 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
                 "job %s finalization claim was reclaimed; stale worker exited",
                 job.id,
             )
+        except CognitiveTurnPending:
+            db.rollback()
+            db.expire_all()
+            pending_job = db.get(models.Job, job.id)
+            if pending_job is None or pending_job.status == "CANCELLED":
+                continue
+            try:
+                _release_partial_finalization_claim(
+                    db,
+                    pending_job,
+                    finalization_claim=claim,
+                )
+                logger.info(
+                    "job %s finalization deferred for an in-flight cognitive turn",
+                    job.id,
+                )
+            except FinalizationClaimLost:
+                db.rollback()
+                logger.info(
+                    "job %s cognitive defer lost its finalization claim",
+                    job.id,
+                )
         except Exception as exc:
             logger.exception("job %s finalization crashed", job.id)
             db.rollback()

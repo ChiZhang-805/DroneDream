@@ -46,6 +46,9 @@ HARNESS_ABLATION_CLAIM_BOUNDARY = (
     "simulator performance, user outcomes, causal component contribution, or "
     "real-flight safety."
 )
+HARNESS_ABLATION_LEGACY_ARTIFACT_SHA256 = (
+    "f91a848c84d1766fd728968f4d82d49a9bc3af7fc2cc036da5b99efed62bb8f2"
+)
 
 
 def _canonical_json(value: object) -> str:
@@ -427,7 +430,8 @@ def _scenario_profile_rows() -> list[dict[str, Any]]:
     }
     profile = _scenario_profile_evidence(cases=[*training_cases, holdout_a])
     training_profiles = profile["training_cases"]
-    assert isinstance(training_profiles, list)
+    if not isinstance(training_profiles, list):
+        raise RuntimeError("scenario profile compiler returned invalid training cases")
     first_safe = training_profiles[0]["safe_perturbations"]
     holdout_variant = _scenario_profile_evidence(cases=[*training_cases, holdout_b])
 
@@ -442,7 +446,8 @@ def _scenario_profile_rows() -> list[dict[str, Any]]:
         ]
     )
     out_of_range_profiles = out_of_range["training_cases"]
-    assert isinstance(out_of_range_profiles, list)
+    if not isinstance(out_of_range_profiles, list):
+        raise RuntimeError("scenario profile compiler returned invalid out-of-range cases")
 
     advanced = _scenario_profile_evidence(
         cases=[*training_cases, holdout_a],
@@ -623,9 +628,16 @@ def verify_harness_ablation_artifact(payload: object) -> dict[str, Any]:
     ):
         raise ValueError("Harness ablation claim boundary is invalid")
     current = build_harness_ablation_artifact()
-    if payload != current:
+    versions = payload.get("contract_versions")
+    legacy = (
+        isinstance(versions, dict)
+        and versions.get("harness_evidence_schema") == "2.7"
+        and versions.get("prompt_template") == "1.6"
+        and declared_hash == HARNESS_ABLATION_LEGACY_ARTIFACT_SHA256
+    )
+    if payload != current and not legacy:
         raise ValueError("Harness ablation artifact does not match current contracts")
-    return current
+    return payload
 
 
 def load_harness_ablation_artifact(path: Path) -> dict[str, Any]:

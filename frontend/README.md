@@ -16,16 +16,28 @@ are kept behind dedicated adapters rather than mixed into API models.
 - `/history` and `/compare` — history, reports, and experiment comparison.
 - `/desktop/setup` — desktop-only prerequisite, Runtime install/repair, and
   readiness flow.
-- `/ece498` — one-screen bilingual ECE 498 BH course introduction and tribute.
+- `ECE498BH` sidebar entry — opens Professor Bin Hu's official Spring 2025
+  course website in the system browser; the console does not maintain a
+  separate course-content route.
 
 The retired batch pages redirect to the overview. Batch HTTP endpoints remain
 available only as an API compatibility surface; the desktop product creates and
 runs one optimization experiment at a time.
 
 Browser builds use history routing. The packaged desktop uses hash routing so
-navigation continues to work from bundled files. On first launch the desktop
-readiness layer starts the managed Runtime once, reuses the result for later
-route changes, and exposes an explicit full re-check from Settings.
+navigation continues to work from bundled files. A desktop cold start opens the
+same edition landing surface as the browser console. Runtime-backed actions stay
+closed until the user completes the explicit install, repair, or full re-check
+flow in Settings; the retained `/desktop/setup` route owns that flow without
+replacing the product workspace at every launch.
+
+Native screenshot audits may set `VITE_DESKTOP_VISUAL_QA=true` only for an
+unsigned engineering build. That desktop-only mode supplies a local preview
+account and bypasses the runtime route loader so every shared-console surface
+can be inspected in the real WebView without using customer credentials. The
+five-edition build script rejects the flag for signed updater builds and gives
+each QA edition an isolated application identifier so it cannot read or mutate
+the installed product's WebView profile.
 
 ## Source layout
 

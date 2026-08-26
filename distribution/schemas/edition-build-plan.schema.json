@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/edition-build-plan.v1.json",
+  "title": "DroneDream unified edition build plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "planVersion",
+    "planId",
+    "state",
+    "blockers",
+    "productDisplayVersion",
+    "internalBuildId",
+    "targetArchitecture",
+    "source",
+    "execution",
+    "policyBindings",
+    "components",
+    "editions",
+    "precombinedBundles",
+    "licenseClosure"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-unified-edition-build-plan"},
+    "planVersion": {"$ref": "#/$defs/semver"},
+    "planId": {"$ref": "#/$defs/id"},
+    "state": {"const": "plan-only"},
+    "blockers": {"$ref": "#/$defs/textArray"},
+    "productDisplayVersion": {"const": "1.0.0"},
+    "internalBuildId": {"$ref": "#/$defs/buildId"},
+    "targetArchitecture": {"const": "windows-x86_64"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "treeState", "commonCorePaths", "commonCoreCommit", "commonCoreHash"],
+      "properties": {
+        "commit": {"$ref": "#/$defs/commit"},
+        "treeState": {"const": "clean"},
+        "commonCorePaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/safePath"}
+        },
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canBuildInstaller",
+        "canBundleModules",
+        "canCreateReleaseBranch",
+        "canPromote",
+        "canInstall",
+        "canMigrateRuntime"
+      ],
+      "properties": {
+        "canBuildInstaller": {"const": false},
+        "canBundleModules": {"const": false},
+        "canCreateReleaseBranch": {"const": false},
+        "canPromote": {"const": false},
+        "canInstall": {"const": false},
+        "canMigrateRuntime": {"const": false}
+      }
+    },
+    "policyBindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityPolicy",
+        "upstreamInventory",
+        "vehiclePackRegistry"
+      ],
+      "properties": {
+        "capabilityPolicy": {"$ref": "#/$defs/fileRef"},
+        "upstreamInventory": {"$ref": "#/$defs/fileRef"},
+        "vehiclePackRegistry": {"$ref": "#/$defs/fileRef"}
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/componentPlan"}
+    },
+    "editions": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/editionPlan"}
+    },
+    "precombinedBundles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/bundlePlan"}
+    },
+    "licenseClosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "notice", "upstreamInventory", "licenseIds", "blockers"],
+      "properties": {
+        "state": {"const": "plan-only-incomplete-artifact-closure"},
+        "notice": {"$ref": "#/$defs/fileRefWithBytes"},
+        "upstreamInventory": {"$ref": "#/$defs/fileRef"},
+        "licenseIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        },
+        "blockers": {"$ref": "#/$defs/textArray"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "buildId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9.+-]{0,127}$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "textArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 512}
+    },
+    "nullableSha256": {
+      "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+    },
+    "nullableBytes": {
+      "oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]
+    },
+    "nullableText": {
+      "oneOf": [{"type": "string", "minLength": 1, "maxLength": 128}, {"type": "null"}]
+    },
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "fileRefWithBytes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "componentPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "componentId",
+        "version",
+        "buildId",
+        "sourceCommit",
+        "contract",
+        "artifactState",
+        "artifactManifestSha256",
+        "artifactSha256",
+        "artifactBytes",
+        "signatureState",
+        "planningDownloadBytes",
+        "planningInstalledBytes"
+      ],
+      "properties": {
+        "componentId": {"$ref": "#/$defs/id"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "buildId": {"$ref": "#/$defs/buildId"},
+        "sourceCommit": {"$ref": "#/$defs/commit"},
+        "contract": {"$ref": "#/$defs/fileRef"},
+        "artifactState": {
+          "enum": ["planned-not-built", "verified-existing-reference"]
+        },
+        "artifactManifestSha256": {"$ref": "#/$defs/nullableSha256"},
+        "artifactSha256": {"$ref": "#/$defs/nullableSha256"},
+        "artifactBytes": {"$ref": "#/$defs/nullableBytes"},
+        "signatureState": {"enum": ["verified", "not-issued"]},
+        "planningDownloadBytes": {"type": "integer", "minimum": 0},
+        "planningInstalledBytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "vehiclePackRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packId",
+        "packVersion",
+        "manifest",
+        "payloadSha256",
+        "validationStatus",
+        "validationTier",
+        "controllerModel",
+        "region"
+      ],
+      "properties": {
+        "packId": {"$ref": "#/$defs/id"},
+        "packVersion": {"$ref": "#/$defs/semver"},
+        "manifest": {"$ref": "#/$defs/fileRef"},
+        "payloadSha256": {"$ref": "#/$defs/sha256"},
+        "validationStatus": {"enum": ["validated", "contract-only", "planned"]},
+        "validationTier": {"enum": ["sim-validated", "hardware-validated", "contract-only", "planned"]},
+        "controllerModel": {"$ref": "#/$defs/nullableText"},
+        "region": {"enum": ["cn", "global"]}
+      }
+    },
+    "artifactPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "buildId", "state", "sha256", "bytes", "packaging"],
+      "properties": {
+        "fileName": {"type": "string", "pattern": "^DroneDream-[A-Za-z0-9-]+-1\\.0\\.0\\.exe$"},
+        "buildId": {"$ref": "#/$defs/buildId"},
+        "state": {"const": "planned-not-built"},
+        "sha256": {"type": "null"},
+        "bytes": {"type": "null"},
+        "packaging": {"const": "tauri-nsis-planned"}
+      }
+    },
+    "resourceEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basis", "downloadBytes", "installedBytes", "requiresWsl", "requiresGazebo"],
+      "properties": {
+        "basis": {"const": "planning-upper-bound-v1"},
+        "downloadBytes": {"type": "integer", "minimum": 0},
+        "installedBytes": {"type": "integer", "minimum": 0},
+        "requiresWsl": {"type": "boolean"},
+        "requiresGazebo": {"type": "boolean"}
+      }
+    },
+    "promotionPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetBranch",
+        "creationState",
+        "observedBranchHead",
+        "sourceCommit",
+        "commonCoreCommit",
+        "commonCoreHash",
+        "promotionManifestState",
+        "prOnly",
+        "forcePushAllowed",
+        "supersedes",
+        "rollback"
+      ],
+      "properties": {
+        "targetBranch": {"pattern": "^codex/software-(sim|lab|field|autonomy)$"},
+        "creationState": {"const": "long-lived-product-branch"},
+        "observedBranchHead": {"$ref": "#/$defs/commit"},
+        "sourceCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreHash": {"$ref": "#/$defs/sha256"},
+        "promotionManifestState": {"const": "planned-not-generated"},
+        "prOnly": {"const": true},
+        "forcePushAllowed": {"const": false},
+        "supersedes": {"type": "array", "maxItems": 0},
+        "rollback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["policy", "targetPromotionId", "targetArtifactSha256"],
+          "properties": {
+            "policy": {"const": "previous-verified-promotion"},
+            "targetPromotionId": {"type": "null"},
+            "targetArtifactSha256": {"type": "null"}
+          }
+        }
+      }
+    },
+    "editionPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "editionId",
+        "editionManifest",
+        "commonCoreCommit",
+        "commonCoreHash",
+        "componentIds",
+        "vehiclePack",
+        "selectedModules",
+        "capabilities",
+        "artifact",
+        "resourceEstimate",
+        "licenseIds",
+        "promotion",
+        "blockers"
+      ],
+      "properties": {
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
+        "editionManifest": {"$ref": "#/$defs/fileRef"},
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreHash": {"$ref": "#/$defs/sha256"},
+        "componentIds": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "vehiclePack": {"$ref": "#/$defs/vehiclePackRef"},
+        "selectedModules": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "capabilities": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "artifact": {"$ref": "#/$defs/artifactPlan"},
+        "resourceEstimate": {"$ref": "#/$defs/resourceEstimate"},
+        "licenseIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "promotion": {"$ref": "#/$defs/promotionPlan"},
+        "blockers": {"$ref": "#/$defs/textArray"}
+      }
+    },
+    "bundlePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundleId",
+        "editionId",
+        "editionBuildId",
+        "vehiclePackId",
+        "controllerModel",
+        "region",
+        "artifact",
+        "resourceEstimate",
+        "state"
+      ],
+      "properties": {
+        "bundleId": {"$ref": "#/$defs/id"},
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
+        "editionBuildId": {"$ref": "#/$defs/buildId"},
+        "vehiclePackId": {"$ref": "#/$defs/id"},
+        "controllerModel": {"$ref": "#/$defs/nullableText"},
+        "region": {"enum": ["cn", "global"]},
+        "artifact": {"$ref": "#/$defs/artifactPlan"},
+        "resourceEstimate": {"$ref": "#/$defs/resourceEstimate"},
+        "state": {"const": "plan-only"}
+      }
+    }
+  }
+}

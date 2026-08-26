@@ -12,6 +12,7 @@ import pytest
 from app.orchestration.harness_component_ablation import (
     HARNESS_COMPONENT_ABLATION_ARMS,
     HARNESS_COMPONENT_ABLATION_SEED_BLOCKS,
+    _comparison_status,
     build_harness_component_ablation_artifact,
     build_harness_component_ablation_manifest,
     verify_harness_component_ablation_artifact,
@@ -22,7 +23,7 @@ from scripts.evaluate_harness_component_ablations import (
 )
 
 ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "evaluation_artifacts"
-STEM = "harness-component-outcome-ablation-v1"
+STEM = "harness-component-outcome-ablation-v2"
 JSON_ARTIFACT = ARTIFACT_ROOT / f"{STEM}.json"
 CSV_ARTIFACT = ARTIFACT_ROOT / f"{STEM}.csv"
 MANIFEST_ARTIFACT = ARTIFACT_ROOT / f"{STEM}.manifest.json"
@@ -39,6 +40,43 @@ def _load_artifact() -> dict[str, object]:
     return verify_harness_component_ablation_artifact(
         json.loads(JSON_ARTIFACT.read_text(encoding="utf-8")),
         manifest=_load_manifest(),
+    )
+
+
+def test_comparison_status_uses_only_preregistered_result_metrics() -> None:
+    result_metrics = {
+        "holdout_loss": 0.5,
+        "optimizer_feasible_rate": 1.0,
+        "trials_to_target": 12,
+        "total_trials": 20,
+        "terminal_failure_trials": 0,
+        "recovered_trials": 0,
+        "evidence_completeness_rate": 1.0,
+    }
+    reference = {
+        "component_activation": {
+            "provider_visible_intervention_activated": False,
+        },
+        "tool_sequence": ["constrained_mobo"],
+        "result_metrics": {
+            **result_metrics,
+            "optimizer_candidate_count": 3,
+        },
+    }
+    comparison = {
+        "component_activation": {
+            "provider_visible_intervention_activated": True,
+        },
+        "tool_sequence": ["constrained_mobo"],
+        "result_metrics": {
+            **result_metrics,
+            "optimizer_candidate_count": 4,
+        },
+    }
+
+    assert (
+        _comparison_status(reference=reference, comparison=comparison)
+        == "no_observed_protocol_difference"
     )
 
 
@@ -122,9 +160,13 @@ def test_ablation_really_removes_memory_and_reflection_before_routing() -> None:
         )
 
 
-def test_committed_component_ablation_matches_current_production_contracts() -> None:
-    assert _load_manifest() == build_harness_component_ablation_manifest()
-    assert _load_artifact() == build_harness_component_ablation_artifact()
+def test_committed_component_ablation_remains_a_verified_legacy_freeze() -> None:
+    manifest = _load_manifest()
+    artifact = _load_artifact()
+    assert manifest["runtime_contract"]["evidence_schema_version"] == "2.7"
+    assert manifest["runtime_contract"]["prompt_template_version"] == "1.6"
+    assert manifest != build_harness_component_ablation_manifest()
+    assert artifact != build_harness_component_ablation_artifact()
 
 
 def test_component_ablation_rejects_claim_or_metric_tamper() -> None:

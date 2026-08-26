@@ -55,6 +55,7 @@ function installDesktopBridge(runtime: unknown = readyRuntime) {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   window.history.replaceState(null, "", "/");
 });
 
@@ -84,7 +85,7 @@ describe("environment-aware routing", () => {
     router.dispose();
   });
 
-  it("routes a true desktop cold start through the 3D launcher", async () => {
+  it("routes every true desktop cold start into the Runtime launcher", async () => {
     installDesktopBridge();
     window.history.replaceState(null, "", "/#/");
     vi.resetModules();
@@ -96,6 +97,20 @@ describe("environment-aware routing", () => {
 
     expect(indexElement?.props?.to).toBe("/desktop/setup");
     expect(indexElement?.props?.replace).toBe(true);
+
+    router.dispose();
+  });
+
+  it("opens runtime-backed routes only in an explicit desktop visual-QA build", async () => {
+    vi.stubEnv("VITE_DESKTOP_VISUAL_QA", "true");
+    installDesktopBridge({ ...readyRuntime, ready: false });
+    window.history.replaceState(null, "", "/#/dashboard");
+    vi.resetModules();
+    const { router } = await import("../router");
+
+    await router.navigate("/jobs/new");
+    expect(router.state.location.pathname).toBe("/jobs/new");
+    expect(router.state.location.search).toBe("");
 
     router.dispose();
   });
@@ -121,10 +136,32 @@ describe("environment-aware routing", () => {
       .toBeUndefined();
     expect(children.find((route) => route.path === "batches/*")?.loader)
       .toEqual(expect.any(Function));
-    for (const path of ["dashboard", "history", "ece498"]) {
+    for (const path of ["dashboard", "history", "scenarios", "autonomy"]) {
       expect(children.find((route) => route.path === path)?.loader, path)
         .toBeUndefined();
     }
+    for (const path of [
+      "assistant",
+      "dashboard",
+      "jobs/new",
+      "jobs/:jobId",
+      "trials/:trialId",
+      "history",
+      "scenarios",
+      "autonomy",
+      "compare",
+      "desktop/setup",
+    ]) {
+      const route = children.find((candidate) => candidate.path === path);
+      expect(route?.lazy, path).toEqual(expect.any(Function));
+      expect(route?.element, path).toBeUndefined();
+    }
+    const autonomy = children.find((route) => route.path === "autonomy");
+    expect(autonomy?.children?.find((route) => route.path === "plugins")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(autonomy?.children?.find((route) => route.path === "plugins/harness")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(children.find((route) => route.path === "ece498")).toBeUndefined();
 
     router.dispose();
   });
@@ -148,9 +185,9 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/dashboard");
-    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
-    expect(window.location.hash).toBe("#/dashboard?settings=runtime&required=experiment");
+    expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe("?required=experiment");
+    expect(window.location.hash).toBe("#/desktop/setup?required=experiment");
     expect(invoke).not.toHaveBeenCalled();
 
     router.dispose();
@@ -178,8 +215,8 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/dashboard");
-    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
+    expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe("?required=experiment");
     expect(invoke).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(0);
@@ -201,8 +238,8 @@ describe("environment-aware routing", () => {
     const { router } = await import("../router");
 
     await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/dashboard");
-    expect(router.state.location.search).toBe("?settings=runtime&required=experiment");
+    expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe("?required=experiment");
 
     router.dispose();
   });
@@ -227,7 +264,7 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const desktop = await import("../router");
     await desktop.router.navigate("/removed-route");
-    expect(desktop.router.state.location.pathname).toBe("/dashboard");
+    expect(desktop.router.state.location.pathname).toBe("/desktop/setup");
     desktop.router.dispose();
 
     delete window.__TAURI__;
@@ -248,6 +285,26 @@ describe("environment-aware routing", () => {
 
     await router.navigate("/batches/new");
     expect(router.state.location.pathname).toBe("/dashboard");
+
+    router.dispose();
+  });
+
+  it("exposes the integrated Lab and primary Field workspaces in Universal", async () => {
+    delete window.__TAURI__;
+    window.history.replaceState(null, "", "/lab");
+    vi.resetModules();
+    const { router } = await import("../router");
+    const children = router.routes[0]?.children ?? [];
+
+    expect(children.find((route) => route.path === "lab")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(children.find((route) => route.path === "lab/hardware")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(children.find((route) => route.path === "field")?.element)
+      .toBeDefined();
+    expect(children.find((route) => route.path === "field/:fieldPage")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(router.state.location.pathname).toBe("/lab");
 
     router.dispose();
   });

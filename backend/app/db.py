@@ -6,6 +6,8 @@ features so Postgres can be swapped in later by changing ``DATABASE_URL``.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterator
 
 from sqlalchemy import create_engine, event, text
@@ -50,6 +52,36 @@ def _build_engine(database_url: str) -> Engine:
 _settings = get_settings()
 engine: Engine = _build_engine(_settings.database_url)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
+
+
+def rebind_database_for_testing(database_url: str) -> None:
+    """Rebind the process-wide session factory without reloading ORM modules.
+
+    Pytest imports test modules during collection, so reloading ``app.db`` or
+    ``app.models`` later creates duplicate ``Base``/model class identities.
+    SQLAlchemy then correctly rejects objects created from the stale class,
+    and FastAPI dependencies can remain bound to stale session factories.
+
+    Tests instead keep one module graph and reconfigure the *same*
+    ``SessionLocal`` object that services and routers imported.  The guard is
+    deliberately fail-closed: production/development code may not redirect a
+    live process to a different database through this helper.
+    """
+
+    global _settings, engine
+
+    settings = get_settings()
+    if settings.app_env.strip().lower() != "test":
+        raise RuntimeError("Database rebinding is allowed only when APP_ENV=test")
+    if database_url != settings.database_url:
+        raise RuntimeError("Test database URL must match the active Settings value")
+
+    previous_engine = engine
+    replacement_engine = _build_engine(database_url)
+    SessionLocal.configure(bind=replacement_engine)
+    engine = replacement_engine
+    _settings = settings
+    previous_engine.dispose()
 
 
 def init_db() -> None:
@@ -106,22 +138,232 @@ def _apply_sqlite_lightweight_migrations() -> None:
             conn.execute(text("ALTER TABLE jobs ADD COLUMN batch_id VARCHAR(64)"))
         if "control_version" not in job_columns:
             conn.execute(
+                text("ALTER TABLE jobs ADD COLUMN control_version INTEGER NOT NULL DEFAULT 1")
+            )
+        if "model_harness_domain" not in job_columns:
+            conn.execute(
                 text(
-                    "ALTER TABLE jobs ADD COLUMN control_version "
-                    "INTEGER NOT NULL DEFAULT 1"
+                    "ALTER TABLE jobs ADD COLUMN model_harness_domain "
+                    "VARCHAR(64) NOT NULL DEFAULT 'optimization.control_tuning'"
                 )
             )
+        if "model_harness_control_plane_json" not in job_columns:
+            conn.execute(text("ALTER TABLE jobs ADD COLUMN model_harness_control_plane_json JSON"))
+        if "model_harness_control_plane_selection_sha256" not in job_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE jobs ADD COLUMN "
+                    "model_harness_control_plane_selection_sha256 VARCHAR(64)"
+                )
+            )
+        from app.model_harness.control_plane import compile_control_plane_receipt
+        from app.model_harness.domains import OPTIMIZATION_CONTROL_TUNING_DOMAIN
+
+        canonical_control_plane_receipt = compile_control_plane_receipt(
+            OPTIMIZATION_CONTROL_TUNING_DOMAIN
+        )
+        canonical_control_plane_json = json.dumps(
+            canonical_control_plane_receipt.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        conn.execute(
+            text(
+                "UPDATE jobs SET model_harness_control_plane_json = :receipt "
+                "WHERE model_harness_control_plane_json IS NULL"
+            ),
+            {"receipt": canonical_control_plane_json},
+        )
+        canonical_selection_sha256 = canonical_control_plane_receipt.selection_sha256
+        conn.execute(
+            text(
+                "UPDATE jobs SET model_harness_control_plane_selection_sha256 = :sha256 "
+                "WHERE model_harness_control_plane_selection_sha256 IS NULL"
+            ),
+            {"sha256": canonical_selection_sha256},
+        )
+        if "job_events" in table_names:
+            job_bindings: dict[str, dict[str, str]] = {}
+            job_rows = (
+                conn.execute(
+                    text(
+                        "SELECT id, model_harness_domain, "
+                        "model_harness_control_plane_json, "
+                        "model_harness_control_plane_selection_sha256 FROM jobs"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            for job_row in job_rows:
+                raw_receipt = job_row["model_harness_control_plane_json"]
+                if isinstance(raw_receipt, str):
+                    try:
+                        decoded_receipt = json.loads(raw_receipt)
+                    except json.JSONDecodeError:
+                        decoded_receipt = None
+                else:
+                    decoded_receipt = raw_receipt
+                receipt_schema_version = (
+                    decoded_receipt.get("schema_version")
+                    if isinstance(decoded_receipt, dict)
+                    else None
+                )
+                if not isinstance(receipt_schema_version, str):
+                    receipt_schema_version = canonical_control_plane_receipt.schema_version
+                job_bindings[str(job_row["id"])] = {
+                    "model_harness_domain": str(job_row["model_harness_domain"]),
+                    "control_plane_schema_version": receipt_schema_version,
+                    "control_plane_selection_sha256": str(
+                        job_row["model_harness_control_plane_selection_sha256"]
+                    ),
+                }
+            event_types_by_job: dict[str, set[str]] = {}
+            legacy_events = (
+                conn.execute(
+                    text(
+                        "SELECT id, job_id, event_type, payload_json FROM job_events "
+                        "WHERE event_type IN ('job_created', 'job_queued')"
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            for event_row in legacy_events:
+                job_id = str(event_row["job_id"])
+                event_type = str(event_row["event_type"])
+                event_types_by_job.setdefault(job_id, set()).add(event_type)
+                binding = job_bindings.get(job_id)
+                if binding is None:
+                    continue
+                raw_payload = event_row["payload_json"]
+                if isinstance(raw_payload, str):
+                    try:
+                        decoded_payload = json.loads(raw_payload)
+                    except json.JSONDecodeError:
+                        decoded_payload = None
+                else:
+                    decoded_payload = raw_payload
+                payload = dict(decoded_payload) if isinstance(decoded_payload, dict) else {}
+                payload.update(binding)
+                conn.execute(
+                    text("UPDATE job_events SET payload_json = :payload WHERE id = :id"),
+                    {
+                        "id": event_row["id"],
+                        "payload": json.dumps(
+                            payload,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ),
+                    },
+                )
+            for job_id, binding in job_bindings.items():
+                existing_types = event_types_by_job.get(job_id, set())
+                for event_type in ("job_created", "job_queued"):
+                    if event_type in existing_types:
+                        continue
+                    digest = hashlib.sha256(
+                        f"sqlite-control-plane:{job_id}:{event_type}".encode()
+                    ).hexdigest()
+                    payload = {
+                        **binding,
+                        "control_plane_binding_source": "lightweight_migration_backfill",
+                    }
+                    conn.execute(
+                        text(
+                            "INSERT INTO job_events "
+                            "(id, job_id, event_type, payload_json, created_at) "
+                            "VALUES (:id, :job_id, :event_type, :payload, CURRENT_TIMESTAMP)"
+                        ),
+                        {
+                            "id": f"evt_mh_{digest[:48]}",
+                            "job_id": job_id,
+                            "event_type": event_type,
+                            "payload": json.dumps(
+                                payload,
+                                ensure_ascii=False,
+                                sort_keys=True,
+                                separators=(",", ":"),
+                            ),
+                        },
+                    )
         experiment_columns = {
             "vehicle_profile_json": "JSON",
             "parameter_space_json": "JSON",
             "objective_config_json": "JSON",
             "scenario_suite_json": "JSON",
+            "llm_access_mode": "VARCHAR(16)",
             "llm_provider": "VARCHAR(64)",
             "llm_base_url": "VARCHAR(2048)",
         }
         for column_name, column_type in experiment_columns.items():
             if column_name not in job_columns:
                 conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
+        first_qualified_columns = {
+            "completion_policy": ("VARCHAR(32) NOT NULL DEFAULT 'first_qualified_stop'"),
+            "job_kind": "VARCHAR(32) NOT NULL DEFAULT 'primary'",
+            "cognitive_policy_version": ("VARCHAR(32) NOT NULL DEFAULT 'adaptive-2-4-v1'"),
+            "provider_turn_cap": "INTEGER NOT NULL DEFAULT 64",
+            "provider_turns_attempted": "INTEGER NOT NULL DEFAULT 0",
+            "provider_turns_succeeded": "INTEGER NOT NULL DEFAULT 0",
+            "provider_request_cap": "INTEGER NOT NULL DEFAULT 128",
+            "provider_max_retries": "INTEGER NOT NULL DEFAULT 1",
+            "provider_requests_attempted": "INTEGER NOT NULL DEFAULT 0",
+            "provider_requests_succeeded": "INTEGER NOT NULL DEFAULT 0",
+            "next_candidate_dispatch_ordinal": "BIGINT NOT NULL DEFAULT 1",
+            "next_qualification_sequence": "BIGINT NOT NULL DEFAULT 1",
+            "first_qualified_candidate_id": "VARCHAR(64)",
+            "first_qualified_at": "DATETIME",
+            "continue_exploration_requested": "BOOLEAN NOT NULL DEFAULT 0",
+            "exploration_budget_json": "JSON",
+            "continuation_parent_job_id": "VARCHAR(64)",
+            "continuation_root_job_id": "VARCHAR(64)",
+            "holdout_policy_version": ("VARCHAR(32) NOT NULL DEFAULT 'legacy-visible-v0'"),
+            "holdout_contract_json": "JSON",
+        }
+        for column_name, column_type in first_qualified_columns.items():
+            if column_name not in job_columns:
+                conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_first_qualified_candidate_id "
+                "ON jobs(first_qualified_candidate_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_continuation_parent_job_id "
+                "ON jobs(continuation_parent_job_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "ux_jobs_continuation_parent_job_id "
+                "ON jobs(continuation_parent_job_id) "
+                "WHERE continuation_parent_job_id IS NOT NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_continuation_root_job_id "
+                "ON jobs(continuation_root_job_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE jobs SET llm_access_mode = CASE "
+                "WHEN llm_provider = 'dronedream' THEN 'platform' "
+                "WHEN llm_provider IS NOT NULL THEN 'byok' "
+                "ELSE NULL END "
+                "WHERE llm_access_mode IS NULL"
+            )
+        )
         finalization_claim_columns = {
             "finalization_claim_token": "VARCHAR(64)",
             "finalization_claim_generation": "INTEGER",
@@ -129,12 +371,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
         }
         for column_name, column_type in finalization_claim_columns.items():
             if column_name not in job_columns:
-                conn.execute(
-                    text(
-                        f"ALTER TABLE jobs ADD COLUMN {column_name} "
-                        f"{column_type}"
-                    )
-                )
+                conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
         conn.execute(
             text(
                 "CREATE INDEX IF NOT EXISTS "
@@ -175,6 +412,43 @@ def _apply_sqlite_lightweight_migrations() -> None:
             }
             if "expires_at" not in secret_columns:
                 conn.execute(text("ALTER TABLE job_secrets ADD COLUMN expires_at DATETIME"))
+        if "harness_experience_memories" in table_names:
+            memory_columns = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info('harness_experience_memories')")
+                ).fetchall()
+            }
+            lifecycle_columns = {
+                "memory_domain": ("VARCHAR(64) NOT NULL DEFAULT 'optimization.control_tuning'"),
+                "source_kind": ("VARCHAR(32) NOT NULL DEFAULT 'verified_job_outcome'"),
+                "evidence_count": "INTEGER NOT NULL DEFAULT 1",
+                "confidence": "FLOAT NOT NULL DEFAULT 1.0",
+                "lifecycle_status": "VARCHAR(16) NOT NULL DEFAULT 'consolidated'",
+            }
+            for column_name, column_type in lifecycle_columns.items():
+                if column_name not in memory_columns:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE harness_experience_memories "
+                            f"ADD COLUMN {column_name} {column_type}"
+                        )
+                    )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS "
+                    "ix_harness_experience_memories_memory_domain "
+                    "ON harness_experience_memories(memory_domain)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS "
+                    "ix_harness_experience_owner_domain_family "
+                    "ON harness_experience_memories"
+                    "(user_id, memory_domain, task_family_sha256)"
+                )
+            )
         if "candidate_parameter_sets" in table_names:
             candidate_columns = {
                 row[1]
@@ -189,6 +463,35 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         "ADD COLUMN optimizer_metadata_json JSON"
                     )
                 )
+            first_qualified_candidate_columns = {
+                "dispatch_ordinal": "BIGINT",
+                "qualification_sequence": "BIGINT",
+                "qualified_at": "DATETIME",
+            }
+            for column_name, column_type in first_qualified_candidate_columns.items():
+                if column_name not in candidate_columns:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE candidate_parameter_sets "
+                            f"ADD COLUMN {column_name} {column_type}"
+                        )
+                    )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_candidate_job_dispatch_ordinal "
+                    "ON candidate_parameter_sets(job_id, dispatch_ordinal) "
+                    "WHERE dispatch_ordinal IS NOT NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_candidate_job_qualification_sequence "
+                    "ON candidate_parameter_sets(job_id, qualification_sequence) "
+                    "WHERE qualification_sequence IS NOT NULL"
+                )
+            )
             if "evidence_ledger_required" not in candidate_columns:
                 conn.execute(
                     text(
@@ -230,6 +533,32 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         );
                     END
                     """
+                )
+            )
+        if "trials" in table_names:
+            trial_columns = {
+                row[1] for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()
+            }
+            qualification_trial_columns = {
+                "qualification_id": "VARCHAR(64)",
+                "evaluation_phase": ("VARCHAR(32) NOT NULL DEFAULT 'optimization'"),
+                "qualification_ordinal": "INTEGER",
+            }
+            for column_name, column_type in qualification_trial_columns.items():
+                if column_name not in trial_columns:
+                    conn.execute(text(f"ALTER TABLE trials ADD COLUMN {column_name} {column_type}"))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS "
+                    "ix_trials_qualification_id ON trials(qualification_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_trial_qualification_phase_ordinal "
+                    "ON trials(qualification_id, evaluation_phase, qualification_ordinal) "
+                    "WHERE qualification_id IS NOT NULL"
                 )
             )
         if "job_reports" in table_names:
@@ -289,6 +618,221 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         SELECT RAISE(
                             ABORT,
                             'winner freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "first_qualified_freeze_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    first_qualified_freeze_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES first_qualified_freeze_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_first_qualified_freeze_receipts_no_update
+                    BEFORE UPDATE ON first_qualified_freeze_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'first-qualified freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text("DROP TRIGGER IF EXISTS trg_first_qualified_freeze_receipts_no_delete")
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER
+                    trg_first_qualified_freeze_receipts_no_delete
+                    BEFORE DELETE ON first_qualified_freeze_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM first_qualified_freeze_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'first-qualified freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "harness_cognitive_turn_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    harness_cognitive_turn_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES harness_cognitive_turn_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_receipts_no_update
+                    BEFORE UPDATE ON harness_cognitive_turn_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_receipts_no_delete
+                    BEFORE DELETE ON harness_cognitive_turn_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "harness_cognitive_turn_outcomes" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_outcomes_no_update
+                    BEFORE UPDATE ON harness_cognitive_turn_outcomes
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_outcomes_no_delete
+                    BEFORE DELETE ON harness_cognitive_turn_outcomes
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.turn_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "provider_network_request_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_receipts_no_update
+                    BEFORE UPDATE ON provider_network_request_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_receipts_no_delete
+                    BEFORE DELETE ON provider_network_request_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.cognitive_turn_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "provider_network_request_outcomes" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_outcomes_no_update
+                    BEFORE UPDATE ON provider_network_request_outcomes
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_outcomes_no_delete
+                    BEFORE DELETE ON provider_network_request_outcomes
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations AS authorization
+                        JOIN provider_network_request_receipts AS receipt
+                          ON receipt.cognitive_turn_receipt_id = authorization.receipt_id
+                        WHERE receipt.id = OLD.request_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request outcomes are append-only'
                         );
                     END
                     """
@@ -563,6 +1107,203 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        if "benchmark_campaigns" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_campaign_manifest_immutable
+                    BEFORE UPDATE ON benchmark_campaigns
+                    WHEN NEW.user_id IS NOT OLD.user_id
+                      OR NEW.campaign_key IS NOT OLD.campaign_key
+                      OR NEW.campaign_version IS NOT OLD.campaign_version
+                      OR NEW.name IS NOT OLD.name
+                      OR NEW.panel IS NOT OLD.panel
+                      OR NEW.protocol_sha256 IS NOT OLD.protocol_sha256
+                      OR NEW.manifest_sha256 IS NOT OLD.manifest_sha256
+                      OR NEW.manifest_json IS NOT OLD.manifest_json
+                      OR NEW.composite_inventory_sha256
+                         IS NOT OLD.composite_inventory_sha256
+                      OR NEW.composite_inventory_json
+                         IS NOT OLD.composite_inventory_json
+                      OR NEW.job_cap IS NOT OLD.job_cap
+                      OR NEW.trial_cap IS NOT OLD.trial_cap
+                      OR NEW.logical_turn_cap IS NOT OLD.logical_turn_cap
+                      OR NEW.network_request_cap IS NOT OLD.network_request_cap
+                      OR NEW.input_utf8_byte_cap IS NOT OLD.input_utf8_byte_cap
+                      OR NEW.output_utf8_byte_cap IS NOT OLD.output_utf8_byte_cap
+                      OR NEW.provider_token_cap IS NOT OLD.provider_token_cap
+                      OR NEW.provider_cost_microusd_cap
+                         IS NOT OLD.provider_cost_microusd_cap
+                      OR NEW.wall_time_second_cap IS NOT OLD.wall_time_second_cap
+                      OR NEW.disk_byte_cap IS NOT OLD.disk_byte_cap
+                      OR NEW.preregistered_at IS NOT OLD.preregistered_at
+                      OR NEW.created_at IS NOT OLD.created_at
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark campaign preregistration is immutable'
+                        );
+                    END
+                    """
+                )
+            )
+        if "benchmark_arms" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_arm_manifest_immutable
+                    BEFORE UPDATE ON benchmark_arms
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark arm preregistration is immutable'
+                        );
+                    END
+                    """
+                )
+            )
+        if {
+            "benchmark_campaigns",
+            "benchmark_campaign_coordinator_states",
+        }.issubset(table_names):
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO benchmark_campaign_coordinator_states (
+                        campaign_id,
+                        lease_generation,
+                        next_batch_ordinal,
+                        next_run_ordinal,
+                        jobs_used,
+                        trials_used,
+                        logical_turns_used,
+                        network_requests_used,
+                        input_utf8_bytes_used,
+                        output_utf8_bytes_used,
+                        provider_tokens_used,
+                        provider_cost_microusd_used,
+                        wall_time_seconds_used,
+                        disk_bytes_used,
+                        created_at,
+                        updated_at
+                    )
+                    SELECT
+                        campaign.id, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    FROM benchmark_campaigns AS campaign
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM benchmark_campaign_coordinator_states AS state
+                        WHERE state.campaign_id = campaign.id
+                    )
+                    """
+                )
+            )
+        if "benchmark_budget_reservations" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_budget_reservation_no_update
+                    BEFORE UPDATE ON benchmark_budget_reservations
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark budget reservations are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_budget_reservation_no_delete
+                    BEFORE DELETE ON benchmark_budget_reservations
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark budget reservations are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        for table_name, trigger_prefix in (
+            ("benchmark_campaign_batch_bindings", "batch"),
+            ("benchmark_campaign_run_bindings", "run"),
+        ):
+            if table_name not in table_names:
+                continue
+            if table_name == "benchmark_campaign_run_bindings":
+                run_binding_columns = {
+                    row[1]
+                    for row in conn.execute(
+                        text("PRAGMA table_info('benchmark_campaign_run_bindings')")
+                    ).fetchall()
+                }
+                for column_name in (
+                    "qualification_policy_version",
+                    "scenario_suite_sha256",
+                    "qualification_contract_sha256",
+                ):
+                    if column_name not in run_binding_columns:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE benchmark_campaign_run_bindings "
+                                f"ADD COLUMN {column_name} VARCHAR(64)"
+                            )
+                        )
+            conn.execute(
+                text(
+                    f"""
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_{trigger_prefix}_binding_no_update
+                    BEFORE UPDATE ON {table_name}
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark execution bindings are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_{trigger_prefix}_binding_no_delete
+                    BEFORE DELETE ON {table_name}
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark execution bindings are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "qualification_trial_receipts" in table_names:
+            for operation in ("update", "delete"):
+                conn.execute(
+                    text(
+                        f"""
+                        CREATE TRIGGER IF NOT EXISTS
+                        trg_qualification_trial_receipts_no_{operation}
+                        BEFORE {operation.upper()} ON qualification_trial_receipts
+                        BEGIN
+                            SELECT RAISE(
+                                ABORT,
+                                'qualification Trial receipts are append-only'
+                            );
+                        END
+                        """
+                    )
+                )
 
 
 def get_db() -> Iterator[Session]:
@@ -575,4 +1316,11 @@ def get_db() -> Iterator[Session]:
         db.close()
 
 
-__all__ = ["Base", "SessionLocal", "engine", "get_db", "init_db"]
+__all__ = [
+    "Base",
+    "SessionLocal",
+    "engine",
+    "get_db",
+    "init_db",
+    "rebind_database_for_testing",
+]

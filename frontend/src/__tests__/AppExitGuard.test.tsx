@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 
@@ -76,6 +76,9 @@ async function requestWindowClose(): Promise<ReturnType<typeof vi.fn>> {
 
 describe("desktop close protection", () => {
   beforeEach(() => {
+    // Exit protection is a workspace-only concern. Visual-QA mode deliberately
+    // bypasses the first-run launcher gate without probing or starting Runtime.
+    vi.stubEnv("VITE_DESKTOP_VISUAL_QA", "true");
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "en");
@@ -87,6 +90,7 @@ describe("desktop close protection", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     delete window.__TAURI__;
   });
 
@@ -112,7 +116,17 @@ describe("desktop close protection", () => {
       completed_steps: [0, 1],
       form: { display_name: "Keep me", llm_api_key: "must-not-persist" },
       selections: {},
-      conversation: null,
+      conversation: {
+        summary: "Keep only this compact summary.",
+        field_provenance: {},
+        messages: [
+          {
+            id: "turn-private",
+            role: "user",
+            content: "must-not-persist-raw-chat",
+          },
+        ],
+      },
     }));
     renderShell("/dashboard");
 
@@ -125,6 +139,12 @@ describe("desktop close protection", () => {
     expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain("Keep me");
     expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toContain(
       "must-not-persist",
+    );
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).not.toContain(
+      "must-not-persist-raw-chat",
+    );
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain(
+      "Keep only this compact summary.",
     );
     expect(invokeDesktop).toHaveBeenCalledWith("stop_runtime_for_exit", undefined);
   });
@@ -141,6 +161,40 @@ describe("desktop close protection", () => {
     expect(screen.getByRole("button", { name: "Exit anyway" })).toBeVisible();
     expect(destroyWindow).not.toHaveBeenCalled();
     expect(invokeDesktop).not.toHaveBeenCalled();
+  });
+
+  it("keeps the native-close confirmation operable above the full settings workspace", async () => {
+    vi.mocked(apiClient.listJobs).mockImplementation(async (params) =>
+      emptyJobs(params?.status === "RUNNING" ? 1 : 0)
+    );
+    renderShell("/dashboard");
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
+    const settingsWorkspace = await screen.findByRole("region", { name: "Settings" });
+    const activeSettingsTab = within(settingsWorkspace).getByRole("tab", { name: "General" });
+    await waitFor(() => expect(activeSettingsTab).toHaveFocus());
+
+    await requestWindowClose();
+
+    const exitDialog = screen.getByRole("dialog", { name: "Before you close DroneDream" });
+    expect(exitDialog).toBeVisible();
+    expect(exitDialog.closest("[inert]")).toBeNull();
+    const settingsHost = settingsWorkspace.closest(".settings-workspace-host");
+    expect(settingsHost).toHaveAttribute("inert");
+    const returnButton = within(exitDialog).getByRole("button", { name: "Return to DroneDream" });
+    const exitButton = within(exitDialog).getByRole("button", { name: "Exit anyway" });
+    await waitFor(() => expect(returnButton).toHaveFocus());
+    exitButton.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(returnButton).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(exitButton).toHaveFocus();
+    fireEvent.click(returnButton);
+    expect(screen.queryByRole("dialog", { name: "Before you close DroneDream" })).toBeNull();
+    await waitFor(() => expect(settingsHost).not.toHaveAttribute("inert"));
+    await waitFor(() => expect(activeSettingsTab).toHaveFocus());
   });
 
   it("cancels known jobs and stops the dedicated runtime before destroying the window", async () => {
@@ -233,5 +287,18 @@ describe("desktop close protection", () => {
     await requestWindowClose();
 
     await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
+  });
+
+  it("always lets the first-run launcher close without probing workspace jobs", async () => {
+    vi.mocked(invokeDesktop).mockRejectedValueOnce(
+      new Error("Runtime is not installed on this machine."),
+    );
+    renderShell("/desktop/setup");
+
+    await requestWindowClose();
+
+    await waitFor(() => expect(destroyWindow).toHaveBeenCalledTimes(1));
+    expect(apiClient.listJobs).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Before you close DroneDream" })).toBeNull();
   });
 });

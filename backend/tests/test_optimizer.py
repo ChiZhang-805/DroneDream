@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from app import models, schemas
+from app.optimization.candidate_evidence_ledger import candidate_evidence_chain_matches_current
 from app.optimization.domain import ParameterDomain, SearchSpace
 from app.optimization.outcome_contract import build_selection_key, selection_order_key
 from app.optimization.outcome_evidence import (
@@ -74,6 +75,30 @@ def test_duplicate_detection_compares_only_selected_tuning_dimensions() -> None:
 
     assert job_manager._is_duplicate_proposal(job, {"MPC_XY_P": 0.95}) is True
     assert job_manager._is_duplicate_proposal(job, {"MPC_XY_P": 1.05}) is False
+
+
+def test_candidate_completion_cannot_change_unselected_legacy_parameters() -> None:
+    job = models.Job(
+        id="job_selected_parameter_boundary",
+        track_type="circle",
+        altitude_m=3.0,
+        sensor_noise_level="medium",
+        objective_profile="robust",
+        parameter_space_json=[
+            {
+                "name": "MPC_XY_P",
+                "enabled": True,
+                "baseline": 0.95,
+            }
+        ],
+    )
+
+    completed = job_manager._complete_candidate_parameters(job, {"MPC_XY_P": 1.05})
+    assert completed["MPC_XY_P"] == pytest.approx(1.05)
+    assert completed["kp_xy"] == pytest.approx(constants.BASELINE_PARAMETERS["kp_xy"])
+
+    with pytest.raises(ValueError, match="unselected parameter kp_xy"):
+        job_manager._complete_candidate_parameters(job, {"kp_xy": 1.2})
 
 
 def test_optimizer_fidelity_prefers_effective_coverage_and_rejects_invalid_values() -> None:
@@ -364,6 +389,43 @@ def test_aggregation_rejects_completed_trial_with_missing_required_metric() -> N
     )
     assert trial.metric is not None
     trial.metric.rmse = None
+
+    result = aggregation._aggregate_candidate(candidate, [trial])
+
+    assert result is None
+    assert candidate.completed_trial_count == 0
+    assert candidate.failed_trial_count == 1
+    assert candidate.aggregated_score is None
+
+
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    [
+        ("score", -0.1),
+        ("crash_flag", True),
+        ("timeout_flag", True),
+        ("instability_flag", True),
+    ],
+)
+def test_aggregation_rejects_invalid_or_contradictory_completed_metric(
+    field_name: str,
+    invalid_value: float | bool,
+) -> None:
+    candidate = models.CandidateParameterSet(
+        id=f"candidate_invalid_{field_name}",
+        job_id=f"job_invalid_{field_name}",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trial = _aggregation_trial(
+        candidate=candidate,
+        trial_id=f"trial_invalid_{field_name}",
+        case_id="nominal",
+        seed=101,
+    )
+    assert trial.metric is not None
+    setattr(trial.metric, field_name, invalid_value)
 
     result = aggregation._aggregate_candidate(candidate, [trial])
 
@@ -1256,6 +1318,7 @@ class _FakeCandidate:
         trial_count: int = 3,
         completed: int = 3,
         generation_index: int = 1,
+        dispatch_ordinal: int | None = None,
         fidelity: float = 1.0,
         parameters: dict[str, float] | None = None,
     ) -> None:
@@ -1270,6 +1333,9 @@ class _FakeCandidate:
         self.completed_trial_count = completed
         self.failed_trial_count = trial_count - completed
         self.generation_index = generation_index
+        self.dispatch_ordinal = (
+            generation_index + 1 if dispatch_ordinal is None else dispatch_ordinal
+        )
         self.optimizer_metadata_json = {"requested_fidelity": fidelity}
         self.rank_in_job: int | None = None
         self.is_best: bool = False
@@ -1312,6 +1378,52 @@ def test_low_fidelity_candidate_is_visible_but_unranked_until_verified() -> None
     assert baseline.rank_in_job == 1
     assert screened.rank_in_job is None
     assert screened.is_best is False
+
+
+@pytest.mark.parametrize(
+    "optimizer_metadata",
+    [
+        {"requested_fidelity": True},
+        {"requested_fidelity": "invalid"},
+        {"requested_fidelity": 0.0},
+        {"requested_fidelity": 1.01},
+        {"requested_fidelity": float("nan")},
+    ],
+)
+def test_malformed_fidelity_candidate_is_never_ranked(
+    optimizer_metadata: dict[str, object],
+) -> None:
+    baseline = _FakeCandidate(
+        candidate_id="baseline-malformed-fidelity",
+        score=2.0,
+        is_baseline=True,
+        generation_index=0,
+    )
+    malformed = _FakeCandidate(
+        candidate_id="malformed-fidelity",
+        score=0.1,
+        generation_index=1,
+    )
+    malformed.optimizer_metadata_json = optimizer_metadata
+
+    winner = aggregation._rank_and_select_best([baseline, malformed])
+
+    assert winner is baseline
+    assert malformed.rank_in_job is None
+    assert malformed.is_best is False
+
+
+def test_candidate_evidence_chain_fails_closed_when_receipts_are_unreadable() -> None:
+    class _UnreadableCandidateEvidence:
+        aggregated_metric_json: dict[str, object] = {}
+
+        @property
+        def evidence_receipts(self) -> list[object]:
+            raise RuntimeError("detached ORM relationship")
+
+    candidate = _UnreadableCandidateEvidence()
+
+    assert candidate_evidence_chain_matches_current(candidate) is False  # type: ignore[arg-type]
 
 
 def test_rank_and_select_best_skips_ineligible_optimizer() -> None:
@@ -1380,6 +1492,111 @@ def test_rank_and_select_best_does_not_publish_partial_baseline() -> None:
     assert winner is None
     assert baseline.rank_in_job is None
     assert baseline.is_best is False
+
+
+@pytest.mark.parametrize(
+    "raw_metric_json",
+    [
+        {
+            "mode": "dry_run",
+            "px4_outcome_evidence": {
+                "schema_id": "dronedream.px4-outcome-evidence/v1",
+                "synthetic": False,
+            },
+        },
+        {
+            "mode": "site_dry_run",
+            "px4_outcome_evidence": {
+                "schema_id": "dronedream.px4-outcome-evidence/v1",
+                "synthetic": False,
+            },
+        },
+        {
+            "mode": "live",
+            "px4_outcome_evidence": {
+                "schema_id": "dronedream.px4-outcome-evidence/v1",
+                "synthetic": True,
+            },
+        },
+        {
+            "mode": "live",
+            "px4_outcome_evidence": {
+                "schema_id": "dronedream.px4-outcome-evidence/v1",
+            },
+        },
+    ],
+    ids=["dry-run-mode", "site-dry-run-mode", "synthetic-evidence", "missing-provenance"],
+)
+def test_publishable_gate_rejects_synthetic_px4_runner_metrics(
+    raw_metric_json: dict[str, object],
+) -> None:
+    candidate = _FakeCandidate(
+        candidate_id="synthetic-px4",
+        score=0.1,
+        trial_count=1,
+        completed=1,
+    )
+    candidate.trials = [
+        SimpleNamespace(
+            status="COMPLETED",
+            metric=SimpleNamespace(
+                rmse=0.1,
+                max_error=0.2,
+                overshoot_count=0,
+                completion_time=1.0,
+                crash_flag=False,
+                timeout_flag=False,
+                score=0.1,
+                final_error=0.05,
+                pass_flag=True,
+                instability_flag=False,
+                raw_metric_json=raw_metric_json,
+            ),
+        )
+    ]
+
+    assert aggregation.candidate_is_publishable(candidate) is False
+    assert aggregation._rank_and_select_best([candidate]) is None
+
+
+def test_publishable_gate_accepts_explicitly_nonsynthetic_px4_metrics() -> None:
+    candidate = _FakeCandidate(
+        candidate_id="physical-px4",
+        score=0.1,
+        trial_count=1,
+        completed=1,
+    )
+    candidate.trials = [
+        SimpleNamespace(
+            status="COMPLETED",
+            metric=SimpleNamespace(
+                rmse=0.1,
+                max_error=0.2,
+                overshoot_count=0,
+                completion_time=1.0,
+                crash_flag=False,
+                timeout_flag=False,
+                score=0.1,
+                final_error=0.05,
+                pass_flag=True,
+                instability_flag=False,
+                raw_metric_json={
+                    "mode": "live",
+                    "px4_outcome_evidence": {
+                        "schema_id": "dronedream.px4-outcome-evidence/v1",
+                        "synthetic": False,
+                    },
+                },
+            ),
+        )
+    ]
+
+    assert aggregation.candidate_is_publishable(candidate) is True
+    # Candidate-level scalar loss may be negative for a legitimate objective
+    # whose direction is ``maximize``. This differs from the non-negative
+    # per-Trial simulator score contract.
+    candidate.aggregated_score = -0.1
+    assert aggregation.candidate_is_publishable(candidate) is True
 
 
 def test_rank_and_select_best_rejects_failed_holdout_verification() -> None:

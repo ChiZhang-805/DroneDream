@@ -115,6 +115,21 @@ def test_desktop_bridge_accepts_one_proof_and_rejects_replay(
     assert replay.json()["error"]["code"] == "DESKTOP_BRIDGE_REPLAY"
 
 
+def test_desktop_bridge_rejects_placeholder_secret_material(
+    client: TestClient,
+    monkeypatch: object,
+) -> None:
+    _configure(monkeypatch)
+    weak_secret = "replace-with-a-generated-desktop-secret-key"
+    monkeypatch.setenv("APP_SECRET_KEY", weak_secret)
+    headers = _proof("GET", "/api/v1/session")
+
+    response = client.get("/api/v1/session", headers=headers)
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "DESKTOP_BRIDGE_CONFIGURATION_ERROR"
+
+
 def test_desktop_bridge_rejects_missing_wrong_runtime_expired_and_body_tamper(
     client: TestClient,
     monkeypatch: object,
@@ -160,6 +175,22 @@ def test_desktop_bridge_rejects_missing_wrong_runtime_expired_and_body_tamper(
     assert tampered.json()["error"]["code"] == "DESKTOP_BRIDGE_BODY_MISMATCH"
 
 
+def test_desktop_bridge_enforces_the_documented_25_mib_asset_contract(
+    client: TestClient,
+    monkeypatch: object,
+) -> None:
+    _configure(monkeypatch)
+    body = b"x" * (25 * 1024 * 1024 + 1)
+    response = client.post(
+        "/api/v1/autonomy/map-packs/import",
+        headers=_proof("POST", "/api/v1/autonomy/map-packs/import", body=body),
+        content=body,
+    )
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "DESKTOP_BRIDGE_BODY_TOO_LARGE"
+
+
 def test_desktop_bridge_preserves_user_ownership_boundary(
     client: TestClient,
     monkeypatch: object,
@@ -169,7 +200,7 @@ def test_desktop_bridge_preserves_user_ownership_boundary(
         b'{"track_type":"circle","start_point":{"x":0,"y":0},"altitude_m":5,'
         b'"wind":{"north":0,"east":0,"south":0,"west":0},'
         b'"sensor_noise_level":"medium","objective_profile":"robust",'
-        b'"optimizer_strategy":"heuristic","simulator_backend":"mock"}'
+        b'"optimizer_strategy":"none","simulator_backend":"real_cli"}'
     )
     created = client.post(
         "/api/v1/jobs",

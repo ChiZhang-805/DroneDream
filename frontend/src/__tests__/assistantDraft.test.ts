@@ -22,6 +22,22 @@ function response(
 ): ExperimentAssistantTurnResponse {
   return {
     schema_version: "1.0",
+    lifecycle_stage: "proposal",
+    model_entrypoint_role: "control_tuning_draft_compiler",
+    creates_job: false,
+    runtime_execution_performed: false,
+    next_required_stage: "review_and_submit_job",
+    model_harness_domain: "optimization.control_tuning",
+    memory_domain: "optimization.control_tuning",
+    control_plane: {
+      plugin_selection_effect: "contract_only",
+      plugin_runtime_receipt_ids: [],
+    },
+    harness_input_sha256: "0".repeat(64),
+    harness_output: {
+      lifecycle_stage: "proposal",
+      runtime_execution_performed: false,
+    },
     experiment_summary: "Parameter intent compiled.",
     accepted_patches: [],
     rejected_patches: [],

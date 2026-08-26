@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, FormEvent, ReactNode } from "react";
+import type {
+  ChangeEvent,
+  FormEvent,
+  ReactNode,
+  WheelEvent as ReactWheelEvent,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Alert } from "../components/Alert";
@@ -9,6 +14,7 @@ import { TrackEditor2D } from "../components/TrackEditor2D";
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { publicDemoConsole } from "../features/demo/publicDemo";
+import { recordProductEvent } from "../features/analytics/productEvents";
 import {
   EXPERIMENTAL_OPTIMIZER_STRATEGIES,
   HARNESS_OPTIMIZER_STRATEGIES,
@@ -39,6 +45,7 @@ import type {
   TrackPoint,
   TrackType,
   TuningMode,
+  UserExperiencePreferences,
 } from "../types/api";
 import {
   BUILTIN_PARAMETER_CATALOG,
@@ -73,19 +80,37 @@ import {
   type ExperimentFormState,
   type ScenarioPreset,
 } from "../features/experiment/formState";
+import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
+import {
+  applyStarterExperienceTemplate,
+  findStarterExperienceTemplate,
+  STARTER_EXPERIENCE_CATALOG_VERSION,
+  STARTER_EXPERIENCE_TEMPLATES,
+  type StarterExperienceId,
+  type StarterExperienceTemplate,
+} from "../features/experiment/experienceTemplates";
 import {
   createExperimentWorkspaceId,
+  isExperimentWorkspaceNameAvailable,
   listExperimentWorkspaces,
   registerExperimentWorkspace,
   updateExperimentWorkspace,
 } from "../features/experiment/workspaceRegistry";
 import { generateReferenceTrack } from "../utils/referenceTrack";
+import { formatNumber } from "../utils/format";
 import { useI18n } from "../i18n/I18nProvider";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type { TranslationKey, TranslationParams } from "../i18n/I18nProvider";
 
 type Translate = (key: TranslationKey, params?: TranslationParams) => string;
 type FormState = ExperimentFormState;
-const DEFAULTS = EXPERIMENT_FORM_DEFAULTS;
+const DEFAULTS: FormState = (
+  ["sim", "lab"].includes(
+    (import.meta.env.VITE_DRONEDREAM_EDITION as string | undefined)?.toLowerCase() ?? "",
+  )
+    ? { ...EXPERIMENT_FORM_DEFAULTS, optimizer_strategy: "llm_harness" }
+    : EXPERIMENT_FORM_DEFAULTS
+);
 
 function isDraftRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -111,6 +136,24 @@ const WIZARD_STEPS: Array<{ key: TranslationKey }> = [
   { key: "wizard.step.constraints" },
   { key: "wizard.step.review" },
 ];
+
+const STARTER_EXPERIENCE_I18N: Record<
+  StarterExperienceId,
+  { title: TranslationKey }
+> = {
+  "hover-basics": {
+    title: "wizard.starter.hover.title",
+  },
+  "first-circle": {
+    title: "wizard.starter.circle.title",
+  },
+  "light-wind-circle": {
+    title: "wizard.starter.wind.title",
+  },
+  "wind-sensor-circle": {
+    title: "wizard.starter.combined.title",
+  },
+};
 
 const OBJECTIVE_WEIGHT_PRESETS: Record<
   Exclude<ObjectiveProfile, "custom">,
@@ -219,6 +262,10 @@ const FIELD_STEPS: Record<string, number> = {
   max_iterations: 3,
   trials_per_candidate: 3,
   max_total_trials: 3,
+  exploration_additional_generations: 3,
+  exploration_additional_trials: 3,
+  exploration_additional_provider_turns: 3,
+  exploration_additional_time_minutes: 3,
   target_rmse: 3,
   target_max_error: 3,
   min_pass_rate: 3,
@@ -286,6 +333,7 @@ const AGGREGATION_HINT_KEYS: Record<RobustAggregation, TranslationKey> = {
 };
 
 const TRACK_HINT_KEYS: Record<TrackType, TranslationKey> = {
+  hover: "wizard.hint.track.hover",
   circle: "wizard.hint.track.circle",
   u_turn: "wizard.hint.track.uTurn",
   lemniscate: "wizard.hint.track.lemniscate",
@@ -302,6 +350,9 @@ const SIMULATOR_BACKEND_HINT_KEYS: Record<SimulatorBackend, TranslationKey> = {
   real_cli: "wizard.hint.backend.realCli",
   mock: "wizard.hint.backend.mock",
 };
+const USER_SIMULATOR_BACKENDS: readonly SimulatorBackend[] = import.meta.env.MODE === "test"
+  ? SIMULATOR_BACKENDS
+  : ["real_cli"];
 
 function selectedHint(
   keys: Record<string, TranslationKey>,
@@ -392,22 +443,29 @@ function parseReferenceTrackInput(raw: string, t?: Translate): {
     return { points: null, error: localizedIssue(t, "wizard.validation.jsonArrayValid") };
   }
   if (!Array.isArray(parsed)) return { points: null, error: localizedIssue(t, "wizard.validation.jsonArray") };
+  if (parsed.length > 10_000) {
+    return {
+      points: null,
+      error: localizedIssue(t, "wizard.validation.trackPointMax", { max: 10_000 }),
+    };
+  }
   const points: TrackPoint[] = [];
   for (let index = 0; index < parsed.length; index += 1) {
     const value = parsed[index];
     if (!value || typeof value !== "object") {
       return { points: null, error: localizedIssue(t, "wizard.validation.trackPointObject", { index: index + 1 }) };
     }
-    const x = Number((value as { x?: unknown }).x);
-    const y = Number((value as { y?: unknown }).y);
-    const zValue = (value as { z?: unknown }).z;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    const candidate = value as { x?: unknown; y?: unknown; z?: unknown };
+    const x = candidate.x;
+    const y = candidate.y;
+    const zValue = candidate.z;
+    if (typeof x !== "number" || !Number.isFinite(x) || typeof y !== "number" || !Number.isFinite(y)) {
       return { points: null, error: localizedIssue(t, "wizard.validation.trackPointXY", { index: index + 1 }) };
     }
-    if (zValue !== undefined && zValue !== null && !Number.isFinite(Number(zValue))) {
+    if (zValue !== undefined && zValue !== null && (typeof zValue !== "number" || !Number.isFinite(zValue))) {
       return { points: null, error: localizedIssue(t, "wizard.validation.trackPointZ", { index: index + 1 }) };
     }
-    points.push({ x, y, z: zValue === undefined || zValue === null ? null : Number(zValue) });
+    points.push({ x, y, z: zValue === undefined || zValue === null ? null : zValue });
   }
   return { points, error: null };
 }
@@ -692,8 +750,19 @@ function validate(
     const value = parseNumber(form.lemniscate_scale_m);
     if (value === null || value <= 0 || value > 100) errors.lemniscate_scale_m = t("wizard.validation.positiveAtMost", { max: 100 });
   }
-  if (parseNumber(form.start_x) === null) errors.start_x = t("wizard.validation.requiredNumber");
-  if (parseNumber(form.start_y) === null) errors.start_y = t("wizard.validation.requiredNumber");
+  const startX = parseNumber(form.start_x);
+  const startY = parseNumber(form.start_y);
+  if (startX === null) errors.start_x = t("wizard.validation.requiredNumber");
+  if (startY === null) errors.start_y = t("wizard.validation.requiredNumber");
+  if (
+    form.track_type === "hover"
+    && startX !== null
+    && startY !== null
+    && (Math.abs(startX) > 1e-9 || Math.abs(startY) > 1e-9)
+  ) {
+    errors.start_x = t("wizard.validation.hoverOrigin");
+    errors.start_y = t("wizard.validation.hoverOrigin");
+  }
   const altitude = parseNumber(form.altitude_m);
   if (altitude === null) errors.altitude_m = t("wizard.validation.requiredNumber");
   else if (altitude < 1 || altitude > 20) errors.altitude_m = t("wizard.validation.between", { min: 1, max: 20 });
@@ -745,6 +814,30 @@ function validate(
       if (magnitude === null || magnitude < 0 || magnitude > 30) errors.gust_magnitude_mps = t("wizard.validation.gustMagnitude");
       if (direction === null || direction < 0 || direction >= 360) errors.gust_direction_deg = t("wizard.validation.gustDirection");
       if (period === null || period <= 0 || period > 300) errors.gust_period_s = t("wizard.validation.gustPeriod");
+      const northMps = parseNumber(form.wind_north);
+      const eastMps = parseNumber(form.wind_east);
+      const southMps = parseNumber(form.wind_south);
+      const westMps = parseNumber(form.wind_west);
+      if (
+        magnitude !== null && magnitude > 0 &&
+        direction !== null && direction >= 0 && direction < 360 &&
+        northMps !== null && eastMps !== null && southMps !== null && westMps !== null
+      ) {
+        const netNorthMps = northMps - southMps;
+        const netEastMps = eastMps - westMps;
+        if (Math.hypot(netNorthMps, netEastMps) > 1e-9) {
+          const steadyDirectionDeg =
+            ((Math.atan2(netEastMps, netNorthMps) * 180) / Math.PI + 360) % 360;
+          const angularDeltaDeg = Math.abs(
+            ((direction - steadyDirectionDeg + 540) % 360) - 180,
+          );
+          if (angularDeltaDeg > 0.001) {
+            errors.gust_direction_deg = t("wizard.validation.gustDirectionAlignment", {
+              direction: formatNumber(steadyDirectionDeg, 3),
+            });
+          }
+        }
+      }
     }
     const obstacleResult = parseObstacles(form.obstacles_json, t);
     if (obstacleResult.error) errors.obstacles_json = obstacleResult.error;
@@ -801,6 +894,50 @@ function validate(
           ? "wizard.validation.minBaselineBudget"
           : "wizard.validation.minTrialBudget",
         { count: trialPlan.minimumRequiredTrials },
+      );
+    }
+  }
+  if (form.continue_exploration_after_qualified) {
+    const generations = parseNumber(form.exploration_additional_generations);
+    const explorationTrials = parseNumber(form.exploration_additional_trials);
+    const providerTurns = parseNumber(form.exploration_additional_provider_turns);
+    const timeMinutes = parseNumber(form.exploration_additional_time_minutes);
+    if (
+      generations === null || !Number.isInteger(generations)
+      || generations < 1 || generations > 32
+    ) {
+      errors.exploration_additional_generations = t(
+        "wizard.validation.integerBetween", { min: 1, max: 32 },
+      );
+    }
+    if (
+      explorationTrials === null || !Number.isInteger(explorationTrials)
+      || explorationTrials < 2 || explorationTrials > 5000
+    ) {
+      errors.exploration_additional_trials = t(
+        "wizard.validation.integerBetween", { min: 2, max: 5000 },
+      );
+    }
+    if (optimizerUsesModelAccess(form.optimizer_strategy)) {
+      if (
+        providerTurns === null || !Number.isInteger(providerTurns)
+        || providerTurns < 0 || providerTurns > 128
+      ) {
+        errors.exploration_additional_provider_turns = t(
+          "wizard.validation.integerBetween", { min: 0, max: 128 },
+        );
+      } else if (generations !== null && providerTurns > generations * 4) {
+        errors.exploration_additional_provider_turns = t(
+          "wizard.validation.explorationProviderCap", { count: generations * 4 },
+        );
+      }
+    }
+    if (
+      timeMinutes === null || !Number.isInteger(timeMinutes)
+      || timeMinutes < 1 || timeMinutes > 1440
+    ) {
+      errors.exploration_additional_time_minutes = t(
+        "wizard.validation.integerBetween", { min: 1, max: 1440 },
       );
     }
   }
@@ -1041,7 +1178,20 @@ function formToRequest(
       target_max_error: form.target_max_error.trim() === "" ? null : Number(form.target_max_error),
       min_pass_rate: Number(form.min_pass_rate),
     },
+    completion_policy: "first_qualified_stop",
   };
+  if (form.continue_exploration_after_qualified) {
+    request.continue_exploration_after_qualified = true;
+    request.exploration_budget = {
+      additional_generation_cap: Number(form.exploration_additional_generations),
+      additional_trial_cap: Number(form.exploration_additional_trials),
+      additional_provider_turn_cap: optimizerUsesModelAccess(form.optimizer_strategy)
+        ? Number(form.exploration_additional_provider_turns)
+        : 0,
+      additional_time_budget_seconds:
+        Number(form.exploration_additional_time_minutes) * 60,
+    };
+  }
   if (optimizerUsesModelAccess(form.optimizer_strategy)) {
     request.llm = form.llm_access_mode === "platform"
       ? {
@@ -1073,6 +1223,10 @@ function legacyRequest(request: JobCreateRequest): JobCreateRequest {
   delete legacy.objective_config;
   delete legacy.scenario_suite;
   delete legacy.max_total_trials;
+  delete legacy.completion_policy;
+  delete legacy.provider_turn_cap;
+  delete legacy.continue_exploration_after_qualified;
+  delete legacy.exploration_budget;
   delete legacy.llm;
   if (llm) {
     if (llm.access_mode === "platform" || !llm.api_key) return legacy;
@@ -1140,6 +1294,9 @@ function isLegacyContractRejection(
   if (!(error instanceof ApiClientError) || ![400, 422].includes(error.httpStatus)) {
     return false;
   }
+  // An old backend cannot enforce an immutable first-qualified receipt or a
+  // separately bounded continuation child. Never silently erase that choice.
+  if (request.continue_exploration_after_qualified) return false;
   if (request.llm && request.llm.provider !== "openai") return false;
   const evidence = `${error.message} ${JSON.stringify(error.details ?? "")}`.toLowerCase();
   const advancedFields = [
@@ -1149,6 +1306,10 @@ function isLegacyContractRejection(
     "scenario_suite",
     "max_total_trials",
     "llm",
+    "completion_policy",
+    "provider_turn_cap",
+    "continue_exploration_after_qualified",
+    "exploration_budget",
   ];
   const rejectionSignal =
     /\b(extra (fields?|inputs?)|unexpected (fields?|arguments?|properties?)|unknown (fields?|properties?)|unrecognized (fields?|properties?)|unsupported (fields?|properties?)|inputs? (are|is) not permitted)\b/u.test(
@@ -1181,13 +1342,15 @@ export function NewJob() {
   const { t } = useI18n();
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
+  const editionTheme = useEditionTheme();
+  const workspaceEdition = editionTheme.id;
   const { settings: modelAccess } = useModelAccess();
   const initialWorkspaceId = useRef((() => {
     const requested = searchParams.get("experiment");
     if (!requested || !/^[a-zA-Z0-9_-]{8,128}$/u.test(requested)) {
       return null;
     }
-    return listExperimentWorkspaces(ownerId).some(
+    return listExperimentWorkspaces(ownerId, workspaceEdition).some(
       (workspace) => workspace.id === requested && !workspace.archived,
     )
       ? requested
@@ -1196,13 +1359,24 @@ export function NewJob() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(
     initialWorkspaceId,
   );
-  const migratedWorkspaceIdRef = useRef<string | null>(null);
   const initialDraft = useRef(
-    loadExperimentDraft(EXPERIMENT_DRAFT_SCHEMA, initialWorkspaceId),
+    initialWorkspaceId
+      ? loadExperimentDraft(EXPERIMENT_DRAFT_SCHEMA, initialWorkspaceId)
+      : null,
+  ).current;
+  const initialTemplate = useRef(
+    initialWorkspaceId
+      ? null
+      : findStarterExperienceTemplate(searchParams.get("scenario")),
+  ).current;
+  const initialBaseForm = useRef<FormState>(
+    initialDraft?.form
+      ?? (initialTemplate
+        ? applyStarterExperienceTemplate(DEFAULTS, initialTemplate)
+        : DEFAULTS),
   ).current;
   const [form, setForm] = useState<FormState>(() => ({
-    ...DEFAULTS,
-    ...(initialDraft?.form ?? {}),
+    ...initialBaseForm,
     llm_provider: modelAccess.provider,
     llm_access_mode: modelAccess.accessMode,
     llm_api_key: modelAccess.apiKey,
@@ -1212,19 +1386,19 @@ export function NewJob() {
   const [catalog, setCatalog] = useState<ParameterCatalogResponse>(BUILTIN_PARAMETER_CATALOG);
   const [selections, setSelections] = useState<ParameterSelectionMap>(() =>
     mergeSelections(
-      createParameterSelections(BUILTIN_PARAMETER_CATALOG.parameters, initialDraft?.form.tuning_mode ?? "basic"),
+      createParameterSelections(BUILTIN_PARAMETER_CATALOG.parameters, initialBaseForm.tuning_mode),
       initialDraft?.selections,
     ),
   );
   const manualEditOriginForm = useRef<FormState>(
-    initialDraft?.conversation ? initialDraft.form : DEFAULTS,
+    initialDraft?.conversation ? initialDraft.form : initialBaseForm,
   ).current;
   const manualEditOriginSelections = useRef<ParameterSelectionMap>(
     initialDraft?.conversation
       ? initialDraft.selections
       : createParameterSelections(
         BUILTIN_PARAMETER_CATALOG.parameters,
-        initialDraft?.form.tuning_mode ?? "basic",
+        initialBaseForm.tuning_mode,
       ),
   ).current;
   const conversationRef = useRef(initialDraft?.conversation ?? null);
@@ -1246,6 +1420,11 @@ export function NewJob() {
   const [showTrackEditor, setShowTrackEditor] = useState(false);
   const [showTrackJson, setShowTrackJson] = useState(false);
   const [showParameterReview, setShowParameterReview] = useState(false);
+  const [lastAppliedTemplateKey, setLastAppliedTemplateKey] = useState<string | null>(
+    initialTemplate?.key ?? null,
+  );
+  const [savedDefaultsState, setSavedDefaultsState] =
+    useState<"idle" | "loading" | "applied" | "empty" | "error">("idle");
   const [capabilities, setCapabilities] = useState<BackendCapabilitiesResponse | null>(null);
   const [capabilitiesUnavailable, setCapabilitiesUnavailable] = useState(false);
   const submittingRef = useRef(false);
@@ -1253,52 +1432,30 @@ export function NewJob() {
   const trackEditorTriggerRef = useRef<HTMLButtonElement>(null);
   const trackJsonTriggerRef = useRef<HTMLButtonElement>(null);
   const parameterReviewTriggerRef = useRef<HTMLButtonElement>(null);
+  const reviewParameterPreviewRef = useRef<HTMLDivElement>(null);
+  const reviewParameterPreviewIndexRef = useRef(0);
+  const reviewParameterWheelDeltaRef = useRef(0);
+  const reviewParameterWheelDirectionRef = useRef(0);
 
   const selectedCount = Object.values(selections).filter(
     (selection) => selection.selected,
   ).length;
   const trialPlan = calculateTrialPlan(form, selectedCount);
   const estimatedTrials = trialPlan.scheduledTrials;
-
-  useEffect(() => {
-    if (
-      workspaceId
-      || migratedWorkspaceIdRef.current
-      || !initialDraft?.form.display_name.trim()
-    ) {
-      return;
-    }
-    const migratedWorkspaceId = createExperimentWorkspaceId();
-    migratedWorkspaceIdRef.current = migratedWorkspaceId;
-    saveExperimentDraft({
-      active_step: initialDraft.active_step,
-      completed_steps: initialDraft.completed_steps,
-      form: { ...initialDraft.form, llm_api_key: "" },
-      selections: initialDraft.selections,
-      conversation: initialDraft.conversation,
-    }, migratedWorkspaceId);
-    registerExperimentWorkspace({
-      id: migratedWorkspaceId,
-      ownerId,
-      name: initialDraft.form.display_name,
-      source: initialDraft.conversation ? "assistant" : "manual",
-      activeStep: initialDraft.active_step,
-      completedSteps: initialDraft.completed_steps,
-    });
-    setWorkspaceId(migratedWorkspaceId);
-  }, [initialDraft, ownerId, workspaceId]);
+  const localPreviewPoints = referenceTrack(form) ?? [];
 
   useEffect(() => {
     if (!workspaceId || !initialDraft?.form.display_name.trim()) return;
-    registerExperimentWorkspace({
-      id: workspaceId,
-      ownerId,
-      name: initialDraft.form.display_name,
-      source: initialDraft.conversation ? "assistant" : "manual",
-      activeStep: initialDraft.active_step,
-      completedSteps: initialDraft.completed_steps,
-    });
-  }, [initialDraft, ownerId, workspaceId]);
+      registerExperimentWorkspace({
+        id: workspaceId,
+        ownerId,
+        edition: workspaceEdition,
+        name: initialDraft.form.display_name,
+        source: initialDraft.conversation ? "assistant" : "manual",
+        activeStep: initialDraft.active_step,
+        completedSteps: initialDraft.completed_steps,
+      });
+  }, [initialDraft, ownerId, workspaceEdition, workspaceId]);
 
   useEffect(() => {
     setForm((current) => {
@@ -1393,7 +1550,7 @@ export function NewJob() {
           name: form.display_name,
           activeStep: step,
           completedSteps: [...completedSteps],
-        });
+        }, workspaceEdition);
       }
     }, 700);
     return () => window.clearTimeout(timer);
@@ -1404,6 +1561,7 @@ export function NewJob() {
     manualEditOriginSelections,
     nameConfirmed,
     ownerId,
+    workspaceEdition,
     selections,
     step,
     workspaceId,
@@ -1484,6 +1642,74 @@ export function NewJob() {
       delete next[key];
       return next;
     });
+  }
+
+  function applyStarterTemplate(template: StarterExperienceTemplate): void {
+    setForm((previous) => applyStarterExperienceTemplate(previous, template));
+    applyModePreset(template.patch.tuning_mode);
+    setLastAppliedTemplateKey(template.key);
+    setErrors((previous) => {
+      const next = { ...previous };
+      for (const key of Object.keys(template.patch)) {
+        delete next[key];
+      }
+      return next;
+    });
+  }
+
+  function applySavedDefaults(preferences: UserExperiencePreferences): void {
+    const template = STARTER_EXPERIENCE_TEMPLATES.find(
+      (candidate) => candidate.key === preferences.default_template_key,
+    );
+    setForm((previous) => {
+      const templated = template
+        ? applyStarterExperienceTemplate(previous, template)
+        : previous;
+      const trackType = preferences.default_track_type ?? templated.track_type;
+      return {
+        ...templated,
+        track_type: trackType,
+        start_x: trackType === "hover" ? "0" : templated.start_x,
+        start_y: trackType === "hover" ? "0" : templated.start_y,
+        altitude_m: preferences.default_altitude_m === null
+          ? templated.altitude_m
+          : String(preferences.default_altitude_m),
+      };
+    });
+    if (template) {
+      applyModePreset(template.patch.tuning_mode);
+      setLastAppliedTemplateKey(template.key);
+    }
+    setErrors((previous) => {
+      const next = { ...previous };
+      for (const key of ["track_type", "start_x", "start_y", "altitude_m"]) {
+        delete next[key];
+      }
+      if (template) {
+        for (const key of Object.keys(template.patch)) delete next[key];
+      }
+      return next;
+    });
+  }
+
+  async function loadSavedDefaults(): Promise<void> {
+    setSavedDefaultsState("loading");
+    try {
+      const preferences = await apiClient.getUserExperiencePreferences();
+      const hasDefaults = (
+        preferences.default_template_key !== null ||
+        preferences.default_track_type !== null ||
+        preferences.default_altitude_m !== null
+      );
+      if (!preferences.saved || !hasDefaults) {
+        setSavedDefaultsState("empty");
+        return;
+      }
+      applySavedDefaults(preferences);
+      setSavedDefaultsState("applied");
+    } catch {
+      setSavedDefaultsState("error");
+    }
   }
 
   function handleTextChange(key: keyof FormState) {
@@ -1570,7 +1796,7 @@ export function NewJob() {
         advanced_enabled: true,
         gust_enabled: true,
         gust_magnitude_mps: "6",
-        gust_direction_deg: "45",
+        gust_direction_deg: "26.565051",
         gust_period_s: "12",
       },
       sensor: {
@@ -1578,7 +1804,7 @@ export function NewJob() {
         noise_search_enabled: true,
         sensor_noise_level: "high",
         advanced_enabled: true,
-        gps_noise_m: "0.8",
+        gps_noise_m: "0",
         baro_noise_m: "0.5",
         imu_noise_scale: "1.4",
         dropout_rate: "0.05",
@@ -1595,9 +1821,9 @@ export function NewJob() {
         advanced_enabled: true,
         gust_enabled: true,
         gust_magnitude_mps: "10",
-        gust_direction_deg: "70",
+        gust_direction_deg: "26.565051",
         gust_period_s: "8",
-        gps_noise_m: "1.2",
+        gps_noise_m: "0",
         baro_noise_m: "0.8",
         imu_noise_scale: "1.8",
         dropout_rate: "0.1",
@@ -1666,6 +1892,7 @@ export function NewJob() {
       registerExperimentWorkspace({
         id: targetWorkspaceId,
         ownerId,
+        edition: workspaceEdition,
         name: nextForm.display_name,
         source: conversationRef.current ? "assistant" : "manual",
         activeStep,
@@ -1683,6 +1910,17 @@ export function NewJob() {
     }
     if (trimmedName.length > 255) {
       setExperimentNameError(t("wizard.validation.nameMax"));
+      return;
+    }
+    if (
+      !isExperimentWorkspaceNameAvailable(
+        ownerId,
+        trimmedName,
+        workspaceEdition,
+        workspaceId,
+      )
+    ) {
+      setExperimentNameError(t("wizard.validation.nameUnique"));
       return;
     }
     const nextForm = { ...form, display_name: trimmedName };
@@ -1710,7 +1948,7 @@ export function NewJob() {
       setErrors((previous) => ({ ...previous, ...nextErrors }));
       if (step === 2 && opensAdvancedScenarioDialog(firstErrorKey)) setShowAdvancedScenario(true);
       if (step === 0 && opensTrackDialog(firstErrorKey)) setShowTrackEditor(true);
-      if (step === 3 && opensModelSettings(firstErrorKey)) openAppSettings();
+      if (step === 3 && opensModelSettings(firstErrorKey)) openAppSettings("model");
       focusErrorField(firstErrorKey, catalog);
       return;
     }
@@ -1742,7 +1980,7 @@ export function NewJob() {
       setStep(firstStep);
       if (firstStep === 2 && opensAdvancedScenarioDialog(firstKey)) setShowAdvancedScenario(true);
       if (firstStep === 0 && opensTrackDialog(firstKey)) setShowTrackEditor(true);
-      if (firstStep === 3 && opensModelSettings(firstKey)) openAppSettings();
+      if (firstStep === 3 && opensModelSettings(firstKey)) openAppSettings("model");
       focusErrorField(firstKey, catalog);
       return;
     }
@@ -1757,7 +1995,7 @@ export function NewJob() {
             status: "draft",
             activeStep: 4,
             completedSteps: [0, 1, 2, 3, 4],
-          });
+          }, workspaceEdition);
         }
         navigate("/dashboard", { replace: false });
         return;
@@ -1813,9 +2051,14 @@ export function NewJob() {
           jobId: created.id,
           activeStep: 4,
           completedSteps: [0, 1, 2, 3, 4],
-        });
+        }, workspaceEdition);
       }
       clearExperimentDraft(workspaceId);
+      void recordProductEvent("job_created", {
+        source: lastAppliedTemplateKey ? "fixed_scenario" : "manual_or_assistant",
+        template_key: lastAppliedTemplateKey,
+        used_legacy_api: usedLegacyApi,
+      });
       navigate(`/jobs/${created.id}`, { replace: false });
     } catch (error) {
       setSubmitError(
@@ -1831,6 +2074,56 @@ export function NewJob() {
 
   const customTrack = parseReferenceTrackInput(form.reference_track_json, t).points ?? [];
   const selectedParameterRows = selectedParameters(selections);
+  useEffect(() => {
+    reviewParameterPreviewIndexRef.current = 0;
+    reviewParameterWheelDeltaRef.current = 0;
+    reviewParameterWheelDirectionRef.current = 0;
+    if (reviewParameterPreviewRef.current) {
+      reviewParameterPreviewRef.current.scrollLeft = 0;
+    }
+  }, [selectedParameterRows.length]);
+
+  const handleReviewParameterWheel = (
+    event: ReactWheelEvent<HTMLDivElement>,
+  ) => {
+    if (selectedParameterRows.length < 7) return;
+    const preview = reviewParameterPreviewRef.current;
+    const items = preview?.querySelectorAll<HTMLElement>("code");
+    if (!preview || !items || items.length < 7) return;
+
+    const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+      ? event.deltaY
+      : event.deltaX;
+    if (delta === 0) return;
+    event.preventDefault();
+
+    const direction = delta > 0 ? 1 : -1;
+    if (
+      reviewParameterWheelDirectionRef.current !== 0
+      && reviewParameterWheelDirectionRef.current !== direction
+    ) {
+      reviewParameterWheelDeltaRef.current = 0;
+    }
+    reviewParameterWheelDirectionRef.current = direction;
+    reviewParameterWheelDeltaRef.current += Math.abs(delta);
+    const threshold = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? 40 : 1;
+    if (reviewParameterWheelDeltaRef.current < threshold) return;
+
+    // Consume one deliberate wheel step per threshold crossing. A mouse wheel
+    // notch therefore reveals exactly one parameter, while small touchpad
+    // deltas are accumulated instead of causing a rapid multi-card jump.
+    reviewParameterWheelDeltaRef.current = 0;
+    const nextIndex = (
+      reviewParameterPreviewIndexRef.current + direction + items.length
+    ) % items.length;
+    reviewParameterPreviewIndexRef.current = nextIndex;
+    const firstOffset = items[0]?.offsetLeft ?? 0;
+    const nextOffset = items[nextIndex]?.offsetLeft ?? firstOffset;
+    preview.scrollTo({
+      left: Math.max(0, nextOffset - firstOffset),
+      behavior: "smooth",
+    });
+  };
   const realCliCapability = capabilities?.simulators.items.real_cli;
   const modelOptimizerCapability = capabilities?.optimizers.items[form.optimizer_strategy];
   const preflightErrors = validate(form, selections, catalog, capabilities, t);
@@ -1919,7 +2212,8 @@ export function NewJob() {
       <form onSubmit={handleSubmit} noValidate className="experiment-form">
         {submitError ? <Alert tone="danger" title={t("wizard.submissionFailed")}>{submitError}</Alert> : null}
 
-        <div hidden={step !== 0} className="wizard-panel">
+        {step === 0 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.flightSetup")}>
             <div className="wizard-flight-setup">
             <div className="form-field wizard-mode-field wizard-full-row">
@@ -1936,6 +2230,91 @@ export function NewJob() {
                 ))}
               </select>
             </div>
+            <section
+              className="stack-sm wizard-subsection starter-experience-section"
+              aria-labelledby="starter-experience-title"
+            >
+              <div className="starter-experience-heading">
+                <div>
+                  <h3 id="starter-experience-title">{t("wizard.starter.title")}</h3>
+                </div>
+                <div className="starter-experience-heading-actions">
+                  <span className="starter-experience-version">
+                    {t("wizard.starter.catalogVersion", {
+                      version: STARTER_EXPERIENCE_CATALOG_VERSION,
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-small"
+                    disabled={savedDefaultsState === "loading"}
+                    onClick={() => void loadSavedDefaults()}
+                  >
+                    {savedDefaultsState === "loading"
+                      ? t("wizard.starter.loadingSaved")
+                      : t("wizard.starter.loadSaved")}
+                  </button>
+                </div>
+              </div>
+              <div className={`starter-experience-layout${lastAppliedTemplateKey ? " has-preview" : ""}`}>
+                <div className="starter-experience-grid">
+                  {STARTER_EXPERIENCE_TEMPLATES.map((template) => {
+                    const copy = STARTER_EXPERIENCE_I18N[template.id];
+                    const title = t(copy.title);
+                    return (
+                      <article className="starter-experience-card" key={template.key}>
+                        <div>
+                          <strong>{title}</strong>
+                          <span>v{template.version}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-small"
+                          aria-label={`${t("wizard.starter.apply")}: ${title}`}
+                          onClick={() => applyStarterTemplate(template)}
+                        >
+                          {t("wizard.starter.apply")}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+                {lastAppliedTemplateKey ? (
+                  <ExperienceTrackPreview
+                    trackType={form.track_type}
+                    points={localPreviewPoints}
+                    altitudeM={Number(form.altitude_m)}
+                    title={t("wizard.preview.title")}
+                    hoverLabel={t("wizard.preview.hover")}
+                    routeLabel={t("wizard.preview.route")}
+                    pointCountLabel={t("wizard.preview.pointCount", {
+                      count: localPreviewPoints.length,
+                    })}
+                    localOnlyLabel={t("wizard.preview.localOnly")}
+                  />
+                ) : null}
+              </div>
+              {lastAppliedTemplateKey ? (
+                <p className="starter-experience-status" role="status">
+                  {t("wizard.starter.applied", { key: lastAppliedTemplateKey })}
+                </p>
+              ) : null}
+              {savedDefaultsState === "applied" ? (
+                <p className="starter-experience-status" role="status">
+                  {t("wizard.starter.savedApplied")}
+                </p>
+              ) : null}
+              {savedDefaultsState === "empty" ? (
+                <p className="starter-experience-note" role="status">
+                  {t("wizard.starter.noSaved")}
+                </p>
+              ) : null}
+              {savedDefaultsState === "error" ? (
+                <p className="starter-experience-note" role="alert">
+                  {t("wizard.starter.loadFailed")}
+                </p>
+              ) : null}
+            </section>
             <section className="stack-sm wizard-subsection" aria-labelledby="flight-setup-vehicle-title">
               <h3 id="flight-setup-vehicle-title">{t("wizard.section.vehicle")}</h3>
               <div className="form-grid">
@@ -2071,6 +2450,9 @@ export function NewJob() {
                     })}
                   </select>
                 </Field>
+                {form.track_type === "hover" ? (
+                  <p className="form-hint wizard-full-row">{t(TRACK_HINT_KEYS.hover)}</p>
+                ) : null}
                 {form.track_type === "circle" ? <Field label={t("wizard.field.circleRadius")} htmlFor="circle_radius_m" error={errors.circle_radius_m} hint={t("wizard.hint.circleRadius")}><input id="circle_radius_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.circle_radius_m} onChange={handleTextChange("circle_radius_m")} /></Field> : null}
                 {form.track_type === "u_turn" ? <><Field label={t("wizard.field.uTurnStraight")} htmlFor="u_turn_straight_length_m" error={errors.u_turn_straight_length_m} hint={t("wizard.hint.uTurnStraight")}><input id="u_turn_straight_length_m" type="number" min="0" max="200" step="0.1" placeholder="0–200" value={form.u_turn_straight_length_m} onChange={handleTextChange("u_turn_straight_length_m")} /></Field><Field label={t("wizard.field.uTurnRadius")} htmlFor="u_turn_turn_radius_m" error={errors.u_turn_turn_radius_m} hint={t("wizard.hint.uTurnRadius")}><input id="u_turn_turn_radius_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.u_turn_turn_radius_m} onChange={handleTextChange("u_turn_turn_radius_m")} /></Field></> : null}
                 {form.track_type === "lemniscate" ? <Field label={t("wizard.field.lemniscateScale")} htmlFor="lemniscate_scale_m" error={errors.lemniscate_scale_m} hint={t("wizard.hint.lemniscateScale")}><input id="lemniscate_scale_m" type="number" min="0" max="100" step="0.1" placeholder="0–100" value={form.lemniscate_scale_m} onChange={handleTextChange("lemniscate_scale_m")} /></Field> : null}
@@ -2171,9 +2553,11 @@ export function NewJob() {
             </section>
             </div>
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
-        <div hidden={step !== 1} className="wizard-panel">
+        {step === 1 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.parameters")}>
             <ParameterSelector
               catalog={catalog.parameters}
@@ -2183,9 +2567,11 @@ export function NewJob() {
               onChange={setSelections}
             />
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
-        <div hidden={step !== 2} className="wizard-panel">
+        {step === 2 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.scenarios")}>
             <div className="scenario-case-selector" aria-describedby={errors.scenario_cases ? "scenario_cases_error" : undefined}>
               <h3>{t("wizard.caseMatrix")}</h3>
@@ -2252,7 +2638,7 @@ export function NewJob() {
                   <Field label={t("wizard.field.advancedScenario")} htmlFor="advanced_enabled"><BooleanSelect id="advanced_enabled" value={form.advanced_enabled} onChange={(value) => update("advanced_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
                   <Field label={t("wizard.field.gustEnabled")} htmlFor="gust_enabled"><BooleanSelect id="gust_enabled" value={form.gust_enabled} disabled={!form.advanced_enabled} onChange={(value) => update("gust_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
                   <Field label={t("wizard.field.gustMagnitude")} htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps}><input id="gust_magnitude_mps" type="number" min="0" max="30" step="0.1" placeholder="0–30" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_magnitude_mps} onChange={handleTextChange("gust_magnitude_mps")} /></Field>
-                  <Field label={t("wizard.field.gustDirection")} htmlFor="gust_direction_deg" error={errors.gust_direction_deg}><input id="gust_direction_deg" type="number" min="0" max="359" step="1" placeholder="0–359" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} /></Field>
+                  <Field label={t("wizard.field.gustDirection")} htmlFor="gust_direction_deg" error={errors.gust_direction_deg ?? preflightErrors.gust_direction_deg}><input id="gust_direction_deg" type="number" min="0" max="359" step="1" placeholder="0–359" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} /></Field>
                   <Field label={t("wizard.field.gustPeriod")} htmlFor="gust_period_s" error={errors.gust_period_s}><input id="gust_period_s" type="number" min="0" max="300" step="0.1" placeholder="0–300" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_period_s} onChange={handleTextChange("gust_period_s")} /></Field>
                 </div>
               </div>
@@ -2305,15 +2691,17 @@ export function NewJob() {
               </div>
             ) : null}
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
-        <div hidden={step !== 3} className="wizard-panel">
+        {step === 3 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.constraints")}>
             <div className="constraint-strategy-layout">
               <div className="constraint-input-column">
                 <div className="form-grid constraints-grid">
                   <Field label={t("wizard.field.simulatorBackend")} required htmlFor="simulator_backend" error={errors.simulator_backend} hint={t(SIMULATOR_BACKEND_HINT_KEYS[form.simulator_backend])}>
-                    <select id="simulator_backend" value={form.simulator_backend} onChange={(event) => update("simulator_backend", event.target.value as SimulatorBackend)}>{SIMULATOR_BACKENDS.map((backend) => <option key={backend} value={backend}>{t(backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")}</option>)}</select>
+                    <select id="simulator_backend" value={form.simulator_backend} onChange={(event) => update("simulator_backend", event.target.value as SimulatorBackend)}>{USER_SIMULATOR_BACKENDS.map((backend) => <option key={backend} value={backend}>{t(backend === "real_cli" ? "wizard.simulator.realCli" : "wizard.simulator.mock")}</option>)}</select>
                   </Field>
                   <Field
                     label={t("wizard.optimizerStrategy")}
@@ -2386,10 +2774,69 @@ export function NewJob() {
                 }
               />
             </div>
+            <section className="completion-policy-card" aria-labelledby="completion-policy-title">
+              <div
+                className="completion-policy-heading"
+                title={t("wizard.completionPolicy.firstQualifiedBody")}
+              >
+                <div>
+                  <h3 id="completion-policy-title">{t("wizard.completionPolicy.title")}</h3>
+                </div>
+                <span className="completion-policy-badge">
+                  {t("wizard.completionPolicy.firstQualifiedBadge")}
+                </span>
+              </div>
+              <label
+                className="completion-policy-toggle"
+                title={t("wizard.completionPolicy.continueBody")}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.continue_exploration_after_qualified}
+                  onChange={(event) => update(
+                    "continue_exploration_after_qualified",
+                    event.target.checked,
+                  )}
+                />
+                <span>
+                  <strong>{t("wizard.completionPolicy.continueTitle")}</strong>
+                </span>
+              </label>
+              {form.continue_exploration_after_qualified ? (
+                <div className="form-grid completion-policy-budget">
+                  <Field label={t("wizard.completionPolicy.generations")} required htmlFor="exploration_additional_generations" error={errors.exploration_additional_generations}>
+                    <input id="exploration_additional_generations" type="number" min="1" max="32" step="1" value={form.exploration_additional_generations} onChange={handleTextChange("exploration_additional_generations")} />
+                  </Field>
+                  <Field label={t("wizard.completionPolicy.trials")} required htmlFor="exploration_additional_trials" error={errors.exploration_additional_trials}>
+                    <input id="exploration_additional_trials" type="number" min="2" max="5000" step="1" value={form.exploration_additional_trials} onChange={handleTextChange("exploration_additional_trials")} />
+                  </Field>
+                  <Field label={t("wizard.completionPolicy.providerTurns")} required htmlFor="exploration_additional_provider_turns" error={errors.exploration_additional_provider_turns}>
+                    <input
+                      id="exploration_additional_provider_turns"
+                      type="number"
+                      min="0"
+                      max="128"
+                      step="1"
+                      disabled={!optimizerUsesModelAccess(form.optimizer_strategy)}
+                      value={optimizerUsesModelAccess(form.optimizer_strategy) ? form.exploration_additional_provider_turns : "0"}
+                      onChange={handleTextChange("exploration_additional_provider_turns")}
+                    />
+                  </Field>
+                  <Field label={t("wizard.completionPolicy.minutes")} required htmlFor="exploration_additional_time_minutes" error={errors.exploration_additional_time_minutes}>
+                    <input id="exploration_additional_time_minutes" type="number" min="1" max="1440" step="1" value={form.exploration_additional_time_minutes} onChange={handleTextChange("exploration_additional_time_minutes")} />
+                  </Field>
+                  <p className="completion-policy-warning">
+                    {t("wizard.completionPolicy.confirmationWarning")}
+                  </p>
+                </div>
+              ) : null}
+            </section>
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
-        <div hidden={step !== 4} className="wizard-panel">
+        {step === 4 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.review")}>
             {preflightSteps.length === 0 ? (
               <div className="preflight-status" role="status"><span aria-hidden="true">✓</span>{t("wizard.preflightReadyTitle")}</div>
@@ -2410,7 +2857,7 @@ export function NewJob() {
                         setStep(issueStep);
                         if (firstIssueKey && issueStep === 2 && opensAdvancedScenarioDialog(firstIssueKey)) setShowAdvancedScenario(true);
                         if (firstIssueKey && issueStep === 0 && opensTrackDialog(firstIssueKey)) setShowTrackEditor(true);
-                        if (firstIssueKey && issueStep === 3 && opensModelSettings(firstIssueKey)) openAppSettings();
+                        if (firstIssueKey && issueStep === 3 && opensModelSettings(firstIssueKey)) openAppSettings("model");
                       }}
                     >
                       {t(WIZARD_STEPS[issueStep].key)} ({Object.keys(preflightErrors).filter((key) => errorStep(key, catalog) === issueStep).length})
@@ -2467,6 +2914,20 @@ export function NewJob() {
                 <ReviewFact label={t("wizard.field.targetRmse")} value={form.target_rmse || t("wizard.review.notSet")} />
                 <ReviewFact label={t("wizard.field.targetMaxError")} value={form.target_max_error || t("wizard.review.notSet")} />
                 <ReviewFact label={t("wizard.field.minPassRate")} value={form.min_pass_rate} />
+                <ReviewFact label={t("wizard.completionPolicy.title")} value={t("wizard.completionPolicy.firstQualifiedBadge")} />
+                <ReviewFact
+                  label={t("wizard.completionPolicy.continueTitle")}
+                  value={form.continue_exploration_after_qualified
+                    ? t("wizard.completionPolicy.reviewBudget", {
+                        generations: form.exploration_additional_generations,
+                        trials: form.exploration_additional_trials,
+                        turns: optimizerUsesModelAccess(form.optimizer_strategy)
+                          ? form.exploration_additional_provider_turns
+                          : "0",
+                        minutes: form.exploration_additional_time_minutes,
+                      })
+                    : t("wizard.completionPolicy.notRequested")}
+                />
               </ReviewBlock>
             </div>
             <section className="review-block review-parameter-card" aria-labelledby="selected-parameters-title">
@@ -2489,7 +2950,12 @@ export function NewJob() {
                 </h3>
                 <span>{t("wizard.review.parameterCount", { count: selectedParameterRows.length })}</span>
               </div>
-              <div className="review-parameter-chips review-parameter-preview" aria-hidden="true">
+              <div
+                ref={reviewParameterPreviewRef}
+                className="review-parameter-chips review-parameter-preview"
+                aria-hidden="true"
+                onWheel={handleReviewParameterWheel}
+              >
                 {selectedParameterRows.map((parameter) => (
                   <code key={parameter.name}>
                     <strong>{parameter.name}</strong>
@@ -2545,12 +3011,34 @@ export function NewJob() {
               </div>
             ) : null}
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
         <div className="wizard-actions">
           {step > 0 ? <button type="button" className="btn btn-ghost" disabled={submitting} onClick={previousStep}>{t("wizard.back")}</button> : null}
           {step < 4 ? <button type="button" className="btn btn-primary" disabled={submitting || currentStepHasErrors} onClick={nextStep}>{t("wizard.next")}</button> : null}
-          {step === 4 ? <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? t("wizard.creating") : t("wizard.create")}</button> : null}
+          {step === 4 ? (
+            <>
+              <button className="btn btn-primary" type="submit" disabled={submitting}>
+                {submitting
+                  ? t("wizard.creating")
+                  : publicDemoConsole
+                    ? "Save editable draft"
+                    : t("wizard.create")}
+              </button>
+              {publicDemoConsole ? (
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled
+                  title="Execution is available only in an installed DroneDream edition with its validated runtime and safety gates."
+                  data-execution-authority="false"
+                >
+                  Run experiment in installed app
+                </button>
+              ) : null}
+            </>
+          ) : null}
         </div>
       </form>
     </section>

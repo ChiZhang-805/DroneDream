@@ -123,6 +123,23 @@ def test_robust_aggregations_follow_worst_objective_direction() -> None:
     assert aggregate_metric(values, direction="minimize", mode="cvar", cvar_alpha=0.2) == 10.0
 
 
+@pytest.mark.parametrize("invalid", [True, "1.0"])
+def test_robust_aggregation_rejects_non_numeric_metric_samples(invalid: object) -> None:
+    with pytest.raises(ValueError, match="metric samples must be finite numbers"):
+        aggregate_metric([1.0, invalid], direction="minimize", mode="mean")  # type: ignore[list-item]
+
+
+@pytest.mark.parametrize("invalid", [False, "1.0"])
+def test_robust_aggregation_rejects_non_numeric_sample_weights(invalid: object) -> None:
+    with pytest.raises(ValueError, match="sample weights must be finite numbers"):
+        aggregate_metric(
+            [1.0, 2.0],
+            direction="minimize",
+            mode="mean",
+            weights=[1.0, invalid],  # type: ignore[list-item]
+        )
+
+
 def test_candidate_evaluation_enforces_worst_case_hard_constraints() -> None:
     config = ObjectiveConfig(
         objectives=[
@@ -701,6 +718,110 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
     )
 
 
+@pytest.mark.parametrize(
+    ("aggregate_override", "selection_override"),
+    [
+        ({"feasible": False}, {"hard_feasible": True}),
+        ({"hard_constraint_violation": 0.25}, {"hard_constraint_violation": 0.0}),
+        ({"optimizer_learning_failure_rate": 0.25}, {"training_failure_rate": 0.0}),
+        ({"scalar_loss": 0.75}, {"decision_loss": 0.4}),
+        ({"training_completed_trial_count": 1}, {"evidence_complete": True}),
+        (
+            {"training_completed_trial_count": 1},
+            {"evidence_complete": False},
+        ),
+        ({"training_passing_trial_count": 3}, {}),
+        (
+            {
+                "training_trial_outcome_counts": {
+                    "success": 2,
+                    "domain_failure": 0,
+                    "infrastructure_failure": 0,
+                    "cancelled": 0,
+                    "invalid_evidence": 0,
+                }
+            },
+            {},
+        ),
+        (
+            {
+                "training_trial_outcome_rates": {
+                    "success": 1.0,
+                    "domain_failure": 0.0,
+                    "infrastructure_failure": 0.0,
+                    "cancelled": 0.0,
+                    "invalid_evidence": 0.0,
+                }
+            },
+            {},
+        ),
+    ],
+)
+def test_candidate_outcome_evidence_rejects_contradictory_selection_key(
+    aggregate_override: dict[str, object],
+    selection_override: dict[str, object],
+) -> None:
+    aggregate: dict[str, object] = {
+        "training_trial_count": 2,
+        "training_completed_trial_count": 2,
+        "training_failed_trial_count": 0,
+        "training_passing_trial_count": 2,
+        "training_trial_outcome_counts": {
+            "success": 2,
+            "domain_failure": 0,
+            "infrastructure_failure": 0,
+            "cancelled": 0,
+            "invalid_evidence": 0,
+            "unknown_failure": 0,
+        },
+        "training_trial_outcome_rates": {
+            "success": 1.0,
+            "domain_failure": 0.0,
+            "infrastructure_failure": 0.0,
+            "cancelled": 0.0,
+            "invalid_evidence": 0.0,
+            "unknown_failure": 0.0,
+        },
+        "optimizer_learning_failure_rate": 0.0,
+        "objective_values": {"rmse": 0.4},
+        "constraint_values": {"crash_flag:lte:0": 0.0},
+        "constraint_violations": {"crash_flag:lte:0": 0.0},
+        "feasible": True,
+        "hard_constraint_violation": 0.0,
+        "preference_loss": 0.4,
+        "soft_constraint_penalty": 0.0,
+        "scalar_loss": 0.4,
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=True,
+            hard_constraint_violation=0.0,
+            training_failure_rate=0.0,
+            decision_loss=0.4,
+        ),
+        "acceptance_rmse": 0.4,
+        "acceptance_max_error": 0.8,
+        "acceptance_pass_rate": 1.0,
+        "acceptance_completion_rate": 1.0,
+    }
+    aggregate.update(aggregate_override)
+    selection_key = dict(aggregate["selection_key"])  # type: ignore[arg-type]
+    selection_key.update(selection_override)
+    aggregate["selection_key"] = selection_key
+
+    with pytest.raises(ValueError, match="selection key"):
+        compile_candidate_outcome_evidence(
+            outcome_contract_id="sha256:" + "a" * 64,
+            candidate_id="candidate-contradictory-selection",
+            generation_index=2,
+            parameter_snapshot={"MPC_XY_P": 0.95},
+            trial_evidence_rows=[
+                {"trial_id": "trial-1", "seed": 101, "rmse": 0.3},
+                {"trial_id": "trial-2", "seed": 102, "rmse": 0.5},
+            ],
+            aggregate=aggregate,
+        )
+
+
 def test_trial_holdout_role_requires_a_boolean_marker() -> None:
     assert trial_is_holdout(SimpleNamespace(scenario_config_json={"holdout": True}))
     assert not trial_is_holdout(SimpleNamespace(scenario_config_json={"holdout": False}))
@@ -951,6 +1072,35 @@ def test_pareto_diagnostics_never_recommend_an_infeasible_parameter_set() -> Non
     assert representative_points(unsafe) == {}
 
 
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), True, "0.1"])
+def test_pareto_point_rejects_invalid_objective_values(invalid: object) -> None:
+    with pytest.raises(ValueError, match="objective values must be finite numbers"):
+        ParetoPoint(
+            "invalid",
+            {"rmse": invalid},  # type: ignore[dict-item]
+            {"rmse": "minimize"},
+        )
+
+
+def test_pareto_point_requires_exact_valid_objective_directions() -> None:
+    with pytest.raises(ValueError, match="directions must exactly match objectives"):
+        ParetoPoint("missing", {"rmse": 0.2}, {})
+    with pytest.raises(ValueError, match="unsupported direction"):
+        ParetoPoint("invalid", {"rmse": 0.2}, {"rmse": "smaller"})
+
+
+@pytest.mark.parametrize("invalid", [-0.1, float("nan"), float("inf"), True])
+def test_pareto_point_rejects_invalid_constraint_violation(invalid: object) -> None:
+    with pytest.raises(ValueError, match="total_violation must be finite and non-negative"):
+        ParetoPoint(
+            "invalid",
+            {"rmse": 0.2},
+            {"rmse": "minimize"},
+            False,
+            invalid,  # type: ignore[arg-type]
+        )
+
+
 def test_scenario_suite_requires_unique_ids_and_seeds() -> None:
     with pytest.raises(ValidationError, match="seeds must be unique"):
         ScenarioCaseConfig(id="wind", scenario_type="wind_perturbed", seeds=[1, 1])
@@ -1053,6 +1203,37 @@ def test_scenario_matrix_is_fixed_across_candidates_and_splits_holdout() -> None
     }
 
 
+def test_scenario_matrix_isolates_nested_config_between_runs_and_source_suite() -> None:
+    suite = ScenarioSuiteConfig(
+        cases=[
+            ScenarioCaseConfig(
+                id="wind",
+                scenario_type="wind_perturbed",
+                seeds=[3, 5],
+                config={
+                    "advanced_scenario_config": {
+                        "wind_gusts": {"enabled": True, "magnitude_mps": 4.0}
+                    }
+                },
+            )
+        ]
+    )
+
+    runs = scenario_matrix(suite)
+    runs[0].config["advanced_scenario_config"]["wind_gusts"]["magnitude_mps"] = 99.0
+
+    assert runs[1].config["advanced_scenario_config"]["wind_gusts"]["magnitude_mps"] == 4.0
+    assert (
+        suite.cases[0].config["advanced_scenario_config"]["wind_gusts"]["magnitude_mps"]
+        == 4.0
+    )
+
+
+def test_scenario_generation_rejects_boolean_index() -> None:
+    with pytest.raises(ValueError, match="non-negative integer"):
+        scenario_matrix_for_generation(ScenarioSuiteConfig(), generation_index=True)
+
+
 def test_non_common_random_number_trial_resolves_against_its_generation() -> None:
     suite = ScenarioSuiteConfig(
         cases=[
@@ -1152,8 +1333,32 @@ def test_scenario_execution_contract_rejects_payload_and_fidelity_drift() -> Non
         },
         advanced_scenario_config={},
     )
+    nominal_full_partial_payload = scenario_execution_payload(
+        run,
+        source="optimizer",
+        generation_index=2,
+        advanced_scenario_config={},
+        optimizer_fidelity_value=0.25,
+        optimizer_requested_fidelity_value=1.0,
+    )
+    nominal_full_partial = validate_scenario_execution_contract(
+        suite,
+        scenario_type=run.scenario_type,
+        scenario_config=nominal_full_partial_payload,
+        seed=run.seed,
+        candidate_source="optimizer",
+        candidate_generation=2,
+        candidate_is_baseline=False,
+        optimizer_metadata={
+            "effective_fidelity": 0.25,
+            "requested_fidelity": 1.0,
+        },
+        advanced_scenario_config={},
+    )
 
     assert not contract.valid
     assert contract.error == "scenario_payload_mismatch"
     assert not fidelity_drift.valid
     assert fidelity_drift.error == "optimizer_fidelity_mismatch"
+    assert not nominal_full_partial.valid
+    assert nominal_full_partial.error == "optimizer_fidelity_mismatch"

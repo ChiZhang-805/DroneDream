@@ -4,6 +4,7 @@ import hashlib
 import os
 import tempfile
 from pathlib import Path
+from typing import BinaryIO
 
 from app.config import get_settings
 from app.storage.base import ArtifactStorage
@@ -36,6 +37,17 @@ class LocalArtifactStorage(ArtifactStorage):
         size = 0
         with _resolve_allowed_path(storage_uri).open("rb") as handle:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+                size += len(chunk)
+        return digest.hexdigest(), size
+
+    def copy_to(self, storage_uri: str, destination: BinaryIO) -> tuple[str, int]:
+        digest = hashlib.sha256()
+        size = 0
+        with _resolve_allowed_path(storage_uri).open("rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                if destination.write(chunk) != len(chunk):
+                    raise OSError("artifact destination accepted only a partial write")
                 digest.update(chunk)
                 size += len(chunk)
         return digest.hexdigest(), size

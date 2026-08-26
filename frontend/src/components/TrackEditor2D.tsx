@@ -101,6 +101,71 @@ function Icon({ name }: { name: "add" | "undo" | "trash" | "left" | "right" | "c
   );
 }
 
+function CoordinateInput({
+  id,
+  value,
+  onCommit,
+}: {
+  id: string;
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const editing = useRef(false);
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    if (!editing.current) setDraft(String(value));
+  }, [value]);
+
+  function finishEditing(): void {
+    if (!editing.current) return;
+    editing.current = false;
+    const normalized = draft.trim();
+    const parsed = Number(normalized);
+    if (normalized !== "" && Number.isFinite(parsed)) {
+      if (!Object.is(parsed, value)) onCommit(parsed);
+      setDraft(String(parsed));
+      return;
+    }
+    setDraft(String(value));
+  }
+
+  return (
+    <input
+      id={id}
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      onFocus={() => {
+        editing.current = true;
+      }}
+      onChange={(event) => {
+        const nextDraft = event.target.value;
+        setDraft(nextDraft);
+        const parsed = Number(nextDraft.trim());
+        if (
+          nextDraft.trim() !== ""
+          && Number.isFinite(parsed)
+          && !Object.is(parsed, value)
+        ) {
+          onCommit(parsed);
+        }
+      }}
+      onBlur={finishEditing}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        } else if (event.key === "Escape") {
+          editing.current = false;
+          setDraft(String(value));
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 export function TrackEditor2D({
   points,
   defaultAltitude,
@@ -481,6 +546,27 @@ export function TrackEditor2D({
   return (
     <div className="track-editor" data-testid="track-editor-workspace">
       <div className="track-editor-toolbar">
+        <div className="track-view-switcher" role="group" aria-label={t("track.viewSwitcher")}>
+          <button
+            type="button"
+            className="track-icon-button"
+            onClick={() => changeView(-1)}
+            aria-label={t("track.previousView")}
+            title={t("track.previousView")}
+          >
+            <Icon name="left" />
+          </button>
+          <span className="track-view-label" aria-live="polite">{viewLabel}</span>
+          <button
+            type="button"
+            className="track-icon-button"
+            onClick={() => changeView(1)}
+            aria-label={t("track.nextView")}
+            title={t("track.nextView")}
+          >
+            <Icon name="right" />
+          </button>
+        </div>
         <div className="track-editor-actions">
           {dataPanelAction ? (
             <div className="track-editor-data-action" data-testid="track-editor-data-action">
@@ -557,27 +643,6 @@ export function TrackEditor2D({
       ) : null}
 
       <div className="track-canvas-shell" data-testid="track-editor-visual-pane">
-        <div className="track-view-switcher" role="group" aria-label={t("track.viewSwitcher")}>
-          <button
-            type="button"
-            className="track-icon-button"
-            onClick={() => changeView(-1)}
-            aria-label={t("track.previousView")}
-            title={t("track.previousView")}
-          >
-            <Icon name="left" />
-          </button>
-          <span className="track-view-label" aria-live="polite">{viewLabel}</span>
-          <button
-            type="button"
-            className="track-icon-button"
-            onClick={() => changeView(1)}
-            aria-label={t("track.nextView")}
-            title={t("track.nextView")}
-          >
-            <Icon name="right" />
-          </button>
-        </div>
         <svg
           className={`track-editor-canvas ${view === "3d" ? "track-editor-canvas-3d" : ""}`}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -734,14 +799,10 @@ export function TrackEditor2D({
                     <label className="sr-only" htmlFor={`waypoint-${index}-${axis}`}>
                       {t("track.waypointInput", { index: index + 1, axis: axis.toUpperCase() })}
                     </label>
-                    <input
+                    <CoordinateInput
                       id={`waypoint-${index}-${axis}`}
-                      type="number"
-                      step="0.1"
                       value={axisValue(point, axis, defaultAltitude)}
-                      onChange={(event) =>
-                        updatePoint(index, { [axis]: Number(event.target.value) })
-                      }
+                      onCommit={(value) => updatePoint(index, { [axis]: value })}
                     />
                   </td>
                 ))}

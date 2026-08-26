@@ -23,7 +23,9 @@ const declaredPackages = {
   ...packageJson.devDependencies,
 };
 const configuredRscPackages = disallowedRscPackages.filter(
-  (name) => name in declaredPackages,
+  (name) =>
+    name in declaredPackages
+    || `node_modules/${name}` in (packageLock.packages ?? {}),
 );
 if (configuredRscPackages.length > 0) {
   throw new Error(
@@ -33,18 +35,27 @@ if (configuredRscPackages.length > 0) {
 
 const routerVersion =
   packageLock.packages?.["node_modules/react-router"]?.version ?? "";
-if (routerVersion !== "7.18.1") {
+if (routerVersion !== "7.18.2") {
   throw new Error(
-    `Expected the reviewed React Router SPA version 7.18.1, found ${routerVersion || "none"}`,
+    `Expected the reviewed React Router SPA version 7.18.2, found ${routerVersion || "none"}`,
   );
 }
 
 const auditArguments = ["audit", "--audit-level=high", "--json"];
+const invokedByNpm = Boolean(process.env.npm_execpath);
+const auditCommand = invokedByNpm
+  ? process.execPath
+  : process.platform === "win32"
+    ? process.env.ComSpec || "cmd.exe"
+    : "npm";
+const auditCommandArguments = invokedByNpm
+  ? [process.env.npm_execpath, ...auditArguments]
+  : process.platform === "win32"
+    ? ["/d", "/s", "/c", "npm", ...auditArguments]
+    : auditArguments;
 const audit = spawnSync(
-  process.env.npm_execpath ? process.execPath : "npm",
-  process.env.npm_execpath
-    ? [process.env.npm_execpath, ...auditArguments]
-    : auditArguments,
+  auditCommand,
+  auditCommandArguments,
   {
     cwd: frontendRoot,
     encoding: "utf8",
@@ -61,10 +72,6 @@ if (audit.error || !audit.stdout?.trim()) {
 
 const report = JSON.parse(audit.stdout);
 const vulnerabilities = report.vulnerabilities ?? {};
-const allowedAdvisoryUrls = new Set([
-  "https://github.com/advisories/GHSA-qwww-vcr4-c8h2",
-]);
-
 function advisoryUrlsFor(packageName, visited = new Set()) {
   if (visited.has(packageName)) {
     return [];
@@ -82,20 +89,12 @@ function advisoryUrlsFor(packageName, visited = new Set()) {
 }
 
 const blockedPackages = [];
-const exceptedPackages = [];
 for (const [packageName, vulnerability] of Object.entries(vulnerabilities)) {
   if (!["high", "critical"].includes(vulnerability.severity)) {
     continue;
   }
   const advisoryUrls = advisoryUrlsFor(packageName);
-  const isNarrowSpaException =
-    advisoryUrls.length > 0 &&
-    advisoryUrls.every((url) => allowedAdvisoryUrls.has(url));
-  if (isNarrowSpaException) {
-    exceptedPackages.push(packageName);
-  } else {
-    blockedPackages.push({ packageName, advisoryUrls });
-  }
+  blockedPackages.push({ packageName, advisoryUrls });
 }
 
 if (blockedPackages.length > 0) {
@@ -110,9 +109,4 @@ if (blockedPackages.length > 0) {
   process.exit(1);
 }
 
-if (exceptedPackages.length > 0) {
-  console.warn(
-    `Accepted the documented browser-SPA-only exception for GHSA-qwww-vcr4-c8h2: ${exceptedPackages.join(", ")}.`,
-  );
-}
 console.log("No applicable high or critical frontend dependency advisories.");

@@ -36,13 +36,58 @@ export type TrialStatus =
   | "FAILED"
   | "CANCELLED";
 
-export type TrackType = "circle" | "u_turn" | "lemniscate" | "custom";
+export type TrackType = "hover" | "circle" | "u_turn" | "lemniscate" | "custom";
 export const TRACK_TYPES: readonly TrackType[] = [
+  "hover",
   "circle",
   "u_turn",
   "lemniscate",
   "custom",
 ];
+
+export type StarterExperienceTemplateKey =
+  | "hover-basics@1"
+  | "first-circle@1"
+  | "light-wind-circle@1"
+  | "wind-sensor-circle@1";
+export type UserDefaultTrackType =
+  | "hover"
+  | "circle"
+  | "u_turn"
+  | "lemniscate";
+
+export interface UserExperiencePreferences {
+  schema_version: "1.0";
+  saved: boolean;
+  memory_enabled: boolean;
+  locale: "en" | "zh-CN" | null;
+  default_template_key: StarterExperienceTemplateKey | null;
+  default_track_type: UserDefaultTrackType | null;
+  default_altitude_m: number | null;
+  retention_days: number;
+  stored_content:
+    "allowlisted_preferences_and_verified_structured_job_outcomes_only";
+  updated_at: string | null;
+}
+
+export interface UserExperiencePreferencesUpdate {
+  memory_enabled?: boolean;
+  locale?: "en" | "zh-CN" | null;
+  default_template_key?: StarterExperienceTemplateKey | null;
+  default_track_type?: UserDefaultTrackType | null;
+  default_altitude_m?: number | null;
+}
+
+export interface UserExperiencePreferencesMutation
+  extends UserExperiencePreferences {
+  deleted_memory_count: number;
+}
+
+export interface DeleteUserExperiencePreferencesResponse {
+  deleted_preferences: boolean;
+  deleted_memory_count: number;
+  memory_enabled: false;
+}
 
 export type SensorNoiseLevel = "low" | "medium" | "high";
 export const SENSOR_NOISE_LEVELS: readonly SensorNoiseLevel[] = [
@@ -75,6 +120,7 @@ export type ScenarioType =
   | "payload_changed"
   | "battery_degraded"
   | "actuator_delay"
+  | "actuator_failure"
   | "custom";
 
 export interface StartPoint {
@@ -205,6 +251,10 @@ export interface JobCreateRequest {
   objective_config?: ObjectiveConfig;
   scenario_suite?: ScenarioSuiteConfig;
   max_total_trials?: number;
+  completion_policy?: CompletionPolicy;
+  provider_turn_cap?: number;
+  continue_exploration_after_qualified?: boolean;
+  exploration_budget?: ContinueExplorationBudget | null;
 }
 
 export interface JobUpdateRequest {
@@ -215,6 +265,25 @@ export interface JobRerunRequest {
   openai?: OpenAIConfig | null;
   llm?: LLMProviderConfig | null;
 }
+
+export type CompletionPolicy =
+  | "first_qualified_stop"
+  | "exploration_budget_stop";
+
+export type JobKind = "primary" | "continue_exploration";
+
+export interface ContinueExplorationBudget {
+  additional_generation_cap: number;
+  additional_trial_cap: number;
+  additional_provider_turn_cap: number;
+  additional_time_budget_seconds: number;
+}
+
+export interface ContinueExplorationRequest {
+  budget: ContinueExplorationBudget;
+  openai?: OpenAIConfig | null;
+  llm?: LLMProviderConfig | null;
+}
 export interface DeleteJobResponse {
   id: string;
   deleted: boolean;
@@ -222,6 +291,12 @@ export interface DeleteJobResponse {
 
 export interface Job {
   id: string;
+  model_harness_domain: "optimization.control_tuning";
+  memory_domain: "optimization.control_tuning";
+  memory_precedence: HarnessMemoryPrecedenceLayer[];
+  raw_conversation_retention: "task_instance_only";
+  long_term_memory_authority: "advisory_only";
+  control_plane: HarnessControlPlaneReceipt;
   control_version: number;
   track_type: TrackType;
   reference_track: TrackPoint[] | null;
@@ -260,6 +335,7 @@ export interface Job {
   current_generation: number;
   optimization_outcome: OptimizationOutcome | null;
   openai_model: string | null;
+  llm_access_mode?: "platform" | "byok" | null;
   llm_provider?: string | null;
   llm_base_url?: string | null;
   vehicle_profile?: VehicleProfileConfig;
@@ -268,6 +344,20 @@ export interface Job {
   objective_config?: ObjectiveConfig;
   scenario_suite?: ScenarioSuiteConfig;
   max_total_trials?: number;
+  completion_policy?: CompletionPolicy;
+  job_kind?: JobKind;
+  cognitive_policy_version?: string;
+  provider_turn_cap?: number;
+  provider_turns_attempted?: number;
+  provider_turns_succeeded?: number;
+  first_qualified_candidate_id?: string | null;
+  first_qualified_freeze_receipt_id?: string | null;
+  first_qualified_at?: string | null;
+  continue_exploration_requested?: boolean;
+  exploration_budget?: ContinueExplorationBudget | null;
+  continuation_parent_job_id?: string | null;
+  continuation_root_job_id?: string | null;
+  holdout_policy_version?: string;
 }
 
 export interface TrialMetrics {
@@ -339,7 +429,10 @@ export type OptimizationOutcome =
   | "max_iterations_reached"
   | "no_usable_candidate"
   | "simulator_unavailable"
-  | "llm_failed";
+  | "llm_failed"
+  | "exploration_improved"
+  | "exploration_no_improvement"
+  | "exploration_budget_exhausted";
 
 export interface AcceptanceCriteria {
   target_rmse: number | null;
@@ -413,19 +506,249 @@ export interface ExperimentAssistantCurrentParameter {
   scale: ParameterScale;
 }
 
+export interface ExperimentAssistantDocumentChunk {
+  schema_version: "1.0";
+  document_id: string;
+  chunk_id: string;
+  display_name: string;
+  content: string;
+  content_sha256: string;
+  retention: "request_only";
+}
+
+export interface ExperimentAssistantDocumentContext {
+  schema_version: "1.0";
+  purpose: "experiment_draft_reference";
+  chunks: ExperimentAssistantDocumentChunk[];
+}
+
+export interface ExperimentAssistantDocumentContextReceipt {
+  schema_version: "1.0";
+  retention: "request_only";
+  persisted: false;
+  chunk_count: number;
+  content_bytes: number;
+  context_sha256: string;
+}
+
 export interface ExperimentAssistantTurnRequest {
   message_id: string;
+  conversation_id?: string | null;
   message: string;
   locale: "en" | "zh-CN";
+  edition?: "universal" | "sim" | "lab" | "field" | "autonomy";
+  requested_task_type?: TaskWorkflowRequestedTaskType;
   conversation_summary: string;
   current_values: Record<string, ExperimentAssistantFieldValue>;
   explicit_field_ids: string[];
   current_parameters: ExperimentAssistantCurrentParameter[];
-  llm: LLMProviderConfig;
+  document_context?: ExperimentAssistantDocumentContext | null;
+  llm?: LLMProviderConfig | null;
+}
+
+export type TaskWorkflowTaskType =
+  | "control_tuning"
+  | "mission_autonomy"
+  | "asset_import_qualification"
+  | "simulation_experiment"
+  | "cross_edition_workflow"
+  | "hardware_validation"
+  | "calibration"
+  | "sim_to_real"
+  | "real_to_sim"
+  | "field_task";
+
+export type TaskWorkflowRequestedTaskType = TaskWorkflowTaskType | "auto_detect";
+
+export interface TaskWorkflowContextItem {
+  key: string;
+  value: string;
+  source: "user" | "workspace" | "asset_receipt" | "prior_summary" | "account_memory";
+}
+
+export interface TaskWorkflowCompileRequest {
+  request_id: string;
+  conversation_id?: string | null;
+  edition: "universal" | "sim" | "lab" | "field" | "autonomy";
+  requested_task_type: TaskWorkflowRequestedTaskType;
+  message: string;
+  locale: "en" | "zh-CN";
+  conversation_summary?: string;
+  context?: TaskWorkflowContextItem[];
+  requested_tool_ids?: string[];
+}
+
+export type TaskWorkflowModelHarnessDomain =
+  | "optimization.control_tuning"
+  | "autonomy.mission"
+  | "asset.qualification"
+  | "experiment.simulation"
+  | "workflow.cross_edition"
+  | "validation.hardware"
+  | "calibration.system"
+  | "transfer.sim_to_real"
+  | "transfer.real_to_sim"
+  | "operations.field";
+
+export type HarnessMemoryDomain = "account.shared" | TaskWorkflowModelHarnessDomain;
+export type HarnessMemoryPrecedenceLayer =
+  | "current_request"
+  | "session"
+  | "domain_memory"
+  | "account_defaults";
+export type HarnessLoopKind =
+  | "single_pass"
+  | "plan_validate"
+  | "iterative_optimize"
+  | "observe_repair"
+  | "promotion_pipeline";
+export type HarnessFixedKernelResponsibility =
+  | "identity_and_tenant_boundary"
+  | "structured_io_validation"
+  | "safety_policy"
+  | "budget_enforcement"
+  | "acceptance_and_evidence"
+  | "memory_governance"
+  | "plugin_trust_and_lifecycle";
+export type HarnessPluginCapability =
+  | "model_provider"
+  | "intent_extractor"
+  | "context_enricher"
+  | "prompt_pack"
+  | "tool_provider"
+  | "planner"
+  | "optimizer"
+  | "critic"
+  | "validator"
+  | "memory_extractor"
+  | "memory_consolidator"
+  | "memory_retriever"
+  | "semantic_retriever"
+  | "simulator_adapter"
+  | "asset_adapter"
+  | "telemetry_adapter"
+  | "recovery_strategy"
+  | "evidence_exporter"
+  | "notification_adapter";
+
+export interface HarnessControlPlanePluginSelection {
+  slot: HarnessPluginCapability;
+  plugin_id: string;
+  version: string;
+  content_sha256: string;
+  trust: "managed" | "signed" | "local_development";
+  source: "explicit" | "product_managed_default";
+  selected_by: "product_managed" | "account_configurable" | "agent_harness_designer";
+}
+
+export interface HarnessControlPlaneReceipt {
+  schema_version: "dronedream.model-harness-control-plane.v1";
+  structured_input_schema_version: "dronedream.model-harness-input.v1";
+  structured_output_schema_version: "dronedream.model-harness-output.v1";
+  domain: TaskWorkflowModelHarnessDomain;
+  loop_kind: HarnessLoopKind;
+  hard_maximum_model_calls: number;
+  hard_maximum_repair_cycles: number;
+  effective_maximum_model_calls: number;
+  effective_maximum_repair_cycles: number;
+  fixed_kernel_responsibilities: HarnessFixedKernelResponsibility[];
+  readable_memory_domains: HarnessMemoryDomain[];
+  writable_memory_domain: HarnessMemoryDomain;
+  memory_retrieval_policy_version: "dronedream.memory-retrieval-policy.v1";
+  learning_promotion_policy_version: "dronedream.learning-promotion-policy.v1";
+  semantic_memory_authority: "advisory_only";
+  online_policy_updates_allowed: false;
+  execution_authority_enforcement: "not_integrated";
+  grants_execution_authority: false;
+  plugin_selection_effect: "contract_only";
+  plugin_runtime_receipt_ids: [];
+  selected_plugins: HarnessControlPlanePluginSelection[];
+  selection_sha256: string;
+}
+
+export interface TaskWorkflowRuntimeOperation {
+  operation_id: string;
+  status: "available" | "delegated" | "refused";
+  execution_state: "not_invoked" | "refused";
+  boundary: "public_backend" | "managed_cloud" | "private_agent_core" | "not_integrated";
+  handler_id: string | null;
+  api_path: string | null;
+  refusal_code: string | null;
+  requires_receipts: string[];
+  may_perform_physical_action: false;
+}
+
+export interface TaskWorkflowRuntimeHandler {
+  schema_version: "dronedream.model-harness-runtime-registry.v1";
+  domain: TaskWorkflowModelHarnessDomain;
+  operations: TaskWorkflowRuntimeOperation[];
+}
+
+export interface TaskWorkflowStep {
+  step_id: string;
+  phase: "understand" | "bind" | "plan" | "validate" | "approve" | "execute" | "evidence";
+  title: string;
+  executor: "model" | "deterministic_service" | "operator" | "runtime_adapter";
+  risk: "low" | "medium" | "high" | "critical";
+  tool_ids: string[];
+  preconditions: string[];
+  completion_evidence: string[];
+  fallback: "ask" | "hold" | "replan" | "rollback" | "return" | "land" | "abort";
+}
+
+export interface TaskWorkflowContract {
+  schema_version: "dronedream.task-workflow.v1";
+  contract_id: string;
+  owner_binding_sha256: string;
+  request_id: string;
+  task_id: string;
+  thread_id: string;
+  lifecycle_stage: "compile_only";
+  model_execution_performed: false;
+  runtime_execution_performed: false;
+  edition: "universal" | "sim" | "lab" | "field" | "autonomy";
+  locale: "en" | "zh-CN";
+  task_type: TaskWorkflowTaskType;
+  routing_source: "explicit" | "auto_detect";
+  model_harness_domain: TaskWorkflowModelHarnessDomain;
+  memory_domain: TaskWorkflowModelHarnessDomain;
+  control_plane: HarnessControlPlaneReceipt;
+  runtime_handler: TaskWorkflowRuntimeHandler;
+  harness_input_sha256: string;
+  harness_output: Record<string, unknown>;
+  status: "draft" | "blocked";
+  system_prompt_registry_version: "dronedream.workflow-prompts.v1";
+  system_prompt_version: string;
+  tool_registry_version: "dronedream.workflow-tools.v1";
+  context_sha256: string;
+  context_bytes: number;
+  eligible_tool_ids: string[];
+  denied_tool_ids: string[];
+  steps: TaskWorkflowStep[];
+  blockers: string[];
+  artifact_kind: string;
+  product_path: string;
+  contract_sha256: string;
 }
 
 export interface ExperimentAssistantTurnResponse {
   schema_version: "1.0";
+  lifecycle_stage: "compile_only" | "proposal";
+  model_entrypoint_role:
+    | "workflow_contract_compiler"
+    | "control_tuning_draft_compiler"
+    | "managed_model_proposal";
+  creates_job: false;
+  runtime_execution_performed: false;
+  next_required_stage: "managed_model_proposal" | "review_and_submit_job" | "review_proposal";
+  model_harness_domain: TaskWorkflowModelHarnessDomain;
+  memory_domain: TaskWorkflowModelHarnessDomain;
+  // The hosted proposal adapter can return a bounded control-plane summary,
+  // while Job resources always expose the complete persisted receipt above.
+  control_plane: Record<string, unknown>;
+  runtime_handler?: TaskWorkflowRuntimeHandler;
+  harness_input_sha256: string;
+  harness_output: Record<string, unknown>;
   experiment_summary: string;
   accepted_patches: ExperimentAssistantPatch[];
   rejected_patches: ExperimentAssistantRejectedPatch[];
@@ -434,9 +757,52 @@ export interface ExperimentAssistantTurnResponse {
   missing_field_ids: string[];
   review_field_ids: string[];
   questions: ExperimentAssistantQuestion[];
+  document_context_receipt?: ExperimentAssistantDocumentContextReceipt | null;
   usage: ExperimentAssistantUsage;
   provider: string;
   model: string;
+  assistant_message?: string;
+  orchestration?: {
+    run_id: string;
+    conversation_id: string;
+    tenant_id: string;
+    organization_id: string | null;
+    workspace_id: string;
+    edition: "universal" | "sim" | "lab" | "field" | "autonomy";
+    artifact_id: string;
+    artifact_version: number;
+    product_link: string;
+    artifact_kind:
+        | "autonomy_mission_plan"
+        | "external_asset_qualification_plan"
+        | "universal_vehicle_model"
+        | "universal_simulation_experiment"
+        | "universal_cross_edition_workflow"
+        | "simulation_experiment"
+        | "lab_simulation_experiment"
+        | "lab_hardware_validation"
+        | "lab_calibration_workflow"
+        | "lab_sim_to_real_workflow"
+        | "lab_real_to_sim_workflow"
+        | "field_task_plan";
+    artifact_payload?: Record<string, unknown>;
+    artifact_sha256?: string;
+    sequence: number;
+    intent: string | null;
+    workflow: Array<{
+      step: string;
+      label: string;
+      status: "completed" | "needs_input" | "proposed" | "refused";
+    }>;
+    generated_files?: Array<{
+      file_id: string;
+      display_name: string;
+      content_type: string;
+      byte_size: number;
+      content_sha256: string;
+      version: number;
+    }>;
+  };
 }
 
 export interface VehicleProfileConfig {
@@ -759,6 +1125,8 @@ export interface TrialSummary {
   candidate_is_baseline: boolean;
   candidate_is_best: boolean;
   candidate_generation_index: number;
+  failure_code: string | null;
+  failure_reason: string | null;
 }
 
 export interface Trial extends TrialSummary {
@@ -766,8 +1134,6 @@ export interface Trial extends TrialSummary {
   attempt_count: number;
   worker_id: string | null;
   simulator_backend: string | null;
-  failure_code: string | null;
-  failure_reason: string | null;
   log_excerpt: string | null;
   metrics: TrialMetrics | null;
   queued_at: string | null;
@@ -823,6 +1189,8 @@ export interface JobReport {
   optimized_metrics: AggregatedMetrics;
   comparison: ComparisonPoint[];
   best_parameters: BestParameters;
+  winner_evidence_id?: string | null;
+  winner_freeze_receipt_id?: string | null;
   report_status: "PENDING" | "READY" | "FAILED";
   created_at: string;
   updated_at: string;
@@ -929,6 +1297,572 @@ export interface JobCompareItem {
 
 export interface JobCompareResponse {
   items: JobCompareItem[];
+}
+
+export type AutonomyEdition = "universal" | "sim" | "lab" | "field" | "autonomy";
+export type AutonomyExecutionTarget = "simulation" | "hitl" | "hardware";
+export type AutonomyPerceptionMode = "map" | "vision" | "fusion";
+
+export interface AutonomyVehicleEnvelope {
+  dry_mass_kg: number;
+  launch_payload_kg: number;
+  pickup_payload_kg: number;
+  max_takeoff_mass_kg: number;
+  max_total_thrust_n: number;
+  radius_m: number;
+  max_speed_mps: number;
+  max_acceleration_mps2: number;
+  reserve_battery_percent: number;
+}
+
+export interface AutonomyRuntimeEvidence {
+  simulation_qualified: boolean;
+  signed_vehicle_pack_id: string | null;
+  operator_confirmed: boolean;
+  localization_ready: boolean;
+  link_ready: boolean;
+  geofence_ready: boolean;
+  battery_ready: boolean;
+}
+
+export interface AutonomyHarnessAsset {
+  kind: "aircraft" | "map";
+  asset_id: string;
+  name: string;
+  version: number;
+  status: string;
+  content_hash: string | null;
+  qualification_receipt_id: string | null;
+  capabilities: Record<string, string | number | boolean | string[] | null>;
+}
+
+export interface AutonomyHarnessInspectRequest {
+  schema_version: "dronedream.autonomy.harness-inspect.v1";
+  edition: AutonomyEdition;
+  natural_language: string;
+  aircraft: AutonomyHarnessAsset;
+  map_pack: AutonomyHarnessAsset;
+}
+
+export interface AutonomyHarnessToolReceipt {
+  tool_id: string;
+  tool_version: string;
+  outcome: "accepted" | "blocked";
+  evidence: Record<string, string | number | boolean | string[] | null>;
+  issue_codes: string[];
+}
+
+export interface AutonomyHarnessInspectResponse {
+  schema_version: "dronedream.autonomy.harness-context.v1";
+  prompt_version: "dronedream.autonomy.system.v1";
+  tool_registry_version: "dronedream.autonomy.tools.v1";
+  context_sha256: string;
+  status: "needs_assets" | "needs_input" | "draft" | "blocked";
+  planning_ready: boolean;
+  blockers: string[];
+  required_next_actions: string[];
+  eligible_tool_ids: string[];
+  tool_receipts: AutonomyHarnessToolReceipt[];
+  repair_policy: {
+    schema_version: "dronedream.autonomy.repair-policy.v1";
+    semantic_attempt_limit: number;
+    trajectory_attempt_limit: number;
+    repeated_plan_hash_limit: number;
+    may_relax_safety_constraints: false;
+  };
+}
+
+export interface AutonomyCompileAssetContext {
+  schema_version: "dronedream.autonomy.compile-assets.v1";
+  harness_context_sha256: string;
+  aircraft: AutonomyHarnessAsset;
+  map_pack: AutonomyHarnessAsset;
+  planner_binding: {
+    schema_version: "dronedream.autonomy.planner-binding.v1";
+    status: "draft";
+    run_id: string;
+    provider: string;
+    model: string;
+    artifact_sha256: string;
+    goal: string;
+    aircraft_id: string;
+    aircraft_version: number;
+    map_id: string;
+    map_version: number;
+    context_sha256: string;
+    task_graph: {
+      nodes: Array<{
+        node_id: string;
+        action: "resolve" | "takeoff" | "navigate" | "traverse" | "pickup" | "inspect" | "return" | "land" | "abort";
+        target: string;
+        depends_on: string[];
+        success_evidence: string[];
+      }>;
+    };
+  } | null;
+}
+
+export interface AutonomyCompileRequest {
+  edition: AutonomyEdition;
+  locale: "en" | "zh-CN";
+  execution_target: AutonomyExecutionTarget;
+  natural_language: string;
+  scene_id: string;
+  perception_mode: AutonomyPerceptionMode;
+  vehicle: AutonomyVehicleEnvelope;
+  evidence: AutonomyRuntimeEvidence;
+  asset_context: AutonomyCompileAssetContext | null;
+}
+
+export interface AutonomyRoutePoint {
+  x: number;
+  y: number;
+  z: number;
+  phase: "launch" | "transit" | "stairs" | "gate" | "pickup" | "return" | "land";
+  speed_limit_mps: number;
+}
+
+export type AutonomyTaskStatus =
+  | "pending"
+  | "ready"
+  | "active"
+  | "blocked"
+  | "completed"
+  | "failed"
+  | "skipped";
+
+export interface AutonomyTaskNode {
+  task_id: string;
+  label: string;
+  status: AutonomyTaskStatus;
+  depends_on: string[];
+  executor:
+    | "language_model"
+    | "mission_executive"
+    | "perception"
+    | "global_planner"
+    | "local_planner"
+    | "payload_controller"
+    | "px4_bridge"
+    | "operator";
+  risk: "low" | "medium" | "high" | "critical";
+  max_retries: number;
+  timeout_s: number;
+  fallback: "continue" | "hold" | "land" | "abort";
+  expected_output: string;
+  completion_evidence: string[];
+  inserted_by: "compiler" | "runtime" | "operator";
+}
+
+export interface AutonomyTaskGraph {
+  schema_version: "dronedream.autonomy.task-graph.v1";
+  revision: number;
+  nodes: AutonomyTaskNode[];
+  active_node_ids: string[];
+  change_reason: string;
+}
+
+export interface AutonomyPerceivedEntity {
+  track_id: string;
+  kind: "person" | "vehicle" | "animal" | "obstacle" | "unknown";
+  position_m: { x: number; y: number; z: number };
+  velocity_mps: { x: number; y: number; z: number };
+  confidence: number;
+  safety_radius_m: number;
+  age_ms: number;
+  source_stream: string;
+}
+
+export interface AutonomyPerceptionStreamHealth {
+  stream_id: string;
+  kind: "rgb" | "depth" | "stereo" | "thermal" | "lidar" | "vio" | "slam" | "map";
+  source: "simulator" | "onboard" | "cloud" | "external";
+  status: "healthy" | "degraded" | "stale" | "offline";
+  rate_hz: number;
+  latency_ms: number;
+  dropped_percent: number;
+}
+
+export interface AutonomyCompileResponse {
+  scene: {
+    id: string;
+    name: string;
+    summary: string;
+    bounds_m: { x: number; y: number; z: number };
+    floors: number;
+    minimum_clearance_m: number;
+    objects: Array<{
+      id: string;
+      kind: string;
+      center: { x: number; y: number; z: number };
+      size: { x: number; y: number; z: number };
+      traversable: boolean;
+      required_clearance_m: number;
+    }>;
+    reference_path: AutonomyRoutePoint[];
+    tags: string[];
+  };
+  contract: {
+    schema_version: "dronedream.autonomy.mission.v2";
+    contract_id: string;
+    edition: AutonomyEdition;
+    locale: "en" | "zh-CN";
+    execution_target: AutonomyExecutionTarget;
+    scene_id: string;
+    perception_mode: AutonomyPerceptionMode;
+    intent: string;
+    steps: Array<{
+      order: number;
+      action: string;
+      label: string;
+      payload_delta_kg: number;
+    }>;
+    task_graph: AutonomyTaskGraph;
+    immutable_safety_rules: string[];
+  };
+  trajectory: AutonomyRoutePoint[];
+  feasible: boolean;
+  issues: Array<{ code: string; severity: "info" | "warning" | "error"; message: string }>;
+  metrics: {
+    route_length_m: number;
+    vertical_travel_m: number;
+    estimated_duration_s: number;
+    minimum_clearance_m: number;
+    launch_mass_kg: number;
+    post_pickup_mass_kg: number;
+    post_pickup_thrust_to_weight: number;
+    braking_distance_m: number;
+  };
+  execution_policy: {
+    readiness: "simulation_ready" | "preview_only" | "denied";
+    adapter: "px4_gazebo_contract" | "hitl_contract" | "hardware_contract";
+    can_execute: boolean;
+    validated_signed_pack_count: number;
+    blockers: string[];
+    required_next_steps: string[];
+  };
+  planner: Record<string, string>;
+  runtime_profile: {
+    schema_version: "dronedream.autonomy.runtime-profile.v1";
+    mode: "simulation_contract" | "hitl_shadow" | "hardware_locked";
+    bridge: "px4_gazebo" | "px4_hitl_shadow" | "px4_hardware_locked";
+    command_authority: boolean;
+    persistence: "process_local_bounded";
+    observation_contract: "dronedream.autonomy.observation.v1";
+    components: Array<{
+      id:
+        | "mission_executive"
+        | "perception_vio_slam"
+        | "world_model"
+        | "global_planner"
+        | "local_planner"
+        | "trajectory_tracker"
+        | "px4_bridge"
+        | "safety_supervisor"
+        | "evidence_recorder";
+      status: "available" | "shadow" | "locked";
+      role: string;
+      rate_hz: number | null;
+      actuator_authority: boolean;
+    }>;
+    fail_safe_actions: Array<"continue" | "hold" | "land" | "abort">;
+  };
+}
+
+export interface AutonomyRuntimeObservation {
+  schema_version?: "dronedream.autonomy.observation.v1";
+  sequence: number;
+  monotonic_ms: number;
+  armed: boolean;
+  landed: boolean;
+  position_m: { x: number; y: number; z: number };
+  velocity_mps: { x: number; y: number; z: number };
+  localization_covariance_m2: number;
+  perception_age_ms: number;
+  minimum_clearance_m: number;
+  battery_percent: number;
+  link_ok: boolean;
+  geofence_ok: boolean;
+  payload_mass_kg: number;
+  mission_progress: number;
+  pickup_confirmed?: boolean;
+  local_replan_active?: boolean;
+  emergency_stop?: boolean;
+  perceived_entities?: AutonomyPerceivedEntity[];
+  stream_health?: AutonomyPerceptionStreamHealth[];
+}
+
+export interface AutonomyRuntimeInterruptionRequest {
+  schema_version?: "dronedream.autonomy.runtime-interruption-request.v1";
+  client_request_id: string;
+  instruction: string;
+}
+
+export interface AutonomyRuntimeInterruptionReceipt {
+  schema_version: "dronedream.autonomy.runtime-interruption.v1";
+  interruption_id: string;
+  client_request_id: string;
+  state: "holding_pending_interpretation" | "applied" | "cancelled";
+  created_at: string;
+  updated_at: string;
+  previous_phase: AutonomyRuntimeSession["phase"];
+  expected_task_graph_revision: number;
+  snapshot_position_m: { x: number; y: number; z: number } | null;
+  instruction_sha256: string;
+}
+
+export interface AutonomyRuntimeReplanApplyRequest {
+  schema_version?: "dronedream.autonomy.runtime-replan-request.v1";
+  interruption_id: string;
+  expected_task_graph_revision: number;
+  client_request_id: string;
+  operator_confirmed: true;
+  mission: AutonomyCompileRequest;
+}
+
+export interface AutonomyRuntimeSession {
+  schema_version: "dronedream.autonomy.runtime-session.v1";
+  session_id: string;
+  contract_id: string;
+  execution_target: AutonomyExecutionTarget;
+  phase:
+    | "ready"
+    | "takeoff"
+    | "navigating"
+    | "pickup"
+    | "replanning"
+    | "returning"
+    | "landing"
+    | "holding"
+    | "completed"
+    | "aborted";
+  bridge: string;
+  command_authority: boolean;
+  created_at: string;
+  updated_at: string;
+  latest_sequence: number;
+  latest_monotonic_ms: number;
+  observation_count: number;
+  decision: {
+    action: "continue" | "hold" | "land" | "abort";
+    accepted: boolean;
+    codes: string[];
+  };
+  mission_revision: number;
+  task_graph: AutonomyTaskGraph;
+  interruption: AutonomyRuntimeInterruptionReceipt | null;
+  perceived_entities: AutonomyPerceivedEntity[];
+  stream_health: AutonomyPerceptionStreamHealth[];
+  decision_events: Array<{
+    revision: number;
+    created_at: string;
+    kind: "session" | "task_transition" | "dynamic_entity" | "safety" | "operator";
+    code: string;
+    summary: string;
+    task_ids: string[];
+    entity_ids: string[];
+  }>;
+  evidence_chain_head: string;
+  terminal: boolean;
+}
+
+export interface AutonomySimulationExecution {
+  schema_version: "dronedream.autonomy.simulation-execution.v1";
+  execution_id: string;
+  runtime_session_id: string;
+  contract_id: string;
+  planner_artifact_sha256: string;
+  state: "starting" | "running" | "verified" | "failed" | "aborting" | "aborted";
+  created_at: string;
+  updated_at: string;
+  progress: number;
+  phase: string;
+  vehicle_model_root_world_enu_m: { x: number; y: number; z: number } | null;
+  vehicle_envelope_center_world_enu_m: { x: number; y: number; z: number } | null;
+  vehicle_speed_m_s: number | null;
+  payload_spawned: boolean;
+  payload_attached: boolean;
+  abort_reason: string | null;
+  mission_evidence_sha256: string | null;
+  mission_evidence: Record<string, unknown> | null;
+}
+
+export interface AutonomyVehiclePackQualificationRequest {
+  pack_id: string;
+  version: number;
+  autopilot: "px4" | "ardupilot" | "custom";
+  firmware: string;
+  flight_controller: string;
+  control_interface: "px4-ros2" | "mavsdk" | "mavlink" | "simulation-only";
+  dry_mass_kg: number;
+  max_takeoff_mass_kg: number;
+  max_total_thrust_n: number;
+  body_size_m: { x: number; y: number; z: number };
+  rotor_radius_m: number;
+  center_of_gravity_m: { x: number; y: number; z: number };
+  inertia_kg_m2: { x: number; y: number; z: number };
+  battery_energy_wh: number;
+  reserve_battery_percent: number;
+  maximum_pickup_payload_kg: number;
+  maximum_speed_mps: number;
+  maximum_acceleration_mps2: number;
+  maximum_climb_mps: number;
+  maximum_descent_mps: number;
+  maximum_tilt_deg: number;
+  command_link_latency_ms: number;
+  command_link_bandwidth_mbps: number;
+  sensors: Array<{
+    sensor_id: string;
+    kind: "rgb" | "depth" | "stereo" | "thermal" | "lidar" | "gps" | "vio";
+    calibrated: boolean;
+    calibration_status: "unverified" | "verified" | "expired" | "failed";
+    position_m: { x: number; y: number; z: number };
+    roll_pitch_yaw_deg: { x: number; y: number; z: number };
+    rate_hz: number;
+    calibration_age_days: number;
+  }>;
+}
+
+export interface AutonomyQualificationIssue {
+  code: string;
+  severity: "info" | "warning" | "error";
+  message: string;
+}
+
+export interface AutonomyVehiclePackQualificationReceipt {
+  schema_version: "dronedream.autonomy.vehicle-pack-receipt.v1";
+  receipt_id: string;
+  pack_id: string;
+  version: number;
+  status: "blocked" | "validated_unsigned";
+  content_sha256: string;
+  planning_radius_m: number;
+  maximum_loaded_mass_kg: number;
+  loaded_thrust_to_weight: number;
+  issues: AutonomyQualificationIssue[];
+  created_at: string;
+  hardware_authority: false;
+}
+
+export interface AutonomyMapAssetAdmissionReceipt {
+  schema_version: "dronedream.autonomy.map-asset-receipt.v1";
+  receipt_id: string;
+  filename: string;
+  format: string;
+  byte_size: number;
+  content_sha256: string;
+  parser: string;
+  status: "admitted" | "rejected";
+  layers: Array<"mesh" | "point-cloud" | "semantic" | "georeference">;
+  issues: AutonomyQualificationIssue[];
+  created_at: string;
+  planning_qualified: false;
+}
+
+export interface AutonomyMapPackQualificationRequest {
+  schema_version: "dronedream.autonomy.map-pack-qualification.v1";
+  name: string;
+  pack_id: string;
+  version: number;
+  compiler_scene_id: string;
+  representation: "hybrid-3d" | "mesh" | "point-cloud" | "occupancy" | "terrain";
+  coordinate_frame: "ENU" | "NED" | "WGS84" | "building-local";
+  resolution_m: number;
+  floor_count: number;
+  bounds_m: { x: number; y: number; z: number };
+  origin: { latitude: number | null; longitude: number | null; altitude_m: number | null };
+  live_updates: "vision-slam" | "depth-fusion" | "lidar-fusion" | "fixed";
+  calibrated: boolean;
+  confidence_percent: number;
+  semantic_layers: Array<
+    | "free-space"
+    | "stairs"
+    | "doors"
+    | "gates"
+    | "people"
+    | "pickup-zones"
+    | "launch-zones"
+    | "rooms"
+    | "corridors"
+    | "roads"
+    | "vegetation"
+    | "street-furniture"
+  >;
+  planning_layers: Array<"collision-geometry" | "occupancy" | "esdf" | "dynamic-overlay" | "confidence">;
+  source_asset_receipt_ids: string[];
+}
+
+export interface AutonomyMapPackQualificationReceipt {
+  schema_version: "dronedream.autonomy.map-pack-receipt.v1";
+  receipt_id: string;
+  pack_id: string;
+  version: number;
+  status: "blocked" | "qualified";
+  content_sha256: string;
+  manifest_sha256: string;
+  compiler_scene_id: string;
+  coordinate_frame: "ENU" | "NED" | "WGS84" | "building-local";
+  resolution_m: number;
+  semantic_layers: AutonomyMapPackQualificationRequest["semantic_layers"];
+  planning_layers: AutonomyMapPackQualificationRequest["planning_layers"];
+  issues: AutonomyQualificationIssue[];
+  created_at: string;
+  hardware_authority: false;
+}
+
+export interface AutonomyBundledMapManifest {
+  schema_version: "dronedream.autonomy.bundled-map-manifest.v1";
+  compiler_scene_id: string;
+  name: string;
+  representation: AutonomyMapPackQualificationRequest["representation"];
+  coordinate_frame: AutonomyMapPackQualificationRequest["coordinate_frame"];
+  resolution_m: number;
+  floor_count: number;
+  bounds_m: { x: number; y: number; z: number };
+  confidence_percent: number;
+  semantic_layers: AutonomyMapPackQualificationRequest["semantic_layers"];
+  planning_layers: AutonomyMapPackQualificationRequest["planning_layers"];
+  manifest_sha256: string;
+}
+
+export interface AutonomySceneCatalogResponse {
+  schema_version: "dronedream.autonomy.scene-catalog.v1";
+  items: Array<{
+    id: string;
+    name: string;
+    map_pack_manifest: AutonomyBundledMapManifest;
+  }>;
+}
+
+export type AutonomyAssetKind = "map" | "world" | "vehicle";
+export type AutonomyAssetMaturity =
+  | "visual_only"
+  | "physics_ready"
+  | "simulation_ready"
+  | "flight_ready"
+  | "qualified";
+
+export interface AutonomyAssetConnector {
+  connector_id: string;
+  name: string;
+  source_application: string;
+  source_formats: string[];
+  asset_kinds: AutonomyAssetKind[];
+  availability: "builtin" | "companion_required" | "plugin_required";
+  execution_boundary:
+    | "declarative_parser"
+    | "isolated_local_companion"
+    | "isolated_plugin";
+  enabled: boolean;
+  output_format: "ddpkg";
+  maximum_import_maturity: AutonomyAssetMaturity;
+}
+
+export interface AutonomyAssetConnectorCatalogResponse {
+  schema_version: "dronedream.autonomy.asset-connector-catalog.v1";
+  normalized_format: "ddpkg-v1";
+  imported_code_execution: false;
+  items: AutonomyAssetConnector[];
 }
 
 export type JobsCompareRequest = JobCompareRequest;

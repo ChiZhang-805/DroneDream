@@ -26,6 +26,305 @@ sys.modules[RUNNER_SPEC.name] = runner_module
 RUNNER_SPEC.loader.exec_module(runner_module)
 
 
+def test_lower_level_launcher_unexpected_output_is_bounded_and_receipted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitter = tmp_path / "launcher_emitter.py"
+    emitter.write_text(
+        "import sys\n"
+        "sys.stdout.buffer.write(b'X' * 256)\n"
+        "sys.stderr.buffer.write(b'FATAL wrapper exception\\n')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(runner_module, "DEFAULT_AUXILIARY_LOG_CAP_BYTES", 64)
+
+    exit_code = runner_module._run_lower_level_launcher(
+        launch_argv=[
+            sys.executable,
+            str(emitter),
+            "--stdout-log",
+            str(tmp_path / "stdout.log"),
+            "--stderr-log",
+            str(tmp_path / "stderr.log"),
+        ],
+        cwd=tmp_path,
+        stdout_log=tmp_path / "stdout.log",
+        stderr_log=tmp_path / "stderr.log",
+        timeout_seconds=10,
+        launch_env=os.environ.copy(),
+    )
+
+    assert exit_code == 0
+    launcher_stdout = tmp_path / runner_module._LAUNCHER_PROCESS_STDOUT_NAME
+    assert launcher_stdout.stat().st_size == 64
+    stdout_receipt = json.loads(
+        (tmp_path / f"{runner_module._LAUNCHER_PROCESS_STDOUT_NAME}.capture.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    stderr_receipt = json.loads(
+        (tmp_path / f"{runner_module._LAUNCHER_PROCESS_STDERR_NAME}.capture.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert stdout_receipt["raw_observed_bytes"] == 256
+    assert stdout_receipt["retained_bytes"] == 64
+    assert stdout_receipt["truncated"] is True
+    assert any(
+        "FATAL wrapper exception" in item["line"] for item in stderr_receipt["critical_lines"]
+    )
+    artifact_types = {item["artifact_type"] for item in runner_module._collect_artifacts(tmp_path)}
+    assert "launcher_process_stdout" in artifact_types
+    assert "launcher_process_stderr" in artifact_types
+    assert "log_capture_receipt_json" in artifact_types
+
+
+def _write_engine_pack_identity_files(
+    tmp_path: Path,
+    *,
+    manifest_schema_version: int = 1,
+    edition_profile: str = "unified-sim-lab",
+) -> tuple[Path, Path, dict[str, object]]:
+    source_commit = "1" * 40
+    px4_commit = "2" * 40
+    pack_id = f"sha256:{'3' * 64}"
+    manifest = {
+        "schemaVersion": manifest_schema_version,
+        "kind": "dronedream-engine-pack",
+        "packId": pack_id,
+        "engineApiVersion": 1,
+        "source": {"gitCommit": source_commit, "sourceDateEpoch": 1_785_693_271},
+        "runtimeCompatibility": {
+            "runtimeProductId": "DroneDreamRuntime",
+            "runtimeVersion": "0.1.0",
+            "pythonVersion": "3.12",
+            "px4Commit": px4_commit,
+            "gazeboVersion": "harmonic@test",
+            "dependencyLockSha256": "4" * 64,
+        },
+        "files": [{"path": "backend/app/main.py", "sizeBytes": 1, "sha256": "5" * 64}],
+    }
+    manifest["editionProfile"] = {
+        "profileId": edition_profile,
+        "includesLargeSimulator": True,
+        "excludedSourcePaths": [],
+    }
+    manifest_path = tmp_path / "engine-pack-manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    state_path = tmp_path / "engine-pack-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "currentPackId": pack_id,
+                "previousPackId": None,
+                "sourceCommit": source_commit,
+                "archiveSha256": "6" * 64,
+                "activatedAt": "2026-08-02T00:00:00+00:00",
+                "runtimeId": "runtime-test-id",
+                "runtimeVersion": "0.1.0",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path, state_path, manifest
+
+
+def test_runner_binds_engine_pack_manifest_to_activation_state(tmp_path: Path) -> None:
+    manifest_path, state_path, manifest = _write_engine_pack_identity_files(tmp_path)
+
+    identity = runner_module._engine_pack_identity(
+        manifest_path=manifest_path,
+        state_path=state_path,
+    )
+
+    assert identity["status"] == "verified"
+    assert identity["pack_id"] == manifest["packId"]
+    assert identity["source_commit"] == manifest["source"]["gitCommit"]
+    assert identity["manifest_schema_version"] == 1
+    assert identity["edition_profile"] == {
+        "status": "verified",
+        "profile_id": "unified-sim-lab",
+        "includes_large_simulator": True,
+        "excluded_source_paths": [],
+    }
+    assert (
+        identity["manifest_sha256"]
+        == runner_module.hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    )
+    assert (
+        identity["runtime_compatibility"]["px4_commit"]
+        == (manifest["runtimeCompatibility"]["px4Commit"])
+    )
+    assert identity["manager_state_binding"] == {
+        "status": "verified",
+        "activation_method": "manager_state",
+        "archive_sha256": "6" * 64,
+        "runtime_id": "runtime-test-id",
+        "runtime_version": "0.1.0",
+    }
+
+
+def test_runner_accepts_and_reports_scoped_engine_pack_schema_v2(tmp_path: Path) -> None:
+    manifest_path, state_path, _manifest = _write_engine_pack_identity_files(
+        tmp_path,
+        manifest_schema_version=2,
+    )
+
+    identity = runner_module._engine_pack_identity(
+        manifest_path=manifest_path,
+        state_path=state_path,
+    )
+
+    assert identity["manifest_schema_version"] == 2
+    assert identity["edition_profile"] == {
+        "status": "verified",
+        "profile_id": "unified-sim-lab",
+        "includes_large_simulator": True,
+        "excluded_source_paths": [],
+    }
+
+
+def test_runner_accepts_autonomy_full_engine_profile(tmp_path: Path) -> None:
+    manifest_path, state_path, _manifest = _write_engine_pack_identity_files(
+        tmp_path,
+        manifest_schema_version=2,
+        edition_profile="autonomy-full",
+    )
+
+    identity = runner_module._engine_pack_identity(
+        manifest_path=manifest_path,
+        state_path=state_path,
+    )
+
+    assert identity["edition_profile"] == {
+        "status": "verified",
+        "profile_id": "autonomy-full",
+        "includes_large_simulator": True,
+        "excluded_source_paths": [],
+    }
+
+
+def test_runner_rejects_profile_free_synthetic_legacy_schema(tmp_path: Path) -> None:
+    manifest_path, state_path, manifest = _write_engine_pack_identity_files(tmp_path)
+    manifest.pop("editionProfile")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(runner_module.RunnerError, match="legacy Engine Pack manifest fields"):
+        runner_module._engine_pack_identity(
+            manifest_path=manifest_path,
+            state_path=state_path,
+        )
+
+
+def test_runner_discovers_manifest_from_the_real_engine_pack_layout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release = tmp_path / "releases" / ("3" * 64)
+    release.mkdir(parents=True)
+    manifest_path, state_path, manifest = _write_engine_pack_identity_files(release)
+    runner_path = release / "scripts" / "simulators" / "px4_gazebo_runner.py"
+    runner_path.parent.mkdir(parents=True)
+    runner_path.write_text("# layout probe\n", encoding="utf-8")
+    monkeypatch.setattr(runner_module, "__file__", str(runner_path))
+
+    identity = runner_module._engine_pack_identity(state_path=state_path)
+
+    assert manifest_path == release / "engine-pack-manifest.json"
+    assert identity["status"] == "verified"
+    assert identity["pack_id"] == manifest["packId"]
+    assert identity["source_commit"] == manifest["source"]["gitCommit"]
+
+
+def test_runner_binds_permission_restricted_manager_state_to_active_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_id = "3" * 64
+    release = tmp_path / "releases" / release_id
+    release.mkdir(parents=True)
+    manifest_path, state_path, _ = _write_engine_pack_identity_files(release)
+    active_path = tmp_path / "current"
+    try:
+        active_path.symlink_to(release, target_is_directory=True)
+    except OSError:
+        pytest.skip("symbolic links are not available for this test user")
+    original_loader = runner_module._load_engine_identity_json
+
+    def permission_restricted_loader(path: Path, *, label: str, max_bytes: int):
+        if path == state_path:
+            try:
+                raise PermissionError("manager state is root-private")
+            except PermissionError as exc:
+                raise runner_module.RunnerError(
+                    "Engine Pack activation state could not be read"
+                ) from exc
+        return original_loader(path, label=label, max_bytes=max_bytes)
+
+    monkeypatch.setattr(runner_module, "_load_engine_identity_json", permission_restricted_loader)
+    identity = runner_module._engine_pack_identity(
+        manifest_path=manifest_path,
+        state_path=state_path,
+        active_path=active_path,
+    )
+
+    assert identity["manager_state_binding"] == {
+        "status": "permission_restricted",
+        "activation_method": "active_symlink",
+        "active_release_id": release_id,
+    }
+
+
+@pytest.mark.parametrize("mismatch_field", ["currentPackId", "sourceCommit", "runtimeVersion"])
+def test_runner_rejects_engine_pack_activation_state_mismatch(
+    tmp_path: Path,
+    mismatch_field: str,
+) -> None:
+    manifest_path, state_path, _ = _write_engine_pack_identity_files(tmp_path)
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state[mismatch_field] = "mismatched"
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    with pytest.raises(runner_module.RunnerError, match=f"{mismatch_field} does not match"):
+        runner_module._engine_pack_identity(
+            manifest_path=manifest_path,
+            state_path=state_path,
+        )
+
+
+@pytest.mark.parametrize("missing", ["manifest", "state"])
+def test_runner_rejects_partial_managed_engine_pack_identity(
+    tmp_path: Path,
+    missing: str,
+) -> None:
+    manifest_path, state_path, _ = _write_engine_pack_identity_files(tmp_path)
+    (manifest_path if missing == "manifest" else state_path).unlink()
+
+    with pytest.raises(runner_module.RunnerError, match="identity is incomplete"):
+        runner_module._engine_pack_identity(
+            manifest_path=manifest_path,
+            state_path=state_path,
+        )
+
+
+def test_runner_rejects_engine_pack_firmware_mismatch() -> None:
+    with pytest.raises(runner_module.RunnerError, match="does not match observed firmware"):
+        runner_module._enforce_engine_pack_firmware_binding(
+            {
+                "status": "verified",
+                "runtime_compatibility": {"px4_commit": "1" * 40},
+            },
+            {"observed_commit": "2" * 40},
+        )
+
+
 def test_track_projection_rejects_empty_candidate_set():
     geometry = runner_module.TrackGeometry(segments=(), total_length=0.0, closed=False)
 
@@ -73,6 +372,147 @@ def test_runner_collects_retained_px4_ulog_as_trial_artifact(
     assert ulog_artifact["file_size_bytes"] == len(b"retained ULog")
 
 
+def _actuator_link_retry_meta() -> dict[str, object]:
+    return {
+        "trial_id": "tri-link-stall",
+        "job_id": "job-link-stall",
+        "candidate_id": "cand-link-stall",
+        "seed": 42,
+        "attempt_count": 1,
+    }
+
+
+def _write_verified_actuator_link_failure(
+    run_dir: Path,
+    *,
+    include_required_logs: bool = True,
+) -> tuple[dict[str, object], dict[str, object]]:
+    meta = _actuator_link_retry_meta()
+    ulog = run_dir / "px4_source.ulg"
+    ulog.write_bytes(b"PX4 ULog proving a static Gazebo ground-truth pose")
+    health = {
+        "schema_id": "dronedream.px4-actuator-link-health/v1",
+        "diagnostic_failure_code": "SIMULATOR_ACTUATOR_LINK_STALLED",
+        "execution_identity": meta,
+        "ulog_sha256": runner_module.sha256_file(ulog),
+        "eligibility": {
+            "eligible": True,
+            "reasons": [],
+            "vehicle": "x500",
+            "selected_px4_parameters": [],
+            "unexpected_px4_parameters": [],
+            "scenario_effect_ids": [],
+            "disqualifying_effect_ids": [],
+        },
+        "thresholds": {},
+        "observations": {},
+        "missing_series": [],
+        "stall_verified": True,
+    }
+    (run_dir / runner_module.ACTUATOR_LINK_HEALTH_NAME).write_text(
+        json.dumps(health),
+        encoding="utf-8",
+    )
+    (run_dir / "offboard_timing.json").write_text("{}", encoding="utf-8")
+    if include_required_logs:
+        (run_dir / "stdout.log").write_text("simulator stdout", encoding="utf-8")
+        (run_dir / "stderr.log").write_text("simulator stderr", encoding="utf-8")
+    return meta, health
+
+
+def test_runner_preserves_verified_actuator_link_failure_before_one_retry(
+    tmp_path: Path,
+) -> None:
+    meta, health = _write_verified_actuator_link_failure(tmp_path)
+
+    verified = runner_module._verified_actuator_link_stall(
+        tmp_path,
+        meta=meta,
+        expected_eligibility=health["eligibility"],
+    )
+    assert verified == health
+
+    receipt = runner_module._preserve_actuator_link_failure_for_retry(
+        tmp_path,
+        meta=meta,
+        health=verified,
+    )
+
+    assert receipt["maximum_launcher_attempts"] == 2
+    assert receipt["retry_index"] == 1
+    assert receipt["first_attempt_health_ulog_sha256"] == health["ulog_sha256"]
+    assert not (tmp_path / "px4_source.ulg").exists()
+    assert (tmp_path / "actuator_link_transient_attempt_1.ulg").is_file()
+    assert (tmp_path / runner_module.TRANSIENT_RETRY_RECEIPT_NAME).is_file()
+    artifact_types = {
+        artifact["artifact_type"]
+        for artifact in runner_module._collect_artifacts(tmp_path)
+    }
+    assert "sim_transient_retry_json" in artifact_types
+    assert "sim_transient_px4_ulog" in artifact_types
+
+    with pytest.raises(runner_module.RunnerError, match="already consumed"):
+        runner_module._preserve_actuator_link_failure_for_retry(
+            tmp_path,
+            meta=meta,
+            health=health,
+        )
+
+
+def test_runner_rejects_tampered_actuator_link_digest(tmp_path: Path) -> None:
+    meta, _ = _write_verified_actuator_link_failure(tmp_path)
+    health_path = tmp_path / runner_module.ACTUATOR_LINK_HEALTH_NAME
+    health = json.loads(health_path.read_text(encoding="utf-8"))
+    health["ulog_sha256"] = "0" * 64
+    health_path.write_text(json.dumps(health), encoding="utf-8")
+
+    assert (
+        runner_module._verified_actuator_link_stall(
+            tmp_path,
+            meta=meta,
+            expected_eligibility=health["eligibility"],
+        )
+        is None
+    )
+
+
+def test_runner_rejects_link_stall_claim_outside_the_trusted_trial_contract(
+    tmp_path: Path,
+) -> None:
+    meta, health = _write_verified_actuator_link_failure(tmp_path)
+    trusted_eligibility = dict(health["eligibility"])
+    trusted_eligibility["eligible"] = False
+    trusted_eligibility["reasons"] = ["payload_battery_or_actuator_effect_requested"]
+
+    assert (
+        runner_module._verified_actuator_link_stall(
+            tmp_path,
+            meta=meta,
+            expected_eligibility=trusted_eligibility,
+        )
+        is None
+    )
+
+
+def test_runner_does_not_partially_move_incomplete_retry_evidence(tmp_path: Path) -> None:
+    meta, health = _write_verified_actuator_link_failure(
+        tmp_path,
+        include_required_logs=False,
+    )
+
+    with pytest.raises(runner_module.RunnerError, match="stderr.log, stdout.log"):
+        runner_module._preserve_actuator_link_failure_for_retry(
+            tmp_path,
+            meta=meta,
+            health=health,
+        )
+
+    assert (tmp_path / "px4_source.ulg").is_file()
+    assert (tmp_path / runner_module.ACTUATOR_LINK_HEALTH_NAME).is_file()
+    assert not (tmp_path / "actuator_link_transient_attempt_1.ulg").exists()
+    assert not (tmp_path / runner_module.TRANSIENT_RETRY_RECEIPT_NAME).exists()
+
+
 def test_runner_rejects_oversized_trial_input_before_json_decode(tmp_path: Path) -> None:
     input_path = tmp_path / "trial_input.json"
     with input_path.open("wb") as stream:
@@ -80,6 +520,31 @@ def test_runner_rejects_oversized_trial_input_before_json_decode(tmp_path: Path)
 
     with pytest.raises(runner_module.RunnerError, match="byte contract limit"):
         runner_module._load_trial_payload(input_path)
+
+
+def test_runner_rejects_stale_output_without_starting_launcher(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = _trial_input(tmp_path)
+    output_path = tmp_path / "trial_result.json"
+    (tmp_path / "telemetry.json").write_text('{"samples": []}', encoding="utf-8")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "false")
+    monkeypatch.setenv("PX4_GAZEBO_LAUNCH_COMMAND", sys.executable)
+
+    def fail_if_launched(**_kwargs: object) -> int:
+        raise AssertionError("stale run output must be rejected before process launch")
+
+    monkeypatch.setattr(runner_module, "_run_lower_level_launcher", fail_if_launched)
+
+    assert runner_module.run_once(input_path, output_path) == 0
+
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert result["failure"]["code"] == runner_module.FAILURE_SIMULATION
+    assert "stale files" in result["failure"]["reason"]
+    assert "telemetry.json" in result["failure"]["reason"]
+    assert result["artifacts"] == []
 
 
 def _trial_input(
@@ -150,6 +615,49 @@ def test_runner_independently_enforces_job_environment_bounds(
 
     with pytest.raises(runner_module.RunnerError, match=expected):
         runner_module._validate_trial_input(payload)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda payload: payload["job_config"].__setitem__("altitude_m", True),
+        lambda payload: payload["job_config"]["start_point"].__setitem__("x", False),
+        lambda payload: payload["job_config"]["wind"].__setitem__("north", True),
+        lambda payload: payload["job_config"].__setitem__(
+            "reference_track",
+            [{"x": False, "y": 0.0, "z": 3.0}, {"x": 1.0, "y": 0.0, "z": 3.0}],
+        ),
+        lambda payload: payload["parameters"].__setitem__("kp_xy", True),
+    ],
+)
+def test_runner_rejects_booleans_in_numeric_trial_fields(
+    tmp_path: Path,
+    mutate: object,
+) -> None:
+    payload = json.loads(_trial_input(tmp_path).read_text(encoding="utf-8"))
+    assert callable(mutate)
+    mutate(payload)
+
+    with pytest.raises(runner_module.RunnerError, match="must be numeric"):
+        runner_module._validate_trial_input(payload)
+
+
+@pytest.mark.parametrize("field", ["t", "x", "y", "z", "vx", "vy", "vz", "yaw"])
+def test_runner_rejects_booleans_in_numeric_telemetry_fields(field: str) -> None:
+    sample: dict[str, object] = {
+        "t": 0.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 3.0,
+        "vx": 0.0,
+        "vy": 0.0,
+        "vz": 0.0,
+        "yaw": 0.0,
+    }
+    sample[field] = True
+
+    with pytest.raises(runner_module.RunnerError, match="must be numeric"):
+        runner_module._normalize_samples([sample])
 
 
 def test_runner_rejects_control_characters_in_execution_identity(tmp_path: Path) -> None:
@@ -355,6 +863,93 @@ def test_px4_runner_dry_run_is_deterministic(tmp_path: Path):
     assert raw["scenario_effects_ready"] is True
 
 
+def test_hover_track_has_independent_stationary_dwell_contract(tmp_path: Path) -> None:
+    input_path = _trial_input(tmp_path)
+    input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+    input_payload["job_config"]["track_type"] = "hover"
+    input_path.write_text(json.dumps(input_payload), encoding="utf-8")
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env["PX4_GAZEBO_DRY_RUN"] = "true"
+
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is True, result
+    assert result["metrics"]["pass_flag"] is True
+    reference = json.loads((tmp_path / "reference_track.json").read_text(encoding="utf-8"))
+    assert reference["track_type"] == "hover"
+    assert reference["hover_duration_s"] == 10.0
+    assert len(reference["points"]) == 101
+    assert {(point["x"], point["y"], point["z"]) for point in reference["points"]} == {
+        (0.0, 0.0, 3.0)
+    }
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["track_mode"] == "stationary_hover"
+    assert raw["track_length_3d_m"] == 0.0
+    assert raw["track_projection"] == "stationary_point_3d_projection"
+    assert raw["coverage_basis"] == ("stationary_hover_time_weighted_trapezoidal_in_tolerance")
+    assert raw["hover_minimum_evaluation_duration_s"] == 10.0
+    assert raw["px4_core_metric_evidence"]["projection_revision"] == (
+        "stationary-point-3d-projection-1.0"
+    )
+
+
+def test_hover_track_fails_when_stationary_dwell_is_too_short(tmp_path: Path) -> None:
+    input_path = _trial_input(tmp_path)
+    input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+    input_payload["job_config"]["track_type"] = "hover"
+    input_path.write_text(json.dumps(input_payload), encoding="utf-8")
+    launcher = _write_launcher_with_payloads(
+        tmp_path / "short_hover_launcher.py",
+        {
+            "samples": [
+                {
+                    "t": round(index * 0.1, 3),
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 3.0,
+                    "crashed": False,
+                }
+                for index in range(51)
+            ]
+        },
+    )
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f'"{sys.executable}" "{launcher}" --telemetry {{telemetry_json}}'
+            ),
+        }
+    )
+
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is True, result
+    assert result["metrics"]["pass_flag"] is False
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["evaluation_track_coverage"] == pytest.approx(0.5)
+    assert raw["evaluation_progress_contract_ok"] is False
+
+
 def test_px4_runner_timeout_maps_to_timeout(tmp_path: Path):
     sleeper = tmp_path / "sleeper.py"
     sleeper.write_text(
@@ -373,6 +968,62 @@ def test_px4_runner_timeout_maps_to_timeout(tmp_path: Path):
     assert proc.returncode == 0
     assert result["success"] is False
     assert result["failure"]["code"] == FAILURE_TIMEOUT
+
+
+def test_lower_level_launcher_reaps_posix_group_after_normal_parent_exit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    cleanup_calls: list[int] = []
+
+    class CompletedParent:
+        pid = 7312
+
+        @staticmethod
+        def wait(*, timeout: float) -> int:
+            assert timeout == 5.0
+            return 0
+
+    monkeypatch.setattr(runner_module.os, "name", "posix")
+    monkeypatch.setattr(
+        runner_module.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: CompletedParent(),
+    )
+    monkeypatch.setattr(
+        runner_module,
+        "_terminate_posix_process_group",
+        cleanup_calls.append,
+    )
+
+    returncode = runner_module._run_lower_level_launcher(
+        launch_argv=["simulator-launcher"],
+        cwd=tmp_path,
+        stdout_log=tmp_path / "stdout.log",
+        stderr_log=tmp_path / "stderr.log",
+        timeout_seconds=5.0,
+    )
+
+    assert returncode == 0
+    assert cleanup_calls == [7312]
+
+
+def test_posix_launcher_group_cleanup_confirms_the_group_is_gone(monkeypatch) -> None:
+    calls: list[tuple[int, int]] = []
+
+    def fake_killpg(process_group_id: int, signal_number: int) -> None:
+        calls.append((process_group_id, signal_number))
+        if signal_number == 0:
+            raise ProcessLookupError
+
+    monkeypatch.setattr(runner_module.os, "killpg", fake_killpg, raising=False)
+
+    runner_module._terminate_posix_process_group(7312)
+
+    assert calls == [
+        (7312, runner_module.signal.SIGTERM),
+        (7312, 0),
+    ]
 
 
 def test_px4_runner_scales_one_x_timeout_for_slow_simulation(tmp_path: Path) -> None:
@@ -460,6 +1111,10 @@ def test_px4_runner_verifies_requested_firmware_against_git_head(tmp_path: Path)
         (verified_dir / "simulator_runtime_manifest.json").read_text(encoding="utf-8")
     )
     assert runtime_manifest["firmware_identity"]["observed_commit"] == head
+    assert runtime_manifest["engine_pack_identity"] == {
+        "status": "unavailable",
+        "reason": "runner is not executing from a managed Engine Pack",
+    }
 
     mismatch_dir = tmp_path / "mismatch"
     proc, result = _run_runner(
@@ -656,11 +1311,13 @@ def test_px4_runner_extracts_real_candidate_parameters_and_writes_evidence(
     }
     assert applied["verification"]["verified"] is True
     artifact_names = {Path(item["storage_path"]).name for item in result["artifacts"]}
+    artifact_types = {item["artifact_type"] for item in result["artifacts"]}
     assert {
         "px4_parameters.requested.json",
         "px4_parameters.before.json",
         "px4_parameters.applied.json",
     }.issubset(artifact_names)
+    assert "px4_parameter_evidence_json" in artifact_types
 
 
 def test_px4_runner_rejects_real_parameter_outside_safe_bounds(tmp_path: Path):
@@ -873,6 +1530,26 @@ def test_px4_runner_rejects_nonpositive_timeout(tmp_path: Path, timeout: str) ->
     assert proc.returncode == 0
     assert result["success"] is False
     assert "must be greater than zero" in result["failure"]["reason"]
+
+
+@pytest.mark.parametrize("configured", ["0", "-1"])
+def test_px4_runner_rejects_nonpositive_evaluation_stability_window(
+    tmp_path: Path,
+    configured: str,
+) -> None:
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "true",
+            "PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES": configured,
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert (
+        "PX4_GAZEBO_EVAL_CONSECUTIVE_SAMPLES must be greater than zero"
+        in (result["failure"]["reason"])
+    )
 
 
 def test_px4_runner_rejects_speed_factor_below_timeout_scaling_contract(
@@ -1343,6 +2020,231 @@ def test_px4_runner_treats_nonzero_launcher_exit_as_failure(tmp_path: Path):
     assert "exited with code 7" in result["failure"]["reason"]
 
 
+def test_nonzero_launcher_exit_is_not_misclassified_as_unsupported_scenario(
+    tmp_path: Path,
+) -> None:
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["scenario_type"] = "wind_perturbed"
+    payload["scenario_config"] = {"wind_mps": 4.0}
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+    launcher = tmp_path / "failed_before_effect_evidence.py"
+    launcher.write_text("raise SystemExit(7)\n", encoding="utf-8")
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": f'"{sys.executable}" "{launcher}"',
+        }
+    )
+
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert result["failure"]["code"] == "SIMULATION_FAILED"
+    assert result["failure"]["reason"] == "lower-level launcher exited with code 7"
+    launch_config = json.loads((tmp_path / "launch_config.json").read_text(encoding="utf-8"))
+    contract = launch_config["scenario_effect_contract"]
+    assert contract["verification_status"] == "invalid_launcher_evidence"
+    assert contract["unsupported_effects"] == ["scenario_config.wind_mps"]
+
+
+def test_px4_runner_retries_one_verified_actuator_link_stall_end_to_end(
+    tmp_path: Path,
+) -> None:
+    launcher = tmp_path / "actuator_link_retry_launcher.py"
+    telemetry_payload = json.dumps(_track_following_telemetry())
+    launcher.write_text(
+        """
+import hashlib
+import json
+import os
+import pathlib
+import sys
+
+telemetry_path = pathlib.Path(sys.argv[sys.argv.index("--telemetry") + 1])
+input_path = pathlib.Path(sys.argv[sys.argv.index("--input") + 1])
+run_dir = telemetry_path.parent
+attempt_path = run_dir / "launcher_attempts.json"
+attempts = json.loads(attempt_path.read_text(encoding="utf-8")) if attempt_path.exists() else []
+attempt = os.environ.get("PX4_TRIAL_LAUNCH_ATTEMPT", "1")
+attempts.append(attempt)
+attempt_path.write_text(json.dumps(attempts), encoding="utf-8")
+
+if attempt == "1":
+    identity = json.loads(input_path.read_text(encoding="utf-8"))["execution_identity"]
+    ulog_path = run_dir / "px4_source.ulg"
+    ulog_path.write_bytes(b"fixture ULog proving a stationary actuator link")
+    ulog_sha = hashlib.sha256(ulog_path.read_bytes()).hexdigest()
+    health = {
+        "schema_id": "dronedream.px4-actuator-link-health/v1",
+        "diagnostic_failure_code": "SIMULATOR_ACTUATOR_LINK_STALLED",
+        "execution_identity": identity,
+        "ulog_sha256": ulog_sha,
+        "eligibility": {
+            "eligible": True,
+            "reasons": [],
+            "vehicle": "x500",
+            "selected_px4_parameters": [],
+            "unexpected_px4_parameters": [],
+            "scenario_effect_ids": [],
+            "disqualifying_effect_ids": [],
+        },
+        "thresholds": {},
+        "observations": {},
+        "missing_series": [],
+        "stall_verified": True,
+    }
+    (run_dir / "actuator_link_health.json").write_text(
+        json.dumps(health), encoding="utf-8"
+    )
+    (run_dir / "offboard_timing.json").write_text("{}", encoding="utf-8")
+    raise SystemExit(7)
+
+telemetry_path.write_text(TELEMETRY_PAYLOAD, encoding="utf-8")
+""".replace("TELEMETRY_PAYLOAD", repr(telemetry_payload)).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_TRIAL_LAUNCH_ATTEMPT": "2",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f'"{sys.executable}" "{launcher}" --input {{trial_input}} '
+                "--telemetry {telemetry_json}"
+            ),
+        },
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert result["success"] is True, result
+    assert json.loads((tmp_path / "launcher_attempts.json").read_text(encoding="utf-8")) == [
+        "1",
+        "2",
+    ]
+    retry = json.loads(
+        (tmp_path / runner_module.TRANSIENT_RETRY_RECEIPT_NAME).read_text(encoding="utf-8")
+    )
+    assert retry["maximum_launcher_attempts"] == 2
+    assert retry["retry_index"] == 1
+    assert (tmp_path / "actuator_link_transient_attempt_1.ulg").is_file()
+    assert (tmp_path / "actuator_link_transient_attempt_1.health.json").is_file()
+    artifact_types = {artifact["artifact_type"] for artifact in result["artifacts"]}
+    assert "sim_transient_retry_json" in artifact_types
+    assert "sim_transient_px4_ulog" in artifact_types
+
+
+def test_px4_runner_surfaces_bounded_structured_launcher_failure(tmp_path: Path):
+    launcher = tmp_path / "nonzero_launcher.py"
+    launcher.write_text(
+        "import json, pathlib, sys\n"
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
+        "run_dir = telemetry.parent\n"
+        "(run_dir / 'offboard_timing.json').write_text(json.dumps({"
+        "'status': 'failed', 'failure': 'TimeoutError: PX4 readiness timeout; "
+        "global_position_ok=false, armable=false'}), encoding='utf-8')\n"
+        "raise SystemExit(7)\n",
+        encoding="utf-8",
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert result["failure"]["code"] == "SIMULATION_FAILED"
+    assert result["failure"]["reason"] == (
+        "lower-level launcher exited with code 7: TimeoutError: PX4 readiness timeout; "
+        "global_position_ok=false, armable=false"
+    )
+
+
+def test_px4_runner_surfaces_wrapper_failure_after_completed_offboard_flight(
+    tmp_path: Path,
+):
+    launcher = tmp_path / "nonzero_launcher.py"
+    launcher.write_text(
+        "import json, pathlib, sys\n"
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
+        "run_dir = telemetry.parent\n"
+        "(run_dir / 'offboard_timing.json').write_text(json.dumps({"
+        "'status': 'completed', 'failure': None}), encoding='utf-8')\n"
+        "(run_dir / 'launcher_failure.json').write_text(json.dumps({"
+        "'schema_version': 'dronedream.launcher_failure.v1', 'status': 'failed', "
+        "'stage': 'real_execution', 'failure': 'ValueError: telemetry timestamp moved "
+        "backwards'}), encoding='utf-8')\n"
+        "raise SystemExit(7)\n",
+        encoding="utf-8",
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert result["failure"]["reason"] == (
+        "lower-level launcher exited with code 7: ValueError: telemetry timestamp moved backwards"
+    )
+    failure_artifact = next(
+        artifact
+        for artifact in result["artifacts"]
+        if artifact["artifact_type"] == "launcher_failure_json"
+    )
+    assert Path(failure_artifact["storage_path"]).name == "launcher_failure.json"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"status": "completed", "failure": "must not be surfaced"},
+        {"status": "failed", "failure": "   "},
+        ["failed", "must not be surfaced"],
+    ],
+)
+def test_lower_level_failure_reason_rejects_non_failure_payloads(
+    tmp_path: Path,
+    payload: object,
+) -> None:
+    (tmp_path / "offboard_timing.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    assert runner_module._lower_level_failure_reason(tmp_path, 9) == (
+        "lower-level launcher exited with code 9"
+    )
+
+
+def test_lower_level_failure_reason_falls_back_for_oversized_evidence(tmp_path: Path) -> None:
+    timing_path = tmp_path / "offboard_timing.json"
+    with timing_path.open("wb") as stream:
+        stream.truncate(runner_module._MAX_OFFBOARD_TIMING_BYTES + 1)
+
+    assert runner_module._lower_level_failure_reason(tmp_path, 9) == (
+        "lower-level launcher exited with code 9"
+    )
+
+
 def test_px4_runner_trajectory_artifact_type_is_json(tmp_path: Path):
     proc, result = _run_runner(tmp_path, env_overrides={"PX4_GAZEBO_DRY_RUN": "true"})
     assert proc.returncode == 0
@@ -1689,7 +2591,7 @@ def test_offboard_timing_window_source_is_used_when_present(tmp_path: Path):
         offboard_timing_payload={
             "track_start_t": _find_sample_time(samples, 10),
             "track_end_t": _find_sample_time(samples, 210),
-            "time_base": "executor_relative_seconds",
+            "time_base": "telemetry_sample_seconds",
         },
     )
     proc, result = _run_runner(
@@ -1712,6 +2614,37 @@ def test_offboard_timing_window_source_is_used_when_present(tmp_path: Path):
     assert result["metrics"]["crash_flag"] is False
     assert raw["evaluation_sample_count"] < raw["total_sample_count"]
     assert result["metrics"]["max_error"] < 3.5
+
+
+def test_executor_relative_timing_is_not_applied_to_telemetry_clock(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    samples = telemetry["samples"]
+    assert isinstance(samples, list)
+    launcher = _write_launcher_with_payloads(
+        tmp_path / "launcher.py",
+        telemetry,
+        offboard_timing_payload={
+            "track_start_t": _find_sample_time(samples, 10),
+            "track_end_t": _find_sample_time(samples, 20),
+            "time_base": "executor_relative_seconds",
+        },
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["evaluation_window_source"] == "telemetry_derived_refined"
+    assert raw["evaluation_window_raw_source"] == "telemetry_derived"
+    assert raw["raw_track_start_t"] is None
+    assert raw["raw_track_end_t"] is None
 
 
 def test_telemetry_derived_window_source_used_when_timing_missing(tmp_path: Path):

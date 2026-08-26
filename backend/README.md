@@ -142,7 +142,9 @@ python3 -m venv .venv
   - `DEMO_AUTH_TOKENS` format:
     `user1@example.com:token1,user2@example.com:token2`
   - OIDC mode requires `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL`, and
-    asymmetric `OIDC_ALGORITHMS`
+    asymmetric `OIDC_ALGORITHMS`; `OIDC_JWKS_TIMEOUT_SECONDS` (default `5`) and
+    `OIDC_JWKS_MAX_BYTES` (default `1048576`) bound identity-provider stalls and
+    malformed or unexpectedly large key sets
   - packaged desktop also requires `DESKTOP_BRIDGE_REQUIRED=true` and
     `DRONEDREAM_RUNTIME_ID`; each `/api/v1` request must carry the native
     Runtime/session/body/token/idempotency-bound Bridge v2 proof, and its nonce

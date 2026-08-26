@@ -10,6 +10,7 @@ import pytest
 
 from app.orchestration.decision_harness import build_decision_messages
 from app.orchestration.harness_context import (
+    HARNESS_PROMPT_TEMPLATE_VERSION,
     HARNESS_TOOL_DEFINITIONS,
     HarnessExecutionMemory,
     HarnessObservedDecisionOutcome,
@@ -62,7 +63,7 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
     for case in cases:
         snapshot = compile_routing_eval_snapshot(case)
         system, user = build_decision_messages(snapshot)
-        assert snapshot.schema_version == "2.7"
+        assert snapshot.schema_version == "2.9"
         assert case.case_id not in system
         assert case.case_id not in user
         assert case.rationale not in system
@@ -70,11 +71,55 @@ def test_routing_eval_uses_exact_production_prompt_without_answer_leakage() -> N
         assert "acceptable_tools" not in user
         assert '"case_id"' not in user
         assert '"registry_version":"2.1"' in user
-        assert '"schema_version":"2.7"' in user
+        assert '"schema_version":"2.9"' in user
         payload = json.loads(user)
+        assert HARNESS_PROMPT_TEMPLATE_VERSION == "1.7"
+        assert payload["score_semantics"] == {
+            "name": "dronedream_aggregated_loss",
+            "direction": "minimize",
+            "lower_is_better": True,
+            "applies_to": [
+                "search.baseline_score",
+                "search.best_score",
+                "search.best_score_by_generation[].best_score",
+                "tool_history[].best_score",
+                "decision_memory[].observed_outcome.incumbent_score_before",
+                "decision_memory[].observed_outcome.cohort_best_score",
+                "decision_memory[].observed_outcome.incumbent_score_after",
+                "cross_job_memory.experiences[].observed_outcome.incumbent_score_before",
+                "cross_job_memory.experiences[].observed_outcome.cohort_best_score",
+                "cross_job_memory.experiences[].observed_outcome.incumbent_score_after",
+                "candidates[].aggregated_score",
+            ],
+            "raw_metric_policy": "do_not_compare_without_explicit_direction",
+        }
+        assert "smaller finite value is better" in payload["instructions"]
+        assert "Never describe a smaller aggregate score as worse." in system
         assert tuple(
             tool["tool_id"] for tool in payload["tool_manifest"]["tools"]
         ) == selectable_harness_tools(snapshot)
+
+
+def test_cold_start_snapshot_does_not_invent_optimizer_history() -> None:
+    case = load_routing_eval_cases(CORPUS)[0]
+    assert case.stimulus.scored_candidate_count == 1
+
+    snapshot = compile_routing_eval_snapshot(case)
+
+    assert snapshot.candidate_history_total == 1
+    assert snapshot.candidate_history_included == 1
+    assert len(snapshot.candidates) == 1
+    assert snapshot.candidates[0].is_baseline is True
+
+
+def test_routing_eval_rejects_nonfinite_stimulus_values(tmp_path: Path) -> None:
+    case = load_routing_eval_cases(CORPUS)[0].model_dump(mode="json")
+    case["stimulus"]["baseline_score"] = float("nan")
+    corpus = tmp_path / "nonfinite.jsonl"
+    corpus.write_text(json.dumps(case, allow_nan=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid Harness routing case"):
+        load_routing_eval_cases(corpus)
 
 
 def test_routing_eval_grades_complete_predictions_by_category() -> None:
@@ -150,9 +195,9 @@ def test_prediction_artifact_binds_corpus_prompts_versions_and_model(
         "schema_version": "1.0",
         "corpus_sha256": routing_corpus_sha256(cases),
         "prompt_suite_sha256": routing_prompt_suite_sha256(cases),
-        "evidence_schema_version": "2.7",
+        "evidence_schema_version": "2.9",
         "tool_registry_version": "2.1",
-        "prompt_template_version": "1.5",
+        "prompt_template_version": "1.7",
         "provider": "openai",
         "model_snapshot": "gpt-test-snapshot",
         "generation_config": {

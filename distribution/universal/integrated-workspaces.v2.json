@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 2,
+  "kind": "dronedream-universal-integrated-workspaces",
+  "contractId": "dronedream-universal-integrated-workspaces/v2",
+  "productEdition": "universal",
+  "workspaceModes": ["sim", "lab", "field", "autonomy"],
+  "workspaceSwitchMeaning": "presentation-and-module-selection-only",
+  "createsCrossEditionHarnessOrchestrator": false,
+  "presentationOnly": true,
+  "grantsHardwareAuthority": false,
+  "validatedVehiclePackCount": 0,
+  "hardwareActionDecision": "deny",
+  "productScopedCapability": {
+    "id": "vehicle-studio",
+    "route": "/vehicle-studio",
+    "hostEditions": ["universal", "autonomy"],
+    "editionBoundStorage": true,
+    "theme": "edition-bound",
+    "shareTargets": ["sim", "lab", "field", "autonomy"],
+    "automaticReceiverInstallation": false,
+    "startsModelHarnessOnImport": false,
+    "unqualifiedAssetCanExecute": false,
+    "grantsHardwareAuthority": false
+  },
+  "donors": {
+    "lab": {
+      "productSource": "b3c5f90948f206472e3e12504d8205cb563ac9dc",
+      "tree": "272125dace28293f206f223865df6ac42ef0bdb2",
+      "evidenceHead": "4b94b635d2b1c26623556306bf5921a947fec8db",
+      "evidenceHeadIsProductSource": false
+    },
+    "field": {
+      "productSource": "7d3d0c34d0e385d88312db34601667a384ecc9c5",
+      "upstreamExact": true,
+      "evidenceHeadIsProductSource": true
+    }
+  },
+  "sourceFiles": [
+    {
+      "path": "frontend/scripts/verify-lab-ui.mjs",
+      "sha256": "5b1dc3c16d1fd265c75a5776633c78a46ad826876efa612d192c2e21a567d891",
+      "donorEdition": "lab",
+      "donorBlob": "125386b98af709fbe559cb1dff6013dd52eee3ed",
+      "integration": "semantic-universal-profile-and-final-field-adaptation"
+    },
+    {
+      "path": "frontend/src/__tests__/FieldAssistantWorkspace.test.tsx",
+      "sha256": "d328f46b9e0aed5ed282cf341083675bafdf88063bc3bbc0630f0a2fb461414e",
+      "donorEdition": "field",
+      "donorBlob": "1311d713f1b5909e8731d99946706e069b83f93c",
+      "integration": "semantic-universal-auth-and-workflow-adaptation"
+    },
+    {
+      "path": "frontend/src/field/FieldAssistantWorkspace.tsx",
+      "sha256": "f148902c817b4d779bcc0948d000f49b3e1cb48ba07c3d6938b27b8abcc89d8d",
+      "donorEdition": "field",
+      "donorBlob": "17aef3e57559c652b080b1c37e675816d24de118",
+      "integration": "semantic-universal-auth-and-workflow-adaptation"
+    },
+    {
+      "path": "frontend/src/field/field.css",
+      "sha256": "28ca4169a7005424edc1e53fa62cff96df9c5e095a42c9be64f1a13f674f5085",
+      "donorEdition": "field",
+      "donorBlob": "49d715fd854354277352be5f77dfd2db5d06b51a",
+      "integration": "semantic-field-settings-and-responsive-chrome"
+    },
+    {
+      "path": "frontend/src/lab/LabSetup.tsx",
+      "sha256": "5b1daee01e303e5fd00cdae49acd9c0cddbc02f13bf98e3cc45222cb0d8f6941",
+      "donorEdition": "lab",
+      "donorBlob": "b4a3a2198e8ce3b25cf766fe425b922f516bd546",
+      "integration": "semantic-universal-auth-and-runtime-adaptation"
+    },
+    {
+      "path": "frontend/src/lab/__tests__/LabSetup.test.tsx",
+      "sha256": "a9c07e6813acdde603bcc69dde711c30338671ab8116d36c4377476d48749d6c",
+      "donorEdition": "lab",
+      "donorBlob": "afee9e33fb49e1eb79084e459782de80fc656b42",
+      "integration": "byte-exact"
+    },
+    {
+      "path": "frontend/src/lab/lab-hardware.css",
+      "sha256": "a1f0f717beb9430352c0e5c38c1935d4e20b407db66676f77115c397d1e6c38e",
+      "donorEdition": "lab",
+      "donorBlob": "905ca7b5f783e9a72c3e063e578a2b071aa8e2b5",
+      "integration": "semantic-universal-container-height-boundary"
+    },
+    {
+      "path": "frontend/src/lab/lab.css",
+      "sha256": "d74fda35bc9a6b6a773fdc19093a24a97b8e75c137101e85cc070fc938fa7910",
+      "donorEdition": "lab",
+      "donorBlob": "5968461d1f67e16551c88888a93fee137a481e68",
+      "integration": "semantic-universal-layout-and-theme-adaptation"
+    },
+    {
+      "path": "frontend/src/pages/ExperimentAssistant.tsx",
+      "sha256": "dbe9d6d43d71779852ce17bd7d0bd3fb791c5383e01fe4205221a5e87a99a2ab",
+      "donorEdition": "lab",
+      "donorBlob": "c0bcfc6042582014a35e28ce2ff1f01bde3f44ad",
+      "integration": "semantic-active-universal-workspace-theme"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "sha256": "f7c519f89d5af766e31ba6cf1f85a65004f1169d1eba0d3ceb83b448f7625d8e",
+      "donorEdition": "lab",
+      "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
+      "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
+    },
+    {
+      "path": "frontend/src/field/FieldApp.tsx",
+      "sha256": "1cb5b7d0048e09038e728ce4a65166a9133e326847ca375aa1cf7496cf59fb54",
+      "donorEdition": "field",
+      "donorBlob": "5c4e3f01f16d831cdf0d995904c5b8b0a9b11c0d",
+      "integration": "semantic-universal-shared-locale-adapter"
+    },
+    {
+      "path": "frontend/src/router.tsx",
+      "sha256": "064dae250bad196288b116006dbfd28924b84ad807bf9d671eb0ef951eef69d2",
+      "donorEdition": "universal",
+      "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
+      "integration": "semantic-universal-workspace-routing-and-shared-locale"
+    }
+  ],
+  "verificationRequirements": {
+    "locales": ["en", "zh-CN"],
+    "viewports": ["1440x1000", "760x900", "390x844"],
+    "assistantSingleScreen": true,
+    "hardwareWorkspaceSingleScreen": true,
+    "mobileChatPlanAriaTabs": true,
+    "presentationAuthorityInvariant": true,
+    "fieldSimulationCapabilityAllowed": false
+  }
+}

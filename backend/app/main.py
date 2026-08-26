@@ -22,13 +22,17 @@ from app.db import SessionLocal, init_db
 from app.desktop_bridge import enforce_desktop_bridge
 from app.response import err
 from app.routers import artifacts as artifacts_router
+from app.routers import autonomy as autonomy_router
 from app.routers import batches as batches_router
+from app.routers import benchmark_campaigns as benchmark_campaigns_router
 from app.routers import capabilities as capabilities_router
 from app.routers import experiment_assistant as experiment_assistant_router
 from app.routers import health
 from app.routers import jobs as jobs_router
 from app.routers import parameter_catalog as parameter_catalog_router
+from app.routers import preferences as preferences_router
 from app.routers import session as session_router
+from app.routers import task_workflows as task_workflows_router
 from app.routers import trials as trials_router
 from app.services.jobs import purge_expired_job_secrets
 from app.storage.cleanup import cleanup_local_artifacts
@@ -144,11 +148,15 @@ def create_app() -> FastAPI:
     api_v1 = FastAPI(title="DroneDream API v1", version=__version__)
     api_v1.include_router(jobs_router.router)
     api_v1.include_router(batches_router.router)
+    api_v1.include_router(benchmark_campaigns_router.router)
     api_v1.include_router(trials_router.router)
     api_v1.include_router(artifacts_router.router)
+    api_v1.include_router(autonomy_router.router)
     api_v1.include_router(parameter_catalog_router.router)
     api_v1.include_router(capabilities_router.router)
     api_v1.include_router(experiment_assistant_router.router)
+    api_v1.include_router(task_workflows_router.router)
+    api_v1.include_router(preferences_router.router)
     api_v1.include_router(session_router.router)
 
     _register_exception_handlers(api_v1)

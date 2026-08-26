@@ -70,6 +70,11 @@ export interface ExperimentFormState {
   max_iterations: string;
   trials_per_candidate: string;
   max_total_trials: string;
+  continue_exploration_after_qualified: boolean;
+  exploration_additional_generations: string;
+  exploration_additional_trials: string;
+  exploration_additional_provider_turns: string;
+  exploration_additional_time_minutes: string;
   target_rmse: string;
   target_max_error: string;
   min_pass_rate: string;
@@ -142,11 +147,16 @@ export const EXPERIMENT_FORM_DEFAULTS: ExperimentFormState = {
   robust_aggregation: "cvar",
   cvar_alpha: "0.2",
   percentile: "95",
-  simulator_backend: "mock",
+  simulator_backend: import.meta.env.MODE === "test" ? "mock" : "real_cli",
   optimizer_strategy: "optimizer_portfolio",
   max_iterations: "12",
   trials_per_candidate: "3",
   max_total_trials: "220",
+  continue_exploration_after_qualified: false,
+  exploration_additional_generations: "4",
+  exploration_additional_trials: "80",
+  exploration_additional_provider_turns: "16",
+  exploration_additional_time_minutes: "60",
   target_rmse: "0.5",
   target_max_error: "",
   min_pass_rate: "0.8",

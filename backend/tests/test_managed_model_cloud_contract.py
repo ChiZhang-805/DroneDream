@@ -2,18 +2,11 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = (
-    REPOSITORY_ROOT
-    / "supabase"
-    / "migrations"
-    / "20260726060000_create_model_access_billing.sql"
+    REPOSITORY_ROOT / "supabase" / "migrations" / "20260726060000_create_model_access_billing.sql"
 )
 SUPABASE_CONFIG = REPOSITORY_ROOT / "supabase" / "config.toml"
-MODEL_GATEWAY = (
-    REPOSITORY_ROOT / "supabase" / "functions" / "model-gateway" / "index.ts"
-)
-BILLING_CHECKOUT = (
-    REPOSITORY_ROOT / "supabase" / "functions" / "billing-checkout" / "index.ts"
-)
+MODEL_GATEWAY = REPOSITORY_ROOT / "supabase" / "functions" / "model-gateway" / "index.ts"
+BILLING_CHECKOUT = REPOSITORY_ROOT / "supabase" / "functions" / "billing-checkout" / "index.ts"
 
 
 def _text(path: Path) -> str:
@@ -75,13 +68,17 @@ def test_gateway_uses_hashed_scoped_grants_and_atomic_reservations() -> None:
     assert "max_calls integer not null check (max_calls between 1 and 256)" in migration
     assert "grant_calls := 256;" in migration
     assert "grant: token" in gateway
-    assert 'requiredEnv("PLATFORM_LLM_API_KEY")' in gateway
+    assert "Deno.env.get(`${prefix}_API_KEY`)" in gateway
+    assert 'globalFallback("PLATFORM_LLM_API_KEY")' in gateway
     assert 'Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")' in gateway
     assert "providerJson.model =" in gateway
     assert "delete providerJson.system_fingerprint" in gateway
-    assert "providerText" not in gateway.split(
-        "if (!providerResponse.ok)", maxsplit=1
-    )[1].split("let providerJson", maxsplit=1)[0].split("throw new GatewayError", maxsplit=1)[0]
+    assert (
+        "providerText"
+        not in gateway.split("if (!providerResponse.ok)", maxsplit=1)[1]
+        .split("let providerJson", maxsplit=1)[0]
+        .split("throw new GatewayError", maxsplit=1)[0]
+    )
     assert "platform_llm_api_key" not in migration.lower()
 
 
@@ -90,14 +87,19 @@ def test_non_jwt_edge_routes_implement_explicit_auth_and_payment_verification() 
     gateway = _text(MODEL_GATEWAY)
     billing = _text(BILLING_CHECKOUT)
 
-    assert config.count("verify_jwt = false") == 2
+    for function_name in (
+        "model-gateway",
+        "assistant-orchestrator",
+        "billing-checkout",
+    ):
+        assert f"[functions.{function_name}]\nverify_jwt = false" in config
     assert "adminClient().auth.getUser(token)" in gateway
-    assert "grant.startsWith(\"ddg_\")" in gateway
+    assert 'grant.startsWith("ddg_")' in gateway
     assert "adminClient().auth.getUser(bearerToken(request))" in billing
     assert "rsaVerify(" in billing
     assert "decryptWechatResource" in billing
     assert "WECHAT_PLATFORM_CERTIFICATE_SERIAL" in billing
-    assert "amount?.currency !== \"CNY\"" in billing
+    assert 'amount?.currency !== "CNY"' in billing
     assert "verifyStripeSignature(" in billing
     assert 'request.headers.get("Stripe-Signature")' in billing
     assert 'event.type !== "checkout.session.completed"' in billing

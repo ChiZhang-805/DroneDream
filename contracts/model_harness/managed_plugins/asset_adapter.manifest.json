@@ -1,0 +1,18 @@
+{
+  "api_contract": {
+    "contract_id": "dronedream.managed.asset-adapter.v1",
+    "input_schema_version": "dronedream.model-harness-input.v1",
+    "output_schema_version": "dronedream.model-harness-output.v1"
+  },
+  "implementation": {
+    "entrypoint": "get_asset_connector_catalog",
+    "module": "app.autonomy.asset_connectors",
+    "source_path": "backend/app/autonomy/asset_connectors.py",
+    "source_sha256": "065ba0193518c200ea15212e710e50f565b9370a472aef3d2297e48596b6326d"
+  },
+  "plugin_id": "dronedream.managed.asset-adapter",
+  "schema_version": "dronedream.managed-plugin-manifest.v1",
+  "slot": "asset_adapter",
+  "trust": "managed",
+  "version": "1.0.0"
+}

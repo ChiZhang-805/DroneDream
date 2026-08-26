@@ -1,0 +1,67 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream-Agent",
+  "identifier": "io.dronedream.desktop.autonomy",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream · AGENT",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 700,
+        "resizable": true,
+        "maximizable": true,
+        "minimizable": true,
+        "closable": true,
+        "decorations": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "publisher": "DroneDream",
+    "shortDescription": "Natural-language autonomous mission workspace",
+    "longDescription": "DroneDream · AGENT turns natural-language intent into structured, reviewable mission plans and supervises execution through repeated Model + Harness loops, pluginized tools, safety holds, replanning and evidence gates. Simulation is the default execution domain; hardware remains fail-closed until explicitly qualified.",
+    "icon": [
+      "gen/brand/autonomy/windows/32x32.png",
+      "gen/brand/autonomy/windows/128x128.png",
+      "gen/brand/autonomy/windows/128x128@2x.png",
+      "gen/brand/autonomy/windows/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/dronedream-autonomy-core",
+      "binaries/dronedream-plugin-isolator"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "gen/brand/autonomy/windows/icon.ico",
+        "uninstallerIcon": "gen/brand/autonomy/windows/icon.ico"
+      }
+    },
+    "resources": {
+      "agent-core-resources/runtime": "agent-core/runtime",
+      "agent-core-resources/official-plugins": "agent-core/official-plugins",
+      "agent-core-resources/default-assets": "agent-core/default-assets",
+      "agent-core-resources/agent-core-stage.json": "agent-core/agent-core-stage.json",
+      "agent-core-resources/dronedream-plugin-isolator.exe": "agent-core/dronedream-plugin-isolator.exe",
+      "../../distribution/editions/autonomy.v1.json": "distribution/editions/autonomy.v1.json",
+      "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",
+      "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",
+      "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json",
+      "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",
+      "../../distribution/desktop/edition-browser-auth.v1.json": "distribution/desktop/edition-browser-auth.v1.json",
+      "../../distribution/desktop/edition-runtime-update-families.v1.json": "distribution/desktop/edition-runtime-update-families.v1.json",
+      "../../brand/editions.json": "brand/editions.json"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-channel/latest-autonomy.json"
+      ],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

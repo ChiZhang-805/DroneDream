@@ -14,6 +14,7 @@ from app.optimization.scenario_generalization_campaign import (
     ScenarioGeneralizationArtifact,
     _enabled_cases,
     _evaluate_case_set,
+    _exhaustive_oracle_parameters,
     _optimizer_search,
     _scenario_suite,
     _search_space,
@@ -91,6 +92,37 @@ def test_optimizer_selection_has_no_validation_input(
     assert selected
     assert len(transcript) == 61
     assert validation_calls == 0
+
+
+def test_optimizer_and_oracle_prioritize_feasible_training_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.optimization.scenario_generalization_campaign as module
+
+    def feasibility_landscape(
+        parameters: dict[str, float],
+        *,
+        cases: tuple[ScenarioCaseConfig, ...],
+        phase: Literal["training", "validation"],
+    ) -> tuple[float, dict[str, float], bool]:
+        del cases, phase
+        infeasible = parameters["kp_xy"] == 0.8
+        return (0.0 if infeasible else 1.0), {}, not infeasible
+
+    monkeypatch.setattr(module, "_evaluate_case_set", feasibility_landscape)
+    training_cases = _enabled_cases(_scenario_suite(), holdout=False)
+    selected, transcript = _optimizer_search(
+        space=_search_space(),
+        training_cases=training_cases,
+    )
+    oracle, _candidate_count, _tie_count = _exhaustive_oracle_parameters(
+        cases=training_cases,
+        phase="training",
+    )
+
+    assert any(row["parameters"]["kp_xy"] == 0.8 for row in transcript)
+    assert selected["kp_xy"] != 0.8
+    assert oracle["kp_xy"] != 0.8
 
 
 def test_each_declared_configuration_shift_changes_the_aggregated_score() -> None:

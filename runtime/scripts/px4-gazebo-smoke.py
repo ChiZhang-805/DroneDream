@@ -37,6 +37,8 @@ async def _round_trip() -> dict[str, float | str]:
     if math.isclose(original, written, rel_tol=0.0, abs_tol=1e-6):
         raise RuntimeError("could not choose a distinct in-range PX4 smoke value")
     write_attempted = False
+    read_back: float | None = None
+    restored: float | None = None
     try:
         write_attempted = True
         await asyncio.wait_for(drone.param.set_param_float(parameter, written), timeout=30)
@@ -49,7 +51,17 @@ async def _round_trip() -> dict[str, float | str]:
                 asyncio.shield(drone.param.set_param_float(parameter, original)),
                 timeout=30,
             )
-    if not all(math.isfinite(value) for value in (original, written, read_back)):
+            restored = float(
+                await asyncio.wait_for(
+                    asyncio.shield(drone.param.get_param_float(parameter)),
+                    timeout=30,
+                )
+            )
+            if not math.isfinite(restored) or abs(original - restored) > 1e-4:
+                raise RuntimeError(f"PX4 parameter restore mismatch: {original} != {restored}")
+    if read_back is None or restored is None:
+        raise RuntimeError("PX4 parameter round-trip did not complete")
+    if not all(math.isfinite(value) for value in (original, written, read_back, restored)):
         raise RuntimeError("PX4 returned a non-finite parameter value")
     if abs(written - read_back) > 1e-4:
         raise RuntimeError(f"PX4 parameter round-trip mismatch: {written} != {read_back}")
@@ -58,6 +70,7 @@ async def _round_trip() -> dict[str, float | str]:
         "original": original,
         "written": written,
         "readBack": read_back,
+        "restored": restored,
     }
 
 

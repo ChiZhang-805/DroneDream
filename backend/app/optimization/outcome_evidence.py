@@ -25,6 +25,7 @@ from pydantic import (
 )
 
 from app.optimization.outcome_taxonomy import (
+    TRIAL_OUTCOME_CLASSES,
     TRIAL_OUTCOME_TAXONOMY_SCHEMA,
 )
 from app.orchestration.attempt_evidence import (
@@ -41,18 +42,10 @@ from app.storage.evidence import (
 
 CANDIDATE_OUTCOME_EVIDENCE_SCHEMA = "dronedream.candidate-outcome-evidence/v1"
 CANDIDATE_REPORT_EVIDENCE_SCHEMA = "dronedream.candidate-report-evidence/v1"
-CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA = (
-    "dronedream.candidate-outcome-evidence/v2"
-)
-CANDIDATE_REPORT_EVIDENCE_V2_SCHEMA = (
-    "dronedream.candidate-report-evidence/v2"
-)
-CANDIDATE_OUTCOME_EVIDENCE_V3_SCHEMA = (
-    "dronedream.candidate-outcome-evidence/v3"
-)
-CANDIDATE_REPORT_EVIDENCE_V3_SCHEMA = (
-    "dronedream.candidate-report-evidence/v3"
-)
+CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA = "dronedream.candidate-outcome-evidence/v2"
+CANDIDATE_REPORT_EVIDENCE_V2_SCHEMA = "dronedream.candidate-report-evidence/v2"
+CANDIDATE_OUTCOME_EVIDENCE_V3_SCHEMA = "dronedream.candidate-outcome-evidence/v3"
+CANDIDATE_REPORT_EVIDENCE_V3_SCHEMA = "dronedream.candidate-report-evidence/v3"
 TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA = "dronedream.trial-outcome-evidence/v2"
 TRIAL_OUTCOME_EVIDENCE_V3_SCHEMA = "dronedream.trial-outcome-evidence/v3"
 
@@ -95,13 +88,9 @@ class TrialArtifactItemEvidenceV1(_FrozenModel):
         )
         if self.content_evidence == SEALED_ARTIFACT_EVIDENCE:
             if any(value is None for value in sealed_fields):
-                raise ValueError(
-                    "sealed artifact evidence requires a complete byte receipt"
-                )
+                raise ValueError("sealed artifact evidence requires a complete byte receipt")
         elif any(value is not None for value in sealed_fields):
-            raise ValueError(
-                "mock metadata-only evidence cannot claim sealed bytes"
-            )
+            raise ValueError("mock metadata-only evidence cannot claim sealed bytes")
         return self
 
 
@@ -120,12 +109,10 @@ class TrialArtifactEvidenceV1(_FrozenModel):
         if self.artifact_count != len(self.artifacts):
             raise ValueError("artifact evidence count does not match rows")
         sealed_count = sum(
-            item.content_evidence == SEALED_ARTIFACT_EVIDENCE
-            for item in self.artifacts
+            item.content_evidence == SEALED_ARTIFACT_EVIDENCE for item in self.artifacts
         )
         metadata_count = sum(
-            item.content_evidence == MOCK_METADATA_ARTIFACT_EVIDENCE
-            for item in self.artifacts
+            item.content_evidence == MOCK_METADATA_ARTIFACT_EVIDENCE for item in self.artifacts
         )
         if (
             sealed_count != self.sealed_artifact_count
@@ -134,17 +121,10 @@ class TrialArtifactEvidenceV1(_FrozenModel):
         ):
             raise ValueError("artifact evidence class counts diverged")
         if any(item.owner_id != self.trial_id for item in self.artifacts):
-            raise ValueError(
-                "artifact evidence contains a different Trial owner"
-            )
-        ordering = [
-            (item.artifact_type, item.artifact_id)
-            for item in self.artifacts
-        ]
+            raise ValueError("artifact evidence contains a different Trial owner")
+        ordering = [(item.artifact_type, item.artifact_id) for item in self.artifacts]
         if ordering != sorted(ordering) or len(set(ordering)) != len(ordering):
-            raise ValueError(
-                "artifact evidence rows must be unique and canonical"
-            )
+            raise ValueError("artifact evidence rows must be unique and canonical")
         return self
 
 
@@ -183,9 +163,7 @@ class CandidateOutcomeEvidenceV1(_FrozenModel):
     completed_trial_count: NonnegativeInt
     failed_trial_count: NonnegativeInt
     passing_trial_count: NonnegativeInt
-    trial_outcome_taxonomy_schema: Literal[
-        "dronedream.trial-outcome-taxonomy/v1"
-    ]
+    trial_outcome_taxonomy_schema: Literal["dronedream.trial-outcome-taxonomy/v1"]
     trial_outcome_counts: dict[str, NonnegativeInt]
     trial_outcome_rates: dict[str, Rate]
     optimizer_learning_failure_rate: Rate
@@ -210,12 +188,12 @@ class CandidateOutcomeEvidenceV2(_FrozenModel):
     candidate_id: str = Field(min_length=1, max_length=128)
     generation_index: NonnegativeInt
     parameter_sha256: Sha256Id
-    trial_evidence_schema: Literal[
+    trial_evidence_schema: Literal["dronedream.trial-outcome-evidence/v2"] = (
         "dronedream.trial-outcome-evidence/v2"
-    ] = "dronedream.trial-outcome-evidence/v2"
-    trial_artifact_evidence_schema: Literal[
+    )
+    trial_artifact_evidence_schema: Literal["dronedream.trial-artifact-evidence/v1"] = (
         "dronedream.trial-artifact-evidence/v1"
-    ] = "dronedream.trial-artifact-evidence/v1"
+    )
     trial_evidence_sha256: Sha256Id
     artifact_count: NonnegativeInt
     sealed_artifact_count: NonnegativeInt
@@ -225,9 +203,7 @@ class CandidateOutcomeEvidenceV2(_FrozenModel):
     completed_trial_count: NonnegativeInt
     failed_trial_count: NonnegativeInt
     passing_trial_count: NonnegativeInt
-    trial_outcome_taxonomy_schema: Literal[
-        "dronedream.trial-outcome-taxonomy/v1"
-    ]
+    trial_outcome_taxonomy_schema: Literal["dronedream.trial-outcome-taxonomy/v1"]
     trial_outcome_counts: dict[str, NonnegativeInt]
     trial_outcome_rates: dict[str, Rate]
     optimizer_learning_failure_rate: Rate
@@ -252,15 +228,15 @@ class CandidateOutcomeEvidenceV3(_FrozenModel):
     candidate_id: str = Field(min_length=1, max_length=128)
     generation_index: NonnegativeInt
     parameter_sha256: Sha256Id
-    trial_evidence_schema: Literal[
+    trial_evidence_schema: Literal["dronedream.trial-outcome-evidence/v3"] = (
         "dronedream.trial-outcome-evidence/v3"
-    ] = "dronedream.trial-outcome-evidence/v3"
-    trial_artifact_evidence_schema: Literal[
+    )
+    trial_artifact_evidence_schema: Literal["dronedream.trial-artifact-evidence/v1"] = (
         "dronedream.trial-artifact-evidence/v1"
-    ] = "dronedream.trial-artifact-evidence/v1"
-    trial_attempt_evidence_schema: Literal[
+    )
+    trial_attempt_evidence_schema: Literal["dronedream.trial-accepted-attempt-evidence/v1"] = (
         "dronedream.trial-accepted-attempt-evidence/v1"
-    ] = "dronedream.trial-accepted-attempt-evidence/v1"
+    )
     trial_evidence_sha256: Sha256Id
     artifact_count: NonnegativeInt
     sealed_artifact_count: NonnegativeInt
@@ -271,9 +247,7 @@ class CandidateOutcomeEvidenceV3(_FrozenModel):
     completed_trial_count: NonnegativeInt
     failed_trial_count: NonnegativeInt
     passing_trial_count: NonnegativeInt
-    trial_outcome_taxonomy_schema: Literal[
-        "dronedream.trial-outcome-taxonomy/v1"
-    ]
+    trial_outcome_taxonomy_schema: Literal["dronedream.trial-outcome-taxonomy/v1"]
     trial_outcome_counts: dict[str, NonnegativeInt]
     trial_outcome_rates: dict[str, Rate]
     optimizer_learning_failure_rate: Rate
@@ -292,10 +266,56 @@ class CandidateOutcomeEvidenceV3(_FrozenModel):
         self,
     ) -> CandidateOutcomeEvidenceV3:
         if self.accepted_attempt_count != self.trial_count:
-            raise ValueError(
-                "every training Trial requires one accepted physical attempt"
-            )
+            raise ValueError("every training Trial requires one accepted physical attempt")
         return self
+
+
+def _candidate_outcome_evidence_is_consistent(
+    evidence: CandidateOutcomeEvidenceV1 | CandidateOutcomeEvidenceV2 | CandidateOutcomeEvidenceV3,
+) -> bool:
+    outcome_classes = set(TRIAL_OUTCOME_CLASSES)
+    counts = evidence.trial_outcome_counts
+    rates = evidence.trial_outcome_rates
+    expected_complete = (
+        evidence.completed_trial_count == evidence.trial_count
+        and evidence.failed_trial_count == 0
+    )
+    expected_rate_total = 1.0 if evidence.trial_count > 0 else 0.0
+    return (
+        evidence.completed_trial_count + evidence.failed_trial_count
+        == evidence.trial_count
+        and evidence.passing_trial_count <= evidence.completed_trial_count
+        and set(counts) == outcome_classes
+        and sum(counts.values()) == evidence.trial_count
+        and counts["success"] == evidence.completed_trial_count
+        and set(rates) == outcome_classes
+        and math.isclose(
+            sum(rates.values()),
+            expected_rate_total,
+            rel_tol=0.0,
+            abs_tol=1e-8,
+        )
+        and math.isclose(
+            rates["success"],
+            evidence.acceptance_projection.completion_rate,
+            rel_tol=0.0,
+            abs_tol=1e-8,
+        )
+        and evidence.selection_key.evidence_complete is expected_complete
+        and evidence.selection_key.hard_feasible is evidence.feasible
+        and math.isclose(
+            evidence.selection_key.training_failure_rate,
+            evidence.optimizer_learning_failure_rate,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+        and math.isclose(
+            evidence.selection_key.decision_loss,
+            evidence.scalar_loss,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+    )
 
 
 class CandidateReportProjectionV1(_FrozenModel):
@@ -331,12 +351,12 @@ class CandidateReportEvidenceV2(_FrozenModel):
     )
     evidence_id: Sha256Id
     candidate_outcome_evidence_id: Sha256Id
-    report_trial_evidence_schema: Literal[
+    report_trial_evidence_schema: Literal["dronedream.trial-outcome-evidence/v2"] = (
         "dronedream.trial-outcome-evidence/v2"
-    ] = "dronedream.trial-outcome-evidence/v2"
-    trial_artifact_evidence_schema: Literal[
+    )
+    trial_artifact_evidence_schema: Literal["dronedream.trial-artifact-evidence/v1"] = (
         "dronedream.trial-artifact-evidence/v1"
-    ] = "dronedream.trial-artifact-evidence/v1"
+    )
     report_trial_evidence_sha256: Sha256Id
     artifact_count: NonnegativeInt
     sealed_artifact_count: NonnegativeInt
@@ -350,15 +370,15 @@ class CandidateReportEvidenceV3(_FrozenModel):
     )
     evidence_id: Sha256Id
     candidate_outcome_evidence_id: Sha256Id
-    report_trial_evidence_schema: Literal[
+    report_trial_evidence_schema: Literal["dronedream.trial-outcome-evidence/v3"] = (
         "dronedream.trial-outcome-evidence/v3"
-    ] = "dronedream.trial-outcome-evidence/v3"
-    trial_artifact_evidence_schema: Literal[
+    )
+    trial_artifact_evidence_schema: Literal["dronedream.trial-artifact-evidence/v1"] = (
         "dronedream.trial-artifact-evidence/v1"
-    ] = "dronedream.trial-artifact-evidence/v1"
-    trial_attempt_evidence_schema: Literal[
+    )
+    trial_attempt_evidence_schema: Literal["dronedream.trial-accepted-attempt-evidence/v1"] = (
         "dronedream.trial-accepted-attempt-evidence/v1"
-    ] = "dronedream.trial-accepted-attempt-evidence/v1"
+    )
     report_trial_evidence_sha256: Sha256Id
     artifact_count: NonnegativeInt
     sealed_artifact_count: NonnegativeInt
@@ -443,9 +463,7 @@ def trial_outcome_evidence_row(
         scenario_config = dict(raw_scenario_config)
     else:
         raise ValueError("trial evidence scenario config must be an object")
-    if failure_code is not None and (
-        not isinstance(failure_code, str) or not failure_code
-    ):
+    if failure_code is not None and (not isinstance(failure_code, str) or not failure_code):
         raise ValueError("trial evidence failure code must be non-empty")
 
     metric = getattr(trial, "metric", None)
@@ -475,13 +493,9 @@ def trial_outcome_evidence_row(
         "metric": metric_payload,
     }
     if artifact_evidence is not None:
-        parsed_artifacts = TrialArtifactEvidenceV1.model_validate(
-            artifact_evidence
-        )
+        parsed_artifacts = TrialArtifactEvidenceV1.model_validate(artifact_evidence)
         if parsed_artifacts.trial_id != trial_id:
-            raise ValueError(
-                "Trial artifact evidence belongs to a different Trial"
-            )
+            raise ValueError("Trial artifact evidence belongs to a different Trial")
         row["evidence_schema"] = TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA
         row["artifact_evidence"] = parsed_artifacts.model_dump(mode="json")
         if accepted_attempt_evidence is not None:
@@ -489,24 +503,15 @@ def trial_outcome_evidence_row(
                 accepted_attempt_evidence
             )
             if parsed_attempt.trial_id != trial_id:
-                raise ValueError(
-                    "accepted attempt evidence belongs to a different Trial"
-                )
-            if (
-                parsed_attempt.artifact_evidence_sha256
-                != _sha256_id(parsed_artifacts.model_dump(mode="json"))
+                raise ValueError("accepted attempt evidence belongs to a different Trial")
+            if parsed_attempt.artifact_evidence_sha256 != _sha256_id(
+                parsed_artifacts.model_dump(mode="json")
             ):
-                raise ValueError(
-                    "accepted attempt does not bind this artifact evidence"
-                )
+                raise ValueError("accepted attempt does not bind this artifact evidence")
             row["evidence_schema"] = TRIAL_OUTCOME_EVIDENCE_V3_SCHEMA
-            row["accepted_attempt_evidence"] = parsed_attempt.model_dump(
-                mode="json"
-            )
+            row["accepted_attempt_evidence"] = parsed_attempt.model_dump(mode="json")
     elif accepted_attempt_evidence is not None:
-        raise ValueError(
-            "accepted attempt evidence requires Trial artifact evidence"
-        )
+        raise ValueError("accepted attempt evidence requires Trial artifact evidence")
     _canonical_json(row)
     return row
 
@@ -530,30 +535,28 @@ def _candidate_evidence_binds_artifacts(candidate: object) -> bool:
     if not isinstance(aggregate, Mapping):
         return False
     evidence = aggregate.get("candidate_outcome_evidence")
-    return (
-        isinstance(evidence, Mapping)
-        and evidence.get("schema_id")
-        in {
-            CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA,
-            CANDIDATE_OUTCOME_EVIDENCE_V3_SCHEMA,
-        }
-    )
+    return isinstance(evidence, Mapping) and evidence.get("schema_id") in {
+        CANDIDATE_OUTCOME_EVIDENCE_V2_SCHEMA,
+        CANDIDATE_OUTCOME_EVIDENCE_V3_SCHEMA,
+    }
 
 
 def _candidate_evidence_binds_attempts(candidate: object) -> bool:
     try:
-        if list(candidate.evidence_receipts):  # type: ignore[attr-defined]
-            return True
+        has_persisted_receipts = bool(
+            list(candidate.evidence_receipts)  # type: ignore[attr-defined]
+        )
     except Exception:
-        pass
+        has_persisted_receipts = False
+    if has_persisted_receipts:
+        return True
     aggregate = getattr(candidate, "aggregated_metric_json", None)
     if not isinstance(aggregate, Mapping):
         return False
     evidence = aggregate.get("candidate_outcome_evidence")
     return (
         isinstance(evidence, Mapping)
-        and evidence.get("schema_id")
-        == CANDIDATE_OUTCOME_EVIDENCE_V3_SCHEMA
+        and evidence.get("schema_id") == CANDIDATE_OUTCOME_EVIDENCE_V3_SCHEMA
     )
 
 
@@ -618,14 +621,10 @@ def candidate_training_trial_evidence_rows(
     except Exception:  # pragma: no cover - detached/lazy ORM state fails closed
         return None
     attempt_binding = (
-        _candidate_evidence_binds_attempts(candidate)
-        if bind_attempts is None
-        else bind_attempts
+        _candidate_evidence_binds_attempts(candidate) if bind_attempts is None else bind_attempts
     )
     artifact_binding = (
-        _candidate_evidence_binds_artifacts(candidate)
-        if bind_artifacts is None
-        else bind_artifacts
+        _candidate_evidence_binds_artifacts(candidate) if bind_artifacts is None else bind_artifacts
     ) or attempt_binding
     artifact_map = _candidate_artifact_evidence_map(
         candidate,
@@ -648,14 +647,10 @@ def candidate_training_trial_evidence_rows(
             row = trial_outcome_evidence_row(
                 trial,
                 artifact_evidence=(
-                    artifact_map.get(str(getattr(trial, "id", "")))
-                    if artifact_binding
-                    else None
+                    artifact_map.get(str(getattr(trial, "id", ""))) if artifact_binding else None
                 ),
                 accepted_attempt_evidence=(
-                    attempt_map.get(str(getattr(trial, "id", "")))
-                    if attempt_binding
-                    else None
+                    attempt_map.get(str(getattr(trial, "id", ""))) if attempt_binding else None
                 ),
             )
             if trial_is_holdout(trial):
@@ -690,14 +685,10 @@ def candidate_report_trial_evidence_rows(
     except Exception:  # pragma: no cover - detached/lazy ORM state fails closed
         return None
     attempt_binding = (
-        _candidate_evidence_binds_attempts(candidate)
-        if bind_attempts is None
-        else bind_attempts
+        _candidate_evidence_binds_attempts(candidate) if bind_attempts is None else bind_attempts
     )
     artifact_binding = (
-        _candidate_evidence_binds_artifacts(candidate)
-        if bind_artifacts is None
-        else bind_artifacts
+        _candidate_evidence_binds_artifacts(candidate) if bind_artifacts is None else bind_artifacts
     ) or attempt_binding
     artifact_map = _candidate_artifact_evidence_map(
         candidate,
@@ -719,14 +710,10 @@ def candidate_report_trial_evidence_rows(
             trial_outcome_evidence_row(
                 trial,
                 artifact_evidence=(
-                    artifact_map.get(str(getattr(trial, "id", "")))
-                    if artifact_binding
-                    else None
+                    artifact_map.get(str(getattr(trial, "id", ""))) if artifact_binding else None
                 ),
                 accepted_attempt_evidence=(
-                    attempt_map.get(str(getattr(trial, "id", "")))
-                    if attempt_binding
-                    else None
+                    attempt_map.get(str(getattr(trial, "id", ""))) if attempt_binding else None
                 ),
             )
             for trial in trials
@@ -756,9 +743,7 @@ def _bound_trial_evidence_counts(
     metadata_only_count = 0
     accepted_attempt_count = 0
     expected_schema = (
-        TRIAL_OUTCOME_EVIDENCE_V3_SCHEMA
-        if bind_attempts
-        else TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA
+        TRIAL_OUTCOME_EVIDENCE_V3_SCHEMA if bind_attempts else TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA
     )
     for row in trial_evidence_rows:
         trial_id = row.get("trial_id")
@@ -773,16 +758,10 @@ def _bound_trial_evidence_counts(
             or not isinstance(seed, int)
             or row.get("evidence_schema") != expected_schema
         ):
-            raise ValueError(
-                "bound Candidate evidence requires canonical Trial rows"
-            )
-        parsed = TrialArtifactEvidenceV1.model_validate(
-            row.get("artifact_evidence")
-        )
+            raise ValueError("bound Candidate evidence requires canonical Trial rows")
+        parsed = TrialArtifactEvidenceV1.model_validate(row.get("artifact_evidence"))
         if parsed.trial_id != trial_id:
-            raise ValueError(
-                "artifact evidence does not belong to its Trial row"
-            )
+            raise ValueError("artifact evidence does not belong to its Trial row")
         canonical_order.append((scenario_type, seed, trial_id))
         artifact_count += parsed.artifact_count
         sealed_count += parsed.sealed_artifact_count
@@ -796,18 +775,12 @@ def _bound_trial_evidence_counts(
                 or parsed_attempt.artifact_evidence_sha256
                 != _sha256_id(parsed.model_dump(mode="json"))
             ):
-                raise ValueError(
-                    "accepted attempt evidence does not bind its Trial row"
-                )
+                raise ValueError("accepted attempt evidence does not bind its Trial row")
             accepted_attempt_count += 1
-    if (
-        canonical_order != sorted(canonical_order)
-        or len({item[2] for item in canonical_order})
-        != len(canonical_order)
-    ):
-        raise ValueError(
-            "artifact-bound Trial evidence rows must be unique and canonical"
-        )
+    if canonical_order != sorted(canonical_order) or len(
+        {item[2] for item in canonical_order}
+    ) != len(canonical_order):
+        raise ValueError("artifact-bound Trial evidence rows must be unique and canonical")
     return (
         artifact_count,
         sealed_count,
@@ -826,16 +799,71 @@ def compile_candidate_outcome_evidence(
     aggregate: Mapping[str, Any],
     bind_trial_artifacts: bool = False,
     bind_trial_attempts: bool = False,
-) -> (
-    CandidateOutcomeEvidenceV1
-    | CandidateOutcomeEvidenceV2
-    | CandidateOutcomeEvidenceV3
-):
+) -> CandidateOutcomeEvidenceV1 | CandidateOutcomeEvidenceV2 | CandidateOutcomeEvidenceV3:
     """Compile one deterministic search-role projection from accepted evidence."""
 
-    selection_key = CandidateSelectionKeyV1.model_validate(
-        aggregate.get("selection_key")
+    selection_key = CandidateSelectionKeyV1.model_validate(aggregate.get("selection_key"))
+    trial_count = _nonnegative_int(
+        aggregate.get("training_trial_count"),
+        field_name="training_trial_count",
     )
+    completed_trial_count = _nonnegative_int(
+        aggregate.get("training_completed_trial_count"),
+        field_name="training_completed_trial_count",
+    )
+    failed_trial_count = _nonnegative_int(
+        aggregate.get("training_failed_trial_count"),
+        field_name="training_failed_trial_count",
+    )
+    passing_trial_count = _nonnegative_int(
+        aggregate.get("training_passing_trial_count"),
+        field_name="training_passing_trial_count",
+    )
+    optimizer_learning_failure_rate = _finite_number(
+        aggregate.get("optimizer_learning_failure_rate"),
+        field_name="optimizer_learning_failure_rate",
+    )
+    scalar_loss = _finite_number(
+        aggregate.get("scalar_loss"),
+        field_name="scalar_loss",
+    )
+    feasible = aggregate.get("feasible")
+    evidence_complete = completed_trial_count == trial_count and failed_trial_count == 0
+    selection_consistent = (
+        isinstance(feasible, bool)
+        and selection_key.evidence_complete is evidence_complete
+        and selection_key.hard_feasible is feasible
+        and math.isclose(
+            selection_key.training_failure_rate,
+            optimizer_learning_failure_rate,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+        and math.isclose(
+            selection_key.decision_loss,
+            scalar_loss,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+    )
+    raw_hard_constraint_violation = aggregate.get("hard_constraint_violation")
+    if raw_hard_constraint_violation is not None:
+        hard_constraint_violation = _finite_number(
+            raw_hard_constraint_violation,
+            field_name="hard_constraint_violation",
+        )
+        selection_consistent = (
+            selection_consistent
+            and hard_constraint_violation >= 0
+            and math.isclose(
+                selection_key.hard_constraint_violation,
+                hard_constraint_violation,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+        )
+    if not selection_consistent:
+        raise ValueError("selection key contradicts the Candidate aggregate")
     acceptance_projection = CandidateAcceptanceProjectionV1(
         rmse=_finite_number(
             aggregate.get("acceptance_rmse"),
@@ -855,9 +883,7 @@ def compile_candidate_outcome_evidence(
         ),
     )
     if bind_trial_attempts and not bind_trial_artifacts:
-        raise ValueError(
-            "physical-attempt evidence requires Trial artifact binding"
-        )
+        raise ValueError("physical-attempt evidence requires Trial artifact binding")
     bound_counts = (
         _bound_trial_evidence_counts(
             trial_evidence_rows,
@@ -883,39 +909,16 @@ def compile_candidate_outcome_evidence(
         "parameter_sha256": _sha256_id(parameter_snapshot),
         "trial_evidence_sha256": _sha256_id(list(trial_evidence_rows)),
         "holdout_projection_sha256": (
-            _sha256_id(aggregate["holdout"])
-            if "holdout" in aggregate
-            else None
+            _sha256_id(aggregate["holdout"]) if "holdout" in aggregate else None
         ),
-        "trial_count": _nonnegative_int(
-            aggregate.get("training_trial_count"),
-            field_name="training_trial_count",
-        ),
-        "completed_trial_count": _nonnegative_int(
-            aggregate.get("training_completed_trial_count"),
-            field_name="training_completed_trial_count",
-        ),
-        "failed_trial_count": _nonnegative_int(
-            aggregate.get("training_failed_trial_count"),
-            field_name="training_failed_trial_count",
-        ),
-        "passing_trial_count": _nonnegative_int(
-            aggregate.get("training_passing_trial_count"),
-            field_name="training_passing_trial_count",
-        ),
-        "trial_outcome_taxonomy_schema": (
-            TRIAL_OUTCOME_TAXONOMY_SCHEMA
-        ),
-        "trial_outcome_counts": aggregate.get(
-            "training_trial_outcome_counts"
-        ),
-        "trial_outcome_rates": aggregate.get(
-            "training_trial_outcome_rates"
-        ),
-        "optimizer_learning_failure_rate": _finite_number(
-            aggregate.get("optimizer_learning_failure_rate"),
-            field_name="optimizer_learning_failure_rate",
-        ),
+        "trial_count": trial_count,
+        "completed_trial_count": completed_trial_count,
+        "failed_trial_count": failed_trial_count,
+        "passing_trial_count": passing_trial_count,
+        "trial_outcome_taxonomy_schema": (TRIAL_OUTCOME_TAXONOMY_SCHEMA),
+        "trial_outcome_counts": aggregate.get("training_trial_outcome_counts"),
+        "trial_outcome_rates": aggregate.get("training_trial_outcome_rates"),
+        "optimizer_learning_failure_rate": optimizer_learning_failure_rate,
         "objective_values": _finite_mapping(
             aggregate.get("objective_values"),
             field_name="objective_values",
@@ -928,7 +931,7 @@ def compile_candidate_outcome_evidence(
             aggregate.get("constraint_violations"),
             field_name="constraint_violations",
         ),
-        "feasible": aggregate.get("feasible"),
+        "feasible": feasible,
         "preference_loss": _finite_number(
             aggregate.get("preference_loss"),
             field_name="preference_loss",
@@ -937,10 +940,7 @@ def compile_candidate_outcome_evidence(
             aggregate.get("soft_constraint_penalty"),
             field_name="soft_constraint_penalty",
         ),
-        "scalar_loss": _finite_number(
-            aggregate.get("scalar_loss"),
-            field_name="scalar_loss",
-        ),
+        "scalar_loss": scalar_loss,
         "selection_key": selection_key.model_dump(mode="json"),
         "acceptance_projection": acceptance_projection.model_dump(mode="json"),
     }
@@ -958,40 +958,33 @@ def compile_candidate_outcome_evidence(
                     if bind_trial_attempts
                     else TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA
                 ),
-                "trial_artifact_evidence_schema": (
-                    TRIAL_ARTIFACT_EVIDENCE_SCHEMA
-                ),
+                "trial_artifact_evidence_schema": (TRIAL_ARTIFACT_EVIDENCE_SCHEMA),
                 "artifact_count": artifact_count,
                 "sealed_artifact_count": sealed_artifact_count,
-                "metadata_only_artifact_count": (
-                    metadata_only_artifact_count
-                ),
+                "metadata_only_artifact_count": (metadata_only_artifact_count),
             }
         )
         if bind_trial_attempts:
             payload.update(
                 {
-                    "trial_attempt_evidence_schema": (
-                        TRIAL_ACCEPTED_ATTEMPT_EVIDENCE_SCHEMA
-                    ),
+                    "trial_attempt_evidence_schema": (TRIAL_ACCEPTED_ATTEMPT_EVIDENCE_SCHEMA),
                     "accepted_attempt_count": accepted_attempt_count,
                 }
             )
     model = (
         CandidateOutcomeEvidenceV3
         if bind_trial_attempts
-        else (
-            CandidateOutcomeEvidenceV2
-            if bind_trial_artifacts
-            else CandidateOutcomeEvidenceV1
-        )
+        else (CandidateOutcomeEvidenceV2 if bind_trial_artifacts else CandidateOutcomeEvidenceV1)
     )
-    return model.model_validate(
+    evidence = model.model_validate(
         {
             "evidence_id": _sha256_id(payload),
             **payload,
         }
     )
+    if not _candidate_outcome_evidence_is_consistent(evidence):
+        raise ValueError("Candidate outcome evidence contradicts trial counts or selection key")
+    return evidence
 
 
 def compile_candidate_report_evidence(
@@ -999,16 +992,10 @@ def compile_candidate_report_evidence(
     candidate_outcome_evidence: object,
     report_trial_evidence_rows: Sequence[Mapping[str, Any]],
     aggregate: Mapping[str, Any],
-) -> (
-    CandidateReportEvidenceV1
-    | CandidateReportEvidenceV2
-    | CandidateReportEvidenceV3
-):
+) -> CandidateReportEvidenceV1 | CandidateReportEvidenceV2 | CandidateReportEvidenceV3:
     """Compile immutable report metrics from one verified outcome projection."""
 
-    outcome_evidence = verify_candidate_outcome_evidence(
-        candidate_outcome_evidence
-    )
+    outcome_evidence = verify_candidate_outcome_evidence(candidate_outcome_evidence)
     if outcome_evidence is None:
         raise ValueError("candidate report evidence requires valid outcome evidence")
     binds_artifacts = isinstance(
@@ -1079,9 +1066,7 @@ def compile_candidate_report_evidence(
             )
         ),
         "candidate_outcome_evidence_id": outcome_evidence.evidence_id,
-        "report_trial_evidence_sha256": _sha256_id(
-            list(report_trial_evidence_rows)
-        ),
+        "report_trial_evidence_sha256": _sha256_id(list(report_trial_evidence_rows)),
         "projection": projection.model_dump(mode="json"),
     }
     if bound_counts is not None:
@@ -1098,33 +1083,23 @@ def compile_candidate_report_evidence(
                     if binds_attempts
                     else TRIAL_OUTCOME_EVIDENCE_V2_SCHEMA
                 ),
-                "trial_artifact_evidence_schema": (
-                    TRIAL_ARTIFACT_EVIDENCE_SCHEMA
-                ),
+                "trial_artifact_evidence_schema": (TRIAL_ARTIFACT_EVIDENCE_SCHEMA),
                 "artifact_count": artifact_count,
                 "sealed_artifact_count": sealed_artifact_count,
-                "metadata_only_artifact_count": (
-                    metadata_only_artifact_count
-                ),
+                "metadata_only_artifact_count": (metadata_only_artifact_count),
             }
         )
         if binds_attempts:
             payload.update(
                 {
-                    "trial_attempt_evidence_schema": (
-                        TRIAL_ACCEPTED_ATTEMPT_EVIDENCE_SCHEMA
-                    ),
+                    "trial_attempt_evidence_schema": (TRIAL_ACCEPTED_ATTEMPT_EVIDENCE_SCHEMA),
                     "accepted_attempt_count": accepted_attempt_count,
                 }
             )
     model = (
         CandidateReportEvidenceV3
         if binds_attempts
-        else (
-            CandidateReportEvidenceV2
-            if binds_artifacts
-            else CandidateReportEvidenceV1
-        )
+        else (CandidateReportEvidenceV2 if binds_artifacts else CandidateReportEvidenceV1)
     )
     return model.model_validate(
         {
@@ -1136,12 +1111,7 @@ def compile_candidate_report_evidence(
 
 def verify_candidate_report_evidence(
     value: object,
-) -> (
-    CandidateReportEvidenceV1
-    | CandidateReportEvidenceV2
-    | CandidateReportEvidenceV3
-    | None
-):
+) -> CandidateReportEvidenceV1 | CandidateReportEvidenceV2 | CandidateReportEvidenceV3 | None:
     """Return parsed report evidence only when its content hash verifies."""
 
     if not isinstance(value, Mapping):
@@ -1172,12 +1142,7 @@ def verify_candidate_report_evidence(
 
 def verify_candidate_outcome_evidence(
     value: object,
-) -> (
-    CandidateOutcomeEvidenceV1
-    | CandidateOutcomeEvidenceV2
-    | CandidateOutcomeEvidenceV3
-    | None
-):
+) -> CandidateOutcomeEvidenceV1 | CandidateOutcomeEvidenceV2 | CandidateOutcomeEvidenceV3 | None:
     """Return the parsed projection only when schema and content hash verify."""
 
     if not isinstance(value, Mapping):
@@ -1201,7 +1166,9 @@ def verify_candidate_outcome_evidence(
         return None
     payload = evidence.model_dump(mode="json")
     evidence_id = payload.pop("evidence_id")
-    if evidence_id != _sha256_id(payload):
+    if evidence_id != _sha256_id(payload) or not _candidate_outcome_evidence_is_consistent(
+        evidence
+    ):
         return None
     return evidence
 
@@ -1262,18 +1229,10 @@ def authoritative_outcome_projection(aggregate: object) -> dict[str, Any]:
         "training_completed_trial_count": evidence.completed_trial_count,
         "training_failed_trial_count": evidence.failed_trial_count,
         "training_passing_trial_count": evidence.passing_trial_count,
-        "trial_outcome_taxonomy_schema": (
-            evidence.trial_outcome_taxonomy_schema
-        ),
-        "training_trial_outcome_counts": dict(
-            evidence.trial_outcome_counts
-        ),
-        "training_trial_outcome_rates": dict(
-            evidence.trial_outcome_rates
-        ),
-        "optimizer_learning_failure_rate": (
-            evidence.optimizer_learning_failure_rate
-        ),
+        "trial_outcome_taxonomy_schema": (evidence.trial_outcome_taxonomy_schema),
+        "training_trial_outcome_counts": dict(evidence.trial_outcome_counts),
+        "training_trial_outcome_rates": dict(evidence.trial_outcome_rates),
+        "optimizer_learning_failure_rate": (evidence.optimizer_learning_failure_rate),
         "training_failure_rate": evidence.selection_key.training_failure_rate,
         "failure_rate": evidence.selection_key.training_failure_rate,
         "acceptance_projection_schema": acceptance.schema_id,
@@ -1291,22 +1250,16 @@ def authoritative_outcome_projection(aggregate: object) -> dict[str, Any]:
         projection.update(
             {
                 "trial_evidence_schema": evidence.trial_evidence_schema,
-                "trial_artifact_evidence_schema": (
-                    evidence.trial_artifact_evidence_schema
-                ),
+                "trial_artifact_evidence_schema": (evidence.trial_artifact_evidence_schema),
                 "artifact_count": evidence.artifact_count,
                 "sealed_artifact_count": evidence.sealed_artifact_count,
-                "metadata_only_artifact_count": (
-                    evidence.metadata_only_artifact_count
-                ),
+                "metadata_only_artifact_count": (evidence.metadata_only_artifact_count),
             }
         )
     if isinstance(evidence, CandidateOutcomeEvidenceV3):
         projection.update(
             {
-                "trial_attempt_evidence_schema": (
-                    evidence.trial_attempt_evidence_schema
-                ),
+                "trial_attempt_evidence_schema": (evidence.trial_attempt_evidence_schema),
                 "accepted_attempt_count": evidence.accepted_attempt_count,
             }
         )
@@ -1333,9 +1286,7 @@ def authoritative_candidate_outcome_projection(
         return projection
     if not projection or not isinstance(aggregate, Mapping):
         return {}
-    evidence = verify_candidate_outcome_evidence(
-        aggregate.get("candidate_outcome_evidence")
-    )
+    evidence = verify_candidate_outcome_evidence(aggregate.get("candidate_outcome_evidence"))
     if (
         evidence is None
         or not isinstance(candidate_id, str)
@@ -1380,12 +1331,8 @@ def authoritative_candidate_trial_outcome_projection(
         or not isinstance(trial_evidence_rows, Sequence)
     ):
         return {}
-    evidence = verify_candidate_outcome_evidence(
-        aggregate.get("candidate_outcome_evidence")
-    )
-    if evidence is None or any(
-        not isinstance(row, Mapping) for row in trial_evidence_rows
-    ):
+    evidence = verify_candidate_outcome_evidence(aggregate.get("candidate_outcome_evidence"))
+    if evidence is None or any(not isinstance(row, Mapping) for row in trial_evidence_rows):
         return {}
     try:
         current_trial_sha256 = _sha256_id(list(trial_evidence_rows))
@@ -1424,15 +1371,10 @@ def authoritative_candidate_report_projection(
     if (
         isinstance(report_trial_evidence_rows, str | bytes)
         or not isinstance(report_trial_evidence_rows, Sequence)
-        or any(
-            not isinstance(row, Mapping)
-            for row in report_trial_evidence_rows
-        )
+        or any(not isinstance(row, Mapping) for row in report_trial_evidence_rows)
     ):
         return {}
-    report_evidence = verify_candidate_report_evidence(
-        aggregate.get("candidate_report_evidence")
-    )
+    report_evidence = verify_candidate_report_evidence(aggregate.get("candidate_report_evidence"))
     if (
         report_evidence is None
         or report_evidence.candidate_outcome_evidence_id
@@ -1440,51 +1382,32 @@ def authoritative_candidate_report_projection(
     ):
         return {}
     try:
-        current_report_trial_sha256 = _sha256_id(
-            list(report_trial_evidence_rows)
-        )
+        current_report_trial_sha256 = _sha256_id(list(report_trial_evidence_rows))
     except (TypeError, ValueError):
         return {}
-    if (
-        current_report_trial_sha256
-        != report_evidence.report_trial_evidence_sha256
-    ):
+    if current_report_trial_sha256 != report_evidence.report_trial_evidence_sha256:
         return {}
     projection = report_evidence.projection.model_dump(mode="json")
     projection["candidate_report_evidence_id"] = report_evidence.evidence_id
-    projection["candidate_outcome_evidence_id"] = (
-        report_evidence.candidate_outcome_evidence_id
-    )
+    projection["candidate_outcome_evidence_id"] = report_evidence.candidate_outcome_evidence_id
     if isinstance(
         report_evidence,
         CandidateReportEvidenceV2 | CandidateReportEvidenceV3,
     ):
         projection.update(
             {
-                "report_trial_evidence_schema": (
-                    report_evidence.report_trial_evidence_schema
-                ),
-                "trial_artifact_evidence_schema": (
-                    report_evidence.trial_artifact_evidence_schema
-                ),
+                "report_trial_evidence_schema": (report_evidence.report_trial_evidence_schema),
+                "trial_artifact_evidence_schema": (report_evidence.trial_artifact_evidence_schema),
                 "artifact_count": report_evidence.artifact_count,
-                "sealed_artifact_count": (
-                    report_evidence.sealed_artifact_count
-                ),
-                "metadata_only_artifact_count": (
-                    report_evidence.metadata_only_artifact_count
-                ),
+                "sealed_artifact_count": (report_evidence.sealed_artifact_count),
+                "metadata_only_artifact_count": (report_evidence.metadata_only_artifact_count),
             }
         )
     if isinstance(report_evidence, CandidateReportEvidenceV3):
         projection.update(
             {
-                "trial_attempt_evidence_schema": (
-                    report_evidence.trial_attempt_evidence_schema
-                ),
-                "accepted_attempt_count": (
-                    report_evidence.accepted_attempt_count
-                ),
+                "trial_attempt_evidence_schema": (report_evidence.trial_attempt_evidence_schema),
+                "accepted_attempt_count": (report_evidence.accepted_attempt_count),
             }
         )
     if "holdout" in outcome_projection:
@@ -1501,25 +1424,21 @@ def require_authoritative_candidate_report_projection(
     """Resolve one ORM-like Candidate and reject invalid required evidence."""
 
     raw_aggregate = (
-        aggregate
-        if aggregate is not None
-        else getattr(candidate, "aggregated_metric_json", None)
+        aggregate if aggregate is not None else getattr(candidate, "aggregated_metric_json", None)
     )
     from app.optimization.candidate_evidence_ledger import (
         candidate_evidence_chain_matches_current,
         candidate_evidence_receipt_required,
     )
 
-    if (
-        candidate_evidence_receipt_required(candidate)
-        and not candidate_evidence_chain_matches_current(
-            candidate,  # type: ignore[arg-type]
-            raw_aggregate,
-        )
+    if candidate_evidence_receipt_required(
+        candidate
+    ) and not candidate_evidence_chain_matches_current(
+        candidate,  # type: ignore[arg-type]
+        raw_aggregate,
     ):
         raise CandidateReportEvidenceError(
-            "required relational Candidate evidence does not match the "
-            "current aggregate"
+            "required relational Candidate evidence does not match the current aggregate"
         )
     projection = authoritative_candidate_report_projection(
         candidate_id=getattr(candidate, "id", None),
@@ -1540,8 +1459,7 @@ def require_authoritative_candidate_report_projection(
         or candidate_report_evidence_required(raw_aggregate)
     ) and not projection:
         raise CandidateReportEvidenceError(
-            "required Candidate report evidence does not match current "
-            "Candidate or Trial evidence"
+            "required Candidate report evidence does not match current Candidate or Trial evidence"
         )
     return projection
 

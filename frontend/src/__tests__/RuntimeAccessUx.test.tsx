@@ -1,7 +1,69 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const runtimeSessionContractMocks = vi.hoisted(() => ({
+  verify: vi.fn(async <T,>(report: T) => report),
+}));
+const openerMocks = vi.hoisted(() => ({
+  openUrl: vi.fn(async () => undefined),
+}));
+const distributionPlanMocks = vi.hoisted(() => ({
+  validate: vi.fn(async (request: { selection: Record<string, unknown> }) => ({
+    schemaVersion: 1,
+    kind: "dronedream-distribution-plan-validation",
+    planVersion: "1.0.0",
+    productDisplayVersion: "1.0.0",
+    sourceCommit: "a".repeat(40),
+    sourceTreeClean: true,
+    planSha256: "b".repeat(64),
+    selection: request.selection,
+    catalog: {
+      registryManifestSha256: "c".repeat(64),
+      capabilityPolicySha256: "d".repeat(64),
+      editionManifestSha256: "e".repeat(64),
+      vehiclePackManifestSha256: "f".repeat(64),
+      vehiclePackPayloadSha256: "1".repeat(64),
+      vehiclePackSignatureState: "missing",
+      validationTier: "contract-only",
+    },
+    requiredModules: ["desktop-core", "runtime-simulation"],
+    optionalModules: [],
+    capabilities: {
+      defaultDecision: "deny",
+      frontendIsAuthority: false,
+      enabledOrConditioned: ["simulation.execute"],
+      denied: ["hardware.arm", "hardware.flight", "hardware.parameter.write"],
+    },
+    rollback: { status: "missing", reference: null },
+    blockers: ["native-apply-not-implemented"],
+    canApply: false,
+    executionAuthorized: false,
+  })),
+}));
+
+vi.mock("../desktop/runtimeSessionContract", async (importOriginal) => {
+  const original = await importOriginal<
+    typeof import("../desktop/runtimeSessionContract")
+  >();
+  return {
+    ...original,
+    verifyRuntimeSessionContract: runtimeSessionContractMocks.verify,
+  };
+});
+
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: openerMocks.openUrl,
+}));
+
+vi.mock("../desktop/bridge", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../desktop/bridge")>();
+  return {
+    ...original,
+    validateDistributionPlan: distributionPlanMocks.validate,
+  };
+});
 
 import { apiClient } from "../api/client";
 import { AppShell } from "../AppShell";
@@ -49,16 +111,6 @@ const readyRuntime = {
   })),
 };
 
-const stoppedRuntime = {
-  ...readyRuntime,
-  running: false,
-  ready: false,
-  components: readyRuntime.components.map((component) => ({
-    ...component,
-    status: component.id === "wsl-runtime" ? "ready" : "stopped",
-  })),
-};
-
 const autoStartableRuntime = {
   ...readyRuntime,
   running: false,
@@ -68,6 +120,17 @@ const autoStartableRuntime = {
     status: component.id === "host-ownership" ? "ready" : "stopped",
   })),
 };
+
+async function openSettingsWorkspace() {
+  fireEvent.click(screen.getByRole("button", { name: /Settings|设置/ }));
+  const quickSettings = screen.getByRole("dialog", {
+    name: /Quick settings|快捷设置/,
+  });
+  fireEvent.click(within(quickSettings).getByRole("button", {
+    name: /All settings|全部设置/,
+  }));
+  return screen.findByRole("region", { name: /Settings|设置/ });
+}
 
 const prerequisites = {
   platform: "windows",
@@ -88,12 +151,18 @@ const prerequisites = {
 describe("desktop runtime access UX", () => {
 afterEach(() => {
   resetDesktopReadinessSession();
+    runtimeSessionContractMocks.verify.mockReset();
+    runtimeSessionContractMocks.verify.mockImplementation(async (report) => report);
+    openerMocks.openUrl.mockReset();
+    openerMocks.openUrl.mockResolvedValue(undefined);
+    distributionPlanMocks.validate.mockClear();
     delete window.__TAURI__;
     window.localStorage.clear();
     vi.restoreAllMocks();
   });
 
   it("keeps read-only pages visible, marks runtime routes, and avoids backend calls", async () => {
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "lab");
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return missingRuntime;
@@ -123,21 +192,37 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Runtime data is not available yet"))
+    expect(await screen.findByText("Runtime disconnected"))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Dashboard" }))
+    expect(screen.getByRole("link", { name: "Experiment" }))
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "ECE498BH" }))
-      .not.toHaveClass("runtime-locked");
-    expect(screen.queryByRole("link", { name: "Experiment" }))
-      .not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Evidence Review" }))
+      .toHaveAttribute("href", "/lab/validation");
+    expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
+    const workspace = await openSettingsWorkspace();
+    fireEvent.click(within(workspace).getByRole("tab", { name: "ECE498BH" }));
+    const courseLink = within(workspace).getByRole("link", { name: "Open course" });
+    expect(courseLink).toHaveAttribute("target", "_blank");
+    fireEvent.click(courseLink);
+    await waitFor(() => {
+      expect(openerMocks.openUrl).toHaveBeenCalledWith(
+        "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+      );
+    });
+    openerMocks.openUrl.mockRejectedValueOnce(new Error("browser unavailable"));
+    fireEvent.click(courseLink);
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
+    expect(await screen.findByRole("alert"))
+      .toHaveTextContent(/course page could not be opened/i);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(4);
+      .querySelectorAll("a")).toHaveLength(7);
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);
@@ -146,7 +231,7 @@ afterEach(() => {
       await router.navigate("/history");
     });
     await waitFor(() => {
-      expect(screen.getByText("Runtime data is not available yet")).toBeInTheDocument();
+      expect(screen.getByText("Runtime disconnected")).toBeInTheDocument();
     });
     expect(listJobs).not.toHaveBeenCalled();
 
@@ -194,17 +279,19 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Runtime data is not available yet")).toBeInTheDocument();
+    expect(await screen.findByText("Runtime disconnected")).toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const workspace = await openSettingsWorkspace();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
         .toHaveLength(1);
     });
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
     await act(async () => {
       await router.navigate("/history");
     });
@@ -219,9 +306,6 @@ afterEach(() => {
     });
     expect(await screen.findByRole("link", { name: "+ New experiment" }))
       .toHaveAttribute("href", "/jobs/new");
-    expect(screen.queryByRole("link", { name: "Experiment" }))
-      .not.toBeInTheDocument();
-
     router.dispose();
     queryClient.clear();
   });
@@ -256,18 +340,25 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Runtime data is not available yet"))
+    expect(await screen.findByText("Runtime disconnected"))
       .toBeInTheDocument();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const workspace = await openSettingsWorkspace();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
     expect(await screen.findByText("The local runtime could not start"))
       .toBeInTheDocument();
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
     expect(screen.getAllByRole("button", { name: "Open settings" }).length)
       .toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Open settings" })[0]);
+    const targetedWorkspace = await screen.findByRole("region", { name: "Settings" });
+    expect(within(targetedWorkspace).getByRole("tab", { name: "Runtime & updates" }))
+      .toHaveAttribute("aria-selected", "true");
+    fireEvent.click(within(targetedWorkspace).getByRole("button", { name: "Back to app" }));
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(1);
     await act(async () => {
@@ -281,10 +372,14 @@ afterEach(() => {
     queryClient.clear();
   });
 
-  it("does not auto-start from the explicit setup route", async () => {
+  it("auto-starts exactly once from the real setup route without a manual button", async () => {
     const invoke = vi.fn(async (command: string) => {
+      if (command === "get_installer_runtime_intent") {
+        return { status: "none", mode: null, targetRoot: null, message: null };
+      }
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return autoStartableRuntime;
+      if (command === "start_runtime") return readyRuntime;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
@@ -292,7 +387,7 @@ afterEach(() => {
       {
         path: "/",
         element: <AppShell />,
-        children: [{ path: "desktop/setup", element: <div>Setup placeholder</div> }],
+        children: [{ path: "desktop/setup", element: <DesktopSetup /> }],
       },
     ], { initialEntries: ["/desktop/setup"] });
 
@@ -302,12 +397,23 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Setup placeholder")).toBeInTheDocument();
     await waitFor(() => {
-      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
+      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status").length)
+        .toBeGreaterThanOrEqual(2);
+    });
+    await waitFor(() => {
+      expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
         .toHaveLength(1);
     });
-    expect(invoke.mock.calls.some(([command]) => command === "start_runtime")).toBe(false);
+    expect(await screen.findByText("The installed runtime is ready."))
+      .toBeInTheDocument();
+    expect(await screen.findByRole("button", {
+      name: "Sign in and enter DroneDream",
+    })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Start runtime" }))
+      .not.toBeInTheDocument();
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(1);
 
     router.dispose();
   });
@@ -346,16 +452,18 @@ afterEach(() => {
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const workspace = await openSettingsWorkspace();
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "简体中文" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "General" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "简体中文" }));
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "English" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "English" }));
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
         .toHaveLength(1);
@@ -365,30 +473,25 @@ afterEach(() => {
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(1);
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Check environment" }))
+      expect(within(workspace).getByRole("button", { name: "Check environment" }))
         .not.toBeDisabled();
     });
-    fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
 
     router.dispose();
   });
 
-  it("syncs a focus recheck from ready to stopped into the global gate", async () => {
-    let currentRuntime = readyRuntime;
-    window.__TAURI__ = {
-      core: {
-        invoke: vi.fn(async (command: string) => {
-          if (command === "get_installer_runtime_intent") {
-            return { status: "none", mode: null, targetRoot: null, message: null };
-          }
-          if (command === "probe_system_prerequisites") return prerequisites;
-          if (command === "probe_runtime_status") {
-            return currentRuntime;
-          }
-          throw new Error(`Unexpected command: ${command}`);
-        }),
-      },
-    };
+  it("keeps a ready launcher frozen on focus and changes it only after a manual check", async () => {
+    let currentRuntime: typeof readyRuntime | typeof missingRuntime = readyRuntime;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "get_installer_runtime_intent") {
+        return { status: "none", mode: null, targetRoot: null, message: null };
+      }
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return currentRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
     const router = createMemoryRouter([
       {
         path: "/",
@@ -412,15 +515,32 @@ afterEach(() => {
       .not.toBeInTheDocument();
     expect(screen.queryByText("This feature needs DroneDreamRuntime"))
       .not.toBeInTheDocument();
+    const initialRuntimeProbeCount = invoke.mock.calls.filter(
+      ([command]) => command === "probe_runtime_status",
+    ).length;
 
-    currentRuntime = stoppedRuntime;
+    currentRuntime = missingRuntime;
     fireEvent.focus(window);
 
-    expect(await screen.findByText("DroneDreamRuntime · Installed · Stopped"))
+    await act(async () => Promise.resolve());
+    expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
+    expect(invoke.mock.calls.filter(
+      ([command]) => command === "probe_runtime_status",
+    )).toHaveLength(initialRuntimeProbeCount);
+
+    const workspace = await openSettingsWorkspace();
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
+
+    expect(await screen.findByText("Environment unavailable")).toBeInTheDocument();
+    expect(screen.getByText("DroneDreamRuntime is not installed."))
       .toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByText("Runtime")).toBeInTheDocument();
-    });
+    expect(invoke.mock.calls.filter(
+      ([command]) => command === "probe_runtime_status",
+    )).toHaveLength(initialRuntimeProbeCount + 1);
+    fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "0");
 
     router.dispose();
   });

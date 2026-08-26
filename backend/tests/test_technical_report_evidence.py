@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 
 from scripts.export_technical_report_evidence import (
+    _load_backend_test_receipt,
+    _read_test_log_text,
     build_report_evidence_bundle,
     summarize_scenario_generalization,
     summarize_simulation_coverage,
@@ -32,7 +34,7 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     second = _build_bundle()
 
     assert first == second
-    assert first["schema_version"] == "dronedream.technical-report-evidence.v6"
+    assert first["schema_version"] == "dronedream.technical-report-evidence.v9"
     assert first["source_commit"] == _TEST_SOURCE_COMMIT
     assert first["generated_at"] == _TEST_GENERATED_AT
     assert len(first["bundle_sha256"]) == 64
@@ -40,9 +42,24 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     routing = first["routing"]
     assert routing["evidence_class"] == "development_routing_corpus"
     assert routing["contract_current"] is False
-    assert routing["qualification_scope"] == "archived_evidence_2_4_prompt_1_1"
-    assert routing["current_evidence_schema_version"] == "2.7"
-    assert routing["current_prompt_template_version"] == "1.5"
+    assert routing["qualification_scope"] == "archived_evidence_2_7_prompt_1_6"
+    assert routing["current_evidence_schema_version"] == "2.9"
+    assert routing["current_prompt_template_version"] == "1.7"
+    assert routing["evidence_schema_version"] == "2.7"
+    assert routing["tool_registry_version"] == "2.1"
+    assert routing["prompt_template_version"] == "1.6"
+    assert routing["corpus_sha256"] == (
+        "98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89"
+    )
+    assert routing["prompt_suite_sha256"] == (
+        "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+    )
+    assert routing["generation_config"] == {
+        "temperature": None,
+        "top_p": None,
+        "seed": None,
+        "response_format": "json_schema",
+    }
     assert routing["case_count"] == 24
     assert routing["passed_count"] == 24
     assert routing["pass_rate"] == 1.0
@@ -50,6 +67,12 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     assert routing["uniform_random_expected_pass_rate"] == pytest.approx(5.625 / 24)
     assert routing["qualified"] is True
     assert len(routing["category_rows"]) == 8
+    assert first["sources"]["routing_predictions"]["path"].endswith(
+        "harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json"
+    )
+    assert first["sources"]["routing_predictions"]["sha256"] == (
+        "2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4"
+    )
 
     coverage = first["simulation_coverage"]
     assert coverage["evidence_class"] == "synthetic_mock_campaign"
@@ -155,6 +178,81 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     ):
         assert len(first["sources"][source_name]["sha256"]) == 64
 
+    trigger_ablation = first["harness_reflection_trigger_ablation"]
+    assert trigger_ablation["evidence_class"] == (
+        "deterministic_reflection_trigger_contract_ablation"
+    )
+    assert trigger_ablation["general_causal_benefit_claim_permitted"] is False
+    assert trigger_ablation["optimizer_quality_claim_permitted"] is False
+    assert trigger_ablation["artifact_sha256"] == (
+        "cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38"
+    )
+    assert trigger_ablation["summary"]["case_count"] == 6
+    assert trigger_ablation["summary"]["step_count"] == 7
+    assert trigger_ablation["summary"]["phase_difference_step_count"] == 4
+    assert trigger_ablation["summary"]["all_six_required_triggers_covered"] is True
+
+    outcome_stress = first["harness_reflection_outcome_stress"]
+    assert outcome_stress["evidence_class"] == ("synthetic_mock_long_horizon_component_stress")
+    assert outcome_stress["claim_label"] == "SYNTHETIC_MOCK_PILOT_INFORMED"
+    assert outcome_stress["physical_fidelity"] is False
+    assert outcome_stress["general_causal_benefit_claim_permitted"] is False
+    assert outcome_stress["consistent_holdout_benefit_observed"] is False
+    assert outcome_stress["causal_synthetic_protocol_effect_observed"] is True
+    assert outcome_stress["artifact_sha256"] == (
+        "6da3544651ee56428b6e78f1613fd520c46b789dc3e7f9d44fc8be153dd9f5b3"
+    )
+    assert outcome_stress["summary"]["total_persisted_trials"] == 1588
+    primary = outcome_stress["contrast_summaries"]["no_observed_outcome_reflection"]
+    assert primary["holdout_paired_signs"] == {
+        "comparison_better": 4,
+        "full_better": 1,
+        "tie": 0,
+    }
+    assert primary["realized_trial_paired_signs"] == {
+        "comparison_better": 2,
+        "full_better": 3,
+        "tie": 0,
+    }
+    assert primary["trial_delta_comparison_minus_full_total"] == 44
+
+    assert {
+        "harness_reflection_trigger_ablation",
+        "harness_reflection_trigger_ablation_manifest",
+        "harness_reflection_trigger_ablation_csv",
+        "harness_reflection_trigger_ablation_sha256",
+        "harness_reflection_outcome_stress",
+        "harness_reflection_outcome_stress_manifest",
+        "harness_reflection_outcome_stress_csv",
+        "harness_reflection_outcome_stress_sha256",
+    } <= set(first["sources"])
+
+    cross_job_memory = first["harness_cross_job_memory"]
+    assert cross_job_memory["artifact_sha256"] == (
+        "eba721fd489815ef3c96d4ce03c765e355592e68eb992341b7d2300cc9c8f78b"
+    )
+    assert cross_job_memory["manifest_sha256"] == (
+        "c89855fdccd09697b1d4331ee3d06feac851c83cf3121b27cc84a12ee2ce5d51"
+    )
+    assert cross_job_memory["summary"] == {
+        "case_count": 10,
+        "failed_count": 0,
+        "network_calls": 0,
+        "passed_count": 10,
+        "provider_calls": 0,
+        "provider_identifier_leak_count": 0,
+        "retrieval_negative_count": 8,
+        "retrieval_positive_count": 2,
+        "simulator_runs": 0,
+    }
+    assert all(row["passed"] is True for row in cross_job_memory["case_rows"])
+    assert {
+        "harness_cross_job_memory",
+        "harness_cross_job_memory_manifest",
+        "harness_cross_job_memory_csv",
+        "harness_cross_job_memory_sha256",
+    } <= set(first["sources"])
+
     backend_tests = first["backend_tests"]
     assert backend_tests["source_commit"] == _TEST_SOURCE_COMMIT
     assert backend_tests["full_suite"]["result"] == {
@@ -168,6 +266,14 @@ def test_report_evidence_bundle_recomputes_frozen_metrics() -> None:
     holdout = first["routing_policy_holdout"]
     assert holdout["evidence_class"] == "deterministic_router_policy_holdout"
     assert holdout["corpus_role"] == "locked_holdout"
+    assert holdout["contract_current"] is False
+    assert holdout["qualification_scope"] == (
+        "archived_evidence_2_7_eligibility_policy_1_1"
+    )
+    assert holdout["current_evidence_schema_version"] == "2.9"
+    assert holdout["evidence_schema_version"] == "2.7"
+    assert holdout["tool_registry_version"] == "2.1"
+    assert holdout["eligibility_policy_version"] == "1.1"
     assert holdout["case_count"] == 16
     assert holdout["passed_count"] == 16
     assert holdout["pass_rate"] == 1.0
@@ -214,6 +320,150 @@ def test_report_evidence_refuses_validation_feedback_in_mixed_shift() -> None:
 
     with pytest.raises(ValueError, match="must not enter"):
         summarize_scenario_generalization(payload)
+
+
+def test_report_evidence_rejects_nonpositive_mixed_shift_baseline() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "evaluation_artifacts"
+        / "scenario-generalization-mock-v1.json"
+    )
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["baseline"]["validation_loss"] = 0.0
+
+    with pytest.raises(ValueError, match="baseline validation loss must be positive"):
+        summarize_scenario_generalization(payload)
+
+
+def test_report_evidence_rejects_mixed_shift_candidate_budget_overrun() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "evaluation_artifacts"
+        / "scenario-generalization-mock-v1.json"
+    )
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["evaluated_candidate_count"] = payload["candidate_budget"] + 1
+
+    with pytest.raises(ValueError, match="evaluated candidates exceed"):
+        summarize_scenario_generalization(payload)
+
+
+def test_report_evidence_rejects_focused_check_with_failed_tests(tmp_path: Path) -> None:
+    receipt = json.loads(_TEST_RECEIPT.read_text(encoding="utf-8"))
+    receipt["focused_checks"][0]["result"]["failed"] = 1
+    unsigned = dict(receipt)
+    unsigned.pop("receipt_sha256")
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="passing focused checks"):
+        _load_backend_test_receipt(
+            receipt_path,
+            source_commit=_TEST_SOURCE_COMMIT,
+        )
+
+
+def test_report_evidence_rejects_focused_check_log_count_mismatch(
+    tmp_path: Path,
+) -> None:
+    receipt = json.loads(_TEST_RECEIPT.read_text(encoding="utf-8"))
+    receipt["focused_checks"][0]["result"]["passed"] = 2
+    unsigned = dict(receipt)
+    unsigned.pop("receipt_sha256")
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="does not contain the declared result"):
+        _load_backend_test_receipt(
+            receipt_path,
+            source_commit=_TEST_SOURCE_COMMIT,
+        )
+
+
+def test_report_evidence_rejects_reflection_sidecar_tamper(
+    tmp_path: Path,
+) -> None:
+    sidecar_path = (
+        Path(__file__).resolve().parents[1]
+        / "evaluation_artifacts"
+        / "harness-reflection-trigger-ablation-v1.sha256"
+    )
+    tampered_path = tmp_path / sidecar_path.name
+    tampered_path.write_text(
+        sidecar_path.read_text(encoding="ascii").replace(
+            "d1c7c752",
+            "00000000",
+            1,
+        ),
+        encoding="ascii",
+    )
+
+    with pytest.raises(ValueError, match="does not bind expected files"):
+        build_report_evidence_bundle(
+            source_commit=_TEST_SOURCE_COMMIT,
+            generated_at=_TEST_GENERATED_AT,
+            backend_test_receipt_path=_TEST_RECEIPT,
+            harness_reflection_trigger_ablation_sha256_path=tampered_path,
+        )
+
+
+def test_report_evidence_rejects_receipt_log_count_mismatch(tmp_path: Path) -> None:
+    receipt = json.loads(_TEST_RECEIPT.read_text(encoding="utf-8"))
+    receipt["full_suite"]["result"]["passed"] = 1142
+    unsigned = dict(receipt)
+    unsigned.pop("receipt_sha256")
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="does not contain the declared result"):
+        build_report_evidence_bundle(
+            source_commit=_TEST_SOURCE_COMMIT,
+            generated_at=_TEST_GENERATED_AT,
+            backend_test_receipt_path=receipt_path,
+        )
+
+
+def test_report_evidence_decodes_powershell_utf16le_pytest_logs(tmp_path: Path) -> None:
+    log_path = tmp_path / "pytest.log"
+    log_path.write_bytes("1147 passed in 788.78s (0:13:08)\r\n".encode("utf-16-le"))
+
+    assert "1147 passed in 788.78s" in _read_test_log_text(log_path)
 
 
 def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:
@@ -282,6 +532,30 @@ def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:
         and float(row["evidence_completeness_rate"]) == 1.0
         for row in outcome_rows
     )
+    with (csv_directory / "harness_reflection_trigger_steps.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        trigger_rows = list(csv.DictReader(handle))
+    assert len(trigger_rows) == 7
+    assert sum(row["result_status"] == "causal_contract_difference" for row in trigger_rows) == 4
+    with (csv_directory / "harness_reflection_outcome_comparisons.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        stress_rows = list(csv.DictReader(handle))
+    assert len(stress_rows) == 15
+    assert (
+        sum(row["comparison_arm"] == "no_observed_outcome_reflection" for row in stress_rows) == 5
+    )
+    with (csv_directory / "harness_cross_job_memory_cases.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        memory_rows = list(csv.DictReader(handle))
+    assert len(memory_rows) == 10
+    assert sum(row["passed"] == "True" for row in memory_rows) == 10
+    assert sum(int(row["retrieved_experience_count"]) for row in memory_rows) == 2
     with (csv_directory / "routing_policy_holdout_categories.csv").open(
         encoding="utf-8",
         newline="",
@@ -289,3 +563,15 @@ def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:
         holdout_rows = list(csv.DictReader(handle))
     assert sum(int(row["case_count"]) for row in holdout_rows) == 16
     assert all(float(row["pass_rate"]) == 1.0 for row in holdout_rows)
+
+
+def test_report_evidence_refuses_to_replace_an_existing_bundle(tmp_path: Path) -> None:
+    bundle = _build_bundle()
+    output_path = tmp_path / "evidence.json"
+    write_report_evidence_bundle(bundle, output_path=output_path)
+    frozen = output_path.read_bytes()
+
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        write_report_evidence_bundle(bundle, output_path=output_path)
+
+    assert output_path.read_bytes() == frozen

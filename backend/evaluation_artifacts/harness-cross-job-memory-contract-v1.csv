@@ -1,0 +1,11 @@
+case_id,expected_retrieved_experience_count,retrieved_experience_count,scenario_similarity,provider_identifiers_absent,prompt_binding_changed,passed
+same_user_exact_task_exact_scenario,1,1,1.0,True,True,True
+same_user_exact_task_shifted_scenario,1,1,0.8,True,True,True
+cross_user_isolated,0,0,,True,False,True
+anonymous_user_isolated,0,0,,True,False,True
+task_family_mismatch,0,0,,True,False,True
+parameter_catalog_drift,0,0,,True,False,True
+revoked_excluded,0,0,,True,False,True
+expired_excluded,0,0,,True,False,True
+contract_version_drift_excluded,0,0,,True,False,True
+source_receipt_drift_excluded,0,0,,True,False,True

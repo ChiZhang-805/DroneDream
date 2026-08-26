@@ -1,0 +1,18 @@
+{
+  "api_contract": {
+    "contract_id": "dronedream.managed.telemetry-adapter.v1",
+    "input_schema_version": "dronedream.model-harness-input.v1",
+    "output_schema_version": "dronedream.model-harness-output.v1"
+  },
+  "implementation": {
+    "entrypoint": "compile_telemetry_semantic_contract",
+    "module": "app.simulator.telemetry_evidence",
+    "source_path": "backend/app/simulator/telemetry_evidence.py",
+    "source_sha256": "5a10c8d0754dce9a0231dcfd4d0aac99af0d586e6bef8377d2afa394836d7d4b"
+  },
+  "plugin_id": "dronedream.managed.telemetry-adapter",
+  "schema_version": "dronedream.managed-plugin-manifest.v1",
+  "slot": "telemetry_adapter",
+  "trust": "managed",
+  "version": "1.0.0"
+}

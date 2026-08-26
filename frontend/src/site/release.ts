@@ -1,4 +1,6 @@
 export type WebsiteRelease = {
+  edition?: "universal" | "sim" | "lab" | "field" | "autonomy";
+  buildNumber?: number;
   version: string;
   fileName: string;
   downloadUrl: string;
@@ -11,13 +13,15 @@ export type WebsiteRelease = {
 declare const __DRONEDREAM_RELEASE__: WebsiteRelease;
 
 const developmentFallbackRelease: WebsiteRelease = {
+  edition: "universal",
+  buildNumber: 1753,
   version: "1.0.0",
-  fileName: "DroneDream_1.0.0_x64-setup.exe",
-  downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
-  checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe.sha256",
-  sha256: "c2018379a21fb72a7cf3c4a7f6381d3fa49cf54a03c167a196d950fd651225a4",
-  sizeBytes: 6_605_457,
-  publishedAt: "2026-07-25",
+  fileName: "DroneDream-Universal_1.0.0_x64-setup.exe",
+  downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1753/DroneDream-Universal_1.0.0_x64-setup.exe",
+  checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1753/DroneDream-Universal_1.0.0_x64-setup.exe.sha256",
+  sha256: "389066d5c41a8579be871ea80b8ea55205afc63d4d9e906ffcfcc46df4f5abfc",
+  sizeBytes: 83_123_235,
+  publishedAt: "2026-08-26",
 };
 
 export const fallbackRelease: WebsiteRelease =
@@ -36,7 +40,19 @@ function isIsoCalendarDate(value: string) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function isAllowedArtifactUrl(value: string, expectedArtifactName: string) {
+const editionProducts = {
+  universal: "DroneDream-Universal",
+  sim: "DroneDream-Sim",
+  lab: "DroneDream-Lab",
+  field: "DroneDream-Field",
+  autonomy: "DroneDream-Agent",
+} as const;
+
+function isAllowedArtifactUrl(
+  value: string,
+  expectedArtifactName: string,
+  expectedTag?: string,
+) {
   if (value === `/downloads/${expectedArtifactName}`) return true;
 
   try {
@@ -58,7 +74,8 @@ function isAllowedArtifactUrl(value: string, expectedArtifactName: string) {
     if (separatorIndex <= 0) return false;
     const tag = remainder.slice(0, separatorIndex);
     const artifactName = remainder.slice(separatorIndex + 1);
-    return /^[A-Za-z0-9._-]+$/u.test(tag) && artifactName === expectedArtifactName;
+    return (expectedTag ? tag === expectedTag : /^[A-Za-z0-9._-]+$/u.test(tag)) &&
+      artifactName === expectedArtifactName;
   } catch {
     return false;
   }
@@ -70,7 +87,6 @@ export function isWebsiteRelease(value: unknown): value is WebsiteRelease {
   const hasValidShape = typeof release.version === "string" &&
     /^\d+\.\d+\.\d+$/u.test(release.version) &&
     typeof release.fileName === "string" &&
-    /^DroneDream_[\w.-]+_x64-setup\.exe$/u.test(release.fileName) &&
     typeof release.downloadUrl === "string" &&
     typeof release.checksumUrl === "string" &&
     typeof release.sha256 === "string" &&
@@ -83,10 +99,30 @@ export function isWebsiteRelease(value: unknown): value is WebsiteRelease {
   if (!hasValidShape) return false;
 
   const validatedRelease = release as WebsiteRelease;
-  const expectedFileName = `DroneDream_${validatedRelease.version}_x64-setup.exe`;
+  const hasEditionMetadata = release.edition !== undefined || release.buildNumber !== undefined;
+  let expectedFileName: string;
+  let expectedTag: string | undefined;
+  if (hasEditionMetadata) {
+    if (
+      typeof release.edition !== "string" ||
+      !(release.edition in editionProducts) ||
+      typeof release.buildNumber !== "number" ||
+      !Number.isSafeInteger(release.buildNumber) ||
+      release.buildNumber <= 0
+    ) return false;
+    const edition = release.edition as keyof typeof editionProducts;
+    expectedFileName = `${editionProducts[edition]}_${validatedRelease.version}_x64-setup.exe`;
+    expectedTag = `five-edition-v${validatedRelease.version}-build-${release.buildNumber}`;
+  } else {
+    expectedFileName = `DroneDream_${validatedRelease.version}_x64-setup.exe`;
+  }
   return validatedRelease.fileName === expectedFileName &&
-    isAllowedArtifactUrl(validatedRelease.downloadUrl, expectedFileName) &&
-    isAllowedArtifactUrl(validatedRelease.checksumUrl, `${expectedFileName}.sha256`);
+    isAllowedArtifactUrl(validatedRelease.downloadUrl, expectedFileName, expectedTag) &&
+    isAllowedArtifactUrl(
+      validatedRelease.checksumUrl,
+      `${expectedFileName}.sha256`,
+      expectedTag,
+    );
 }
 
 export function compareReleaseVersions(left: string, right: string) {
@@ -97,4 +133,22 @@ export function compareReleaseVersions(left: string, right: string) {
     if (difference !== 0) return Math.sign(difference);
   }
   return 0;
+}
+
+export function isReleaseCandidateNonDowngrade(
+  candidate: WebsiteRelease,
+  current: WebsiteRelease,
+) {
+  const versionComparison = compareReleaseVersions(candidate.version, current.version);
+  if (versionComparison !== 0) return versionComparison > 0;
+
+  if (
+    candidate.edition === undefined ||
+    current.edition === undefined ||
+    candidate.buildNumber === undefined ||
+    current.buildNumber === undefined
+  ) return true;
+
+  return candidate.edition === current.edition &&
+    candidate.buildNumber >= current.buildNumber;
 }

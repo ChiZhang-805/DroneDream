@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -15,6 +16,36 @@ class ParetoPoint:
     feasible: bool = True
     total_violation: float = 0.0
     payload: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.id, str) or not self.id:
+            raise ValueError("Pareto point id must be a non-empty string")
+        if not self.objectives or any(
+            not isinstance(metric, str) or not metric
+            for metric in self.objectives
+        ):
+            raise ValueError("Pareto objectives require non-empty metric names")
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not math.isfinite(float(value))
+            for value in self.objectives.values()
+        ):
+            raise ValueError("Pareto objective values must be finite numbers")
+        if set(self.directions) != set(self.objectives):
+            raise ValueError("Pareto directions must exactly match objectives")
+        for metric, direction in self.directions.items():
+            if direction not in {"minimize", "maximize"}:
+                raise ValueError(f"unsupported direction for {metric}: {direction}")
+        if not isinstance(self.feasible, bool):
+            raise ValueError("Pareto feasibility must be a boolean")
+        if (
+            isinstance(self.total_violation, bool)
+            or not isinstance(self.total_violation, int | float)
+            or not math.isfinite(float(self.total_violation))
+            or float(self.total_violation) < 0.0
+        ):
+            raise ValueError("Pareto total_violation must be finite and non-negative")
 
 
 def _dominates(first: ParetoPoint, second: ParetoPoint) -> bool:

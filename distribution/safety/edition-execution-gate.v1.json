@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-execution-gate-policy",
+  "policyId": "edition-execution-gate",
+  "policyVersion": "1.0.0",
+  "defaultDecision": "deny",
+  "frontendIsAuthority": false,
+  "hardwareActionHandlersImplemented": false,
+  "capabilityPolicy": {
+    "policyId": "core-capabilities",
+    "policyVersion": "1.0.0",
+    "sha256": "ff15182466b2adf5e5134009096c55a6e110f8af2c247818735facc17874ccc3"
+  },
+  "requiredDecisionLayers": ["native", "backend", "runtime"],
+  "contextBinding": {
+    "canonicalization": "RFC8785-JCS",
+    "hashAlgorithm": "SHA-256",
+    "unknownFieldsDecision": "deny",
+    "requiredFields": [
+      "authorizationRequestId",
+      "actor.accountId",
+      "actor.actorId",
+      "deviceHardwareIdentity.deviceId",
+      "deviceHardwareIdentity.hardwareIdentityHash",
+      "vehicle.vehicleId",
+      "vehicle.packId",
+      "vehicle.packManifestSha256",
+      "vehicle.controllerId",
+      "vehicle.firmwareFamily",
+      "vehicle.firmwareVersion",
+      "vehicle.firmwareIdentityHash",
+      "vehicle.dynamicsConfigHash",
+      "vehicle.sensorConfigHash",
+      "vehicle.payloadConfigHash",
+      "parameterCandidateHash",
+      "compositeInventoryHash",
+      "policy.capabilityPolicySha256",
+      "policy.executionGatePolicySha256",
+      "policy.editionManifestSha256",
+      "source.repositoryCommit",
+      "source.enginePackManifestSha256",
+      "source.runtimeBaseManifestSha256",
+      "editionId",
+      "action",
+      "targetKind",
+      "issuedAt",
+      "expiresAt",
+      "nonce",
+      "sequence"
+    ]
+  },
+  "receiptPolicy": {
+    "appendOnlyAudit": true,
+    "oneTimeConsumption": true,
+    "attemptRecordedBeforeDecision": true,
+    "denyPrecedence": ["failed", "deny", "indeterminate", "missing", "allow"],
+    "maximumRequestTtlSeconds": 300,
+    "maximumOperatorChallengeTtlSeconds": 120,
+    "replayDecision": "deny",
+    "expiredDecision": "deny",
+    "crossContextDecision": "deny"
+  },
+  "qualificationPolicy": {
+    "optimizationCandidateReceiptIsHardwareAuthority": false,
+    "requiresIndependentHoldout": true,
+    "requiredBindings": [
+      "scenarioContractHash",
+      "qualificationLevel",
+      "parameterCandidateHash",
+      "vehicleDynamicsConfigHash",
+      "sensorConfigHash",
+      "payloadConfigHash",
+      "evidenceHash",
+      "holdoutContractHash"
+    ],
+    "acceptedLevels": ["sim", "hitl"]
+  },
+  "structuredEvidence": {
+    "requiredReceiptTypes": [
+      "trusted-qualification",
+      "parameter-snapshot",
+      "transaction-rollback",
+      "operator-confirmation",
+      "preflight",
+      "safety-zone",
+      "control-takeover",
+      "emergency-stop"
+    ],
+    "operatorConfirmationMode": "short-lived-challenge",
+    "booleanConfirmationForbidden": true,
+    "allReceiptsBindAuthorizationRequest": true
+  },
+  "editionBoundaries": {
+    "simDeniedActions": [
+      "external.qgroundcontrol.launch",
+      "hardware.arm",
+      "hardware.discover",
+      "hardware.emergency-stop",
+      "hardware.flight",
+      "hardware.hitl.execute",
+      "hardware.parameter.read",
+      "hardware.parameter.write",
+      "hardware.preflight.execute",
+      "qualification.trusted.consume"
+    ],
+    "fieldDeniedActions": [
+      "hardware.hitl.execute",
+      "qualification.simulation.issue",
+      "simulation.execute",
+      "simulation.parameter.write",
+      "simulation.vehicle.arm"
+    ],
+    "hardwareActionsRequireValidatedSignedPack": true,
+    "zeroValidatedPackDecision": "deny"
+  },
+  "compatibilityBindings": [
+    "repository-source",
+    "composite-inventory",
+    "capability-policy",
+    "edition-manifest",
+    "vehicle-pack-manifest",
+    "vehicle-pack-signature",
+    "validation-tier",
+    "vehicle-identity",
+    "controller",
+    "firmware",
+    "parameter-candidate"
+  ],
+  "quorum": {
+    "requiredLayers": ["native", "backend", "runtime"],
+    "allLayersMustAllow": true,
+    "canonicalContextHashMustMatch": true,
+    "canonicalDecisionHashesRequired": true,
+    "lateAllowCannotOverrideTerminalNonAllow": true,
+    "frontendReceiptAccepted": false
+  },
+  "fakeIssuerPolicy": {
+    "allowedEnvironment": "test",
+    "issuerPrefix": "test-fixture:",
+    "productionDecision": "deny"
+  },
+  "auditPolicy": {
+    "forbiddenFields": [
+      "password",
+      "apiKey",
+      "rawChat",
+      "rawPrompt",
+      "providerRequestId"
+    ],
+    "requiredFields": [
+      "authorizationRequestId",
+      "contextHash",
+      "decision",
+      "reasonCodes",
+      "consumptionState"
+    ]
+  }
+}

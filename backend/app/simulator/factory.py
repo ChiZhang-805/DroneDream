@@ -1,19 +1,19 @@
 """Select the :class:`SimulatorAdapter` implementation at runtime.
 
 Adapter choice is driven by the ``SIMULATOR_BACKEND`` environment variable
-(default ``mock``). The worker calls :func:`get_simulator_adapter` once per
+(default ``real_cli``). The worker calls :func:`get_simulator_adapter` once per
 trial, so operators can switch backends without code changes.
 
-Supported values:
+Product runtime value:
 
-* ``mock`` → :class:`MockSimulatorAdapter` (deterministic workflow tests)
 * ``real_cli`` → :class:`RealCliSimulatorAdapter` (subprocess
   adapter driven by ``REAL_SIMULATOR_COMMAND`` and the JSON file protocol
   documented in ``docs/PHASE8_REAL_SIM_AND_GPT_TUNING.md``)
 
-``real_stub`` remains registered only for isolated test compatibility. It is
-deliberately rejected outside ``APP_ENV=test`` because selecting a backend
-that can only fail is unsafe and misleading in an operator-facing product.
+``mock`` and ``real_stub`` remain registered only for isolated regression
+tests. They are deliberately rejected outside ``APP_ENV=test`` so neither a
+synthetic physics landscape nor a guaranteed-to-fail stub can be selected by
+an operator-facing product.
 
 The ``SIMULATOR_BACKEND`` env var, when set, overrides every job's
 ``simulator_backend`` column. Leave it unset to let per-job UI selection take
@@ -30,13 +30,13 @@ from app.simulator.mock import MockSimulatorAdapter
 from app.simulator.real_cli import RealCliSimulatorAdapter
 from app.simulator.real_stub import RealSimulatorAdapterStub
 
-DEFAULT_BACKEND = "mock"
+DEFAULT_BACKEND = "real_cli"
 
 _PUBLIC_REGISTRY: dict[str, type[SimulatorAdapter]] = {
-    "mock": MockSimulatorAdapter,
     "real_cli": RealCliSimulatorAdapter,
 }
 _TEST_ONLY_REGISTRY: dict[str, type[SimulatorAdapter]] = {
+    "mock": MockSimulatorAdapter,
     "real_stub": RealSimulatorAdapterStub,
 }
 _REGISTRY = {**_PUBLIC_REGISTRY, **_TEST_ONLY_REGISTRY}

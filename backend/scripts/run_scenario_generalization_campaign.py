@@ -3,12 +3,25 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-from app.optimization.scenario_generalization_campaign import (
+BACKEND = Path(__file__).resolve().parents[1]
+while str(BACKEND) in sys.path:
+    sys.path.remove(str(BACKEND))
+sys.path.insert(0, str(BACKEND))
+
+import app  # noqa: E402
+from app.optimization.scenario_generalization_campaign import (  # noqa: E402
     run_scenario_generalization_campaign,
     write_frozen_scenario_generalization_artifact,
 )
+
+
+def _assert_local_backend_import() -> None:
+    app_path = Path(app.__file__).resolve()
+    if not app_path.is_relative_to(BACKEND):
+        raise RuntimeError(f"imported app from {app_path}, expected it under {BACKEND}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,6 +36,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    _assert_local_backend_import()
     args = parse_args()
     artifact = run_scenario_generalization_campaign()
     write_frozen_scenario_generalization_artifact(args.output, artifact)

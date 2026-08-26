@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-release-promotion",
+  "promotionId": "sim-1.0.0-planned-fixture",
+  "promotionVersion": "1.0.0",
+  "state": "planned",
+  "blockers": [
+    "The composite installation is planned and contains contract-only assets.",
+    "The long-lived SIM product branch has not received a verified promotion."
+  ],
+  "sourceCommit": "6b50f86ed80c190b816f19d06de143a328bda7e2",
+  "commonCoreHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "productDisplayVersion": "1.0.0",
+  "edition": {
+    "editionId": "sim",
+    "editionManifestSha256": "74bf27e5e607c180cc939d0e38b65149ba8c4d6bb455fb4ca78d00a04c53c95b",
+    "compositeManifestSha256": "3a95397cb3c9cd897bbc2986061e5b8fad249446096285fea217e1f4dae57dff"
+  },
+  "branchPolicy": {
+    "targetBranch": "codex/software-sim",
+    "creationState": "long-lived-product-branch",
+    "proposedHeadCommit": "6b50f86ed80c190b816f19d06de143a328bda7e2",
+    "headClassification": "exact-source",
+    "metadataOnlyChangedPaths": [],
+    "prOnly": true,
+    "forcePushAllowed": false
+  },
+  "artifact": {
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "bytes": 0,
+    "authenticodeState": "not-signed",
+    "updaterSignatureState": "not-issued"
+  },
+  "runtimeBase": {
+    "manifestSha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "artifactSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "buildId": "fixture-runtime"
+  },
+  "enginePack": {
+    "manifestSha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "artifactSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "buildId": "fixture-engine"
+  },
+  "vehiclePacks": [
+    {
+      "packId": "fixture-x500-contract",
+      "manifestSha256": "c46bfeb3f9712e230a39204b33c1108de6092236489480f51887d6304cea33c7",
+      "artifactSha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    }
+  ],
+  "capabilities": [
+    "qualification.simulation.issue",
+    "simulation.execute",
+    "simulation.parameter.write",
+    "simulation.vehicle.arm",
+    "updater.module.apply",
+    "vehicle-pack.install"
+  ],
+  "validationTier": "sim-runtime-contract",
+  "licenseNotice": {
+    "path": "licenses/THIRD_PARTY_NOTICES.md",
+    "sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "sizeBytes": 10
+  },
+  "supersedes": [],
+  "rollback": {
+    "policy": "previous-verified-promotion",
+    "targetPromotionId": null,
+    "targetArtifactSha256": null
+  }
+}

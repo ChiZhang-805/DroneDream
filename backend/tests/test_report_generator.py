@@ -7,9 +7,10 @@ the `/api/v1/jobs/{job_id}/report` endpoint's failure-path behaviour.
 
 from __future__ import annotations
 
-import importlib
+import hashlib
 import json
-import sys
+import struct
+import zlib
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,15 +21,16 @@ from sqlalchemy.exc import DatabaseError
 
 
 def _clear_settings_cache() -> None:
-    """Clear the currently loaded config module, not a stale pre-reload alias."""
+    """Clear the process-wide settings cache."""
 
-    config_module = importlib.import_module("app.config")
+    from app import config as config_module
+
     config_module.get_settings.cache_clear()
 
 
 @pytest.fixture()
 def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
-    """Reload the backend against an isolated SQLite DB."""
+    """Bind the backend to an isolated SQLite DB."""
 
     db_path = tmp_path / "report.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
@@ -38,40 +40,17 @@ def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
-    models_was_loaded = "app.models" in sys.modules
-
     import app.db as db_module
-
-    importlib.reload(db_module)
-
-    if models_was_loaded:
-        models_module = importlib.reload(sys.modules["app.models"])
-    else:
-        models_module = importlib.import_module("app.models")
-
-    import app.services.jobs as jobs_service_module
-
-    importlib.reload(jobs_service_module)
-
+    import app.models as models_module
     import app.orchestration.aggregation as aggregation_module
-    import app.orchestration.constants as constants_module
-    import app.orchestration.events as events_module
     import app.orchestration.job_manager as job_manager_module
     import app.orchestration.metrics as metrics_module  # noqa: F401
-    import app.orchestration.optimizer as optimizer_module
     import app.orchestration.report_generator as report_generator_module
     import app.orchestration.runner as runner_module
     import app.orchestration.trial_executor as trial_executor_module
+    import app.services.jobs as jobs_service_module
 
-    importlib.reload(constants_module)
-    importlib.reload(optimizer_module)
-    importlib.reload(events_module)
-    importlib.reload(job_manager_module)
-    importlib.reload(trial_executor_module)
-    importlib.reload(report_generator_module)
-    importlib.reload(aggregation_module)
-    importlib.reload(runner_module)
-
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
 
     yield {
@@ -114,6 +93,14 @@ def _run_job_to_completion(
     req = schemas.JobCreateRequest(
         optimizer_strategy=optimizer_strategy,
         simulator_backend="mock",
+        # These tests exercise multi-candidate report and tamper-rejection
+        # paths.  Keep the baseline below the preregistered qualification bar
+        # so the product's default first-qualified policy does not correctly
+        # stop before an optimizer candidate is generated.
+        acceptance_criteria=schemas.AcceptanceCriteria(
+            target_rmse=0.01,
+            min_pass_rate=1.0,
+        ),
         **request_kwargs,
     )
     with db_module.SessionLocal() as db:
@@ -149,6 +136,70 @@ def test_summary_text_covers_baseline_and_optimized(ctx):
     assert "Baseline achieved aggregated score" in text
     assert "Optimizer candidate" in text or "No optimizer candidate beat the baseline" in text
     assert "No failure or instability flags" in text or "Watch-outs" in text
+
+
+def test_summary_text_handles_incomplete_diagnostic_metrics(ctx):
+    models = ctx["models"]
+    report_generator = ctx["report_generator"]
+    baseline = models.CandidateParameterSet(
+        id="cand_partial_baseline",
+        job_id="job_partial",
+        generation_index=0,
+        source_type="baseline",
+        label="baseline",
+        parameter_json={},
+        is_baseline=True,
+    )
+    partial_aggregate = {
+        "aggregated_score": 1.25,
+        "rmse": None,
+        "completion_time": None,
+    }
+
+    text = report_generator.generate_summary_text(
+        best=baseline,
+        baseline_agg=partial_aggregate,
+        best_agg=partial_aggregate,
+        baseline_trials=[],
+        best_trials=[],
+    )
+
+    assert "aggregated score 1.2500" in text
+    assert "RMSE unavailable" in text
+    assert "completion unavailable" in text
+    assert "no best-candidate trial rows were available" in text
+
+
+def test_summary_text_does_not_recommend_a_diagnostic_baseline(ctx):
+    models = ctx["models"]
+    report_generator = ctx["report_generator"]
+    baseline = models.CandidateParameterSet(
+        id="cand_unqualified_baseline",
+        job_id="job_unqualified",
+        generation_index=0,
+        source_type="baseline",
+        label="baseline",
+        parameter_json={},
+        is_baseline=True,
+        is_best=False,
+    )
+    aggregate = {
+        "aggregated_score": 3.4332,
+        "rmse": 8.4936,
+        "completion_time": 38.808,
+    }
+
+    text = report_generator.generate_summary_text(
+        best=baseline,
+        baseline_agg=aggregate,
+        best_agg=aggregate,
+        baseline_trials=[],
+        best_trials=[],
+    )
+
+    assert "No candidate satisfied the publication and evidence gates" in text
+    assert "diagnostic comparison fallback" in text
+    assert "not a validated recommendation" in text
 
 
 def test_bound_report_projection_seals_compatibility_and_evidence_fields(
@@ -478,11 +529,11 @@ def test_ensure_job_artifacts_is_idempotent(ctx):
         second = rg.ensure_job_artifacts(db, job=job, report_body=report_body, best=best)
         db.commit()
 
-        assert len(first) == 4
+        assert len(first) == 5
         assert second == []
 
         rows = db.query(models.Artifact).filter(models.Artifact.owner_id == job.id).all()
-        assert len(rows) == 4
+        assert len(rows) == 5
 
 
 def test_real_cli_job_artifacts_are_real_files_and_idempotent(ctx, tmp_path, monkeypatch):
@@ -649,6 +700,99 @@ def test_real_cli_artifact_regeneration_mismatch_preserves_verified_bytes(
         assert report_row.digest_receipt.evidence_id == sealed_evidence_id
 
 
+def test_unregistered_immutable_artifact_mismatch_is_not_overwritten(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from app.storage.integrity import ArtifactIntegrityError
+
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    original = b"unregistered bytes from an interrupted transaction"
+    destination.write_bytes(original)
+
+    with pytest.raises(
+        ArtifactIntegrityError,
+        match="unregistered immutable artifact bytes differ",
+    ):
+        rg._publish_immutable_artifact(destination, b'{"new":"content"}\n')
+
+    assert destination.read_bytes() == original
+
+
+def test_unregistered_exact_immutable_artifact_is_recovered_without_rewrite(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    content = b'{"recover":"exact bytes"}\n'
+    destination.write_bytes(content)
+    original_mtime = destination.stat().st_mtime_ns
+
+    rg._publish_immutable_artifact(destination, content)
+
+    assert destination.read_bytes() == content
+    assert destination.stat().st_mtime_ns == original_mtime
+
+
+def test_failed_immutable_artifact_write_removes_only_its_partial_file(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+
+    def fail_fsync(descriptor: int) -> None:
+        del descriptor
+        raise OSError("injected fsync failure")
+
+    monkeypatch.setattr(rg.os, "fsync", fail_fsync)
+    with pytest.raises(OSError, match="injected fsync failure"):
+        rg._publish_immutable_artifact(destination, b"partial bytes")
+
+    assert not destination.exists()
+
+
+def test_immutable_artifact_rejects_symlink_destination(
+    ctx,
+    tmp_path,
+    monkeypatch,
+):
+    from app.storage.integrity import ArtifactIntegrityError
+
+    rg = ctx["report_generator"]
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+    _clear_settings_cache()
+    outside = tmp_path / "outside.txt"
+    outside.write_bytes(b"outside bytes")
+    destination = tmp_path / "jobs" / "job_test" / "job_artifacts" / "report.json"
+    destination.parent.mkdir(parents=True)
+    try:
+        destination.symlink_to(outside)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
+
+    with pytest.raises(
+        ArtifactIntegrityError,
+        match="not a regular file",
+    ):
+        rg._publish_immutable_artifact(destination, b"replacement")
+
+    assert outside.read_bytes() == b"outside bytes"
+
+
 def test_real_cli_pdf_artifact_upsert_is_idempotent(ctx, tmp_path, monkeypatch):
     rg = ctx["report_generator"]
     models = ctx["models"]
@@ -743,8 +887,37 @@ def test_pdf_renderer_uses_unicode_cid_font_for_chinese_text() -> None:
     assert "蝶 梦 水 云 乡".encode("utf-16-be").hex().upper().encode("ascii") in pdf
 
 
-def test_free_pdf_renderer_draws_brand_watermark_on_every_page() -> None:
-    from app.services.pdf_report import _build_pdf
+def test_report_watermark_asset_is_the_only_transparent_image_source() -> None:
+    from app.services.pdf_report import _REPORT_WATERMARK_PATH, _load_report_watermark
+
+    image_files = sorted(
+        path.name
+        for path in _REPORT_WATERMARK_PATH.parent.iterdir()
+        if path.suffix.lower() in {".png", ".webp", ".gif", ".jpg", ".jpeg"}
+    )
+    assert image_files == ["report-watermark.png"]
+
+    payload = _REPORT_WATERMARK_PATH.read_bytes()
+    assert payload[:8] == b"\x89PNG\r\n\x1a\n"
+    assert payload[12:16] == b"IHDR"
+    width, height, bit_depth, color_type, compression, filtering, interlace = struct.unpack(
+        ">IIBBBBB", payload[16:29]
+    )
+    assert (width, height) == (512, 512)
+    assert (bit_depth, color_type, compression, filtering, interlace) == (8, 6, 0, 0, 0)
+
+    watermark = _load_report_watermark()
+    assert len(watermark.rgb) == width * height * 3
+    assert len(watermark.alpha) == width * height
+    assert min(watermark.alpha) == 0
+    assert max(watermark.alpha) == 255
+    assert watermark.source_sha256 == hashlib.sha256(payload).hexdigest()
+
+
+def test_free_pdf_renderer_embeds_canonical_brand_watermark_on_every_page() -> None:
+    from app.services.pdf_report import _build_pdf, _load_report_watermark
+
+    watermark = _load_report_watermark()
 
     pdf = _build_pdf(
         [f"report evidence line {index}" for index in range(120)],
@@ -754,8 +927,12 @@ def test_free_pdf_renderer_draws_brand_watermark_on_every_page() -> None:
     assert b"/Count 3" in pdf
     assert pdf.count(b"% DD-FREE-REPORT-WATERMARK-V1") == 3
     assert b"/CA 0.18 /ca 0.18" in pdf
-    assert b"0.45 0.16 0.88 RG" in pdf
-    assert b"0.92 0.17 0.57 RG" in pdf
+    assert pdf.count(b"/DDWatermark Do") == 3
+    assert pdf.count(b"/Subtype /Image") == 2
+    assert b"/SMask 6 0 R" in pdf
+    assert f"/DDSourceSHA256 ({watermark.source_sha256})".encode("ascii") in pdf
+    assert zlib.compress(watermark.rgb, level=9) in pdf
+    assert zlib.compress(watermark.alpha, level=9) in pdf
 
     paid_pdf = _build_pdf(
         [f"report evidence line {index}" for index in range(120)],
@@ -763,6 +940,9 @@ def test_free_pdf_renderer_draws_brand_watermark_on_every_page() -> None:
     )
     assert b"/Count 3" in paid_pdf
     assert b"DD-FREE-REPORT-WATERMARK" not in paid_pdf
+    assert b"/DDWatermark" not in paid_pdf
+    assert b"/DDSourceSHA256" not in paid_pdf
+    assert b"/Subtype /Image" not in paid_pdf
 
 
 def test_job_report_records_parameter_lineage_feedback_and_rationale(ctx):
@@ -1302,6 +1482,10 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
                 "wind_gusts": {"enabled": True},
                 "service_token": "should-not-appear",
                 "nested": {"db_password": "do-not-leak"},
+                "credential": "credential-do-not-leak",
+                "authorization": "Bearer authorization-do-not-leak",
+                "cookie": "session=cookie-do-not-leak",
+                "bearer": "bearer-do-not-leak",
             },
         )
         db.add(job)
@@ -1334,8 +1518,31 @@ def test_repro_manifest_excludes_sensitive_values(ctx, tmp_path, monkeypatch):
         assert "db-secret" not in text
         assert "should-not-appear" not in text
         assert "do-not-leak" not in text
+        assert "credential-do-not-leak" not in text
+        assert "authorization-do-not-leak" not in text
+        assert "cookie-do-not-leak" not in text
+        assert "bearer-do-not-leak" not in text
         assert "encrypted_api_key" not in text
         assert "APP_SECRET_KEY" not in text
+
+
+def test_repro_payload_sanitizer_rejects_common_credential_fields() -> None:
+    repro_manifest = __import__(
+        "app.orchestration.repro_manifest",
+        fromlist=["sanitize_payload"],
+    )
+
+    sanitized = repro_manifest.sanitize_payload(
+        {
+            "credential": "credential-value",
+            "authorization": "Bearer authorization-value",
+            "cookie": "session=cookie-value",
+            "bearer": "bearer-value",
+            "authoritative_evidence": "retain-normal-field",
+        }
+    )
+
+    assert sanitized == {"authoritative_evidence": "retain-normal-field"}
 
 
 def test_build_job_report_lines_includes_new_sections(ctx):
@@ -1458,15 +1665,9 @@ def test_build_job_report_lines_includes_new_sections(ctx):
 
 
 def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     job_id = _run_job_to_completion(
         ctx,
@@ -1479,7 +1680,7 @@ def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
         expected_evidence_id = job.report.winner_evidence_json["evidence_id"]
         expected_receipt_id = job.winner_freeze.id
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         response = client.get(f"/api/v1/jobs/{job_id}/report")
 
     assert response.status_code == 200
@@ -1488,15 +1689,9 @@ def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
 
 
 def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     job_id = _run_job_to_completion(
         ctx,
@@ -1510,7 +1705,7 @@ def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
         job.winner_freeze.winner_candidate_id = "cand_tampered"
         db.commit()
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         response = client.get(f"/api/v1/jobs/{job_id}/report")
 
     assert response.status_code == 409
@@ -1520,15 +1715,9 @@ def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
 def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
     """A FAILED job returns a structured JOB_FAILED error with context."""
 
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
@@ -1550,7 +1739,7 @@ def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
         job_ref.latest_error_message = "All baseline trials failed; cannot produce a report."
         db.commit()
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         resp = client.get(f"/api/v1/jobs/{job_id}/report")
         assert resp.status_code == 409
         body = resp.json()
@@ -1562,15 +1751,9 @@ def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
 
 
 def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
@@ -1587,7 +1770,7 @@ def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
         job_id = job.id
         jobs_service.cancel_job(db, job_id)
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         resp = client.get(f"/api/v1/jobs/{job_id}/report")
         assert resp.status_code == 409
         body = resp.json()
@@ -1598,18 +1781,12 @@ def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
 
 
 def test_job_detail_includes_recent_events(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
 
+    import app.main as main_module
+
     job_id = _run_job_to_completion(ctx)
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         body = client.get(f"/api/v1/jobs/{job_id}").json()["data"]
 
     events = body.get("recent_events")
@@ -1626,19 +1803,13 @@ def test_job_detail_includes_recent_events(ctx):
 
 
 def test_artifacts_endpoint_exposes_job_artifacts(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     job_id = _run_job_to_completion(ctx)
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         body = client.get(f"/api/v1/jobs/{job_id}/artifacts").json()["data"]
 
     assert isinstance(body, list)

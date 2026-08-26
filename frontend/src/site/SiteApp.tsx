@@ -4,6 +4,11 @@ import { BrandLockup } from "../components/BrandLockup";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
+import { getManagedModelUsage } from "../features/settings/cloudModelAccess";
+import {
+  getOrganizationAccess,
+  type OrganizationAccess,
+} from "../features/organization/organizationConsole";
 import {
   captchaProtectionConfigured,
   turnstileSiteKey,
@@ -11,12 +16,22 @@ import {
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
+import { headerDownloadCatalog } from "./downloadCatalog";
 import { ManualPage } from "./ManualPage";
+import { OAuthConsentPage } from "./OAuthConsentPage";
+import { authorizationIdFromLocation } from "./oauthConsentPolicy";
+import { OrganizationPage } from "./OrganizationPage";
 import { PricingPage } from "./PricingPage";
+import { ProductPage } from "./ProductPage";
 import {
-  compareReleaseVersions,
+  fallbackEditionAvailability,
+  isEditionAvailabilityDocument,
+  type EditionAvailabilityDocument,
+} from "./editionAvailability";
+import {
   fallbackRelease,
   formatBinarySize,
+  isReleaseCandidateNonDowngrade,
   isWebsiteRelease,
   type WebsiteRelease,
 } from "./release";
@@ -26,6 +41,23 @@ const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`
 const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 const COMMUNITY_GUIDELINES_URL = `${GITHUB_URL}/blob/main/COMMUNITY_GUIDELINES.md`;
 
+type AuthMode =
+  | "sign-in"
+  | "register"
+  | "recovery-choice"
+  | "recovery-sign-in"
+  | "recovery-password"
+  | "reset-update";
+
+const WEBSITE_DRONE_THEME = Object.freeze({
+  primary: 0x68e8ff,
+  secondary: 0x9b72ff,
+  tertiary: 0xf166d8,
+  darkSurface: 0x070913,
+  fog: 0x070913,
+  gridMinor: 0x34244f,
+});
+
 const content = {
   en: {
     skip: "Skip to content",
@@ -33,8 +65,8 @@ const content = {
     metaDescription: "Configure, optimize, simulate, and compare PX4 control parameters in one local Windows workflow.",
     navLabel: "Primary navigation",
     nav: [
-      ["Product", "/pricing/"],
-      ["Workflow", "/"],
+      ["Product", "/product/"],
+      ["Pricing", "/pricing/"],
       ["Manual", "/manual/"],
       ["Community", "/community/"],
     ],
@@ -43,7 +75,19 @@ const content = {
     menu: "Open navigation",
     closeMenu: "Close navigation",
     downloadShort: "Download",
+    downloadMenuTitle: "Choose your DroneDream edition",
+    downloadMenuHint: "Windows 10 / 11 · x64 · Version 1.0.0",
+    downloadDescriptions: {
+      universal: "The complete workspace for cross-product orchestration",
+      sim: "Repeatable PX4 and Gazebo simulation experiments",
+      lab: "Simulation-to-hardware validation and calibration",
+      field: "Guarded real-device operation and field tuning",
+      autonomy: "Natural-language autonomous mission workflows",
+    },
     console: "Console",
+    organization: "Manage organization",
+    accountPlan: "Plan",
+    businessPlan: "Business",
     signIn: "Sign in",
     register: "Register",
     account: "Account",
@@ -64,12 +108,27 @@ const content = {
     passwordMismatch: "The two passwords do not match.",
     codeRequired: "Send and enter the verification code before creating the account.",
     completeCaptcha: "Complete the security check before continuing.",
-    registerNow: "New to DroneDream? Register now",
-    backToSignIn: "Already registered? Sign in",
+    accountRequestFailed: "The account request could not be completed. Please try again.",
+    registerNow: "Register",
+    backToSignIn: "Back to sign in",
+    forgotPassword: "Forgot password",
+    recoveryTitle: "Recover account",
+    recoveryCodeSignIn: "Sign in with an email code",
+    recoveryPassword: "Reset password with an email code",
+    recoverySignInTitle: "Email code sign-in",
+    recoveryPasswordTitle: "Reset password",
+    recoveryCodeRequired: "Send and enter the email verification code first.",
+    recoveryCodeSent: "Verification code sent.",
+    signInWithCode: "Sign in",
+    resetAndSignIn: "Reset password and sign in",
+    resetUpdateTitle: "Choose a new password",
+    resetUpdateBody: "This email link verified the reset request. Choose a new password to finish.",
+    updatePassword: "Update password",
+    passwordUpdated: "Your password has been updated.",
     openConsole: "Open console",
     signOut: "Sign out",
     closeAuth: "Close account dialog",
-    eyebrow: "LOCAL-FIRST PX4 / GAZEBO TUNING",
+    eyebrow: "AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION",
     heroLead: "Tune with evidence.",
     heroAccent: "Fly with confidence.",
     downloadWindows: "Download for Windows",
@@ -81,7 +140,7 @@ const content = {
     productEyebrow: "ONE CONTINUOUS WORKFLOW",
     productTitle: "From question to defensible result.",
     productBody:
-      "Parameters, simulations, decisions, and reports stay together in one reproducible experiment.",
+      "Keep parameters, simulations, decisions, and reports in one reproducible study.",
     demoPhases: [
       {
         label: "01 · Define",
@@ -98,14 +157,14 @@ const content = {
       },
       {
         label: "02 · Search",
-        title: "Choose the next candidate",
+        title: "Choose the next trial",
         body: [
           "Read history, failed trials, and new feedback.",
           "Keep bounds, coupling, and feasibility active.",
           "Let Bayesian, trust-region, evolution compete.",
           "Spend budget where the model still learns.",
           "Propose candidates with clear information value.",
-          "Turn gain guessing into disciplined, evidence-led search.",
+          "Turn gain guesses into evidence-led search.",
         ],
         status: "Candidate 24 / 60",
       },
@@ -113,12 +172,12 @@ const content = {
         label: "03 · Verify",
         title: "Compare the evidence",
         body: [
-          "Check feasibility, error, overshoot, and settling.",
-          "Compare repeats, robustness, and Pareto trade-offs.",
+          "Check feasibility, error, overshoot, and settle time.",
+          "Compare repeats, robustness, and Pareto fronts.",
           "Reject winners that break hidden constraints.",
-          "Keep logs, metrics, seeds, and snapshots together.",
+          "Keep logs, metrics, seeds, and snapshots linked.",
           "Preserve evidence for accepted control settings.",
-          "Make every result auditable by the entire flight team.",
+          "Make every result auditable by the flight team.",
         ],
         status: "Acceptance passed",
       },
@@ -138,10 +197,10 @@ const content = {
     capabilitiesEyebrow: "BUILT FOR ITERATION",
     capabilitiesTitle: "A local flight lab, not a parameter form.",
     capabilities: [
-      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore only the control surface your experiment needs, leaving unrelated dimensions untouched."], "sliders"],
-      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain before ranking the final winner under the same independent validation suite."], "orbit"],
-      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Resume, diagnose, and clean failed simulations before the next isolated trial begins safely."], "shield"],
-      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce every decision from evidence together with its complete experiment history."], "report"],
+      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore the needed control surface; leave unrelated dimensions safely untouched."], "sliders"],
+      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain under the same independent suite before ranking the final winner."], "orbit"],
+      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Diagnose and clean failed simulations before the next isolated trial begins safely."], "shield"],
+      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce each decision from its complete, fully linked evidence trail."], "report"],
     ],
     capabilityOpen: "Open details for",
     capabilityBack: "Return to overview",
@@ -168,14 +227,14 @@ const content = {
         ["Dedicated WSL2", "Runs the DroneDream distribution independently and never reuses or modifies a personal Ubuntu environment."],
         ["Trial isolation", "Assigns each PX4 / Gazebo run its own ports, process group, temporary files, and termination boundary safely."],
         ["Pinned inputs", "Records firmware, model, world, route, parameters, seeds, and environment effects before repeatable execution."],
-        ["Recovery and cleanup", "Exports failure diagnostics, preserves artifacts, and safely removes abandoned processes before the next clean launch."],
+        ["Recovery and cleanup", "Preserves failure evidence, then removes abandoned processes so the next isolated launch starts cleanly."],
       ],
       [
         ["Configuration snapshot", "Stores the vehicle, firmware, ranges, optimizer, constraints, and trial budget for every tested candidate."],
         ["Scenario identity", "Links each result to its world, route, disturbances, seeds, and acceptance criteria for direct comparison."],
         ["Logs and metrics", "Keeps telemetry, process logs, tracking metrics, failures, and artifacts together in one auditable result."],
         ["Pareto evidence", "Shows feasible trade-offs across error, overshoot, settling, robustness, and cost without hiding constraints."],
-        ["Reproducibility manifest", "Hashes critical inputs and identifies the runtime so another machine can audit the same decision later."],
+        ["Reproducibility manifest", "Records the runtime and hashes every critical input so another machine can reproduce the same decision."],
       ],
     ],
     manualEyebrow: "GET STARTED",
@@ -210,7 +269,7 @@ const content = {
     platform: "Platform",
     platformValue: "Windows x64",
     released: "Released",
-    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is published while code signing is being prepared.",
+    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is available now.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
     communityGuidelines: "Community guidelines",
@@ -221,8 +280,8 @@ const content = {
     metaDescription: "在 Windows 本地完成 PX4 控制参数选择、自动优化、可复现仿真与结果对比。",
     navLabel: "主导航",
     nav: [
-      ["产品", "/pricing/"],
-      ["工作流", "/"],
+      ["产品", "/product/"],
+      ["价格", "/pricing/"],
       ["说明书", "/manual/"],
       ["社区", "/community/"],
     ],
@@ -231,7 +290,19 @@ const content = {
     menu: "打开导航",
     closeMenu: "关闭导航",
     downloadShort: "下载",
+    downloadMenuTitle: "选择适合你的 DroneDream 版本",
+    downloadMenuHint: "Windows 10 / 11 · x64 · 版本 1.0.0",
+    downloadDescriptions: {
+      universal: "用于跨产品协同与编排的完整工作台",
+      sim: "可重复运行的 PX4 与 Gazebo 仿真实验",
+      lab: "仿真到硬件的双向验证与标定",
+      field: "带安全边界的实机运行与现场调参",
+      autonomy: "通过自然语言完成自主任务工作流",
+    },
     console: "控制台",
+    organization: "企业管理",
+    accountPlan: "套餐",
+    businessPlan: "企业",
     signIn: "登录",
     register: "注册",
     account: "账号",
@@ -252,8 +323,23 @@ const content = {
     passwordMismatch: "两次输入的密码不一致。",
     codeRequired: "请先发送并填写邮箱验证码，再创建账号。",
     completeCaptcha: "请先完成安全验证，再继续。",
-    registerNow: "还没有账号？立即注册",
-    backToSignIn: "已经注册？返回登录",
+    accountRequestFailed: "无法完成账号请求，请稍后重试。",
+    registerNow: "注册",
+    backToSignIn: "返回登录",
+    forgotPassword: "忘记密码",
+    recoveryTitle: "找回账号",
+    recoveryCodeSignIn: "使用邮箱验证码登录",
+    recoveryPassword: "使用邮箱验证码修改密码",
+    recoverySignInTitle: "邮箱验证码登录",
+    recoveryPasswordTitle: "修改密码",
+    recoveryCodeRequired: "请先发送并填写邮箱验证码。",
+    recoveryCodeSent: "验证码已发送。",
+    signInWithCode: "登录",
+    resetAndSignIn: "修改密码并登录",
+    resetUpdateTitle: "设置新密码",
+    resetUpdateBody: "邮件链接已确认本次重置请求，请设置新密码以完成操作。",
+    updatePassword: "更新密码",
+    passwordUpdated: "密码已更新。",
     openConsole: "进入控制台",
     signOut: "退出登录",
     closeAuth: "关闭账号窗口",
@@ -326,7 +412,7 @@ const content = {
     capabilitiesEyebrow: "为持续迭代而设计",
     capabilitiesTitle: "本地飞行实验室不只是参数表单",
     capabilities: [
-      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，不把预算浪费在无关维度上，并始终保持预算与搜索焦点集中。"], "sliders"],
+      ["按需选择参数", ["单独选择一个 PX4 参数，或直接使用整理好的控制参数组。", "为搜索范围设置安全边界，并同步声明必要的耦合依赖。", "只探索实验真正需要的控制空间，不浪费试验预算，并始终保持搜索重点集中。"], "sliders"],
       ["七种实验算法", ["依据实验结构与搜索空间形态匹配合适的优化算法。", "融合约束、多保真、信赖域与进化搜索共同探索候选。", "复验每一项真实收益，再通过统一的独立验证流程确定最终优胜方案、可靠结论与复核依据。"], "orbit"],
       ["隔离运行环境", ["在专用 WSL2 中运行 PX4、Gazebo、任务进程与试验产物。", "让每次试验都与个人 Linux 文件及现有进程保持严格隔离。", "失败仿真也能安全续传、诊断和清理，并确保下一轮试验在干净环境中稳定启动与完整运行。"], "shield"],
       ["可追溯报告", ["把每个候选方案关联到对应场景、随机种子与参数快照。", "统一保留日志、评测指标、试验产物与完整运行环境清单。", "用完整证据复现每次调优决策，同时保留实验上下文、演进过程、最终判断与完整依据。"], "report"],
@@ -448,6 +534,14 @@ function DownloadIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" />
+    </svg>
+  );
+}
+
+function DownloadChevronIcon() {
+  return (
+    <svg className="site-header-download-chevron" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="m3.5 6 4.5 4 4.5-4" />
     </svg>
   );
 }
@@ -750,11 +844,14 @@ export function SiteApp() {
   const auth = useAuthOrLocal();
   const copy = content[locale];
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
+  const [editionAvailability, setEditionAvailability] =
+    useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
+  const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
   const [authEmail, setAuthEmail] = useState("");
   const [authCode, setAuthCode] = useState("");
   const [authCodeSent, setAuthCodeSent] = useState(false);
@@ -764,19 +861,66 @@ export function SiteApp() {
   const [authCaptchaCycle, setAuthCaptchaCycle] = useState(0);
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [organizationAccess, setOrganizationAccess] =
+    useState<OrganizationAccess | null>(null);
+  const [accountPlan, setAccountPlan] = useState<{
+    name: string;
+    billingScope: "individual" | "business";
+  } | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const downloadButtonRef = useRef<HTMLButtonElement>(null);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
   const authDialogRef = useRef<HTMLElement>(null);
   const authCloseRef = useRef<HTMLButtonElement>(null);
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
-    : path === "/pricing"
-      ? "pricing"
+    : path === "/product"
+      ? "product"
+      : path === "/pricing"
+        ? "pricing"
+      : path === "/organization"
+        ? "organization"
       : path === "/community"
         ? "community"
-        : "home";
+         : path === "/oauth/consent"
+           ? "oauth-consent"
+         : "home";
+  const hasValidOAuthAuthorizationId = sitePage === "oauth-consent"
+    && authorizationIdFromLocation() !== null;
+  const oauthAuthPage = hasValidOAuthAuthorizationId && (
+    !auth.account || authPending || Boolean(authError)
+  );
+
+  useEffect(() => {
+    let active = true;
+    if (!auth.account) {
+      setOrganizationAccess(null);
+      setAccountPlan(null);
+      return () => { active = false; };
+    }
+    void Promise.allSettled([
+      getOrganizationAccess(),
+      getManagedModelUsage(),
+    ]).then(([organizationResult, usageResult]) => {
+      if (!active) return;
+      setOrganizationAccess(
+        organizationResult.status === "fulfilled" ? organizationResult.value : null,
+      );
+      setAccountPlan(
+        usageResult.status === "fulfilled"
+          ? {
+              name: usageResult.value.plan.name,
+              billingScope: usageResult.value.account?.billing_scope ?? "individual",
+            }
+          : null,
+      );
+    });
+    return () => { active = false; };
+  }, [auth.account]);
 
   useEffect(() => {
     document.title = copy.metaTitle;
@@ -798,10 +942,24 @@ export function SiteApp() {
       .then((candidate) => {
         if (
           isWebsiteRelease(candidate) &&
-          compareReleaseVersions(candidate.version, fallbackRelease.version) >= 0
+          isReleaseCandidateNonDowngrade(candidate, fallbackRelease)
         ) {
           setRelease(candidate);
         }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/downloads/editions.json", { signal: controller.signal, cache: "no-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`edition metadata: ${response.status}`);
+        return response.json() as Promise<unknown>;
+      })
+      .then((candidate) => {
+        if (isEditionAvailabilityDocument(candidate)) setEditionAvailability(candidate);
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -889,10 +1047,18 @@ export function SiteApp() {
       const firstInput = authDialogRef.current?.querySelector<HTMLInputElement>(
         "input:not(:disabled)",
       );
-      (auth.account ? authCloseRef.current : firstInput)?.focus();
+      (
+        auth.account && authMode !== "reset-update"
+          ? authCloseRef.current
+          : firstInput
+      )?.focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (
+        event.key === "Escape"
+        && authMode !== "reset-update"
+        && !oauthAuthPage
+      ) {
         setAuthOpen(false);
         return;
       }
@@ -922,7 +1088,7 @@ export function SiteApp() {
       });
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [auth.account, authOpen]);
+  }, [auth.account, authMode, authOpen, oauthAuthPage]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -934,6 +1100,29 @@ export function SiteApp() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [menuOpen]);
+
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node
+        && !downloadMenuRef.current?.contains(event.target)
+      ) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setDownloadMenuOpen(false);
+      downloadButtonRef.current?.focus();
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [downloadMenuOpen]);
 
   const currentPhase = copy.demoPhases[activePhase];
   const displaySize = useMemo(() => formatBinarySize(release.sizeBytes), [release.sizeBytes]);
@@ -960,8 +1149,11 @@ export function SiteApp() {
       ?.focus();
   };
 
-  const closeMenu = () => setMenuOpen(false);
-  const openAccount = (mode: "sign-in" | "register" = "sign-in") => {
+  const closeMenu = () => {
+    setMenuOpen(false);
+    setDownloadMenuOpen(false);
+  };
+  const openAccount = (mode: AuthMode = "sign-in") => {
     setAuthMode(mode);
     setAuthCode("");
     setAuthCodeSent(false);
@@ -970,9 +1162,65 @@ export function SiteApp() {
     setAuthCaptchaToken(null);
     setAuthCaptchaCycle((current) => current + 1);
     setAuthError(null);
+    setAuthNotice(null);
     setMenuOpen(false);
+    setDownloadMenuOpen(false);
     setAuthOpen(true);
   };
+
+  const localizedAuthError = (reason: unknown): string => {
+    const message = reason instanceof Error ? reason.message : "";
+    const localizedValidationMessages: string[] = [
+      copy.passwordTooShort,
+      copy.passwordMismatch,
+      copy.codeRequired,
+      copy.recoveryCodeRequired,
+      copy.completeCaptcha,
+    ];
+    return localizedValidationMessages.includes(message)
+      ? message
+      : copy.accountRequestFailed;
+  };
+
+  useEffect(() => {
+    if (!auth.passwordRecovery) return;
+    setAuthMode("reset-update");
+    setAuthPassword("");
+    setAuthPasswordConfirmation("");
+    setAuthError(null);
+    setAuthNotice(null);
+    setAuthOpen(true);
+  }, [auth.passwordRecovery]);
+
+  useEffect(() => {
+    if (sitePage !== "oauth-consent" || !hasValidOAuthAuthorizationId) return;
+    if (
+      auth.account
+      && authOpen
+      && !auth.passwordRecovery
+      && !authPending
+      && !authError
+    ) {
+      setAuthOpen(false);
+    } else if (
+      auth.configured
+      && !auth.loading
+      && !auth.account
+      && !authOpen
+    ) {
+      openAccount("sign-in");
+    }
+  }, [
+    auth.account,
+    auth.configured,
+    auth.loading,
+    auth.passwordRecovery,
+    authError,
+    authOpen,
+    authPending,
+    hasValidOAuthAuthorizationId,
+    sitePage,
+  ]);
 
   const openConsole = () => {
     if (auth.account) {
@@ -987,8 +1235,21 @@ export function SiteApp() {
     if (authPending) return;
     setAuthPending(true);
     setAuthError(null);
+    setAuthNotice(null);
     try {
-      if (authMode === "sign-in") {
+      if (authMode === "reset-update") {
+        if (authPassword.length < 8) {
+          throw new Error(copy.passwordTooShort);
+        }
+        if (authPassword !== authPasswordConfirmation) {
+          throw new Error(copy.passwordMismatch);
+        }
+        await auth.updatePassword(authPassword);
+        setAuthPassword("");
+        setAuthPasswordConfirmation("");
+        setAuthMode("sign-in");
+        setAuthNotice(copy.passwordUpdated);
+      } else if (authMode === "sign-in") {
         if (captchaProtectionConfigured && !authCaptchaToken) {
           throw new Error(copy.completeCaptcha);
         }
@@ -1001,7 +1262,7 @@ export function SiteApp() {
         } else {
           await auth.signInWithPassword(authEmail, authPassword);
         }
-      } else {
+      } else if (authMode === "register") {
         if (authPassword.length < 8) {
           throw new Error(copy.passwordTooShort);
         }
@@ -1016,14 +1277,36 @@ export function SiteApp() {
           authCode,
           authPassword,
         );
+      } else if (
+        authMode === "recovery-sign-in"
+        || authMode === "recovery-password"
+      ) {
+        if (!authCodeSent || !authCode.trim()) {
+          throw new Error(copy.recoveryCodeRequired);
+        }
+        if (authMode === "recovery-password") {
+          if (authPassword.length < 8) {
+            throw new Error(copy.passwordTooShort);
+          }
+          if (authPassword !== authPasswordConfirmation) {
+            throw new Error(copy.passwordMismatch);
+          }
+          await auth.verifyRecoveryCode(
+            authEmail,
+            authCode,
+            authPassword,
+          );
+        } else {
+          await auth.verifyRecoveryCode(authEmail, authCode);
+        }
       }
     } catch (reason) {
-      setAuthError(
-        reason instanceof Error ? reason.message : "Account request failed.",
-      );
+      setAuthError(localizedAuthError(reason));
     } finally {
       setAuthPending(false);
-      if (authMode === "sign-in" && captchaProtectionConfigured) {
+      if (
+        authMode === "sign-in" && captchaProtectionConfigured
+      ) {
         setAuthCaptchaToken(null);
         setAuthCaptchaCycle((current) => current + 1);
       }
@@ -1053,10 +1336,9 @@ export function SiteApp() {
         await auth.sendRegistrationCode(authEmail);
       }
       setAuthCodeSent(true);
+      setAuthNotice(copy.recoveryCodeSent);
     } catch (reason) {
-      setAuthError(
-        reason instanceof Error ? reason.message : "Account request failed.",
-      );
+      setAuthError(localizedAuthError(reason));
     } finally {
       setAuthPending(false);
       if (captchaProtectionConfigured) {
@@ -1066,12 +1348,71 @@ export function SiteApp() {
     }
   };
 
+  const sendRecoveryCode = async () => {
+    if (authPending) return;
+    setAuthError(null);
+    setAuthNotice(null);
+    if (captchaProtectionConfigured && !authCaptchaToken) {
+      setAuthError(copy.completeCaptcha);
+      return;
+    }
+    setAuthPending(true);
+    try {
+      if (authCaptchaToken) {
+        await auth.sendRecoveryCode(authEmail, authCaptchaToken);
+      } else {
+        await auth.sendRecoveryCode(authEmail);
+      }
+      setAuthCodeSent(true);
+      setAuthNotice(copy.recoveryCodeSent);
+    } catch (reason) {
+      setAuthError(localizedAuthError(reason));
+    } finally {
+      setAuthPending(false);
+      if (captchaProtectionConfigured) {
+        setAuthCaptchaToken(null);
+        setAuthCaptchaCycle((current) => current + 1);
+      }
+    }
+  };
+
+  const recoveryCodeMode = authMode === "recovery-sign-in"
+    || authMode === "recovery-password";
+  const authTitle = authMode === "recovery-choice"
+    ? copy.recoveryTitle
+    : authMode === "recovery-sign-in"
+      ? copy.recoverySignInTitle
+      : authMode === "recovery-password"
+        ? copy.recoveryPasswordTitle
+        : authMode === "reset-update"
+          ? copy.resetUpdateTitle
+          : auth.account
+            ? copy.account
+            : authMode === "register"
+              ? copy.registerTitle
+              : copy.authTitle;
+  const showEmailField = authMode !== "reset-update"
+    && authMode !== "recovery-choice";
+  const showPasswordField = authMode === "sign-in"
+    || authMode === "register"
+    || authMode === "recovery-password"
+    || authMode === "reset-update";
+  const showPasswordConfirmation = authMode === "register"
+    || authMode === "recovery-password"
+    || authMode === "reset-update";
+  const showVerificationCode = authMode === "register" || recoveryCodeMode;
+  const showCaptcha = captchaProtectionConfigured && (
+    authMode === "sign-in"
+    || authMode === "register"
+    || recoveryCodeMode
+  );
+
   return (
     <div className="dd-site" data-locale={locale} data-page={sitePage}>
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
         <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
-          <BrandLockup variant="primary" />
+          <BrandLockup />
         </a>
         <nav
           id="site-navigation"
@@ -1081,6 +1422,9 @@ export function SiteApp() {
           {copy.nav.map(([label, target]) => (
             <a key={target} href={target} onClick={closeMenu}>{label}</a>
           ))}
+          {organizationAccess?.authorized ? (
+            <a href="/organization/" onClick={closeMenu}>{copy.organization}</a>
+          ) : null}
           <button type="button" onClick={openConsole}>{copy.console}</button>
         </nav>
         <div className="site-header-actions">
@@ -1101,10 +1445,64 @@ export function SiteApp() {
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z" /></svg>
             {copy.language}
           </button>
-          <a className="site-header-download" href={release.downloadUrl} download={release.fileName}>
-            <DownloadIcon />
-            {copy.downloadShort}
-          </a>
+          <div
+            ref={downloadMenuRef}
+            className={`site-download-picker${downloadMenuOpen ? " is-open" : ""}`}
+          >
+            <button
+              ref={downloadButtonRef}
+              type="button"
+              className="site-header-download"
+              aria-expanded={downloadMenuOpen}
+              aria-haspopup="menu"
+              aria-controls="site-download-menu"
+              onClick={() => {
+                setMenuOpen(false);
+                setDownloadMenuOpen((open) => !open);
+              }}
+            >
+              <DownloadIcon />
+              <span className="site-header-download-label">{copy.downloadShort}</span>
+              <DownloadChevronIcon />
+            </button>
+            {downloadMenuOpen ? (
+              <div
+                id="site-download-menu"
+                className="site-download-menu"
+                role="menu"
+                aria-label={copy.downloadMenuTitle}
+              >
+                <div className="site-download-menu-heading">
+                  <strong>{copy.downloadMenuTitle}</strong>
+                  <span>{copy.downloadMenuHint}</span>
+                </div>
+                <div className="site-download-menu-options">
+                  {headerDownloadCatalog.map((download) => (
+                    <a
+                      key={download.id}
+                      className="site-download-option"
+                      href={download.downloadUrl}
+                      download={download.fileName}
+                      role="menuitem"
+                      data-edition={download.id}
+                      data-sha256={download.sha256}
+                      onClick={() => setDownloadMenuOpen(false)}
+                    >
+                      <img src={download.mark} alt="" aria-hidden="true" />
+                      <span className="site-download-option-copy">
+                        <strong>{download.label}</strong>
+                        <span>{copy.downloadDescriptions[download.id]}</span>
+                      </span>
+                      <span className="site-download-option-meta">
+                        {formatBinarySize(download.sizeBytes)}
+                        <DownloadIcon />
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button
             ref={menuButtonRef}
             type="button"
@@ -1112,7 +1510,10 @@ export function SiteApp() {
             aria-label={menuOpen ? copy.closeMenu : copy.menu}
             aria-expanded={menuOpen}
             aria-controls="site-navigation"
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => {
+              setDownloadMenuOpen(false);
+              setMenuOpen((open) => !open);
+            }}
           >
             <span />
             <span />
@@ -1123,23 +1524,59 @@ export function SiteApp() {
       <main id="main-content">
         {sitePage === "manual" ? (
           <ManualPage locale={locale} />
+        ) : sitePage === "product" ? (
+          <ProductPage availability={editionAvailability} locale={locale} />
         ) : sitePage === "pricing" ? (
           <PricingPage
             locale={locale}
             authenticated={Boolean(auth.account)}
             onRequireAccount={() => openAccount("register")}
           />
+        ) : sitePage === "organization" ? (
+          <OrganizationPage locale={locale} accountId={auth.account?.id ?? null} />
         ) : sitePage === "community" ? (
           <CommunityPage
             locale={locale}
             account={auth.account}
             onRequireAccount={() => openAccount("sign-in")}
           />
+        ) : sitePage === "oauth-consent" && (
+          !hasValidOAuthAuthorizationId
+          ||
+          (auth.account && !authPending && !authError)
+          || (!auth.configured && !auth.loading)
+        ) ? (
+          <OAuthConsentPage
+            locale={locale}
+            account={auth.account}
+            authConfigured={auth.configured}
+            authLoading={auth.loading}
+            onRequireSignIn={() => openAccount("sign-in")}
+            onRequireRegistration={() => openAccount("register")}
+            onSwitchAccount={() => {
+              setAuthPending(true);
+              setAuthError(null);
+              void auth.signOut()
+                .then(() => openAccount("sign-in"))
+                .catch((reason: unknown) => {
+                  setAuthError(localizedAuthError(reason));
+                  setAuthOpen(true);
+                })
+                .finally(() => setAuthPending(false));
+            }}
+          />
+        ) : sitePage === "oauth-consent" ? (
+          <div className="site-oauth-auth-stage" aria-hidden="true" />
         ) : (
           <>
         <section className="site-hero" id="home" aria-labelledby="hero-title">
           <div className="site-hero-scene" aria-hidden="true">
-            <DroneLaunchScene active starflightControllerRef={droneFlightRef} visualOffsetX={1.58} />
+            <DroneLaunchScene
+              active
+              starflightControllerRef={droneFlightRef}
+              themeOverride={WEBSITE_DRONE_THEME}
+              visualOffsetX={1.58}
+            />
           </div>
           <div className="site-hero-shade" aria-hidden="true" />
           <div className="site-shell site-hero-layout">
@@ -1368,46 +1805,82 @@ export function SiteApp() {
 
       {authOpen ? (
         <div
-          className="site-auth-backdrop"
+          className={`site-auth-backdrop${oauthAuthPage ? " is-oauth-page" : ""}`}
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setAuthOpen(false);
+            if (
+              event.target === event.currentTarget
+              && authMode !== "reset-update"
+              && !oauthAuthPage
+            ) {
+              setAuthOpen(false);
+            }
           }}
         >
           <section
             ref={authDialogRef}
-            className="site-auth-dialog"
+            className={`site-auth-dialog${oauthAuthPage ? " is-oauth-page" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="site-auth-title"
           >
-            <header>
-              <h2 id="site-auth-title">
-                {auth.account
-                  ? copy.account
-                  : authMode === "register"
-                    ? copy.registerTitle
-                    : copy.authTitle}
-              </h2>
-              <button
-                ref={authCloseRef}
-                type="button"
-                aria-label={copy.closeAuth}
-                onClick={() => setAuthOpen(false)}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m7 7 10 10M17 7 7 17" />
-                </svg>
-              </button>
+            <header className="site-auth-header">
+              <div className="site-auth-brand" role="img" aria-label="DroneDream">
+                <BrandLockup />
+              </div>
+              <div className="site-auth-header-actions">
+                {!auth.account && authMode !== "reset-update" ? (
+                  <button
+                    type="button"
+                    className="site-auth-mode-switch"
+                    disabled={authPending}
+                    onClick={() => openAccount(
+                      authMode === "sign-in" ? "register" : "sign-in",
+                    )}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M15.5 19.25v-1.5a3.5 3.5 0 0 0-3.5-3.5H7a3.5 3.5 0 0 0-3.5 3.5v1.5M9.5 10.25a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM18.25 7v6.5M15 10.25h6.5" />
+                    </svg>
+                    <span>
+                      {authMode === "sign-in" ? copy.registerNow : copy.backToSignIn}
+                    </span>
+                  </button>
+                ) : null}
+                {authMode !== "reset-update" && !oauthAuthPage ? (
+                <button
+                  ref={authCloseRef}
+                  type="button"
+                  className="site-auth-close"
+                  aria-label={copy.closeAuth}
+                  onClick={() => setAuthOpen(false)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m7 7 10 10M17 7 7 17" />
+                  </svg>
+                </button>
+              ) : null}
+              </div>
             </header>
-            {auth.account ? (
+            <h2 id="site-auth-title">{authTitle}</h2>
+            {auth.account && authMode !== "reset-update" ? (
               <div className="site-auth-account">
                 <AccountIcon />
                 <strong>{auth.account.displayName}</strong>
                 <span>{auth.account.email}</span>
+                {accountPlan ? (
+                  <span className="site-auth-plan">
+                    {copy.accountPlan}: {accountPlan.billingScope === "business" ? `${copy.businessPlan} ` : ""}{accountPlan.name}
+                  </span>
+                ) : null}
                 <a className="site-button site-button-primary" href="/console/">
                   {copy.openConsole}
                   <ArrowRightIcon />
                 </a>
+                {organizationAccess?.authorized ? (
+                  <a className="site-button site-button-secondary" href="/organization/">
+                    {copy.organization}
+                    <ArrowRightIcon />
+                  </a>
+                ) : null}
                 <button
                   type="button"
                   className="site-auth-text-button"
@@ -1417,11 +1890,7 @@ export function SiteApp() {
                     setAuthError(null);
                     void auth.signOut()
                       .catch((reason: unknown) => {
-                        setAuthError(
-                          reason instanceof Error
-                            ? reason.message
-                            : "Account request failed.",
-                        );
+                        setAuthError(localizedAuthError(reason));
                       })
                       .finally(() => setAuthPending(false));
                   }}
@@ -1429,153 +1898,189 @@ export function SiteApp() {
                   {copy.signOut}
                 </button>
               </div>
+            ) : authMode === "recovery-choice" ? (
+              <div className="site-auth-recovery-options">
+                <button
+                  type="button"
+                  disabled={authPending}
+                  onClick={() => openAccount("recovery-sign-in")}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M3.5 6.25 12 12l8.5-5.75M4.75 4.5h14.5A1.75 1.75 0 0 1 21 6.25v11.5a1.75 1.75 0 0 1-1.75 1.75H4.75A1.75 1.75 0 0 1 3 17.75V6.25A1.75 1.75 0 0 1 4.75 4.5Z" />
+                  </svg>
+                  <span>{copy.recoveryCodeSignIn}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={authPending}
+                  onClick={() => openAccount("recovery-password")}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14.25 8.75a4.5 4.5 0 1 0-3.73 4.43L13 15.66V18h2.34v2.34H18V17.7l-4.82-4.82a4.5 4.5 0 0 0 1.07-4.13Z" />
+                    <circle cx="9.75" cy="8.75" r="1" />
+                  </svg>
+                  <span>{copy.recoveryPassword}</span>
+                </button>
+              </div>
             ) : (
               <>
+                {authMode === "reset-update" ? (
+                  <p className="site-auth-guidance">{copy.resetUpdateBody}</p>
+                ) : null}
                 <form className="site-auth-form" onSubmit={(event) => void submitAuth(event)}>
-                  <label>
-                    <span>{copy.email}</span>
-                    <input
-                      type="email"
-                      required
-                      autoComplete="email"
-                      value={authEmail}
-                      disabled={
-                        authPending ||
-                        (authMode === "register" && authCodeSent)
-                      }
-                      onChange={(event) => setAuthEmail(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>{copy.password}</span>
-                    <input
-                      type="password"
-                      required
-                      minLength={8}
-                      autoComplete={
-                        authMode === "register"
-                          ? "new-password"
-                          : "current-password"
-                      }
-                      value={authPassword}
-                      placeholder={copy.passwordPlaceholder}
-                      disabled={authPending}
-                      onChange={(event) => setAuthPassword(event.target.value)}
-                    />
-                  </label>
-                  {authMode === "register" ? (
-                    <>
-                      <label>
-                        <span>{copy.confirmPassword}</span>
+                  {showEmailField ? (
+                    <label>
+                      <span>{copy.email}</span>
+                      <input
+                        type="email"
+                        required
+                        autoComplete="email"
+                        value={authEmail}
+                        disabled={
+                          authPending
+                          || (showVerificationCode && authCodeSent)
+                        }
+                        onChange={(event) => setAuthEmail(event.target.value)}
+                      />
+                    </label>
+                  ) : null}
+                  {showPasswordField ? (
+                    <label>
+                      <span>{copy.password}</span>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete={
+                          authMode === "sign-in"
+                            ? "current-password"
+                            : "new-password"
+                        }
+                        value={authPassword}
+                        placeholder={copy.passwordPlaceholder}
+                        disabled={authPending}
+                        onChange={(event) => setAuthPassword(event.target.value)}
+                      />
+                    </label>
+                  ) : null}
+                  {showPasswordConfirmation ? (
+                    <label>
+                      <span>{copy.confirmPassword}</span>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        value={authPasswordConfirmation}
+                        placeholder={copy.confirmPasswordPlaceholder}
+                        disabled={authPending}
+                        onChange={(event) =>
+                          setAuthPasswordConfirmation(event.target.value)
+                        }
+                      />
+                    </label>
+                  ) : null}
+                  {showVerificationCode ? (
+                    <div className="site-auth-code-field">
+                      <label htmlFor="site-verification-code">
+                        <span>{copy.code}</span>
+                      </label>
+                      <div className="site-auth-code-row">
                         <input
-                          type="password"
+                          id="site-verification-code"
+                          type="text"
                           required
-                          minLength={8}
-                          autoComplete="new-password"
-                          value={authPasswordConfirmation}
-                          placeholder={copy.confirmPasswordPlaceholder}
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          minLength={6}
+                          maxLength={12}
+                          value={authCode}
+                          placeholder={copy.codePlaceholder}
                           disabled={authPending}
                           onChange={(event) =>
-                            setAuthPasswordConfirmation(event.target.value)
+                            setAuthCode(event.target.value.replace(/\s/gu, ""))
                           }
                         />
-                      </label>
-                      <div className="site-auth-code-field">
-                        <label htmlFor="site-registration-code">
-                          <span>{copy.code}</span>
-                        </label>
-                        <div className="site-auth-code-row">
-                          <input
-                            id="site-registration-code"
-                            type="text"
-                            required
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            minLength={6}
-                            maxLength={12}
-                            value={authCode}
-                            placeholder={copy.codePlaceholder}
-                            disabled={authPending}
-                            onChange={(event) =>
-                              setAuthCode(event.target.value.replace(/\s/gu, ""))
-                            }
-                          />
-                          <button
-                            type="button"
-                            className="site-auth-code-button"
-                            disabled={authPending || !authEmail.trim()}
-                            onClick={() => void sendRegistrationCode()}
-                          >
-                            {authCodeSent ? copy.resendCode : copy.sendCode}
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          className="site-auth-code-button"
+                          disabled={authPending || !authEmail.trim()}
+                          onClick={() => void (
+                            authMode === "register"
+                              ? sendRegistrationCode()
+                              : sendRecoveryCode()
+                          )}
+                        >
+                          {authCodeSent ? copy.resendCode : copy.sendCode}
+                        </button>
                       </div>
-                    </>
+                    </div>
                   ) : null}
-                  {captchaProtectionConfigured ? (
+                  {showCaptcha ? (
                     <AuthCaptcha
                       key={authCaptchaCycle}
                       siteKey={turnstileSiteKey}
+                      locale={locale}
                       onTokenChange={setAuthCaptchaToken}
                     />
                   ) : null}
                   <button type="submit" disabled={authPending || auth.loading}>
                     {authMode === "register"
                       ? copy.createAccount
-                      : copy.signInAction}
+                      : authMode === "reset-update"
+                        ? copy.updatePassword
+                        : authMode === "recovery-sign-in"
+                          ? copy.signInWithCode
+                          : authMode === "recovery-password"
+                            ? copy.resetAndSignIn
+                            : copy.signInAction}
                   </button>
                 </form>
-                <button
-                  type="button"
-                  className="site-auth-text-button"
-                  disabled={authPending}
-                  onClick={() => {
-                    setAuthMode((current) =>
-                      current === "sign-in" ? "register" : "sign-in",
-                    );
-                    setAuthCode("");
-                    setAuthCodeSent(false);
-                    setAuthPassword("");
-                    setAuthPasswordConfirmation("");
-                    setAuthCaptchaToken(null);
-                    setAuthCaptchaCycle((current) => current + 1);
-                    setAuthError(null);
-                  }}
-                >
-                  {authMode === "sign-in"
-                    ? copy.registerNow
-                    : copy.backToSignIn}
-                </button>
+                {authMode === "sign-in" ? (
+                  <div className="site-auth-link-row">
+                    <button
+                      type="button"
+                      className="site-auth-text-button"
+                      disabled={authPending}
+                      onClick={() => openAccount("recovery-choice")}
+                    >
+                      {copy.forgotPassword}
+                    </button>
+                  </div>
+                ) : null}
               </>
             )}
+            {authNotice ? <div className="site-auth-notice" role="status">{authNotice}</div> : null}
             {authError ? <div className="site-auth-error" role="alert">{authError}</div> : null}
           </section>
         </div>
       ) : null}
 
-      <footer className="site-footer">
-        <div className="site-shell">
-          <div className="site-footer-brand" role="img" aria-label="DroneDream">
-            <BrandLockup variant="primary" />
+      {sitePage === "home" ? (
+        <footer className="site-footer">
+          <div className="site-shell">
+            <div className="site-footer-brand" role="img" aria-label="DroneDream">
+              <BrandLockup />
+            </div>
+            <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
+            <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
+              <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
+                <FeatureIcon name="shield" />
+                {copy.codeSigningPolicy}
+              </a>
+              <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
+                <DocumentIcon />
+                {copy.privacyPolicy}
+              </a>
+              <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
+                <FeatureIcon name="report" />
+                {copy.communityGuidelines}
+              </a>
+            </nav>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
           </div>
-          <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
-          <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
-            <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
-              <FeatureIcon name="shield" />
-              {copy.codeSigningPolicy}
-            </a>
-            <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
-              <DocumentIcon />
-              {copy.privacyPolicy}
-            </a>
-            <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
-              <FeatureIcon name="report" />
-              {copy.communityGuidelines}
-            </a>
-          </nav>
-          <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
-        </div>
-      </footer>
+        </footer>
+      ) : null}
     </div>
   );
 }

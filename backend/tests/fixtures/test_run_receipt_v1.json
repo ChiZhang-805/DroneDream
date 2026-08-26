@@ -11,8 +11,8 @@
       "finished_at": "2026-07-28T00:13:01Z",
       "log": {
         "path": "backend/tests/fixtures/test_run_receipt_v1.log",
-        "sha256": "2e6a7c1dcdde2074ff8e4a114283a324d1bedbf639aa6a703debe9e4ee9f4f11",
-        "size_bytes": 113
+        "sha256": "938a4336ec29b15d2c1ad463f8789a0f196681042a0b9c92eea56b3f2a1c6e47",
+        "size_bytes": 131
       },
       "result": {
         "failed": 0,
@@ -29,8 +29,8 @@
     "finished_at": "2026-07-28T00:12:39Z",
     "log": {
       "path": "backend/tests/fixtures/test_run_receipt_v1.log",
-      "sha256": "2e6a7c1dcdde2074ff8e4a114283a324d1bedbf639aa6a703debe9e4ee9f4f11",
-      "size_bytes": 113
+      "sha256": "938a4336ec29b15d2c1ad463f8789a0f196681042a0b9c92eea56b3f2a1c6e47",
+      "size_bytes": 131
     },
     "result": {
       "failed": 0,
@@ -46,7 +46,7 @@
     "working_directory": "backend"
   },
   "generated_at": "2026-07-28T00:00:00Z",
-  "receipt_sha256": "6434f4ecf0052a2aa4ff65b1d326111e4640add3190aa86faa20efe83dc8a7f2",
+  "receipt_sha256": "cdbe4567459cac22cefa2d7cc8aa3c3d947bc76964d25eacf0681b09c9d7f3a6",
   "schema_version": "dronedream.test-run-receipt.v1",
   "source_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "validation_bridge": {

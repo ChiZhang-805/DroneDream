@@ -1,289 +1,271 @@
 from __future__ import annotations
 
-import tempfile
+import argparse
+import hashlib
+import json
 from pathlib import Path
 
-from fontTools.ttLib import TTFont
-from PIL import Image, ImageDraw, ImageFont
-
+from PIL import Image, ImageChops
 
 REPO = Path(__file__).resolve().parents[1]
-SOURCE = REPO / "docs" / "assets" / "drone-dream-logo-source.png"
-DOCS_ASSETS = REPO / "docs" / "assets"
-BRAND_ASSETS = DOCS_ASSETS / "brand"
-FRONTEND_ASSETS = REPO / "frontend" / "src" / "assets"
-FRONTEND_PUBLIC = REPO / "frontend" / "public"
-TAURI_SOURCE = REPO / "desktop" / "src-tauri" / "app-icon.png"
-SPACE_GROTESK_WOFF2 = (
-    REPO
-    / "frontend"
-    / "node_modules"
-    / "@fontsource-variable"
-    / "space-grotesk"
-    / "files"
-    / "space-grotesk-latin-wght-normal.woff2"
-)
-
-BRAND_VIOLET = "#684BFF"
-BRAND_LAVENDER = "#9B72FF"
-BRAND_MAGENTA = "#F166D8"
-BRAND_WHITE = "#FFFFFF"
-BRAND_INK = "#171225"
+CONTRACT_PATH = REPO / "brand" / "editions.json"
+ICON_DIR = REPO / "brand" / "icons"
+WEBSITE_FAVICON_PATH = ICON_DIR / "website-favicon-64.png"
+DEFAULT_DERIVATIVE_ROOT = REPO / "desktop" / "src-tauri" / "gen" / "brand"
+DEFAULT_FAVICON_PATH = REPO / "frontend" / "public" / "drone-favicon.png"
+EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
+ICO_SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 
 
-def require_inputs() -> None:
-    missing = [path for path in (SOURCE, SPACE_GROTESK_WOFF2) if not path.is_file()]
-    if missing:
-        joined = "\n".join(f"- {path}" for path in missing)
-        raise FileNotFoundError(f"Required brand inputs are missing:\n{joined}")
+class BrandAssetError(RuntimeError):
+    pass
 
 
-def crop_alpha(image: Image.Image) -> Image.Image:
-    rgba = image.convert("RGBA")
-    bbox = rgba.getchannel("A").getbbox()
-    if bbox is None:
-        raise ValueError(f"{SOURCE} contains no visible pixels.")
-    return rgba.crop(bbox)
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def square_mark(source: Image.Image, size: int, padding_ratio: float) -> Image.Image:
-    visible = crop_alpha(source)
-    content_extent = round(size * (1 - 2 * padding_ratio))
-    scale = min(content_extent / visible.width, content_extent / visible.height)
-    resized = visible.resize(
-        (max(1, round(visible.width * scale)), max(1, round(visible.height * scale))),
-        Image.Resampling.LANCZOS,
-    )
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    canvas.alpha_composite(
-        resized,
-        ((size - resized.width) // 2, (size - resized.height) // 2),
-    )
-    return canvas
+def load_contract() -> dict[str, object]:
+    try:
+        payload = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise BrandAssetError("brand/editions.json could not be read") from exc
+    if (
+        payload.get("schemaVersion") != 1
+        or payload.get("kind") != "dronedream-edition-brand-system"
+        or payload.get("separator") != "·"
+        or payload.get("safety")
+        != {"presentationOnly": True, "grantsHardwareAuthority": False}
+        or tuple(payload.get("editions", {})) != EDITION_IDS
+    ):
+        raise BrandAssetError("edition brand contract identity drifted")
+    return payload
 
 
-def convert_space_grotesk(output: Path) -> Path:
-    font = TTFont(SPACE_GROTESK_WOFF2)
-    font.flavor = None
-    font.save(output)
-    return output
-
-
-def font_at(path: Path, size: int, weight: int) -> ImageFont.FreeTypeFont:
-    font = ImageFont.truetype(str(path), size=size)
-    if hasattr(font, "set_variation_by_axes"):
-        font.set_variation_by_axes([weight])
-    return font
-
-
-def measured_letters(
-    word: str,
-    font: ImageFont.FreeTypeFont,
-    tracking: int,
-) -> tuple[list[tuple[str, int, int]], int]:
-    letters: list[tuple[str, int, int]] = []
-    cursor = 0
-    for character in word:
-        left, _, right, _ = font.getbbox(character)
-        width = max(1, right - left)
-        letters.append((character, cursor - left, width))
-        cursor += width + tracking
-    return letters, max(1, cursor - tracking)
-
-
-def horizontal_gradient(
-    size: tuple[int, int],
-    colors: tuple[str, str, str] = (
-        BRAND_VIOLET,
-        BRAND_LAVENDER,
-        BRAND_MAGENTA,
-    ),
-) -> Image.Image:
-    anchors = [
-        tuple(int(color.removeprefix("#")[index : index + 2], 16) for index in (0, 2, 4))
-        for color in colors
-    ]
-    width, height = size
-    row = Image.new("RGB", (width, 1))
-    pixels = row.load()
-    for x in range(width):
-        position = x / max(1, width - 1)
-        if position <= 0.52:
-            local = position / 0.52
-            start, end = anchors[0], anchors[1]
-        else:
-            local = (position - 0.52) / 0.48
-            start, end = anchors[1], anchors[2]
-        pixels[x, 0] = tuple(
-            round(channel_start + (channel_end - channel_start) * local)
-            for channel_start, channel_end in zip(start, end)
+def validate_png(path: Path, descriptor: dict[str, object]) -> Image.Image:
+    if not path.is_file() or not path.resolve().is_relative_to(REPO.resolve()):
+        raise BrandAssetError(
+            f"canonical brand asset is missing or escaped the repository: {path}"
         )
-    return row.resize((width, height))
+    if sha256(path) != descriptor["sha256"]:
+        raise BrandAssetError(
+            f"canonical brand asset hash drifted: {path.relative_to(REPO)}"
+        )
+    with Image.open(path) as source:
+        if (
+            source.format != "PNG"
+            or source.mode != "RGBA"
+            or source.size != (descriptor["width"], descriptor["height"])
+        ):
+            raise BrandAssetError(
+                f"canonical brand asset format drifted: {path.relative_to(REPO)}"
+            )
+        image = source.copy()
+    alpha = image.getchannel("A")
+    minimum, maximum = alpha.getextrema()
+    if minimum != 0 or maximum != 255 or alpha.getbbox() is None:
+        raise BrandAssetError(
+            f"canonical brand asset must have a transparent background: {path.relative_to(REPO)}"
+        )
+    return image
 
 
-def wordmark(
-    font_path: Path,
-    *,
-    word: str,
-    weight: int,
-    size: int,
-    tracking: int,
-    notch: bool = True,
-) -> Image.Image:
-    font = font_at(font_path, size, weight)
-    letters, width = measured_letters(word, font, tracking)
-    ascent, descent = font.getmetrics()
-    height = ascent + descent + 28
-    mask = Image.new("L", (width + 28, height), 0)
-    draw = ImageDraw.Draw(mask)
-    capital_d_origins: list[tuple[int, int]] = []
-    for character, letter_x, letter_width in letters:
-        draw.text((letter_x + 14, 8), character, fill=255, font=font)
-        if character == "D":
-            capital_d_origins.append((letter_x + 14, letter_width))
+def validate_canonical_assets(
+    contract: dict[str, object],
+) -> dict[str, Image.Image]:
+    editions = contract["editions"]
+    expected_paths: set[Path] = set()
+    marks: dict[str, Image.Image] = {}
+    lockups: dict[str, Image.Image] = {}
+    for edition_id in EDITION_IDS:
+        edition = editions[edition_id]
+        for kind in ("mark", "lockup"):
+            descriptor = edition[kind]
+            path = REPO / descriptor["path"]
+            expected_paths.add(path.resolve())
+            image = validate_png(path, descriptor)
+            if kind == "mark":
+                marks[edition_id] = image
+            else:
+                lockups[edition_id] = image
 
-    if notch:
-        for letter_x, letter_width in capital_d_origins:
-            cut_y = 8 + round(size * 0.18)
-            cut_x = letter_x + round(letter_width * 0.61)
-            draw.polygon(
-                (
-                    (cut_x, cut_y),
-                    (cut_x + round(size * 0.14), cut_y),
-                    (cut_x + round(size * 0.075), cut_y + round(size * 0.082)),
-                ),
-                fill=0,
+    actual_paths = {
+        path.resolve()
+        for path in ICON_DIR.glob("*.png")
+        if path.is_file() and path.resolve() != WEBSITE_FAVICON_PATH.resolve()
+    }
+    if actual_paths != expected_paths or len(actual_paths) != 10:
+        unexpected = sorted(
+            str(path.relative_to(REPO)) for path in actual_paths - expected_paths
+        )
+        missing = sorted(
+            str(path.relative_to(REPO)) for path in expected_paths - actual_paths
+        )
+        raise BrandAssetError(
+            "canonical icon inventory must equal ten files; "
+            f"unexpected={unexpected}, missing={missing}"
+        )
+    favicon = validate_png(
+        WEBSITE_FAVICON_PATH,
+        {
+            "sha256": "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7",
+            "width": 64,
+            "height": 64,
+        },
+    )
+    if favicon.size != (64, 64):
+        raise BrandAssetError("approved website favicon dimensions drifted")
+
+    reference_prefix: Image.Image | None = None
+    label_ratios: list[float] = []
+    for edition_id in EDITION_IDS[1:]:
+        edition = editions[edition_id]
+        image = lockups[edition_id]
+        alpha = image.getchannel("A")
+        wordmark_end = int(edition["wordmarkEndX"])
+        separator_start = int(edition["separatorStartX"])
+        separator_end = int(edition["separatorEndX"])
+        label_start = int(edition["editionLabelStartX"])
+        if not (
+            wordmark_end
+            < separator_start
+            <= separator_end
+            < label_start
+            < image.width
+        ):
+            raise BrandAssetError(f"lockup separator geometry drifted: {edition_id}")
+        left_gap = alpha.crop(
+            (wordmark_end + 1, 0, separator_start, image.height)
+        )
+        right_gap = alpha.crop(
+            (separator_end + 1, 0, label_start, image.height)
+        )
+        if left_gap.getbbox() is not None or right_gap.getbbox() is not None:
+            raise BrandAssetError(
+                f"lockup separator gaps are not transparent: {edition_id}"
+            )
+        if (
+            separator_start - wordmark_end - 1
+            != label_start - separator_end - 1
+        ):
+            raise BrandAssetError(f"lockup separator is not centered: {edition_id}")
+
+        prefix = alpha.crop((0, 0, wordmark_end + 1, image.height))
+        if reference_prefix is None:
+            reference_prefix = prefix
+        elif (
+            prefix.size != reference_prefix.size
+            or ImageChops.difference(prefix, reference_prefix).getbbox()
+        ):
+            raise BrandAssetError(
+                f"DroneDream wordmark letters changed size or position: {edition_id}"
             )
 
-    fill = horizontal_gradient(mask.size).convert("RGBA")
-    fill.putalpha(mask)
-    return crop_alpha(fill)
-
-
-def fit(image: Image.Image, max_width: int, max_height: int) -> Image.Image:
-    visible = crop_alpha(image)
-    scale = min(max_width / visible.width, max_height / visible.height)
-    return visible.resize(
-        (max(1, round(visible.width * scale)), max(1, round(visible.height * scale))),
-        Image.Resampling.LANCZOS,
-    )
-
-
-def lockup(mark: Image.Image, text: Image.Image) -> Image.Image:
-    # Keep the animal mark only slightly taller than the wordmark. This mirrors
-    # the compact, optically aligned relationship used by strong horizontal
-    # brand lockups instead of making the symbol feel like a separate poster.
-    mark_fit = fit(mark, 220, 220)
-    text_fit = fit(text, 1500, 210)
-    gap = 46
-    width = mark_fit.width + gap + text_fit.width
-    height = max(mark_fit.height, text_fit.height)
-    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    # The bat's upper wing carries more visual mass, so lowering it by two
-    # pixels produces a truer optical centre against the cap/x-height.
-    mark_y = min(height - mark_fit.height, (height - mark_fit.height) // 2 + 2)
-    canvas.alpha_composite(mark_fit, (0, mark_y))
-    canvas.alpha_composite(
-        text_fit,
-        (mark_fit.width + gap, (height - text_fit.height) // 2),
-    )
-    return canvas
-
-
-def white_background_logo(source: Image.Image) -> Image.Image:
-    horizontal_padding = 72
-    vertical_padding = 48
-    canvas = Image.new(
-        "RGBA",
-        (
-            source.width + horizontal_padding * 2,
-            source.height + vertical_padding * 2,
-        ),
-        BRAND_WHITE,
-    )
-    canvas.alpha_composite(source, (horizontal_padding, vertical_padding))
-    return canvas
-
-
-def preview(
-    primary_lockup: Image.Image,
-    compact_lockup: Image.Image,
-) -> Image.Image:
-    width, height = 2400, 1200
-    canvas = Image.new("RGBA", (width, height), BRAND_WHITE)
-    draw = ImageDraw.Draw(canvas)
-    draw.rectangle((width // 2, 0, width, height), fill=BRAND_INK)
-    draw.line((0, height // 2, width, height // 2), fill="#E9E5EE", width=2)
-
-    for row, source in enumerate((primary_lockup, compact_lockup)):
-        item = fit(source, 980, 360)
-        cell_y = row * (height // 2)
-        x = (width // 2 - item.width) // 2
-        y = cell_y + (height // 2 - item.height) // 2
-        canvas.alpha_composite(item, (x, y))
-
-        light_variant = item.copy()
-        alpha = light_variant.getchannel("A")
-        white_fill = Image.new("RGBA", item.size, BRAND_WHITE)
-        white_fill.putalpha(alpha)
-        canvas.alpha_composite(
-            white_fill,
-            (width // 2 + x, y),
+        # The first 249 columns contain the bat mark. Compare visible letter
+        # heights, not the full lockup prefix, so the mark cannot distort the
+        # typography measurement.
+        wordmark_bbox = alpha.crop(
+            (249, 0, wordmark_end + 1, image.height)
+        ).getbbox()
+        label_bbox = alpha.crop(
+            (label_start, 0, image.width, image.height)
+        ).getbbox()
+        if wordmark_bbox is None or label_bbox is None:
+            raise BrandAssetError(f"lockup visible text is missing: {edition_id}")
+        label_ratios.append(
+            (label_bbox[3] - label_bbox[1])
+            / (wordmark_bbox[3] - wordmark_bbox[1])
         )
 
-    return canvas
-
-
-def save_png(image: Image.Image, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path, optimize=True)
-
-
-def build() -> None:
-    require_inputs()
-    source = Image.open(SOURCE).convert("RGBA")
-    mark = square_mark(source, 1024, 0.09)
-    favicon = square_mark(source, 64, 0.025)
-
-    save_png(mark, DOCS_ASSETS / "drone-dream-icon.png")
-    save_png(mark, FRONTEND_ASSETS / "drone-dream-mark.png")
-    save_png(favicon, FRONTEND_PUBLIC / "drone-favicon.png")
-    save_png(mark, TAURI_SOURCE)
-
-    with tempfile.TemporaryDirectory(prefix="dronedream-brand-") as temp:
-        font_path = convert_space_grotesk(Path(temp) / "space-grotesk-variable.ttf")
-        primary = wordmark(
-            font_path,
-            word="DroneDream",
-            weight=620,
-            size=250,
-            tracking=-3,
+    if max(label_ratios) - min(label_ratios) > 0.005:
+        raise BrandAssetError("edition label font heights are not consistent")
+    if not all(1.0 <= ratio <= 1.03 for ratio in label_ratios):
+        raise BrandAssetError(
+            "edition labels and DroneDream letters must remain the same visible height"
         )
-        compact = wordmark(
-            font_path,
-            word="DRONEDREAM",
-            weight=690,
-            size=218,
-            tracking=8,
-        )
+    return marks
 
-    primary_lockup = lockup(mark, primary)
-    compact_lockup = lockup(mark, compact)
-    save_png(primary, BRAND_ASSETS / "drone-dream-wordmark-primary.png")
-    save_png(compact, BRAND_ASSETS / "drone-dream-wordmark-compact.png")
-    save_png(primary_lockup, BRAND_ASSETS / "drone-dream-lockup-primary.png")
-    save_png(compact_lockup, BRAND_ASSETS / "drone-dream-lockup-compact.png")
-    save_png(primary_lockup, FRONTEND_ASSETS / "drone-dream-lockup-primary.png")
-    save_png(compact_lockup, FRONTEND_ASSETS / "drone-dream-lockup-compact.png")
-    save_png(
-        white_background_logo(primary_lockup),
-        BRAND_ASSETS / "drone-dream-logo-horizontal-white.png",
+
+def generate_derivatives(
+    marks: dict[str, Image.Image],
+    edition_ids: tuple[str, ...],
+    derivative_root: Path,
+    favicon_path: Path,
+) -> list[Path]:
+    outputs: list[Path] = []
+    for edition_id in edition_ids:
+        windows_dir = derivative_root / edition_id / "windows"
+        windows_dir.mkdir(parents=True, exist_ok=True)
+        source = marks[edition_id]
+        for size, name in (
+            (32, "32x32.png"),
+            (128, "128x128.png"),
+            (256, "128x128@2x.png"),
+        ):
+            output = windows_dir / name
+            source.resize((size, size), Image.Resampling.LANCZOS).save(
+                output, format="PNG"
+            )
+            outputs.append(output)
+        ico_path = windows_dir / "icon.ico"
+        source.save(
+            ico_path,
+            format="ICO",
+            sizes=[(size, size) for size in ICO_SIZES],
+        )
+        outputs.append(ico_path)
+
+    favicon_path.parent.mkdir(parents=True, exist_ok=True)
+    favicon_path.write_bytes(WEBSITE_FAVICON_PATH.read_bytes())
+    outputs.append(favicon_path)
+    return outputs
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--edition", choices=("all",) + EDITION_IDS, default="all"
     )
-    save_png(
-        preview(primary_lockup, compact_lockup),
-        BRAND_ASSETS / "drone-dream-brand-preview.png",
+    parser.add_argument(
+        "--derivative-root", type=Path, default=DEFAULT_DERIVATIVE_ROOT
     )
+    parser.add_argument(
+        "--favicon-path", type=Path, default=DEFAULT_FAVICON_PATH
+    )
+    args = parser.parse_args()
+
+    contract = load_contract()
+    marks = validate_canonical_assets(contract)
+    if args.check:
+        print(
+            json.dumps(
+                {"status": "verified", "canonicalIconCount": 10},
+                separators=(",", ":"),
+            )
+        )
+        return 0
+
+    edition_ids = EDITION_IDS if args.edition == "all" else (args.edition,)
+    outputs = generate_derivatives(
+        marks,
+        edition_ids,
+        args.derivative_root.resolve(),
+        args.favicon_path.resolve(),
+    )
+    print(
+        json.dumps(
+            {
+                "status": "generated",
+                "editionIds": edition_ids,
+                "derivativeCount": len(outputs),
+                "outputs": [str(path) for path in outputs],
+            },
+            separators=(",", ":"),
+        )
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    build()
+    raise SystemExit(main())

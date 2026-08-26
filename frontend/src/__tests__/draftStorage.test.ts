@@ -163,6 +163,71 @@ describe("experiment draft storage migration", () => {
     expect(window.sessionStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
   });
 
+  it("keeps raw conversation messages in session storage only", () => {
+    expect(saveExperimentDraft({
+      active_step: 2,
+      completed_steps: [0, 1],
+      form: { name: "private-chat", llm_api_key: "" },
+      selections: { MPC_XY_P: 2 },
+      conversation: {
+        summary: "Compressed circular-track intent.",
+        field_provenance: {
+          altitude_m: { source: "explicit", message_id: "turn-1" },
+        },
+        messages: [
+          {
+            id: "turn-1",
+            role: "user",
+            content: "raw-chat-must-not-persist",
+          },
+        ],
+      },
+    })).not.toBeNull();
+
+    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .toContain("raw-chat-must-not-persist");
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .not.toContain("raw-chat-must-not-persist");
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .toContain("Compressed circular-track intent.");
+
+    window.sessionStorage.clear();
+    const restored = loadExperimentDraft(schema);
+    expect(restored?.conversation).toMatchObject({
+      summary: "Compressed circular-track intent.",
+      messages: [],
+    });
+  });
+
+  it("scrubs raw messages from an older persistent v3 draft on load", () => {
+    window.localStorage.setItem(
+      EXPERIMENT_DRAFT_KEY,
+      JSON.stringify({
+        schema_version: 3,
+        saved_at: "2026-07-28T00:00:00.000Z",
+        active_step: 1,
+        completed_steps: [0],
+        form: { name: "older-draft", llm_api_key: "" },
+        selections: { MPC_XY_P: 1 },
+        conversation: {
+          summary: "Safe compact summary.",
+          field_provenance: {},
+          messages: [
+            {
+              id: "turn-old",
+              role: "user",
+              content: "old-raw-chat",
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(loadExperimentDraft(schema)?.conversation?.messages).toEqual([]);
+    expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
+      .not.toContain("old-raw-chat");
+  });
+
   it("restores a redacted persistent draft in a new app session", () => {
     window.localStorage.setItem(
       EXPERIMENT_DRAFT_KEY,

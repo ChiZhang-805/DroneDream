@@ -1,5 +1,32 @@
+#[cfg(dronedream_agent)]
+mod agent_core;
+mod app_update;
+mod browser_auth;
+mod browser_auth_audit;
+mod browser_auth_vault;
+mod component_update;
 mod desktop_api_bridge;
+mod distribution_plan;
+mod edition_safety;
+mod engine_pack;
+#[cfg(dronedream_hardware_domain)]
+mod field_adapters;
+#[cfg(dronedream_hardware_domain)]
+mod field_device;
+#[cfg(dronedream_hardware_domain)]
+mod field_harness;
+#[cfg(dronedream_hardware_domain)]
+mod field_preflight;
+#[cfg(dronedream_hardware_domain)]
+mod field_recovery;
+#[cfg(dronedream_hardware_domain)]
+mod field_tuning;
+#[cfg(dronedream_hardware_domain)]
+mod hardware_domain;
 mod installer_handoff;
+#[cfg(dronedream_lab)]
+mod lab_calibration;
+mod live_recording;
 mod preferences;
 mod prerequisites;
 #[cfg(target_os = "windows")]
@@ -9,6 +36,8 @@ mod runtime_cache;
 mod runtime_installer;
 mod runtime_keepalive;
 mod webview2_preflight;
+#[cfg(target_os = "windows")]
+mod window_placement;
 
 use tauri::Manager;
 
@@ -38,36 +67,262 @@ pub fn run() {
         }
     }
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
+    let builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_updater::Builder::new()
+                .default_version_comparator(|current, release| {
+                    if !app_update::release_matches_compiled_edition(release.notes.as_deref()) {
+                        return false;
+                    }
+                    if release.version != current {
+                        return release.version > current;
+                    }
+                    app_update::newer_equal_version_release(release.notes.as_deref())
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
+                #[cfg(target_os = "windows")]
+                if let Err(error) = window_placement::clamp_to_nearest_work_area(&window) {
+                    eprintln!("Could not clamp restored main window to its work area: {error}");
+                }
                 let _ = window.show();
                 let _ = window.set_focus();
             }
         }))
+        .manage(browser_auth::BrowserAuthCoordinator::default())
+        .setup(|app| {
+            #[cfg(target_os = "windows")]
+            if let Some(window) = app.get_webview_window("main") {
+                if let Err(error) = window_placement::clamp_to_nearest_work_area(&window) {
+                    eprintln!("Could not clamp main window to its work area: {error}");
+                }
+            }
+            #[cfg(dronedream_agent)]
+            agent_core::start(app);
+            Ok(())
+        });
+
+    let builder = builder
         .manage(runtime_installer::RuntimeInstaller::default())
         .manage(runtime_keepalive::RuntimeKeepalive::default())
-        .manage(desktop_api_bridge::DesktopApiBridge::default())
-        .invoke_handler(tauri::generate_handler![
-            prerequisites::probe_system_prerequisites,
-            preferences::get_installer_locale,
-            installer_handoff::get_installer_runtime_intent,
-            installer_handoff::auto_start_installer_runtime,
-            installer_handoff::discard_installer_runtime_intent,
-            runtime::probe_runtime_status,
-            runtime::get_runtime_install_plan,
-            runtime_installer::start_runtime_install,
-            runtime_installer::get_runtime_install_progress,
-            runtime_installer::cancel_runtime_install,
-            runtime_installer::start_runtime,
-            runtime_installer::repair_runtime,
-            desktop_api_bridge::desktop_api_request,
-            runtime_keepalive::stop_runtime_for_exit
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running DroneDream desktop");
+        .manage(desktop_api_bridge::DesktopApiBridge::default());
+
+    #[cfg(dronedream_field)]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        browser_auth::begin_browser_auth,
+        browser_auth::cancel_browser_auth,
+        browser_auth::clear_browser_auth_vault,
+        browser_auth::restore_browser_auth_vault,
+        prerequisites::probe_system_prerequisites,
+        preferences::get_installer_locale,
+        installer_handoff::get_installer_runtime_intent,
+        installer_handoff::auto_start_installer_runtime,
+        installer_handoff::discard_installer_runtime_intent,
+        engine_pack::get_engine_pack_status,
+        engine_pack::ensure_app_update_idle,
+        engine_pack::install_embedded_engine_pack,
+        runtime::probe_runtime_status,
+        runtime::get_runtime_install_plan,
+        runtime_installer::start_runtime_install,
+        runtime_installer::start_runtime_upgrade,
+        runtime_installer::get_runtime_install_progress,
+        runtime_installer::cancel_runtime_install,
+        runtime_installer::start_runtime,
+        runtime_installer::repair_runtime,
+        distribution_plan::validate_distribution_plan,
+        desktop_api_bridge::desktop_api_request,
+        desktop_api_bridge::desktop_download_artifact,
+        live_recording::save_live_recording,
+        runtime_keepalive::stop_runtime_for_exit,
+        component_update::check_component_updates,
+        component_update::install_component_update,
+        agent_core::agent_core_request,
+        agent_core::agent_core_restart,
+        agent_core::agent_core_status,
+        agent_core::agent_core_import_asset_path,
+        agent_core::agent_core_submit_companion_result_path,
+        field_adapters::get_field_adapter_catalog,
+        field_adapters::inspect_field_adapter_frame,
+        field_adapters::inspect_field_protocol_frame,
+        field_adapters::install_field_adapter,
+        field_adapters::probe_field_mavlink_telemetry,
+        field_device::discover_field_devices,
+        field_harness::run_field_harness_job,
+        field_harness::list_field_harness_jobs,
+        field_harness::load_field_harness_job,
+        field_recovery::create_field_parameter_snapshot,
+        field_recovery::list_field_parameter_snapshots,
+        field_recovery::load_field_parameter_snapshot,
+        field_recovery::compare_field_parameter_snapshot,
+        field_recovery::prepare_field_parameter_rollback,
+        field_preflight::prepare_field_preflight,
+        field_tuning::get_field_tuning_status,
+        field_tuning::run_field_tuning_demo,
+        field_tuning::prepare_field_hardware_tuning,
+    ]);
+
+    #[cfg(all(dronedream_hardware_domain, not(dronedream_lab), not(dronedream_field)))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        browser_auth::begin_browser_auth,
+        browser_auth::cancel_browser_auth,
+        browser_auth::clear_browser_auth_vault,
+        browser_auth::restore_browser_auth_vault,
+        prerequisites::probe_system_prerequisites,
+        preferences::get_installer_locale,
+        installer_handoff::get_installer_runtime_intent,
+        installer_handoff::auto_start_installer_runtime,
+        installer_handoff::discard_installer_runtime_intent,
+        engine_pack::get_engine_pack_status,
+        engine_pack::ensure_app_update_idle,
+        engine_pack::install_embedded_engine_pack,
+        runtime::probe_runtime_status,
+        runtime::get_runtime_install_plan,
+        runtime_installer::start_runtime_install,
+        runtime_installer::start_runtime_upgrade,
+        runtime_installer::get_runtime_install_progress,
+        runtime_installer::cancel_runtime_install,
+        runtime_installer::start_runtime,
+        runtime_installer::repair_runtime,
+        distribution_plan::validate_distribution_plan,
+        desktop_api_bridge::desktop_api_request,
+        desktop_api_bridge::desktop_download_artifact,
+        live_recording::save_live_recording,
+        runtime_keepalive::stop_runtime_for_exit,
+        component_update::check_component_updates,
+        component_update::install_component_update,
+        agent_core::agent_core_request,
+        agent_core::agent_core_restart,
+        agent_core::agent_core_status,
+        agent_core::agent_core_import_asset_path,
+        agent_core::agent_core_submit_companion_result_path,
+        field_adapters::get_field_adapter_catalog,
+        field_adapters::inspect_field_adapter_frame,
+        field_adapters::inspect_field_protocol_frame,
+        field_adapters::install_field_adapter,
+        field_adapters::probe_field_mavlink_telemetry,
+        field_device::discover_field_devices,
+        field_harness::run_field_harness_job,
+        field_harness::list_field_harness_jobs,
+        field_harness::load_field_harness_job,
+        field_recovery::create_field_parameter_snapshot,
+        field_recovery::list_field_parameter_snapshots,
+        field_recovery::load_field_parameter_snapshot,
+        field_recovery::compare_field_parameter_snapshot,
+        field_recovery::prepare_field_parameter_rollback,
+        field_preflight::prepare_field_preflight,
+        field_tuning::get_field_tuning_status,
+        field_tuning::run_field_tuning_demo,
+        field_tuning::prepare_field_hardware_tuning,
+    ]);
+
+    #[cfg(dronedream_lab)]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        browser_auth::begin_browser_auth,
+        browser_auth::cancel_browser_auth,
+        browser_auth::clear_browser_auth_vault,
+        browser_auth::restore_browser_auth_vault,
+        prerequisites::probe_system_prerequisites,
+        preferences::get_installer_locale,
+        installer_handoff::get_installer_runtime_intent,
+        installer_handoff::auto_start_installer_runtime,
+        installer_handoff::discard_installer_runtime_intent,
+        engine_pack::get_engine_pack_status,
+        engine_pack::ensure_app_update_idle,
+        engine_pack::install_embedded_engine_pack,
+        runtime::probe_runtime_status,
+        runtime::get_runtime_install_plan,
+        runtime_installer::start_runtime_install,
+        runtime_installer::start_runtime_upgrade,
+        runtime_installer::get_runtime_install_progress,
+        runtime_installer::cancel_runtime_install,
+        runtime_installer::start_runtime,
+        runtime_installer::repair_runtime,
+        distribution_plan::validate_distribution_plan,
+        desktop_api_bridge::desktop_api_request,
+        desktop_api_bridge::desktop_download_artifact,
+        live_recording::save_live_recording,
+        runtime_keepalive::stop_runtime_for_exit,
+        component_update::check_component_updates,
+        component_update::install_component_update,
+        agent_core::agent_core_request,
+        agent_core::agent_core_restart,
+        agent_core::agent_core_status,
+        agent_core::agent_core_import_asset_path,
+        agent_core::agent_core_submit_companion_result_path,
+        field_adapters::get_field_adapter_catalog,
+        field_adapters::inspect_field_adapter_frame,
+        field_adapters::inspect_field_protocol_frame,
+        field_adapters::install_field_adapter,
+        field_adapters::probe_field_mavlink_telemetry,
+        field_device::discover_field_devices,
+        field_harness::run_field_harness_job,
+        field_harness::list_field_harness_jobs,
+        field_harness::load_field_harness_job,
+        field_recovery::create_field_parameter_snapshot,
+        field_recovery::list_field_parameter_snapshots,
+        field_recovery::load_field_parameter_snapshot,
+        field_recovery::compare_field_parameter_snapshot,
+        field_recovery::prepare_field_parameter_rollback,
+        field_preflight::prepare_field_preflight,
+        field_tuning::get_field_tuning_status,
+        field_tuning::run_field_tuning_demo,
+        field_tuning::prepare_field_hardware_tuning,
+        lab_calibration::evaluate_lab_calibration_cycle,
+    ]);
+
+    #[cfg(all(not(dronedream_hardware_domain), not(dronedream_field)))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        browser_auth::begin_browser_auth,
+        browser_auth::cancel_browser_auth,
+        browser_auth::clear_browser_auth_vault,
+        browser_auth::restore_browser_auth_vault,
+        prerequisites::probe_system_prerequisites,
+        preferences::get_installer_locale,
+        installer_handoff::get_installer_runtime_intent,
+        installer_handoff::auto_start_installer_runtime,
+        installer_handoff::discard_installer_runtime_intent,
+        engine_pack::get_engine_pack_status,
+        engine_pack::ensure_app_update_idle,
+        engine_pack::install_embedded_engine_pack,
+        runtime::probe_runtime_status,
+        runtime::get_runtime_install_plan,
+        runtime_installer::start_runtime_install,
+        runtime_installer::start_runtime_upgrade,
+        runtime_installer::get_runtime_install_progress,
+        runtime_installer::cancel_runtime_install,
+        runtime_installer::start_runtime,
+        runtime_installer::repair_runtime,
+        distribution_plan::validate_distribution_plan,
+        desktop_api_bridge::desktop_api_request,
+        desktop_api_bridge::desktop_download_artifact,
+        live_recording::save_live_recording,
+        runtime_keepalive::stop_runtime_for_exit,
+        component_update::check_component_updates,
+        component_update::install_component_update,
+        agent_core::agent_core_request,
+        agent_core::agent_core_restart,
+        agent_core::agent_core_status,
+        agent_core::agent_core_import_asset_path,
+        agent_core::agent_core_submit_companion_result_path,
+    ]);
+
+    let app = builder
+        .build(tauri::generate_context!())
+        .expect("error while building DroneDream desktop");
+    app.run(|handle, event| {
+        #[cfg(dronedream_agent)]
+        if matches!(
+            event,
+            tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }
+        ) {
+            agent_core::stop(handle);
+        }
+    });
 }

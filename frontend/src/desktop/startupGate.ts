@@ -5,11 +5,18 @@ export type DesktopStartupGateStatus =
   | "ready"
   | "blocked";
 
+export type DesktopStartupGateFailureCode =
+  | "accountIdentityMismatch"
+  | "runtimeSessionApiMissing"
+  | "accountVerificationFailed"
+  | "updateRequired";
+
 export interface DesktopStartupGateSession {
   status: DesktopStartupGateStatus;
   accountId: string | null;
   checkedAt: number | null;
   error: string | null;
+  failureCode: DesktopStartupGateFailureCode | null;
 }
 
 type DesktopStartupGateListener = () => void;
@@ -19,6 +26,7 @@ const INITIAL_SESSION: DesktopStartupGateSession = {
   accountId: null,
   checkedAt: null,
   error: null,
+  failureCode: null,
 };
 
 let session = INITIAL_SESSION;
@@ -49,7 +57,11 @@ export function subscribeDesktopStartupGate(
 
 export function setDesktopStartupGateState(
   status: Exclude<DesktopStartupGateStatus, "ready">,
-  options: { accountId?: string | null; error?: string | null } = {},
+  options: {
+    accountId?: string | null;
+    error?: string | null;
+    failureCode?: DesktopStartupGateFailureCode | null;
+  } = {},
 ): DesktopStartupGateSession {
   verificationRevision += 1;
   verificationInFlight = null;
@@ -58,6 +70,7 @@ export function setDesktopStartupGateState(
     accountId: options.accountId ?? null,
     checkedAt: null,
     error: options.error ?? null,
+    failureCode: options.failureCode ?? null,
   });
 }
 
@@ -69,6 +82,21 @@ export function approveDesktopStartupGateWithoutCloudAuth(): DesktopStartupGateS
     accountId: null,
     checkedAt: Date.now(),
     error: null,
+    failureCode: null,
+  });
+}
+
+export function approveDesktopStartupGateForAccount(
+  accountId: string,
+): DesktopStartupGateSession {
+  verificationRevision += 1;
+  verificationInFlight = null;
+  return publish({
+    status: "ready",
+    accountId,
+    checkedAt: Date.now(),
+    error: null,
+    failureCode: null,
   });
 }
 
@@ -89,6 +117,7 @@ export async function verifyDesktopStartupGate(
     accountId,
     checkedAt: null,
     error: null,
+    failureCode: null,
   });
   const operation = verifier()
     .then((result) => {
@@ -100,13 +129,20 @@ export async function verifyDesktopStartupGate(
         return session;
       }
       if (result.status !== "ready" || result.user_id !== accountId) {
-        throw new Error("The local API accepted a different account identity.");
+        return publish({
+          status: "blocked",
+          accountId,
+          checkedAt: null,
+          error: "The local API accepted a different account identity.",
+          failureCode: "accountIdentityMismatch",
+        });
       }
       return publish({
         status: "ready",
         accountId,
         checkedAt: Date.now(),
         error: null,
+        failureCode: null,
       });
     })
     .catch((error: unknown) => {
@@ -117,13 +153,21 @@ export async function verifyDesktopStartupGate(
       ) {
         return session;
       }
+      const candidate = error && typeof error === "object"
+        ? error as { code?: unknown; httpStatus?: unknown }
+        : null;
+      const missingSessionApi = candidate?.httpStatus === 404 ||
+        candidate?.code === "NOT_FOUND";
       return publish({
         status: "blocked",
         accountId,
         checkedAt: null,
-        error: error instanceof Error
-          ? error.message
+        error: missingSessionApi
+          ? "The installed Runtime does not provide the desktop account-session API."
           : "The local API did not accept the signed-in account.",
+        failureCode: missingSessionApi
+          ? "runtimeSessionApiMissing"
+          : "accountVerificationFailed",
       });
     })
     .finally(() => {

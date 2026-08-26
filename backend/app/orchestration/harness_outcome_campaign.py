@@ -32,9 +32,7 @@ from app.orchestration import aggregation, job_manager, trial_executor
 from app.services import jobs as job_services
 from app.simulator.mock import MockSimulatorAdapter
 
-HARNESS_OUTCOME_CAMPAIGN_SCHEMA_VERSION = (
-    "dronedream.harness-fallback-outcome-campaign/v1"
-)
+HARNESS_OUTCOME_CAMPAIGN_SCHEMA_VERSION = "dronedream.harness-fallback-outcome-campaign/v1"
 HARNESS_OUTCOME_CAMPAIGN_EVIDENCE_CLASS = "synthetic_mock_campaign"
 HARNESS_OUTCOME_CAMPAIGN_LABEL = "SYNTHETIC_MOCK"
 HARNESS_OUTCOME_CAMPAIGN_CLAIM_BOUNDARY = (
@@ -81,9 +79,7 @@ class _NetworkConnectMeasurement:
 
     def block(self, *_args: object, **_kwargs: object) -> None:
         self.attempt_count += 1
-        raise SyntheticNetworkConnectBlocked(
-            "network connect blocked by synthetic campaign guard"
-        )
+        raise SyntheticNetworkConnectBlocked("network connect blocked by synthetic campaign guard")
 
 
 class _ProviderErrorClient:
@@ -163,6 +159,20 @@ def _normalized_json(value: object) -> object:
             for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
         }
     raise ValueError(f"campaign outcome contains unsupported {type(value).__name__}")
+
+
+def _normalized_campaign_json(value: object) -> object:
+    """Canonicalize outcomes while omitting declared opaque evidence IDs."""
+
+    if isinstance(value, dict):
+        return {
+            str(key): _normalized_campaign_json(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+            if str(key) != "evidence_id"
+        }
+    if isinstance(value, list | tuple):
+        return [_normalized_campaign_json(item) for item in value]
+    return _normalized_json(value)
 
 
 def _scenario_suite(seed_block: int) -> schemas.ScenarioSuiteConfig:
@@ -267,11 +277,7 @@ def _aggregate_projection(candidate: models.CandidateParameterSet) -> dict[str, 
         "optimizer_learning_failure_rate",
         "holdout",
     )
-    return {
-        key: _normalized_json(aggregate[key])
-        for key in keys
-        if key in aggregate
-    }
+    return {key: _normalized_campaign_json(aggregate[key]) for key in keys if key in aggregate}
 
 
 def _candidate_projection(
@@ -346,9 +352,7 @@ def _trial_projection(
         "seed": trial.seed,
         "holdout": config.get("holdout") is True,
         "scenario_weight": _finite(config.get("scenario_weight")),
-        "optimizer_requested_fidelity": _finite(
-            config.get("optimizer_requested_fidelity")
-        ),
+        "optimizer_requested_fidelity": _finite(config.get("optimizer_requested_fidelity")),
         "optimizer_fidelity": _finite(config.get("optimizer_fidelity")),
         "status": trial.status,
         "failure_code": trial.failure_code,
@@ -411,21 +415,14 @@ def _normalize_outcome(db: Session, job_id: str) -> dict[str, Any]:
         None,
     )
     best_aggregate = (
-        best.aggregated_metric_json if best is not None and isinstance(
-            best.aggregated_metric_json, dict
-        )
+        best.aggregated_metric_json
+        if best is not None and isinstance(best.aggregated_metric_json, dict)
         else {}
     )
     holdout = best_aggregate.get("holdout")
-    holdout_loss = (
-        _finite(holdout.get("scalar_loss"))
-        if isinstance(holdout, dict)
-        else None
-    )
+    holdout_loss = _finite(holdout.get("scalar_loss")) if isinstance(holdout, dict) else None
     terminal_trial_count = sum(trial.status in _TERMINAL_TRIALS for trial in job.trials)
-    complete_trial_evidence_count = sum(
-        _trial_evidence_complete(trial) for trial in job.trials
-    )
+    complete_trial_evidence_count = sum(_trial_evidence_complete(trial) for trial in job.trials)
     complete_candidate_evidence_count = sum(
         _candidate_evidence_complete(candidate) for candidate in candidates
     )
@@ -448,9 +445,7 @@ def _normalize_outcome(db: Session, job_id: str) -> dict[str, Any]:
         "expected_evidence_units": expected_evidence_units,
         "complete_evidence_units": complete_evidence_units,
         "completeness_rate": (
-            complete_evidence_units / expected_evidence_units
-            if expected_evidence_units
-            else 0.0
+            complete_evidence_units / expected_evidence_units if expected_evidence_units else 0.0
         ),
     }
     winner = (
@@ -520,6 +515,7 @@ def _drive_job(
     *,
     job_id: str,
     client: _ProviderErrorClient | _InvalidResponseClient | None,
+    max_steps: int | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run one isolated Job using a process-local, test-only client object.
 
@@ -527,6 +523,10 @@ def _drive_job(
     cannot be supplied through the production API. It is an in-process
     evaluation seam used here so no credential or provider transport exists.
     """
+
+    step_limit = HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS + 20 if max_steps is None else max_steps
+    if isinstance(step_limit, bool) or step_limit < 1:
+        raise ValueError("campaign orchestration step limit must be positive")
 
     previous_client = aggregation._llm_client_override
     aggregation.set_llm_client_override(client)
@@ -536,7 +536,7 @@ def _drive_job(
             started = job_manager.start_queued_jobs(db, limit=1)
         if started != [job_id]:
             raise RuntimeError("campaign Job did not enter RUNNING")
-        for _step in range(HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS + 20):
+        for _step in range(step_limit):
             ran_trial = False
             with factory() as db:
                 trial_id = trial_executor.claim_and_run_one_pending_trial(
@@ -586,6 +586,7 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
                 db,
                 user=user,
                 req=request,
+                allow_internal_test_backend=True,
             )
             job_id = job.id
             db.commit()
@@ -607,8 +608,7 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
         "fallback_trace": trace,
         "outcome_sha256": _sha256(outcome),
         "component_sha256": {
-            component: _sha256(outcome[component])
-            for component in _OUTCOME_COMPONENTS
+            component: _sha256(outcome[component]) for component in _OUTCOME_COMPONENTS
         },
         "outcome": outcome,
     }
@@ -672,9 +672,7 @@ def build_harness_outcome_campaign() -> dict[str, Any]:
         for arm_name in HARNESS_OUTCOME_CAMPAIGN_ARMS[1:]:
             arm = by_name[arm_name]
             component_matches = {
-                component: (
-                    arm["outcome"][component] == reference["outcome"][component]
-                )
+                component: (arm["outcome"][component] == reference["outcome"][component])
                 for component in _OUTCOME_COMPONENTS
             }
             exact_match = arm["outcome"] == reference["outcome"]
@@ -716,11 +714,7 @@ def build_harness_outcome_campaign() -> dict[str, Any]:
         "physical_fidelity": False,
         "simulator_backend": "mock",
         "live_model_calls": False,
-        "network_calls": sum(
-            arm["network_calls"]
-            for block in block_rows
-            for arm in block["arms"]
-        ),
+        "network_calls": sum(arm["network_calls"] for block in block_rows for arm in block["arms"]),
         "real_credentials_used": False,
         "llm_superiority_claim_permitted": False,
         "harness_causal_benefit_claim_permitted": False,
@@ -797,6 +791,7 @@ def verify_harness_outcome_campaign(payload: object) -> dict[str, Any]:
         artifact.get("schema_version") != HARNESS_OUTCOME_CAMPAIGN_SCHEMA_VERSION
         or artifact.get("evidence_class") != HARNESS_OUTCOME_CAMPAIGN_EVIDENCE_CLASS
         or artifact.get("claim_label") != HARNESS_OUTCOME_CAMPAIGN_LABEL
+        or artifact.get("claim_boundary") != HARNESS_OUTCOME_CAMPAIGN_CLAIM_BOUNDARY
         or artifact.get("physical_fidelity") is not False
         or artifact.get("simulator_backend") != "mock"
         or artifact.get("live_model_calls") is not False
@@ -858,9 +853,7 @@ def verify_harness_outcome_campaign(payload: object) -> dict[str, Any]:
         for arm_name in HARNESS_OUTCOME_CAMPAIGN_ARMS[1:]:
             arm = by_name[arm_name]
             component_matches = {
-                component: (
-                    arm["outcome"][component] == reference["outcome"][component]
-                )
+                component: (arm["outcome"][component] == reference["outcome"][component])
                 for component in _OUTCOME_COMPONENTS
             }
             recomputed_comparisons.append(

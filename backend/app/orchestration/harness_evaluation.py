@@ -68,7 +68,7 @@ HarnessEvalCategory = Literal[
 
 
 class _ClosedModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class HarnessEvalToolHistory(_ClosedModel):
@@ -257,6 +257,23 @@ class HarnessRoutingPredictionArtifact(_ClosedModel):
         return self
 
 
+class HarnessRoutingArchivedPredictionArtifact(_ClosedModel):
+    """Strict historical artifact shape without pretending versions are current."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    corpus_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    prompt_suite_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_schema_version: str
+    tool_registry_version: str
+    prompt_template_version: str
+    provider: str = Field(min_length=1, max_length=64)
+    model_snapshot: str = Field(min_length=1, max_length=160)
+    generation_config: HarnessRoutingGenerationConfig = Field(
+        default_factory=HarnessRoutingGenerationConfig
+    )
+    predictions: dict[str, HarnessRoutingPrediction]
+
+
 def _canonical_json(value: object) -> str:
     return json.dumps(
         value,
@@ -278,6 +295,15 @@ def assert_routing_result_flow(
     development evidence, or live optimizer feedback.
     """
 
+    if source_role not in {"development", "locked_holdout"}:
+        raise ValueError(f"unknown routing corpus role: {source_role}")
+    if destination not in {
+        "evaluation_artifact",
+        "development_evidence",
+        "router_training",
+        "runtime_feedback",
+    }:
+        raise ValueError(f"unknown routing result destination: {destination}")
     if source_role == "locked_holdout" and destination != "evaluation_artifact":
         raise ValueError(
             "locked Harness routing holdout results are evaluation-only and "
@@ -336,8 +362,45 @@ def load_routing_prediction_artifact(
     return artifact
 
 
+def load_archived_routing_prediction_artifact(
+    path: Path,
+    cases: tuple[HarnessRoutingEvalCase, ...],
+    *,
+    evidence_schema_version: str,
+    prompt_template_version: str,
+    prompt_suite_sha256: str,
+) -> HarnessRoutingArchivedPredictionArtifact:
+    """Load one explicitly pinned historical provider freeze.
+
+    Historical prompt bytes cannot be recomputed by the current prompt builder.
+    Callers therefore must supply the independently frozen prompt-suite digest
+    and versions rather than silently accepting any non-current artifact.
+    """
+
+    try:
+        artifact = HarnessRoutingArchivedPredictionArtifact.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError) as exc:
+        raise ValueError("invalid archived Harness routing prediction artifact") from exc
+    if (
+        artifact.evidence_schema_version != evidence_schema_version
+        or artifact.prompt_template_version != prompt_template_version
+        or artifact.tool_registry_version != HARNESS_TOOL_REGISTRY_VERSION
+        or artifact.prompt_suite_sha256 != prompt_suite_sha256
+    ):
+        raise ValueError("archived Harness routing version binding mismatch")
+    if artifact.corpus_sha256 != routing_corpus_sha256(cases):
+        raise ValueError("archived prediction artifact corpus_sha256 does not match corpus")
+    expected_ids = {case.case_id for case in cases}
+    if set(artifact.predictions) != expected_ids:
+        raise ValueError("archived prediction artifact does not exactly cover the corpus")
+    return artifact
+
+
 def grade_routing_prediction_artifact(
-    artifact: HarnessRoutingPredictionArtifact,
+    artifact: HarnessRoutingPredictionArtifact
+    | HarnessRoutingArchivedPredictionArtifact,
     cases: tuple[HarnessRoutingEvalCase, ...],
 ) -> HarnessRoutingEvalReport:
     return build_routing_eval_report(
@@ -399,7 +462,7 @@ def compile_routing_eval_snapshot(
                 best_score=stimulus.best_score,
             )
         )
-    candidates = (
+    candidate_rows = [
         HarnessCandidateEvidence(
             generation=0,
             source_type="baseline",
@@ -409,23 +472,27 @@ def compile_routing_eval_snapshot(
             trial_count=stimulus.trials_per_candidate,
             completed_trial_count=stimulus.trials_per_candidate,
             failed_trial_count=0,
-        ),
-        HarnessCandidateEvidence(
-            generation=stimulus.current_generation,
-            source_type="optimizer",
-            is_baseline=False,
-            aggregated_score=stimulus.best_score,
-            metrics={
-                "aggregated_score": stimulus.best_score,
-                "feasible": stimulus.feasible_candidate_count > 0,
-            },
-            trial_count=stimulus.trials_per_candidate,
-            completed_trial_count=stimulus.trials_per_candidate,
-            failed_trial_count=round(
-                stimulus.observed_failure_rate * stimulus.trials_per_candidate
-            ),
-        ),
-    )
+        )
+    ]
+    if stimulus.scored_candidate_count > 1:
+        candidate_rows.append(
+            HarnessCandidateEvidence(
+                generation=stimulus.current_generation,
+                source_type="optimizer",
+                is_baseline=False,
+                aggregated_score=stimulus.best_score,
+                metrics={
+                    "aggregated_score": stimulus.best_score,
+                    "feasible": stimulus.feasible_candidate_count > 0,
+                },
+                trial_count=stimulus.trials_per_candidate,
+                completed_trial_count=stimulus.trials_per_candidate,
+                failed_trial_count=round(
+                    stimulus.observed_failure_rate * stimulus.trials_per_candidate
+                ),
+            )
+        )
+    candidates = tuple(candidate_rows)
     tool_history = tuple(
         HarnessToolHistory(
             tool_id=item.tool_id,
@@ -693,6 +760,7 @@ __all__ = [
     "HarnessRoutingGenerationConfig",
     "HarnessRoutingPrediction",
     "HarnessRoutingPredictionArtifact",
+    "HarnessRoutingArchivedPredictionArtifact",
     "HarnessRoutingQualification",
     "HarnessRoutingEvalSummary",
     "HarnessRoutingGrade",
@@ -705,6 +773,7 @@ __all__ = [
     "grade_routing_prediction_artifact",
     "load_routing_eval_cases",
     "load_routing_prediction_artifact",
+    "load_archived_routing_prediction_artifact",
     "routing_corpus_sha256",
     "routing_prompt_suite_sha256",
     "summarize_routing_baselines",

@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/composite-installation-manifest.v1.json",
+  "title": "DroneDream composite installation manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "inventoryVersion",
+    "sourceCommit",
+    "commonCoreHash",
+    "productDisplayVersion",
+    "edition",
+    "region",
+    "targetArchitecture",
+    "components",
+    "vehiclePacks",
+    "selectedModules",
+    "capabilities",
+    "resourceEstimate",
+    "installability",
+    "licenseNotice"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-composite-installation"},
+    "inventoryVersion": {"$ref": "#/$defs/semver"},
+    "sourceCommit": {"$ref": "#/$defs/commit"},
+    "commonCoreHash": {"$ref": "#/$defs/sha256"},
+    "productDisplayVersion": {"const": "1.0.0"},
+    "edition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["editionId", "editionVersion", "manifestSha256"],
+      "properties": {
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
+        "editionVersion": {"$ref": "#/$defs/semver"},
+        "manifestSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "region": {"enum": ["cn", "global"]},
+    "targetArchitecture": {"const": "windows-x86_64"},
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["desktop", "runtimeBase", "enginePack"],
+      "properties": {
+        "desktop": {"$ref": "#/$defs/componentRef"},
+        "runtimeBase": {"$ref": "#/$defs/componentRef"},
+        "enginePack": {"$ref": "#/$defs/componentRef"}
+      }
+    },
+    "vehiclePacks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/vehiclePackRef"}
+    },
+    "selectedModules": {"$ref": "#/$defs/idArray"},
+    "capabilities": {"$ref": "#/$defs/idArray"},
+    "resourceEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["downloadBytes", "installedBytes", "requiresWsl", "requiresGazebo"],
+      "properties": {
+        "downloadBytes": {"type": "integer", "minimum": 0},
+        "installedBytes": {"type": "integer", "minimum": 0},
+        "requiresWsl": {"type": "boolean"},
+        "requiresGazebo": {"type": "boolean"}
+      }
+    },
+    "installability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "blockers", "physicalCapabilityStatus"],
+      "properties": {
+        "state": {"enum": ["installable", "planned"]},
+        "blockers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 512}
+        },
+        "physicalCapabilityStatus": {"enum": ["disabled", "contract-only", "validated"]}
+      }
+    },
+    "licenseNotice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "sizeBytes"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "sizeBytes": {"type": "integer", "minimum": 1}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "idArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "componentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "componentId",
+        "version",
+        "buildId",
+        "sourceCommit",
+        "manifestSha256",
+        "artifactSha256",
+        "artifactBytes",
+        "signatureState",
+        "validationTier"
+      ],
+      "properties": {
+        "componentId": {"$ref": "#/$defs/id"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "buildId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "sourceCommit": {"$ref": "#/$defs/commit"},
+        "manifestSha256": {"$ref": "#/$defs/sha256"},
+        "artifactSha256": {"$ref": "#/$defs/sha256"},
+        "artifactBytes": {"type": "integer", "minimum": 0},
+        "signatureState": {"enum": ["verified", "not-issued"]},
+        "validationTier": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "vehiclePackRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packId",
+        "packVersion",
+        "manifestSha256",
+        "payloadSha256",
+        "artifactSha256",
+        "artifactBytes",
+        "signatureState",
+        "validationTier"
+      ],
+      "properties": {
+        "packId": {"$ref": "#/$defs/id"},
+        "packVersion": {"$ref": "#/$defs/semver"},
+        "manifestSha256": {"$ref": "#/$defs/sha256"},
+        "payloadSha256": {"$ref": "#/$defs/sha256"},
+        "artifactSha256": {"$ref": "#/$defs/sha256"},
+        "artifactBytes": {"type": "integer", "minimum": 0},
+        "signatureState": {"enum": ["verified", "not-issued"]},
+        "validationTier": {
+          "enum": ["sim-validated", "hardware-validated", "contract-only", "planned"]
+        }
+      }
+    }
+  }
+}

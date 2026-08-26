@@ -14,12 +14,19 @@ function normalizeNoVncViewerUrl(raw: string): string {
 
   try {
     const url = new URL(trimmed);
+    if (
+      !["http:", "https:"].includes(url.protocol)
+      || url.username
+      || url.password
+    ) {
+      return "";
+    }
     url.searchParams.set("autoconnect", "1");
     url.searchParams.set("resize", "scale");
     url.searchParams.set("view_clip", "0");
     return url.toString();
   } catch {
-    return trimmed;
+    return "";
   }
 }
 

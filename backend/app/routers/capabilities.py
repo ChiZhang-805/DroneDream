@@ -8,11 +8,21 @@ from pathlib import Path
 from fastapi import APIRouter
 
 from app import __version__
+from app.autonomy.harness import (
+    AUTONOMY_SYSTEM_PROMPT_VERSION,
+    AUTONOMY_TOOL_REGISTRY_VERSION,
+    autonomy_tool_registry,
+)
 from app.config import get_settings
 from app.optimization.experimental_types import EXPERIMENTAL_OPTIMIZER_STRATEGIES
 from app.orchestration.decision_harness import (
     HARNESS_DECISION_TRACE_SCHEMA_VERSION,
     HARNESS_PROMPT_TEMPLATE_VERSION,
+)
+from app.orchestration.experience_memory import (
+    HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+    HARNESS_EXPERIENCE_RETENTION_DAYS,
+    HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION,
 )
 from app.orchestration.harness_context import (
     HARNESS_EVIDENCE_SCHEMA_VERSION,
@@ -80,25 +90,26 @@ def _real_cli_configuration() -> tuple[bool, str, str | None]:
 
 def _simulator_capabilities() -> dict[str, object]:
     override = _global_simulator_override()
-    # real_stub is an internal regression-test adapter, not an operator-facing
-    # runtime. Treat it exactly like any other invalid override so a deployed
-    # API cannot advertise a guaranteed-to-fail worker configuration.
-    override_supported = override in {None, "mock", "real_cli"}
+    test_mode = get_settings().app_env.strip().lower() in {"test", "testing"}
+    supported_backends = {"real_cli"}
+    if test_mode:
+        supported_backends.add("mock")
+    # Synthetic adapters are internal regression tools, not operator-facing
+    # runtimes. A deployed API must neither advertise nor accept them.
+    override_supported = override is None or override in supported_backends
     real_configured, real_status, real_reason = _real_cli_configuration()
 
     def selectable(backend: str) -> bool:
         return override_supported and override in {None, backend}
 
-    mock_selectable = selectable("mock")
+    mock_selectable = test_mode and selectable("mock")
     real_selectable = selectable("real_cli")
     if not override_supported:
         mock_status = "invalid_override"
         mock_reason = f"SIMULATOR_BACKEND contains unsupported value {override!r}."
     elif override is not None and override != "mock":
         mock_status = "overridden"
-        mock_reason = (
-            f"SIMULATOR_BACKEND forces {override!r}; per-job mock selection is ignored."
-        )
+        mock_reason = f"SIMULATOR_BACKEND forces {override!r}; per-job mock selection is ignored."
     else:
         mock_status = "available"
         mock_reason = None
@@ -112,6 +123,50 @@ def _simulator_capabilities() -> dict[str, object]:
             f"SIMULATOR_BACKEND forces {override!r}; per-job real_cli selection is ignored."
         )
 
+    scenario_effect_contract = bundled_launcher_capabilities()
+    items: dict[str, object] = {
+        "real_cli": {
+            "selectable": real_selectable,
+            "configured": real_configured,
+            "ready": real_selectable and real_configured,
+            "status": real_status,
+            "reason": real_reason,
+            "requires_external_runtime": True,
+            "result_protocol": "dronedream.real_cli.result.v1",
+            # The bundled MAVSDK wrapper currently connects to a fixed
+            # local endpoint. Until host-level instance/port leases exist,
+            # operators must serialize real simulations per host.
+            "max_concurrency_per_host_without_instance_allocator": 1,
+            "instance_allocation": "operator_managed",
+            "bundled_runner_advanced_effects": list(scenario_effect_contract["physically_applied"]),
+            "scenario_effect_contract": scenario_effect_contract,
+            "unverified_effect_passthrough_opt_in": True,
+        },
+    }
+    if test_mode:
+        items["mock"] = {
+            "selectable": mock_selectable,
+            "configured": True,
+            "ready": mock_selectable,
+            "status": mock_status,
+            "reason": mock_reason,
+            "physical_fidelity": False,
+            "purpose": "deterministic_synthetic_workflow_validation",
+            "catalog_parameter_effects": "synthetic_normalized_landscape_v1",
+            "supported_scenarios": [
+                "nominal",
+                "noise_perturbed",
+                "wind_perturbed",
+                "combined_perturbed",
+                "turbulence",
+                "gps_dropout",
+                "payload_changed",
+                "battery_degraded",
+                "actuator_delay",
+                "actuator_failure",
+                "custom",
+            ],
+        }
     return {
         "configuration_scope": "api_process",
         # API and workers can be deployed separately. Until workers publish
@@ -120,47 +175,7 @@ def _simulator_capabilities() -> dict[str, object]:
         "authoritative": False,
         "worker_override": override,
         "worker_override_supported": override_supported,
-        "items": {
-            "mock": {
-                "selectable": mock_selectable,
-                "configured": True,
-                "ready": mock_selectable,
-                "status": mock_status,
-                "reason": mock_reason,
-                "physical_fidelity": False,
-                "purpose": "deterministic_synthetic_workflow_validation",
-                "catalog_parameter_effects": "synthetic_normalized_landscape_v1",
-                "supported_scenarios": [
-                    "nominal",
-                    "noise_perturbed",
-                    "wind_perturbed",
-                    "combined_perturbed",
-                    "turbulence",
-                    "gps_dropout",
-                    "payload_changed",
-                    "battery_degraded",
-                    "actuator_delay",
-                    "custom",
-                ],
-            },
-            "real_cli": {
-                "selectable": real_selectable,
-                "configured": real_configured,
-                "ready": real_selectable and real_configured,
-                "status": real_status,
-                "reason": real_reason,
-                "requires_external_runtime": True,
-                "result_protocol": "dronedream.real_cli.result.v1",
-                # The bundled MAVSDK wrapper currently connects to a fixed
-                # local endpoint. Until host-level instance/port leases exist,
-                # operators must serialize real simulations per host.
-                "max_concurrency_per_host_without_instance_allocator": 1,
-                "instance_allocation": "operator_managed",
-                "bundled_runner_advanced_effects": ["obstacles", "steady_wind"],
-                "scenario_effect_contract": bundled_launcher_capabilities(),
-                "unverified_effect_passthrough_opt_in": True,
-            },
-        },
+        "items": items,
     }
 
 
@@ -184,6 +199,31 @@ def read_capabilities() -> dict[str, object]:
                     "schema_version": "1.0",
                     "draft_only": True,
                 },
+                "mission_autonomy": {
+                    "available": True,
+                    "mission_schema": "dronedream.autonomy.mission.v2",
+                    "scene_catalog": "dronedream.autonomy.scene-catalog.v1",
+                    "editions": ["universal", "sim", "lab", "field", "autonomy"],
+                    "simulation_adapter": "px4_gazebo_contract",
+                    "hardware_authority": False,
+                    "validated_signed_vehicle_packs": 0,
+                    "runtime_session_schema": "dronedream.autonomy.runtime-session.v1",
+                    "observation_schema": "dronedream.autonomy.observation.v1",
+                    "runtime_persistence": "process_local_bounded",
+                    "hitl_mode": "shadow_only",
+                    "physical_transport_bound": False,
+                    "planner_prompt_version": AUTONOMY_SYSTEM_PROMPT_VERSION,
+                    "tool_registry_version": AUTONOMY_TOOL_REGISTRY_VERSION,
+                    "tool_registry": autonomy_tool_registry(),
+                    "asset_gate": "one_qualified_vehicle_and_one_qualified_map",
+                    "model_actuator_authority": False,
+                    "repair_policy": {
+                        "semantic_attempt_limit": 3,
+                        "trajectory_attempt_limit": 5,
+                        "repeated_plan_hash_limit": 2,
+                        "may_relax_safety_constraints": False,
+                    },
+                },
                 "llm_tool_harness": {
                     "available": True,
                     "decision_schema_version": "1.0",
@@ -192,6 +232,15 @@ def read_capabilities() -> dict[str, object]:
                     "prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
                     "trace_schema_version": HARNESS_DECISION_TRACE_SCHEMA_VERSION,
                     "tool_registry": "closed",
+                    "cross_job_memory": {
+                        "available": True,
+                        "schema_version": (HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION),
+                        "retrieval_policy_version": (HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION),
+                        "scope": "same_authenticated_user",
+                        "task_family_policy": "exact_structural_match",
+                        "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+                        "revocable": True,
+                    },
                 },
             },
             "simulators": _simulator_capabilities(),
@@ -211,13 +260,9 @@ def read_capabilities() -> dict[str, object]:
                     "cma_es": {"ready": True, "status": "available"},
                     "gpt": {
                         "ready": gpt_ready,
-                        "status": (
-                            "available" if gpt_ready else "server_secret_not_configured"
-                        ),
+                        "status": ("available" if gpt_ready else "server_secret_not_configured"),
                         "requires_user_api_key": True,
-                        "prompt_schema_version": (
-                            LLM_PROPOSER_PROMPT_SCHEMA_VERSION
-                        ),
+                        "prompt_schema_version": (LLM_PROPOSER_PROMPT_SCHEMA_VERSION),
                         "reason": (
                             None
                             if gpt_ready
@@ -229,11 +274,7 @@ def read_capabilities() -> dict[str, object]:
                     },
                     "llm_harness": {
                         "ready": gpt_ready,
-                        "status": (
-                            "experimental"
-                            if gpt_ready
-                            else "server_secret_not_configured"
-                        ),
+                        "status": ("experimental" if gpt_ready else "server_secret_not_configured"),
                         "experimental": True,
                         "requires_user_api_key": True,
                         "tool_registry": "closed",
@@ -251,7 +292,7 @@ def read_capabilities() -> dict[str, object]:
                         ),
                     },
                     **_experimental_optimizer_capabilities(),
-                }
+                },
             },
             "parameter_catalog": {
                 "catalog_version": CATALOG_VERSION,

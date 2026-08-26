@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-build-profile",
+  "profileVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "artifactFileName": "DroneDream-Universal-1.0.0.exe",
+  "tauriConfigOverlay": "desktop/src-tauri/tauri.universal.conf.json",
+  "enginePackProfile": "unified-sim-lab",
+  "enginePackProfileMeaning": "backward-compatible Runtime profile identifier for the full Universal payload",
+  "enginePackPayloadContract": {
+    "contractId": "dronedream-universal-engine-payload/v1",
+    "requiredEditionIds": ["sim", "lab", "field", "autonomy"],
+    "requiredVehiclePackRegistry": "distribution/vehicle-packs/registry.v1.json",
+    "requiredSafetyPolicy": "distribution/safety/edition-execution-gate.v1.json",
+    "forbiddenPathPrefixes": [
+      "distribution/build-planning",
+      "distribution/build-plans",
+      "distribution/tests"
+    ],
+    "profileIdIsCompatibilityIdentity": true,
+    "uiModeNeverGrantsCapability": true
+  },
+  "brand": {
+    "editionId": "universal",
+    "displayName": "DroneDream",
+    "manifest": "brand/editions.json",
+    "windowsIcon": "desktop/src-tauri/gen/brand/universal/windows/icon.ico",
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "sharedUiContract": {
+    "contractId": "dronedream-shared-edition-ui/v1",
+    "donorCommit": "62ac2345828f50a221c1aaed0ea7273a628c9d5d",
+    "sourceFiles": [
+      {
+        "path": "frontend/src/AppShell.tsx",
+        "sha256": "3aee54ff6c9bb7f6254ba38550e7dbc1cdbd7cd9906a034189442b5b3fe4c500"
+      },
+      {
+        "path": "frontend/src/components/EditionSettingsSurface.tsx",
+        "sha256": "3ea948a9ba8cd24cab665b1c220de28873a3ae7b30f595253c38395a03d6d9ee"
+      },
+      {
+        "path": "frontend/src/components/SettingsUpdateCenter.tsx",
+        "sha256": "64736b9d706bc87cd5057cf2cc6ba87a38179908a2d896c8ac39e2104c0dca02"
+      },
+      {
+        "path": "frontend/src/components/DroneLaunchScene.tsx",
+        "sha256": "91fa72de9d5bc66b89798697aa8cc9e0243eb20f4e35ebf695d228b709c7d17e"
+      },
+      {
+        "path": "frontend/src/features/distribution/universalMode.ts",
+        "sha256": "31c72fe2df1af20cbb5026b6e883000b93d71d0db0ee950353d6a7b6f17f3097"
+      },
+      {
+        "path": "frontend/src/styles.css",
+        "sha256": "f7c519f89d5af766e31ba6cf1f85a65004f1169d1eba0d3ceb83b448f7625d8e"
+      },
+      {
+        "path": "frontend/src/theme/EditionThemeProvider.tsx",
+        "sha256": "7af5cf6dcf1e0756b7da9ca6a10375f23ccee8c37e7b090b45942fe350168898"
+      },
+      {
+        "path": "frontend/src/theme/editionTheme.ts",
+        "sha256": "3b31e988a2fa6a9708a83b88fc00f6bee1c03cbafcaffd08f5be2ef56ca272fb"
+      }
+    ],
+    "visualEvidence": {
+      "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/software-ui-layout-receipt.json",
+      "sha256": "f5bce9cc9a166be53c790cbd22e2b6e5f2f5a91ea3c81f7600a9be53b2d73700",
+      "subjectCommit": "7cf37d728211a92bbcbb411c3ce8cca904d4c38a",
+      "caseCount": 7,
+      "locales": ["en", "zh-CN"],
+      "viewportWidths": [390, 760, 1440],
+      "coveredSettingsTabs": ["general", "memory", "model"],
+      "runtimePanelHeadedValidationStatus": "pending-exact-desktop-runtime-red-validation"
+    },
+    "minimumDesktopViewport": {
+      "width": 390,
+      "height": 700,
+      "scalePercent": 100
+    },
+    "settingsDialogVerticalOverflowAllowed": false,
+    "activeSettingsPanelVerticalOverflowAllowed": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "fieldLightweightEntryIntegrationStatus": "integrated-in-universal"
+  },
+  "integratedWorkspaceUiContract": {
+    "contractId": "dronedream-universal-integrated-workspaces/v2",
+    "manifest": "distribution/universal/integrated-workspaces.v2.json",
+    "sha256": "5be6eb068cb6ce75453e898b96f5f929d7b80e8fb6f2490fcdcc2f5433a9d950",
+    "sourceFileCount": 12,
+    "workspaceModes": ["sim", "lab", "field", "autonomy"],
+    "createsCrossEditionHarnessOrchestrator": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "workspaceModes": ["sim", "lab", "field", "autonomy"],
+  "productScopedCapabilities": {
+    "vehicleStudio": {
+      "hostEditions": ["universal", "autonomy"],
+      "editionBoundStorage": true,
+      "route": "/vehicle-studio",
+      "productSourceCommit": "b2fdade2afcfa20e1f117eafabb537aafa6f067f",
+      "contract": "distribution/universal/vehicle-studio.v1.json",
+      "schema": "distribution/schemas/vehicle-pack-draft-envelope.schema.json",
+      "shareTargets": ["sim", "lab", "field", "autonomy"],
+      "transport": "file-based-draft-envelope",
+      "automaticReceiverInstallation": false,
+      "modelHarnessStartsOnImport": false,
+      "unqualifiedAssetCanExecute": false,
+      "grantsSimulationExecution": false,
+      "grantsHardwareAuthority": false,
+      "sourceFiles": [
+        {"path": "frontend/src/pages/VehicleStudio.tsx", "sha256": "f74a42483f0885ab1e25e61601aac183ff15e223332edaa7f53c5c4494bfb38a"},
+        {"path": "frontend/src/components/VehicleModelPreview3D.tsx", "sha256": "79d4cc6d948356e87d5817455bd08b32b4d872665b03e3d45e21815fccf97956"},
+        {"path": "frontend/src/features/vehicleStudio/model.ts", "sha256": "2260affd2671cb8737ce3e3fff427ce7687137bafc3099482dbc04b84f8ec54c"},
+        {"path": "frontend/src/features/vehicleStudio/pack.ts", "sha256": "1eff6c24ef7ab4b2c33ebb762d11f9b1a52b4f9a101965d4141bd382ec0ca455"},
+        {"path": "frontend/src/features/vehicleStudio/preview.ts", "sha256": "b25aef0f255488b52ce000475e32ab893f31aab0e3241aeef3ea485f99b7e9b2"},
+        {"path": "frontend/src/features/vehicleStudio/storage.ts", "sha256": "b0a9d4a16e893ea6ad47510b4e403fa8669055a03136a118e3764affcc9c5591"},
+      {"path": "frontend/src/router.tsx", "sha256": "04bc165f1175f55c1854592426165946bff31273b7001ee103279c73df088dc2"},
+      {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "f2910ac131458bb8ac503f0c3c75b202b6e05485a8fe36b45c00873a46db7a3e"},
+        {"path": "distribution/schemas/vehicle-pack-draft-envelope.schema.json", "sha256": "5ac6852fa3c0cf1a5386f8044e5773b3738462e92068842692a32b828d083d5a"},
+        {"path": "distribution/universal/vehicle-studio.v1.json", "sha256": "73babe0b97c308ba4db756bf4fb6d2e95b092e6432798d68b266988c2e8383d9"}
+      ]
+    }
+  },
+  "desktopContracts": {
+    "coexistence": "distribution/desktop/edition-coexistence.v1.json",
+    "browserAuth": "distribution/desktop/edition-browser-auth.v1.json",
+    "runtimeAndUpdaterFamilies": "distribution/desktop/edition-runtime-update-families.v1.json",
+    "editionId": "universal",
+    "authClientId": "dronedream-desktop-universal",
+    "bundleIdentifier": "io.dronedream.desktop.universal",
+    "credentialVaultNamespace": "DroneDream/Auth/universal/v1",
+    "updaterMetadataFileName": "latest-universal.json"
+  },
+  "capabilityAuthority": {
+    "frontendCanAuthorize": false,
+    "requiredDecisionLayers": ["native", "backend", "runtime"],
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecision": "deny"
+  },
+  "build": {
+    "sharedScript": "desktop/scripts/build-windows-msvc.ps1",
+    "wrapperScript": "desktop/scripts/build-universal-installer.ps1",
+    "targetTriple": "x86_64-pc-windows-msvc",
+    "fallbackScript": "desktop/scripts/build-windows-llvm.ps1",
+    "fallbackTargetTriple": "x86_64-pc-windows-gnullvm",
+    "cargoTargetMustBeOutsideRepository": true,
+    "updaterSignatureRequired": true,
+    "authenticodeRequiredForInternalTest": false,
+    "exactCleanSourceRequired": true,
+    "buildCountPerAuthorization": 1
+  },
+  "websiteHandoff": {
+    "contract": "distribution/universal/release/website-exact-exe-handoff.v1.json",
+    "recipientBranch": "codex/website",
+    "receiverMayRebuild": false,
+    "receiverMayRename": false,
+    "publishedFiles": [
+      "DroneDream-Universal-1.0.0.exe",
+      "DroneDream-Universal-1.0.0.exe.sha256",
+      "DroneDream-Universal-1.0.0.exe.sig",
+      "DroneDream-Universal-1.0.0.exe.receipt.json"
+    ]
+  },
+  "lifecycle": {
+    "freshInstall": "requires isolated RED validation before releaseReady",
+    "upgrade": "requires isolated RED validation without replacing the user's current install",
+    "uninstall": "must preserve separately owned Runtime and user data",
+    "shortcut": "must use the canonical Universal icon",
+    "webView2": "embedded bootstrapper and post-install health check required",
+    "locales": ["en", "zh-CN"]
+  },
+  "releaseGates": {
+    "installerLifecycleReceiptRequired": true,
+    "exactEditionBrowserAuthReceiptRequired": true,
+    "browserAuthMayUseExistingBrowserCookie": true,
+    "crossEditionSessionReuseAllowed": false,
+    "releaseReadyBeforeBothReceipts": false
+  }
+}

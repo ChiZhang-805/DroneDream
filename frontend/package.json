@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "field:dev": "vite --config vite.field.config.ts",
+    "field:build": "tsc -b && vite build --config vite.field.config.ts",
+    "field:preview": "vite preview --config vite.field.config.ts",
     "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
@@ -14,6 +17,25 @@
     "site:build": "tsc -b && vite build --config vite.site.config.ts",
     "console:build": "vite build --config vite.console.config.ts",
     "site:preview": "vite preview --config vite.site.config.ts",
+    "test:dashboard-layout": "node scripts/verify-dashboard-layout.mjs",
+    "test:history-layout": "node scripts/verify-history-layout.mjs",
+    "test:community-layout": "node scripts/verify-community-layout.mjs",
+    "test:oauth-consent-layout": "node scripts/verify-oauth-consent-layout.mjs",
+    "test:desktop-browser-auth": "node scripts/verify-desktop-browser-auth.mjs",
+    "test:admin-layout": "node scripts/verify-admin-console-layout.mjs",
+    "test:software-ui-layout": "node scripts/verify-software-ui-layout.mjs",
+    "test:lab-ui": "vitest run src/lab src/__tests__/router.test.ts",
+    "test:lab-ui-layout": "node scripts/verify-lab-ui.mjs",
+    "test:sim-startup-layout": "node scripts/verify-sim-startup-layout.mjs",
+    "test:desktop-startup-layout": "node scripts/verify-sim-startup-layout.mjs",
+    "test:field-ui-layout": "node scripts/verify-field-ui-layout.mjs",
+    "test:field-installed-launcher": "node scripts/inspect-field-installed-launcher.mjs",
+    "test:settings-locales": "node scripts/verify-settings-locales.mjs",
+    "test:assistant-orchestration": "node scripts/verify-assistant-orchestration.mjs",
+    "test:autonomy-mission-entry": "node scripts/verify-autonomy-mission-entry.mjs",
+    "test:school-map-and-drone": "node scripts/verify-school-map-and-drone.mjs",
+    "test:fixed-scenarios-layout": "node scripts/verify-fixed-scenarios-layout.mjs",
+    "test:five-edition-desktop-parity": "node scripts/verify-five-edition-desktop-parity.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -21,14 +43,18 @@
     "@fontsource-variable/space-grotesk": "^5.2.10",
     "@supabase/supabase-js": "^2.110.8",
     "@tanstack/react-query": "^5.51.0",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-opener": "2.5.4",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
+    "@xyflow/react": "^12.11.3",
     "lucide-react": "^1.26.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "7.18.1",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "7.18.2",
+    "remark-gfm": "^4.0.1",
     "three": "^0.180.0"
   },
   "devDependencies": {
@@ -51,12 +77,15 @@
     "globals": "^17.7.0",
     "jsdom": "^28.1.0",
     "playwright": "^1.61.1",
-    "postcss": "^8.5.22",
+    "pngjs": "^5.0.0",
+    "postcss": "^8.5.23",
     "typescript": "^5.5.4",
     "vite": "^7.3.6",
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "undici": "^7.28.0"
+    "brace-expansion": "5.0.9",
+    "nanoid": "3.3.18",
+    "undici": "^7.29.0"
   }
 }

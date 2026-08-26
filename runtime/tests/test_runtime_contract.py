@@ -75,6 +75,30 @@ class RuntimeManifestContractTests(unittest.TestCase):
         self.assertEqual(backend["project"]["version"], pins["BACKEND_VERSION"])
         self.assertEqual(worker["project"]["version"], pins["WORKER_VERSION"])
 
+    def test_runtime_test_entrypoints_use_the_pinned_pytest_contract(self) -> None:
+        workflows = (
+            ROOT / ".github" / "workflows" / "runtime-contract.yml",
+            ROOT / ".github" / "workflows" / "quality-gate.yml",
+            ROOT / ".github" / "workflows" / "runtime-release.yml",
+        )
+        for workflow in workflows:
+            content = workflow.read_text(encoding="utf-8")
+            with self.subTest(workflow=workflow.name):
+                self.assertIn('"pytest==9.1.1"', content)
+                self.assertIn("python -m pytest runtime/tests -q", content)
+                self.assertNotIn("unittest discover -s runtime/tests", content)
+
+        check_script_path = ROOT / "scripts" / "check-runtime.sh"
+        if check_script_path.exists():
+            check_script = check_script_path.read_text(encoding="utf-8")
+            self.assertIn("pytest==9.1.1", check_script)
+            self.assertIn('"$RUNTIME_PYTHON" -m pytest runtime/tests -q', check_script)
+            self.assertNotIn("unittest discover -s runtime/tests", check_script)
+
+        readme = (RUNTIME / "README.md").read_text(encoding="utf-8")
+        self.assertIn("python -m pytest runtime/tests -q", readme)
+        self.assertNotIn("unittest discover -s runtime/tests", readme)
+
     def test_promotion_is_atomic_and_requires_every_real_check(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
@@ -185,33 +209,31 @@ class RuntimeManifestContractTests(unittest.TestCase):
         ):
             self.assertIn(fragment, desktop)
 
-    def test_packaged_desktop_runtime_requires_supabase_oidc(self) -> None:
-        values = {}
-        for raw_line in (
-            (RUNTIME / "config" / "runtime.env.default").read_text(encoding="utf-8").splitlines()
-        ):
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
-                continue
-            key, separator, value = line.partition("=")
-            self.assertEqual(separator, "=", raw_line)
-            values[key] = value
+    def test_services_execute_the_atomically_activated_engine_pack(self) -> None:
+        api = (RUNTIME / "systemd" / "dronedream-api.service").read_text(encoding="utf-8")
+        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(encoding="utf-8")
+        for service in (api, worker):
+            self.assertIn("/opt/dronedream/engine/current", service)
+            self.assertNotIn("WorkingDirectory=/opt/dronedream/source", service)
+        self.assertIn("engine/current/backend/alembic.ini", api)
+        self.assertIn("ExecStart=/opt/dronedream/venv/bin/drone-dream-worker", worker)
 
-        self.assertEqual(values["APP_ENV"], "desktop")
-        self.assertEqual(values["AUTH_MODE"], "oidc_jwt")
-        self.assertEqual(values["OIDC_AUDIENCE"], "authenticated")
-        self.assertEqual(values["OIDC_ALGORITHMS"], "ES256")
-        self.assertEqual(values["DESKTOP_BRIDGE_REQUIRED"], "true")
-        self.assertEqual(values["DESKTOP_BRIDGE_CLOCK_SKEW_SECONDS"], "30")
-        self.assertEqual(values["DESKTOP_BRIDGE_NONCE_RETENTION_SECONDS"], "600")
-        self.assertRegex(
-            values["OIDC_ISSUER"],
-            r"^https://[a-z0-9]+\.supabase\.co/auth/v1$",
-        )
-        self.assertEqual(
-            values["OIDC_JWKS_URL"],
-            values["OIDC_ISSUER"] + "/.well-known/jwks.json",
-        )
+    def test_runtime_auth_template_is_fail_closed_and_injected_at_build(self) -> None:
+        template = (RUNTIME / "config" / "runtime.env.default").read_text(encoding="utf-8")
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        build = (RUNTIME / "build-rootfs.sh").read_text(encoding="utf-8")
+        self.assertIn("AUTH_MODE=oidc_jwt", template)
+        self.assertIn("DESKTOP_BRIDGE_REQUIRED=true", template)
+        for placeholder in (
+            "__OIDC_ISSUER__",
+            "__OIDC_JWKS_URL__",
+            "__MODEL_GATEWAY_BASE_URL__",
+        ):
+            self.assertIn(placeholder, template)
+            self.assertIn(placeholder, dockerfile)
+        self.assertIn("VITE_SUPABASE_URL", build)
+        self.assertIn("/auth/v1/.well-known/jwks.json", build)
+        self.assertIn("/functions/v1/model-gateway", build)
 
 
 class ThirdPartyNoticeContractTests(unittest.TestCase):
@@ -460,6 +482,30 @@ class SystemdContractTests(unittest.TestCase):
         self.assertGreater(
             dockerfile.index("ARG DRONEDREAM_SOURCE_COMMIT"),
             dockerfile.index("COPY . /opt/dronedream/source"),
+        )
+
+    def test_runtime_seeds_a_verified_bootable_engine_pack_before_enabling_services(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        build_script = (RUNTIME / "build-rootfs.sh").read_text(encoding="utf-8")
+        self.assertIn(
+            'source_date_epoch=$(git -C "$root" show -s --format=%ct "$source_commit")',
+            build_script,
+        )
+        self.assertIn('--build-arg "DRONEDREAM_SOURCE_DATE_EPOCH=$source_date_epoch"', build_script)
+        self.assertIn("ARG DRONEDREAM_SOURCE_DATE_EPOCH", dockerfile)
+        self.assertIn("/opt/dronedream/source/engine-pack/tools/engine_pack.py", dockerfile)
+        self.assertIn("/usr/lib/dronedream/engine-pack-manager.py", dockerfile)
+        self.assertIn("--no-services", dockerfile)
+        for required in (
+            "test -L /opt/dronedream/engine/current",
+            "test -s /opt/dronedream/engine/current/engine-pack-manifest.json",
+            "test -d /opt/dronedream/engine/current/backend/app",
+            "test -d /opt/dronedream/engine/current/worker/drone_dream_worker",
+        ):
+            self.assertIn(required, dockerfile)
+        self.assertLess(
+            dockerfile.index("test -L /opt/dronedream/engine/current"),
+            dockerfile.index("systemctl enable dronedream-runtime-init.service"),
         )
 
     def test_runtime_diagnostic_tools_are_packaged_and_verified(self) -> None:

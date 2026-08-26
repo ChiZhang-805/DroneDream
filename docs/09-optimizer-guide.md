@@ -40,11 +40,6 @@ engine explicitly:
 - `bipop_cma_es`: full-covariance CMA-ES with a deterministic BIPOP-inspired
   alternating small/large restart schedule and stagnation recovery. This is
   not presented as the original BIPOP evaluation-budget balancing policy.
-  Sampling uses the symmetric positive-definite covariance square root rather
-  than a non-unique eigenvector factor, then canonicalizes unit-vector spelling.
-  A fixed seed therefore cannot be rotated into another discrete candidate
-  merely because a BLAS implementation chose a different basis for a repeated
-  eigenvalue.
 - `optimizer_portfolio`: allocates each generation across the six engines above
   using measured improvement, recent improvement, feasibility, and an
   exploration bonus. Every proposal records its child engine.

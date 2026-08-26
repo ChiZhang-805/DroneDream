@@ -19,6 +19,108 @@ These artifacts qualify routing discrimination only. They do not establish that
 LLM routing improves final simulation outcomes over a budget-matched
 deterministic optimizer campaign.
 
+## Current and historical Harness freezes
+
+The current provider Artifact is
+`harness-routing-gpt-4.1-2025-04-14-evidence-2.9-prompt-1.7-20260729.json`.
+It binds corpus SHA-256
+`98b94ae1e32f3df7f5d119cefebe0f949fea5f17c537f8688c7d4c05b1d92f89`
+and prompt-suite SHA-256
+`5e57d7a02e855f68eb4eb481e92e24b520775af1479534063ae352321e200d3f`.
+Its file SHA-256 is
+`11c5de7e208cb9b3e1263943ff8086bd919a57753948a9fd0db0ffd48e621ed1`;
+independent grading gives 23/24, 95.83% overall, and the declared qualification
+passes. The retained miss is `tight_budget_expensive_matrix`: the provider
+selected `turbo`, while the frozen corpus accepts `multi_fidelity_mobo` or
+`optimizer_portfolio`. Its manifest canonical-payload SHA-256 is
+`ea4c6242fe01c56f088d4042772dba763378d94d011f0c550c35ec862638ea7a`.
+The manifest binds exact source
+`d36ef166f985f761ab9e733753f61237950049da`, command, safe generation controls,
+duration, 24 provider calls, zero retries, exact artifact bytes, result, and
+claim boundary without persisting a credential or provider request ID. The
+artifact, manifest, and receipt are frozen together in evidence commit
+`d49353925ce074e3cb71508ee21cd2abfcee79cf`.
+
+The Evidence 2.8 / Prompt 1.7 provider run remains an immutable historical
+freeze with file SHA-256
+`d2359e0540aa284cd84262ec4c378369bc3fbab856d8384c3eff56738ef225c4`.
+Its matching aggregate score does not make its prompt suite or individual
+decisions interchangeable with the Evidence 2.9 freeze.
+
+The Prompt 1.6 / Evidence 2.7 provider run remains an immutable archived freeze.
+It scored 24/24 and has SHA-256
+`2cd125346b10bc914c90d889ef43db97714dbbce9f20bbe47b5e0365e39c76e4`.
+Its perfect score is not silently carried forward across the Prompt 1.7 /
+Evidence 2.8 contract change.
+
+Two Prompt 1.5 provider runs are intentionally retained. The first scored
+19/24 and is unqualified (SHA-256
+`fddf588a74ce675cd521172a841a6f5daefe1fe5b5b2c6834979c54df6b73acf`);
+the rerun scored 21/24 and meets the declared routing thresholds (SHA-256
+`9e3c198664e79097c6fef540b0d775fc009f148288e8051f3b5be759b1987571`).
+Their variation prevents treating the later Prompt 1.6 result as a causal
+prompt-lift estimate. The original Evidence 2.4 / Prompt 1.1 Artifact is also
+historical and is rejected by the current loader.
+
+The `harness-contract-ablation-v2.*` and
+`harness-component-outcome-ablation-v2.*` files are current-contract
+successors. Their `v1` counterparts remain immutable historical freezes; the
+version bump prevents a Prompt/Evidence upgrade from overwriting prior bytes.
+
+`harness-fallback-contract-campaign-v3.*` is the current deterministic
+multi-tool fallback integration freeze. It preserves the 15 matched arms and
+474 persisted Trials from v2 while making the declared normalization contract
+literal: opaque nested `evidence_id` values are excluded from the campaign
+projection. Those IDs hash higher-precision intermediate floats and can differ
+between supported Python runtimes even when every normalized outcome field is
+identical. The v3 artifact canonical SHA-256 is
+`12d200777278455cfc4f47de127f027d43834901e76b793d5addbb18c5435605`;
+the JSON and CSV file SHA-256 values are
+`1c7b7a15662ae519c4f1b1c17db018a3cc7536f5ec5c87bf4f7b2f50e36bd458`
+and
+`d4a002789924297973c19d4b0213b381ce30c437e441346732a52b64f9bde4c2`.
+The v2 files remain immutable and strictly verifiable as historical evidence.
+Neither version establishes LLM superiority, causal Harness benefit, physical
+fidelity, or PX4/Gazebo performance.
+
+`harness-reflection-trigger-ablation-v1.*` freezes six direct input
+interventions against the production receding-plan compiler, eligibility gate,
+and selectable-tool surface. Across seven evaluated steps, four interventions
+change phase, tool surface, and selected tool. The high-cost/stagnation case is
+an explicit no-observed-difference result because the trusted search summary,
+not the removed observed outcome, governs that decision. The search-space
+exhaustion case is explicitly inconclusive because no dispatched cohort exists
+and therefore no reflection intervention activates. The artifact SHA-256 is
+`cb7cc30bac7f63df4ddda84d81f881e111b6bac229eacc0b5ec5a228df3b0c38`.
+Recompute and require byte-identical files with:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe scripts\evaluate_harness_reflection_triggers.py --check
+```
+
+`harness-reflection-outcome-stress-v1.*` extends the same four matched arms
+and five seed blocks to a pilot-informed four-generation, 120-Trial ceiling.
+The 20 synthetic Jobs persist 1,588 Trials with complete evidence and zero
+network calls. Removing verified observed outcomes activates the intervention
+and changes both tool sequence and frozen outcome in all five blocks. It does
+not establish a general benefit: full AURORA has lower holdout loss in one
+block and the comparison in four; full AURORA uses fewer realized Trials in
+three blocks and the comparison in two. The aggregate comparison-minus-full
+Trial delta is `+44`, but the paired direction is mixed and must not be
+described as a consistent cost reduction. The protocol is synthetic,
+pilot-informed, and non-confirmatory; it establishes neither LLM superiority
+nor PX4/Gazebo, physical, sim-to-real, safety, or generalized causal benefit.
+The artifact SHA-256 is
+`6da3544651ee56428b6e78f1613fd520c46b789dc3e7f9d44fc8be153dd9f5b3`.
+Recompute all arms and require byte-identical files with:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe `
+  scripts\evaluate_harness_reflection_outcome_stress.py --check
+```
+
 `simulation-coverage-mock-v3.json` is the current separate deterministic
 outcome campaign; v2 remains an immutable historical freeze. The v3 campaign
 runs the production optimizer portfolio against all ten mock scenario types,

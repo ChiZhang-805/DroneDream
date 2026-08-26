@@ -1,26 +1,7 @@
 name: Runtime contract
 
 on:
-  pull_request:
-    paths:
-      - "runtime/**"
-      - ".github/workflows/runtime-contract.yml"
-      - ".github/workflows/runtime-release.yml"
-      - "desktop/src-tauri/src/runtime.rs"
-      - "backend/app/routers/health.py"
-      - "backend/pyproject.toml"
-      - "worker/pyproject.toml"
-      - "scripts/simulators/**"
-  push:
-    paths:
-      - "runtime/**"
-      - ".github/workflows/runtime-contract.yml"
-      - ".github/workflows/runtime-release.yml"
-      - "desktop/src-tauri/src/runtime.rs"
-      - "backend/app/routers/health.py"
-      - "backend/pyproject.toml"
-      - "worker/pyproject.toml"
-      - "scripts/simulators/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -40,7 +21,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check \
             --requirement runtime/locks/release-tools-requirements.lock \
-            "ruff==0.15.21"
+            "ruff==0.15.21" "pytest==9.1.1"
           python -m ruff check runtime/tools runtime/tests runtime/scripts scripts/simulators
           python -m ruff check runtime/tools runtime/scripts scripts/simulators --select S
           python -m ruff format --check runtime/tools runtime/tests runtime/scripts \
@@ -49,7 +30,7 @@ jobs:
             --pins runtime/pins.env \
             --python-lock runtime/locks/python-requirements.lock
           python -m compileall -q runtime/tools runtime/tests runtime/scripts scripts/simulators
-          python -m unittest discover -s runtime/tests -v
+          python -m pytest runtime/tests -q
       - name: Validate shell syntax
         run: |
           mapfile -d '' scripts < <(find runtime scripts/simulators -type f -name '*.sh' -print0)

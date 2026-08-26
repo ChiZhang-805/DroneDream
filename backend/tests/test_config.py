@@ -66,6 +66,26 @@ def test_managed_model_gateway_requires_credential_free_https() -> None:
         Settings(model_gateway_base_url="https://user:pass@example.com/model-gateway")
 
 
+def test_assistant_orchestrator_requires_the_trusted_oidc_origin() -> None:
+    settings = Settings(
+        oidc_issuer="https://example.supabase.co/auth/v1",
+        assistant_orchestrator_url=(
+            "https://example.supabase.co/functions/v1/assistant-orchestrator"
+        ),
+    )
+    assert settings.assistant_orchestrator_url.endswith("/assistant-orchestrator")
+
+    with pytest.raises(ValidationError, match="credential-free absolute HTTPS"):
+        Settings(assistant_orchestrator_url="http://example.supabase.co/orchestrator")
+    with pytest.raises(ValidationError, match="trusted OIDC issuer origin"):
+        Settings(
+            oidc_issuer="https://example.supabase.co/auth/v1",
+            assistant_orchestrator_url=(
+                "https://attacker.example/functions/v1/assistant-orchestrator"
+            ),
+        )
+
+
 def test_runtime_id_is_optional_and_requires_a_canonical_uuid() -> None:
     assert Settings().dronedream_runtime_id is None
     assert (
@@ -184,6 +204,17 @@ def test_production_oidc_auth_accepts_asymmetric_https_configuration() -> None:
     )
     assert settings.oidc_audience_list == ["dronedream-api"]
     assert settings.oidc_algorithm_list == ["RS256", "ES256"]
+
+
+def test_oidc_jwks_network_limits_are_bounded() -> None:
+    settings = Settings()
+    assert settings.oidc_jwks_timeout_seconds == 5
+    assert settings.oidc_jwks_max_bytes == 1024 * 1024
+
+    with pytest.raises(ValidationError):
+        Settings(oidc_jwks_timeout_seconds=31)
+    with pytest.raises(ValidationError):
+        Settings(oidc_jwks_max_bytes=4095)
 
 
 def test_oidc_auth_rejects_symmetric_token_algorithms() -> None:

@@ -14,6 +14,15 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("cloud model access client", () => {
+  it("fills the allowance bar from remaining credits and clamps invalid values", async () => {
+    const { cloud } = await loadCloudAccess();
+    expect(cloud.remainingAllowanceRatio(2_000, 2_000)).toBe(100);
+    expect(cloud.remainingAllowanceRatio(1_316, 2_000)).toBeCloseTo(65.8);
+    expect(cloud.remainingAllowanceRatio(-1, 2_000)).toBe(0);
+    expect(cloud.remainingAllowanceRatio(2_001, 2_000)).toBe(100);
+    expect(cloud.remainingAllowanceRatio(10, 0)).toBe(0);
+  });
+
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv(
@@ -27,6 +36,7 @@ describe("cloud model access client", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   });
@@ -104,10 +114,133 @@ describe("cloud model access client", () => {
         body: JSON.stringify({
           scope: "job",
           scope_reference: "draft-42",
+          provider: "openai",
+          model: "gpt-4.1",
         }),
       }),
     );
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("PLATFORM_LLM_API_KEY");
+  });
+
+  it("uses a one-time grant for a bounded managed chat completion", async () => {
+    const { cloud } = await loadCloudAccess();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      id: "chat-1",
+      model: "DroneDream Managed",
+      choices: [{ message: { role: "assistant", content: '{"summary":"ready"}' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await cloud.completeManagedModelChat(
+      {
+        access_mode: "platform",
+        grant: `ddg_${"a".repeat(48)}`,
+        scope: "assistant",
+        expires_at: "2026-08-08T01:00:00Z",
+        max_calls: 1,
+        gateway_base_url: "https://cloud.example.test/functions/v1/model-gateway",
+        managed_model: "DroneDream Managed",
+        usage: {} as never,
+      },
+      [{ role: "user", content: "Prepare a bounded Field plan." }],
+      { type: "json_object" },
+    );
+
+    expect(result.choices[0]?.message.content).toContain("summary");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://cloud.example.test/functions/v1/model-gateway/chat/completions",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ddg_${"a".repeat(48)}`,
+          "Idempotency-Key": expect.any(String),
+        }),
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Prepare a bounded Field plan." }],
+          response_format: { type: "json_object" },
+        }),
+      }),
+    );
+  });
+
+  it("rejects a grant gateway outside the managed-model endpoint", async () => {
+    const { cloud } = await loadCloudAccess();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(cloud.completeManagedModelChat(
+      {
+        access_mode: "platform",
+        grant: `ddg_${"a".repeat(48)}`,
+        scope: "assistant",
+        expires_at: "2026-08-08T01:00:00Z",
+        max_calls: 1,
+        gateway_base_url: "https://attacker.example.test/collect",
+        managed_model: "DroneDream Managed",
+        usage: {} as never,
+      },
+      [{ role: "user", content: "test" }],
+    )).rejects.toMatchObject({
+      code: "MODEL_GATEWAY_INVALID",
+      status: 503,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("loads the centrally filtered model catalog and requests one provider", async () => {
+    const { cloud, auth } = await loadCloudAccess();
+    auth.setAuthAccessToken("signed-user-token");
+    const catalog = {
+      policy_version: 8,
+      models: [
+        {
+          provider: "deepseek",
+          display_name: "DeepSeek",
+          model: "deepseek-chat",
+          enabled: true,
+          assistant_enabled: true,
+          job_enabled: false,
+          policy_version: 8,
+        },
+      ],
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ data: catalog }))
+      .mockResolvedValueOnce(jsonResponse({
+        data: {
+          access_mode: "platform",
+          grant: "ddg_one_time_scoped_test_grant_1234567890",
+          scope: "assistant",
+          expires_at: "2026-08-03T00:00:00Z",
+          max_calls: 1,
+          gateway_base_url: "https://cloud.example.test/functions/v1/model-gateway",
+          managed_model: "deepseek-chat",
+          usage: {},
+        },
+      }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(cloud.getManagedModelCatalog()).resolves.toEqual(catalog);
+    await cloud.issueManagedModelGrant(
+      "assistant",
+      "draft-84",
+      "deepseek",
+      "deepseek-v4-flash",
+    );
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://cloud.example.test/functions/v1/model-gateway/models",
+    );
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({
+      body: JSON.stringify({
+        scope: "assistant",
+        scope_reference: "draft-84",
+        provider: "deepseek",
+        model: "deepseek-v4-flash",
+      }),
+    }));
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toMatch(/api[_-]?key/iu);
   });
 
   it("maps an exhausted managed allowance to the typed BYOK boundary", async () => {
@@ -125,6 +258,55 @@ describe("cloud model access client", () => {
       code: "MODEL_QUOTA_EXHAUSTED",
       status: 402,
       message: "Switch to BYOK or upgrade.",
+    });
+  });
+
+  it("fails at its deadline when response headers arrive but the body stalls", async () => {
+    vi.useFakeTimers();
+    const { cloud, auth } = await loadCloudAccess();
+    auth.setAuthAccessToken("signed-user-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull: () => new Promise<void>(() => undefined),
+          }),
+        ),
+      ),
+    );
+
+    const assertion = expect(cloud.getManagedModelUsage()).rejects.toMatchObject({
+      name: "CloudModelAccessError",
+      code: "NETWORK_ERROR",
+      status: 0,
+      message: "Request timed out after 30 seconds.",
+    });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await assertion;
+  });
+
+  it("reports an oversized cloud response without attempting JSON parsing", async () => {
+    const { cloud, auth } = await loadCloudAccess();
+    auth.setAuthAccessToken("signed-user-token");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("{}", {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": String(1024 * 1024 + 1),
+          },
+        }),
+      ),
+    );
+
+    await expect(cloud.getManagedModelUsage()).rejects.toMatchObject({
+      name: "CloudModelAccessError",
+      code: "RESPONSE_TOO_LARGE",
+      status: 200,
+      message: "Response exceeded the 1 MiB safety limit.",
     });
   });
 
@@ -198,6 +380,7 @@ describe("cloud model access client", () => {
       }),
       body: JSON.stringify({
         plan_id: "plus",
+        billing_scope: "individual",
         payment_method: "wechat",
         idempotency_key: "6f882c36-e6df-4a44-af8d-2ae0104f6bf0",
       }),

@@ -14,6 +14,7 @@ dist/
 .vite/
 *.tsbuildinfo
 *.log
+!backend/tests/fixtures/test_run_receipt_v1.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -39,9 +40,15 @@ pnpm-debug.log*
 # Build artifacts / data
 artifacts/
 /.artifacts/
+desktop/src-tauri/binaries/
+desktop/src-tauri/agent-core-resources/
 tmp/
 /desktop/src-tauri/target/
 /desktop/src-tauri/gen/
+/brand/generated/
+/frontend/public/drone-favicon.png
 /frontend/site-dist/
+/frontend/field-dist/
+/supabase/.temp/
 /runtime/out/
 /output/

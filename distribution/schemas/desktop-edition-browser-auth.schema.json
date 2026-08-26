@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/desktop-edition-browser-auth.v1.json",
+  "title": "DroneDream desktop edition browser authorization contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "contractVersion",
+    "identityBinding",
+    "accountAuthority",
+    "authorizationProtocol",
+    "credentialStorage",
+    "logoutSemantics",
+    "auditReceipt",
+    "editions",
+    "releaseGate"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-desktop-edition-browser-auth"},
+    "contractVersion": {"const": "1.0.0"},
+    "identityBinding": {"$ref": "#/$defs/identityBinding"},
+    "accountAuthority": {"$ref": "#/$defs/accountAuthority"},
+    "authorizationProtocol": {"$ref": "#/$defs/authorizationProtocol"},
+    "credentialStorage": {"$ref": "#/$defs/credentialStorage"},
+    "logoutSemantics": {"$ref": "#/$defs/logoutSemantics"},
+    "auditReceipt": {"$ref": "#/$defs/auditReceipt"},
+    "editions": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {"$ref": "#/$defs/edition"}
+    },
+    "releaseGate": {"$ref": "#/$defs/releaseGate"}
+  },
+  "$defs": {
+    "identityBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractPath", "contractSha256"],
+      "properties": {
+        "contractPath": {"const": "distribution/desktop/edition-coexistence.v1.json"},
+        "contractSha256": {"pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "accountAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "projectUrl",
+        "sharedAccountSubject",
+        "sharedCloudAuthorization",
+        "explicitPerEditionAuthorizationRequired",
+        "browserSessionMayReduceCredentialEntry",
+        "automaticCrossEditionAuthentication",
+        "desktopTokenImport"
+      ],
+      "properties": {
+        "provider": {"const": "supabase"},
+        "projectUrl": {"const": "https://yggabfynndpzymlqvnim.supabase.co"},
+        "sharedAccountSubject": {"const": true},
+        "sharedCloudAuthorization": {"const": true},
+        "explicitPerEditionAuthorizationRequired": {"const": true},
+        "browserSessionMayReduceCredentialEntry": {"const": true},
+        "automaticCrossEditionAuthentication": {"const": false},
+        "desktopTokenImport": {"const": false}
+      }
+    },
+    "authorizationProtocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolVersion", "flow", "pkceMethod", "nativeVerifierBytes", "stateBytes",
+        "nonceBytes", "attemptIdBytes", "transactionTtlSeconds", "singleActiveAttemptPerEdition",
+        "oneTimeCallback", "oneTimeCodeExchange", "providerRetryCount", "authorizationEndpoint",
+        "tokenExchangeEndpoint", "authorizationUiEndpoint", "callbackTransport", "loopbackHost",
+        "fixedRegisteredLoopbackPortRequired", "strictHostAndOriginRequired", "callbackPathTemplate",
+        "callbackFields", "nativeBoundContext", "callbackMustNotContain",
+        "browserConfirmationRequired", "uninitiatedCallbackDenied", "crossEditionCallbackDenied",
+        "crossPortCallbackDenied", "expiredCallbackDenied", "replayedCallbackDenied",
+        "directPasswordPageAllowed", "rawTokenLoopbackAllowed"
+      ],
+      "properties": {
+        "protocolVersion": {"const": "desktop-browser-auth-pkce-v1"},
+        "flow": {"const": "hosted-authorization-code-pkce"},
+        "pkceMethod": {"const": "S256"},
+        "nativeVerifierBytes": {"const": 32},
+        "stateBytes": {"const": 32},
+        "nonceBytes": {"const": 32},
+        "attemptIdBytes": {"const": 16},
+        "transactionTtlSeconds": {"const": 600},
+        "singleActiveAttemptPerEdition": {"const": true},
+        "oneTimeCallback": {"const": true},
+        "oneTimeCodeExchange": {"const": true},
+        "providerRetryCount": {"const": 0},
+        "authorizationEndpoint": {"const": "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize"},
+        "tokenExchangeEndpoint": {"const": "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/token"},
+        "authorizationUiEndpoint": {"const": "https://getdronedream.com/oauth/consent"},
+        "callbackTransport": {"const": "loopback-http"},
+        "loopbackHost": {"const": "127.0.0.1"},
+        "fixedRegisteredLoopbackPortRequired": {"const": true},
+        "strictHostAndOriginRequired": {"const": true},
+        "callbackPathTemplate": {"const": "/desktop-auth/{editionId}/callback"},
+        "callbackFields": {"const": ["code", "state"]},
+        "nativeBoundContext": {"const": ["editionId", "authClientId", "attemptId", "callbackPort", "codeVerifier", "nonce"]},
+        "callbackMustNotContain": {"const": ["accessToken", "refreshToken", "password", "cookie"]},
+        "browserConfirmationRequired": {"const": true},
+        "uninitiatedCallbackDenied": {"const": true},
+        "crossEditionCallbackDenied": {"const": true},
+        "crossPortCallbackDenied": {"const": true},
+        "expiredCallbackDenied": {"const": true},
+        "replayedCallbackDenied": {"const": true},
+        "directPasswordPageAllowed": {"const": false},
+        "rawTokenLoopbackAllowed": {"const": false}
+      }
+    },
+    "credentialStorage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "refreshTokenPersistence", "accessTokenPersistence", "plainTextPasswordPersistence",
+        "plainTextTokenFileAllowed", "crossEditionDiscoveryAllowed", "crossEditionImportAllowed",
+        "vaultEntryKeyTemplate", "webViewStorageMustMatchBundleIdentifier"
+      ],
+      "properties": {
+        "refreshTokenPersistence": {"const": "windows-credential-manager"},
+        "accessTokenPersistence": {"const": "edition-webview-session-cache"},
+        "plainTextPasswordPersistence": {"const": false},
+        "plainTextTokenFileAllowed": {"const": false},
+        "crossEditionDiscoveryAllowed": {"const": false},
+        "crossEditionImportAllowed": {"const": false},
+        "vaultEntryKeyTemplate": {"const": "{credentialVaultNamespace}/{accountSubjectHash}"},
+        "webViewStorageMustMatchBundleIdentifier": {"const": true}
+      }
+    },
+    "logoutSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["localEditionLogout", "globalLogout", "localLogoutMustNotClearOtherEditions", "globalLogoutRequiresSeparateConfirmation"],
+      "properties": {
+        "localEditionLogout": {"const": "revoke-current-edition-session-and-clear-current-edition-vault-only"},
+        "globalLogout": {"const": "explicit-server-side-revoke-all-sessions"},
+        "localLogoutMustNotClearOtherEditions": {"const": true},
+        "globalLogoutRequiresSeparateConfirmation": {"const": true}
+      }
+    },
+    "auditReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "receiptVersion", "allowedFields", "forbiddenFields"],
+      "properties": {
+        "kind": {"const": "dronedream-desktop-browser-auth-attempt"},
+        "receiptVersion": {"const": 1},
+        "allowedFields": {"type": "array", "minItems": 14, "uniqueItems": true, "items": {"type": "string"}},
+        "forbiddenFields": {"const": ["accessToken", "refreshToken", "password", "cookie", "rawCallback", "providerRequestId"]}
+      }
+    },
+    "edition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["editionId", "authClientId", "providerClientIdBuildVariable", "bundleIdentifier", "loopbackPathPrefix", "loopbackPort", "redirectUri", "customProtocol", "credentialVaultNamespace", "webViewDataNamespace"],
+      "properties": {
+        "editionId": {"enum": ["universal", "sim", "lab", "field", "autonomy"]},
+        "authClientId": {"pattern": "^dronedream-desktop-(universal|sim|lab|field|autonomy)$"},
+        "providerClientIdBuildVariable": {"const": "DRONEDREAM_OAUTH_CLIENT_ID"},
+        "bundleIdentifier": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field|autonomy)$"},
+        "loopbackPathPrefix": {"pattern": "^/desktop-auth/(universal|sim|lab|field|autonomy)/$"},
+        "loopbackPort": {"type": "integer", "minimum": 49152, "maximum": 65535},
+        "redirectUri": {"pattern": "^http://127\\.0\\.0\\.1:[0-9]+/desktop-auth/(universal|sim|lab|field|autonomy)/callback$"},
+        "customProtocol": {"pattern": "^dronedream-(universal|sim|lab|field|autonomy)$"},
+        "credentialVaultNamespace": {"pattern": "^DroneDream/Auth/(universal|sim|lab|field|autonomy)/v1$"},
+        "webViewDataNamespace": {"pattern": "^io\\.dronedream\\.desktop\\.(universal|sim|lab|field|autonomy)$"}
+      }
+    },
+    "releaseGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nativeProtocolEnforcementReceiptRequired", "hostedBrokerReceiptRequired", "credentialVaultReceiptRequired", "fiveEditionConcurrencyReceiptRequired", "cancelTimeoutOfflineSwitchAccountReceiptRequired", "releaseMayUseLegacyDirectTokenLoopback"],
+      "properties": {
+        "nativeProtocolEnforcementReceiptRequired": {"const": true},
+        "hostedBrokerReceiptRequired": {"const": true},
+        "credentialVaultReceiptRequired": {"const": true},
+        "fiveEditionConcurrencyReceiptRequired": {"const": true},
+        "cancelTimeoutOfflineSwitchAccountReceiptRequired": {"const": true},
+        "releaseMayUseLegacyDirectTokenLoopback": {"const": false}
+      }
+    }
+  }
+}

@@ -26,6 +26,7 @@ import math
 import os
 import shutil
 import threading
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -42,6 +43,7 @@ from app.optimization.outcome_taxonomy import classify_trial_outcome
 from app.optimization.scenarios import validate_scenario_execution_contract
 from app.orchestration.attempt_evidence import (
     TrialAttemptEvidenceError,
+    accepted_trial_attempt_evidence,
     record_accepted_trial_attempt_outcome,
     record_superseded_trial_attempt_outcome,
     record_trial_attempt_claim,
@@ -50,6 +52,9 @@ from app.orchestration.attempt_evidence import (
 )
 from app.orchestration.events import record_event
 from app.orchestration.outcome_contract_guard import check_job_outcome_contract
+from app.orchestration.qualification_receipts import (
+    record_qualification_trial_receipt,
+)
 from app.parameters import get_parameter, validate_parameter_values
 from app.simulator import (
     ArtifactMetadata,
@@ -64,6 +69,7 @@ from app.simulator.base import (
     FAILURE_ARTIFACT_PERSISTENCE,
     FAILURE_INPUT_EVIDENCE_DRIFT,
     FAILURE_INVALID_PARAMETERS,
+    FAILURE_INVALID_RESULT,
     FAILURE_OUTCOME_CONTRACT_DRIFT,
     FAILURE_RESULT_PERSISTENCE,
     FAILURE_SCENARIO_CONTRACT_DRIFT,
@@ -102,7 +108,7 @@ def _resolve_backend_override(
     2. The job's ``simulator_backend_requested`` column — Phase 8 per-job
        UI selection.
     3. ``None`` — the :func:`~app.simulator.factory.get_simulator_adapter`
-       default (``mock``).
+       product default (``real_cli``).
     """
 
     if env_backend:
@@ -159,8 +165,7 @@ def _attempt_for_token(
     return db.scalar(
         select(models.TrialExecutionAttempt).where(
             models.TrialExecutionAttempt.trial_id == token.trial_id,
-            models.TrialExecutionAttempt.attempt_count
-            == token.attempt_count,
+            models.TrialExecutionAttempt.attempt_count == token.attempt_count,
         )
     )
 
@@ -193,9 +198,7 @@ def _seal_accepted_attempt(
     db.flush()
     attempt = db.get(models.TrialExecutionAttempt, attempt_id)
     if attempt is None:
-        raise TrialAttemptEvidenceError(
-            "terminal Trial is missing its physical attempt claim"
-        )
+        raise TrialAttemptEvidenceError("terminal Trial is missing its physical attempt claim")
     outcome_class = classify_trial_outcome(
         status=trial.status,
         failure_code=trial.failure_code,
@@ -210,6 +213,33 @@ def _seal_accepted_attempt(
             trial,
             verify_bytes=True,
         ),
+    )
+
+
+def _seal_qualification_trial_receipt(
+    db: Session,
+    *,
+    trial: models.Trial,
+) -> None:
+    """Persist the terminal qualification receipt in the Trial transaction."""
+
+    if trial.qualification_id is None:
+        return
+    db.flush()
+    artifact_evidence = _trial_artifact_evidence(
+        trial,
+        verify_bytes=True,
+    )
+    db.expire(trial, ["accepted_attempt", "qualification_receipt"])
+    accepted_attempt = accepted_trial_attempt_evidence(
+        trial,
+        artifact_evidence=artifact_evidence,
+    )
+    record_qualification_trial_receipt(
+        db,
+        trial=trial,
+        accepted_attempt=accepted_attempt,
+        artifact_evidence=artifact_evidence,
     )
 
 
@@ -271,6 +301,7 @@ class _TrialLeaseHeartbeat:
     def _run(self) -> None:
         from app.db import SessionLocal
 
+        renewal_deadline = time.monotonic() + float(self._lease_seconds)
         while not self._stop.wait(self._interval_seconds):
             try:
                 with SessionLocal() as heartbeat_db:
@@ -285,14 +316,29 @@ class _TrialLeaseHeartbeat:
                             self._cancellation_event.set()
                         return
                     heartbeat_db.commit()
+                    renewal_deadline = time.monotonic() + float(self._lease_seconds)
             except Exception:
-                # A transient database outage should not kill a simulator
-                # process. The completion fence below remains authoritative.
                 logger.warning(
                     "failed to renew lease for trial %s",
                     self._token.trial_id,
                     exc_info=True,
                 )
+                # A short database outage does not invalidate the current
+                # ownership proof. Once the last confirmed lease window has
+                # elapsed, however, another worker may legally reclaim the
+                # Trial. Stop this adapter through its cancellation event so
+                # two physical simulations do not keep running in parallel;
+                # the completion fence remains the final persistence guard.
+                if time.monotonic() >= renewal_deadline:
+                    self.lost.set()
+                    if self._cancellation_event is not None:
+                        self._cancellation_event.set()
+                    logger.error(
+                        "trial %s lease could not be confirmed before expiry; "
+                        "requesting simulator cancellation",
+                        self._token.trial_id,
+                    )
+                    return
 
 
 def _acquire_completion_fence(
@@ -303,22 +349,14 @@ def _acquire_completion_fence(
 ) -> bool:
     """Fence result persistence using the global Job-before-Trial lock order."""
 
-    job_id = db.scalar(
-        select(models.Trial.job_id).where(
-            models.Trial.id == token.trial_id
-        )
-    )
+    job_id = db.scalar(select(models.Trial.job_id).where(models.Trial.id == token.trial_id))
     if not isinstance(job_id, str) or not job_id:
         db.rollback()
         return False
     # Cancellation acquires the Job row before it updates child Trials. Taking
     # the same first lock here prevents a PostgreSQL Job<->Trial deadlock when
     # cancellation races simulator completion.
-    locked_job = db.scalar(
-        select(models.Job)
-        .where(models.Job.id == job_id)
-        .with_for_update()
-    )
+    locked_job = db.scalar(select(models.Job).where(models.Job.id == job_id).with_for_update())
     if locked_job is None:
         db.rollback()
         return False
@@ -367,9 +405,7 @@ def _claim_inputs_still_match(
     db.expire_all()
     if lock_sources:
         locked_job = db.scalar(
-            select(models.Job)
-            .where(models.Job.id == trial.job_id)
-            .with_for_update()
+            select(models.Job).where(models.Job.id == trial.job_id).with_for_update()
         )
         locked_candidate = db.scalar(
             select(models.CandidateParameterSet)
@@ -385,12 +421,9 @@ def _claim_inputs_still_match(
         )
     else:
         current_attempt = db.get(models.TrialExecutionAttempt, attempt_id)
-    return (
-        current_attempt is not None
-        and trial_attempt_claim_matches_current_inputs(
-            trial,
-            attempt=current_attempt,
-        )
+    return current_attempt is not None and trial_attempt_claim_matches_current_inputs(
+        trial,
+        attempt=current_attempt,
     )
 
 
@@ -413,10 +446,7 @@ def _trial_execution_contract_failure(
     if candidate.job_id != job.id:
         return (FAILURE_SCENARIO_CONTRACT_DRIFT, "candidate_job_mismatch")
     if candidate.source_type == "baseline":
-        if (
-            not candidate.is_baseline
-            or job.baseline_candidate_id != candidate.id
-        ):
+        if not candidate.is_baseline or job.baseline_candidate_id != candidate.id:
             return (
                 FAILURE_SCENARIO_CONTRACT_DRIFT,
                 "baseline_candidate_identity_mismatch",
@@ -615,10 +645,7 @@ def _build_trial_context(
         raw_trial_value = input_snapshot.get("trial")
         parameters = input_snapshot.get("candidate_parameters")
         raw_job_config = input_snapshot.get("job_config")
-        if (
-            not isinstance(raw_trial_value, Mapping)
-            or not isinstance(raw_job_config, Mapping)
-        ):
+        if not isinstance(raw_trial_value, Mapping) or not isinstance(raw_job_config, Mapping):
             raise ValueError("trial execution input snapshot has an invalid shape")
         raw_trial = raw_trial_value
         scenario_config = raw_trial.get("scenario_config")
@@ -646,11 +673,7 @@ def _build_trial_context(
         or not scenario_type
     ):
         raise ValueError("trial execution input identity is invalid")
-    if (
-        isinstance(attempt_count, bool)
-        or not isinstance(attempt_count, int)
-        or attempt_count < 1
-    ):
+    if isinstance(attempt_count, bool) or not isinstance(attempt_count, int) or attempt_count < 1:
         raise ValueError("trial attempt_count must be a positive integer")
     return TrialContext(
         trial_id=trial_id,
@@ -660,11 +683,7 @@ def _build_trial_context(
         parameters=copy.deepcopy(parameters),
         seed=seed,
         scenario_type=scenario_type,
-        scenario_config=(
-            copy.deepcopy(scenario_config)
-            if scenario_config is not None
-            else None
-        ),
+        scenario_config=(copy.deepcopy(scenario_config) if scenario_config is not None else None),
         attempt_count=attempt_count,
         cancellation_event=cancellation_event,
     )
@@ -680,7 +699,11 @@ _LEGACY_CONTROLLER_PARAMETERS = {
 }
 
 
-def _validate_trial_px4_parameters(ctx: TrialContext) -> TrialContext:
+def _validate_trial_px4_parameters(
+    ctx: TrialContext,
+    *,
+    require_explicit_px4_parameters: bool = False,
+) -> TrialContext:
     """Final safety fence before any simulator process is started."""
 
     profile = dict(ctx.job_config.vehicle_profile or {})
@@ -732,6 +755,8 @@ def _validate_trial_px4_parameters(ctx: TrialContext) -> TrialContext:
                 px4_values[name] = value
 
     if not px4_values:
+        if require_explicit_px4_parameters:
+            raise ValueError("real_cli optimization requires at least one explicit PX4 parameter")
         return ctx
     normalized = validate_parameter_values(
         px4_values,
@@ -780,9 +805,7 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                 f"{source_sha256}-{safe_name}"
             )
             if key in seen_storage_keys:
-                raise ArtifactIntegrityError(
-                    "trial returned duplicate artifact content metadata"
-                )
+                raise ArtifactIntegrityError("trial returned duplicate artifact content metadata")
             seen_storage_keys.add(key)
             if settings.artifact_storage_backend == "local":
                 # LocalArtifactStorage intentionally returns the source path.
@@ -795,20 +818,13 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if local_path.resolve() != target:
                     if target.is_file():
-                        target_sha256, target_size = artifact_content_digest(
-                            target
-                        )
-                        if (
-                            target_sha256 != source_sha256
-                            or target_size != source_size
-                        ):
+                        target_sha256, target_size = artifact_content_digest(target)
+                        if target_sha256 != source_sha256 or target_size != source_size:
                             raise ArtifactIntegrityError(
                                 "content-addressed artifact target was modified"
                             )
                     else:
-                        temporary = target.with_name(
-                            f".{target.name}.{os.getpid()}.tmp"
-                        )
+                        temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
                         try:
                             shutil.copy2(local_path, temporary)
                             temporary.replace(target)
@@ -830,18 +846,11 @@ def _persist_artifacts(db: Session, trial: models.Trial, artifacts: list[Artifac
             persisted_size = local_path.stat().st_size
             digest_source = local_path
             if settings.artifact_storage_backend != "local":
-                stored_content = storage.read_bytes(storage_path)
-                stored_sha256, stored_size = artifact_content_digest(
-                    stored_content
-                )
-                if (
-                    stored_sha256 != source_sha256
-                    or stored_size != source_size
-                ):
+                stored_sha256, stored_size = storage.content_digest(storage_path)
+                if stored_sha256 != source_sha256 or stored_size != source_size:
                     raise ArtifactIntegrityError(
                         "artifact storage did not preserve simulator bytes"
                     )
-                digest_source = stored_content
         artifact = models.Artifact(
             owner_type="trial",
             owner_id=trial.id,
@@ -910,11 +919,7 @@ def _handle_artifact_persistence_failure(
             code=failure_code,
             reason=failure_reason,
             log_excerpt=log_excerpt,
-            attempt_id=(
-                current_attempt.id
-                if current_attempt is not None
-                else None
-            ),
+            attempt_id=(current_attempt.id if current_attempt is not None else None),
         )
     finally:
         _finalize_adapter_run(simulator, ctx, None)
@@ -938,21 +943,21 @@ def claim_and_run_one_pending_trial(
     """
 
     worker_id = _validated_worker_id(worker_id)
-    now = _now()
     lease_seconds = get_settings().worker_lease_seconds
-    lease_until = now + timedelta(seconds=lease_seconds)
     reclaim_enabled = get_settings().worker_stale_running_reclaim_enabled
-    claimable = (models.Trial.status == "PENDING") & (
-        models.Trial.lease_expires_at.is_(None) | (models.Trial.lease_expires_at <= now)
-    )
-    stale_running = (
-        (models.Trial.status == "RUNNING")
-        & (models.Trial.lease_expires_at.is_not(None))
-        & (models.Trial.lease_expires_at <= now)
-    )
-    claim_pool = or_(claimable, stale_running) if reclaim_enabled else claimable
     claim_collisions = 0
     while True:
+        eligibility_now = _now()
+        claimable = (models.Trial.status == "PENDING") & (
+            models.Trial.lease_expires_at.is_(None)
+            | (models.Trial.lease_expires_at <= eligibility_now)
+        )
+        stale_running = (
+            (models.Trial.status == "RUNNING")
+            & (models.Trial.lease_expires_at.is_not(None))
+            & (models.Trial.lease_expires_at <= eligibility_now)
+        )
+        claim_pool = or_(claimable, stale_running) if reclaim_enabled else claimable
         # Schedule the least-served eligible Job first, then its oldest Trial.
         # The Job row is the short-lived scheduling mutex on PostgreSQL:
         # concurrent workers skip a locked Job and spread across other runnable
@@ -961,17 +966,14 @@ def claim_and_run_one_pending_trial(
         # work), so newly arrived Jobs receive prompt service without erasing
         # the FIFO order inside any one Job.
         eligible_trial = aliased(models.Trial)
-        eligible_claimable = (
-            (eligible_trial.status == "PENDING")
-            & (
-                eligible_trial.lease_expires_at.is_(None)
-                | (eligible_trial.lease_expires_at <= now)
-            )
+        eligible_claimable = (eligible_trial.status == "PENDING") & (
+            eligible_trial.lease_expires_at.is_(None)
+            | (eligible_trial.lease_expires_at <= eligibility_now)
         )
         eligible_stale_running = (
             (eligible_trial.status == "RUNNING")
             & (eligible_trial.lease_expires_at.is_not(None))
-            & (eligible_trial.lease_expires_at <= now)
+            & (eligible_trial.lease_expires_at <= eligibility_now)
         )
         eligible_pool = (
             or_(eligible_claimable, eligible_stale_running)
@@ -988,12 +990,14 @@ def claim_and_run_one_pending_trial(
         selected_job_id = db.scalar(
             select(models.Job.id)
             .where(
+                models.Job.status == "RUNNING",
+                models.Job.first_qualified_candidate_id.is_(None),
                 exists(
                     select(eligible_trial.id).where(
                         eligible_trial.job_id == models.Job.id,
                         eligible_pool,
                     )
-                )
+                ),
             )
             .order_by(
                 served_attempts.asc(),
@@ -1007,8 +1011,19 @@ def claim_and_run_one_pending_trial(
             return None
         selected_trial = db.execute(
             select(models.Trial.id, models.Trial.job_id, models.Trial.status)
+            .join(
+                models.CandidateParameterSet,
+                models.CandidateParameterSet.id == models.Trial.candidate_id,
+            )
             .where(models.Trial.job_id == selected_job_id, claim_pool)
             .order_by(
+                # Windows' wall-clock resolution can assign the same queued
+                # and created timestamps to an entire dispatch batch.  The
+                # server-issued candidate ordinal is the authoritative order;
+                # UUIDs must never decide whether baseline or optimizer work
+                # reaches the first-qualified gate first.
+                models.CandidateParameterSet.dispatch_ordinal.asc().nullslast(),
+                models.Trial.qualification_ordinal.asc().nullslast(),
                 models.Trial.queued_at.asc().nullsfirst(),
                 models.Trial.created_at.asc(),
                 models.Trial.id.asc(),
@@ -1030,6 +1045,8 @@ def claim_and_run_one_pending_trial(
         trial_id = str(selected_trial.id)
         job_id = str(selected_trial.job_id)
         was_pending = selected_trial.status == "PENDING"
+        claim_time = _now()
+        lease_until = claim_time + timedelta(seconds=lease_seconds)
 
         # --- Claim ------------------------------------------------------
         update_stmt = (
@@ -1041,7 +1058,7 @@ def claim_and_run_one_pending_trial(
                 worker_id=worker_id,
                 lease_owner=worker_id,
                 lease_expires_at=lease_until,
-                claimed_at=now,
+                claimed_at=claim_time,
                 finished_at=None,
                 failure_code=None,
                 failure_reason=None,
@@ -1050,7 +1067,7 @@ def claim_and_run_one_pending_trial(
             .values(attempt_count=(models.Trial.attempt_count + 1))
             .values(
                 started_at=case(
-                    (models.Trial.started_at.is_(None), now),
+                    (models.Trial.started_at.is_(None), claim_time),
                     else_=models.Trial.started_at,
                 )
             )
@@ -1088,6 +1105,9 @@ def claim_and_run_one_pending_trial(
         )
     sim = adapter or get_simulator_adapter(backend_override)
     trial.simulator_backend = sim.backend_name
+    require_explicit_px4_parameters = bool(
+        sim.backend_name == "real_cli" and job is not None and job.optimizer_strategy != "none"
+    )
     attempt_id: str | None = None
     cancellation_event = threading.Event()
     ctx: TrialContext | None = None
@@ -1122,13 +1142,10 @@ def claim_and_run_one_pending_trial(
                     .outerjoin(models.TrialExecutionAttemptOutcome)
                     .where(
                         models.TrialExecutionAttempt.trial_id == trial.id,
-                        models.TrialExecutionAttempt.attempt_count
-                        < trial.attempt_count,
+                        models.TrialExecutionAttempt.attempt_count < trial.attempt_count,
                         models.TrialExecutionAttemptOutcome.id.is_(None),
                     )
-                    .order_by(
-                        models.TrialExecutionAttempt.attempt_count.asc()
-                    )
+                    .order_by(models.TrialExecutionAttempt.attempt_count.asc())
                 )
             )
             for previous in previous_open_attempts:
@@ -1136,7 +1153,7 @@ def claim_and_run_one_pending_trial(
                     db,
                     attempt=previous,
                     superseded_by_attempt_count=trial.attempt_count,
-                    finished_at=now,
+                    finished_at=claim_time,
                 )
         attempt = record_trial_attempt_claim(
             db,
@@ -1145,10 +1162,8 @@ def claim_and_run_one_pending_trial(
             candidate=candidate,
             worker_id=worker_id,
             simulator_backend=sim.backend_name,
-            claim_kind=(
-                "initial" if was_pending else "stale-reclaim"
-            ),
-            claimed_at=now,
+            claim_kind=("initial" if was_pending else "stale-reclaim"),
+            claimed_at=claim_time,
             input_snapshot=input_snapshot,
         )
         attempt_id = attempt.id
@@ -1250,9 +1265,7 @@ def claim_and_run_one_pending_trial(
         return trial_id
 
     if execution_contract_failure is not None:
-        contract_failure_code, contract_failure_reason = (
-            execution_contract_failure
-        )
+        contract_failure_code, contract_failure_reason = execution_contract_failure
         logger.warning(
             "rejected non-authoritative execution contract trial=%s: %s",
             trial_id,
@@ -1308,7 +1321,10 @@ def claim_and_run_one_pending_trial(
     db.commit()
 
     try:
-        ctx = _validate_trial_px4_parameters(ctx)
+        ctx = _validate_trial_px4_parameters(
+            ctx,
+            require_explicit_px4_parameters=require_explicit_px4_parameters,
+        )
     except (TypeError, ValueError) as exc:
         logger.warning(
             "rejected invalid PX4 candidate before simulation trial=%s: %s",
@@ -1434,6 +1450,21 @@ def claim_and_run_one_pending_trial(
         _finalize_adapter_run(sim, ctx, result)
         return trial_id
 
+    if result.backend != sim.backend_name:
+        _mark_trial_failed(
+            db,
+            trial,
+            code=FAILURE_INVALID_RESULT,
+            reason=(
+                "Simulator result backend does not match the claimed adapter "
+                f"({result.backend!r} != {sim.backend_name!r}); metrics and "
+                "artifacts were rejected."
+            )[:1000],
+            attempt_id=attempt_id,
+        )
+        _finalize_adapter_run(sim, ctx, result)
+        return trial_id
+
     if not result.success or result.metrics is None:
         failure: TrialFailure = result.failure or TrialFailure(
             code=FAILURE_SIM_ERROR, reason="Adapter returned no metrics and no failure."
@@ -1508,6 +1539,7 @@ def claim_and_run_one_pending_trial(
         trial=trial,
         attempt_id=attempt_id,
     )
+    _seal_qualification_trial_receipt(db, trial=trial)
 
     _refresh_progress_counters(db, job)
     record_event(
@@ -1571,6 +1603,7 @@ def _mark_trial_failed(
         trial=trial,
         attempt_id=attempt_id,
     )
+    _seal_qualification_trial_receipt(db, trial=trial)
 
     job = db.get(models.Job, trial.job_id)
     if job is not None:

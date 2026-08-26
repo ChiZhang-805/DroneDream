@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import json
 import math
 import re
@@ -38,31 +39,44 @@ from app.orchestration.harness_component_ablation import (  # noqa: E402
 from app.orchestration.harness_context import (  # noqa: E402
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_PROMPT_TEMPLATE_VERSION,
-    HARNESS_TOOL_DEFINITIONS,
-    HarnessToolId,
+)
+from app.orchestration.harness_cross_job_memory_evaluation import (  # noqa: E402
+    verify_harness_cross_job_memory_artifact,
+    verify_harness_cross_job_memory_manifest,
 )
 from app.orchestration.harness_evaluation import (  # noqa: E402
-    build_routing_eval_report,
+    grade_routing_prediction_artifact,
+    load_archived_routing_prediction_artifact,
     load_routing_eval_cases,
 )
 from app.orchestration.harness_outcome_campaign import (  # noqa: E402
     load_harness_outcome_campaign,
 )
+from app.orchestration.harness_reflection_outcome_stress import (  # noqa: E402
+    verify_harness_reflection_outcome_stress_artifact,
+    verify_harness_reflection_outcome_stress_manifest,
+)
+from app.orchestration.harness_reflection_trigger_ablation import (  # noqa: E402
+    verify_harness_reflection_trigger_artifact,
+    verify_harness_reflection_trigger_manifest,
+)
 from app.orchestration.harness_routing_holdout import (  # noqa: E402
-    load_locked_routing_policy_holdout,
-    load_locked_routing_policy_result,
+    load_archived_locked_routing_policy_holdout,
+    load_archived_locked_routing_policy_result,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
-REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v6"
+REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v9"
 REPORT_EVIDENCE_MANIFEST_SCHEMA_VERSION = "dronedream.technical-report-evidence-manifest.v1"
-TEST_RUN_RECEIPT_SCHEMA_VERSION = "dronedream.test-run-receipt.v1"
-ARCHIVED_ROUTING_CORPUS_SHA256 = "4968b0a9639d59474c00402dcd261a241377bdb57a6273554f4d6ad0d1172625"
-ARCHIVED_ROUTING_PROMPT_SUITE_SHA256 = (
-    "d300d0516378974fb57be896b155ef1a537278594b03c0ecbdceff9ade26dc59"
-)
+SUPPORTED_TEST_RUN_RECEIPT_SCHEMA_VERSIONS = {
+    "dronedream.test-run-receipt.v1",
+    "dronedream.test-run-receipt.v2",
+}
 DEFAULT_ROUTING_CORPUS = BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_eval_v1.jsonl"
 DEFAULT_ROUTING_PREDICTIONS = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-routing-gpt-4.1-2025-04-14.json"
+    BACKEND_ROOT
+    / "evaluation_artifacts"
+    / "harness-routing-gpt-4.1-2025-04-14-evidence-2.7-prompt-1.6-20260728.json"
 )
 DEFAULT_SIMULATION_COVERAGE = (
     BACKEND_ROOT / "evaluation_artifacts" / "simulation-coverage-mock-v3.json"
@@ -71,19 +85,57 @@ DEFAULT_SCENARIO_GENERALIZATION = (
     BACKEND_ROOT / "evaluation_artifacts" / "scenario-generalization-mock-v1.json"
 )
 DEFAULT_HARNESS_ABLATIONS = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v1.json"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v2.json"
 )
 DEFAULT_HARNESS_OUTCOME_CAMPAIGN = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-outcome-campaign-v1.json"
 )
 DEFAULT_HARNESS_COMPONENT_ABLATION = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v1.json"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v2.json"
 )
 DEFAULT_HARNESS_COMPONENT_ABLATION_MANIFEST = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v1.manifest.json"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v2.manifest.json"
 )
 DEFAULT_HARNESS_COMPONENT_ABLATION_CSV = (
-    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v1.csv"
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-component-outcome-ablation-v2.csv"
+)
+DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-trigger-ablation-v1.json"
+)
+DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_MANIFEST = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-trigger-ablation-v1.manifest.json"
+)
+DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_CSV = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-trigger-ablation-v1.csv"
+)
+DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_SHA256 = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-trigger-ablation-v1.sha256"
+)
+DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.json"
+)
+DEFAULT_HARNESS_CROSS_JOB_MEMORY = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-cross-job-memory-contract-v1.json"
+)
+DEFAULT_HARNESS_CROSS_JOB_MEMORY_MANIFEST = (
+    BACKEND_ROOT
+    / "evaluation_artifacts"
+    / "harness-cross-job-memory-contract-v1.manifest.json"
+)
+DEFAULT_HARNESS_CROSS_JOB_MEMORY_CSV = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-cross-job-memory-contract-v1.csv"
+)
+DEFAULT_HARNESS_CROSS_JOB_MEMORY_SHA256 = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-cross-job-memory-contract-v1.sha256"
+)
+DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_MANIFEST = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.manifest.json"
+)
+DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_CSV = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.csv"
+)
+DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_SHA256 = (
+    BACKEND_ROOT / "evaluation_artifacts" / "harness-reflection-outcome-stress-v1.sha256"
 )
 DEFAULT_ROUTING_HOLDOUT_CORPUS = (
     BACKEND_ROOT / "tests" / "fixtures" / "harness_routing_policy_holdout_v1.jsonl"
@@ -139,6 +191,18 @@ def _load_json_object(path: Path) -> dict[str, Any]:
     return value
 
 
+def _read_test_log_text(path: Path) -> str:
+    """Decode a hash-bound pytest log without assuming the host shell encoding."""
+
+    raw = path.read_bytes()
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        return raw.decode("utf-16")
+    sample = raw[:512]
+    if len(raw) % 2 == 0 and sample and sample[1::2].count(0) >= max(1, len(sample[1::2]) * 3 // 4):
+        return raw.decode("utf-16-le")
+    return raw.decode("utf-8", errors="replace")
+
+
 def _validate_source_commit(value: str) -> str:
     if re.fullmatch(r"[0-9a-f]{40}", value) is None:
         raise ValueError("source_commit must be a full lowercase Git SHA")
@@ -169,6 +233,20 @@ def _repository_source(path: Path) -> dict[str, str]:
     }
 
 
+def _verify_sha256_sidecar(
+    path: Path,
+    *,
+    bound_paths: tuple[Path, ...],
+) -> None:
+    expected = [f"{_sha256_file(bound_path)}  {bound_path.name}" for bound_path in bound_paths]
+    try:
+        actual = path.read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ValueError(f"invalid SHA-256 sidecar: {path}") from exc
+    if actual != expected:
+        raise ValueError(f"SHA-256 sidecar does not bind expected files: {path}")
+
+
 def _load_backend_test_receipt(
     path: Path,
     *,
@@ -183,7 +261,7 @@ def _load_backend_test_receipt(
         or hashlib.sha256(_canonical_json(unsigned).encode("utf-8")).hexdigest() != declared_hash
     ):
         raise ValueError("backend test receipt hash does not recompute")
-    if payload.get("schema_version") != TEST_RUN_RECEIPT_SCHEMA_VERSION:
+    if payload.get("schema_version") not in SUPPORTED_TEST_RUN_RECEIPT_SCHEMA_VERSIONS:
         raise ValueError("backend test receipt schema is unsupported")
     if payload.get("source_commit") != source_commit:
         raise ValueError("backend test receipt does not bind the source commit")
@@ -195,10 +273,12 @@ def _load_backend_test_receipt(
     if (
         not isinstance(result, dict)
         or result.get("status") != "passed"
-        or result.get("passed") != 1139
+        or isinstance(result.get("passed"), bool)
+        or not isinstance(result.get("passed"), int)
+        or result["passed"] <= 0
         or result.get("failed") != 0
     ):
-        raise ValueError("backend test receipt does not prove the 1,139-test run")
+        raise ValueError("backend test receipt does not prove a passing full-suite run")
     log = full_suite.get("log")
     if not isinstance(log, dict):
         raise ValueError("backend test receipt is missing its full-suite log")
@@ -223,56 +303,30 @@ def _load_backend_test_receipt(
         ):
             raise ValueError("backend test receipt log binding does not recompute")
         verified_logs.append(resolved_log)
-    if "1139 passed in" not in verified_logs[0].read_text(
-        encoding="utf-8",
-        errors="replace",
-    ):
-        raise ValueError("backend full-suite log does not contain the 1,139-test result")
+    if f"{result['passed']} passed in" not in _read_test_log_text(verified_logs[0]):
+        raise ValueError("backend full-suite log does not contain the declared result")
     if not focused_checks:
         raise ValueError("backend test receipt requires passing focused checks")
-    for check in focused_checks:
+    for index, check in enumerate(focused_checks):
         if not isinstance(check, dict):
             raise ValueError("backend test receipt focused check is invalid")
         check_result = check.get("result")
-        if not isinstance(check_result, dict) or check_result.get("status") != "passed":
+        if (
+            not isinstance(check_result, dict)
+            or check_result.get("status") != "passed"
+            or isinstance(check_result.get("passed"), bool)
+            or not isinstance(check_result.get("passed"), int)
+            or check_result["passed"] <= 0
+            or check_result.get("failed") != 0
+        ):
             raise ValueError("backend test receipt requires passing focused checks")
+        if f"{check_result['passed']} passed in" not in _read_test_log_text(
+            verified_logs[index + 1]
+        ):
+            raise ValueError(
+                "backend focused-check log does not contain the declared result"
+            )
     return payload
-
-
-def _load_archived_routing_predictions(
-    path: Path,
-    *,
-    case_ids: set[str],
-) -> tuple[dict[str, HarnessToolId], dict[str, Any]]:
-    """Validate the historical 2.4/1.1 freeze without relabeling it current."""
-
-    payload = _load_json_object(path)
-    expected = {
-        "schema_version": "1.0",
-        "corpus_sha256": ARCHIVED_ROUTING_CORPUS_SHA256,
-        "prompt_suite_sha256": ARCHIVED_ROUTING_PROMPT_SUITE_SHA256,
-        "evidence_schema_version": "2.4",
-        "tool_registry_version": "2.1",
-        "prompt_template_version": "1.1",
-    }
-    for key, expected_value in expected.items():
-        if payload.get(key) != expected_value:
-            raise ValueError(f"archived routing artifact {key} does not match frozen contract")
-    raw_predictions = payload.get("predictions")
-    if not isinstance(raw_predictions, dict) or set(raw_predictions) != case_ids:
-        raise ValueError("archived routing predictions must exactly cover the development corpus")
-    predictions: dict[str, HarnessToolId] = {}
-    for case_id, raw in raw_predictions.items():
-        if not isinstance(raw, dict) or set(raw) != {"rationale", "selected_tool"}:
-            raise ValueError("archived routing prediction has an invalid closed shape")
-        tool_id = raw.get("selected_tool")
-        rationale = raw.get("rationale")
-        if tool_id not in HARNESS_TOOL_DEFINITIONS:
-            raise ValueError("archived routing prediction selected an unknown tool")
-        if not isinstance(rationale, str) or not rationale.strip():
-            raise ValueError("archived routing prediction requires a rationale")
-        predictions[case_id] = cast(HarnessToolId, tool_id)
-    return predictions, payload
 
 
 def summarize_simulation_coverage(payload: dict[str, Any]) -> dict[str, Any]:
@@ -453,10 +507,20 @@ def summarize_scenario_generalization(payload: dict[str, Any]) -> dict[str, Any]
             or len(set(value)) != len(value)
         ):
             raise ValueError(f"{name} must contain {expected_count} unique ids")
-    assert isinstance(training_case_ids, list)
-    assert isinstance(validation_case_ids, list)
-    assert isinstance(configuration_shift_ids, list)
-    assert isinstance(novel_type_ids, list)
+    if not all(
+        isinstance(value, list)
+        for value in (
+            training_case_ids,
+            validation_case_ids,
+            configuration_shift_ids,
+            novel_type_ids,
+        )
+    ):
+        raise ValueError("mixed-shift case identifiers must be lists")
+    training_case_ids = cast(list[str], training_case_ids)
+    validation_case_ids = cast(list[str], validation_case_ids)
+    configuration_shift_ids = cast(list[str], configuration_shift_ids)
+    novel_type_ids = cast(list[str], novel_type_ids)
     if set(configuration_shift_ids) & set(novel_type_ids):
         raise ValueError("mixed-shift case classes must be disjoint")
     if set(configuration_shift_ids) | set(novel_type_ids) != set(validation_case_ids):
@@ -514,6 +578,8 @@ def summarize_scenario_generalization(payload: dict[str, Any]) -> dict[str, Any]
         baseline.get("validation_loss"),
         field="baseline.validation_loss",
     )
+    if baseline_validation_loss <= 0:
+        raise ValueError("mixed-shift baseline validation loss must be positive")
     declared_improvement = _as_finite_float(
         payload.get("baseline_to_selected_validation_improvement_rate"),
         field="baseline_to_selected_validation_improvement_rate",
@@ -526,6 +592,17 @@ def summarize_scenario_generalization(payload: dict[str, Any]) -> dict[str, Any]
         abs_tol=1e-12,
     ):
         raise ValueError("mixed-shift validation improvement does not recompute")
+
+    candidate_budget = _as_positive_int(
+        payload.get("candidate_budget"),
+        field="candidate_budget",
+    )
+    evaluated_candidate_count = _as_positive_int(
+        payload.get("evaluated_candidate_count"),
+        field="evaluated_candidate_count",
+    )
+    if evaluated_candidate_count > candidate_budget:
+        raise ValueError("mixed-shift evaluated candidates exceed the declared budget")
 
     evidence = verify_candidate_generalization_evidence(payload.get("generalization_evidence"))
     if evidence is None:
@@ -554,14 +631,8 @@ def summarize_scenario_generalization(payload: dict[str, Any]) -> dict[str, Any]
         "validation_case_count": len(validation_case_ids),
         "configuration_shift_case_count": len(configuration_shift_ids),
         "novel_scenario_type_case_count": len(novel_type_ids),
-        "candidate_budget": _as_positive_int(
-            payload.get("candidate_budget"),
-            field="candidate_budget",
-        ),
-        "evaluated_candidate_count": _as_positive_int(
-            payload.get("evaluated_candidate_count"),
-            field="evaluated_candidate_count",
-        ),
+        "candidate_budget": candidate_budget,
+        "evaluated_candidate_count": evaluated_candidate_count,
         "training_scalar_loss": training_loss,
         "validation_scalar_loss": validation_loss,
         "scalar_loss_relative_degradation": (evidence.scalar_loss_relative_degradation),
@@ -601,6 +672,34 @@ def build_report_evidence_bundle(
     harness_component_ablation_path: Path = DEFAULT_HARNESS_COMPONENT_ABLATION,
     harness_component_ablation_manifest_path: Path = (DEFAULT_HARNESS_COMPONENT_ABLATION_MANIFEST),
     harness_component_ablation_csv_path: Path = (DEFAULT_HARNESS_COMPONENT_ABLATION_CSV),
+    harness_reflection_trigger_ablation_path: Path = (DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION),
+    harness_reflection_trigger_ablation_manifest_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_MANIFEST
+    ),
+    harness_reflection_trigger_ablation_csv_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_CSV
+    ),
+    harness_reflection_trigger_ablation_sha256_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_SHA256
+    ),
+    harness_reflection_outcome_stress_path: Path = (DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS),
+    harness_reflection_outcome_stress_manifest_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_MANIFEST
+    ),
+    harness_reflection_outcome_stress_csv_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_CSV
+    ),
+    harness_reflection_outcome_stress_sha256_path: Path = (
+        DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_SHA256
+    ),
+    harness_cross_job_memory_path: Path = DEFAULT_HARNESS_CROSS_JOB_MEMORY,
+    harness_cross_job_memory_manifest_path: Path = (
+        DEFAULT_HARNESS_CROSS_JOB_MEMORY_MANIFEST
+    ),
+    harness_cross_job_memory_csv_path: Path = DEFAULT_HARNESS_CROSS_JOB_MEMORY_CSV,
+    harness_cross_job_memory_sha256_path: Path = (
+        DEFAULT_HARNESS_CROSS_JOB_MEMORY_SHA256
+    ),
     backend_test_receipt_path: Path | None = None,
     routing_holdout_corpus_path: Path = DEFAULT_ROUTING_HOLDOUT_CORPUS,
     routing_holdout_manifest_path: Path = DEFAULT_ROUTING_HOLDOUT_MANIFEST,
@@ -611,12 +710,19 @@ def build_report_evidence_bundle(
     source_commit = _validate_source_commit(source_commit)
     generated_at = _validate_generated_at(generated_at)
     cases = load_routing_eval_cases(routing_corpus_path)
-    predictions, archived_artifact = _load_archived_routing_predictions(
+    routing_artifact = load_archived_routing_prediction_artifact(
         routing_predictions_path,
-        case_ids={case.case_id for case in cases},
+        cases,
+        evidence_schema_version="2.7",
+        prompt_template_version="1.6",
+        prompt_suite_sha256=(
+            "93ca5fdafe123741821f47296e3e8b23cb5f9d68ff9d78bbf2c10af83642bd77"
+        ),
     )
-    routing_report = build_routing_eval_report(cases, predictions)
-    prediction_counts = Counter(predictions.values())
+    routing_report = grade_routing_prediction_artifact(routing_artifact, cases)
+    prediction_counts = Counter(
+        prediction.selected_tool for prediction in routing_artifact.predictions.values()
+    )
 
     routing = {
         "evidence_class": "development_routing_corpus",
@@ -624,12 +730,22 @@ def build_report_evidence_bundle(
             "Measures acceptable optimizer-tool selection on a versioned "
             "development corpus; it is not a simulator outcome benchmark."
         ),
+        "stochasticity_boundary": (
+            "The frozen provider response is graded deterministically. A fresh "
+            "model call is a stochastic rerun, not causal proof of a prompt change."
+        ),
         "contract_current": False,
-        "qualification_scope": "archived_evidence_2_4_prompt_1_1",
+        "qualification_scope": "archived_evidence_2_7_prompt_1_6",
         "current_evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
         "current_prompt_template_version": HARNESS_PROMPT_TEMPLATE_VERSION,
-        "model_snapshot": archived_artifact["model_snapshot"],
-        "provider": archived_artifact["provider"],
+        "evidence_schema_version": routing_artifact.evidence_schema_version,
+        "tool_registry_version": routing_artifact.tool_registry_version,
+        "prompt_template_version": routing_artifact.prompt_template_version,
+        "corpus_sha256": routing_artifact.corpus_sha256,
+        "prompt_suite_sha256": routing_artifact.prompt_suite_sha256,
+        "model_snapshot": routing_artifact.model_snapshot,
+        "provider": routing_artifact.provider,
+        "generation_config": routing_artifact.generation_config.model_dump(mode="json"),
         "case_count": routing_report.predictions.case_count,
         "passed_count": routing_report.predictions.passed_count,
         "pass_rate": routing_report.predictions.pass_rate,
@@ -746,6 +862,112 @@ def build_report_evidence_bundle(
         "comparison_rows": verified_component["comparison_rows"],
         "component_isolation_rows": verified_component["component_isolation_rows"],
     }
+    trigger_manifest_payload = _load_json_object(harness_reflection_trigger_ablation_manifest_path)
+    verified_trigger_manifest = verify_harness_reflection_trigger_manifest(trigger_manifest_payload)
+    trigger_payload = _load_json_object(harness_reflection_trigger_ablation_path)
+    verified_trigger = verify_harness_reflection_trigger_artifact(
+        trigger_payload,
+        manifest=verified_trigger_manifest,
+    )
+    _verify_sha256_sidecar(
+        harness_reflection_trigger_ablation_sha256_path,
+        bound_paths=(
+            harness_reflection_trigger_ablation_path,
+            harness_reflection_trigger_ablation_csv_path,
+            harness_reflection_trigger_ablation_manifest_path,
+        ),
+    )
+    harness_reflection_trigger_ablation = {
+        "evidence_class": verified_trigger["evidence_class"],
+        "claim_label": verified_trigger["claim_label"],
+        "claim_boundary": verified_trigger["claim_boundary"],
+        "provider_calls": verified_trigger["provider_calls"],
+        "network_calls": verified_trigger["network_calls"],
+        "real_credentials_used": verified_trigger["real_credentials_used"],
+        "simulator_runs": verified_trigger["simulator_runs"],
+        "physical_fidelity": verified_trigger["physical_fidelity"],
+        "general_causal_benefit_claim_permitted": verified_trigger[
+            "general_causal_benefit_claim_permitted"
+        ],
+        "optimizer_quality_claim_permitted": verified_trigger["optimizer_quality_claim_permitted"],
+        "artifact_sha256": verified_trigger["artifact_sha256"],
+        "manifest_sha256": verified_trigger["manifest_sha256"],
+        "summary": verified_trigger["summary"],
+        "case_rows": verified_trigger["case_rows"],
+    }
+    outcome_stress_manifest_payload = _load_json_object(
+        harness_reflection_outcome_stress_manifest_path
+    )
+    verified_outcome_stress_manifest = verify_harness_reflection_outcome_stress_manifest(
+        outcome_stress_manifest_payload
+    )
+    outcome_stress_payload = _load_json_object(harness_reflection_outcome_stress_path)
+    verified_outcome_stress = verify_harness_reflection_outcome_stress_artifact(
+        outcome_stress_payload,
+        manifest=verified_outcome_stress_manifest,
+    )
+    _verify_sha256_sidecar(
+        harness_reflection_outcome_stress_sha256_path,
+        bound_paths=(
+            harness_reflection_outcome_stress_path,
+            harness_reflection_outcome_stress_csv_path,
+            harness_reflection_outcome_stress_manifest_path,
+        ),
+    )
+    harness_reflection_outcome_stress = {
+        "evidence_class": verified_outcome_stress["evidence_class"],
+        "claim_label": verified_outcome_stress["claim_label"],
+        "claim_boundary": verified_outcome_stress["claim_boundary"],
+        "physical_fidelity": verified_outcome_stress["physical_fidelity"],
+        "simulator_backend": verified_outcome_stress["simulator_backend"],
+        "live_model_calls": verified_outcome_stress["live_model_calls"],
+        "network_calls": verified_outcome_stress["network_calls"],
+        "real_credentials_used": verified_outcome_stress["real_credentials_used"],
+        "general_causal_benefit_claim_permitted": verified_outcome_stress[
+            "general_causal_benefit_claim_permitted"
+        ],
+        "llm_superiority_claim_permitted": verified_outcome_stress[
+            "llm_superiority_claim_permitted"
+        ],
+        "px4_or_flight_claim_permitted": verified_outcome_stress["px4_or_flight_claim_permitted"],
+        "consistent_holdout_benefit_observed": verified_outcome_stress[
+            "consistent_holdout_benefit_observed"
+        ],
+        "causal_synthetic_protocol_effect_observed": verified_outcome_stress[
+            "causal_synthetic_protocol_effect_observed"
+        ],
+        "artifact_sha256": verified_outcome_stress["artifact_sha256"],
+        "manifest_sha256": verified_outcome_stress["manifest_sha256"],
+        "summary": verified_outcome_stress["summary"],
+        "contrast_summaries": verified_outcome_stress["contrast_summaries"],
+        "comparison_rows": verified_outcome_stress["comparison_rows"],
+    }
+    cross_job_manifest_payload = _load_json_object(
+        harness_cross_job_memory_manifest_path
+    )
+    verified_cross_job_manifest = verify_harness_cross_job_memory_manifest(
+        cross_job_manifest_payload
+    )
+    cross_job_payload = _load_json_object(harness_cross_job_memory_path)
+    verified_cross_job = verify_harness_cross_job_memory_artifact(
+        cross_job_payload,
+        manifest=verified_cross_job_manifest,
+    )
+    _verify_sha256_sidecar(
+        harness_cross_job_memory_sha256_path,
+        bound_paths=(
+            harness_cross_job_memory_path,
+            harness_cross_job_memory_csv_path,
+            harness_cross_job_memory_manifest_path,
+        ),
+    )
+    harness_cross_job_memory = {
+        "claim_boundary": verified_cross_job["claim_boundary"],
+        "artifact_sha256": verified_cross_job["artifact_sha256"],
+        "manifest_sha256": verified_cross_job["manifest_sha256"],
+        "summary": verified_cross_job["summary"],
+        "case_rows": verified_cross_job["case_rows"],
+    }
     backend_tests = (
         None
         if backend_test_receipt_path is None
@@ -754,14 +976,18 @@ def build_report_evidence_bundle(
             source_commit=source_commit,
         )
     )
-    holdout_bundle = load_locked_routing_policy_holdout(
+    holdout_bundle = load_archived_locked_routing_policy_holdout(
         routing_holdout_corpus_path,
         routing_holdout_manifest_path,
         routing_corpus_path,
+        policy_input_suite_sha256=(
+            "29e937ea2d69453056b75a8f1ebf19afba8eabeab185e0cc0d012ffaeedc15d7"
+        ),
     )
-    holdout_result = load_locked_routing_policy_result(
+    holdout_result = load_archived_locked_routing_policy_result(
         routing_holdout_result_path,
         holdout_bundle,
+        evidence_schema_version="2.7",
     )
     holdout_category_counts: Counter[str] = Counter()
     holdout_category_passes: Counter[str] = Counter()
@@ -772,9 +998,18 @@ def build_report_evidence_bundle(
         "evidence_class": holdout_result.evidence_class,
         "claim_boundary": (
             "Measures exact production tool-eligibility sets on a separate, "
-            "hash-locked deterministic policy corpus. It makes no LLM routing "
-            "quality, simulator outcome, or permanent-blindness claim."
+            "hash-locked deterministic policy corpus archived under Evidence 2.7. "
+            "Eligibility policy 1.1 still reproduces its exact labels under current "
+            "software, but its historical evidence snapshot is not relabelled as "
+            "Evidence 2.9. It makes no LLM routing quality, simulator outcome, or "
+            "permanent-blindness claim."
         ),
+        "contract_current": False,
+        "qualification_scope": "archived_evidence_2_7_eligibility_policy_1_1",
+        "current_evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+        "evidence_schema_version": holdout_result.evidence_schema_version,
+        "tool_registry_version": holdout_result.tool_registry_version,
+        "eligibility_policy_version": holdout_result.eligibility_policy_version,
         "corpus_role": holdout_result.source_role,
         "case_count": holdout_result.case_count,
         "passed_count": holdout_result.passed_count,
@@ -813,6 +1048,42 @@ def build_report_evidence_bundle(
         "harness_component_outcome_ablation_csv": _repository_source(
             harness_component_ablation_csv_path
         ),
+        "harness_reflection_trigger_ablation": _repository_source(
+            harness_reflection_trigger_ablation_path
+        ),
+        "harness_reflection_trigger_ablation_manifest": _repository_source(
+            harness_reflection_trigger_ablation_manifest_path
+        ),
+        "harness_reflection_trigger_ablation_csv": _repository_source(
+            harness_reflection_trigger_ablation_csv_path
+        ),
+        "harness_reflection_trigger_ablation_sha256": _repository_source(
+            harness_reflection_trigger_ablation_sha256_path
+        ),
+        "harness_reflection_outcome_stress": _repository_source(
+            harness_reflection_outcome_stress_path
+        ),
+        "harness_reflection_outcome_stress_manifest": _repository_source(
+            harness_reflection_outcome_stress_manifest_path
+        ),
+        "harness_reflection_outcome_stress_csv": _repository_source(
+            harness_reflection_outcome_stress_csv_path
+        ),
+        "harness_reflection_outcome_stress_sha256": _repository_source(
+            harness_reflection_outcome_stress_sha256_path
+        ),
+        "harness_cross_job_memory": _repository_source(
+            harness_cross_job_memory_path
+        ),
+        "harness_cross_job_memory_manifest": _repository_source(
+            harness_cross_job_memory_manifest_path
+        ),
+        "harness_cross_job_memory_csv": _repository_source(
+            harness_cross_job_memory_csv_path
+        ),
+        "harness_cross_job_memory_sha256": _repository_source(
+            harness_cross_job_memory_sha256_path
+        ),
         "routing_policy_holdout_corpus": _repository_source(routing_holdout_corpus_path),
         "routing_policy_holdout_manifest": _repository_source(routing_holdout_manifest_path),
         "routing_policy_holdout_result": _repository_source(routing_holdout_result_path),
@@ -830,6 +1101,9 @@ def build_report_evidence_bundle(
         "harness_ablations": harness_ablations,
         "harness_outcome_campaign": harness_outcome_campaign,
         "harness_component_outcome_ablation": harness_component_ablation,
+        "harness_reflection_trigger_ablation": (harness_reflection_trigger_ablation),
+        "harness_reflection_outcome_stress": (harness_reflection_outcome_stress),
+        "harness_cross_job_memory": harness_cross_job_memory,
         "routing_policy_holdout": routing_policy_holdout,
     }
     if backend_tests is not None:
@@ -842,14 +1116,14 @@ def build_report_evidence_bundle(
     }
 
 
-def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+def _csv_bytes(path: Path, rows: list[dict[str, Any]]) -> bytes:
     if not rows:
         raise ValueError(f"cannot write empty CSV: {path.name}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
+    handle = io.StringIO(newline="")
+    writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    return handle.getvalue().encode("utf-8")
 
 
 def write_report_evidence_bundle(
@@ -862,12 +1136,12 @@ def write_report_evidence_bundle(
 ) -> None:
     if (manifest_path is None) != (sha256_path is None):
         raise ValueError("manifest_path and sha256_path must be provided together")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(bundle, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    bundle_payload = (
+        json.dumps(bundle, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    outputs: list[tuple[Path, bytes]] = [(output_path, bundle_payload)]
     if manifest_path is not None and sha256_path is not None:
+        output_sha256 = hashlib.sha256(bundle_payload).hexdigest()
         manifest = {
             "schema_version": REPORT_EVIDENCE_MANIFEST_SCHEMA_VERSION,
             "source_commit": bundle["source_commit"],
@@ -875,59 +1149,85 @@ def write_report_evidence_bundle(
             "bundle": {
                 "path": output_path.name,
                 "bundle_sha256": bundle["bundle_sha256"],
-                "file_sha256": _sha256_file(output_path),
+                "file_sha256": output_sha256,
             },
             "sources": bundle["sources"],
         }
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        manifest_path.write_text(
-            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        sha256_path.parent.mkdir(parents=True, exist_ok=True)
-        sha256_path.write_text(
+        manifest_payload = (
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        outputs.extend(
             (
-                f"{_sha256_file(output_path)}  {output_path.name}\n"
-                f"{_sha256_file(manifest_path)}  {manifest_path.name}\n"
-            ),
-            encoding="utf-8",
+                (manifest_path, manifest_payload),
+                (
+                    sha256_path,
+                    (
+                        f"{output_sha256}  {output_path.name}\n"
+                        f"{hashlib.sha256(manifest_payload).hexdigest()}  "
+                        f"{manifest_path.name}\n"
+                    ).encode(),
+                ),
+            )
         )
     if csv_directory is None:
+        write_new_evidence_files(outputs, label="technical-report evidence bundle")
         return
     routing = bundle["routing"]
     coverage = bundle["simulation_coverage"]
     scenario_generalization = bundle["scenario_generalization"]
     harness_ablations = bundle["harness_ablations"]
     harness_outcome_campaign = bundle["harness_outcome_campaign"]
+    harness_reflection_trigger_ablation = bundle["harness_reflection_trigger_ablation"]
+    harness_reflection_outcome_stress = bundle["harness_reflection_outcome_stress"]
+    harness_cross_job_memory = bundle["harness_cross_job_memory"]
     routing_policy_holdout = bundle["routing_policy_holdout"]
-    _write_csv(
-        csv_directory / "routing_categories.csv",
-        routing["category_rows"],
+    trigger_rows = []
+    for case in harness_reflection_trigger_ablation["case_rows"]:
+        for step in case["steps"]:
+            full, no_reflection = step["arms"]
+            trigger_rows.append(
+                {
+                    "case_id": case["case_id"],
+                    "trigger": case["trigger"],
+                    "step_id": step["step_id"],
+                    "intervention_activated": step["intervention_activated"],
+                    "result_status": step["result_status"],
+                    "full_phase": full["plan_phase"],
+                    "no_reflection_phase": no_reflection["plan_phase"],
+                    "full_selected_tool": full["selected_tool"],
+                    "no_reflection_selected_tool": no_reflection["selected_tool"],
+                    "phase_changed": step["differences"]["plan_phase"],
+                    "tool_surface_changed": step["differences"]["selectable_tools"],
+                    "selected_tool_changed": step["differences"]["selected_tool"],
+                }
+            )
+    csv_rows = (
+        ("routing_categories.csv", routing["category_rows"]),
+        ("routing_tool_selection.csv", routing["tool_selection_rows"]),
+        ("synthetic_scenario_holdout.csv", coverage["scenario_rows"]),
+        (
+            "synthetic_mixed_shift_generalization.csv",
+            scenario_generalization["case_rows"],
+        ),
+        ("harness_contract_ablations.csv", harness_ablations["component_rows"]),
+        ("harness_fallback_outcomes.csv", harness_outcome_campaign["arm_rows"]),
+        ("harness_reflection_trigger_steps.csv", trigger_rows),
+        (
+            "harness_reflection_outcome_comparisons.csv",
+            harness_reflection_outcome_stress["comparison_rows"],
+        ),
+        ("harness_cross_job_memory_cases.csv", harness_cross_job_memory["case_rows"]),
+        (
+            "routing_policy_holdout_categories.csv",
+            routing_policy_holdout["category_rows"],
+        ),
     )
-    _write_csv(
-        csv_directory / "routing_tool_selection.csv",
-        routing["tool_selection_rows"],
+    outputs.extend(
+        (path, _csv_bytes(path, rows))
+        for name, rows in csv_rows
+        for path in (csv_directory / name,)
     )
-    _write_csv(
-        csv_directory / "synthetic_scenario_holdout.csv",
-        coverage["scenario_rows"],
-    )
-    _write_csv(
-        csv_directory / "synthetic_mixed_shift_generalization.csv",
-        scenario_generalization["case_rows"],
-    )
-    _write_csv(
-        csv_directory / "harness_contract_ablations.csv",
-        harness_ablations["component_rows"],
-    )
-    _write_csv(
-        csv_directory / "harness_fallback_outcomes.csv",
-        harness_outcome_campaign["arm_rows"],
-    )
-    _write_csv(
-        csv_directory / "routing_policy_holdout_categories.csv",
-        routing_policy_holdout["category_rows"],
-    )
+    write_new_evidence_files(outputs, label="technical-report evidence bundle")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -1011,6 +1311,66 @@ def _parse_args() -> argparse.Namespace:
         default=DEFAULT_HARNESS_COMPONENT_ABLATION_CSV,
     )
     parser.add_argument(
+        "--harness-reflection-trigger-ablation",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION,
+    )
+    parser.add_argument(
+        "--harness-reflection-trigger-ablation-manifest",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_MANIFEST,
+    )
+    parser.add_argument(
+        "--harness-reflection-trigger-ablation-csv",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_CSV,
+    )
+    parser.add_argument(
+        "--harness-reflection-trigger-ablation-sha256",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_TRIGGER_ABLATION_SHA256,
+    )
+    parser.add_argument(
+        "--harness-reflection-outcome-stress",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS,
+    )
+    parser.add_argument(
+        "--harness-reflection-outcome-stress-manifest",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_MANIFEST,
+    )
+    parser.add_argument(
+        "--harness-reflection-outcome-stress-csv",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_CSV,
+    )
+    parser.add_argument(
+        "--harness-reflection-outcome-stress-sha256",
+        type=Path,
+        default=DEFAULT_HARNESS_REFLECTION_OUTCOME_STRESS_SHA256,
+    )
+    parser.add_argument(
+        "--harness-cross-job-memory",
+        type=Path,
+        default=DEFAULT_HARNESS_CROSS_JOB_MEMORY,
+    )
+    parser.add_argument(
+        "--harness-cross-job-memory-manifest",
+        type=Path,
+        default=DEFAULT_HARNESS_CROSS_JOB_MEMORY_MANIFEST,
+    )
+    parser.add_argument(
+        "--harness-cross-job-memory-csv",
+        type=Path,
+        default=DEFAULT_HARNESS_CROSS_JOB_MEMORY_CSV,
+    )
+    parser.add_argument(
+        "--harness-cross-job-memory-sha256",
+        type=Path,
+        default=DEFAULT_HARNESS_CROSS_JOB_MEMORY_SHA256,
+    )
+    parser.add_argument(
         "--backend-test-receipt",
         type=Path,
         required=True,
@@ -1049,6 +1409,36 @@ def main() -> int:
             args.harness_component_ablation_manifest.resolve()
         ),
         harness_component_ablation_csv_path=(args.harness_component_ablation_csv.resolve()),
+        harness_reflection_trigger_ablation_path=(
+            args.harness_reflection_trigger_ablation.resolve()
+        ),
+        harness_reflection_trigger_ablation_manifest_path=(
+            args.harness_reflection_trigger_ablation_manifest.resolve()
+        ),
+        harness_reflection_trigger_ablation_csv_path=(
+            args.harness_reflection_trigger_ablation_csv.resolve()
+        ),
+        harness_reflection_trigger_ablation_sha256_path=(
+            args.harness_reflection_trigger_ablation_sha256.resolve()
+        ),
+        harness_reflection_outcome_stress_path=(args.harness_reflection_outcome_stress.resolve()),
+        harness_reflection_outcome_stress_manifest_path=(
+            args.harness_reflection_outcome_stress_manifest.resolve()
+        ),
+        harness_reflection_outcome_stress_csv_path=(
+            args.harness_reflection_outcome_stress_csv.resolve()
+        ),
+        harness_reflection_outcome_stress_sha256_path=(
+            args.harness_reflection_outcome_stress_sha256.resolve()
+        ),
+        harness_cross_job_memory_path=args.harness_cross_job_memory.resolve(),
+        harness_cross_job_memory_manifest_path=(
+            args.harness_cross_job_memory_manifest.resolve()
+        ),
+        harness_cross_job_memory_csv_path=args.harness_cross_job_memory_csv.resolve(),
+        harness_cross_job_memory_sha256_path=(
+            args.harness_cross_job_memory_sha256.resolve()
+        ),
         backend_test_receipt_path=args.backend_test_receipt.resolve(),
         routing_holdout_corpus_path=args.routing_holdout_corpus.resolve(),
         routing_holdout_manifest_path=args.routing_holdout_manifest.resolve(),

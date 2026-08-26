@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
+from urllib.request import Request
 
 import pytest
 
@@ -40,9 +41,7 @@ def test_report_export_tier_comes_from_authenticated_gateway_snapshot(
     tier = report_entitlements.resolve_report_export_tier(
         authorization_header="Bearer signed-user-jwt",
         settings=Settings(
-            model_gateway_base_url=(
-                "https://example.supabase.co/functions/v1/model-gateway"
-            ),
+            model_gateway_base_url=("https://example.supabase.co/functions/v1/model-gateway"),
             llm_request_timeout_seconds=30,
         ),
     )
@@ -79,9 +78,7 @@ def test_report_export_tier_fails_closed_to_free(
         report_entitlements.resolve_report_export_tier(
             authorization_header=authorization,
             settings=Settings(
-                model_gateway_base_url=(
-                    "https://example.supabase.co/functions/v1/model-gateway"
-                )
+                model_gateway_base_url=("https://example.supabase.co/functions/v1/model-gateway")
             ),
         )
         == "free"
@@ -100,10 +97,60 @@ def test_report_export_tier_fails_closed_when_gateway_is_unavailable(
         report_entitlements.resolve_report_export_tier(
             authorization_header="Bearer signed-user-jwt",
             settings=Settings(
-                model_gateway_base_url=(
-                    "https://example.supabase.co/functions/v1/model-gateway"
-                )
+                model_gateway_base_url=("https://example.supabase.co/functions/v1/model-gateway")
             ),
+        )
+        == "free"
+    )
+
+
+def test_entitlement_transport_refuses_redirects() -> None:
+    handler = report_entitlements._NoRedirectHandler()
+    redirected = cast(Any, handler).redirect_request(
+        Request("https://identity.example.test/usage"),
+        None,
+        302,
+        "Found",
+        {},
+        "https://attacker.example.test/capture",
+    )
+
+    assert redirected is None
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://example.invalid/functions/v1/model-gateway",
+        "file:///tmp/model-gateway",
+        "https://user:password@example.invalid/functions/v1/model-gateway",
+        "https://example.invalid/functions/v1/model-gateway?redirect=file:///tmp",
+        "https:///functions/v1/model-gateway",
+    ],
+)
+def test_report_export_tier_rejects_non_https_or_ambiguous_gateway_urls(
+    monkeypatch: pytest.MonkeyPatch,
+    base_url: str,
+) -> None:
+    def unexpected_urlopen(*args: object, **kwargs: object) -> object:
+        raise AssertionError("invalid gateway URL must not reach urlopen")
+
+    monkeypatch.setattr(report_entitlements, "urlopen", unexpected_urlopen)
+
+    with pytest.raises(
+        ValueError,
+        match="MODEL_GATEWAY_BASE_URL must be a credential-free absolute HTTPS URL",
+    ):
+        Settings(model_gateway_base_url=base_url)
+
+    bypassed_settings = Settings.model_construct(
+        model_gateway_base_url=base_url,
+        llm_request_timeout_seconds=30,
+    )
+    assert (
+        report_entitlements.resolve_report_export_tier(
+            authorization_header="Bearer signed-user-jwt",
+            settings=bypassed_settings,
         )
         == "free"
     )

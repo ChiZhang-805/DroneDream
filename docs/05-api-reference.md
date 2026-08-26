@@ -111,10 +111,6 @@ status codes are advisory — clients should branch on `error.code`.
 | `JOB_FAILED` | 409 | Report was requested for a job in the terminal `FAILED` state. `error.details.failure_code` gives the job-level cause (see §5.2). |
 | `JOB_CANCELLED` | 409 | Report was requested for a job in the terminal `CANCELLED` state. |
 | `REPORT_NOT_READY` | 409 | Report was requested while the job is still `CREATED / QUEUED / RUNNING / AGGREGATING / FINALIZING`. |
-| `CONTROL_VERSION_REQUIRED` | 428 | A protected deployment received a user-authored Job/Batch command without the current `control_version`. |
-| `CONTROL_VERSION_INVALID` | 422 | `control_version` is not a positive integer. |
-| `CONTROL_VERSION_CONFLICT` | 409 | The Job/Batch changed after the client's view loaded; refresh before issuing a new command. |
-| `BATCH_CHILD_CONTROL_CONFLICT` | 409 | A child Job changed repeatedly during Batch cancellation; the Batch transaction rolls back instead of returning a partial cancellation. |
 | `INTERNAL_ERROR` | 500 | Unhandled server error. Always includes a request-scoped message; `details` may be `null`. |
 
 ### 5.2 Job-level failure codes
@@ -136,17 +132,8 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 | Code | Meaning |
 |---|---|
 | `ADAPTER_UNAVAILABLE` | The requested simulator adapter is unavailable, disabled for the current environment, or missing its executable command. The internal `real_stub` adapter is test-only and is rejected outside `APP_ENV=test`. |
-| `SIM_ERROR` | A trusted adapter or worker encountered an infrastructure error. |
-| `SIMULATOR_EXECUTION_TIMEOUT` | The external simulator process exceeded its wall-clock budget; this is infrastructure evidence, not proof that the controller timed out in flight. |
-| `INVALID_SIMULATOR_RESULT` | The result file was missing, malformed, identity-mismatched, internally inconsistent, or lacked required verified evidence. |
-| `UNVERIFIED_SIMULATOR_FAILURE` | An external simulator reported failure, but its producer-selected code was quarantined as diagnostic text and did not choose the canonical outcome class. |
-| `ARTIFACT_PERSISTENCE_FAILED` | Trial evidence bytes could not be persisted and verified. |
-| `RESULT_PERSISTENCE_FAILED` | The terminal Trial result could not be persisted safely. |
-| `INVALID_CANDIDATE_PARAMETERS` | The Candidate failed the deterministic parameter contract before a valid simulation observation was produced. |
-| `CANCELLED` | Cancellation won the terminal transition. |
-| `TIMEOUT` | Trusted domain evidence proves the frozen flight-completion deadline was exceeded. |
-| `SIMULATION_FAILED` | Trusted domain evidence proves a candidate-dependent simulation failure. |
-| `UNSTABLE_CANDIDATE` | Trusted domain evidence proves controller instability. |
+| `SIMULATION_FAILED` | The adapter raised an error during execution. |
+| `WORKER_TIMEOUT` | The trial exceeded its per-trial budget. |
 
 ---
 
@@ -168,7 +155,7 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 | `GET` | `/api/v1/trials/{trial_id}` | Trial detail (metrics, failure reason, artifacts). |
 | `GET` | `/api/v1/jobs/{job_id}/report` | Job report (requires job in `COMPLETED`). |
 | `GET` | `/api/v1/jobs/{job_id}/artifacts` | Artifact metadata list. |
-| `GET` | `/api/v1/artifacts/{artifact_id}/download` | Authorized local/S3 artifact download; completed experiment PDFs apply the trusted export-tier policy. |
+| `GET` | `/api/v1/artifacts/{artifact_id}/download` | Authorized local/S3 artifact download. |
 | `POST/GET` | `/api/v1/batches` | Create or list batches. |
 | `GET` | `/api/v1/batches/{batch_id}` | Batch detail. |
 | `GET` | `/api/v1/batches/{batch_id}/jobs` | Jobs in a batch. |
@@ -177,46 +164,6 @@ These appear on individual `Trial` rows under `trial.failure_code` (never as
 | `GET` | `/api/v1/capabilities` | Advisory runtime/optimizer capability discovery. |
 
 `GET /health`, `/health/live`, and `/health/ready` live **outside** `/api/v1`.
-
-### 6.1 Mutation version fence
-
-Every Job and Batch representation includes `control_version`, starting at
-`1`. The user-authored mutation routes below accept the current value as the
-query parameter `control_version`:
-
-- `PATCH /api/v1/jobs/{job_id}`
-- `POST /api/v1/jobs/{job_id}/cancel`
-- `DELETE /api/v1/jobs/{job_id}`
-- `POST /api/v1/batches/{batch_id}/cancel`
-
-Packaged desktop and production deployments require the parameter. Each
-successful command compares and increments the value atomically; a stale value
-returns `CONTROL_VERSION_CONFLICT` without applying the command. Development
-and test deployments temporarily infer the current value when it is omitted
-for source compatibility, but clients must not depend on that exception.
-
-`Idempotency-Key` and `control_version` protect different boundaries. An exact
-retry with the same idempotency key replays its committed response before the
-version check, recovering a lost response safely. A new command uses a new
-idempotency key and the latest version, preventing a stale tab or delayed UI
-action from overwriting a newer decision.
-
-### 6.2 Experiment PDF export tiers
-
-Downloading an Artifact with `artifact_type="pdf_report"` resolves the current
-subscription from the authenticated model-gateway usage snapshot. Client query
-parameters and request bodies cannot select a tier. Missing configuration,
-invalid or unavailable snapshots, unknown plans, and expired authentication
-all fail closed to `free`.
-
-Free exports are rendered from the authorized completed Job state and receive a
-low-opacity DroneDream `FREE EXPORT` brand seal on every page. Plus and Pro
-receive the verified stored PDF bytes without that seal. S3-backed report
-Artifacts never use the presigned-redirect shortcut, because a direct object
-URL would bypass the trusted entitlement and transformation boundary. Responses
-set `Cache-Control: private, no-store`,
-`X-DroneDream-Report-Tier`, and
-`X-DroneDream-Report-Watermark`.
 
 List endpoints are bounded. `GET /api/v1/batches` accepts `page` (default 1)
 and `page_size` (default 100, maximum 200), and returns `items`, `page`,
@@ -371,9 +318,7 @@ LLM reruns remain LLM-based; the previously stored encrypted job key is not reus
 
 Transitions a non-terminal job to `CANCELLED`. Rejects terminal jobs with
 `JOB_ALREADY_COMPLETED` / `JOB_ALREADY_CANCELLED` / `JOB_FAILED` as
-appropriate. Send the `control_version` returned by the current Job view as a
-query parameter. Returns the updated `Job` object, including the incremented
-version, in the success envelope.
+appropriate. Returns the updated `Job` object in the success envelope.
 
 ### 7.6 `POST /api/v1/experiment-assistant/turn`
 
@@ -439,36 +384,26 @@ For `COMPLETED` jobs, returns:
 - `baseline_metrics` and `optimized_metrics` (keyed metric blocks).
 - `comparison` (array of `{metric, baseline, optimized, lower_is_better}`).
 - `best_parameters` (flat key/value map).
-- `winner_evidence_id` (content-addressed final-selection receipt for modern
-  evidence-bound jobs; `null` for legacy reports).
-- `winner_freeze_receipt_id` (insert-once Job-level freeze row referenced by
-  modern reports; `null` for legacy reports).
 
 For `FAILED` jobs, returns a structured error envelope with
 `error.code=JOB_FAILED` and `error.details.failure_code` set to a
 job-level failure code (see §5.2). For jobs still in flight, returns
-`error.code=REPORT_NOT_READY`. If a modern winner-freeze receipt no longer
-matches its evidence or Job selection, returns
-`error.code=REPORT_EVIDENCE_INVALID`.
+`error.code=REPORT_NOT_READY`.
 
 ### 9.2 `GET /api/v1/jobs/{job_id}/artifacts`
 
 Returns the artifact metadata list for a job. Each row includes
 `artifact_type`, `display_name`, `storage_path`, `mime_type`, file size, and
-timestamps. Digest-bound rows additionally expose `integrity_policy`,
-`digest_evidence_id`, and `content_sha256`. Storage paths may identify mock,
-managed local, or S3-compatible objects.
+timestamps. Storage paths may identify mock, managed local, or S3-compatible
+objects.
 
 ### 9.3 `GET /api/v1/artifacts/{artifact_id}/download`
 
-Downloads an owned managed-local or S3-compatible artifact. When an Artifact is
-digest-bound, the service reads and verifies its bytes against the insert-once
-receipt before streaming; digest-bound S3 objects never use an unverified
-presigned redirect. A receipt/metadata/byte mismatch returns HTTP 409 with
-`error.code=ARTIFACT_INTEGRITY_INVALID`. Legacy unbound S3 objects may still
-return a short-lived redirect when presigning is available. Mock artifacts are
-metadata-only and return `ARTIFACT_NOT_DOWNLOADABLE`. Missing objects, paths
-outside the configured artifact roots, and cross-user artifacts fail closed.
+Downloads an owned managed-local artifact, or returns a short-lived redirect
+for an owned S3-compatible object when presigning is available. Mock artifacts
+are metadata-only and return `ARTIFACT_NOT_DOWNLOADABLE`. Missing objects,
+paths outside the configured artifact roots, and cross-user artifacts fail
+closed.
 
 ---
 

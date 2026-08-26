@@ -1,0 +1,3634 @@
+{
+  "schema_version": 1,
+  "subject_commit": "7cf37d728211a92bbcbb411c3ce8cca904d4c38a",
+  "subject_dirty": false,
+  "branch": "agent/wave-shared-experience-agent",
+  "browser": "Microsoft Edge (Playwright msedge channel)",
+  "api_mode": "offline 503 fixture; no API key, backend write, or user photo",
+  "generated_at": "2026-08-22T07:54:58.534Z",
+  "cases": [
+    {
+      "case": {
+        "id": "desktop-en",
+        "locale": "en",
+        "edition": "universal",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      },
+      "settings": {
+        "editionSwitcher": {
+          "trigger": {
+            "imageHeight": 31.1875,
+            "imageWidth": 170.015625,
+            "naturalWidth": 2595,
+            "naturalHeight": 476,
+            "gapToChevron": 17.546875,
+            "fitsTrigger": true
+          },
+          "menu": [
+            {
+              "edition": "universal",
+              "imageHeight": 28.15625,
+              "imageWidth": 132.640625,
+              "rightClearance": 64.84375,
+              "fitsItem": true
+            },
+            {
+              "edition": "sim",
+              "imageHeight": 28.15625,
+              "imageWidth": 153.484375,
+              "rightClearance": 23.53125,
+              "fitsItem": true
+            },
+            {
+              "edition": "lab",
+              "imageHeight": 28.15625,
+              "imageWidth": 155.328125,
+              "rightClearance": 42.15625,
+              "fitsItem": true
+            },
+            {
+              "edition": "field",
+              "imageHeight": 28.15625,
+              "imageWidth": 160.6875,
+              "rightClearance": 36.796875,
+              "fitsItem": true
+            },
+            {
+              "edition": "autonomy",
+              "imageHeight": 28.15625,
+              "imageWidth": 173.1875,
+              "rightClearance": 24.296875,
+              "fitsItem": true
+            }
+          ],
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-edition-switcher-lockups.png",
+            "sha256": "a8684c35a1b6ffb2976dd7ea3a1fa165f01ec6e6746724c1f80dde6ea67689dc"
+          }
+        },
+        "manage": {
+          "left": 943.078125,
+          "right": 1117.15625,
+          "top": 388.5625,
+          "bottom": 426.546875,
+          "width": 174.078125
+        },
+        "refresh": {
+          "left": 1001.15625,
+          "right": 1117.15625,
+          "top": 771.828125,
+          "bottom": 803.828125,
+          "width": 116
+        },
+        "period": {
+          "left": 315.65625,
+          "right": 989.15625,
+          "top": 778.71875,
+          "bottom": 796.953125,
+          "width": 673.5
+        },
+        "footer": {
+          "left": 315.65625,
+          "right": 1124.34375,
+          "top": 770.0625,
+          "bottom": 805.609375,
+          "width": 808.6875
+        },
+        "usage": {
+          "left": 305.390625,
+          "right": 1134.609375,
+          "top": 330.28125,
+          "bottom": 814.609375,
+          "width": 829.21875
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(30, 23, 33)",
+        "mutedColor": "rgb(117, 108, 121)",
+        "accessModeColor": "rgb(30, 23, 33)",
+        "headingColor": "rgb(37, 27, 40)",
+        "themeBinding": {
+          "edition": "sim",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#00D9FF",
+            "#2671FF",
+            "#744CFF"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 0
+        },
+        "settingsViewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "course",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 629,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "panelImages": [
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-settings-general.png",
+            "sha256": "2478c8300187933b80d7436435f37faed11a8ef4d2ab5b5d482511bdcd65b7d5"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-settings-memory.png",
+            "sha256": "a40d893adce2ec0b2f11c66e7083bc225ae6e8323cf245831693b97512d8ab6b"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-settings-model.png",
+            "sha256": "898e814a0c45480854d2f206e0991b6e1ddd6dfa1726ce3547cd3df87c954fa8"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-settings-course.png",
+            "sha256": "b36bdd7c2aebd548c62b5fd5ae1145cb81348479bef9b4affaad36d8146923e5"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> usage-range -> reset-card -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-assistant-models.png",
+          "sha256": "7f0293794ae3fec460286355736a61de9ff5e4e2c8bc5067282b217f0fabc655"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-settings.png",
+          "sha256": "42d04bef88efcb2d3e9c1dd4e54d4636d1d0206fa495ec372e7c295866978650"
+        }
+      },
+      "sharedWorkflowWorkspace": "sim",
+      "distributionSetup": {
+        "left": 268,
+        "right": 1416,
+        "width": 1148,
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "canApply": "false",
+        "buttonCount": 0,
+        "stored": "{\"schemaVersion\":1,\"editionId\":\"sim\",\"region\":\"global\",\"vehiclePackId\":\"px4-gazebo-x500-reference\",\"controllerKey\":null,\"optionalModules\":[]}",
+        "storedHasSensitiveField": false,
+        "visibleSelects": true,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-distribution-setup.png",
+          "sha256": "39f36563c2e60207dc530d2c5392325d83b36b8bd391b391b2b2910dbcb4357e"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 672,
+          "height": 491.453125
+        },
+        "viewport": {
+          "width": 304,
+          "height": 304
+        },
+        "preview": {
+          "width": 72,
+          "height": 72
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-avatar-crop.png",
+          "sha256": "b3e05319d23ad75b5690ffaee3dcd36a462966e88e4c26bf30bdc5733dbfb99f"
+        }
+      },
+      "fixedScenarios": {
+        "nav": {
+          "left": 12,
+          "right": 231,
+          "top": 77.59375,
+          "bottom": 428.390625,
+          "width": 219,
+          "height": 350.796875
+        },
+        "page": {
+          "left": 268,
+          "right": 1416,
+          "top": 87,
+          "bottom": 931.8125,
+          "width": 1148,
+          "height": 844.8125
+        },
+        "version": null,
+        "navEntries": [
+          {
+            "left": 12,
+            "right": 231,
+            "top": 106.765625,
+            "bottom": 147.3125,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/assistant",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 151.3125,
+            "bottom": 191.859375,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/autonomy",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 225.03125,
+            "bottom": 265.578125,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/jobs/new",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 298.75,
+            "bottom": 339.296875,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/dashboard",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 343.296875,
+            "bottom": 383.84375,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/scenarios",
+            "active": true,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 387.84375,
+            "bottom": 428.390625,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/history",
+            "active": false,
+            "labelFits": true
+          }
+        ],
+        "cards": [
+          {
+            "left": 268,
+            "right": 836.234375,
+            "top": 131.796875,
+            "bottom": 931.8125,
+            "width": 568.234375,
+            "height": 800.015625
+          },
+          {
+            "left": 847.75,
+            "right": 1416,
+            "top": 131.796875,
+            "bottom": 931.8125,
+            "width": 568.25,
+            "height": 800.015625
+          }
+        ],
+        "factRowsAligned": true,
+        "previews": [
+          {
+            "left": 290.78125,
+            "right": 813.453125,
+            "top": 399.1875,
+            "bottom": 868.8125,
+            "width": 522.671875,
+            "height": 469.625
+          },
+          {
+            "left": 870.53125,
+            "right": 1393.21875,
+            "top": 399.1875,
+            "bottom": 868.8125,
+            "width": 522.6875,
+            "height": 469.625
+          }
+        ],
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "balancedNavigation": true,
+        "keyboardScenarioSelection": true,
+        "freshNameRequired": true,
+        "createRequests": 0,
+        "mobileMenu": null,
+        "mobileMenuImage": null,
+        "switchedViewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-fixed-scenarios-xy-view.png",
+          "sha256": "d3df42b2152af7833fe19a656a5356f9bd28b05c9f17e18106e4a5bfa667b2a8"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-fixed-scenarios.png",
+          "sha256": "473bce50be0fa0d346ae326b2ea451237698eb55ae6d795819f365457befb0a6"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "coursePanelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-ece498-settings-entry.png",
+          "sha256": "1cb4f2e9a7fa10bf3563ef1eacdc4927a8205c90c61b9d5bf69f0ee3fc65e703"
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-ece498-external-entry.png",
+          "sha256": "3135eb65bec665b6290b62de3462ae65542af037df8010a60381c835dea0e2cc"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 510.1875,
+            "right": 662.71875,
+            "top": 117.734375,
+            "bottom": 155.484375,
+            "width": 152.53125
+          },
+          "actions": {
+            "left": 1279.03125,
+            "right": 1434.203125,
+            "top": 117.734375,
+            "bottom": 155.484375,
+            "width": 155.171875
+          },
+          "visual": {
+            "left": 37.796875,
+            "right": 662.71875,
+            "top": 163.484375,
+            "bottom": 950.203125,
+            "width": 624.921875
+          },
+          "data": {
+            "left": 670.390625,
+            "right": 1434.203125,
+            "top": 163.484375,
+            "bottom": 950.203125,
+            "width": 763.8125
+          },
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-track-editor.png",
+            "sha256": "ba867ce802eb3e91c89fe02ac15e498e3d69b16067c2ca5c60224f85a08968c2"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 763,
+            "scrollHeight": 763,
+            "overflowY": "auto",
+            "bottom": 935.6875
+          },
+          "lastGroupBottom": 925.890625,
+          "selects": [
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            }
+          ],
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-scenario.png",
+            "sha256": "07f95680eacbab859b5d80587b4d51f2955b4a2e3a4eaa700291f09509ed557c"
+          }
+        },
+        "completionPolicy": {
+          "policy": {
+            "left": 269.796875,
+            "right": 1404.203125,
+            "top": 787.1875,
+            "bottom": 978.921875,
+            "scrollWidth": 1132,
+            "clientWidth": 1132
+          },
+          "panel": {
+            "left": 256.796875,
+            "right": 1427.203125,
+            "top": 172.28125,
+            "bottom": 935.6875
+          },
+          "budgetVisible": true,
+          "numberInputCount": 4,
+          "allInputsInsideCard": true,
+          "providerTurnsDisabled": true,
+          "providerTurnsValue": "0",
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-completion-policy.png",
+            "sha256": "9a53147dcbcd5d5cd6ab71102d6b16a47e34df47b93bb7276dde732608c8ec82"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 1107,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 367,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-parameter-wheel.png",
+            "sha256": "f713ce7a8d8eb6cfe3e0a5c2831e40f9f2a1c0fa99107b9e066686f600666bcf"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": true,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-workspace-pinned.png",
+          "sha256": "a92f33c3dbb1837a7d097721f925b8ffb19e88c40ed3c26171b79c205932ce9e"
+        },
+        "dragPreviewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-en-workspace-drag-preview.png",
+          "sha256": "4aa8ce4e13dae078b463a6570b50d46386d3053016412d9563bd7c770887298c"
+        }
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "desktop-zh",
+        "locale": "zh-CN",
+        "edition": "field",
+        "viewport": {
+          "width": 1440,
+          "height": 1000
+        }
+      },
+      "settings": {
+        "editionSwitcher": {
+          "trigger": {
+            "imageHeight": 31.1875,
+            "imageWidth": 177.984375,
+            "naturalWidth": 2865,
+            "naturalHeight": 502,
+            "gapToChevron": 9.578125,
+            "fitsTrigger": true
+          },
+          "menu": [
+            {
+              "edition": "universal",
+              "imageHeight": 28.15625,
+              "imageWidth": 132.640625,
+              "rightClearance": 64.84375,
+              "fitsItem": true
+            },
+            {
+              "edition": "sim",
+              "imageHeight": 28.15625,
+              "imageWidth": 153.484375,
+              "rightClearance": 44,
+              "fitsItem": true
+            },
+            {
+              "edition": "lab",
+              "imageHeight": 28.15625,
+              "imageWidth": 155.328125,
+              "rightClearance": 42.15625,
+              "fitsItem": true
+            },
+            {
+              "edition": "field",
+              "imageHeight": 28.15625,
+              "imageWidth": 160.6875,
+              "rightClearance": 16.328125,
+              "fitsItem": true
+            },
+            {
+              "edition": "autonomy",
+              "imageHeight": 28.15625,
+              "imageWidth": 173.1875,
+              "rightClearance": 24.296875,
+              "fitsItem": true
+            }
+          ],
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-edition-switcher-lockups.png",
+            "sha256": "e83df4b4ecb5726991f27fcd8934397ebabb021172f512c8ee4318acb38f759e"
+          }
+        },
+        "manage": {
+          "left": 1030.359375,
+          "right": 1117.15625,
+          "top": 389.640625,
+          "bottom": 427.625,
+          "width": 86.796875
+        },
+        "refresh": {
+          "left": 1001.15625,
+          "right": 1117.15625,
+          "top": 771.921875,
+          "bottom": 803.921875,
+          "width": 116
+        },
+        "period": {
+          "left": 315.65625,
+          "right": 989.15625,
+          "top": 778.796875,
+          "bottom": 797.03125,
+          "width": 673.5
+        },
+        "footer": {
+          "left": 315.65625,
+          "right": 1124.34375,
+          "top": 770.234375,
+          "bottom": 805.609375,
+          "width": 808.6875
+        },
+        "usage": {
+          "left": 305.390625,
+          "right": 1134.609375,
+          "top": 331.609375,
+          "bottom": 814.609375,
+          "width": 829.21875
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(30, 23, 33)",
+        "mutedColor": "rgb(117, 108, 121)",
+        "accessModeColor": "rgb(30, 23, 33)",
+        "headingColor": "rgb(58, 33, 23)",
+        "themeBinding": {
+          "edition": "field",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#FFC247",
+            "#FF754B",
+            "#D746A5"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 0
+        },
+        "settingsViewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "course",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "panelImages": [
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-settings-general.png",
+            "sha256": "37b39ee542d09c8066bc6c50f3e88be1e7e9d60b363231abbbc0d5593d00f4cf"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-settings-memory.png",
+            "sha256": "56b414d62bb1c65547ca8855a4ccdb0c8f853b52e5a21eaf0b3dfb3bdaae23a0"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-settings-model.png",
+            "sha256": "66b31d8e35e2ac651103994304b3f28e85cb25e448382d2d94573270f64da11e"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-settings-course.png",
+            "sha256": "e6e2451ab36a09bb91eed900cb9e0466de89d05220d39b5b136b556c52e16755"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> usage-range -> reset-card -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-assistant-models.png",
+          "sha256": "665e4c0055be6bd5bdafa818f4b4fd90490ff65e2a7df51c7a38af86d341dae2"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-settings.png",
+          "sha256": "cec9fa0401566b6eddde23d7ef8f7576fb8ccb3bf7bc2a74f80bfb73579becea"
+        }
+      },
+      "sharedWorkflowWorkspace": "sim",
+      "distributionSetup": {
+        "left": 268,
+        "right": 1416,
+        "width": 1148,
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "canApply": "false",
+        "buttonCount": 0,
+        "stored": "{\"schemaVersion\":1,\"editionId\":\"sim\",\"region\":\"cn\",\"vehiclePackId\":\"px4-gazebo-x500-reference\",\"controllerKey\":null,\"optionalModules\":[]}",
+        "storedHasSensitiveField": false,
+        "visibleSelects": true,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-distribution-setup.png",
+          "sha256": "afcba030ff8dedaaa8a764e378ddb3b7b9515f62446714556e1a060a24330a12"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 672,
+          "height": 494.453125
+        },
+        "viewport": {
+          "width": 304,
+          "height": 304
+        },
+        "preview": {
+          "width": 72,
+          "height": 72
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-avatar-crop.png",
+          "sha256": "38c2f78d07653e8526811d9488e684b9ea12bbcef2d4f46f5a9ccfc40c38afbb"
+        }
+      },
+      "fixedScenarios": {
+        "nav": {
+          "left": 12,
+          "right": 231,
+          "top": 77.59375,
+          "bottom": 428.390625,
+          "width": 219,
+          "height": 350.796875
+        },
+        "page": {
+          "left": 268,
+          "right": 1416,
+          "top": 87,
+          "bottom": 931.8125,
+          "width": 1148,
+          "height": 844.8125
+        },
+        "version": null,
+        "navEntries": [
+          {
+            "left": 12,
+            "right": 231,
+            "top": 106.765625,
+            "bottom": 147.3125,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/assistant",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 151.3125,
+            "bottom": 191.859375,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/autonomy",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 225.03125,
+            "bottom": 265.578125,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/jobs/new",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 298.75,
+            "bottom": 339.296875,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/dashboard",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 343.296875,
+            "bottom": 383.84375,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/scenarios",
+            "active": true,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 231,
+            "top": 387.84375,
+            "bottom": 428.390625,
+            "width": 219,
+            "height": 40.546875,
+            "href": "/history",
+            "active": false,
+            "labelFits": true
+          }
+        ],
+        "cards": [
+          {
+            "left": 268,
+            "right": 836.234375,
+            "top": 131.796875,
+            "bottom": 931.8125,
+            "width": 568.234375,
+            "height": 800.015625
+          },
+          {
+            "left": 847.75,
+            "right": 1416,
+            "top": 131.796875,
+            "bottom": 931.8125,
+            "width": 568.25,
+            "height": 800.015625
+          }
+        ],
+        "factRowsAligned": true,
+        "previews": [
+          {
+            "left": 290.78125,
+            "right": 813.453125,
+            "top": 399.1875,
+            "bottom": 868.8125,
+            "width": 522.671875,
+            "height": 469.625
+          },
+          {
+            "left": 870.53125,
+            "right": 1393.21875,
+            "top": 399.1875,
+            "bottom": 868.8125,
+            "width": 522.6875,
+            "height": 469.625
+          }
+        ],
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "balancedNavigation": true,
+        "keyboardScenarioSelection": true,
+        "freshNameRequired": true,
+        "createRequests": 0,
+        "mobileMenu": null,
+        "mobileMenuImage": null,
+        "switchedViewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-fixed-scenarios-xy-view.png",
+          "sha256": "d4605312b965307fcd5941aa089b9405f17b95098cf2c35b5f25314e4cf670ac"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-fixed-scenarios.png",
+          "sha256": "9fba485abed826456d805c720c46f0d7f31c18eb89838f0b9eb0ec067d3a6ffa"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "coursePanelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-ece498-settings-entry.png",
+          "sha256": "872227146e1f8c073ed024175531028f7e87a3187f6f16f03999a7b95ca8c737"
+        },
+        "documentWidth": 1440,
+        "documentScrollWidth": 1440,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-ece498-external-entry.png",
+          "sha256": "3cec5e7317b90b50aeee3f3b586f7f3b1a4bfe58fc1871e6dc4bea6c2ae6e351"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 510.1875,
+            "right": 662.71875,
+            "top": 117.734375,
+            "bottom": 155.484375,
+            "width": 152.53125
+          },
+          "actions": {
+            "left": 1279.03125,
+            "right": 1434.203125,
+            "top": 117.734375,
+            "bottom": 155.484375,
+            "width": 155.171875
+          },
+          "visual": {
+            "left": 37.796875,
+            "right": 662.71875,
+            "top": 163.484375,
+            "bottom": 950.203125,
+            "width": 624.921875
+          },
+          "data": {
+            "left": 670.390625,
+            "right": 1434.203125,
+            "top": 163.484375,
+            "bottom": 950.203125,
+            "width": 763.8125
+          },
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-track-editor.png",
+            "sha256": "c3969c0a4defa1b48ad77612b1bec8d9e303325c8d597c39eca0afba0519bd20"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 763,
+            "scrollHeight": 763,
+            "overflowY": "auto",
+            "bottom": 935.125
+          },
+          "lastGroupBottom": 925.328125,
+          "selects": [
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            }
+          ],
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-scenario.png",
+            "sha256": "21cfbb17d7553dcb172326aa409aa56f9d6759cbc9370a08294fb92f9c6e5907"
+          }
+        },
+        "completionPolicy": {
+          "policy": {
+            "left": 269.796875,
+            "right": 1404.203125,
+            "top": 771.390625,
+            "bottom": 963.125,
+            "scrollWidth": 1132,
+            "clientWidth": 1132
+          },
+          "panel": {
+            "left": 256.796875,
+            "right": 1427.203125,
+            "top": 172.28125,
+            "bottom": 935.125
+          },
+          "budgetVisible": true,
+          "numberInputCount": 4,
+          "allInputsInsideCard": true,
+          "providerTurnsDisabled": true,
+          "providerTurnsValue": "0",
+          "documentWidth": 1440,
+          "documentScrollWidth": 1440,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-completion-policy.png",
+            "sha256": "9e63aaf5fc1b31ab5bd195967b6efeecbb97029127e4125c3871b0578f812464"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 1107,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 367,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-parameter-wheel.png",
+            "sha256": "4cc799b9e5063154f149c5fd0e88ff12932f884fa4b0f8230ae6287475eba373"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": true,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-workspace-pinned.png",
+          "sha256": "fec00ae8b017eae9e030578c1b498b10e2c7396491b01ca2a977cdf8252f02a6"
+        },
+        "dragPreviewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/desktop-zh-workspace-drag-preview.png",
+          "sha256": "5f80372b9feb20b1033fb7da2843950d448e70918a311352c3062b910ec3c53e"
+        }
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "tablet-en",
+        "locale": "en",
+        "edition": "lab",
+        "viewport": {
+          "width": 760,
+          "height": 900
+        }
+      },
+      "settings": {
+        "editionSwitcher": {
+          "trigger": {
+            "imageHeight": 31.1875,
+            "imageWidth": 172.046875,
+            "naturalWidth": 2648,
+            "naturalHeight": 480,
+            "gapToChevron": 474.921875,
+            "fitsTrigger": true
+          },
+          "menu": [
+            {
+              "edition": "universal",
+              "imageHeight": 28.15625,
+              "imageWidth": 132.640625,
+              "rightClearance": 524.25,
+              "fitsItem": true
+            },
+            {
+              "edition": "sim",
+              "imageHeight": 28.15625,
+              "imageWidth": 153.484375,
+              "rightClearance": 503.40625,
+              "fitsItem": true
+            },
+            {
+              "edition": "lab",
+              "imageHeight": 28.15625,
+              "imageWidth": 155.328125,
+              "rightClearance": 481.09375,
+              "fitsItem": true
+            },
+            {
+              "edition": "field",
+              "imageHeight": 28.15625,
+              "imageWidth": 160.6875,
+              "rightClearance": 496.203125,
+              "fitsItem": true
+            },
+            {
+              "edition": "autonomy",
+              "imageHeight": 28.15625,
+              "imageWidth": 351.046875,
+              "rightClearance": 305.84375,
+              "fitsItem": true
+            }
+          ],
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-edition-switcher-lockups.png",
+            "sha256": "c1f1aef783aceae9cda8297131482aa89cf3c09a8f40bad70005aadb7132a7c0"
+          }
+        },
+        "manage": {
+          "left": 541.078125,
+          "right": 715.15625,
+          "top": 388.5625,
+          "bottom": 426.546875,
+          "width": 174.078125
+        },
+        "refresh": {
+          "left": 599.15625,
+          "right": 715.15625,
+          "top": 771.828125,
+          "bottom": 803.828125,
+          "width": 116
+        },
+        "period": {
+          "left": 45.65625,
+          "right": 587.15625,
+          "top": 778.71875,
+          "bottom": 796.953125,
+          "width": 541.5
+        },
+        "footer": {
+          "left": 45.65625,
+          "right": 722.34375,
+          "top": 770.0625,
+          "bottom": 805.609375,
+          "width": 676.6875
+        },
+        "usage": {
+          "left": 35.390625,
+          "right": 732.609375,
+          "top": 330.28125,
+          "bottom": 814.609375,
+          "width": 697.21875
+        },
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(30, 23, 33)",
+        "mutedColor": "rgb(117, 108, 121)",
+        "accessModeColor": "rgb(30, 23, 33)",
+        "headingColor": "rgb(37, 27, 40)",
+        "themeBinding": {
+          "edition": "lab",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#A7E84A",
+            "#20C77A",
+            "#087E69"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 0
+        },
+        "settingsViewport": {
+          "width": 760,
+          "height": 900
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "course",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "panelImages": [
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-settings-general.png",
+            "sha256": "d58cbf5d4a827caf318ee79694b68738e88d9ecea9e3b652f5831b00faefccfe"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-settings-memory.png",
+            "sha256": "6bfbe2df0d8a33609725fd6752d682fdf2acf87f894c06e0e46ff7345491d637"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-settings-model.png",
+            "sha256": "5c82e6fe5ee88dbdb5a183257780e9ed545e16d13ca94bd3a361de71dec6b08e"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-settings-course.png",
+            "sha256": "656d91b79cb54a7ecebdb920ac29d22d81cc0e1cd2350bfcf005532ac5191548"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> usage-range -> reset-card -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-assistant-models.png",
+          "sha256": "2a0e96c80baa690f911e7028e021f9e8f68bf59653234ea1aefe475a00e11e7f"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-settings.png",
+          "sha256": "08e2836f5e673837629b71f8ff4be040c0e91d510559e95994a2271aeeefe25f"
+        }
+      },
+      "sharedWorkflowWorkspace": "sim",
+      "distributionSetup": {
+        "left": 24,
+        "right": 736,
+        "width": 712,
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "canApply": "false",
+        "buttonCount": 0,
+        "stored": "{\"schemaVersion\":1,\"editionId\":\"sim\",\"region\":\"global\",\"vehiclePackId\":\"px4-gazebo-x500-reference\",\"controllerKey\":null,\"optionalModules\":[]}",
+        "storedHasSensitiveField": false,
+        "visibleSelects": true,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-distribution-setup.png",
+          "sha256": "7f8a883bd263ea81b0b0a34e727cebe09e6587cffa2c1091f3ca4f0d828cdb25"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 672,
+          "height": 491.453125
+        },
+        "viewport": {
+          "width": 304,
+          "height": 304
+        },
+        "preview": {
+          "width": 72,
+          "height": 72
+        },
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-avatar-crop.png",
+          "sha256": "1c0bed05dc062902b2d86fbc88fb91c69f8308dad3c317e739fe493c08df421d"
+        }
+      },
+      "fixedScenarios": {
+        "nav": {
+          "left": 12,
+          "right": 748,
+          "top": 79.984375,
+          "bottom": 212.8125,
+          "width": 736,
+          "height": 132.828125
+        },
+        "page": {
+          "left": 24,
+          "right": 736,
+          "top": 311.203125,
+          "bottom": 1793.359375,
+          "width": 712,
+          "height": 1482.15625
+        },
+        "version": null,
+        "navEntries": [
+          {
+            "left": 135.59375,
+            "right": 377.203125,
+            "top": 79.984375,
+            "bottom": 120.53125,
+            "width": 241.609375,
+            "height": 40.546875,
+            "href": "/assistant",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 382.796875,
+            "right": 624.390625,
+            "top": 79.984375,
+            "bottom": 120.53125,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/autonomy",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 253.59375,
+            "top": 126.125,
+            "bottom": 166.671875,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/jobs/new",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 382.796875,
+            "right": 624.390625,
+            "top": 126.125,
+            "bottom": 166.671875,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/dashboard",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 253.59375,
+            "top": 172.265625,
+            "bottom": 212.8125,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/scenarios",
+            "active": true,
+            "labelFits": true
+          },
+          {
+            "left": 259.1875,
+            "right": 500.796875,
+            "top": 172.265625,
+            "bottom": 212.8125,
+            "width": 241.609375,
+            "height": 40.546875,
+            "href": "/history",
+            "active": false,
+            "labelFits": true
+          }
+        ],
+        "cards": [
+          {
+            "left": 24,
+            "right": 736,
+            "top": 356,
+            "bottom": 1068.921875,
+            "width": 712,
+            "height": 712.921875
+          },
+          {
+            "left": 24,
+            "right": 736,
+            "top": 1080.4375,
+            "bottom": 1793.359375,
+            "width": 712,
+            "height": 712.921875
+          }
+        ],
+        "factRowsAligned": true,
+        "previews": [
+          {
+            "left": 46.78125,
+            "right": 713.21875,
+            "top": 623.390625,
+            "bottom": 1005.921875,
+            "width": 666.4375,
+            "height": 382.53125
+          },
+          {
+            "left": 46.78125,
+            "right": 713.21875,
+            "top": 1347.828125,
+            "bottom": 1730.359375,
+            "width": 666.4375,
+            "height": 382.53125
+          }
+        ],
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "balancedNavigation": true,
+        "keyboardScenarioSelection": true,
+        "freshNameRequired": true,
+        "createRequests": 0,
+        "mobileMenu": null,
+        "mobileMenuImage": null,
+        "switchedViewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-fixed-scenarios-xy-view.png",
+          "sha256": "3a46f9f9798a860d783bc7fa755d5d14bef4333386eb974cd8945a5b1c03635d"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-fixed-scenarios.png",
+          "sha256": "01501dba23e2f3ccc002b5391021da61d216bd8d83f1311f88dba7dc217de5ff"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "coursePanelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-ece498-settings-entry.png",
+          "sha256": "b6d2479ec57bcd538eda48c3ac3ed7d7b4ff280cc01ba6899f447b0922b14a7e"
+        },
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-ece498-external-entry.png",
+          "sha256": "59adfd46311c4ddecc92f404404fbbc8b83f9b13b225dcca632d80a96fd53e36"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 229.5,
+            "right": 382.03125,
+            "top": 104.734375,
+            "bottom": 142.5,
+            "width": 152.53125
+          },
+          "actions": {
+            "left": 590.21875,
+            "right": 745.390625,
+            "top": 104.734375,
+            "bottom": 142.5,
+            "width": 155.171875
+          },
+          "visual": {
+            "left": 28.984375,
+            "right": 745.390625,
+            "top": 150.5,
+            "bottom": 560.21875,
+            "width": 716.40625
+          },
+          "data": {
+            "left": 28.984375,
+            "right": 745.390625,
+            "top": 568.21875,
+            "bottom": 863.203125,
+            "width": 716.40625
+          },
+          "documentWidth": 760,
+          "documentScrollWidth": 760,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-track-editor.png",
+            "sha256": "24db362308352f9c7c91f6adef0206a5bf637100d0e9d2191ba2156af6f0873d"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 424,
+            "scrollHeight": 1186,
+            "overflowY": "auto",
+            "bottom": 835.203125
+          },
+          "lastGroupBottom": 1586.21875,
+          "selects": [
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            }
+          ],
+          "documentWidth": 760,
+          "documentScrollWidth": 760,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-scenario.png",
+            "sha256": "a02667dedf3985d041536f753608fdc3a46fcabbb5e81f1750863bffa6237dc2"
+          }
+        },
+        "completionPolicy": {
+          "policy": {
+            "left": 25.78125,
+            "right": 724.21875,
+            "top": 686.375,
+            "bottom": 983.84375,
+            "scrollWidth": 696,
+            "clientWidth": 696
+          },
+          "panel": {
+            "left": 11.1875,
+            "right": 748.8125,
+            "top": 411.21875,
+            "bottom": 835.203125
+          },
+          "budgetVisible": true,
+          "numberInputCount": 4,
+          "allInputsInsideCard": true,
+          "providerTurnsDisabled": true,
+          "providerTurnsValue": "0",
+          "documentWidth": 760,
+          "documentScrollWidth": 760,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-completion-policy.png",
+            "sha256": "81c960f6cde039352033380cff12964c91a0a92be7336c603c97ace02602cebd"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 672,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 803,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-parameter-wheel.png",
+            "sha256": "ab489cab450714e47c2ff94630fe7ff6d376e259adaf08e42aec16ac9f8d7a74"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": false,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-en-workspace-pinned.png",
+          "sha256": "842be4dea62b1d3f65adebe03aeb7380defc0ed899e2a1a2ed121a1c6653fedc"
+        },
+        "dragPreviewImage": null
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "tablet-zh",
+        "locale": "zh-CN",
+        "edition": "sim",
+        "viewport": {
+          "width": 760,
+          "height": 900
+        }
+      },
+      "settings": {
+        "editionSwitcher": {
+          "trigger": {
+            "imageHeight": 31.1875,
+            "imageWidth": 170.015625,
+            "naturalWidth": 2595,
+            "naturalHeight": 476,
+            "gapToChevron": 476.953125,
+            "fitsTrigger": true
+          },
+          "menu": [
+            {
+              "edition": "universal",
+              "imageHeight": 28.15625,
+              "imageWidth": 132.640625,
+              "rightClearance": 524.25,
+              "fitsItem": true
+            },
+            {
+              "edition": "sim",
+              "imageHeight": 28.15625,
+              "imageWidth": 153.484375,
+              "rightClearance": 482.9375,
+              "fitsItem": true
+            },
+            {
+              "edition": "lab",
+              "imageHeight": 28.15625,
+              "imageWidth": 155.328125,
+              "rightClearance": 501.5625,
+              "fitsItem": true
+            },
+            {
+              "edition": "field",
+              "imageHeight": 28.15625,
+              "imageWidth": 160.6875,
+              "rightClearance": 496.203125,
+              "fitsItem": true
+            },
+            {
+              "edition": "autonomy",
+              "imageHeight": 28.15625,
+              "imageWidth": 351.046875,
+              "rightClearance": 305.84375,
+              "fitsItem": true
+            }
+          ],
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-edition-switcher-lockups.png",
+            "sha256": "6b66e650a4034b2b9d4daa5129fc795479aeb79205d9d6e68be06c6e71d5e0b4"
+          }
+        },
+        "manage": {
+          "left": 628.359375,
+          "right": 715.15625,
+          "top": 389.640625,
+          "bottom": 427.625,
+          "width": 86.796875
+        },
+        "refresh": {
+          "left": 599.15625,
+          "right": 715.15625,
+          "top": 771.921875,
+          "bottom": 803.921875,
+          "width": 116
+        },
+        "period": {
+          "left": 45.65625,
+          "right": 587.15625,
+          "top": 778.796875,
+          "bottom": 797.03125,
+          "width": 541.5
+        },
+        "footer": {
+          "left": 45.65625,
+          "right": 722.34375,
+          "top": 770.234375,
+          "bottom": 805.609375,
+          "width": 676.6875
+        },
+        "usage": {
+          "left": 35.390625,
+          "right": 732.609375,
+          "top": 331.609375,
+          "bottom": 814.609375,
+          "width": 697.21875
+        },
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(30, 23, 33)",
+        "mutedColor": "rgb(117, 108, 121)",
+        "accessModeColor": "rgb(30, 23, 33)",
+        "headingColor": "rgb(37, 27, 40)",
+        "themeBinding": {
+          "edition": "sim",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#00D9FF",
+            "#2671FF",
+            "#744CFF"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 0
+        },
+        "settingsViewport": {
+          "width": 760,
+          "height": 900
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "course",
+            "dialogClientHeight": 758,
+            "dialogScrollHeight": 758,
+            "dialogTop": 70,
+            "dialogBottom": 830,
+            "panelClientHeight": 628,
+            "panelScrollHeight": 628,
+            "panelTop": 186.984375,
+            "panelBottom": 814.609375,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "panelImages": [
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-settings-general.png",
+            "sha256": "bcfbe3ccbbc334b6c2758a3ec7c0b84853dbb8668c49ba5a72bdf666e28540fc"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-settings-memory.png",
+            "sha256": "3b308f5aeec83263cd6157e98d9b5e4aa7d4375ee8aac5c0f47305a204544f39"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-settings-model.png",
+            "sha256": "17158ebbdef147f940e4b338e302e229c5312a1b9aacc673f2f169839c02991d"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-settings-course.png",
+            "sha256": "4f0ead824b922fa70630d98dc4af2370af8bded9b39be4b9d69ce0c086e7da74"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> usage-range -> reset-card -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-assistant-models.png",
+          "sha256": "9b3c7dc28d1cf8f60e4a7dc2705169d9a508c6704c973dfdd648e9bef67a927a"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-settings.png",
+          "sha256": "1aea3531a64205b9717860c616f968ff5dd1e51987fbf0c54161f995b72de358"
+        }
+      },
+      "sharedWorkflowWorkspace": "sim",
+      "distributionSetup": {
+        "left": 24,
+        "right": 736,
+        "width": 712,
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "canApply": "false",
+        "buttonCount": 0,
+        "stored": "{\"schemaVersion\":1,\"editionId\":\"sim\",\"region\":\"cn\",\"vehiclePackId\":\"px4-gazebo-x500-reference\",\"controllerKey\":null,\"optionalModules\":[]}",
+        "storedHasSensitiveField": false,
+        "visibleSelects": true,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-distribution-setup.png",
+          "sha256": "f391a7ae4c6b8b275bfea1616009daf7ddade479b1dce3612c8c1cace4340181"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 672,
+          "height": 494.453125
+        },
+        "viewport": {
+          "width": 304,
+          "height": 304
+        },
+        "preview": {
+          "width": 72,
+          "height": 72
+        },
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-avatar-crop.png",
+          "sha256": "c73c1712f04eb31523127b0eab44610252847bd5b9dd114a654573b5ea9c4036"
+        }
+      },
+      "fixedScenarios": {
+        "nav": {
+          "left": 12,
+          "right": 748,
+          "top": 79.984375,
+          "bottom": 212.8125,
+          "width": 736,
+          "height": 132.828125
+        },
+        "page": {
+          "left": 24,
+          "right": 736,
+          "top": 311.203125,
+          "bottom": 1793.359375,
+          "width": 712,
+          "height": 1482.15625
+        },
+        "version": null,
+        "navEntries": [
+          {
+            "left": 135.59375,
+            "right": 377.203125,
+            "top": 79.984375,
+            "bottom": 120.53125,
+            "width": 241.609375,
+            "height": 40.546875,
+            "href": "/assistant",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 382.796875,
+            "right": 624.390625,
+            "top": 79.984375,
+            "bottom": 120.53125,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/autonomy",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 253.59375,
+            "top": 126.125,
+            "bottom": 166.671875,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/jobs/new",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 382.796875,
+            "right": 624.390625,
+            "top": 126.125,
+            "bottom": 166.671875,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/dashboard",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 253.59375,
+            "top": 172.265625,
+            "bottom": 212.8125,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/scenarios",
+            "active": true,
+            "labelFits": true
+          },
+          {
+            "left": 259.1875,
+            "right": 500.796875,
+            "top": 172.265625,
+            "bottom": 212.8125,
+            "width": 241.609375,
+            "height": 40.546875,
+            "href": "/history",
+            "active": false,
+            "labelFits": true
+          }
+        ],
+        "cards": [
+          {
+            "left": 24,
+            "right": 736,
+            "top": 356,
+            "bottom": 1068.921875,
+            "width": 712,
+            "height": 712.921875
+          },
+          {
+            "left": 24,
+            "right": 736,
+            "top": 1080.4375,
+            "bottom": 1793.359375,
+            "width": 712,
+            "height": 712.921875
+          }
+        ],
+        "factRowsAligned": true,
+        "previews": [
+          {
+            "left": 46.78125,
+            "right": 713.21875,
+            "top": 623.390625,
+            "bottom": 1005.921875,
+            "width": 666.4375,
+            "height": 382.53125
+          },
+          {
+            "left": 46.78125,
+            "right": 713.21875,
+            "top": 1347.828125,
+            "bottom": 1730.359375,
+            "width": 666.4375,
+            "height": 382.53125
+          }
+        ],
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "balancedNavigation": true,
+        "keyboardScenarioSelection": true,
+        "freshNameRequired": true,
+        "createRequests": 0,
+        "mobileMenu": null,
+        "mobileMenuImage": null,
+        "switchedViewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-fixed-scenarios-xy-view.png",
+          "sha256": "5a406a4bff8f2ee0dc04d84422cd176e62f55c3cc51036cbe2ddec963cdbd138"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-fixed-scenarios.png",
+          "sha256": "f5ae25b1bcb4b35a2a387cf50d58de48d4cd1975ea63af033474182835a3a801"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "coursePanelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-ece498-settings-entry.png",
+          "sha256": "90e41ce3e71b42f395fa8bde6004115c87d901410c7bf4c0c9c582e30b3b742f"
+        },
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-ece498-external-entry.png",
+          "sha256": "0eafc5b8f1cc7e0d37a0909da38d2766fdd1c0042891d7608197987361700468"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 229.5,
+            "right": 382.03125,
+            "top": 104.734375,
+            "bottom": 142.5,
+            "width": 152.53125
+          },
+          "actions": {
+            "left": 590.21875,
+            "right": 745.390625,
+            "top": 104.734375,
+            "bottom": 142.5,
+            "width": 155.171875
+          },
+          "visual": {
+            "left": 28.984375,
+            "right": 745.390625,
+            "top": 150.5,
+            "bottom": 560.21875,
+            "width": 716.40625
+          },
+          "data": {
+            "left": 28.984375,
+            "right": 745.390625,
+            "top": 568.21875,
+            "bottom": 863.203125,
+            "width": 716.40625
+          },
+          "documentWidth": 760,
+          "documentScrollWidth": 760,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-track-editor.png",
+            "sha256": "e60906250563f370068391548bc654b4a180821c86ac48c4c72528a93ca88529"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 422,
+            "scrollHeight": 1186,
+            "overflowY": "auto",
+            "bottom": 833.046875
+          },
+          "lastGroupBottom": 1586.21875,
+          "selects": [
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            }
+          ],
+          "documentWidth": 760,
+          "documentScrollWidth": 760,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-scenario.png",
+            "sha256": "a2242582e46c8f10f170ed89060bb719184e62b5165a12165dfe92cc27688385"
+          }
+        },
+        "completionPolicy": {
+          "policy": {
+            "left": 25.78125,
+            "right": 724.21875,
+            "top": 700.375,
+            "bottom": 981.65625,
+            "scrollWidth": 696,
+            "clientWidth": 696
+          },
+          "panel": {
+            "left": 11.1875,
+            "right": 748.8125,
+            "top": 411.21875,
+            "bottom": 833.046875
+          },
+          "budgetVisible": true,
+          "numberInputCount": 4,
+          "allInputsInsideCard": true,
+          "providerTurnsDisabled": true,
+          "providerTurnsValue": "0",
+          "documentWidth": 760,
+          "documentScrollWidth": 760,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-completion-policy.png",
+            "sha256": "1ab884c95ecac00f928f71c40a7448468e77a733114531cf57965678707e339a"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 672,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 803,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-parameter-wheel.png",
+            "sha256": "52b548e362062d408af032c1ca9a302c363150fa66d98a43b380333b69d86995"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": false,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-zh-workspace-pinned.png",
+          "sha256": "67e23bdb2bce113f2d50f4fa556ce42e52939ebfd7a247b69d278c0ec9557f2a"
+        },
+        "dragPreviewImage": null
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "mobile-en",
+        "locale": "en",
+        "edition": "universal",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      "settings": {
+        "editionSwitcher": {
+          "trigger": {
+            "imageHeight": 19.1875,
+            "imageWidth": 104.59375,
+            "naturalWidth": 2595,
+            "naturalHeight": 476,
+            "gapToChevron": 64.921875,
+            "fitsTrigger": true
+          },
+          "menu": [
+            {
+              "edition": "universal",
+              "imageHeight": 19.1875,
+              "imageWidth": 90.390625,
+              "rightClearance": 208.09375,
+              "fitsItem": true
+            },
+            {
+              "edition": "sim",
+              "imageHeight": 19.1875,
+              "imageWidth": 104.59375,
+              "rightClearance": 173.421875,
+              "fitsItem": true
+            },
+            {
+              "edition": "lab",
+              "imageHeight": 19.1875,
+              "imageWidth": 105.84375,
+              "rightClearance": 192.640625,
+              "fitsItem": true
+            },
+            {
+              "edition": "field",
+              "imageHeight": 19.1875,
+              "imageWidth": 109.5,
+              "rightClearance": 188.984375,
+              "fitsItem": true
+            },
+            {
+              "edition": "autonomy",
+              "imageHeight": 19.1875,
+              "imageWidth": 239.21875,
+              "rightClearance": 59.265625,
+              "fitsItem": true
+            }
+          ],
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-edition-switcher-lockups.png",
+            "sha256": "a89a5a305a48dc25c6ffff15d4769d25733f2a221c2767e97b02e6ef53d615ef"
+          }
+        },
+        "manage": {
+          "left": 231.328125,
+          "right": 346.578125,
+          "top": 340.0625,
+          "bottom": 368.0625,
+          "width": 115.25
+        },
+        "refresh": {
+          "left": 230.578125,
+          "right": 346.578125,
+          "top": 630.125,
+          "bottom": 662.125,
+          "width": 116
+        },
+        "period": {
+          "left": 36.234375,
+          "right": 218.578125,
+          "top": 639.15625,
+          "bottom": 653.078125,
+          "width": 182.34375
+        },
+        "footer": {
+          "left": 36.234375,
+          "right": 353.765625,
+          "top": 628.484375,
+          "bottom": 663.765625,
+          "width": 317.53125
+        },
+        "usage": {
+          "left": 29.796875,
+          "right": 360.203125,
+          "top": 292.828125,
+          "bottom": 670.203125,
+          "width": 330.40625
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(30, 23, 33)",
+        "mutedColor": "rgb(117, 108, 121)",
+        "accessModeColor": "rgb(30, 23, 33)",
+        "headingColor": "rgb(37, 27, 40)",
+        "themeBinding": {
+          "edition": "sim",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#00D9FF",
+            "#2671FF",
+            "#744CFF"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 800
+        },
+        "settingsViewport": {
+          "width": 390,
+          "height": 700
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 556,
+            "panelScrollHeight": 556,
+            "panelTop": 114.171875,
+            "panelBottom": 670.203125,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 556,
+            "panelScrollHeight": 556,
+            "panelTop": 114.171875,
+            "panelBottom": 670.203125,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 556,
+            "panelScrollHeight": 556,
+            "panelTop": 114.171875,
+            "panelBottom": 670.203125,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "course",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 556,
+            "panelScrollHeight": 556,
+            "panelTop": 114.171875,
+            "panelBottom": 670.203125,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "panelImages": [
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-settings-general.png",
+            "sha256": "aebea05dc90282be2880e4aad14c19b4421944864d43b7f694ff8ae5862255d5"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-settings-memory.png",
+            "sha256": "0df61b0110f6bc2f94395559d266f6ae4ebd474a6850d73f8aee925dafd7e912"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-settings-model.png",
+            "sha256": "849894b1390a923c843e800755f1f79d99ce0d72ce0bb33131aaa71472e55736"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-settings-course.png",
+            "sha256": "ea61967cb1a9fea11214e65a4ecf2a4da12b02b2fa561da6fa470ae3cb0f7c29"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> usage-range -> reset-card -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-assistant-models.png",
+          "sha256": "c475c2e9e9d8db741c70db374f5b809c69613f97f213a11ff8bc3eda0cda002c"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-settings.png",
+          "sha256": "949748c9866edbf535c334e1326289a92efbf9eca63672d4a35d0c8b8881d6c9"
+        }
+      },
+      "sharedWorkflowWorkspace": "sim",
+      "distributionSetup": {
+        "left": 13.59375,
+        "right": 376.40625,
+        "width": 362.8125,
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "canApply": "false",
+        "buttonCount": 0,
+        "stored": "{\"schemaVersion\":1,\"editionId\":\"sim\",\"region\":\"global\",\"vehiclePackId\":\"px4-gazebo-x500-reference\",\"controllerKey\":null,\"optionalModules\":[]}",
+        "storedHasSensitiveField": false,
+        "visibleSelects": true,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-distribution-setup.png",
+          "sha256": "92cb457b2a25e02f76a9705fd97e42663381e09e5d12edb91b26bd0ec054fc98"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 378.8125,
+          "height": 550.78125
+        },
+        "viewport": {
+          "width": 256,
+          "height": 256
+        },
+        "preview": {
+          "width": 57.59375,
+          "height": 57.59375
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-avatar-crop.png",
+          "sha256": "02e3a27e9fb253110eb22427e68bf00b48f0af07bbe6de6ed429d9e1933ae42c"
+        }
+      },
+      "fixedScenarios": {
+        "nav": {
+          "left": 156.375,
+          "right": 374.609375,
+          "top": 147.75,
+          "bottom": 534.46875,
+          "width": 218.234375,
+          "height": 386.71875
+        },
+        "page": {
+          "left": 13.59375,
+          "right": 376.40625,
+          "top": 85.109375,
+          "bottom": 1362.71875,
+          "width": 362.8125,
+          "height": 1277.609375
+        },
+        "version": null,
+        "navEntries": [
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 179.0625,
+            "bottom": 227.859375,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/assistant",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 227.859375,
+            "bottom": 276.65625,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/autonomy",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 307.96875,
+            "bottom": 356.765625,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/jobs/new",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 388.078125,
+            "bottom": 436.875,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/dashboard",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 436.875,
+            "bottom": 485.671875,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/scenarios",
+            "active": true,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 485.671875,
+            "bottom": 534.46875,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/history",
+            "active": false,
+            "labelFits": true
+          }
+        ],
+        "cards": [
+          {
+            "left": 13.59375,
+            "right": 376.40625,
+            "top": 166.609375,
+            "bottom": 758.90625,
+            "width": 362.8125,
+            "height": 592.296875
+          },
+          {
+            "left": 13.59375,
+            "right": 376.40625,
+            "top": 770.421875,
+            "bottom": 1362.71875,
+            "width": 362.8125,
+            "height": 592.296875
+          }
+        ],
+        "factRowsAligned": true,
+        "previews": [
+          {
+            "left": 36.375,
+            "right": 353.625,
+            "top": 468.234375,
+            "bottom": 695.90625,
+            "width": 317.25,
+            "height": 227.671875
+          },
+          {
+            "left": 36.375,
+            "right": 353.625,
+            "top": 1072.046875,
+            "bottom": 1299.71875,
+            "width": 317.25,
+            "height": 227.671875
+          }
+        ],
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "balancedNavigation": true,
+        "keyboardScenarioSelection": true,
+        "freshNameRequired": true,
+        "createRequests": 0,
+        "mobileMenu": {
+          "panel": {
+            "left": 155.375,
+            "right": 375.609375,
+            "top": 71.515625,
+            "bottom": 584.265625,
+            "width": 220.234375
+          },
+          "panelMinWidth": "0px",
+          "account": {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 72.515625,
+            "bottom": 147.75,
+            "width": 218.234375
+          },
+          "settings": {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 534.46875,
+            "bottom": 583.265625,
+            "width": 218.234375
+          },
+          "links": [
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 179.0625,
+              "bottom": 227.859375,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 227.859375,
+              "bottom": 276.65625,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 307.96875,
+              "bottom": 356.765625,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 388.078125,
+              "bottom": 436.875,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 436.875,
+              "bottom": 485.671875,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 485.671875,
+              "bottom": 534.46875,
+              "width": 218.234375
+            }
+          ],
+          "rowsFit": true,
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "trigger": {
+            "left": 334.8125,
+            "right": 375.609375,
+            "width": 40.796875
+          }
+        },
+        "mobileMenuImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-mobile-navigation.png",
+          "sha256": "f0573536a80d1509940bdcd2e6a57748a5bb35aa6d2c56eacb7cf8d852b76056"
+        },
+        "switchedViewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-fixed-scenarios-xy-view.png",
+          "sha256": "7b11de8058e7976596a544afb9106468aa083b27b2093cb32767d10993e7d0a4"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-fixed-scenarios.png",
+          "sha256": "fa99209e753fb99a11200c5d82459528200baad00e2393eeaccc8a687a12b19c"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "coursePanelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-ece498-settings-entry.png",
+          "sha256": "5fee8f631a81426c3c8ea89f186cf99f536d379239b338048bd0874640840bfd"
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-ece498-external-entry.png",
+          "sha256": "df9e5444e8222f40dfded40a84daeb41a04c92c7c79e8471b20783e2a7809049"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 89.5625,
+            "bottom": 127.3125,
+            "width": 341.625
+          },
+          "actions": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 134.5,
+            "bottom": 168.5,
+            "width": 341.625
+          },
+          "visual": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 175.6875,
+            "bottom": 549.703125,
+            "width": 341.625
+          },
+          "data": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 556.890625,
+            "bottom": 826.203125,
+            "width": 341.625
+          },
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-track-editor.png",
+            "sha256": "2b630e9b94236ca683aeb33f58ad50507d14104fc1b91972b787a1538e394cee"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 620,
+            "scrollHeight": 1638,
+            "overflowY": "auto",
+            "bottom": 780.8125
+          },
+          "lastGroupBottom": 1789.6875,
+          "selects": [
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            },
+            {
+              "value": "Enable",
+              "clientWidth": 116,
+              "textWidth": 36.75932312011719,
+              "requiredWidth": 79
+            },
+            {
+              "value": "Disable",
+              "clientWidth": 116,
+              "textWidth": 40.49993896484375,
+              "requiredWidth": 83
+            }
+          ],
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-scenario.png",
+            "sha256": "aefa27496188195537703988d5b0097a290855dfd94838c818727f03ebbdf248"
+          }
+        },
+        "completionPolicy": {
+          "policy": {
+            "left": 17.78125,
+            "right": 362.21875,
+            "top": 542.109375,
+            "bottom": 1082.453125,
+            "scrollWidth": 342,
+            "clientWidth": 342
+          },
+          "panel": {
+            "left": 7.1875,
+            "right": 382.8125,
+            "top": 161.21875,
+            "bottom": 780.8125
+          },
+          "budgetVisible": true,
+          "numberInputCount": 4,
+          "allInputsInsideCard": true,
+          "providerTurnsDisabled": true,
+          "providerTurnsValue": "0",
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-completion-policy.png",
+            "sha256": "3c73edc3ca2c5152ba4bb7f8392cbe7d5c7b631b7f1ae39137b0be02d21c0060"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 318,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 1157,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-parameter-wheel.png",
+            "sha256": "e7abda4586e4b0ec7f94d191787ddb0e0b888f3f57ac480e788079ea0658e194"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": false,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-en-workspace-pinned.png",
+          "sha256": "d4f21736f0fc84c040571fd154db62bd2d1b99952ecc647afe42f7caf4f511c0"
+        },
+        "dragPreviewImage": null
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "mobile-zh",
+        "locale": "zh-CN",
+        "edition": "field",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      },
+      "settings": {
+        "editionSwitcher": {
+          "trigger": {
+            "imageHeight": 19.1875,
+            "imageWidth": 109.5,
+            "naturalWidth": 2865,
+            "naturalHeight": 502,
+            "gapToChevron": 60.015625,
+            "fitsTrigger": true
+          },
+          "menu": [
+            {
+              "edition": "universal",
+              "imageHeight": 19.1875,
+              "imageWidth": 90.390625,
+              "rightClearance": 208.09375,
+              "fitsItem": true
+            },
+            {
+              "edition": "sim",
+              "imageHeight": 19.1875,
+              "imageWidth": 104.59375,
+              "rightClearance": 193.890625,
+              "fitsItem": true
+            },
+            {
+              "edition": "lab",
+              "imageHeight": 19.1875,
+              "imageWidth": 105.84375,
+              "rightClearance": 192.640625,
+              "fitsItem": true
+            },
+            {
+              "edition": "field",
+              "imageHeight": 19.1875,
+              "imageWidth": 109.5,
+              "rightClearance": 168.515625,
+              "fitsItem": true
+            },
+            {
+              "edition": "autonomy",
+              "imageHeight": 19.1875,
+              "imageWidth": 239.21875,
+              "rightClearance": 59.265625,
+              "fitsItem": true
+            }
+          ],
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-edition-switcher-lockups.png",
+            "sha256": "0ede378690a16dae946d34ac50d378b267b3726b0408dcc48e0fd11ea907459e"
+          }
+        },
+        "manage": {
+          "left": 291.453125,
+          "right": 346.578125,
+          "top": 341.96875,
+          "bottom": 369.96875,
+          "width": 55.125
+        },
+        "refresh": {
+          "left": 230.578125,
+          "right": 346.578125,
+          "top": 630.265625,
+          "bottom": 662.265625,
+          "width": 116
+        },
+        "period": {
+          "left": 36.234375,
+          "right": 218.578125,
+          "top": 639.296875,
+          "bottom": 653.21875,
+          "width": 182.34375
+        },
+        "footer": {
+          "left": 36.234375,
+          "right": 353.765625,
+          "top": 628.765625,
+          "bottom": 663.765625,
+          "width": 317.53125
+        },
+        "usage": {
+          "left": 29.796875,
+          "right": 360.203125,
+          "top": 295.15625,
+          "bottom": 670.203125,
+          "width": 330.40625
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "usageValuesFit": true,
+        "foregroundColor": "rgb(30, 23, 33)",
+        "mutedColor": "rgb(117, 108, 121)",
+        "accessModeColor": "rgb(30, 23, 33)",
+        "headingColor": "rgb(58, 33, 23)",
+        "themeBinding": {
+          "edition": "field",
+          "presentationOnly": "true",
+          "grantsHardwareAuthority": "false",
+          "colors": [
+            "#FFC247",
+            "#FF754B",
+            "#D746A5"
+          ]
+        },
+        "layerBinding": {
+          "backdropZIndex": 900,
+          "mobileHeaderZIndex": 800
+        },
+        "settingsViewport": {
+          "width": 390,
+          "height": 700
+        },
+        "panelMeasurements": [
+          {
+            "tab": "general",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 556,
+            "panelScrollHeight": 556,
+            "panelTop": 114.171875,
+            "panelBottom": 670.203125,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "memory",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 556,
+            "panelScrollHeight": 556,
+            "panelTop": 114.171875,
+            "panelBottom": 670.203125,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "model",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 556,
+            "panelScrollHeight": 556,
+            "panelTop": 114.171875,
+            "panelBottom": 670.203125,
+            "grantsHardwareAuthority": "false"
+          },
+          {
+            "tab": "course",
+            "dialogClientHeight": 658,
+            "dialogScrollHeight": 658,
+            "dialogTop": 20,
+            "dialogBottom": 680,
+            "panelClientHeight": 556,
+            "panelScrollHeight": 556,
+            "panelTop": 114.171875,
+            "panelBottom": 670.203125,
+            "grantsHardwareAuthority": "false"
+          }
+        ],
+        "panelImages": [
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-settings-general.png",
+            "sha256": "c8b8bac8ab396c5c3a2a78204eb313020377a06eec9d04b858c8841f9f8de444"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-settings-memory.png",
+            "sha256": "3c74214d522423dfc95d9af8a9a95056b8c18c0bc069ecf747f4391a9f20ff9d"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-settings-model.png",
+            "sha256": "9815426951918917e0142a837b369d9ce626c96afedb60eb26d42608d207d9bd"
+          },
+          {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-settings-course.png",
+            "sha256": "9a636fcec1b8f0b50ee65ffe828a68bee9a8b87ec10f1106bf69ad76883b784c"
+          }
+        ],
+        "keyboardFocusOrder": "manage-subscription -> usage-range -> reset-card -> refresh-usage",
+        "assistantModelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-assistant-models.png",
+          "sha256": "419973b33c8e4f84744710d5124c50071694344fab1761d6bf2a6d3b8b284cfd"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-settings.png",
+          "sha256": "87006015f85e3b162341fa546d929398349fc5e03da33fe3aaaff82440f49f26"
+        }
+      },
+      "sharedWorkflowWorkspace": "sim",
+      "distributionSetup": {
+        "left": 13.59375,
+        "right": 376.40625,
+        "width": 362.8125,
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "canApply": "false",
+        "buttonCount": 0,
+        "stored": "{\"schemaVersion\":1,\"editionId\":\"sim\",\"region\":\"cn\",\"vehiclePackId\":\"px4-gazebo-x500-reference\",\"controllerKey\":null,\"optionalModules\":[]}",
+        "storedHasSensitiveField": false,
+        "visibleSelects": true,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-distribution-setup.png",
+          "sha256": "00062662a36cb6a2b2d62714822477546dc85da12772d5c6e59429f163cf015b"
+        }
+      },
+      "avatar": {
+        "dialog": {
+          "width": 378.8125,
+          "height": 553.78125
+        },
+        "viewport": {
+          "width": 256,
+          "height": 256
+        },
+        "preview": {
+          "width": 57.59375,
+          "height": 57.59375
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "syntheticInput": true,
+        "cancelPreservedAvatar": true,
+        "confirmedFormat": "image/jpeg",
+        "outputPixels": "512x512",
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-avatar-crop.png",
+          "sha256": "8300cc8d5aab44439214c9ee9ffec60668c26d111cfe1c8d1cdef25d9635f1ec"
+        }
+      },
+      "fixedScenarios": {
+        "nav": {
+          "left": 156.375,
+          "right": 374.609375,
+          "top": 147.75,
+          "bottom": 534.46875,
+          "width": 218.234375,
+          "height": 386.71875
+        },
+        "page": {
+          "left": 13.59375,
+          "right": 376.40625,
+          "top": 85.109375,
+          "bottom": 1362.71875,
+          "width": 362.8125,
+          "height": 1277.609375
+        },
+        "version": null,
+        "navEntries": [
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 179.0625,
+            "bottom": 227.859375,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/assistant",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 227.859375,
+            "bottom": 276.65625,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/autonomy",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 307.96875,
+            "bottom": 356.765625,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/jobs/new",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 388.078125,
+            "bottom": 436.875,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/dashboard",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 436.875,
+            "bottom": 485.671875,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/scenarios",
+            "active": true,
+            "labelFits": true
+          },
+          {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 485.671875,
+            "bottom": 534.46875,
+            "width": 218.234375,
+            "height": 48.796875,
+            "href": "/history",
+            "active": false,
+            "labelFits": true
+          }
+        ],
+        "cards": [
+          {
+            "left": 13.59375,
+            "right": 376.40625,
+            "top": 166.609375,
+            "bottom": 758.90625,
+            "width": 362.8125,
+            "height": 592.296875
+          },
+          {
+            "left": 13.59375,
+            "right": 376.40625,
+            "top": 770.421875,
+            "bottom": 1362.71875,
+            "width": 362.8125,
+            "height": 592.296875
+          }
+        ],
+        "factRowsAligned": true,
+        "previews": [
+          {
+            "left": 36.375,
+            "right": 353.625,
+            "top": 468.234375,
+            "bottom": 695.90625,
+            "width": 317.25,
+            "height": 227.671875
+          },
+          {
+            "left": 36.375,
+            "right": 353.625,
+            "top": 1072.046875,
+            "bottom": 1299.71875,
+            "width": 317.25,
+            "height": 227.671875
+          }
+        ],
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "balancedNavigation": true,
+        "keyboardScenarioSelection": true,
+        "freshNameRequired": true,
+        "createRequests": 0,
+        "mobileMenu": {
+          "panel": {
+            "left": 155.375,
+            "right": 375.609375,
+            "top": 71.515625,
+            "bottom": 584.265625,
+            "width": 220.234375
+          },
+          "panelMinWidth": "0px",
+          "account": {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 72.515625,
+            "bottom": 147.75,
+            "width": 218.234375
+          },
+          "settings": {
+            "left": 156.375,
+            "right": 374.609375,
+            "top": 534.46875,
+            "bottom": 583.265625,
+            "width": 218.234375
+          },
+          "links": [
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 179.0625,
+              "bottom": 227.859375,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 227.859375,
+              "bottom": 276.65625,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 307.96875,
+              "bottom": 356.765625,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 388.078125,
+              "bottom": 436.875,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 436.875,
+              "bottom": 485.671875,
+              "width": 218.234375
+            },
+            {
+              "left": 156.375,
+              "right": 374.609375,
+              "top": 485.671875,
+              "bottom": 534.46875,
+              "width": 218.234375
+            }
+          ],
+          "rowsFit": true,
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "trigger": {
+            "left": 334.8125,
+            "right": 375.609375,
+            "width": 40.796875
+          }
+        },
+        "mobileMenuImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-mobile-navigation.png",
+          "sha256": "03a5473ee59571653fd0025cd6eae2835756b58d5f11f48124018504a0161f65"
+        },
+        "switchedViewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-fixed-scenarios-xy-view.png",
+          "sha256": "01454b76669a47d12c1281ed698286edc353168ff0a4da58f4ca7fb78d108aeb"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-fixed-scenarios.png",
+          "sha256": "cabe7d575b2dce49434198e91db7dc514bcb726aa84b24dd2d9d022a47032cbf"
+        }
+      },
+      "ece498": {
+        "courseUrl": "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+        "target": "_blank",
+        "internalCoursePageRemoved": true,
+        "popupReachedExactUrl": true,
+        "coursePanelImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-ece498-settings-entry.png",
+          "sha256": "0fbacd83a9af47b53438845ea36856cd92ad4c6da6685abfd1d3e0d9f462bbb4"
+        },
+        "documentWidth": 390,
+        "documentScrollWidth": 390,
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-ece498-external-entry.png",
+          "sha256": "88840146d1c141467534b9caec42138834ab7ad5eeec3e736d997ff02870b8d4"
+        }
+      },
+      "wizard": {
+        "track": {
+          "switcher": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 89.5625,
+            "bottom": 127.3125,
+            "width": 341.625
+          },
+          "actions": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 134.5,
+            "bottom": 168.5,
+            "width": 341.625
+          },
+          "visual": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 175.6875,
+            "bottom": 549.703125,
+            "width": 341.625
+          },
+          "data": {
+            "left": 25.78125,
+            "right": 367.40625,
+            "top": 556.890625,
+            "bottom": 826.203125,
+            "width": 341.625
+          },
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-track-editor.png",
+            "sha256": "4cc4674c1d88a42889eaf4a67533a6c7b34c25c9f48005fcde58bb6de2a0ce20"
+          }
+        },
+        "scenario": {
+          "panel": {
+            "clientHeight": 617,
+            "scrollHeight": 1619,
+            "overflowY": "auto",
+            "bottom": 778.65625
+          },
+          "lastGroupBottom": 1770,
+          "selects": [
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "启用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            },
+            {
+              "value": "禁用",
+              "clientWidth": 116,
+              "textWidth": 23.03997802734375,
+              "requiredWidth": 66
+            }
+          ],
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-scenario.png",
+            "sha256": "f367fad60bc91a19c5631646e3d6ef275cc48a806a777c7516dc5b7a76303894"
+          }
+        },
+        "completionPolicy": {
+          "policy": {
+            "left": 17.78125,
+            "right": 362.21875,
+            "top": 596.375,
+            "bottom": 1080.34375,
+            "scrollWidth": 342,
+            "clientWidth": 342
+          },
+          "panel": {
+            "left": 7.1875,
+            "right": 382.8125,
+            "top": 161.21875,
+            "bottom": 778.65625
+          },
+          "budgetVisible": true,
+          "numberInputCount": 4,
+          "allInputsInsideCard": true,
+          "providerTurnsDisabled": true,
+          "providerTurnsValue": "0",
+          "documentWidth": 390,
+          "documentScrollWidth": 390,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-completion-policy.png",
+            "sha256": "efda3821384b7f5f31b677a6e1b5ab257cb1124744022f50bcf565aaa634b0e0"
+          }
+        },
+        "parameterWheel": {
+          "before": {
+            "scrollLeft": 0,
+            "itemCount": 7,
+            "childTags": [
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE",
+              "CODE"
+            ],
+            "overflowX": "hidden",
+            "clientWidth": 318,
+            "scrollWidth": 1475
+          },
+          "wrapped": {
+            "scrollLeft": 1157,
+            "lastItemVisible": true
+          },
+          "returnedScrollLeft": 1,
+          "image": {
+            "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-parameter-wheel.png",
+            "sha256": "0f86655e78901d0c00c8c08913c2daddd2d4ff5bd5735e13850daa64ffaed304"
+          }
+        }
+      },
+      "workspace": {
+        "freshEntryStartedBlank": true,
+        "duplicateActiveNameRejected": true,
+        "pinnedMarkerPersisted": true,
+        "explicitResumeIdentity": true,
+        "draggedUnpinnedBeforePinnedBecamePinned": false,
+        "pinnedImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/mobile-zh-workspace-pinned.png",
+          "sha256": "dd98658e9c9b0862cb52c267e581a085202da0a8e8b0e9ae21d1f9883f4f1830"
+        },
+        "dragPreviewImage": null
+      },
+      "pageErrors": [],
+      "status": "pass"
+    },
+    {
+      "case": {
+        "id": "tablet-fixed-scenarios-en",
+        "locale": "en",
+        "edition": "sim",
+        "viewport": {
+          "width": 760,
+          "height": 900
+        }
+      },
+      "scope": "fixed-scenarios-only",
+      "fixedScenarios": {
+        "nav": {
+          "left": 12,
+          "right": 748,
+          "top": 79.984375,
+          "bottom": 212.8125,
+          "width": 736,
+          "height": 132.828125
+        },
+        "page": {
+          "left": 24,
+          "right": 736,
+          "top": 311.203125,
+          "bottom": 1793.359375,
+          "width": 712,
+          "height": 1482.15625
+        },
+        "version": null,
+        "navEntries": [
+          {
+            "left": 135.59375,
+            "right": 377.203125,
+            "top": 79.984375,
+            "bottom": 120.53125,
+            "width": 241.609375,
+            "height": 40.546875,
+            "href": "/assistant",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 382.796875,
+            "right": 624.390625,
+            "top": 79.984375,
+            "bottom": 120.53125,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/autonomy",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 253.59375,
+            "top": 126.125,
+            "bottom": 166.671875,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/jobs/new",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 382.796875,
+            "right": 624.390625,
+            "top": 126.125,
+            "bottom": 166.671875,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/dashboard",
+            "active": false,
+            "labelFits": true
+          },
+          {
+            "left": 12,
+            "right": 253.59375,
+            "top": 172.265625,
+            "bottom": 212.8125,
+            "width": 241.59375,
+            "height": 40.546875,
+            "href": "/scenarios",
+            "active": true,
+            "labelFits": true
+          },
+          {
+            "left": 259.1875,
+            "right": 500.796875,
+            "top": 172.265625,
+            "bottom": 212.8125,
+            "width": 241.609375,
+            "height": 40.546875,
+            "href": "/history",
+            "active": false,
+            "labelFits": true
+          }
+        ],
+        "cards": [
+          {
+            "left": 24,
+            "right": 736,
+            "top": 356,
+            "bottom": 1068.921875,
+            "width": 712,
+            "height": 712.921875
+          },
+          {
+            "left": 24,
+            "right": 736,
+            "top": 1080.4375,
+            "bottom": 1793.359375,
+            "width": 712,
+            "height": 712.921875
+          }
+        ],
+        "factRowsAligned": true,
+        "previews": [
+          {
+            "left": 46.78125,
+            "right": 713.21875,
+            "top": 623.390625,
+            "bottom": 1005.921875,
+            "width": 666.4375,
+            "height": 382.53125
+          },
+          {
+            "left": 46.78125,
+            "right": 713.21875,
+            "top": 1347.828125,
+            "bottom": 1730.359375,
+            "width": 666.4375,
+            "height": 382.53125
+          }
+        ],
+        "documentWidth": 760,
+        "documentScrollWidth": 760,
+        "balancedNavigation": true,
+        "keyboardScenarioSelection": true,
+        "freshNameRequired": true,
+        "createRequests": 0,
+        "mobileMenu": null,
+        "mobileMenuImage": null,
+        "switchedViewImage": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-fixed-scenarios-en-fixed-scenarios-xy-view.png",
+          "sha256": "3a46f9f9798a860d783bc7fa755d5d14bef4333386eb974cd8945a5b1c03635d"
+        },
+        "image": {
+          "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/tablet-fixed-scenarios-en-fixed-scenarios.png",
+          "sha256": "01501dba23e2f3ccc002b5391021da61d216bd8d83f1311f88dba7dc217de5ff"
+        }
+      },
+      "pageErrors": [],
+      "status": "pass"
+    }
+  ],
+  "status": "pass"
+}

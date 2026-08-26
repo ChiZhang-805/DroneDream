@@ -1,0 +1,1138 @@
+.harness-editor-page {
+  --harness-red: #e52050;
+  --harness-red-dark: #ad173d;
+  --harness-ink: #1f1a1d;
+  --harness-muted: #71686d;
+  --harness-line: #e7e0e3;
+  position: relative;
+  display: grid;
+  grid-template-rows: 62px 50px 44px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+  overflow: hidden;
+  background: #fbfafb;
+  color: var(--harness-ink);
+}
+
+.harness-editor-header,
+.harness-editor-toolbar,
+.harness-level-bar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--harness-line);
+  background: rgba(255, 255, 255, 0.97);
+}
+
+.harness-editor-header {
+  justify-content: space-between;
+  padding: 0 22px;
+}
+
+.harness-editor-heading,
+.harness-editor-heading nav,
+.harness-editor-status,
+.harness-editor-toolbar,
+.harness-editor-toolbar label,
+.harness-editor-toolbar button,
+.harness-level-bar nav,
+.harness-level-bar nav span,
+.harness-flow-legend,
+.harness-flow-legend span,
+.harness-palette header,
+.harness-piece-content,
+.harness-visual-node footer,
+.harness-inspector header,
+.harness-inspector-title,
+.harness-run-drawer header,
+.harness-run-drawer header > div,
+.harness-protected-note {
+  display: flex;
+  align-items: center;
+}
+
+.harness-editor-heading {
+  height: 100%;
+  gap: 28px;
+}
+
+.harness-editor-heading h1,
+.harness-palette h2,
+.harness-inspector h2,
+.harness-run-drawer h2 {
+  margin: 0;
+}
+
+.harness-editor-heading h1 {
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+
+.harness-editor-heading nav {
+  align-self: stretch;
+  gap: 22px;
+}
+
+.harness-editor-heading nav a {
+  position: relative;
+  display: grid;
+  color: #766d72;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  place-items: center;
+}
+
+.harness-editor-heading nav a.active {
+  color: var(--harness-red);
+}
+
+.harness-editor-heading nav a.active::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--harness-red);
+  content: "";
+}
+
+.harness-editor-status {
+  gap: 9px;
+}
+
+.harness-editor-status > span {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #eef8f1;
+  color: #347348;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.harness-editor-status > span.is-rejected {
+  background: #fff0f3;
+  color: #b41a3e;
+}
+
+.harness-editor-status code {
+  color: var(--harness-muted);
+  font: 650 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.harness-editor-status button,
+.harness-inspector header button,
+.harness-run-drawer header button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--harness-muted);
+  cursor: pointer;
+  place-items: center;
+}
+
+.harness-editor-status button:hover,
+.harness-inspector header button:hover,
+.harness-run-drawer header button:hover {
+  background: #f5f1f3;
+}
+
+.harness-editor-status svg,
+.harness-inspector header button svg,
+.harness-run-drawer header button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.harness-editor-toolbar {
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.harness-editor-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.harness-editor-toolbar label {
+  position: relative;
+  flex: 0 0 auto;
+  height: 34px;
+  padding-left: 10px;
+  border: 1px solid var(--harness-line);
+  border-radius: 7px;
+  background: #fff;
+  gap: 7px;
+}
+
+.harness-editor-toolbar label > span {
+  color: var(--harness-muted);
+  font-size: 11px;
+}
+
+.harness-editor-toolbar select {
+  min-width: 120px;
+  max-width: 184px;
+  padding: 0 26px 0 0;
+  overflow: hidden;
+  border: 0;
+  outline: 0;
+  appearance: none;
+  background: transparent;
+  color: var(--harness-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harness-editor-toolbar label > svg {
+  position: absolute;
+  right: 8px;
+  width: 13px;
+  pointer-events: none;
+}
+
+.harness-editor-toolbar button {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #51494d;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  gap: 6px;
+}
+
+.harness-editor-toolbar button:hover:not(:disabled) {
+  background: #f5f1f3;
+}
+
+.harness-editor-toolbar button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.harness-editor-toolbar button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.harness-toolbar-separator {
+  width: 1px;
+  height: 24px;
+  margin: 0 3px;
+  background: var(--harness-line);
+}
+
+.harness-editor-toolbar button.is-primary {
+  margin-left: auto;
+  padding-inline: 14px;
+  background: linear-gradient(135deg, #f13a63, #b81140);
+  color: #fff;
+}
+
+.harness-level-bar {
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0 18px;
+}
+
+.harness-level-bar nav {
+  min-width: 0;
+  gap: 2px;
+}
+
+.harness-level-bar nav span {
+  min-width: 0;
+}
+
+.harness-level-bar nav svg {
+  width: 14px;
+  color: #aaa0a5;
+}
+
+.harness-level-bar nav button {
+  max-width: 230px;
+  padding: 6px 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #736a6f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.harness-level-bar nav button.is-current {
+  background: #f5f1f3;
+  color: var(--harness-red);
+}
+
+.harness-flow-legend {
+  flex: 0 0 auto;
+  gap: 14px;
+  color: #756c71;
+  font-size: 11px;
+}
+
+.harness-flow-legend span {
+  gap: 5px;
+}
+
+.harness-flow-legend i {
+  width: 24px;
+  height: 0;
+  border-top: 2px solid #554c51;
+}
+
+.harness-flow-legend i.is-dashed {
+  border-top-style: dashed;
+  border-color: #91878d;
+}
+
+.harness-flow-legend b {
+  display: grid;
+  width: 23px;
+  height: 15px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #bc3f95, #6a4ac7);
+  color: #fff;
+  place-items: center;
+}
+
+.harness-flow-legend b svg {
+  width: 10px;
+  height: 10px;
+}
+
+.harness-editor-error {
+  position: absolute;
+  z-index: 30;
+  top: 166px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  max-width: min(560px, calc(100% - 36px));
+  padding: 9px 13px;
+  border: 1px solid #f2a8ba;
+  border-radius: 8px;
+  background: #fff5f7;
+  box-shadow: 0 12px 30px rgba(70, 30, 44, 0.1);
+  color: #b61940;
+  font-size: 12px;
+  transform: translateX(-50%);
+  gap: 8px;
+}
+
+.harness-editor-error svg {
+  width: 16px;
+}
+
+.harness-editor-workspace {
+  display: grid;
+  grid-template-columns: 188px minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.harness-editor-workspace.has-inspector {
+  grid-template-columns: 188px minmax(0, 1fr) 282px;
+}
+
+.harness-palette {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 15px 13px 12px;
+  overflow: hidden auto;
+  border-right: 1px solid var(--harness-line);
+  background: #f8f6f7;
+}
+
+.harness-palette header {
+  justify-content: space-between;
+  margin: 0 3px 14px;
+}
+
+.harness-palette h2 {
+  font-size: 14px;
+}
+
+.harness-palette header > span {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  border-radius: 999px;
+  background: #eee8eb;
+  color: #746b70;
+  font-size: 11px;
+  font-weight: 750;
+  place-items: center;
+}
+
+.harness-category-list {
+  display: grid;
+  gap: 4px;
+}
+
+.harness-category-list > span {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: #51494d;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 7px;
+}
+
+.harness-category-list > span:hover {
+  background: #f0ecee;
+}
+
+.harness-category-list i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--category-color, #6552c7);
+}
+
+.harness-category-list b {
+  color: #9b9297;
+  font-size: 10px;
+}
+
+.harness-plugin-pieces {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.harness-plugin-pieces section {
+  display: grid;
+  gap: 5px;
+}
+
+.harness-plugin-pieces h3,
+.harness-slot-options h3 {
+  margin: 0 3px 2px;
+  color: #7b7277;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.harness-plugin-pieces button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #fff;
+  color: #544c50;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: grab;
+  gap: 7px;
+}
+
+.harness-plugin-pieces button.is-enabled {
+  border-color: #f0a4b6;
+  color: #b91a41;
+}
+
+.harness-plugin-pieces button svg {
+  width: 14px;
+}
+
+.harness-switch-link {
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+  padding: 10px 6px 2px;
+  color: #766d72;
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: none;
+  gap: 7px;
+}
+
+.harness-switch-link:hover {
+  color: var(--harness-red);
+}
+
+.harness-switch-link svg {
+  width: 14px;
+}
+
+.harness-canvas {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.harness-canvas .react-flow {
+  background: linear-gradient(180deg, #fff 0%, #fdfbfd 100%);
+}
+
+.harness-canvas .react-flow__node-harness {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.harness-canvas .react-flow__controls {
+  right: 12px;
+  bottom: 12px;
+  left: auto;
+  overflow: hidden;
+  border: 1px solid var(--harness-line);
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(60, 35, 48, 0.08);
+}
+
+.harness-canvas .react-flow__controls button {
+  border-color: var(--harness-line);
+}
+
+.harness-canvas-loading {
+  display: grid;
+  height: 100%;
+  color: #857b81;
+  font-size: 12px;
+  place-content: center;
+  justify-items: center;
+  gap: 9px;
+}
+
+.harness-canvas-loading svg {
+  width: 20px;
+  animation: harness-spin 0.9s linear infinite;
+}
+
+.harness-visual-node {
+  position: relative;
+  width: var(--piece-outer-width);
+  height: 132px;
+  color: #292226;
+  transition: filter 160ms ease, opacity 160ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.harness-visual-node.is-model {
+  width: var(--model-width);
+  height: var(--model-height);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--piece-color) 78%, #2e1730);
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--piece-color) 92%, #ff5574), color-mix(in srgb, var(--piece-color) 72%, #4d2b91));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--piece-color) 24%, transparent);
+  color: #fff;
+}
+
+.harness-visual-node.is-model::after {
+  position: absolute;
+  top: -62px;
+  right: -26px;
+  width: 160px;
+  height: 160px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  content: "";
+}
+
+.harness-puzzle-shape {
+  position: absolute;
+  inset: 0;
+  width: var(--piece-outer-width);
+  height: 132px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.harness-puzzle-shape path {
+  fill: color-mix(in srgb, var(--piece-color) 14%, #fff);
+  stroke: color-mix(in srgb, var(--piece-color) 72%, #fff);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition: fill 150ms ease, stroke 150ms ease;
+}
+
+.harness-visual-node:hover .harness-puzzle-shape path,
+.harness-visual-node.is-selected .harness-puzzle-shape path {
+  fill: color-mix(in srgb, var(--piece-color) 20%, #fff);
+  stroke: var(--piece-color);
+}
+
+.harness-visual-node.is-selected {
+  filter: drop-shadow(0 9px 14px color-mix(in srgb, var(--piece-color) 22%, transparent));
+}
+
+.react-flow__node.dragging .harness-visual-node {
+  z-index: 20;
+  filter: drop-shadow(0 15px 20px rgba(45, 28, 38, 0.22));
+  transform: scale(1.055);
+}
+
+.harness-visual-node.is-drop-preview {
+  opacity: 0.34;
+  filter: saturate(0.8);
+  pointer-events: none;
+}
+
+.harness-visual-node.has-issue .harness-puzzle-shape path {
+  stroke: #d73c4f;
+  stroke-dasharray: 5 4;
+}
+
+.harness-piece-content {
+  position: absolute;
+  z-index: 2;
+  top: 22px;
+  left: 18px;
+  width: var(--piece-body-width);
+  min-width: 0;
+  padding: 0 12px;
+  gap: 7px;
+}
+
+.harness-visual-node.is-model .harness-piece-content {
+  top: 14px;
+  left: 0;
+  width: 100%;
+  padding: 0 18px;
+}
+
+.harness-piece-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--piece-color) 16%, #fff);
+  color: var(--piece-color);
+  place-items: center;
+}
+
+.harness-visual-node.is-model .harness-piece-icon {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.harness-piece-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.harness-piece-content > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.harness-piece-content strong,
+.harness-piece-content small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harness-piece-content strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.harness-piece-content small {
+  color: #7d7379;
+  font-size: 9.5px;
+}
+
+.harness-visual-node.is-model .harness-piece-content small {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.harness-node-enter {
+  flex: 0 0 auto;
+  width: 13px;
+  margin-left: auto;
+  color: color-mix(in srgb, var(--piece-color) 78%, #333);
+}
+
+.harness-visual-node.is-model .harness-node-enter {
+  color: #fff;
+}
+
+.harness-visual-node footer {
+  position: absolute;
+  z-index: 2;
+  right: 18px;
+  bottom: 18px;
+  left: 34px;
+  justify-content: space-between;
+  color: color-mix(in srgb, var(--piece-color) 74%, #4f474c);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.harness-visual-node.is-model footer {
+  right: 15px;
+  bottom: 8px;
+  left: 18px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.harness-visual-node footer svg {
+  width: 12px;
+  height: 12px;
+}
+
+.harness-flow-handle,
+.harness-edit-handle {
+  width: 7px !important;
+  height: 7px !important;
+  border: 1px solid #fff !important;
+  background: var(--piece-color) !important;
+}
+
+.harness-flow-handle {
+  top: 3px !important;
+  opacity: 0;
+}
+
+.harness-flow-handle.is-target {
+  left: 43% !important;
+}
+
+.harness-flow-handle.is-source {
+  left: 57% !important;
+}
+
+.harness-edit-handle {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.harness-visual-node:hover .harness-edit-handle {
+  opacity: 0.9;
+}
+
+.harness-visual-node.is-puzzle .harness-edit-handle.react-flow__handle-left {
+  left: 18px !important;
+}
+
+.harness-visual-node.is-puzzle .harness-edit-handle.react-flow__handle-right {
+  right: 18px !important;
+}
+
+.harness-canvas .react-flow__edge {
+  pointer-events: visibleStroke;
+}
+
+.harness-canvas .react-flow__edge-path {
+  stroke-linecap: round;
+}
+
+.harness-inspector {
+  min-width: 0;
+  min-height: 0;
+  padding: 15px 15px 18px;
+  overflow: hidden auto;
+  border-left: 1px solid var(--harness-line);
+  background: #fff;
+}
+
+.harness-inspector header {
+  justify-content: space-between;
+  height: 30px;
+  margin-bottom: 17px;
+}
+
+.harness-inspector h2 {
+  font-size: 14px;
+}
+
+.harness-inspector-title {
+  min-width: 0;
+  margin-bottom: 18px;
+  gap: 10px;
+}
+
+.harness-inspector-title > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #f7f2f4;
+  place-items: center;
+}
+
+.harness-inspector-title svg {
+  width: 17px;
+}
+
+.harness-inspector-title > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.harness-inspector-title strong,
+.harness-inspector-title small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.harness-inspector-title strong {
+  font-size: 13px;
+}
+
+.harness-inspector-title small {
+  color: #857b81;
+  font-size: 10px;
+}
+
+.harness-enter-level {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 36px;
+  margin-bottom: 16px;
+  border: 1px solid #efb1bf;
+  border-radius: 7px;
+  background: #fff7f9;
+  color: #b91840;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  gap: 6px;
+}
+
+.harness-enter-level svg {
+  width: 15px;
+}
+
+.harness-inspector > label {
+  display: grid;
+  margin-top: 13px;
+  color: #6f666b;
+  font-size: 11px;
+  gap: 6px;
+}
+
+.harness-inspector input[type="number"],
+.harness-inspector select {
+  width: 100%;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--harness-line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--harness-ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.harness-inspector .harness-check-label {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.harness-slot-options {
+  display: grid;
+  margin-top: 17px;
+  gap: 6px;
+}
+
+.harness-slot-options button {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) 16px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--harness-line);
+  border-radius: 7px;
+  background: #fff;
+  color: #51494d;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  gap: 7px;
+}
+
+.harness-slot-options button > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c8c0c4;
+}
+
+.harness-slot-options button.is-active {
+  border-color: #efa7b8;
+  color: #b61940;
+}
+
+.harness-slot-options button.is-active > span {
+  background: var(--harness-red);
+}
+
+.harness-slot-options button svg {
+  width: 14px;
+}
+
+.harness-protected-note {
+  margin: 18px 0 0;
+  padding: 9px;
+  border-radius: 7px;
+  background: #fff5f7;
+  color: #ad173d;
+  font-size: 10px;
+  line-height: 1.45;
+  gap: 7px;
+}
+
+.harness-protected-note svg {
+  flex: 0 0 auto;
+  width: 14px;
+}
+
+.harness-context-menu {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  min-width: 168px;
+  padding: 5px;
+  border: 1px solid var(--harness-line);
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(45, 28, 37, 0.18);
+}
+
+.harness-context-menu button,
+.harness-context-menu a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #433b3f;
+  font: inherit;
+  font-size: 11px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.harness-context-menu button:hover,
+.harness-context-menu a:hover {
+  background: #f6f2f4;
+}
+
+.harness-context-menu button.is-danger {
+  color: #b61940;
+}
+
+.harness-context-menu svg {
+  width: 14px;
+}
+
+.harness-run-drawer {
+  position: absolute;
+  z-index: 60;
+  right: 18px;
+  bottom: 18px;
+  width: min(560px, calc(100% - 36px));
+  max-height: min(520px, calc(100% - 190px));
+  padding: 15px;
+  overflow: hidden auto;
+  border: 1px solid var(--harness-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(49, 30, 40, 0.18);
+}
+
+.harness-run-drawer header {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.harness-run-drawer header > div {
+  gap: 8px;
+}
+
+.harness-run-drawer header > div > svg {
+  width: 17px;
+  color: var(--harness-red);
+}
+
+.harness-run-drawer h2 {
+  font-size: 14px;
+}
+
+.harness-run-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--harness-line);
+  border-radius: 8px;
+  background: var(--harness-line);
+}
+
+.harness-run-metrics span {
+  display: grid;
+  padding: 10px;
+  background: #fff;
+  gap: 4px;
+}
+
+.harness-run-metrics small {
+  color: #857b81;
+  font-size: 9px;
+}
+
+.harness-run-metrics strong {
+  font-size: 13px;
+}
+
+.harness-run-drawer ol {
+  display: grid;
+  margin: 13px 0 0;
+  padding: 0;
+  list-style: none;
+  gap: 6px;
+}
+
+.harness-run-drawer li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  min-height: 34px;
+  font-size: 10px;
+  gap: 8px;
+}
+
+.harness-run-drawer li > strong {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: #f6e7eb;
+  color: #b61940;
+  place-items: center;
+}
+
+.harness-run-drawer li > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.harness-run-drawer li small {
+  color: #857b81;
+}
+
+@keyframes harness-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+  .harness-editor-page {
+    grid-template-rows: 58px 48px 42px minmax(0, 1fr);
+  }
+
+  .harness-editor-heading h1 {
+    font-size: 18px;
+  }
+
+  .harness-editor-heading nav {
+    display: none;
+  }
+
+  .harness-editor-workspace,
+  .harness-editor-workspace.has-inspector {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .harness-inspector {
+    position: absolute;
+    z-index: 50;
+    top: 148px;
+    right: 0;
+    bottom: 0;
+    width: min(282px, calc(100% - 56px));
+    box-shadow: -16px 0 36px rgba(47, 29, 39, 0.12);
+  }
+
+  .harness-flow-legend {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .harness-editor-header {
+    padding: 0 12px;
+  }
+
+  .harness-editor-status > span,
+  .harness-editor-status code {
+    display: none;
+  }
+
+  .harness-editor-workspace,
+  .harness-editor-workspace.has-inspector {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .harness-palette {
+    display: none;
+  }
+
+  .harness-editor-toolbar button {
+    padding-inline: 7px;
+  }
+
+  .harness-editor-toolbar button:not(.is-primary) {
+    font-size: 0;
+  }
+
+  .harness-editor-toolbar button svg {
+    margin: 0;
+  }
+
+  .harness-level-bar {
+    padding-inline: 8px;
+  }
+}

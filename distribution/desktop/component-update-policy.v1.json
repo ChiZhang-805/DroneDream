@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-desktop-component-update-policy",
+  "contractVersion": "1.0.0",
+  "catalogTrust": {
+    "canonicalization": "RFC8785-JCS",
+    "signatureAlgorithm": "Ed25519",
+    "detachedSignatureRequired": true,
+    "httpsRequired": true,
+    "contentHashAlgorithm": "SHA-256",
+    "antiRollbackSequenceRequired": true,
+    "unknownComponentAction": "reject"
+  },
+  "updateOrder": [
+    "desktop-app",
+    "base-runtime",
+    "engine-pack",
+    "capability-pack",
+    "asset-pack"
+  ],
+  "components": [
+    {
+      "componentId": "desktop-app",
+      "displayName": "DroneDream desktop",
+      "installScope": "per-edition-user",
+      "updateMechanism": "tauri-updater",
+      "implementationState": "implemented",
+      "defaultPolicy": "recommended",
+      "activationStrategy": "app-restart",
+      "rollbackStrategy": "tauri-reinstall-previous",
+      "preservesUserState": true,
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
+      "requires": []
+    },
+    {
+      "componentId": "base-runtime",
+      "displayName": "DroneDream Base Runtime",
+      "installScope": "shared-wsl",
+      "updateMechanism": "runtime-base-manager",
+      "implementationState": "implemented",
+      "defaultPolicy": "required",
+      "activationStrategy": "verified-backup-reimport",
+      "rollbackStrategy": "verified-backup-restore",
+      "preservesUserState": true,
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
+      "requires": ["desktop-app"]
+    },
+    {
+      "componentId": "engine-pack",
+      "displayName": "DroneDream Engine Pack",
+      "installScope": "shared-runtime-profile",
+      "updateMechanism": "engine-pack-manager",
+      "implementationState": "implemented",
+      "defaultPolicy": "automatic",
+      "activationStrategy": "atomic-symlink",
+      "rollbackStrategy": "previous-symlink",
+      "preservesUserState": true,
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
+      "requires": ["base-runtime"]
+    },
+    {
+      "componentId": "capability-pack",
+      "displayName": "DroneDream Workflow Capability Pack",
+      "installScope": "shared-runtime-profile",
+      "updateMechanism": "component-pack-manager",
+      "implementationState": "planned",
+      "defaultPolicy": "recommended",
+      "activationStrategy": "atomic-symlink",
+      "rollbackStrategy": "previous-symlink",
+      "preservesUserState": true,
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
+      "requires": ["base-runtime", "engine-pack"]
+    },
+    {
+      "componentId": "asset-pack",
+      "displayName": "DroneDream Vehicle and Map Assets",
+      "installScope": "shared-content-cache",
+      "updateMechanism": "component-pack-manager",
+      "implementationState": "planned",
+      "defaultPolicy": "optional",
+      "activationStrategy": "atomic-symlink",
+      "rollbackStrategy": "previous-symlink",
+      "preservesUserState": true,
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
+      "requires": ["base-runtime", "engine-pack"]
+    },
+    {
+      "componentId": "user-state",
+      "displayName": "User projects and account state",
+      "installScope": "per-user-data",
+      "updateMechanism": "none",
+      "implementationState": "not-updatable",
+      "defaultPolicy": "never",
+      "activationStrategy": "none",
+      "rollbackStrategy": "never-touch",
+      "preservesUserState": true,
+      "editions": ["universal", "sim", "lab", "field", "autonomy"],
+      "requires": []
+    }
+  ]
+}

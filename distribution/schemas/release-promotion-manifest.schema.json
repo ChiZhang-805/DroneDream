@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/release-promotion-manifest.v1.json",
+  "title": "DroneDream release promotion manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "promotionId",
+    "promotionVersion",
+    "state",
+    "blockers",
+    "sourceCommit",
+    "commonCoreHash",
+    "productDisplayVersion",
+    "edition",
+    "branchPolicy",
+    "artifact",
+    "runtimeBase",
+    "enginePack",
+    "vehiclePacks",
+    "capabilities",
+    "validationTier",
+    "licenseNotice",
+    "supersedes",
+    "rollback"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-release-promotion"},
+    "promotionId": {"$ref": "#/$defs/id"},
+    "promotionVersion": {"$ref": "#/$defs/semver"},
+    "state": {"enum": ["planned", "promotable"]},
+    "blockers": {"$ref": "#/$defs/textArray"},
+    "sourceCommit": {"$ref": "#/$defs/commit"},
+    "commonCoreHash": {"$ref": "#/$defs/sha256"},
+    "productDisplayVersion": {"const": "1.0.0"},
+    "edition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["editionId", "editionManifestSha256", "compositeManifestSha256"],
+      "properties": {
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
+        "editionManifestSha256": {"$ref": "#/$defs/sha256"},
+        "compositeManifestSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "branchPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetBranch",
+        "creationState",
+        "proposedHeadCommit",
+        "headClassification",
+        "metadataOnlyChangedPaths",
+        "prOnly",
+        "forcePushAllowed"
+      ],
+      "properties": {
+        "targetBranch": {"pattern": "^codex/software-(sim|lab|field|autonomy)$"},
+        "creationState": {
+          "enum": ["long-lived-product-branch", "existing-protected"]
+        },
+        "proposedHeadCommit": {"$ref": "#/$defs/commit"},
+        "headClassification": {"enum": ["exact-source", "edition-metadata-only"]},
+        "metadataOnlyChangedPaths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/safePath"}
+        },
+        "prOnly": {"const": true},
+        "forcePushAllowed": {"const": false}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fileName",
+        "sha256",
+        "bytes",
+        "authenticodeState",
+        "updaterSignatureState"
+      ],
+      "properties": {
+        "fileName": {"type": "string", "minLength": 1, "maxLength": 255},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "authenticodeState": {"enum": ["valid", "not-signed"]},
+        "updaterSignatureState": {"enum": ["verified", "not-issued"]}
+      }
+    },
+    "runtimeBase": {"$ref": "#/$defs/componentRef"},
+    "enginePack": {"$ref": "#/$defs/componentRef"},
+    "vehiclePacks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/vehiclePackRef"}
+    },
+    "capabilities": {"$ref": "#/$defs/idArray"},
+    "validationTier": {"type": "string", "minLength": 1, "maxLength": 128},
+    "licenseNotice": {"$ref": "#/$defs/licenseNotice"},
+    "supersedes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["promotionId", "artifactSha256"],
+        "properties": {
+          "promotionId": {"$ref": "#/$defs/id"},
+          "artifactSha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "targetPromotionId", "targetArtifactSha256"],
+      "properties": {
+        "policy": {"const": "previous-verified-promotion"},
+        "targetPromotionId": {"oneOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+        "targetArtifactSha256": {
+          "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "semver": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "textArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 512}
+    },
+    "idArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "componentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestSha256", "artifactSha256", "buildId"],
+      "properties": {
+        "manifestSha256": {"$ref": "#/$defs/sha256"},
+        "artifactSha256": {"$ref": "#/$defs/sha256"},
+        "buildId": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "vehiclePackRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packId", "manifestSha256", "artifactSha256"],
+      "properties": {
+        "packId": {"$ref": "#/$defs/id"},
+        "manifestSha256": {"$ref": "#/$defs/sha256"},
+        "artifactSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "licenseNotice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "sizeBytes"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "sizeBytes": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

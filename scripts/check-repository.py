@@ -64,12 +64,16 @@ TEXT_NAMES = {
 }
 MARKDOWN_LINK = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 SECRET_PATTERNS = {
-    "PEM private key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    "PEM private key": re.compile(
+        r"-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----"
+        r"\s+[A-Za-z0-9+/=\r\n]{64,}"
+    ),
     "Alibaba Cloud AccessKey": re.compile(r"\bLTAI[A-Za-z0-9]{12,}\b"),
     "AWS access key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "GitHub token": re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b"),
     "OpenAI API key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b"),
 }
+SECRET_SENTINELS = ("sk-contract-persistence-test",)
 
 
 def project_files() -> list[Path]:
@@ -92,6 +96,21 @@ def project_files() -> list[Path]:
 
 def is_text(path: Path) -> bool:
     return path.suffix.lower() in TEXT_SUFFIXES or path.name in TEXT_NAMES
+
+
+def read_utf8_text(path: Path) -> str:
+    """Read project text while accepting the optional UTF-8 BOM."""
+
+    return path.read_text(encoding="utf-8-sig", errors="strict")
+
+
+def probable_secret_names(text: str) -> list[str]:
+    """Return secret classes after removing exact non-secret contract sentinels."""
+
+    candidate = text
+    for sentinel in SECRET_SENTINELS:
+        candidate = candidate.replace(sentinel, "")
+    return [name for name, pattern in SECRET_PATTERNS.items() if pattern.search(candidate)]
 
 
 def markdown_target(raw_target: str) -> str | None:
@@ -132,7 +151,7 @@ def main() -> int:
             continue
         text_files += 1
         try:
-            text = absolute_path.read_text(encoding="utf-8", errors="strict")
+            text = read_utf8_text(absolute_path)
         except UnicodeDecodeError as exc:
             errors.append(f"{relative_path}: invalid UTF-8 ({exc})")
             continue
@@ -140,9 +159,8 @@ def main() -> int:
             errors.append(f"{relative_path}: contains a Unicode replacement character")
         if "\x00" in text:
             errors.append(f"{relative_path}: contains a NUL byte")
-        for secret_name, pattern in SECRET_PATTERNS.items():
-            if pattern.search(text):
-                errors.append(f"{relative_path}: contains a probable {secret_name}")
+        for secret_name in probable_secret_names(text):
+            errors.append(f"{relative_path}: contains a probable {secret_name}")
 
         if relative_path.suffix.lower() == ".json":
             json_files += 1

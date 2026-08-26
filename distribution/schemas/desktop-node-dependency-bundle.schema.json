@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/desktop-node-dependency-bundle.v1.json",
+  "title": "DroneDream attested detached desktop Node dependency bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "bundleVersion",
+    "bundleId",
+    "state",
+    "editionScope",
+    "productSource",
+    "ownedBase",
+    "dependencyRoot",
+    "sourceInputs",
+    "toolchain",
+    "mounts",
+    "inventory",
+    "policies",
+    "attestation"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-desktop-node-dependency-bundle"},
+    "bundleVersion": {"const": "1.0.0"},
+    "bundleId": {"type": "string", "pattern": "^npm-win32-x64-[0-9a-f]{16}$"},
+    "state": {"const": "attested-offline"},
+    "editionScope": {
+      "const": ["universal", "sim", "lab", "field", "autonomy"]
+    },
+    "productSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": {"$ref": "#/$defs/commit"},
+        "tree": {"$ref": "#/$defs/gitObject"}
+      }
+    },
+    "ownedBase": {"$ref": "#/$defs/absoluteWindowsPath"},
+    "dependencyRoot": {"$ref": "#/$defs/absoluteWindowsPath"},
+    "sourceInputs": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "prefixItems": [
+        {"$ref": "#/$defs/desktopPackageJson"},
+        {"$ref": "#/$defs/desktopPackageLock"},
+        {"$ref": "#/$defs/frontendPackageJson"},
+        {"$ref": "#/$defs/frontendPackageLock"}
+      ],
+      "items": false
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operatingSystem", "architecture", "nodeVersion", "npmVersion", "tauriCli", "platformCli", "vite"],
+      "properties": {
+        "operatingSystem": {"const": "windows"},
+        "architecture": {"const": "x64"},
+        "nodeVersion": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "npmVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "tauriCli": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "packageJsonPath", "packageJsonSha256", "entrypointPath", "entrypointSha256"],
+          "properties": {
+            "version": {"const": "2.11.4"},
+            "packageJsonPath": {"const": "desktop/node_modules/@tauri-apps/cli/package.json"},
+            "packageJsonSha256": {"$ref": "#/$defs/sha256"},
+            "entrypointPath": {"const": "desktop/node_modules/@tauri-apps/cli/tauri.js"},
+            "entrypointSha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "platformCli": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packageName", "version", "packageJsonPath", "packageJsonSha256", "binaryPath", "binarySha256"],
+          "properties": {
+            "packageName": {"const": "@tauri-apps/cli-win32-x64-msvc"},
+            "version": {"const": "2.11.4"},
+            "packageJsonPath": {"const": "desktop/node_modules/@tauri-apps/cli-win32-x64-msvc/package.json"},
+            "packageJsonSha256": {"$ref": "#/$defs/sha256"},
+            "binaryPath": {"const": "desktop/node_modules/@tauri-apps/cli-win32-x64-msvc/cli.win32-x64-msvc.node"},
+            "binarySha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "vite": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "packageJsonPath", "packageJsonSha256"],
+          "properties": {
+            "version": {"const": "7.3.6"},
+            "packageJsonPath": {"const": "frontend/node_modules/vite/package.json"},
+            "packageJsonSha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      }
+    },
+    "mounts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["linkPath", "targetPath", "linkType"],
+          "properties": {
+            "linkPath": {"const": "desktop/node_modules"},
+            "targetPath": {"const": "desktop/node_modules"},
+            "linkType": {"const": "junction"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["linkPath", "targetPath", "linkType"],
+          "properties": {
+            "linkPath": {"const": "frontend/node_modules"},
+            "targetPath": {"const": "frontend/node_modules"},
+            "linkType": {"const": "junction"}
+          }
+        }
+      ],
+      "items": false
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "excludedPaths", "entries", "treeFingerprint"],
+      "properties": {
+        "algorithm": {"const": "sha256-lines-v1"},
+        "excludedPaths": {"const": ["manifest.json"]},
+        "entries": {
+          "type": "array",
+          "minItems": 6,
+          "items": {"$ref": "#/$defs/inventoryEntry"}
+        },
+        "treeFingerprint": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "networkAllowed",
+        "systemTauriAllowed",
+        "arbitraryPathInjectionAllowed",
+        "dependencyMutationAllowed",
+        "dependencyPayloadAllowed",
+        "preparationAuthorizedSeparately"
+      ],
+      "properties": {
+        "networkAllowed": {"const": false},
+        "systemTauriAllowed": {"const": false},
+        "arbitraryPathInjectionAllowed": {"const": false},
+        "dependencyMutationAllowed": {"const": false},
+        "dependencyPayloadAllowed": {"const": false},
+        "preparationAuthorizedSeparately": {"const": true}
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["createdAt", "preparationReceiptSha256", "offlineCacheSha256", "lifecycleScriptsAudited"],
+      "properties": {
+        "createdAt": {"type": "string", "format": "date-time"},
+        "preparationReceiptSha256": {"$ref": "#/$defs/sha256"},
+        "offlineCacheSha256": {"$ref": "#/$defs/sha256"},
+        "lifecycleScriptsAudited": {"const": true}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "gitObject": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "safePath": {"type": "string", "pattern": "^[A-Za-z0-9@][A-Za-z0-9@_.+-]*(?:/[A-Za-z0-9@][A-Za-z0-9@_.+-]*)*$"},
+    "absoluteWindowsPath": {"type": "string", "pattern": "^[A-Za-z]:/[A-Za-z0-9 _().@+{}\\[\\]-]+(?:/[A-Za-z0-9 _().@+{}\\[\\]-]+)*$"},
+    "sourceInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourcePath", "bundlePath", "sha256"],
+      "properties": {
+        "sourcePath": {"$ref": "#/$defs/safePath"},
+        "bundlePath": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "desktopPackageJson": {"allOf": [{"$ref": "#/$defs/sourceInput"}, {"properties": {"sourcePath": {"const": "desktop/package.json"}, "bundlePath": {"const": "desktop/package.json"}}}]},
+    "desktopPackageLock": {"allOf": [{"$ref": "#/$defs/sourceInput"}, {"properties": {"sourcePath": {"const": "desktop/package-lock.json"}, "bundlePath": {"const": "desktop/package-lock.json"}}}]},
+    "frontendPackageJson": {"allOf": [{"$ref": "#/$defs/sourceInput"}, {"properties": {"sourcePath": {"const": "frontend/package.json"}, "bundlePath": {"const": "frontend/package.json"}}}]},
+    "frontendPackageLock": {"allOf": [{"$ref": "#/$defs/sourceInput"}, {"properties": {"sourcePath": {"const": "frontend/package-lock.json"}, "bundlePath": {"const": "frontend/package-lock.json"}}}]},
+    "inventoryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "type", "bytes", "sha256", "target"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "type": {"enum": ["file", "directory", "reparse"]},
+        "bytes": {"type": "integer", "minimum": 0},
+        "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "target": {"oneOf": [{"$ref": "#/$defs/safePath"}, {"type": "null"}]}
+      }
+    }
+  }
+}

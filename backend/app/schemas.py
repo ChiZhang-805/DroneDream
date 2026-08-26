@@ -7,6 +7,7 @@ validation; unknown fields are rejected (``extra="forbid"``) per the API spec.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from datetime import datetime
@@ -15,9 +16,25 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.model_harness.control_plane import (
+    HarnessControlPlaneReceipt,
+    HarnessOutputEnvelope,
+)
+from app.model_harness.domains import (
+    DOMAIN_SCHEMA_VERSION,
+    LONG_TERM_MEMORY_AUTHORITY,
+    MEMORY_PRECEDENCE,
+    RAW_CONVERSATION_RETENTION,
+    MemoryDomain,
+    MemoryPrecedenceLayer,
+    ModelHarnessDomain,
+)
+from app.model_harness.runtime import HarnessRuntimeHandler
+
 # --- Enums / literals -------------------------------------------------------
 
-TrackType = Literal["circle", "u_turn", "lemniscate", "custom"]
+TrackType = Literal["hover", "circle", "u_turn", "lemniscate", "custom"]
+DefaultTrackType = Literal["hover", "circle", "u_turn", "lemniscate"]
 SensorNoiseLevel = Literal["low", "medium", "high"]
 ObjectiveProfile = Literal["stable", "fast", "smooth", "robust", "custom"]
 JobStatus = Literal[
@@ -31,6 +48,26 @@ JobStatus = Literal[
     "CANCELLED",
 ]
 TrialStatus = Literal["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"]
+QualificationState = Literal[
+    "pending_screening",
+    "screening",
+    "screening_failed",
+    "sealed_qualification",
+    "qualification_10",
+    "qualification_extended_20",
+    "qualified",
+    "qualification_failed",
+    "indeterminate",
+    "cancelled",
+]
+QualificationPhase = Literal["screening", "qualification"]
+QualificationTrialTerminalStatus = Literal[
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED",
+    "TIMEOUT",
+    "INDETERMINATE",
+]
 ScenarioType = Literal[
     "nominal",
     "noise_perturbed",
@@ -41,6 +78,7 @@ ScenarioType = Literal[
     "payload_changed",
     "battery_degraded",
     "actuator_delay",
+    "actuator_failure",
     "custom",
 ]
 ReportStatus = Literal["PENDING", "READY", "FAILED"]
@@ -66,6 +104,9 @@ ConstraintOperator = Literal["lt", "lte", "gt", "gte", "eq"]
 RobustAggregation = Literal["mean", "worst", "cvar", "percentile"]
 OptimizationOutcome = Literal[
     "success",
+    "exploration_improved",
+    "exploration_no_improvement",
+    "exploration_budget_exhausted",
     "max_iterations_reached",
     "no_usable_candidate",
     "simulator_unavailable",
@@ -79,6 +120,25 @@ BatchStatus = Literal[
     "FAILED",
     "CANCELLED",
 ]
+StarterExperienceTemplateKey = Literal[
+    "hover-basics@1",
+    "first-circle@1",
+    "light-wind-circle@1",
+]
+CompletionPolicy = Literal["first_qualified_stop", "exploration_budget_stop"]
+JobKind = Literal["primary", "continue_exploration"]
+CognitiveTurnRole = Literal["plan", "revision", "diagnosis", "critic"]
+CognitiveTurnOutcomeStatus = Literal[
+    "succeeded",
+    "provider_failed",
+    "invalid_schema",
+    "source_drift",
+    "cancelled",
+    "indeterminate",
+]
+
+MAX_PROVIDER_TURNS_PER_JOB = 128
+MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB = 256
 
 
 JOB_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
@@ -98,6 +158,38 @@ class _Strict(BaseModel):
         str_strip_whitespace=True,
         strict=True,
     )
+
+
+class UserExperiencePreferencesUpdate(_Strict):
+    memory_enabled: bool = False
+    locale: Literal["en", "zh-CN"] | None = None
+    default_template_key: StarterExperienceTemplateKey | None = None
+    default_track_type: DefaultTrackType | None = None
+    default_altitude_m: Annotated[float, Field(ge=1, le=20)] | None = None
+
+    @model_validator(mode="after")
+    def require_at_least_one_field(self) -> UserExperiencePreferencesUpdate:
+        if not self.model_fields_set:
+            raise ValueError("At least one preference field is required.")
+        return self
+
+
+class UserExperiencePreferences(BaseModel):
+    schema_version: Literal["1.0"] = "1.0"
+    memory_domain: Literal["account.shared"] = "account.shared"
+    memory_precedence: tuple[MemoryPrecedenceLayer, ...] = MEMORY_PRECEDENCE
+    long_term_memory_authority: Literal["advisory_only"] = LONG_TERM_MEMORY_AUTHORITY
+    saved: bool
+    memory_enabled: bool
+    locale: Literal["en", "zh-CN"] | None = None
+    default_template_key: StarterExperienceTemplateKey | None = None
+    default_track_type: DefaultTrackType | None = None
+    default_altitude_m: float | None = None
+    retention_days: int
+    stored_content: Literal["allowlisted_preferences_and_verified_structured_job_outcomes_only"] = (
+        "allowlisted_preferences_and_verified_structured_job_outcomes_only"
+    )
+    updated_at: datetime | None = None
 
 
 class StartPoint(_Strict):
@@ -228,6 +320,39 @@ class LLMProviderConfig(_Strict):
         return self
 
 
+class ContinueExplorationBudget(_Strict):
+    """Additional, independently bounded budget for a continuation child Job."""
+
+    additional_generation_cap: Annotated[int, Field(ge=1, le=32)]
+    additional_trial_cap: Annotated[int, Field(ge=2, le=5000)]
+    additional_provider_turn_cap: Annotated[
+        int,
+        Field(ge=0, le=MAX_PROVIDER_TURNS_PER_JOB),
+    ]
+    additional_time_budget_seconds: Annotated[int, Field(ge=60, le=86_400)]
+
+    @model_validator(mode="after")
+    def _validate_worst_case_provider_budget(self) -> ContinueExplorationBudget:
+        worst_case = self.additional_generation_cap * 4
+        if self.additional_provider_turn_cap > worst_case:
+            raise ValueError("additional_provider_turn_cap cannot exceed four turns per generation")
+        return self
+
+
+class ContinueExplorationRequest(_Strict):
+    """Explicit post-qualification authorization for one continuation child."""
+
+    budget: ContinueExplorationBudget
+    openai: OpenAIConfig | None = None
+    llm: LLMProviderConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_provider_shape(self) -> ContinueExplorationRequest:
+        if self.openai is not None and self.llm is not None:
+            raise ValueError("provide either openai or llm, not both")
+        return self
+
+
 AssistantFieldValue = str | float | int | bool
 AssistantPatchSource = Literal["explicit", "derived", "proposed_default"]
 
@@ -297,10 +422,81 @@ class ExperimentAssistantCurrentParameter(_Strict):
         return self
 
 
+class ExperimentAssistantDocumentChunk(_Strict):
+    schema_version: Literal["1.0"] = "1.0"
+    document_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+    )
+    chunk_id: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-z0-9][a-z0-9._-]*$",
+    )
+    display_name: str = Field(min_length=1, max_length=255)
+    content: str = Field(min_length=1, max_length=4_000)
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    retention: Literal["request_only"] = "request_only"
+
+    @model_validator(mode="after")
+    def _validate_chunk(self) -> ExperimentAssistantDocumentChunk:
+        if "\x00" in self.display_name or "\x00" in self.content:
+            raise ValueError("document context cannot contain NUL bytes")
+        actual_sha256 = hashlib.sha256(self.content.encode("utf-8")).hexdigest()
+        if actual_sha256 != self.content_sha256:
+            raise ValueError("document context content_sha256 does not match content")
+        return self
+
+
+class ExperimentAssistantDocumentContext(_Strict):
+    schema_version: Literal["1.0"] = "1.0"
+    purpose: Literal["experiment_draft_reference"] = "experiment_draft_reference"
+    chunks: list[ExperimentAssistantDocumentChunk] = Field(min_length=1, max_length=4)
+
+    @model_validator(mode="after")
+    def _validate_context(self) -> ExperimentAssistantDocumentContext:
+        identities = [(chunk.document_id, chunk.chunk_id) for chunk in self.chunks]
+        if len(set(identities)) != len(identities):
+            raise ValueError("document context chunk identities must be unique")
+        if sum(len(chunk.content.encode("utf-8")) for chunk in self.chunks) > 8_000:
+            raise ValueError("document context exceeds the 8000-byte request-only limit")
+        return self
+
+
+class ExperimentAssistantDocumentContextReceipt(_Strict):
+    schema_version: Literal["1.0"] = "1.0"
+    retention: Literal["request_only"] = "request_only"
+    persisted: Literal[False] = False
+    chunk_count: Annotated[int, Field(ge=1, le=4)]
+    content_bytes: Annotated[int, Field(ge=1, le=8_000)]
+    context_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class ExperimentAssistantTurnRequest(_Strict):
     message_id: str = Field(min_length=1, max_length=128)
+    conversation_id: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_.:-]+$",
+    )
     message: str = Field(min_length=1, max_length=12_000)
     locale: Literal["en", "zh-CN"] = "en"
+    edition: Literal["universal", "sim", "lab", "field", "autonomy"] = "universal"
+    requested_task_type: Literal[
+        "auto_detect",
+        "control_tuning",
+        "mission_autonomy",
+        "asset_import_qualification",
+        "simulation_experiment",
+        "cross_edition_workflow",
+        "hardware_validation",
+        "calibration",
+        "sim_to_real",
+        "real_to_sim",
+        "field_task",
+    ] = "auto_detect"
     conversation_summary: str = Field(default="", max_length=4_000)
     current_values: dict[str, AssistantFieldValue] = Field(
         default_factory=dict,
@@ -311,7 +507,8 @@ class ExperimentAssistantTurnRequest(_Strict):
         default_factory=list,
         max_length=64,
     )
-    llm: LLMProviderConfig
+    document_context: ExperimentAssistantDocumentContext | None = None
+    llm: LLMProviderConfig | None = None
 
     @model_validator(mode="after")
     def _validate_turn(self) -> ExperimentAssistantTurnRequest:
@@ -334,6 +531,32 @@ class ExperimentAssistantTurnRequest(_Strict):
 
 class ExperimentAssistantTurnResponse(_Strict):
     schema_version: Literal["1.0"] = "1.0"
+    domain_schema_version: Literal["dronedream.model-harness-domains.v1"] = DOMAIN_SCHEMA_VERSION
+    lifecycle_stage: Literal["compile_only", "proposal"]
+    model_entrypoint_role: Literal[
+        "workflow_contract_compiler",
+        "control_tuning_draft_compiler",
+        "managed_model_proposal",
+    ]
+    creates_job: Literal[False] = False
+    runtime_execution_performed: Literal[False] = False
+    next_required_stage: Literal[
+        "managed_model_proposal",
+        "review_and_submit_job",
+        "review_proposal",
+    ]
+    model_harness_domain: ModelHarnessDomain
+    memory_domain: MemoryDomain
+    memory_precedence: tuple[MemoryPrecedenceLayer, ...] = MEMORY_PRECEDENCE
+    raw_conversation_retention: Literal["task_instance_only"] = RAW_CONVERSATION_RETENTION
+    long_term_memory_authority: Literal["advisory_only"] = LONG_TERM_MEMORY_AUTHORITY
+    control_plane: HarnessControlPlaneReceipt
+    runtime_handler: HarnessRuntimeHandler
+    harness_input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    harness_output: HarnessOutputEnvelope
+    account_memory_read: bool = False
+    domain_memory_read: Literal[False] = False
+    memory_context_source: Literal["request_only", "request_and_account_defaults"] = "request_only"
     experiment_summary: str = Field(max_length=2_000)
     accepted_patches: list[ExperimentAssistantPatch] = Field(max_length=96)
     rejected_patches: list[ExperimentAssistantRejectedPatch] = Field(max_length=96)
@@ -342,9 +565,12 @@ class ExperimentAssistantTurnResponse(_Strict):
     missing_field_ids: list[str] = Field(max_length=32)
     review_field_ids: list[str] = Field(max_length=32)
     questions: list[ExperimentAssistantQuestion] = Field(max_length=4)
+    document_context_receipt: ExperimentAssistantDocumentContextReceipt | None = None
     usage: ExperimentAssistantUsage = Field(default_factory=ExperimentAssistantUsage)
     provider: str
     model: str
+    assistant_message: str | None = Field(default=None, max_length=4_000)
+    orchestration: dict[str, object] | None = None
 
 
 class VehicleProfileConfig(_Strict):
@@ -650,18 +876,32 @@ class JobCreateRequest(_Strict):
     baseline_parameters: BaselineParameters = Field(default_factory=BaselineParameters)
 
     # Advanced experiment definition. Empty ``parameter_space`` deliberately
-    # selects the legacy six-parameter domain so old API clients keep working.
+    # selects the legacy six-parameter domain for mock-backend compatibility.
+    # Real PX4 optimization must name the parameters that will be written and
+    # read back; otherwise several legacy dimensions are physically inert.
     vehicle_profile: VehicleProfileConfig = Field(default_factory=VehicleProfileConfig)
     parameter_catalog_version: str = Field(default="builtin-v1", min_length=1, max_length=128)
     parameter_space: list[ParameterSelection] = Field(default_factory=list, max_length=64)
     objective_config: ObjectiveConfig = Field(default_factory=ObjectiveConfig)
     scenario_suite: ScenarioSuiteConfig = Field(default_factory=ScenarioSuiteConfig)
 
-    simulator_backend: SimulatorBackend = "mock"
+    simulator_backend: SimulatorBackend = "real_cli"
     optimizer_strategy: OptimizerStrategy = "heuristic"
     max_iterations: Annotated[int, Field(ge=1, le=100)] = 20
     trials_per_candidate: Annotated[int, Field(ge=1, le=10)] = 3
     max_total_trials: Annotated[int, Field(ge=1, le=10000)] = 100
+    completion_policy: CompletionPolicy = "first_qualified_stop"
+    provider_turn_cap: Annotated[
+        int,
+        Field(ge=0, le=MAX_PROVIDER_TURNS_PER_JOB),
+    ] = 64
+    provider_request_cap: Annotated[
+        int,
+        Field(ge=0, le=MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB),
+    ] = 128
+    provider_max_retries: Annotated[int, Field(ge=0, le=5)] = 1
+    continue_exploration_after_qualified: bool = False
+    exploration_budget: ContinueExplorationBudget | None = None
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
     openai: OpenAIConfig | None = None
     llm: LLMProviderConfig | None = None
@@ -677,6 +917,20 @@ class JobCreateRequest(_Strict):
             raise ValueError(
                 "reference_track with at least 2 points is required when track_type=custom"
             )
+        if self.track_type == "hover":
+            if abs(self.start_point.x) > 1e-9 or abs(self.start_point.y) > 1e-9:
+                raise ValueError("hover track requires start_point x=0 and y=0")
+            for idx, point in enumerate(points):
+                point_z = self.altitude_m if point.z is None else point.z
+                if (
+                    abs(point.x) > 1e-9
+                    or abs(point.y) > 1e-9
+                    or abs(point_z - self.altitude_m) > 1e-9
+                ):
+                    raise ValueError(
+                        "hover reference_track must remain at x=0, y=0 "
+                        f"and altitude_m; point {idx} differs"
+                    )
         for idx, point in enumerate(points):
             if not math.isfinite(point.x) or not math.isfinite(point.y):
                 raise ValueError(f"reference_track[{idx}] x/y must be finite numbers")
@@ -686,32 +940,72 @@ class JobCreateRequest(_Strict):
         if len(set(parameter_names)) != len(parameter_names):
             raise ValueError("parameter_space names must be unique")
         enabled = [item for item in self.parameter_space if item.enabled and not item.locked]
-        experimental_optimizers = {
-            "llm_harness",
-            "constrained_mobo",
-            "multi_fidelity_mobo",
-            "turbo",
-            "saasbo",
-            "surrogate_cma_es",
-            "bipop_cma_es",
-            "optimizer_portfolio",
-        }
         if (
             self.simulator_backend == "real_cli"
-            and self.optimizer_strategy in experimental_optimizers
+            and self.optimizer_strategy != "none"
             and not self.parameter_space
         ):
-            raise ValueError(
-                "experimental real_cli optimization requires an explicit PX4 parameter_space"
-            )
+            if "parameter_space" in self.model_fields_set:
+                raise ValueError("real_cli optimization requires a non-empty PX4 parameter_space")
+            # A request that relies on product defaults must still be physically
+            # actionable. Seed the two coupled PX4 horizontal-loop parameters
+            # from the built-in catalog; an explicitly supplied empty list is
+            # rejected so callers cannot silently opt into inert optimization.
+            self.parameter_space = [
+                ParameterSelection(
+                    name="MPC_XY_P",
+                    baseline=0.95,
+                    minimum=0.6,
+                    maximum=1.3,
+                    step=0.1,
+                ),
+                ParameterSelection(
+                    name="MPC_XY_VEL_P_ACC",
+                    baseline=1.8,
+                    minimum=1.2,
+                    maximum=2.8,
+                    step=0.1,
+                ),
+            ]
+            enabled = [item for item in self.parameter_space if item.enabled and not item.locked]
         if self.optimizer_strategy != "none" and self.parameter_space and not enabled:
             raise ValueError("parameter_space requires at least one enabled, unlocked parameter")
         if self.openai is not None and self.llm is not None:
             raise ValueError("provide either openai or llm, not both")
+        if self.continue_exploration_after_qualified != (self.exploration_budget is not None):
+            raise ValueError(
+                "continue_exploration_after_qualified and exploration_budget must be set together"
+            )
         if self.optimizer_strategy == "llm_harness" and not any(
             case.enabled and case.holdout for case in self.scenario_suite.cases
         ):
             raise ValueError("llm_harness requires at least one enabled holdout scenario case")
+        if self.optimizer_strategy in {"gpt", "llm_harness"}:
+            worst_case_provider_turns = min(
+                MAX_PROVIDER_TURNS_PER_JOB,
+                self.max_iterations * 4,
+            )
+            if "provider_turn_cap" not in self.model_fields_set:
+                self.provider_turn_cap = min(
+                    self.provider_turn_cap,
+                    worst_case_provider_turns,
+                )
+            elif self.provider_turn_cap > worst_case_provider_turns:
+                raise ValueError("provider_turn_cap cannot exceed four turns per generation")
+            worst_case_provider_requests = min(
+                MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB,
+                self.provider_turn_cap * (self.provider_max_retries + 2),
+            )
+            if "provider_request_cap" not in self.model_fields_set:
+                self.provider_request_cap = min(
+                    self.provider_request_cap,
+                    worst_case_provider_requests,
+                )
+            elif self.provider_request_cap > worst_case_provider_requests:
+                raise ValueError(
+                    "provider_request_cap exceeds the frozen retry and "
+                    "compatibility-fallback policy"
+                )
         scenario_trial_count = sum(
             len(case.seeds) for case in self.scenario_suite.cases if case.enabled
         )
@@ -738,6 +1032,12 @@ class BatchCreateRequest(_Strict):
 
 class Job(BaseModel):
     id: str
+    model_harness_domain: Literal["optimization.control_tuning"] = "optimization.control_tuning"
+    memory_domain: Literal["optimization.control_tuning"] = "optimization.control_tuning"
+    memory_precedence: tuple[MemoryPrecedenceLayer, ...] = MEMORY_PRECEDENCE
+    raw_conversation_retention: Literal["task_instance_only"] = RAW_CONVERSATION_RETENTION
+    long_term_memory_authority: Literal["advisory_only"] = LONG_TERM_MEMORY_AUTHORITY
+    control_plane: HarnessControlPlaneReceipt
     control_version: int = Field(ge=1)
     track_type: TrackType
     start_point: StartPoint
@@ -773,7 +1073,7 @@ class Job(BaseModel):
     # have not emitted any events yet.
     recent_events: list[JobEventInfo] = Field(default_factory=list)
     # Phase 8: auto-tuning configuration + progress.
-    simulator_backend_requested: SimulatorBackend = "mock"
+    simulator_backend_requested: SimulatorBackend = "real_cli"
     optimizer_strategy: OptimizerStrategy = "heuristic"
     max_iterations: int = 20
     trials_per_candidate: int = 3
@@ -782,8 +1082,27 @@ class Job(BaseModel):
     current_generation: int = 0
     optimization_outcome: OptimizationOutcome | None = None
     openai_model: str | None = None
+    llm_access_mode: Literal["platform", "byok"] | None = None
     llm_provider: str | None = None
     llm_base_url: str | None = None
+    completion_policy: CompletionPolicy = "first_qualified_stop"
+    job_kind: JobKind = "primary"
+    cognitive_policy_version: str = "adaptive-2-4-v1"
+    provider_turn_cap: int = 64
+    provider_turns_attempted: int = 0
+    provider_turns_succeeded: int = 0
+    provider_request_cap: int = 128
+    provider_max_retries: int = 1
+    provider_requests_attempted: int = 0
+    provider_requests_succeeded: int = 0
+    first_qualified_candidate_id: str | None = None
+    first_qualified_freeze_receipt_id: str | None = None
+    first_qualified_at: datetime | None = None
+    continue_exploration_requested: bool = False
+    exploration_budget: ContinueExplorationBudget | None = None
+    continuation_parent_job_id: str | None = None
+    continuation_root_job_id: str | None = None
+    holdout_policy_version: str = "legacy-visible-v0"
 
 
 class PaginatedJobs(BaseModel):
@@ -843,6 +1162,9 @@ CandidateSourceType = Literal["baseline", "optimizer", "llm_optimizer"]
 class Candidate(BaseModel):
     id: str
     generation_index: int
+    dispatch_ordinal: int | None = None
+    qualification_sequence: int | None = None
+    qualified_at: datetime | None = None
     source_type: str
     label: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
@@ -864,6 +1186,253 @@ class Candidate(BaseModel):
     updated_at: datetime
 
 
+class CandidateQualification(BaseModel):
+    """Persisted two-stage qualification contract, never proposal context."""
+
+    contract_schema: Literal["dronedream.candidate-qualification/v1"]
+    id: str
+    job_id: str
+    candidate_id: str
+    rule_version: Literal["screen-4-sealed-9of10-8to20-18of20/v1"]
+    rule_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    holdout_contract_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    selection_snapshot_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    state: QualificationState
+    state_revision: int = Field(ge=1)
+    qualification_sequence: int | None = Field(default=None, ge=1)
+    screening_required: Literal[4] = 4
+    qualification_initial_required: Literal[10] = 10
+    qualification_extended_required: Literal[20] = 20
+    direct_pass_min: Literal[9] = 9
+    extension_trigger_passes: Literal[8] = 8
+    extended_pass_min: Literal[18] = 18
+    max_candidates_per_run: Literal[2] = 2
+    sealed_at: datetime | None = None
+    decided_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    @model_validator(mode="after")
+    def _validate_terminal_binding(self) -> CandidateQualification:
+        sealed_states = {
+            "sealed_qualification",
+            "qualification_10",
+            "qualification_extended_20",
+            "qualified",
+            "qualification_failed",
+        }
+        terminal_states = {
+            "screening_failed",
+            "qualified",
+            "qualification_failed",
+            "indeterminate",
+            "cancelled",
+        }
+        if self.state in sealed_states and self.sealed_at is None:
+            raise ValueError("sealed qualification state requires sealed_at")
+        if self.state in terminal_states and self.decided_at is None:
+            raise ValueError("terminal qualification state requires decided_at")
+        if self.state == "qualified" and self.qualification_sequence is None:
+            raise ValueError("qualified state requires a server sequence")
+        if self.state != "qualified" and self.qualification_sequence is not None:
+            raise ValueError("only a qualified state may carry a server sequence")
+        return self
+
+
+class QualificationTrialReceipt(BaseModel):
+    """Secret-free, append-only terminal evidence for one gated Trial."""
+
+    receipt_schema: Literal["dronedream.qualification-trial-receipt/v1"]
+    id: str
+    qualification_id: str
+    trial_id: str
+    phase: QualificationPhase
+    ordinal: int = Field(ge=1, le=20)
+    terminal_status: QualificationTrialTerminalStatus
+    passed: bool
+    safety_critical_failure: bool
+    effect_readback_complete: bool
+    evidence_complete: bool
+    evidence_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    finalized_at: datetime
+
+    @model_validator(mode="after")
+    def _validate_outcome(self) -> QualificationTrialReceipt:
+        if self.phase == "screening" and self.ordinal > 4:
+            raise ValueError("screening ordinal exceeds the four-repeat gate")
+        if self.passed and (
+            self.terminal_status != "COMPLETED"
+            or self.safety_critical_failure
+            or not self.effect_readback_complete
+            or not self.evidence_complete
+        ):
+            raise ValueError("a passing receipt requires complete, safe evidence")
+        return self
+
+
+class FirstQualifiedAccounting(BaseModel):
+    """Non-beautified work counters frozen at first qualification."""
+
+    simulations_attempted: int = Field(ge=0)
+    trials_attempted: int = Field(ge=0)
+    trials_completed: int = Field(ge=0)
+    trials_passed: int = Field(ge=0)
+    trials_failed: int = Field(ge=0)
+    trials_cancelled: int = Field(ge=0)
+    trials_timed_out: int = Field(ge=0)
+    trials_indeterminate: int = Field(ge=0)
+    generations: int = Field(ge=0)
+    provider_turns_attempted: int = Field(ge=0)
+    provider_turns_succeeded: int = Field(ge=0)
+    provider_requests_attempted: int | None = Field(default=None, ge=0)
+    provider_requests_succeeded: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _validate_provider_counts(self) -> FirstQualifiedAccounting:
+        if self.provider_turns_succeeded > self.provider_turns_attempted:
+            raise ValueError("provider turn successes cannot exceed attempts")
+        if (self.provider_requests_attempted is None) != (self.provider_requests_succeeded is None):
+            raise ValueError("provider request counts must be supplied together")
+        if (
+            self.provider_requests_attempted is not None
+            and self.provider_requests_succeeded is not None
+            and self.provider_requests_succeeded > self.provider_requests_attempted
+        ):
+            raise ValueError("provider request successes cannot exceed attempts")
+        return self
+
+
+class FirstQualifiedFreezeReceipt(BaseModel):
+    receipt_schema: Literal[
+        "dronedream.first-qualified-freeze-receipt/v1",
+        "dronedream.first-qualified-freeze-receipt/v2",
+    ]
+    definition_version: Literal[
+        "server-sequence-deterministic-tiebreak/v1",
+        "server-sequence-deterministic-tiebreak/v2",
+    ]
+    id: str
+    job_id: str
+    candidate_id: str
+    evidence_id: str
+    holdout_contract_sha256: str
+    qualification_sequence: int = Field(ge=1)
+    generation_index: int = Field(ge=0)
+    dispatch_ordinal: int = Field(ge=1)
+    time_to_first_qualified_ms: int = Field(ge=0)
+    accounting: FirstQualifiedAccounting
+    frozen_at: datetime
+
+    @model_validator(mode="after")
+    def _validate_versioned_accounting(self) -> FirstQualifiedFreezeReceipt:
+        is_v2 = self.receipt_schema.endswith("/v2")
+        if is_v2 != self.definition_version.endswith("/v2"):
+            raise ValueError("receipt schema and definition versions must match")
+        has_request_counts = self.accounting.provider_requests_attempted is not None
+        if is_v2 != has_request_counts:
+            raise ValueError("v2 receipts require actual provider request counts")
+        return self
+
+
+class HarnessCognitiveTurnReceipt(BaseModel):
+    receipt_schema: Literal["dronedream.harness-cognitive-turn-attempt/v1"]
+    id: str
+    job_id: str
+    generation_index: int = Field(ge=0)
+    turn_index: int = Field(ge=1, le=4)
+    turn_role: CognitiveTurnRole
+    trigger_policy_version: str
+    trigger_reasons: list[str] = Field(default_factory=list, max_length=16)
+    source_commit: str = Field(min_length=40, max_length=40)
+    model_snapshot: str = Field(min_length=1, max_length=128)
+    prompt_sha256: str = Field(min_length=64, max_length=64)
+    evidence_sha256: str = Field(min_length=64, max_length=64)
+    schema_sha256: str = Field(min_length=64, max_length=64)
+    tool_outputs_sha256: str = Field(min_length=64, max_length=64)
+    attempted_at: datetime
+
+
+class HarnessCognitiveTurnOutcome(BaseModel):
+    outcome_schema: Literal["dronedream.harness-cognitive-turn-outcome/v1"]
+    id: str
+    turn_receipt_id: str
+    status: CognitiveTurnOutcomeStatus
+    response_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    error_code: str | None = Field(default=None, max_length=64)
+    completed_at: datetime
+
+
+class ProviderPriceSnapshot(_Strict):
+    """Immutable per-request price inputs; no credential or billing identity."""
+
+    schema_version: Literal["dronedream.provider-price-snapshot/v1"]
+    currency: Literal["USD"] = "USD"
+    source: Literal["preregistered", "unavailable"]
+    input_microusd_per_million_tokens: int | None = Field(default=None, ge=0)
+    output_microusd_per_million_tokens: int | None = Field(default=None, ge=0)
+    effective_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _validate_price_availability(self) -> ProviderPriceSnapshot:
+        rates = (
+            self.input_microusd_per_million_tokens,
+            self.output_microusd_per_million_tokens,
+        )
+        if self.source == "preregistered" and (
+            any(rate is None for rate in rates) or self.effective_at is None
+        ):
+            raise ValueError("preregistered price snapshots require both rates and time")
+        if self.source == "unavailable" and (
+            any(rate is not None for rate in rates) or self.effective_at is not None
+        ):
+            raise ValueError("unavailable price snapshots cannot invent rates or time")
+        return self
+
+
+class ProviderNetworkRequestReceipt(BaseModel):
+    """Safe public shape of a pre-network immutable request receipt."""
+
+    receipt_schema: Literal["dronedream.provider-network-request-attempt/v1"]
+    id: str
+    cognitive_turn_receipt_id: str
+    request_index: int = Field(ge=1, le=8)
+    request_kind: Literal["primary", "retry", "compatibility_fallback"]
+    retry_policy_version: Literal["explicit-network-attempts-v1"]
+    provider: str = Field(min_length=1, max_length=64)
+    model_snapshot: str = Field(min_length=1, max_length=128)
+    api_surface: str = Field(min_length=1, max_length=64)
+    base_url_normalized: str = Field(min_length=1, max_length=2048)
+    base_url_sha256: str = Field(min_length=64, max_length=64)
+    region: str | None = Field(default=None, max_length=64)
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    top_p: float | None = Field(default=None, gt=0, le=1)
+    provider_seed: int | None = None
+    response_schema_sha256: str = Field(min_length=64, max_length=64)
+    prompt_sha256: str = Field(min_length=64, max_length=64)
+    tool_outputs_sha256: str = Field(min_length=64, max_length=64)
+    request_body_sha256: str = Field(min_length=64, max_length=64)
+    input_utf8_bytes: int = Field(ge=0)
+    price_snapshot: ProviderPriceSnapshot
+    price_snapshot_sha256: str = Field(min_length=64, max_length=64)
+    attempted_at: datetime
+
+
+class ProviderNetworkRequestOutcome(BaseModel):
+    outcome_schema: Literal["dronedream.provider-network-request-outcome/v1"]
+    id: str
+    request_receipt_id: str
+    status: Literal["succeeded", "failed", "indeterminate"]
+    response_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    output_utf8_bytes: int = Field(ge=0)
+    input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
+    provider_cost_microusd: int | None = Field(default=None, ge=0)
+    latency_ms: int = Field(ge=0)
+    error_code: str | None = Field(default=None, max_length=64)
+    completed_at: datetime
+
+
 class OptimizationHistory(BaseModel):
     items: list[Candidate]
     pareto_candidate_ids: list[str] = Field(default_factory=list)
@@ -882,6 +1451,11 @@ class TrialSummary(BaseModel):
     # Job Detail table can render PASS / FAIL alongside the COMPLETED status.
     # ``None`` means "no metric yet" (queued/running/failed-without-metrics).
     pass_flag: bool | None = None
+    # Failed rows must carry their canonical persisted diagnosis in the list
+    # response.  Requiring a separate detail request for every failed row made
+    # the Job Detail table and evidence collectors silently lose the reason.
+    failure_code: str | None = None
+    failure_reason: str | None = None
     # Phase 5: candidate metadata surfaced so the frontend can distinguish
     # baseline vs optimizer rows and highlight the best candidate without
     # needing a second API call.
@@ -898,8 +1472,6 @@ class Trial(TrialSummary):
     attempt_count: int
     worker_id: str | None = None
     simulator_backend: str | None = None
-    failure_code: str | None = None
-    failure_reason: str | None = None
     log_excerpt: str | None = None
     metrics: TrialMetrics | None = None
     queued_at: datetime | None = None
@@ -1110,9 +1682,22 @@ __all__ = [
     "BaselineParameters",
     "ComparisonPoint",
     "Candidate",
+    "CognitiveTurnOutcomeStatus",
+    "CognitiveTurnRole",
+    "CompletionPolicy",
+    "ContinueExplorationBudget",
+    "ContinueExplorationRequest",
+    "FirstQualifiedAccounting",
+    "FirstQualifiedFreezeReceipt",
+    "HarnessCognitiveTurnOutcome",
+    "HarnessCognitiveTurnReceipt",
+    "ProviderNetworkRequestOutcome",
+    "ProviderNetworkRequestReceipt",
+    "ProviderPriceSnapshot",
     "JOB_CANCELLABLE_STATUSES",
     "JOB_TERMINAL_STATUSES",
     "Job",
+    "JobKind",
     "JobCreateRequest",
     "JobErrorInfo",
     "JobEventInfo",
@@ -1124,6 +1709,9 @@ __all__ = [
     "ObjectiveSpec",
     "ConstraintSpec",
     "ExperimentAssistantCurrentParameter",
+    "ExperimentAssistantDocumentChunk",
+    "ExperimentAssistantDocumentContext",
+    "ExperimentAssistantDocumentContextReceipt",
     "ExperimentAssistantPatch",
     "ExperimentAssistantParameterPatch",
     "ExperimentAssistantQuestion",
@@ -1132,6 +1720,8 @@ __all__ = [
     "ExperimentAssistantTurnResponse",
     "ExperimentAssistantUsage",
     "LLMProviderConfig",
+    "MAX_PROVIDER_TURNS_PER_JOB",
+    "MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB",
     "OpenAIConfig",
     "OptimizationOutcome",
     "OptimizationHistory",

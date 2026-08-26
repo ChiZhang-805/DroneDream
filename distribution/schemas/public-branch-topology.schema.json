@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getdronedream.com/schemas/public-branch-topology.schema.json",
+  "title": "DroneDream public branch topology",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "topologyVersion", "requiredBranchCount", "branches", "policy"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-public-branch-topology"},
+    "topologyVersion": {"const": "1.0.0"},
+    "requiredBranchCount": {"const": 8},
+    "branches": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "role", "productId"],
+        "properties": {
+          "name": {"enum": ["main", "codex/software", "codex/software-sim", "codex/software-lab", "codex/software-field", "codex/software-agent", "codex/website", "codex/technical-report"]},
+          "role": {"enum": ["protected-integration", "long-lived-product", "long-lived-delivery"]},
+          "productId": {"type": ["string", "null"], "enum": [null, "universal", "sim", "lab", "field", "autonomy", "website", "technical-report"]}
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["featureBranchesTemporary", "deleteFeatureBranchOnlyAfterMerged", "forcePushAllowed", "commonCoreChangesReturnToMain", "sharedProductChangesPropagateThroughPullRequests", "privateAutonomyDevelopmentMayRunInParallel"],
+      "properties": {
+        "featureBranchesTemporary": {"const": true},
+        "deleteFeatureBranchOnlyAfterMerged": {"const": true},
+        "forcePushAllowed": {"const": false},
+        "commonCoreChangesReturnToMain": {"const": true},
+        "sharedProductChangesPropagateThroughPullRequests": {"const": true},
+        "privateAutonomyDevelopmentMayRunInParallel": {"const": true}
+      }
+    }
+  }
+}

@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import struct
+import zlib
+from dataclasses import dataclass
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +34,23 @@ _SECRET_TOKENS = (
     "bearer",
     "cookie",
 )
+
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_REPORT_WATERMARK_PATH = (
+    Path(__file__).resolve().parents[3] / "brand" / "report" / "report-watermark.png"
+)
+_REPORT_WATERMARK_GSTATE_OBJECT = 5
+_REPORT_WATERMARK_ALPHA_OBJECT = 6
+_REPORT_WATERMARK_IMAGE_OBJECT = 7
+
+
+@dataclass(frozen=True)
+class _ReportWatermark:
+    width: int
+    height: int
+    rgb: bytes
+    alpha: bytes
+    source_sha256: str
 
 
 def _worst_max_error(aggregate: dict[str, Any]) -> Any:
@@ -185,60 +207,177 @@ def _pdf_text_operand(text: str) -> bytes:
     return f"<{text.encode('utf-16-be').hex().upper()}> Tj".encode("ascii")
 
 
-def _free_report_watermark_stream() -> list[bytes]:
-    """Draw a non-official, semi-transparent DroneDream brand seal.
+def _paeth_predictor(left: int, up: int, upper_left: int) -> int:
+    estimate = left + up - upper_left
+    left_distance = abs(estimate - left)
+    up_distance = abs(estimate - up)
+    upper_left_distance = abs(estimate - upper_left)
+    if left_distance <= up_distance and left_distance <= upper_left_distance:
+        return left
+    if up_distance <= upper_left_distance:
+        return up
+    return upper_left
 
-    The purple/magenta rings and stylized bat deliberately avoid the red,
-    star-shaped, organization-name, and registration-number conventions of a
-    government or legal seal. The mark overlaps the lower-right body region at
-    low opacity so it remains visible without obscuring the report.
-    """
+
+def _decode_rgba_scanlines(*, compressed: bytes, width: int, height: int) -> bytes:
+    bytes_per_pixel = 4
+    stride = width * bytes_per_pixel
+    raw = zlib.decompress(compressed)
+    expected_size = height * (stride + 1)
+    if len(raw) != expected_size:
+        raise ValueError("report watermark PNG scanline size is invalid")
+
+    decoded = bytearray(height * stride)
+    source_offset = 0
+    for row_index in range(height):
+        filter_type = raw[source_offset]
+        source_offset += 1
+        if filter_type > 4:
+            raise ValueError("report watermark PNG uses an unsupported row filter")
+        row_offset = row_index * stride
+        previous_row_offset = row_offset - stride
+        for column in range(stride):
+            value = raw[source_offset + column]
+            left = decoded[row_offset + column - bytes_per_pixel] if column >= 4 else 0
+            up = decoded[previous_row_offset + column] if row_index else 0
+            upper_left = (
+                decoded[previous_row_offset + column - bytes_per_pixel]
+                if row_index and column >= 4
+                else 0
+            )
+            if filter_type == 1:
+                value += left
+            elif filter_type == 2:
+                value += up
+            elif filter_type == 3:
+                value += (left + up) // 2
+            elif filter_type == 4:
+                value += _paeth_predictor(left, up, upper_left)
+            decoded[row_offset + column] = value & 0xFF
+        source_offset += stride
+    return bytes(decoded)
+
+
+@lru_cache(maxsize=1)
+def _load_report_watermark() -> _ReportWatermark:
+    """Load the one canonical transparent report watermark PNG."""
+
+    payload = _REPORT_WATERMARK_PATH.read_bytes()
+    if not payload.startswith(_PNG_SIGNATURE):
+        raise ValueError("report watermark must be a PNG file")
+
+    offset = len(_PNG_SIGNATURE)
+    width = height = 0
+    idat = bytearray()
+    saw_ihdr = False
+    saw_iend = False
+    while offset < len(payload):
+        if offset + 12 > len(payload):
+            raise ValueError("report watermark PNG is truncated")
+        length = struct.unpack(">I", payload[offset : offset + 4])[0]
+        chunk_type = payload[offset + 4 : offset + 8]
+        data_start = offset + 8
+        data_end = data_start + length
+        crc_end = data_end + 4
+        if crc_end > len(payload):
+            raise ValueError("report watermark PNG chunk is truncated")
+        chunk_data = payload[data_start:data_end]
+        expected_crc = struct.unpack(">I", payload[data_end:crc_end])[0]
+        actual_crc = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            raise ValueError("report watermark PNG chunk checksum is invalid")
+
+        if chunk_type == b"IHDR":
+            if saw_ihdr or length != 13:
+                raise ValueError("report watermark PNG has an invalid IHDR")
+            width, height, bit_depth, color_type, compression, filtering, interlace = (
+                struct.unpack(">IIBBBBB", chunk_data)
+            )
+            if (
+                not 1 <= width <= 2048
+                or not 1 <= height <= 2048
+                or bit_depth != 8
+                or color_type != 6
+                or compression != 0
+                or filtering != 0
+                or interlace != 0
+            ):
+                raise ValueError("report watermark must be a non-interlaced 8-bit RGBA PNG")
+            saw_ihdr = True
+        elif chunk_type == b"IDAT":
+            if not saw_ihdr or saw_iend:
+                raise ValueError("report watermark PNG chunk order is invalid")
+            idat.extend(chunk_data)
+        elif chunk_type == b"IEND":
+            if length != 0 or not saw_ihdr or not idat:
+                raise ValueError("report watermark PNG has an invalid IEND")
+            saw_iend = True
+            offset = crc_end
+            break
+        offset = crc_end
+
+    if not saw_iend or offset != len(payload):
+        raise ValueError("report watermark PNG has trailing or incomplete data")
+
+    rgba = _decode_rgba_scanlines(compressed=bytes(idat), width=width, height=height)
+    rgb = bytearray(width * height * 3)
+    alpha = bytearray(width * height)
+    for pixel_index in range(width * height):
+        rgba_offset = pixel_index * 4
+        rgb_offset = pixel_index * 3
+        rgb[rgb_offset : rgb_offset + 3] = rgba[rgba_offset : rgba_offset + 3]
+        alpha[pixel_index] = rgba[rgba_offset + 3]
+    if min(alpha) != 0 or max(alpha) != 255:
+        raise ValueError("report watermark must contain transparent and opaque pixels")
+
+    return _ReportWatermark(
+        width=width,
+        height=height,
+        rgb=bytes(rgb),
+        alpha=bytes(alpha),
+        source_sha256=hashlib.sha256(payload).hexdigest(),
+    )
+
+
+def _pdf_image_stream(dictionary: str, payload: bytes) -> bytes:
+    return (
+        f"<< {dictionary} /Filter /FlateDecode /Length {len(payload)} >>\nstream\n".encode(
+            "ascii"
+        )
+        + payload
+        + b"\nendstream"
+    )
+
+
+def _report_watermark_pdf_objects(watermark: _ReportWatermark) -> tuple[bytes, bytes]:
+    alpha_stream = zlib.compress(watermark.alpha, level=9)
+    alpha_object = _pdf_image_stream(
+        "/Type /XObject /Subtype /Image "
+        f"/Width {watermark.width} /Height {watermark.height} "
+        "/ColorSpace /DeviceGray /BitsPerComponent 8",
+        alpha_stream,
+    )
+    rgb_stream = zlib.compress(watermark.rgb, level=9)
+    image_object = _pdf_image_stream(
+        "/Type /XObject /Subtype /Image "
+        f"/Width {watermark.width} /Height {watermark.height} "
+        "/ColorSpace /DeviceRGB /BitsPerComponent 8 "
+        f"/SMask {_REPORT_WATERMARK_ALPHA_OBJECT} 0 R "
+        f"/DDSourceSHA256 ({watermark.source_sha256})",
+        rgb_stream,
+    )
+    return alpha_object, image_object
+
+
+def _free_report_watermark_stream() -> list[bytes]:
+    """Place the canonical watermark image in the lower-right report body."""
 
     return [
         b"% DD-FREE-REPORT-WATERMARK-V1",
         b"q",
         b"/GSW gs",
-        b"2.4 w",
-        b"0.45 0.16 0.88 RG",
-        # Outer circle, centered at (492, 118), radius 64.
-        b"492 182 m",
-        b"527.35 182 556 153.35 556 118 c",
-        b"556 82.65 527.35 54 492 54 c",
-        b"456.65 54 428 82.65 428 118 c",
-        b"428 153.35 456.65 182 492 182 c S",
-        b"1.3 w",
-        b"0.92 0.17 0.57 RG",
-        # Inner circle.
-        b"492 174 m",
-        b"522.93 174 548 148.93 548 118 c",
-        b"548 87.07 522.93 62 492 62 c",
-        b"461.07 62 436 87.07 436 118 c",
-        b"436 148.93 461.07 174 492 174 c S",
-        # Minimal bat silhouette: two wings, a compact body, and pointed ears.
-        b"0.48 0.18 0.90 rg",
-        b"492 129 m",
-        b"480 143 463 148 447 143 c",
-        b"455 134 458 123 455 111 c",
-        b"469 116 479 111 486 101 c",
-        b"489 96 490 91 492 84 c",
-        b"494 91 495 96 498 101 c",
-        b"505 111 515 116 529 111 c",
-        b"526 123 529 134 537 143 c",
-        b"521 148 504 143 492 129 c f",
-        # Ears and head.
-        b"486 132 m 487 142 l 492 137 l 497 142 l 498 132 l h f",
-        b"BT",
-        b"/F1 7 Tf",
-        b"0.45 0.16 0.88 rg",
-        b"455 159 Td",
-        _pdf_text_operand("DRONE DREAM"),
-        b"ET",
-        b"BT",
-        b"/F1 7 Tf",
-        b"0.92 0.17 0.57 rg",
-        b"458 71 Td",
-        _pdf_text_operand("FREE EXPORT"),
-        b"ET",
+        b"128 0 0 128 428 54 cm",
+        b"/DDWatermark Do",
         b"Q",
     ]
 
@@ -277,10 +416,14 @@ def _build_pdf(lines: list[str], *, free_tier_watermark: bool = False) -> bytes:
     wrapped_lines = _wrap_lines(lines)
     pages = _paginate_lines(wrapped_lines)
     page_count = len(pages)
+    watermark = _load_report_watermark() if free_tier_watermark else None
+    static_object_count = _REPORT_WATERMARK_IMAGE_OBJECT if watermark is not None else 4
+    first_content_object = static_object_count + 1
+    first_page_object = static_object_count + 2
 
     objects: list[bytes] = []
     objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
-    page_kids = " ".join(f"{7 + i * 2} 0 R" for i in range(page_count))
+    page_kids = " ".join(f"{first_page_object + i * 2} 0 R" for i in range(page_count))
     objects.append(f"<< /Type /Pages /Kids [{page_kids}] /Count {page_count} >>".encode())
     objects.append(
         b"<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light "
@@ -290,7 +433,10 @@ def _build_pdf(lines: list[str], *, free_tier_watermark: bool = False) -> bytes:
         b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light "
         b"/CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 4 >> >>"
     )
-    objects.append(b"<< /Type /ExtGState /CA 0.18 /ca 0.18 >>")
+    if watermark is not None:
+        objects.append(b"<< /Type /ExtGState /CA 0.18 /ca 0.18 >>")
+        alpha_object, image_object = _report_watermark_pdf_objects(watermark)
+        objects.extend((alpha_object, image_object))
 
     for idx, page_lines in enumerate(pages):
         stream_obj = _build_page_stream(
@@ -300,12 +446,19 @@ def _build_pdf(lines: list[str], *, free_tier_watermark: bool = False) -> bytes:
             free_tier_watermark=free_tier_watermark,
         )
         objects.append(stream_obj)
+        if watermark is not None:
+            resources = (
+                "/Resources << /Font << /F1 3 0 R >> "
+                f"/ExtGState << /GSW {_REPORT_WATERMARK_GSTATE_OBJECT} 0 R >> "
+                f"/XObject << /DDWatermark {_REPORT_WATERMARK_IMAGE_OBJECT} 0 R >> >> "
+            )
+        else:
+            resources = "/Resources << /Font << /F1 3 0 R >> >> "
         page_obj = (
             "<< /Type /Page /Parent 2 0 R "
             "/MediaBox [0 0 595 842] "
-            "/Resources << /Font << /F1 3 0 R >> "
-            "/ExtGState << /GSW 5 0 R >> >> "
-            f"/Contents {6 + idx * 2} 0 R >>"
+            f"{resources}"
+            f"/Contents {first_content_object + idx * 2} 0 R >>"
         ).encode()
         objects.append(page_obj)
 

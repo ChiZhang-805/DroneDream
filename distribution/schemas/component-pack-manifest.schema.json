@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/component-pack-manifest.v1.json",
+  "title": "DroneDream independently updateable component pack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "packType",
+    "packName",
+    "packId",
+    "version",
+    "releaseSequence",
+    "runtimeCompatibility",
+    "editionProfiles",
+    "files"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-component-pack"},
+    "packType": {"enum": ["capability", "asset"]},
+    "packName": {"type": "string", "minLength": 1, "maxLength": 80},
+    "packId": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "releaseSequence": {"type": "integer", "minimum": 1},
+    "runtimeCompatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeProductId", "minimumRuntimeVersion", "engineApiVersion"],
+      "properties": {
+        "runtimeProductId": {"const": "DroneDreamRuntime"},
+        "minimumRuntimeVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "engineApiVersion": {"const": 1}
+      }
+    },
+    "editionProfiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {"enum": ["unified-sim-lab", "sim-only", "field-lightweight", "autonomy-full"]}
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sizeBytes", "sha256"],
+        "properties": {
+          "path": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"},
+          "sizeBytes": {"type": "integer", "minimum": 0, "maximum": 4294967296},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

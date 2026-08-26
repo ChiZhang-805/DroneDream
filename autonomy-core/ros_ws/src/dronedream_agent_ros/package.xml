@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>dronedream_agent_ros</name>
+  <version>0.1.0</version>
+  <description>ROS 2 runtime nodes for the DroneDream flight-agent core.</description>
+  <maintainer email="engineering@dronedream.local">DroneDream</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>dronedream_agent_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

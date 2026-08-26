@@ -36,7 +36,16 @@ _SAFE_ENV_ALLOWLIST: tuple[str, ...] = (
     "DRONEDREAM_PX4_EXECUTABLE",
     "DRONEDREAM_GAZEBO_EXECUTABLE",
 )
-_SENSITIVE_ENV_TOKENS: tuple[str, ...] = ("KEY", "TOKEN", "SECRET", "PASSWORD")
+_SENSITIVE_ENV_TOKENS: tuple[str, ...] = (
+    "KEY",
+    "TOKEN",
+    "SECRET",
+    "PASSWORD",
+    "CREDENTIAL",
+    "AUTHORIZATION",
+    "COOKIE",
+    "BEARER",
+)
 
 
 def _fmt_dt(value: datetime | None) -> str | None:

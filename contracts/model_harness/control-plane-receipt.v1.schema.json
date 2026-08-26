@@ -1,0 +1,293 @@
+{
+  "$defs": {
+    "PluginSelection": {
+      "additionalProperties": false,
+      "description": "A content-bound plugin selection; never an arbitrary import path.",
+      "properties": {
+        "content_sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "plugin_id": {
+          "maxLength": 128,
+          "minLength": 3,
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]{1,126}[a-z0-9])?$",
+          "title": "Plugin Id",
+          "type": "string"
+        },
+        "selected_by": {
+          "default": "product_managed",
+          "enum": [
+            "product_managed",
+            "account_configurable",
+            "agent_harness_designer"
+          ],
+          "title": "Selected By",
+          "type": "string"
+        },
+        "slot": {
+          "enum": [
+            "model_provider",
+            "intent_extractor",
+            "context_enricher",
+            "prompt_pack",
+            "tool_provider",
+            "planner",
+            "optimizer",
+            "critic",
+            "validator",
+            "memory_extractor",
+            "memory_consolidator",
+            "memory_retriever",
+            "semantic_retriever",
+            "simulator_adapter",
+            "asset_adapter",
+            "telemetry_adapter",
+            "recovery_strategy",
+            "evidence_exporter",
+            "notification_adapter"
+          ],
+          "title": "Slot",
+          "type": "string"
+        },
+        "source": {
+          "default": "explicit",
+          "enum": [
+            "explicit",
+            "product_managed_default"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "trust": {
+          "enum": [
+            "managed",
+            "signed",
+            "local_development"
+          ],
+          "title": "Trust",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot",
+        "plugin_id",
+        "version",
+        "content_sha256",
+        "trust"
+      ],
+      "title": "PluginSelection",
+      "type": "object"
+    }
+  },
+  "$id": "urn:dronedream:schema:model-harness:control-plane-receipt:v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "domain": {
+      "enum": [
+        "optimization.control_tuning",
+        "autonomy.mission",
+        "asset.qualification",
+        "experiment.simulation",
+        "workflow.cross_edition",
+        "validation.hardware",
+        "calibration.system",
+        "transfer.sim_to_real",
+        "transfer.real_to_sim",
+        "operations.field"
+      ],
+      "title": "Domain",
+      "type": "string"
+    },
+    "effective_maximum_model_calls": {
+      "minimum": 1,
+      "title": "Effective Maximum Model Calls",
+      "type": "integer"
+    },
+    "effective_maximum_repair_cycles": {
+      "minimum": 0,
+      "title": "Effective Maximum Repair Cycles",
+      "type": "integer"
+    },
+    "execution_authority_enforcement": {
+      "const": "not_integrated",
+      "default": "not_integrated",
+      "title": "Execution Authority Enforcement",
+      "type": "string"
+    },
+    "fixed_kernel_responsibilities": {
+      "items": {
+        "enum": [
+          "identity_and_tenant_boundary",
+          "structured_io_validation",
+          "safety_policy",
+          "budget_enforcement",
+          "acceptance_and_evidence",
+          "memory_governance",
+          "plugin_trust_and_lifecycle"
+        ],
+        "type": "string"
+      },
+      "title": "Fixed Kernel Responsibilities",
+      "type": "array"
+    },
+    "grants_execution_authority": {
+      "const": false,
+      "default": false,
+      "title": "Grants Execution Authority",
+      "type": "boolean"
+    },
+    "hard_maximum_model_calls": {
+      "minimum": 1,
+      "title": "Hard Maximum Model Calls",
+      "type": "integer"
+    },
+    "hard_maximum_repair_cycles": {
+      "minimum": 0,
+      "title": "Hard Maximum Repair Cycles",
+      "type": "integer"
+    },
+    "learning_promotion_policy_version": {
+      "const": "dronedream.learning-promotion-policy.v1",
+      "default": "dronedream.learning-promotion-policy.v1",
+      "title": "Learning Promotion Policy Version",
+      "type": "string"
+    },
+    "loop_kind": {
+      "enum": [
+        "single_pass",
+        "plan_validate",
+        "iterative_optimize",
+        "observe_repair",
+        "promotion_pipeline"
+      ],
+      "title": "Loop Kind",
+      "type": "string"
+    },
+    "memory_retrieval_policy_version": {
+      "const": "dronedream.memory-retrieval-policy.v1",
+      "default": "dronedream.memory-retrieval-policy.v1",
+      "title": "Memory Retrieval Policy Version",
+      "type": "string"
+    },
+    "online_policy_updates_allowed": {
+      "const": false,
+      "default": false,
+      "title": "Online Policy Updates Allowed",
+      "type": "boolean"
+    },
+    "plugin_runtime_receipt_ids": {
+      "default": [],
+      "maxItems": 0,
+      "minItems": 0,
+      "title": "Plugin Runtime Receipt Ids",
+      "type": "array"
+    },
+    "plugin_selection_effect": {
+      "const": "contract_only",
+      "default": "contract_only",
+      "title": "Plugin Selection Effect",
+      "type": "string"
+    },
+    "readable_memory_domains": {
+      "items": {
+        "enum": [
+          "account.shared",
+          "optimization.control_tuning",
+          "autonomy.mission",
+          "asset.qualification",
+          "experiment.simulation",
+          "workflow.cross_edition",
+          "validation.hardware",
+          "calibration.system",
+          "transfer.sim_to_real",
+          "transfer.real_to_sim",
+          "operations.field"
+        ],
+        "type": "string"
+      },
+      "title": "Readable Memory Domains",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "dronedream.model-harness-control-plane.v1",
+      "default": "dronedream.model-harness-control-plane.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_plugins": {
+      "items": {
+        "$ref": "#/$defs/PluginSelection"
+      },
+      "title": "Selected Plugins",
+      "type": "array"
+    },
+    "selection_sha256": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Selection Sha256",
+      "type": "string"
+    },
+    "semantic_memory_authority": {
+      "const": "advisory_only",
+      "default": "advisory_only",
+      "title": "Semantic Memory Authority",
+      "type": "string"
+    },
+    "structured_input_schema_version": {
+      "const": "dronedream.model-harness-input.v1",
+      "default": "dronedream.model-harness-input.v1",
+      "title": "Structured Input Schema Version",
+      "type": "string"
+    },
+    "structured_output_schema_version": {
+      "const": "dronedream.model-harness-output.v1",
+      "default": "dronedream.model-harness-output.v1",
+      "title": "Structured Output Schema Version",
+      "type": "string"
+    },
+    "writable_memory_domain": {
+      "enum": [
+        "account.shared",
+        "optimization.control_tuning",
+        "autonomy.mission",
+        "asset.qualification",
+        "experiment.simulation",
+        "workflow.cross_edition",
+        "validation.hardware",
+        "calibration.system",
+        "transfer.sim_to_real",
+        "transfer.real_to_sim",
+        "operations.field"
+      ],
+      "title": "Writable Memory Domain",
+      "type": "string"
+    }
+  },
+  "required": [
+    "domain",
+    "loop_kind",
+    "hard_maximum_model_calls",
+    "hard_maximum_repair_cycles",
+    "effective_maximum_model_calls",
+    "effective_maximum_repair_cycles",
+    "fixed_kernel_responsibilities",
+    "readable_memory_domains",
+    "writable_memory_domain",
+    "selected_plugins",
+    "selection_sha256"
+  ],
+  "title": "HarnessControlPlaneReceipt",
+  "type": "object"
+}

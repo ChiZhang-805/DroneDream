@@ -3,14 +3,29 @@
 from __future__ import annotations
 
 import json
-from typing import Literal
-from urllib.request import Request, urlopen
+from typing import Any, Literal
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from app.config import Settings, get_settings
 
 ReportExportTier = Literal["free", "plus", "pro"]
 _MAX_SNAPSHOT_BYTES = 65_536
 _MAX_AUTHORIZATION_BYTES = 16_384
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Keep the authenticated entitlement request on its configured origin."""
+
+    def redirect_request(self, *_args: Any, **_kwargs: Any) -> None:
+        return None
+
+
+def urlopen(request: Request, *, timeout: float) -> Any:
+    """Open one request without forwarding its bearer token through a redirect."""
+
+    opener = build_opener(_NoRedirectHandler())
+    return opener.open(request, timeout=timeout)  # noqa: S310 - validated HTTPS request.
 
 
 def _verified_plan_id(payload: object) -> ReportExportTier | None:
@@ -48,14 +63,21 @@ def resolve_report_export_tier(
     current = settings or get_settings()
     base_url = current.model_gateway_base_url.strip().rstrip("/")
     authorization = (authorization_header or "").strip()
+    parsed_base_url = urlsplit(base_url)
     if (
         not base_url
+        or parsed_base_url.scheme != "https"
+        or not parsed_base_url.hostname
+        or parsed_base_url.username is not None
+        or parsed_base_url.password is not None
+        or parsed_base_url.query
+        or parsed_base_url.fragment
         or not authorization.startswith("Bearer ")
         or len(authorization.encode("utf-8")) > _MAX_AUTHORIZATION_BYTES
     ):
         return "free"
 
-    request = Request(
+    request = Request(  # noqa: S310 - base URL is validated as credential-free HTTPS.
         f"{base_url}/usage",
         method="GET",
         headers={
@@ -65,7 +87,7 @@ def resolve_report_export_tier(
         },
     )
     try:
-        with urlopen(
+        with urlopen(  # noqa: S310 - request URL is constrained above.
             request,
             timeout=min(current.llm_request_timeout_seconds, 5.0),
         ) as response:

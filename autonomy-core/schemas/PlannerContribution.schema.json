@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "applicable": {
+      "title": "Applicable",
+      "type": "boolean"
+    },
+    "deterministic_gates": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "maxProperties": 32,
+      "minProperties": 1,
+      "title": "Deterministic Gates",
+      "type": "object"
+    },
+    "hard_constraints": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Hard Constraints",
+      "type": "array"
+    },
+    "layer": {
+      "enum": [
+        "semantic",
+        "temporal",
+        "global",
+        "local",
+        "indoor",
+        "outdoor",
+        "dynamic-obstacle",
+        "energy",
+        "link",
+        "payload",
+        "regulatory"
+      ],
+      "title": "Layer",
+      "type": "string"
+    },
+    "objective_metrics": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Objective Metrics",
+      "type": "array"
+    },
+    "planner_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "title": "Planner Id",
+      "type": "string"
+    },
+    "required_inputs": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Required Inputs",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "dronedream.planner-contribution.v1",
+      "default": "dronedream.planner-contribution.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "planner_id",
+    "layer",
+    "applicable",
+    "deterministic_gates"
+  ],
+  "title": "PlannerContribution",
+  "type": "object"
+}

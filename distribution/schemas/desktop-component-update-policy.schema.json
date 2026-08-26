@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/desktop-component-update-policy.v1.json",
+  "title": "DroneDream desktop component update policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "contractVersion",
+    "catalogTrust",
+    "updateOrder",
+    "components"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-desktop-component-update-policy"},
+    "contractVersion": {"const": "1.0.0"},
+    "catalogTrust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalization",
+        "signatureAlgorithm",
+        "detachedSignatureRequired",
+        "httpsRequired",
+        "contentHashAlgorithm",
+        "antiRollbackSequenceRequired",
+        "unknownComponentAction"
+      ],
+      "properties": {
+        "canonicalization": {"const": "RFC8785-JCS"},
+        "signatureAlgorithm": {"const": "Ed25519"},
+        "detachedSignatureRequired": {"const": true},
+        "httpsRequired": {"const": true},
+        "contentHashAlgorithm": {"const": "SHA-256"},
+        "antiRollbackSequenceRequired": {"const": true},
+        "unknownComponentAction": {"const": "reject"}
+      }
+    },
+    "updateOrder": {
+      "const": [
+        "desktop-app",
+        "base-runtime",
+        "engine-pack",
+        "capability-pack",
+        "asset-pack"
+      ]
+    },
+    "components": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "componentId",
+          "displayName",
+          "installScope",
+          "updateMechanism",
+          "implementationState",
+          "defaultPolicy",
+          "activationStrategy",
+          "rollbackStrategy",
+          "preservesUserState",
+          "editions",
+          "requires"
+        ],
+        "properties": {
+          "componentId": {
+            "enum": [
+              "desktop-app",
+              "base-runtime",
+              "engine-pack",
+              "capability-pack",
+              "asset-pack",
+              "user-state"
+            ]
+          },
+          "displayName": {"type": "string", "minLength": 1, "maxLength": 80},
+          "installScope": {
+            "enum": ["per-edition-user", "shared-wsl", "shared-runtime-profile", "shared-content-cache", "per-user-data"]
+          },
+          "updateMechanism": {
+            "enum": ["tauri-updater", "runtime-base-manager", "engine-pack-manager", "component-pack-manager", "none"]
+          },
+          "implementationState": {"enum": ["implemented", "install-only", "planned", "not-updatable"]},
+          "defaultPolicy": {"enum": ["automatic", "recommended", "optional", "required", "never"]},
+          "activationStrategy": {
+            "enum": ["app-restart", "verified-backup-reimport", "atomic-symlink", "atomic-directory-swap", "none"]
+          },
+          "rollbackStrategy": {
+            "enum": ["tauri-reinstall-previous", "verified-backup-restore", "previous-symlink", "previous-directory", "never-touch"]
+          },
+          "preservesUserState": {"const": true},
+          "editions": {
+            "type": "array",
+            "minItems": 5,
+            "maxItems": 5,
+            "uniqueItems": true,
+            "items": {"enum": ["universal", "sim", "lab", "field", "autonomy"]}
+          },
+          "requires": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": ["desktop-app", "base-runtime", "engine-pack", "capability-pack", "asset-pack"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "arms": [
+    "full_aurora",
+    "no_decision_memory",
+    "no_observed_outcome_reflection",
+    "fixed_deterministic_portfolio"
+  ],
+  "budget": {
+    "max_iterations": 2,
+    "max_total_trials": 40,
+    "terminal_accounting": "every persisted terminal Trial remains in total, failure, recovery, and evidence-completeness denominators"
+  },
+  "claim_boundary": "Matched, deterministic component intervention on MockSimulatorAdapter using a preregistered local scripted router. Results describe only this frozen synthetic protocol. They do not establish general AURORA or LLM superiority, PX4/Gazebo performance, physical fidelity, transfer to real aircraft, or real-flight safety.",
+  "claim_label": "SYNTHETIC_MOCK",
+  "evidence_class": "synthetic_mock_component_ablation",
+  "initial_design": {
+    "baseline_parameters": {
+      "accel_limit": 4.0,
+      "disturbance_rejection": 0.5,
+      "kd_xy": 0.2,
+      "ki_xy": 0.05,
+      "kp_xy": 1.0,
+      "vel_limit": 5.0
+    },
+    "candidate_count": 1,
+    "kind": "shared_service_default_baseline",
+    "parameter_space": "legacy_six_parameter_domain",
+    "same_for_every_arm": true
+  },
+  "interpretation_rule": {
+    "inconclusive": "an ablated component was unavailable, or the isolating contrast retained versus removed that component but the preregistered policy never made it decision-relevant and therefore produced identical tool sequences and outcomes",
+    "no_observed_protocol_difference": "the intervention was activated but all preregistered result metrics equal full_aurora",
+    "observed_protocol_difference": "the intervention was activated and at least one preregistered result metric differs from full_aurora"
+  },
+  "interventions": {
+    "fixed_deterministic_portfolio": "bypass model routing and use optimizer_portfolio directly",
+    "full_aurora": "no context intervention",
+    "no_decision_memory": "replace the provider-visible decision_memory tuple with empty",
+    "no_observed_outcome_reflection": "preserve decision receipts but replace verified reflection with unavailable and remove observed_outcome"
+  },
+  "manifest_sha256": "28092e9a5114bd4a02c297246cde8467014e22553d93c028a19b08db678a5072",
+  "metrics": [
+    "holdout_loss",
+    "optimizer_feasible_rate",
+    "trials_to_target",
+    "total_trials",
+    "terminal_failure_trials",
+    "recovered_trials",
+    "evidence_completeness_rate"
+  ],
+  "objective_contract": {
+    "constraints": [
+      {
+        "hard": true,
+        "metric": "max_error",
+        "operator": "lte",
+        "threshold": 3.0
+      }
+    ],
+    "objectives": [
+      {
+        "direction": "minimize",
+        "metric": "rmse"
+      }
+    ],
+    "robust_aggregation": "mean"
+  },
+  "runtime_contract": {
+    "evidence_schema_version": "2.7",
+    "live_model_calls": false,
+    "network_connect_guard": [
+      "socket.connect",
+      "socket.connect_ex",
+      "socket.create_connection"
+    ],
+    "physical_fidelity": false,
+    "prompt_template_version": "1.6",
+    "real_credentials_used": false,
+    "simulator_backend": "mock",
+    "tool_registry_version": "2.1"
+  },
+  "scenario_matrix": {
+    "common_random_numbers": true,
+    "holdout": [
+      {
+        "case": "combined-holdout",
+        "seed_offset": 99
+      }
+    ],
+    "training": [
+      {
+        "case": "nominal-training",
+        "seed_offset": 1
+      },
+      {
+        "case": "wind-training",
+        "seed_offset": 2
+      },
+      {
+        "case": "noise-training",
+        "seed_offset": 3
+      }
+    ]
+  },
+  "schema_version": "dronedream.harness-component-outcome-ablation-manifest/v1",
+  "scripted_router_policy": {
+    "generation_1": "choose constrained_mobo when eligible; otherwise choose optimizer_portfolio",
+    "later_generation_with_verified_reflection": "choose turbo when eligible and the prior cohort has complete evidence, at least one feasible candidate, and zero domain failure Trials; otherwise choose optimizer_portfolio",
+    "later_generation_without_verified_reflection": "choose optimizer_portfolio",
+    "no_free_text_feedback": true
+  },
+  "seed_blocks": [
+    6100,
+    7200,
+    8300,
+    9400,
+    10500
+  ],
+  "time_to_target": {
+    "accounting": "all Trial rows through the complete target generation; otherwise right-censored at the arm total",
+    "metric": "training scalar_loss",
+    "relative_improvement": 0.05,
+    "target": "first generation containing a full-fidelity feasible optimizer candidate at least 5% better than the shared baseline"
+  }
+}

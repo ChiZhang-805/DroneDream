@@ -456,6 +456,19 @@ def test_full_target_scalarization_never_uses_reduced_fidelity_incumbent() -> No
         )
         == ()
     )
+    nominal_full_partial = replace(
+        reduced[0],
+        requested_fidelity=1.0,
+    )
+    assert (
+        bayesian_optimizers._joint_scalarized_incumbents(
+            (nominal_full_partial,),
+            models,
+            scalarizations,
+            prefer_full_fidelity=True,
+        )
+        == ()
+    )
 
     full = replace(
         _observation(3, 0.5, 0.5, fidelity=1.0),
@@ -472,6 +485,20 @@ def test_full_target_scalarization_never_uses_reduced_fidelity_incumbent() -> No
         scalarizations,
         prefer_full_fidelity=True,
     ) == pytest.approx((0.8,))
+
+
+def test_non_mf_history_rejects_nominal_full_with_partial_effective_coverage() -> None:
+    partial = replace(
+        _observation(1, 0.2, 0.2, fidelity=1.0),
+        fidelity=0.25,
+        requested_fidelity=1.0,
+    )
+
+    filtered = bayesian_optimizers._full_fidelity_request(
+        _request("constrained_mobo", (partial,))
+    )
+
+    assert filtered.observations == ()
 
 
 @pytest.mark.parametrize(

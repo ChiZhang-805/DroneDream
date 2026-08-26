@@ -8,11 +8,14 @@ process — never inside a request handler.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal, cast
 
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
@@ -21,6 +24,11 @@ from app import models, schemas
 from app import secrets as job_secrets
 from app.config import get_settings
 from app.llm_provider_policy import llm_base_url_is_allowed
+from app.model_harness.control_plane import (
+    HarnessControlPlaneReceipt,
+    compile_control_plane_receipt,
+)
+from app.model_harness.domains import OPTIMIZATION_CONTROL_TUNING_DOMAIN
 from app.optimization.candidate_evidence_ledger import (
     authorize_candidate_evidence_deletion,
 )
@@ -36,6 +44,14 @@ from app.orchestration.attempt_evidence import (
     record_accepted_trial_attempt_outcome,
 )
 from app.orchestration.events import record_event
+from app.orchestration.first_qualified import (
+    FirstQualifiedFreezeError,
+    require_first_qualified_freeze_receipt,
+)
+from app.orchestration.winner_freeze import (
+    WinnerFreezeError,
+    require_winner_freeze_receipt,
+)
 from app.parameters import (
     classify_airframe,
     get_parameter,
@@ -44,6 +60,10 @@ from app.parameters import (
     resolve_catalog_version,
     validate_parameter_values,
     validate_search_selections,
+)
+from app.simulator.scenario_effects import (
+    ScenarioEffectContractError,
+    build_scenario_effect_request,
 )
 from app.storage import get_artifact_storage
 from app.storage.evidence import candidate_trial_artifact_evidence
@@ -62,8 +82,114 @@ class JobServiceError(Exception):
         self.http_status = http_status
 
 
+def _control_plane_event_binding(
+    receipt: HarnessControlPlaneReceipt,
+) -> dict[str, str]:
+    return {
+        "model_harness_domain": receipt.domain,
+        "control_plane_schema_version": receipt.schema_version,
+        "control_plane_selection_sha256": receipt.selection_sha256,
+    }
+
+
+def _validated_job_control_plane_receipt(
+    job: models.Job,
+) -> HarnessControlPlaneReceipt:
+    """Validate the persisted receipt and its immutable creation-event binding."""
+
+    def invalid() -> JobServiceError:
+        return JobServiceError(
+            "MODEL_HARNESS_CONTROL_PLANE_RECEIPT_INVALID",
+            f"Job {job.id} has an invalid Model + Harness control-plane receipt.",
+            http_status=409,
+        )
+
+    if job.model_harness_domain != OPTIMIZATION_CONTROL_TUNING_DOMAIN:
+        raise invalid()
+    try:
+        receipt = HarnessControlPlaneReceipt.model_validate(job.model_harness_control_plane_json)
+    except (TypeError, ValueError) as exc:
+        raise invalid() from exc
+    if receipt.domain != job.model_harness_domain:
+        raise invalid()
+    if job.model_harness_control_plane_selection_sha256 != receipt.selection_sha256:
+        raise invalid()
+
+    expected_binding = _control_plane_event_binding(receipt)
+    bound_events = [
+        event for event in job.events if event.event_type in {"job_created", "job_queued"}
+    ]
+    for event in bound_events:
+        payload = event.payload_json
+        if not isinstance(payload, dict):
+            raise invalid()
+        if any(payload.get(key) != value for key, value in expected_binding.items()):
+            raise invalid()
+    return receipt
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _validate_real_cli_scenario_effect_contract(req: schemas.JobCreateRequest) -> None:
+    """Reject physically incompatible real-simulator effects before persistence."""
+
+    if req.simulator_backend != "real_cli":
+        return
+    advanced = (
+        req.advanced_scenario_config.model_dump(mode="json")
+        if req.advanced_scenario_config is not None
+        else {}
+    )
+    job_config = {
+        "wind": req.wind.model_dump(mode="json"),
+        "sensor_noise_level": req.sensor_noise_level,
+    }
+    for case in req.scenario_suite.cases:
+        if not case.enabled:
+            continue
+        for seed in case.seeds:
+            try:
+                build_scenario_effect_request(
+                    execution_identity={
+                        "job_validation": True,
+                        "scenario_case_id": case.id,
+                        "seed": seed,
+                    },
+                    scenario_type=case.scenario_type,
+                    scenario_config=dict(case.config),
+                    job_config=job_config,
+                    advanced_config=advanced,
+                )
+            except ScenarioEffectContractError as exc:
+                raise JobServiceError(
+                    "INVALID_SCENARIO_EFFECT_CONTRACT",
+                    f"scenario case {case.id!r} seed {seed} is not physically executable: {exc}",
+                    http_status=422,
+                ) from exc
+
+
+def _validate_operator_simulator_backend(
+    req: schemas.JobCreateRequest,
+    *,
+    allow_internal_test_backend: bool = False,
+) -> None:
+    """Keep synthetic adapters behind the explicit regression-test boundary."""
+
+    if req.simulator_backend != "mock":
+        return
+    if allow_internal_test_backend:
+        return
+    app_env = get_settings().app_env.strip().lower()
+    if app_env in {"test", "testing"}:
+        return
+    raise JobServiceError(
+        "SIMULATOR_BACKEND_TEST_ONLY",
+        "The deterministic mock simulator is available only to the regression-test suite; "
+        "operator jobs must use the configured real PX4/Gazebo runtime.",
+        http_status=422,
+    )
 
 
 def _expected_control_version(
@@ -79,10 +205,7 @@ def _expected_control_version(
         if get_settings().app_env.strip().lower() in {"desktop", "prod", "production"}:
             raise JobServiceError(
                 "CONTROL_VERSION_REQUIRED",
-                (
-                    f"A current control_version is required to modify "
-                    f"{resource_kind} {resource_id}."
-                ),
+                (f"A current control_version is required to modify {resource_kind} {resource_id}."),
                 http_status=428,
             )
         # Preserve source/API compatibility for non-packaged development while
@@ -119,6 +242,16 @@ def _raise_control_version_conflict(
 def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
     if req.optimizer_strategy not in {"gpt", "llm_harness"}:
         return
+    settings = get_settings()
+    if req.provider_max_retries > settings.llm_max_retries:
+        raise JobServiceError(
+            "PROVIDER_RETRY_POLICY_UNAVAILABLE",
+            (
+                "provider_max_retries exceeds the server deployment policy; "
+                "reduce the Job retry cap or update the reviewed server policy."
+            ),
+            http_status=422,
+        )
     provider_config = req.llm or req.openai
     if provider_config is None:
         raise JobServiceError(
@@ -128,7 +261,7 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
         )
     if isinstance(provider_config, schemas.LLMProviderConfig):
         if provider_config.access_mode == "platform":
-            if not get_settings().model_gateway_base_url.strip():
+            if not settings.model_gateway_base_url.strip():
                 raise JobServiceError(
                     "MODEL_GATEWAY_NOT_CONFIGURED",
                     "The DroneDream managed-model gateway is not configured.",
@@ -340,7 +473,18 @@ def _create_job_from_config(
     batch_id: str | None = None,
     persist_objective_config: bool | None = None,
     persist_scenario_suite: bool | None = None,
+    job_kind: schemas.JobKind = "primary",
+    continuation_parent_job_id: str | None = None,
+    continuation_root_job_id: str | None = None,
+    holdout_policy_version: str = "legacy-visible-v0",
+    holdout_contract: dict[str, object] | None = None,
+    allow_internal_test_backend: bool = False,
 ) -> models.Job:
+    _validate_operator_simulator_backend(
+        req,
+        allow_internal_test_backend=allow_internal_test_backend,
+    )
+    _validate_real_cli_scenario_effect_contract(req)
     try:
         outcome_contract = compile_outcome_contract(
             req.objective_config,
@@ -374,6 +518,7 @@ def _create_job_from_config(
     settings = get_settings()
     platform_access = req.llm is not None and req.llm.access_mode == "platform"
     if req.llm is not None:
+        llm_access_mode = req.llm.access_mode
         llm_provider = req.llm.provider
         llm_model = settings.model_gateway_managed_model_alias if platform_access else req.llm.model
         llm_base_url = (
@@ -383,17 +528,24 @@ def _create_job_from_config(
         )
         llm_credential = req.llm.platform_grant if platform_access else req.llm.api_key
     elif req.openai is not None:
+        llm_access_mode = "byok"
         llm_provider = "openai"
         llm_model = req.openai.model
         llm_base_url = None
         llm_credential = req.openai.api_key
     else:
+        llm_access_mode = None
         llm_provider = None
         llm_model = None
         llm_base_url = None
         llm_credential = None
+    control_plane_receipt = compile_control_plane_receipt(OPTIMIZATION_CONTROL_TUNING_DOMAIN)
+    control_plane_binding = _control_plane_event_binding(control_plane_receipt)
     job = models.Job(
         user_id=user.id,
+        model_harness_domain=OPTIMIZATION_CONTROL_TUNING_DOMAIN,
+        model_harness_control_plane_json=control_plane_receipt.model_dump(mode="json"),
+        model_harness_control_plane_selection_sha256=(control_plane_receipt.selection_sha256),
         track_type=req.track_type,
         start_point_x=req.start_point.x,
         start_point_y=req.start_point.y,
@@ -439,12 +591,31 @@ def _create_job_from_config(
         max_iterations=req.max_iterations,
         trials_per_candidate=req.trials_per_candidate,
         max_total_trials=req.max_total_trials,
+        completion_policy=req.completion_policy,
+        job_kind=job_kind,
+        provider_turn_cap=req.provider_turn_cap,
+        provider_request_cap=req.provider_request_cap,
+        provider_max_retries=req.provider_max_retries,
+        # A creation-time budget is only a preregistration.  It must not look
+        # like the authenticated post-qualification continuation action has
+        # already happened; that flag flips only when the child Job is claimed.
+        continue_exploration_requested=False,
+        exploration_budget_json=(
+            req.exploration_budget.model_dump(mode="json")
+            if req.exploration_budget is not None
+            else None
+        ),
+        continuation_parent_job_id=continuation_parent_job_id,
+        continuation_root_job_id=continuation_root_job_id,
+        holdout_policy_version=holdout_policy_version,
+        holdout_contract_json=holdout_contract,
         target_rmse=req.acceptance_criteria.target_rmse,
         target_max_error=req.acceptance_criteria.target_max_error,
         min_pass_rate=req.acceptance_criteria.min_pass_rate,
         current_generation=0,
         optimization_outcome=None,
         openai_model=llm_model,
+        llm_access_mode=llm_access_mode,
         llm_provider=llm_provider,
         llm_base_url=llm_base_url,
     )
@@ -468,12 +639,22 @@ def _create_job_from_config(
             job_id=job.id,
             event_type="job_created",
             payload_json={
+                **control_plane_binding,
                 "source_job_id": source_job_id,
                 "batch_id": batch_id,
                 "simulator_backend": req.simulator_backend,
                 "optimizer_strategy": req.optimizer_strategy,
                 "max_iterations": req.max_iterations,
                 "trials_per_candidate": req.trials_per_candidate,
+                "completion_policy": req.completion_policy,
+                "job_kind": job_kind,
+                "provider_turn_cap": req.provider_turn_cap,
+                "provider_request_cap": req.provider_request_cap,
+                "provider_max_retries": req.provider_max_retries,
+                "continue_exploration_preregistered": (req.continue_exploration_after_qualified),
+                "continuation_parent_job_id": continuation_parent_job_id,
+                "continuation_root_job_id": continuation_root_job_id,
+                "holdout_policy_version": holdout_policy_version,
                 "baseline_parameters": req.baseline_parameters.model_dump(mode="json"),
                 "vehicle_profile": req.vehicle_profile.model_dump(mode="json"),
                 "parameter_catalog_version": req.parameter_catalog_version,
@@ -493,7 +674,7 @@ def _create_job_from_config(
         models.JobEvent(
             job_id=job.id,
             event_type="job_queued",
-            payload_json=None,
+            payload_json=control_plane_binding,
         )
     )
     return job
@@ -530,6 +711,12 @@ def create_job(
     user: models.User | None = None,
     commit: bool = True,
 ) -> models.Job:
+    if req.completion_policy != "first_qualified_stop":
+        raise JobServiceError(
+            "INVALID_COMPLETION_POLICY",
+            "exploration_budget_stop is reserved for server-created continuation Jobs.",
+            http_status=422,
+        )
     _validate_parameter_space(req)
     _validate_gpt_request(req)
     job = _create_job_from_config(db, user=_resolve_user(db, user), req=req, source_job_id=None)
@@ -606,7 +793,7 @@ def list_jobs(
     if page_size < 1 or page_size > 200:
         raise JobServiceError("INVALID_INPUT", "page_size must be in [1, 200]", http_status=422)
 
-    stmt = select(models.Job)
+    stmt = select(models.Job).options(selectinload(models.Job.events))
     count_stmt = select(func.count(models.Job.id))
     if user is not None:
         if get_settings().auth_mode == "disabled":
@@ -625,6 +812,8 @@ def list_jobs(
         stmt.order_by(models.Job.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     )
     items = list(db.scalars(stmt))
+    for item in items:
+        _validated_job_control_plane_receipt(item)
     return items, total
 
 
@@ -635,6 +824,7 @@ def get_job(db: Session, job_id: str, *, user: models.User | None = None) -> mod
     auth_disabled_owned_null = get_settings().auth_mode == "disabled" and job.user_id is None
     if user is not None and job.user_id != user.id and not auth_disabled_owned_null:
         raise JobServiceError("JOB_NOT_FOUND", f"Job {job_id} was not found.", http_status=404)
+    _validated_job_control_plane_receipt(job)
     return job
 
 
@@ -649,6 +839,12 @@ def rerun_job(
 ) -> models.Job:
     resolved_user = _resolve_user(db, user)
     source = get_job(db, job_id, user=resolved_user)
+    if source.job_kind == "continue_exploration":
+        raise JobServiceError(
+            "CONTINUATION_RERUN_NOT_ALLOWED",
+            "Restart exploration from its immutable parent instead of rerunning a continuation.",
+            http_status=409,
+        )
     rerun_suffix = " (rerun)"
     rerun_display_name = (
         f"{source.display_name[: 255 - len(rerun_suffix)]}{rerun_suffix}"
@@ -725,6 +921,10 @@ def rerun_job(
         max_iterations=source.max_iterations,
         trials_per_candidate=source.trials_per_candidate,
         max_total_trials=source.max_total_trials,
+        completion_policy=source.completion_policy,  # type: ignore[arg-type]
+        provider_turn_cap=source.provider_turn_cap,
+        provider_request_cap=source.provider_request_cap,
+        provider_max_retries=source.provider_max_retries,
         acceptance_criteria=schemas.AcceptanceCriteria(
             target_rmse=source.target_rmse,
             target_max_error=source.target_max_error,
@@ -762,6 +962,454 @@ def rerun_job(
         db.flush()
     db.refresh(new_job)
     return new_job
+
+
+_CONTINUATION_HOLDOUT_POLICY = "continuation-independent-holdout-v1"
+_CONTINUATION_HOLDOUT_SCHEMA = "dronedream.continuation-holdout-contract/v1"
+
+
+def _sha256_json(value: object) -> str:
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _independent_continuation_suite(
+    source: models.Job,
+    *,
+    freeze: models.FirstQualifiedFreezeReceipt,
+) -> tuple[schemas.ScenarioSuiteConfig, dict[str, object]]:
+    """Derive a preregistered holdout split without reading parent outcomes."""
+
+    if not isinstance(source.scenario_suite_json, dict):
+        raise JobServiceError(
+            "CONTINUATION_HOLDOUT_REQUIRED",
+            "Continue exploration requires an explicit persisted scenario suite.",
+            http_status=409,
+        )
+    source_suite = schemas.ScenarioSuiteConfig(**source.scenario_suite_json)
+    used_seeds = {seed for case in source_suite.cases if case.enabled for seed in case.seeds}
+    child_cases: list[schemas.ScenarioCaseConfig] = []
+    derivations: list[dict[str, object]] = []
+    enabled_holdout_count = 0
+    for case in source_suite.cases:
+        payload = case.model_dump(mode="json")
+        if not case.enabled or not case.holdout:
+            child_cases.append(schemas.ScenarioCaseConfig(**payload))
+            continue
+        enabled_holdout_count += 1
+        replacement: list[int] = []
+        for ordinal, _old_seed in enumerate(case.seeds):
+            counter = 0
+            while True:
+                material = (
+                    f"{_CONTINUATION_HOLDOUT_POLICY}|{freeze.evidence_id}|"
+                    f"{case.id}|{ordinal}|{counter}"
+                ).encode()
+                derived = int.from_bytes(hashlib.sha256(material).digest()[:4], "big")
+                derived &= 0x7FFF_FFFF
+                if derived not in used_seeds:
+                    used_seeds.add(derived)
+                    replacement.append(derived)
+                    break
+                counter += 1
+        payload["seeds"] = replacement
+        child_cases.append(schemas.ScenarioCaseConfig(**payload))
+        derivations.append(
+            {
+                "case_id": case.id,
+                "seed_count": len(replacement),
+                "derivation": "sha256-policy-receipt-case-ordinal-counter",
+            }
+        )
+    if enabled_holdout_count == 0:
+        raise JobServiceError(
+            "CONTINUATION_HOLDOUT_REQUIRED",
+            "Continue exploration requires at least one enabled holdout case.",
+            http_status=409,
+        )
+    child_suite = schemas.ScenarioSuiteConfig(
+        cases=child_cases,
+        common_random_numbers=source_suite.common_random_numbers,
+    )
+    suite_payload = child_suite.model_dump(mode="json")
+    contract: dict[str, object] = {
+        "schema": _CONTINUATION_HOLDOUT_SCHEMA,
+        "policy_version": _CONTINUATION_HOLDOUT_POLICY,
+        "parent_job_id": source.id,
+        "parent_first_qualified_receipt_id": freeze.id,
+        "parent_holdout_contract_sha256": freeze.holdout_contract_sha256,
+        "scenario_suite_sha256": _sha256_json(suite_payload),
+        "derivations": derivations,
+        "parent_holdout_outcomes_visible_to_child_model": False,
+        "child_holdout_outcomes_visible_during_selection": False,
+    }
+    contract["contract_sha256"] = _sha256_json(contract)
+    return child_suite, contract
+
+
+def _continuation_parameter_inputs(
+    source: models.Job,
+    *,
+    candidate: models.CandidateParameterSet,
+) -> tuple[schemas.BaselineParameters, list[schemas.ParameterSelection]]:
+    """Use the immutable parent result as the child baseline, within frozen bounds."""
+
+    raw_parameters = candidate.parameter_json
+    if not isinstance(raw_parameters, dict):
+        raise JobServiceError(
+            "FIRST_QUALIFIED_EVIDENCE_INVALID",
+            "The first-qualified candidate parameter payload is malformed.",
+            http_status=409,
+        )
+    by_upper = {str(key).strip().upper(): value for key, value in raw_parameters.items()}
+    legacy = schemas.BaselineParameters(**(source.baseline_parameter_json or {})).model_dump()
+    for key in schemas.BaselineParameters.model_fields:
+        value = by_upper.get(key.upper())
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            continue
+        numeric = float(value)
+        if math.isfinite(numeric):
+            legacy[key] = numeric
+    baseline = schemas.BaselineParameters(**legacy)
+
+    selections: list[schemas.ParameterSelection] = []
+    for raw in source.parameter_space_json or []:
+        if not isinstance(raw, dict):
+            raise JobServiceError(
+                "FIRST_QUALIFIED_EVIDENCE_INVALID",
+                "The persisted parameter space is malformed.",
+                http_status=409,
+            )
+        payload = dict(raw)
+        name = str(payload.get("name", "")).strip().upper()
+        value = by_upper.get(name)
+        if payload.get("enabled", True) is True:
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                raise JobServiceError(
+                    "FIRST_QUALIFIED_EVIDENCE_INVALID",
+                    f"The first-qualified candidate is missing parameter {name}.",
+                    http_status=409,
+                )
+            numeric = float(value)
+            if not math.isfinite(numeric):
+                raise JobServiceError(
+                    "FIRST_QUALIFIED_EVIDENCE_INVALID",
+                    f"The first-qualified candidate parameter {name} is not finite.",
+                    http_status=409,
+                )
+            payload["baseline"] = numeric
+        selections.append(schemas.ParameterSelection(**payload))
+    return baseline, selections
+
+
+def _continuation_provider_config(
+    source: models.Job,
+    request: schemas.ContinueExplorationRequest,
+) -> tuple[schemas.OpenAIConfig | None, schemas.LLMProviderConfig | None]:
+    """Validate a fresh child binding without reading or copying the parent secret."""
+
+    if source.optimizer_strategy not in {"gpt", "llm_harness"}:
+        if request.openai is not None or request.llm is not None:
+            raise JobServiceError(
+                "CONTINUATION_PROVIDER_NOT_USED",
+                "This optimizer does not use a model credential.",
+                http_status=422,
+            )
+        if request.budget.additional_provider_turn_cap != 0:
+            raise JobServiceError(
+                "CONTINUATION_PROVIDER_BUDGET_INVALID",
+                "A non-model continuation must use zero provider turns.",
+                http_status=422,
+            )
+        return None, None
+    if request.budget.additional_provider_turn_cap < 1:
+        raise JobServiceError(
+            "CONTINUATION_PROVIDER_BUDGET_INVALID",
+            "A model-guided continuation requires at least one provider turn.",
+            http_status=422,
+        )
+    provided = request.llm or request.openai
+    if provided is None:
+        raise JobServiceError(
+            "CONTINUATION_FRESH_GRANT_REQUIRED",
+            "Continue exploration requires a fresh model credential or platform grant.",
+            http_status=422,
+        )
+    if isinstance(provided, schemas.OpenAIConfig):
+        if source.llm_access_mode != "byok" or source.llm_provider not in {None, "openai"}:
+            raise JobServiceError(
+                "CONTINUATION_PROVIDER_MISMATCH",
+                "The continuation provider must match the parent Job.",
+                http_status=409,
+            )
+        model = provided.model or source.openai_model
+        if source.openai_model and model != source.openai_model:
+            raise JobServiceError(
+                "CONTINUATION_MODEL_MISMATCH",
+                "The continuation model snapshot must match the parent Job.",
+                http_status=409,
+            )
+        return schemas.OpenAIConfig(api_key=provided.api_key, model=model), None
+
+    if provided.access_mode != source.llm_access_mode:
+        raise JobServiceError(
+            "CONTINUATION_PROVIDER_MISMATCH",
+            "The continuation access mode must match the parent Job.",
+            http_status=409,
+        )
+    expected_provider = "dronedream" if provided.access_mode == "platform" else source.llm_provider
+    if expected_provider and provided.provider != expected_provider:
+        raise JobServiceError(
+            "CONTINUATION_PROVIDER_MISMATCH",
+            "The continuation provider must match the parent Job.",
+            http_status=409,
+        )
+    model = provided.model or source.openai_model
+    if provided.access_mode == "byok" and source.openai_model and model != source.openai_model:
+        raise JobServiceError(
+            "CONTINUATION_MODEL_MISMATCH",
+            "The continuation model snapshot must match the parent Job.",
+            http_status=409,
+        )
+    expected_base_url = (source.llm_base_url or "").rstrip("/") or None
+    if provided.access_mode == "byok" and provided.base_url != expected_base_url:
+        raise JobServiceError(
+            "CONTINUATION_PROVIDER_MISMATCH",
+            "The continuation provider endpoint must match the parent Job.",
+            http_status=409,
+        )
+    return None, schemas.LLMProviderConfig(
+        access_mode=provided.access_mode,
+        provider=provided.provider,
+        api_key=provided.api_key,
+        platform_grant=provided.platform_grant,
+        model=(model if provided.access_mode == "byok" else None),
+        base_url=(expected_base_url if provided.access_mode == "byok" else None),
+    )
+
+
+def continue_exploration(
+    db: Session,
+    job_id: str,
+    request: schemas.ContinueExplorationRequest,
+    *,
+    user: models.User | None = None,
+    expected_control_version: int | None = None,
+    commit: bool = True,
+) -> models.Job:
+    """Create one bounded child Job without mutating the parent's frozen result."""
+
+    resolved_user = _resolve_user(db, user)
+    parent = get_job(db, job_id, user=resolved_user)
+    expected_version = _expected_control_version(
+        resource_kind="Job",
+        resource_id=parent.id,
+        current_version=parent.control_version,
+        supplied_version=expected_control_version,
+    )
+    existing_child = db.scalar(
+        select(models.Job).where(models.Job.continuation_parent_job_id == parent.id)
+    )
+    if existing_child is not None:
+        raise JobServiceError(
+            "CONTINUATION_ALREADY_EXISTS",
+            f"Job {parent.id} already has continuation child {existing_child.id}.",
+            http_status=409,
+        )
+    requested_budget = request.budget.model_dump(mode="json")
+    if (
+        parent.exploration_budget_json is not None
+        and parent.exploration_budget_json != requested_budget
+    ):
+        raise JobServiceError(
+            "CONTINUATION_BUDGET_MISMATCH",
+            "The confirmed continuation budget differs from the preregistered parent budget.",
+            http_status=409,
+        )
+    if parent.status != "COMPLETED":
+        raise JobServiceError(
+            "CONTINUATION_PARENT_NOT_COMPLETE",
+            "Continue exploration is available only after the parent Job is complete.",
+            http_status=409,
+        )
+    if parent.first_qualified_freeze is None:
+        raise JobServiceError(
+            "CONTINUATION_FIRST_QUALIFIED_REQUIRED",
+            "Continue exploration requires an immutable first-qualified receipt.",
+            http_status=409,
+        )
+    try:
+        require_first_qualified_freeze_receipt(parent.first_qualified_freeze, job=parent)
+    except FirstQualifiedFreezeError as exc:
+        raise JobServiceError(
+            "FIRST_QUALIFIED_EVIDENCE_INVALID",
+            "The parent first-qualified receipt failed verification.",
+            http_status=409,
+        ) from exc
+    incumbent = next(
+        (
+            candidate
+            for candidate in parent.candidates
+            if candidate.id == parent.first_qualified_candidate_id
+        ),
+        None,
+    )
+    if incumbent is None or not candidate_is_publishable(incumbent):
+        raise JobServiceError(
+            "FIRST_QUALIFIED_EVIDENCE_INVALID",
+            "The parent first-qualified candidate is not publishable.",
+            http_status=409,
+        )
+
+    child_suite, holdout_contract = _independent_continuation_suite(
+        parent,
+        freeze=parent.first_qualified_freeze,
+    )
+    baseline, parameter_space = _continuation_parameter_inputs(
+        parent,
+        candidate=incumbent,
+    )
+    scenario_trial_count = sum(len(case.seeds) for case in child_suite.cases if case.enabled)
+    minimum_trial_cap = scenario_trial_count * 2
+    if request.budget.additional_trial_cap < minimum_trial_cap:
+        raise JobServiceError(
+            "CONTINUATION_TRIAL_BUDGET_TOO_SMALL",
+            (
+                "The continuation trial cap must cover the incumbent and at least "
+                f"one new candidate ({minimum_trial_cap} Trials required)."
+            ),
+            http_status=422,
+        )
+    fresh_openai, fresh_llm = _continuation_provider_config(parent, request)
+    suffix = " (continue exploration)"
+    display_name = (
+        f"{parent.display_name[: 255 - len(suffix)]}{suffix}" if parent.display_name else None
+    )
+    child_request = schemas.JobCreateRequest(
+        track_type=parent.track_type,  # type: ignore[arg-type]
+        start_point=schemas.StartPoint(x=parent.start_point_x, y=parent.start_point_y),
+        altitude_m=parent.altitude_m,
+        wind=schemas.WindVector(
+            north=parent.wind_north,
+            east=parent.wind_east,
+            south=parent.wind_south,
+            west=parent.wind_west,
+        ),
+        sensor_noise_level=parent.sensor_noise_level,  # type: ignore[arg-type]
+        objective_profile=parent.objective_profile,  # type: ignore[arg-type]
+        reference_track=(
+            [schemas.TrackPoint(**point) for point in parent.reference_track_json]
+            if parent.reference_track_json
+            else None
+        ),
+        advanced_scenario_config=(
+            schemas.AdvancedScenarioConfig(**parent.advanced_scenario_config_json)
+            if parent.advanced_scenario_config_json
+            else None
+        ),
+        display_name=display_name,
+        baseline_parameters=baseline,
+        vehicle_profile=schemas.VehicleProfileConfig(**(parent.vehicle_profile_json or {})),
+        parameter_catalog_version=parent.parameter_catalog_version,
+        parameter_space=parameter_space,
+        objective_config=schemas.ObjectiveConfig(**(parent.objective_config_json or {})),
+        scenario_suite=child_suite,
+        simulator_backend=parent.simulator_backend_requested,  # type: ignore[arg-type]
+        optimizer_strategy=parent.optimizer_strategy,  # type: ignore[arg-type]
+        max_iterations=request.budget.additional_generation_cap,
+        trials_per_candidate=parent.trials_per_candidate,
+        max_total_trials=request.budget.additional_trial_cap,
+        completion_policy="exploration_budget_stop",
+        provider_turn_cap=request.budget.additional_provider_turn_cap,
+        provider_max_retries=parent.provider_max_retries,
+        acceptance_criteria=schemas.AcceptanceCriteria(
+            target_rmse=parent.target_rmse,
+            target_max_error=parent.target_max_error,
+            min_pass_rate=parent.min_pass_rate,
+        ),
+        openai=fresh_openai,
+        llm=fresh_llm,
+    )
+    _validate_parameter_space(child_request)
+    _validate_gpt_request(child_request)
+    claimed = db.execute(
+        update(models.Job)
+        .where(
+            models.Job.id == parent.id,
+            models.Job.user_id == resolved_user.id,
+            models.Job.control_version == expected_version,
+            models.Job.status == "COMPLETED",
+            models.Job.first_qualified_candidate_id == parent.first_qualified_candidate_id,
+        )
+        .values(
+            control_version=models.Job.control_version + 1,
+            continue_exploration_requested=True,
+            exploration_budget_json=requested_budget,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(claimed, "rowcount", None) != 1:
+        db.expire_all()
+        current = db.get(models.Job, parent.id)
+        _raise_control_version_conflict(
+            resource_kind="Job",
+            resource_id=parent.id,
+            expected_version=expected_version,
+            current_version=current.control_version if current is not None else None,
+        )
+    db.expire(parent)
+    db.refresh(parent)
+    root_id = parent.continuation_root_job_id or parent.id
+    child = _create_job_from_config(
+        db,
+        user=resolved_user,
+        req=child_request,
+        source_job_id=parent.id,
+        persist_objective_config=True,
+        persist_scenario_suite=True,
+        job_kind="continue_exploration",
+        continuation_parent_job_id=parent.id,
+        continuation_root_job_id=root_id,
+        holdout_policy_version=_CONTINUATION_HOLDOUT_POLICY,
+        holdout_contract=holdout_contract,
+    )
+    child.exploration_budget_json = requested_budget
+    record_event(
+        db,
+        parent.id,
+        "continue_exploration_child_created",
+        {
+            "child_job_id": child.id,
+            "budget": request.budget.model_dump(mode="json"),
+            "holdout_policy_version": _CONTINUATION_HOLDOUT_POLICY,
+        },
+    )
+    record_event(
+        db,
+        child.id,
+        "continue_exploration_started",
+        {
+            "parent_job_id": parent.id,
+            "root_job_id": root_id,
+            "first_qualified_candidate_id": parent.first_qualified_candidate_id,
+            "first_qualified_receipt_id": parent.first_qualified_freeze.id,
+            "budget": request.budget.model_dump(mode="json"),
+            "holdout_contract_sha256": holdout_contract["contract_sha256"],
+            "fresh_child_credential_binding": (fresh_openai is not None or fresh_llm is not None),
+        },
+    )
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    db.refresh(child)
+    return child
 
 
 def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.BatchProgress, str]:
@@ -844,6 +1492,12 @@ def create_batch(
 ) -> models.BatchJob:
     resolved_user = _resolve_user(db, user)
     for child_req in req.jobs:
+        if child_req.completion_policy != "first_qualified_stop":
+            raise JobServiceError(
+                "INVALID_COMPLETION_POLICY",
+                "Batch clients cannot create continuation completion policies directly.",
+                http_status=422,
+            )
         _validate_parameter_space(child_req)
         _validate_gpt_request(child_req)
     batch = models.BatchJob(
@@ -967,6 +1621,42 @@ def _claim_job_cancellation(
     return isinstance(rowcount, int) and rowcount == 1
 
 
+def _seal_cancelled_trial_attempt(
+    db: Session,
+    *,
+    trial: models.Trial,
+) -> None:
+    """Seal an open physical attempt after its logical Trial is cancelled."""
+
+    attempt = db.scalar(
+        select(models.TrialExecutionAttempt).where(
+            models.TrialExecutionAttempt.trial_id == trial.id,
+            models.TrialExecutionAttempt.attempt_count == trial.attempt_count,
+        )
+    )
+    if attempt is None or attempt.outcome is not None:
+        return
+    db.flush()
+    artifact_mapping = candidate_trial_artifact_evidence(
+        trial.candidate,
+        [trial],
+        verify_bytes=True,
+    )
+    if artifact_mapping is None or trial.id not in artifact_mapping:
+        raise JobServiceError(
+            "TRIAL_ATTEMPT_EVIDENCE_INVALID",
+            "Cannot seal the cancelled physical Trial attempt.",
+            http_status=500,
+        )
+    record_accepted_trial_attempt_outcome(
+        db,
+        trial=trial,
+        attempt=attempt,
+        outcome_class="cancelled",
+        artifact_evidence=artifact_mapping[trial.id],
+    )
+
+
 def cancel_batch(
     db: Session,
     batch_id: str,
@@ -1049,6 +1739,7 @@ def cancel_batch(
             trial.finished_at = now
             trial.lease_owner = None
             trial.lease_expires_at = None
+            _seal_cancelled_trial_attempt(db, trial=trial)
         db.add(
             models.JobEvent(
                 job_id=child.id,
@@ -1165,11 +1856,7 @@ def cancel_job(
                 current_version=job.control_version,
             )
         if job.status in schemas.JOB_TERMINAL_STATUSES:
-            code = (
-                "JOB_ALREADY_CANCELLED"
-                if job.status == "CANCELLED"
-                else "JOB_ALREADY_COMPLETED"
-            )
+            code = "JOB_ALREADY_CANCELLED" if job.status == "CANCELLED" else "JOB_ALREADY_COMPLETED"
             raise JobServiceError(
                 code,
                 f"Job {job.id} is already in terminal state {job.status}.",
@@ -1187,32 +1874,7 @@ def cancel_job(
         trial.finished_at = now
         trial.lease_owner = None
         trial.lease_expires_at = None
-        attempt = db.scalar(
-            select(models.TrialExecutionAttempt).where(
-                models.TrialExecutionAttempt.trial_id == trial.id,
-                models.TrialExecutionAttempt.attempt_count == trial.attempt_count,
-            )
-        )
-        if attempt is not None and attempt.outcome is None:
-            db.flush()
-            artifact_mapping = candidate_trial_artifact_evidence(
-                trial.candidate,
-                [trial],
-                verify_bytes=True,
-            )
-            if artifact_mapping is None or trial.id not in artifact_mapping:
-                raise JobServiceError(
-                    "TRIAL_ATTEMPT_EVIDENCE_INVALID",
-                    "Cannot seal the cancelled physical Trial attempt.",
-                    http_status=500,
-                )
-            record_accepted_trial_attempt_outcome(
-                db,
-                trial=trial,
-                attempt=attempt,
-                outcome_class="cancelled",
-                artifact_evidence=artifact_mapping[trial.id],
-            )
+        _seal_cancelled_trial_attempt(db, trial=trial)
     purge_job_secrets(db, job, reason="job_cancelled")
     db.add(models.JobEvent(job_id=job.id, event_type="job_cancelled", payload_json=None))
     if commit:
@@ -1223,6 +1885,56 @@ def cancel_job(
     return job
 
 
+DeletedArtifactPayload = tuple[str, str]
+
+
+def cleanup_deleted_job_artifacts(
+    artifact_payloads: list[DeletedArtifactPayload],
+) -> None:
+    """Best-effort physical cleanup after the owning database rows commit.
+
+    A failed payload deletion intentionally leaves an orphan for the retention
+    scanner (or the S3 lifecycle policy). It must never roll back an already
+    committed user deletion or, conversely, run before that deletion commits.
+    """
+
+    if not artifact_payloads:
+        return
+    try:
+        storage = get_artifact_storage()
+    except Exception:
+        logger.exception("could not initialize storage for deleted Job cleanup")
+        return
+    for artifact_id, storage_path in artifact_payloads:
+        try:
+            if storage_path.startswith("s3://"):
+                if storage.exists(storage_path):
+                    storage.delete(storage_path)
+                continue
+            raw_path = Path(storage_path)
+            if ".." in raw_path.parts:
+                logger.warning(
+                    "skipping out-of-root artifact during job deletion; artifact_id=%s",
+                    artifact_id,
+                )
+                continue
+            if storage.exists(storage_path):
+                storage.delete(storage_path)
+        except ValueError:
+            # A stale or corrupted DB row must never make us touch a path
+            # outside configured storage roots. The committed metadata
+            # deletion still stands while that path remains untouched.
+            logger.warning(
+                "skipping forbidden artifact path during job deletion; artifact_id=%s",
+                artifact_id,
+            )
+        except Exception:
+            logger.exception(
+                "post-commit artifact cleanup failed; artifact_id=%s",
+                artifact_id,
+            )
+
+
 def delete_job(
     db: Session,
     job_id: str,
@@ -1230,7 +1942,10 @@ def delete_job(
     user: models.User | None = None,
     commit: bool = True,
     expected_control_version: int | None = None,
+    deferred_artifact_cleanup: list[DeletedArtifactPayload] | None = None,
 ) -> dict[str, object]:
+    if not commit and deferred_artifact_cleanup is None:
+        raise ValueError("deferred_artifact_cleanup is required when commit=False")
     job = get_job(db, job_id, user=user)
     expected_version = _expected_control_version(
         resource_kind="Job",
@@ -1242,6 +1957,18 @@ def delete_job(
         raise JobServiceError(
             "JOB_NOT_DELETABLE",
             f"Active job {job.id} cannot be deleted.",
+            http_status=409,
+        )
+    continuation_child_id = db.scalar(
+        select(models.Job.id).where(models.Job.continuation_parent_job_id == job.id)
+    )
+    if continuation_child_id is not None:
+        raise JobServiceError(
+            "JOB_HAS_CONTINUATION_CHILD",
+            (
+                f"Job {job.id} remains the immutable recovery parent for "
+                f"continuation child {continuation_child_id}; delete the child first."
+            ),
             http_status=409,
         )
     claimed = db.execute(
@@ -1290,8 +2017,11 @@ def delete_job(
             )
         )
     )
-    real_artifacts = [a for a in artifact_rows if not a.storage_path.startswith("mock://")]
-    storage = get_artifact_storage() if real_artifacts else None
+    artifact_payloads = [
+        (artifact.id, artifact.storage_path)
+        for artifact in artifact_rows
+        if not artifact.storage_path.startswith("mock://")
+    ]
     try:
         for artifact in artifact_rows:
             authorize_artifact_integrity_deletion(
@@ -1305,12 +2035,30 @@ def delete_job(
                 attempt=attempt,
                 reason="job_delete",
             )
-        for receipt in candidate_evidence_rows:
+        for candidate_receipt in candidate_evidence_rows:
             authorize_candidate_evidence_deletion(
                 db,
-                receipt=receipt,
+                receipt=candidate_receipt,
                 reason="job_delete",
             )
+        for cognitive_receipt in job.cognitive_turn_receipts:
+            cognitive_authorization = db.get(
+                models.HarnessCognitiveTurnDeleteAuthorization,
+                cognitive_receipt.id,
+            )
+            if cognitive_authorization is None:
+                db.add(
+                    models.HarnessCognitiveTurnDeleteAuthorization(
+                        receipt_id=cognitive_receipt.id,
+                        reason="job_delete",
+                    )
+                )
+            elif cognitive_authorization.reason != "job_delete":
+                raise JobServiceError(
+                    "COGNITIVE_TURN_DELETE_NOT_AUTHORIZED",
+                    "Cognitive turn deletion has a conflicting authorization.",
+                    http_status=500,
+                )
         if job.winner_freeze is not None:
             winner_authorization = db.get(
                 models.WinnerFreezeDeleteAuthorization,
@@ -1329,43 +2077,24 @@ def delete_job(
                     "Winner freeze deletion has a conflicting authorization.",
                     http_status=500,
                 )
-        for artifact in real_artifacts:
-            if storage is None:
-                continue
-            storage_path = artifact.storage_path
-            try:
-                if storage_path.startswith("s3://"):
-                    if storage.exists(storage_path):
-                        storage.delete(storage_path)
-                    continue
-                raw_path = Path(storage_path)
-                if ".." in raw_path.parts:
-                    logger.warning(
-                        "skipping out-of-root artifact during job deletion; artifact_id=%s",
-                        artifact.id,
+        if job.first_qualified_freeze is not None:
+            first_qualified_authorization = db.get(
+                models.FirstQualifiedFreezeDeleteAuthorization,
+                job.first_qualified_freeze.id,
+            )
+            if first_qualified_authorization is None:
+                db.add(
+                    models.FirstQualifiedFreezeDeleteAuthorization(
+                        receipt_id=job.first_qualified_freeze.id,
+                        reason="job_delete",
                     )
-                    continue
-                if not storage.exists(storage_path):
-                    continue
-                storage.delete(storage_path)
-            except JobServiceError:
-                raise
-            except ValueError:
-                # A stale or corrupted DB row must never make us touch a path
-                # outside configured storage roots, nor hold the job hostage.
-                # Drop the metadata with the job while leaving that path alone.
-                logger.warning(
-                    "skipping forbidden artifact path during job deletion; artifact_id=%s",
-                    artifact.id,
                 )
-                continue
-            except Exception as exc:
+            elif first_qualified_authorization.reason != "job_delete":
                 raise JobServiceError(
-                    "ARTIFACT_DELETE_FAILED",
-                    f"Failed to delete artifact_id={artifact.id}",
+                    "FIRST_QUALIFIED_FREEZE_DELETE_NOT_AUTHORIZED",
+                    "First-qualified freeze deletion has a conflicting authorization.",
                     http_status=500,
-                ) from exc
-
+                )
         for child in db.scalars(select(models.Job).where(models.Job.source_job_id == job.id)):
             child.source_job_id = None
         for artifact in artifact_rows:
@@ -1373,8 +2102,14 @@ def delete_job(
         db.delete(job)
         if commit:
             db.commit()
+            cleanup_deleted_job_artifacts(artifact_payloads)
         else:
             db.flush()
+            if deferred_artifact_cleanup is None:
+                raise RuntimeError(
+                    "deferred artifact cleanup is missing after non-committing deletion"
+                )
+            deferred_artifact_cleanup.extend(artifact_payloads)
         return {"id": job_id, "deleted": True}
     except Exception as exc:
         db.rollback()
@@ -1413,6 +2148,7 @@ def _recent_events(job: models.Job) -> list[schemas.JobEventInfo]:
 
 
 def to_job_schema(job: models.Job) -> schemas.Job:
+    control_plane_receipt = _validated_job_control_plane_receipt(job)
     latest_error = None
     if job.latest_error_code is not None:
         latest_error = schemas.JobErrorInfo(
@@ -1420,8 +2156,24 @@ def to_job_schema(job: models.Job) -> schemas.Job:
             message=job.latest_error_message or "",
         )
     baseline_parameters = schemas.BaselineParameters(**(job.baseline_parameter_json or {}))
+    llm_access_mode: Literal["platform", "byok"] | None
+    if job.llm_access_mode in {"platform", "byok"}:
+        llm_access_mode = cast(Literal["platform", "byok"], job.llm_access_mode)
+    elif job.llm_provider == "dronedream":
+        # Compatibility for jobs created before the explicit access-mode
+        # column existed. Managed access has always used this reserved
+        # provider identifier.
+        llm_access_mode = "platform"
+    elif job.llm_provider is not None:
+        llm_access_mode = "byok"
+    else:
+        llm_access_mode = None
+
     return schemas.Job(
         id=job.id,
+        model_harness_domain=job.model_harness_domain,  # type: ignore[arg-type]
+        memory_domain=job.model_harness_domain,  # type: ignore[arg-type]
+        control_plane=control_plane_receipt,
         control_version=job.control_version,
         track_type=job.track_type,  # type: ignore[arg-type]
         start_point=schemas.StartPoint(x=job.start_point_x, y=job.start_point_y),
@@ -1485,8 +2237,33 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         current_generation=job.current_generation,
         optimization_outcome=job.optimization_outcome,  # type: ignore[arg-type]
         openai_model=job.openai_model,
+        llm_access_mode=llm_access_mode,
         llm_provider=job.llm_provider,
         llm_base_url=job.llm_base_url,
+        completion_policy=job.completion_policy,  # type: ignore[arg-type]
+        job_kind=job.job_kind,  # type: ignore[arg-type]
+        cognitive_policy_version=job.cognitive_policy_version,
+        provider_turn_cap=job.provider_turn_cap,
+        provider_turns_attempted=job.provider_turns_attempted,
+        provider_turns_succeeded=job.provider_turns_succeeded,
+        provider_request_cap=job.provider_request_cap,
+        provider_max_retries=job.provider_max_retries,
+        provider_requests_attempted=job.provider_requests_attempted,
+        provider_requests_succeeded=job.provider_requests_succeeded,
+        first_qualified_candidate_id=job.first_qualified_candidate_id,
+        first_qualified_freeze_receipt_id=(
+            job.first_qualified_freeze.id if job.first_qualified_freeze is not None else None
+        ),
+        first_qualified_at=job.first_qualified_at,
+        continue_exploration_requested=job.continue_exploration_requested,
+        exploration_budget=(
+            schemas.ContinueExplorationBudget(**job.exploration_budget_json)
+            if job.exploration_budget_json is not None
+            else None
+        ),
+        continuation_parent_job_id=job.continuation_parent_job_id,
+        continuation_root_job_id=job.continuation_root_job_id,
+        holdout_policy_version=job.holdout_policy_version,
     )
 
 
@@ -1522,6 +2299,8 @@ def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
         status=trial.status,  # type: ignore[arg-type]
         score=trial.metric.score if trial.metric is not None else None,
         pass_flag=(trial.metric.pass_flag if trial.metric is not None else None),
+        failure_code=trial.failure_code,
+        failure_reason=trial.failure_reason,
         candidate_label=candidate.label if candidate is not None else None,
         candidate_source_type=source_type,
         candidate_optimizer_strategy=candidate_optimizer_strategy,
@@ -1554,8 +2333,6 @@ def to_trial_schema(trial: models.Trial) -> schemas.Trial:
         attempt_count=trial.attempt_count,
         worker_id=trial.worker_id,
         simulator_backend=trial.simulator_backend,
-        failure_code=trial.failure_code,
-        failure_reason=trial.failure_reason,
         log_excerpt=trial.log_excerpt,
         metrics=metrics,
         queued_at=trial.queued_at,
@@ -1619,8 +2396,43 @@ def compare_jobs(
         optimized_metrics = (
             dict(job.report.optimized_metric_json or {}) if job.report is not None else None
         )
+        verified_real_winner = False
+        if (
+            job.simulator_backend_requested == "real_cli"
+            and job.best_candidate_id
+            and job.report is not None
+            and job.report.winner_freeze_receipt_id is not None
+        ):
+            if job.report.winner_freeze_receipt is None:
+                raise JobServiceError(
+                    "REPORT_EVIDENCE_INVALID",
+                    f"Winner freeze receipt for Job {job.id} is missing.",
+                    http_status=409,
+                )
+            try:
+                require_winner_freeze_receipt(
+                    job.report.winner_freeze_receipt,
+                    job=job,
+                    evidence=job.report.winner_evidence_json,
+                )
+            except WinnerFreezeError as exc:
+                raise JobServiceError(
+                    "REPORT_EVIDENCE_INVALID",
+                    f"Winner freeze receipt for Job {job.id} is invalid.",
+                    http_status=409,
+                ) from exc
+            verified_real_winner = True
+        validated_best = bool(
+            job.best_candidate_id
+            and (job.simulator_backend_requested != "real_cli" or verified_real_winner)
+        )
         if job.status != "COMPLETED":
             baseline_metrics = None
+            optimized_metrics = None
+        elif not validated_best:
+            # A completed no-winner run can still carry a diagnostic baseline
+            # projection in its report. Never rank that projection as an
+            # optimized result in cross-job comparisons.
             optimized_metrics = None
         best_candidate = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
         items.append(
@@ -1635,9 +2447,9 @@ def compare_jobs(
                 optimization_outcome=job.optimization_outcome,  # type: ignore[arg-type]
                 baseline_metrics=baseline_metrics,
                 optimized_metrics=optimized_metrics,
-                best_candidate_id=job.best_candidate_id,
+                best_candidate_id=job.best_candidate_id if validated_best else None,
                 best_parameters=dict(best_candidate.parameter_json or {})
-                if best_candidate is not None
+                if validated_best and best_candidate is not None
                 else {},
                 trial_count=len(job.trials),
                 completed_trial_count=sum(1 for t in job.trials if t.status == "COMPLETED"),
@@ -1780,11 +2592,7 @@ def _candidate_evaluation(
             raise RuntimeError("validated scenario resolution unexpectedly has no case")
         return scenario_case
 
-    training_trials = [
-        trial
-        for trial in candidate.trials
-        if not _matched_case(trial).holdout
-    ]
+    training_trials = [trial for trial in candidate.trials if not _matched_case(trial).holdout]
 
     def _resolved_case(
         trial: models.Trial,
@@ -1883,6 +2691,9 @@ def optimization_history(job: models.Job) -> schemas.OptimizationHistory:
             schemas.Candidate(
                 id=candidate.id,
                 generation_index=candidate.generation_index,
+                dispatch_ordinal=candidate.dispatch_ordinal,
+                qualification_sequence=candidate.qualification_sequence,
+                qualified_at=candidate.qualified_at,
                 source_type=candidate.source_type,
                 label=candidate.label,
                 parameters=dict(candidate.parameter_json or {}),

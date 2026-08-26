@@ -1,0 +1,292 @@
+{
+  "$defs": {
+    "Px4GazeboArtifactBindings": {
+      "additionalProperties": false,
+      "properties": {
+        "clearance_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Clearance Sha256",
+          "type": "string"
+        },
+        "controller_params_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Controller Params Sha256",
+          "type": "string"
+        },
+        "executor_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Executor Sha256",
+          "type": "string"
+        },
+        "px4_ulogs": {
+          "items": {
+            "$ref": "#/$defs/Px4UlogArtifact"
+          },
+          "minItems": 1,
+          "title": "Px4 Ulogs",
+          "type": "array"
+        },
+        "ros_workspace": {
+          "title": "Ros Workspace",
+          "type": "string"
+        },
+        "route_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Route Sha256",
+          "type": "string"
+        },
+        "semantic_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Semantic Sha256",
+          "type": "string"
+        },
+        "track_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Track Sha256",
+          "type": "string"
+        },
+        "vehicle_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Vehicle Sha256",
+          "type": "string"
+        },
+        "world_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "World Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "world_sha256",
+        "semantic_sha256",
+        "vehicle_sha256",
+        "route_sha256",
+        "track_sha256",
+        "clearance_sha256",
+        "controller_params_sha256",
+        "executor_sha256",
+        "px4_ulogs",
+        "ros_workspace"
+      ],
+      "title": "Px4GazeboArtifactBindings",
+      "type": "object"
+    },
+    "Px4GazeboGates": {
+      "additionalProperties": false,
+      "properties": {
+        "executor_completed": {
+          "title": "Executor Completed",
+          "type": "boolean"
+        },
+        "goal_observed": {
+          "title": "Goal Observed",
+          "type": "boolean"
+        },
+        "landing_confirmed": {
+          "title": "Landing Confirmed",
+          "type": "boolean"
+        },
+        "native_terminal_lifecycle_published": {
+          "title": "Native Terminal Lifecycle Published",
+          "type": "boolean"
+        },
+        "no_live_abort": {
+          "title": "No Live Abort",
+          "type": "boolean"
+        },
+        "offboard_timing_complete": {
+          "title": "Offboard Timing Complete",
+          "type": "boolean"
+        },
+        "px4_ulog_present": {
+          "title": "Px4 Ulog Present",
+          "type": "boolean"
+        },
+        "ros_observations_present": {
+          "title": "Ros Observations Present",
+          "type": "boolean"
+        },
+        "runtime_pose_samples_present": {
+          "title": "Runtime Pose Samples Present",
+          "type": "boolean"
+        },
+        "static_route_clearance_bound": {
+          "title": "Static Route Clearance Bound",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "executor_completed",
+        "offboard_timing_complete",
+        "runtime_pose_samples_present",
+        "ros_observations_present",
+        "goal_observed",
+        "landing_confirmed",
+        "native_terminal_lifecycle_published",
+        "no_live_abort",
+        "px4_ulog_present",
+        "static_route_clearance_bound"
+      ],
+      "title": "Px4GazeboGates",
+      "type": "object"
+    },
+    "Px4GazeboMeasurements": {
+      "additionalProperties": false,
+      "properties": {
+        "abort_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Abort Reason"
+        },
+        "executor_return_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Executor Return Code"
+        },
+        "landing_state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Landing State"
+        },
+        "minimum_goal_distance_m": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Goal Distance M"
+        },
+        "minimum_tolerated_landing_clearance_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Tolerated Landing Clearance M"
+        },
+        "pose_sample_count": {
+          "minimum": 0,
+          "title": "Pose Sample Count",
+          "type": "integer"
+        },
+        "ros_observation_rows": {
+          "minimum": 0,
+          "title": "Ros Observation Rows",
+          "type": "integer"
+        },
+        "tolerated_landing_contact_samples": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tolerated Landing Contact Samples",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "pose_sample_count",
+        "ros_observation_rows"
+      ],
+      "title": "Px4GazeboMeasurements",
+      "type": "object"
+    },
+    "Px4UlogArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "exclusiveMinimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "size_bytes",
+        "sha256"
+      ],
+      "title": "Px4UlogArtifact",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "$ref": "#/$defs/Px4GazeboArtifactBindings"
+    },
+    "gates": {
+      "$ref": "#/$defs/Px4GazeboGates"
+    },
+    "measurements": {
+      "$ref": "#/$defs/Px4GazeboMeasurements"
+    },
+    "schema_version": {
+      "const": "dronedream.generic-px4-gazebo-run.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "verified",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "vehicle": {
+      "title": "Vehicle",
+      "type": "string"
+    },
+    "world": {
+      "title": "World",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "world",
+    "vehicle",
+    "gates",
+    "measurements",
+    "artifacts"
+  ],
+  "title": "Px4GazeboRunEvidence",
+  "type": "object"
+}

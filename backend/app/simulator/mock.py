@@ -49,6 +49,7 @@ _SCENARIO_FACTOR: dict[str, float] = {
     "payload_changed": 1.30,
     "battery_degraded": 1.25,
     "actuator_delay": 1.55,
+    "actuator_failure": 2.25,
     "custom": 1.15,
 }
 
@@ -273,6 +274,9 @@ class MockSimulatorAdapter(SimulatorAdapter):
                 )
             except (TypeError, ValueError):
                 actuator_delay_penalty = 0.1
+        actuator_failure_penalty = (
+            0.75 if ctx.scenario_type == "actuator_failure" else 0.0
+        )
         turbulence_penalty = 0.0
         if ctx.scenario_type == "turbulence":
             try:
@@ -308,6 +312,12 @@ class MockSimulatorAdapter(SimulatorAdapter):
             scenario_control_penalty = (
                 max(0.0, kp - 1.05) * 0.18 + abs(kd - 0.32) * 0.08
             )
+        elif ctx.scenario_type == "actuator_failure":
+            scenario_control_penalty = (
+                max(0.0, kp - 0.95) * 0.25
+                + abs(kd - 0.40) * 0.15
+                + max(0.0, 0.75 - disturbance) * 0.30
+            )
 
         rng = random.Random(  # noqa: S311 - deterministic simulator noise
             ctx.seed * 31 + sum(ord(c) for c in ctx.scenario_type)
@@ -322,6 +332,7 @@ class MockSimulatorAdapter(SimulatorAdapter):
             + dropout_rate * 0.20
             + obstacle_count * 0.005
             + actuator_delay_penalty
+            + actuator_failure_penalty
             + turbulence_penalty
             + scenario_control_penalty
             + jitter,
@@ -367,6 +378,7 @@ class MockSimulatorAdapter(SimulatorAdapter):
             "catalog_parameter_penalty": round(catalog_penalty, 6),
             "catalog_parameter_contributions": catalog_contributions,
             "actuator_delay_penalty": round(actuator_delay_penalty, 4),
+            "actuator_failure_penalty": round(actuator_failure_penalty, 4),
             "turbulence_penalty": round(turbulence_penalty, 4),
             "scenario_control_penalty": round(scenario_control_penalty, 6),
             "advanced_scenario_summary": {

@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-harness-job-receipt",
+  "jobId": "field-harness-fixture-001",
+  "createdAt": "2026-08-07T00:00:00Z",
+  "editionId": "field",
+  "executionDomain": "real-device-recorded-evidence",
+  "executionMode": "offline-evidence-replay-no-device-io",
+  "sourceCommit": "2f8fa28564dab7b1ff264c853705535373cb9068",
+  "enginePackId": "sha256:be477878d2c9e8ea273813357aa4af57e7599eb075beb790784322359018d90c",
+  "requestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "jobName": "LAB bridge fixture",
+  "objective": "tracking",
+  "targetScore": 0.5,
+  "deviceObservationId": "offline-frame:recorded-001",
+  "observationSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "snapshotSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "vehiclePackId": "px4-gazebo-x500-reference",
+  "controllerId": "px4-autopilot",
+  "firmwareVersion": "px4-v1.16.0",
+  "adapterId": "mavlink-px4-v2",
+  "budget": {
+    "maxIterations": 4,
+    "usedTrainingTrials": 2,
+    "usedHoldoutTrials": 1,
+    "remainingIterations": 2
+  },
+  "trials": [
+    {
+      "trialId": "field-trial-001",
+      "telemetrySha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "candidateSha256": "d4bb303ead211a98d99d03e69399fe8f604d640ffe837b974c9533065e5ebf23",
+      "parameters": {
+        "MC_PITCH_P": 6.4,
+        "MC_ROLL_P": 6.4,
+        "MPC_XY_VEL_P_ACC": 1.8
+      },
+      "metrics": {
+        "trackingError": 0.31,
+        "overshootPercent": 7.2,
+        "controlEffort": 0.48,
+        "constraintViolations": 0,
+        "emergencyInterventions": 0
+      },
+      "score": 0.27464,
+      "accepted": true,
+      "failureClass": "none",
+      "independentHoldout": false
+    },
+    {
+      "trialId": "field-trial-002",
+      "telemetrySha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "candidateSha256": "11561b41b015fefedcde138c44e34659897f92d9ee3076fac3b532ab71918953",
+      "parameters": {
+        "MC_PITCH_P": 6.5,
+        "MC_ROLL_P": 6.5,
+        "MPC_XY_VEL_P_ACC": 1.82
+      },
+      "metrics": {
+        "trackingError": 0.57,
+        "overshootPercent": 10.4,
+        "controlEffort": 0.51,
+        "constraintViolations": 0,
+        "emergencyInterventions": 0
+      },
+      "score": 0.46148,
+      "accepted": true,
+      "failureClass": "none",
+      "independentHoldout": false
+    },
+    {
+      "trialId": "field-holdout-001",
+      "telemetrySha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "candidateSha256": "d4bb303ead211a98d99d03e69399fe8f604d640ffe837b974c9533065e5ebf23",
+      "parameters": {
+        "MC_PITCH_P": 6.4,
+        "MC_ROLL_P": 6.4,
+        "MPC_XY_VEL_P_ACC": 1.8
+      },
+      "metrics": {
+        "trackingError": 0.34,
+        "overshootPercent": 7.8,
+        "controlEffort": 0.49,
+        "constraintViolations": 0,
+        "emergencyInterventions": 0
+      },
+      "score": 0.29736,
+      "accepted": true,
+      "failureClass": "none",
+      "independentHoldout": true
+    }
+  ],
+  "selectedCandidateSha256": "d4bb303ead211a98d99d03e69399fe8f604d640ffe837b974c9533065e5ebf23",
+  "proposedParameters": {
+    "MC_PITCH_P": 6.42,
+    "MC_ROLL_P": 6.42,
+    "MPC_XY_VEL_P_ACC": 1.81
+  },
+  "proposedCandidateSha256": "017061a08f07222cb2c7c378a1305cd54ab7e2bdb6dffb61f7c5472141e23b27",
+  "holdoutTrialId": "field-holdout-001",
+  "qualification": {
+    "status": "recorded-evidence-passed",
+    "recordedEvidencePassed": true,
+    "hardwareValid": false,
+    "reason": "Recorded evidence can guide the next bounded trial but never grants hardware authority"
+  },
+  "blockers": [
+    "field.registry.zero-validated-packs",
+    "field.native-backend-runtime-quorum.missing",
+    "field.operator-confirmation.missing"
+  ],
+  "providerRequests": 0,
+  "deviceOpenAttempts": 0,
+  "hardwareWriteAttempts": 0,
+  "armAttempts": 0,
+  "flightAttempts": 0,
+  "hardwareAuthority": false,
+  "receiptSha256": "8a1df763d326aa1ea52e08547acc3e74edd4f2a823642e7255db948b0345a761"
+}

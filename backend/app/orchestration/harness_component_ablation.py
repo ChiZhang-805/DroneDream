@@ -47,9 +47,7 @@ from app.orchestration.harness_outcome_campaign import (
 )
 from app.services import jobs as job_services
 
-HARNESS_COMPONENT_ABLATION_SCHEMA_VERSION = (
-    "dronedream.harness-component-outcome-ablation/v1"
-)
+HARNESS_COMPONENT_ABLATION_SCHEMA_VERSION = "dronedream.harness-component-outcome-ablation/v1"
 HARNESS_COMPONENT_ABLATION_MANIFEST_SCHEMA_VERSION = (
     "dronedream.harness-component-outcome-ablation-manifest/v1"
 )
@@ -72,6 +70,9 @@ HARNESS_COMPONENT_ABLATION_ARMS = (
 HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS = 2
 HARNESS_COMPONENT_ABLATION_MAX_TOTAL_TRIALS = 40
 HARNESS_COMPONENT_ABLATION_TARGET_RELATIVE_IMPROVEMENT = 0.05
+HARNESS_COMPONENT_ABLATION_LEGACY_MANIFEST_SHA256 = (
+    "28092e9a5114bd4a02c297246cde8467014e22553d93c028a19b08db678a5072"
+)
 
 HarnessComponentArm = Literal[
     "full_aurora",
@@ -120,9 +121,7 @@ def build_harness_component_ablation_manifest() -> dict[str, Any]:
             "candidate_count": 1,
             "same_for_every_arm": True,
             "parameter_space": "legacy_six_parameter_domain",
-            "baseline_parameters": schemas.BaselineParameters().model_dump(
-                mode="json"
-            ),
+            "baseline_parameters": schemas.BaselineParameters().model_dump(mode="json"),
         },
         "scenario_matrix": {
             "common_random_numbers": True,
@@ -163,9 +162,7 @@ def build_harness_component_ablation_manifest() -> dict[str, Any]:
                 "first generation containing a full-fidelity feasible optimizer "
                 "candidate at least 5% better than the shared baseline"
             ),
-            "relative_improvement": (
-                HARNESS_COMPONENT_ABLATION_TARGET_RELATIVE_IMPROVEMENT
-            ),
+            "relative_improvement": (HARNESS_COMPONENT_ABLATION_TARGET_RELATIVE_IMPROVEMENT),
             "accounting": (
                 "all Trial rows through the complete target generation; "
                 "otherwise right-censored at the arm total"
@@ -173,24 +170,19 @@ def build_harness_component_ablation_manifest() -> dict[str, Any]:
         },
         "scripted_router_policy": {
             "generation_1": (
-                "choose constrained_mobo when eligible; otherwise choose "
-                "optimizer_portfolio"
+                "choose constrained_mobo when eligible; otherwise choose optimizer_portfolio"
             ),
             "later_generation_with_verified_reflection": (
                 "choose turbo when eligible and the prior cohort has complete "
                 "evidence, at least one feasible candidate, and zero domain "
                 "failure Trials; otherwise choose optimizer_portfolio"
             ),
-            "later_generation_without_verified_reflection": (
-                "choose optimizer_portfolio"
-            ),
+            "later_generation_without_verified_reflection": ("choose optimizer_portfolio"),
             "no_free_text_feedback": True,
         },
         "interventions": {
             "full_aurora": "no context intervention",
-            "no_decision_memory": (
-                "replace the provider-visible decision_memory tuple with empty"
-            ),
+            "no_decision_memory": ("replace the provider-visible decision_memory tuple with empty"),
             "no_observed_outcome_reflection": (
                 "preserve decision receipts but replace verified reflection "
                 "with unavailable and remove observed_outcome"
@@ -248,8 +240,15 @@ def verify_harness_component_ablation_manifest(payload: object) -> dict[str, Any
         raise ValueError("Harness component-ablation manifest hash is invalid")
     if declared_hash != _manifest_sha256(manifest):
         raise ValueError("Harness component-ablation manifest hash does not recompute")
+    runtime = payload.get("runtime_contract")
+    legacy = (
+        isinstance(runtime, dict)
+        and runtime.get("evidence_schema_version") == "2.7"
+        and runtime.get("prompt_template_version") == "1.6"
+        and declared_hash == HARNESS_COMPONENT_ABLATION_LEGACY_MANIFEST_SHA256
+    )
     current = build_harness_component_ablation_manifest()
-    if payload != current:
+    if payload != current and not legacy:
         raise ValueError("Harness component-ablation manifest drifted")
     return payload
 
@@ -287,18 +286,16 @@ def _job_request(
     seed_block: int,
     *,
     arm: HarnessComponentArm,
+    max_iterations: int = HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS,
+    max_total_trials: int = HARNESS_COMPONENT_ABLATION_MAX_TOTAL_TRIALS,
 ) -> schemas.JobCreateRequest:
-    strategy = (
-        "optimizer_portfolio"
-        if arm == "fixed_deterministic_portfolio"
-        else "llm_harness"
-    )
+    strategy = "optimizer_portfolio" if arm == "fixed_deterministic_portfolio" else "llm_harness"
     return schemas.JobCreateRequest(
         display_name=f"synthetic-component-ablation-{seed_block}",
         simulator_backend="mock",
         optimizer_strategy=strategy,  # type: ignore[arg-type]
-        max_iterations=HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS,
-        max_total_trials=HARNESS_COMPONENT_ABLATION_MAX_TOTAL_TRIALS,
+        max_iterations=max_iterations,
+        max_total_trials=max_total_trials,
         objective_config=schemas.ObjectiveConfig(
             objectives=[
                 schemas.ObjectiveSpec(metric="rmse", direction="minimize"),
@@ -349,11 +346,7 @@ class _ScriptedRouterClient:
             if isinstance(row, dict) and isinstance(row.get("tool_id"), str)
         ]
         budget = raw_evidence.get("budget")
-        current_generation = (
-            budget.get("current_generation")
-            if isinstance(budget, dict)
-            else None
-        )
+        current_generation = budget.get("current_generation") if isinstance(budget, dict) else None
         if isinstance(current_generation, bool) or not isinstance(
             current_generation,
             int,
@@ -376,7 +369,8 @@ class _ScriptedRouterClient:
             reason = "preregistered first-generation constraint-aware exploration"
         elif verified and "turbo" in allowed_tools:
             latest = verified[-1]["observed_outcome"]
-            assert isinstance(latest, dict)
+            if not isinstance(latest, dict):
+                raise ValueError("verified reflection lost its observed outcome")
             if (
                 latest.get("completed_candidate_rate") == 1.0
                 and isinstance(latest.get("feasible_candidate_count"), int)
@@ -445,9 +439,7 @@ class _ContextIntervention:
             self.removed_reflection_count += changed
             if changed:
                 self.changed_prompt_count += 1
-            snapshot = snapshot.model_copy(
-                update={"decision_memory": tuple(transformed)}
-            )
+            snapshot = snapshot.model_copy(update={"decision_memory": tuple(transformed)})
         return snapshot, has_scored_evidence
 
     def summary(self) -> dict[str, Any]:
@@ -463,9 +455,7 @@ class _ContextIntervention:
             "changed_prompt_count": self.changed_prompt_count,
             "removed_memory_count": self.removed_memory_count,
             "removed_reflection_count": self.removed_reflection_count,
-            "provider_visible_intervention_activated": (
-                self.changed_prompt_count > 0
-            ),
+            "provider_visible_intervention_activated": (self.changed_prompt_count > 0),
         }
 
 
@@ -483,6 +473,7 @@ def _build_context_wrapper(
         *,
         execution_events: object = (),
         verified_started_decision_ids: object = (),
+        generation_plan_history: object = (),
     ) -> tuple[HarnessEvidenceSnapshot, bool]:
         snapshot, has_scored_evidence = original(
             job,
@@ -491,6 +482,7 @@ def _build_context_wrapper(
                 Any,
                 verified_started_decision_ids,
             ),
+            generation_plan_history=cast(Any, generation_plan_history),
         )
         return intervention.apply(snapshot, has_scored_evidence)
 
@@ -517,41 +509,25 @@ def _candidate_is_full_fidelity(candidate: dict[str, Any]) -> bool:
 
 
 def _result_metrics(outcome: dict[str, Any]) -> dict[str, Any]:
-    candidates = [
-        item
-        for item in outcome["candidates"]
-        if isinstance(item, dict)
-    ]
-    optimizer_candidates = [
-        item
-        for item in candidates
-        if item.get("source_type") == "optimizer"
-    ]
+    candidates = [item for item in outcome["candidates"] if isinstance(item, dict)]
+    optimizer_candidates = [item for item in candidates if item.get("source_type") == "optimizer"]
     feasible_optimizer_candidates = [
         item
         for item in optimizer_candidates
-        if isinstance(item.get("aggregate"), dict)
-        and item["aggregate"].get("feasible") is True
+        if isinstance(item.get("aggregate"), dict) and item["aggregate"].get("feasible") is True
     ]
     baseline = next(
         (
             item
             for item in candidates
-            if item.get("is_baseline") is True
-            and isinstance(item.get("aggregate"), dict)
+            if item.get("is_baseline") is True and isinstance(item.get("aggregate"), dict)
         ),
         None,
     )
-    baseline_loss = (
-        baseline["aggregate"].get("scalar_loss")
-        if isinstance(baseline, dict)
-        else None
-    )
+    baseline_loss = baseline["aggregate"].get("scalar_loss") if isinstance(baseline, dict) else None
     target_loss = (
-        float(baseline_loss)
-        * (1.0 - HARNESS_COMPONENT_ABLATION_TARGET_RELATIVE_IMPROVEMENT)
-        if isinstance(baseline_loss, int | float)
-        and not isinstance(baseline_loss, bool)
+        float(baseline_loss) * (1.0 - HARNESS_COMPONENT_ABLATION_TARGET_RELATIVE_IMPROVEMENT)
+        if isinstance(baseline_loss, int | float) and not isinstance(baseline_loss, bool)
         else None
     )
     target_generation: int | None = None
@@ -576,15 +552,8 @@ def _result_metrics(outcome: dict[str, Any]) -> dict[str, Any]:
         if target_generation is not None
         else None
     )
-    trial_rows = [
-        item
-        for item in outcome["trials"]
-        if isinstance(item, dict)
-    ]
-    terminal_failures = sum(
-        item.get("status") in {"FAILED", "CANCELLED"}
-        for item in trial_rows
-    )
+    trial_rows = [item for item in outcome["trials"] if isinstance(item, dict)]
+    terminal_failures = sum(item.get("status") in {"FAILED", "CANCELLED"} for item in trial_rows)
     recovered_trials = sum(
         item.get("status") == "COMPLETED"
         and isinstance(item.get("attempt_count"), int)
@@ -595,9 +564,7 @@ def _result_metrics(outcome: dict[str, Any]) -> dict[str, Any]:
     metrics = {
         "holdout_loss": outcome["holdout_loss"],
         "optimizer_candidate_count": len(optimizer_candidates),
-        "feasible_optimizer_candidate_count": len(
-            feasible_optimizer_candidates
-        ),
+        "feasible_optimizer_candidate_count": len(feasible_optimizer_candidates),
         "optimizer_feasible_rate": (
             len(feasible_optimizer_candidates) / len(optimizer_candidates)
             if optimizer_candidates
@@ -608,16 +575,12 @@ def _result_metrics(outcome: dict[str, Any]) -> dict[str, Any]:
         "target_reached": target_generation is not None,
         "target_generation": target_generation,
         "trials_to_target": trials_to_target,
-        "right_censor_trials": (
-            None if target_generation is not None else total_trials
-        ),
+        "right_censor_trials": (None if target_generation is not None else total_trials),
         "total_trials": total_trials,
         "completed_trials": int(outcome["budget"]["completed_trials"]),
         "terminal_failure_trials": terminal_failures,
         "recovered_trials": recovered_trials,
-        "failure_rate": (
-            terminal_failures / total_trials if total_trials else 0.0
-        ),
+        "failure_rate": (terminal_failures / total_trials if total_trials else 0.0),
         "recovery_rate": (
             recovered_trials / (terminal_failures + recovered_trials)
             if terminal_failures + recovered_trials
@@ -658,14 +621,10 @@ def _decision_trace_from_outcome(
             continue
         generation = item.get("generation_index")
         if isinstance(generation, bool) or not isinstance(generation, int):
-            raise ValueError(
-                "Harness component-ablation Candidate generation is invalid"
-            )
+            raise ValueError("Harness component-ablation Candidate generation is invalid")
         by_generation.setdefault(generation, []).append(item)
     if sorted(by_generation) != list(range(1, len(by_generation) + 1)):
-        raise ValueError(
-            "Harness component-ablation optimizer generations are not contiguous"
-        )
+        raise ValueError("Harness component-ablation optimizer generations are not contiguous")
     trace: list[dict[str, Any]] = []
     for generation in sorted(by_generation):
         candidates = by_generation[generation]
@@ -679,17 +638,13 @@ def _decision_trace_from_outcome(
             and isinstance(metadata.get("strategy"), str)
         }
         if len(strategies) != 1:
-            raise ValueError(
-                "Harness component-ablation generation strategy is ambiguous"
-            )
+            raise ValueError("Harness component-ablation generation strategy is ambiguous")
         trace.append(
             {
                 "generation": generation,
                 "tool_id": next(iter(strategies)),
                 "decision_source": (
-                    "fixed_policy"
-                    if arm == "fixed_deterministic_portfolio"
-                    else "model"
+                    "fixed_policy" if arm == "fixed_deterministic_portfolio" else "model"
                 ),
                 "status": "dispatched",
                 "dispatched_candidates": len(candidates),
@@ -698,22 +653,22 @@ def _decision_trace_from_outcome(
     return trace
 
 
-def _run_arm(seed_block: int, arm: HarnessComponentArm) -> dict[str, Any]:
+def _run_arm(
+    seed_block: int,
+    arm: HarnessComponentArm,
+    *,
+    max_iterations: int = HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS,
+    max_total_trials: int = HARNESS_COMPONENT_ABLATION_MAX_TOTAL_TRIALS,
+) -> dict[str, Any]:
     if arm not in HARNESS_COMPONENT_ABLATION_ARMS:
         raise ValueError(f"unknown component-ablation arm: {arm}")
-    client = (
-        None
-        if arm == "fixed_deterministic_portfolio"
-        else _ScriptedRouterClient()
-    )
+    client = None if arm == "fixed_deterministic_portfolio" else _ScriptedRouterClient()
     intervention = _ContextIntervention(arm)
     # Several repository tests deliberately evict and re-import every
     # ``app.*`` module to exercise isolated databases. Resolve the live module
     # at execution time so the intervention patches the exact function used
     # by JobManager rather than a stale collection-time module object.
-    live_decision_harness = importlib.import_module(
-        "app.orchestration.decision_harness"
-    )
+    live_decision_harness = importlib.import_module("app.orchestration.decision_harness")
     wrapper = _build_context_wrapper(
         intervention,
         live_decision_harness,
@@ -738,7 +693,13 @@ def _run_arm(seed_block: int, arm: HarnessComponentArm) -> dict[str, Any]:
             job = job_services._create_job_from_config(
                 db,
                 user=user,
-                req=_job_request(seed_block, arm=arm),
+                req=_job_request(
+                    seed_block,
+                    arm=arm,
+                    max_iterations=max_iterations,
+                    max_total_trials=max_total_trials,
+                ),
+                allow_internal_test_backend=True,
             )
             job_id = job.id
             db.commit()
@@ -747,6 +708,7 @@ def _run_arm(seed_block: int, arm: HarnessComponentArm) -> dict[str, Any]:
                 factory,
                 job_id=job_id,
                 client=cast(Any, client),
+                max_steps=max_total_trials + 20,
             )
         finally:
             aggregation.set_llm_client_override(previous_client)
@@ -774,16 +736,14 @@ def _run_arm(seed_block: int, arm: HarnessComponentArm) -> dict[str, Any]:
                 "dispatched_candidates": sum(
                     item.get("generation_index") == generation
                     for item in outcome["candidates"]
-                    if isinstance(item, dict)
-                    and item.get("source_type") == "optimizer"
+                    if isinstance(item, dict) and item.get("source_type") == "optimizer"
                 ),
             }
             for generation in sorted(
                 {
                     int(item["generation_index"])
                     for item in outcome["candidates"]
-                    if isinstance(item, dict)
-                    and item.get("source_type") == "optimizer"
+                    if isinstance(item, dict) and item.get("source_type") == "optimizer"
                 }
             )
         ]
@@ -815,12 +775,13 @@ def _comparison_status(
 ) -> str:
     activation = comparison["component_activation"]
     tool_changed = comparison["tool_sequence"] != reference["tool_sequence"]
-    provider_input_changed = bool(
-        activation["provider_visible_intervention_activated"]
-    )
+    provider_input_changed = bool(activation["provider_visible_intervention_activated"])
     if not provider_input_changed and not tool_changed:
         return "inconclusive_intervention_not_activated"
-    if comparison["result_metrics"] == reference["result_metrics"]:
+    if all(
+        comparison["result_metrics"].get(metric) == reference["result_metrics"].get(metric)
+        for metric in _RESULT_METRICS
+    ):
         return "no_observed_protocol_difference"
     return "observed_protocol_difference"
 
@@ -843,12 +804,10 @@ def _comparison_row(
         "seed_block": seed_block,
         "reference_arm": "full_aurora",
         "comparison_arm": comparison["arm"],
-        "provider_visible_intervention_activated": comparison[
-            "component_activation"
-        ]["provider_visible_intervention_activated"],
-        "tool_sequence_changed": (
-            comparison["tool_sequence"] != reference["tool_sequence"]
-        ),
+        "provider_visible_intervention_activated": comparison["component_activation"][
+            "provider_visible_intervention_activated"
+        ],
+        "tool_sequence_changed": (comparison["tool_sequence"] != reference["tool_sequence"]),
         "reference_tool_sequence": reference["tool_sequence"],
         "comparison_tool_sequence": comparison["tool_sequence"],
         "result_status": _comparison_status(
@@ -865,8 +824,7 @@ def _comparison_row(
             - float(reference_metrics["holdout_loss"])
         ),
         "total_trials_delta_from_full": (
-            int(comparison_metrics["total_trials"])
-            - int(reference_metrics["total_trials"])
+            int(comparison_metrics["total_trials"]) - int(reference_metrics["total_trials"])
         ),
     }
 
@@ -880,20 +838,14 @@ def _decision_receipt_memory_isolation_row(
 ) -> dict[str, Any]:
     """Isolate receipt-only memory after reflection has been removed in both arms."""
 
-    tool_sequence_match = (
-        no_reflection["tool_sequence"] == no_memory["tool_sequence"]
-    )
-    result_metrics_match = (
-        no_reflection["result_metrics"] == no_memory["result_metrics"]
-    )
+    tool_sequence_match = no_reflection["tool_sequence"] == no_memory["tool_sequence"]
+    result_metrics_match = no_reflection["result_metrics"] == no_memory["result_metrics"]
     removed = no_memory["component_activation"]["removed_memory_count"] > 0
     status = (
         "inconclusive_component_not_decision_relevant_under_policy"
         if removed and tool_sequence_match and result_metrics_match
         else (
-            "observed_protocol_difference"
-            if removed
-            else "inconclusive_intervention_not_activated"
+            "observed_protocol_difference" if removed else "inconclusive_intervention_not_activated"
         )
     )
     return {
@@ -979,9 +931,7 @@ def build_harness_component_ablation_artifact() -> dict[str, Any]:
         "simulator_backend": "mock",
         "live_model_calls": False,
         "network_calls": sum(
-            int(arm["network_calls"])
-            for block in block_rows
-            for arm in block["arms"]
+            int(arm["network_calls"]) for block in block_rows for arm in block["arms"]
         ),
         "real_credentials_used": False,
         "general_causal_claim_permitted": False,
@@ -992,8 +942,7 @@ def build_harness_component_ablation_artifact() -> dict[str, Any]:
             "seed_block_count": len(HARNESS_COMPONENT_ABLATION_SEED_BLOCKS),
             "arm_count": len(HARNESS_COMPONENT_ABLATION_ARMS),
             "arm_run_count": (
-                len(HARNESS_COMPONENT_ABLATION_SEED_BLOCKS)
-                * len(HARNESS_COMPONENT_ABLATION_ARMS)
+                len(HARNESS_COMPONENT_ABLATION_SEED_BLOCKS) * len(HARNESS_COMPONENT_ABLATION_ARMS)
             ),
             "total_persisted_trials": sum(
                 int(arm["result_metrics"]["total_trials"])
@@ -1003,13 +952,11 @@ def build_harness_component_ablation_artifact() -> dict[str, Any]:
             "comparison_count": len(comparison_rows),
             "component_isolation_count": len(component_isolation_rows),
             "inconclusive_component_isolation_count": sum(
-                row["result_status"].startswith("inconclusive_")
-                for row in component_isolation_rows
+                row["result_status"].startswith("inconclusive_") for row in component_isolation_rows
             ),
             "interpretation_status_counts": status_counts,
             "all_network_calls_blocked": all(
-                arm["network_calls"] == 0
-                and arm["network_connect_guard_enforced"] is True
+                arm["network_calls"] == 0 and arm["network_connect_guard_enforced"] is True
                 for block in block_rows
                 for arm in block["arms"]
             ),
@@ -1029,7 +976,14 @@ def build_harness_component_ablation_artifact() -> dict[str, Any]:
     }
 
 
-def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
+def _verify_arm(
+    arm: object,
+    *,
+    expected_name: str,
+    expected_prompt_count: int = HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS,
+) -> dict[str, Any]:
+    if expected_prompt_count < 1:
+        raise ValueError("Harness component-ablation prompt count is invalid")
     if not isinstance(arm, dict) or arm.get("arm") != expected_name:
         raise ValueError("Harness component-ablation arm order or identity drifted")
     outcome = arm.get("outcome")
@@ -1050,24 +1004,19 @@ def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
         arm=expected_name,
     )
     expected_tools = [row["tool_id"] for row in expected_trace]
-    if (
-        arm.get("decision_trace") != expected_trace
-        or arm.get("tool_sequence") != expected_tools
-    ):
-        raise ValueError(
-            "Harness component-ablation decision trace does not recompute"
-        )
+    if arm.get("decision_trace") != expected_trace or arm.get("tool_sequence") != expected_tools:
+        raise ValueError("Harness component-ablation decision trace does not recompute")
     router_trace = arm.get("scripted_router_trace")
     provider_calls = arm.get("provider_calls")
     activation = arm.get("component_activation")
     if not isinstance(router_trace, list) or not isinstance(activation, dict):
-        raise ValueError(
-            "Harness component-ablation intervention evidence is invalid"
-        )
+        raise ValueError("Harness component-ablation intervention evidence is invalid")
+    removed_context_count = sum(range(expected_prompt_count))
+    changed_prompt_count = expected_prompt_count - 1
     expected_activations = {
         "full_aurora": {
             "component": "none",
-            "prompt_count": 2,
+            "prompt_count": expected_prompt_count,
             "changed_prompt_count": 0,
             "removed_memory_count": 0,
             "removed_reflection_count": 0,
@@ -1075,18 +1024,18 @@ def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
         },
         "no_decision_memory": {
             "component": "decision_memory",
-            "prompt_count": 2,
-            "changed_prompt_count": 1,
-            "removed_memory_count": 1,
+            "prompt_count": expected_prompt_count,
+            "changed_prompt_count": changed_prompt_count,
+            "removed_memory_count": removed_context_count,
             "removed_reflection_count": 0,
             "provider_visible_intervention_activated": True,
         },
         "no_observed_outcome_reflection": {
             "component": "observed_outcome_reflection",
-            "prompt_count": 2,
-            "changed_prompt_count": 1,
+            "prompt_count": expected_prompt_count,
+            "changed_prompt_count": changed_prompt_count,
             "removed_memory_count": 0,
-            "removed_reflection_count": 1,
+            "removed_reflection_count": removed_context_count,
             "provider_visible_intervention_activated": True,
         },
         "fixed_deterministic_portfolio": {
@@ -1099,22 +1048,13 @@ def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
         },
     }
     if activation != expected_activations[expected_name]:
-        raise ValueError(
-            "Harness component-ablation intervention evidence does not recompute"
-        )
+        raise ValueError("Harness component-ablation intervention evidence does not recompute")
     if expected_name == "fixed_deterministic_portfolio":
         if provider_calls != 0 or router_trace:
-            raise ValueError(
-                "Harness component-ablation fixed arm invoked a router"
-            )
+            raise ValueError("Harness component-ablation fixed arm invoked a router")
         return arm
-    if (
-        provider_calls != len(expected_trace)
-        or len(router_trace) != len(expected_trace)
-    ):
-        raise ValueError(
-            "Harness component-ablation router call count does not recompute"
-        )
+    if provider_calls != len(expected_trace) or len(router_trace) != len(expected_trace):
+        raise ValueError("Harness component-ablation router call count does not recompute")
     for expected, routed in zip(expected_trace, router_trace, strict=True):
         if (
             not isinstance(routed, dict)
@@ -1123,13 +1063,11 @@ def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
             or not isinstance(routed.get("allowed_tools"), list)
             or expected["tool_id"] not in routed["allowed_tools"]
         ):
-            raise ValueError(
-                "Harness component-ablation router trace does not recompute"
-            )
+            raise ValueError("Harness component-ablation router trace does not recompute")
     expected_memory_counts = {
-        "full_aurora": [(0, 0), (1, 1)],
-        "no_decision_memory": [(0, 0), (0, 0)],
-        "no_observed_outcome_reflection": [(0, 0), (1, 0)],
+        "full_aurora": [(index, index) for index in range(expected_prompt_count)],
+        "no_decision_memory": [(0, 0)] * expected_prompt_count,
+        "no_observed_outcome_reflection": [(index, 0) for index in range(expected_prompt_count)],
     }[expected_name]
     actual_memory_counts = [
         (
@@ -1139,9 +1077,7 @@ def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
         for routed in router_trace
     ]
     if actual_memory_counts != expected_memory_counts:
-        raise ValueError(
-            "Harness component-ablation router memory trace does not recompute"
-        )
+        raise ValueError("Harness component-ablation router memory trace does not recompute")
     return arm
 
 
@@ -1161,13 +1097,10 @@ def verify_harness_component_ablation_artifact(
     if declared_hash != _sha256(artifact):
         raise ValueError("Harness component-ablation artifact hash does not recompute")
     if (
-        artifact.get("schema_version")
-        != HARNESS_COMPONENT_ABLATION_SCHEMA_VERSION
-        or artifact.get("evidence_class")
-        != HARNESS_COMPONENT_ABLATION_EVIDENCE_CLASS
+        artifact.get("schema_version") != HARNESS_COMPONENT_ABLATION_SCHEMA_VERSION
+        or artifact.get("evidence_class") != HARNESS_COMPONENT_ABLATION_EVIDENCE_CLASS
         or artifact.get("claim_label") != HARNESS_COMPONENT_ABLATION_LABEL
-        or artifact.get("claim_boundary")
-        != HARNESS_COMPONENT_ABLATION_CLAIM_BOUNDARY
+        or artifact.get("claim_boundary") != HARNESS_COMPONENT_ABLATION_CLAIM_BOUNDARY
         or artifact.get("physical_fidelity") is not False
         or artifact.get("simulator_backend") != "mock"
         or artifact.get("live_model_calls") is not False
@@ -1186,9 +1119,7 @@ def verify_harness_component_ablation_artifact(
     if artifact.get("manifest_sha256") != manifest_payload["manifest_sha256"]:
         raise ValueError("Harness component-ablation manifest binding is invalid")
     blocks = artifact.get("block_rows")
-    if not isinstance(blocks, list) or len(blocks) != len(
-        HARNESS_COMPONENT_ABLATION_SEED_BLOCKS
-    ):
+    if not isinstance(blocks, list) or len(blocks) != len(HARNESS_COMPONENT_ABLATION_SEED_BLOCKS):
         raise ValueError("Harness component-ablation block rows are invalid")
     recomputed_comparisons: list[dict[str, Any]] = []
     recomputed_isolations: list[dict[str, Any]] = []
@@ -1204,15 +1135,12 @@ def verify_harness_component_ablation_artifact(
             not isinstance(block, dict)
             or block.get("block_id") != block_id
             or block.get("seed_block") != seed_block
-            or block.get("training_seeds")
-            != [seed_block + 1, seed_block + 2, seed_block + 3]
+            or block.get("training_seeds") != [seed_block + 1, seed_block + 2, seed_block + 3]
             or block.get("holdout_seeds") != [seed_block + 99]
         ):
             raise ValueError("Harness component-ablation seed block drifted")
         raw_arms = block.get("arms")
-        if not isinstance(raw_arms, list) or len(raw_arms) != len(
-            HARNESS_COMPONENT_ABLATION_ARMS
-        ):
+        if not isinstance(raw_arms, list) or len(raw_arms) != len(HARNESS_COMPONENT_ABLATION_ARMS):
             raise ValueError("Harness component-ablation arms are invalid")
         arms = [
             _verify_arm(arm, expected_name=name)
@@ -1244,9 +1172,7 @@ def verify_harness_component_ablation_artifact(
     if artifact.get("comparison_rows") != recomputed_comparisons:
         raise ValueError("Harness component-ablation comparisons do not recompute")
     if artifact.get("component_isolation_rows") != recomputed_isolations:
-        raise ValueError(
-            "Harness component-ablation isolation rows do not recompute"
-        )
+        raise ValueError("Harness component-ablation isolation rows do not recompute")
     status_counts = {
         status: sum(row["result_status"] == status for row in recomputed_comparisons)
         for status in (
@@ -1259,19 +1185,15 @@ def verify_harness_component_ablation_artifact(
         "seed_block_count": len(HARNESS_COMPONENT_ABLATION_SEED_BLOCKS),
         "arm_count": len(HARNESS_COMPONENT_ABLATION_ARMS),
         "arm_run_count": (
-            len(HARNESS_COMPONENT_ABLATION_SEED_BLOCKS)
-            * len(HARNESS_COMPONENT_ABLATION_ARMS)
+            len(HARNESS_COMPONENT_ABLATION_SEED_BLOCKS) * len(HARNESS_COMPONENT_ABLATION_ARMS)
         ),
         "total_persisted_trials": sum(
-            int(arm["result_metrics"]["total_trials"])
-            for block in blocks
-            for arm in block["arms"]
+            int(arm["result_metrics"]["total_trials"]) for block in blocks for arm in block["arms"]
         ),
         "comparison_count": len(recomputed_comparisons),
         "component_isolation_count": len(recomputed_isolations),
         "inconclusive_component_isolation_count": sum(
-            row["result_status"].startswith("inconclusive_")
-            for row in recomputed_isolations
+            row["result_status"].startswith("inconclusive_") for row in recomputed_isolations
         ),
         "interpretation_status_counts": status_counts,
         "all_network_calls_blocked": True,

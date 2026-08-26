@@ -1,10 +1,34 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "../AppShell";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { resetDesktopReadinessSession } from "../desktop/readiness";
+
+const updaterState = vi.hoisted(() => ({
+  current: {
+    status: "current",
+    availableVersion: null as string | null,
+    updateRequired: false,
+    progress: null as number | null,
+    error: null as string | null,
+    enginePack: null,
+    componentUpdates: null as import("../desktop/bridge").ComponentUpdateReport | null,
+    desktopRuntime: true,
+    checkForUpdates: vi.fn(async () => undefined),
+    installAvailableUpdate: vi.fn(async () => undefined),
+    installComponentUpdates: vi.fn(async () => undefined),
+    reconcileEnginePack: vi.fn(async () => undefined),
+    reconcileComponentPacks: vi.fn(async () => undefined),
+  },
+}));
+
+vi.mock("../desktop/updaterContext", () => ({
+  AppUpdaterProvider: ({ children }: { children: ReactNode }) => children,
+  useAppUpdaterState: () => updaterState.current,
+}));
 
 const componentIds = [
   "wsl-runtime",
@@ -66,7 +90,10 @@ function renderDashboard() {
     {
       path: "/",
       element: <AppShell />,
-      children: [{ path: "dashboard", element: <div>Dashboard content</div> }],
+      children: [
+        { path: "dashboard", element: <div>Dashboard content</div> },
+        { path: "desktop/setup", element: <div>Runtime Base upgrade</div> },
+      ],
     },
   ], { initialEntries: ["/dashboard"] });
   const page = render(
@@ -77,11 +104,41 @@ function renderDashboard() {
   return { ...page, router };
 }
 
+async function openRuntimeSettings(locale: "en" | "zh-CN" = "en") {
+  fireEvent.click(screen.getByRole("button", {
+    name: locale === "zh-CN" ? "设置" : "Settings",
+  }));
+  const quickSettings = screen.getByRole("dialog", {
+    name: locale === "zh-CN" ? "设置" : "Settings",
+  });
+  fireEvent.click(within(quickSettings).getByRole("button", {
+    name: locale === "zh-CN" ? /Runtime 与更新/ : /Runtime & updates/,
+  }));
+  return screen.findByRole("region", {
+    name: locale === "zh-CN" ? "设置" : "Settings",
+  });
+}
+
 afterEach(() => {
   resetDesktopReadinessSession();
   delete window.__TAURI__;
   window.localStorage.clear();
   window.history.replaceState(null, "", "/");
+  updaterState.current = {
+    ...updaterState.current,
+    status: "current",
+    availableVersion: null,
+    updateRequired: false,
+    progress: null,
+    error: null,
+    enginePack: null,
+    componentUpdates: null,
+    checkForUpdates: vi.fn(async () => undefined),
+    installAvailableUpdate: vi.fn(async () => undefined),
+    installComponentUpdates: vi.fn(async () => undefined),
+    reconcileEnginePack: vi.fn(async () => undefined),
+    reconcileComponentPacks: vi.fn(async () => undefined),
+  };
 });
 
 describe("workspace sidebar version module", () => {
@@ -93,7 +150,256 @@ describe("workspace sidebar version module", () => {
     expect(screen.queryByText("DroneDream 1.0.0")).not.toBeInTheDocument();
     expect(document.querySelector(".app-version-pill")).toBeNull();
     expect(screen.getByRole("button", { name: "Account" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Update DroneDream" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
 
+    router.dispose();
+  });
+
+  it("shows a compact account-adjacent update action only when an update is ready", () => {
+    const installAvailableUpdate = vi.fn(async () => undefined);
+    updaterState.current = {
+      ...updaterState.current,
+      status: "available",
+      availableVersion: "1.0.0",
+      installAvailableUpdate,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const update = screen.getByRole("button", { name: "Update DroneDream" });
+    expect(update).toHaveClass("app-update-button");
+    expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
+    fireEvent.click(update);
+    expect(installAvailableUpdate).toHaveBeenCalledOnce();
+
+    router.dispose();
+  });
+
+  it("reserves the account-adjacent download action for application updates", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "componentAvailable",
+      componentUpdates: {
+        catalogSequence: 1,
+        generatedAt: "2026-08-16T00:00:00Z",
+        expiresAt: "2026-08-23T00:00:00Z",
+        candidates: [],
+      },
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    expect(document.querySelector(".app-update-button")).toBeNull();
+
+    router.dispose();
+  });
+
+  it("keeps generic update failures in settings without showing a download icon", async () => {
+    const checkForUpdates = vi.fn(async () => undefined);
+    updaterState.current = {
+      ...updaterState.current,
+      status: "error",
+      error: "Update service unavailable",
+      checkForUpdates,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
+    expect(document.querySelector(".app-update-button")).toBeNull();
+
+    const dialog = await openRuntimeSettings();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
+    expect(checkForUpdates).toHaveBeenCalledOnce();
+
+    router.dispose();
+  });
+
+  it("replaces the download icon with live application download progress", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "downloading",
+      progress: 42,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const progress = screen.getByRole("button", { name: /42%/ });
+    expect(progress).toBeDisabled();
+    expect(progress).toHaveTextContent("42%");
+    expect(progress.querySelector("svg")).toBeNull();
+
+    router.dispose();
+  });
+
+  it("holds at 100% while the completed update exits and relaunches", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "installing",
+      progress: 100,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const progress = screen.getByRole("button", { name: /100%/ });
+    expect(progress).toBeDisabled();
+    expect(progress).toHaveTextContent("100%");
+
+    router.dispose();
+  });
+
+  it("keeps the account name action independent from the trailing update slot", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "available",
+      availableVersion: "1.0.0",
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    expect(screen.getByRole("menu", { name: "Account" })).toBeVisible();
+    expect(updaterState.current.installAvailableUpdate).not.toHaveBeenCalled();
+
+    router.dispose();
+  });
+});
+
+describe("Settings update center", () => {
+  it("checks again from the current state and keeps environment checks separate", async () => {
+    const checkForUpdates = vi.fn(async () => undefined);
+    updaterState.current = { ...updaterState.current, checkForUpdates };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const dialog = await openRuntimeSettings();
+    expect(within(dialog).getByRole("heading", { name: "Software updates" })).toBeVisible();
+    expect(within(dialog).getByText("DroneDream is up to date. Click to check again."))
+      .toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Check for updates" }));
+
+    expect(checkForUpdates).toHaveBeenCalledOnce();
+    expect(within(dialog).getByRole("button", { name: "Check environment" })).toBeEnabled();
+    router.dispose();
+  });
+
+  it("shows required application updates and invokes the signed installer", async () => {
+    const installAvailableUpdate = vi.fn(async () => undefined);
+    updaterState.current = {
+      ...updaterState.current,
+      status: "available",
+      availableVersion: "1.0.1",
+      updateRequired: true,
+      installAvailableUpdate,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const dialog = await openRuntimeSettings();
+    expect(within(dialog).getByText("Version 1.0.1 is available. Click to update."))
+      .toBeVisible();
+    expect(within(dialog).getByText("Required")).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Install update" }));
+
+    expect(installAvailableUpdate).toHaveBeenCalledOnce();
+    router.dispose();
+  });
+
+  it("lists signed pack urgency and installs the selected pack update set", async () => {
+    const installComponentUpdates = vi.fn(async () => undefined);
+    updaterState.current = {
+      ...updaterState.current,
+      status: "componentAvailable",
+      updateRequired: true,
+      componentUpdates: {
+        catalogSequence: 2,
+        generatedAt: "2026-08-23T00:00:00Z",
+        expiresAt: "2026-08-30T00:00:00Z",
+        candidates: [{
+          componentId: "capability-pack",
+          version: "1.2.0",
+          releaseSequence: 12,
+          urgency: "required",
+          installMode: "user-confirmed",
+          dependencies: [],
+          packId: `sha256:${"5".repeat(64)}`,
+          installedVersion: "1.1.0",
+          installedReleaseSequence: 11,
+          available: true,
+        }],
+      },
+      installComponentUpdates,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const dialog = await openRuntimeSettings();
+    expect(within(dialog).getByText("Workflow pack")).toBeVisible();
+    expect(within(dialog).getByText("v1.2.0")).toBeVisible();
+    expect(within(dialog).getAllByText("Required").length).toBeGreaterThan(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Install pack updates" }));
+
+    expect(installComponentUpdates).toHaveBeenCalledOnce();
+    router.dispose();
+  });
+
+  it("renders application download progress", async () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "downloading",
+      progress: 42,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const dialog = await openRuntimeSettings();
+    expect(within(dialog).getByRole("progressbar", { name: "Update progress" }))
+      .toHaveValue(42);
+    expect(within(dialog).getByText("42%")).toBeVisible();
+    router.dispose();
+  });
+
+  it("opens the Runtime Base upgrade entry for an incompatible manager", async () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "runtimeBaseRequired",
+      updateRequired: true,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const dialog = await openRuntimeSettings();
+    fireEvent.click(within(dialog).getByRole("button", {
+      name: "Open Runtime Base upgrade",
+    }));
+
+    expect(router.state.location.pathname).toBe("/desktop/setup");
+    router.dispose();
+  });
+
+  it("renders independently authored Simplified Chinese update copy", async () => {
+    installReadyDesktopBridge();
+    window.localStorage.setItem("drone-dream:locale", "zh-CN");
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const dialog = await openRuntimeSettings("zh-CN");
+    expect(within(dialog).getByRole("heading", { name: "软件更新" })).toBeVisible();
+    expect(within(dialog).getByText("DroneDream 已是最新版本，点击可再次检查。"))
+      .toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "检查更新" })).toBeEnabled();
     router.dispose();
   });
 });

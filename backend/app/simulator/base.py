@@ -146,7 +146,7 @@ class TrialMetricsPayload:
                 raise TypeError(f"{name} must be numeric")
             if not math.isfinite(float(value)):
                 raise ValueError(f"{name} must be finite")
-        for name in ("rmse", "max_error", "completion_time", "final_error"):
+        for name in ("rmse", "max_error", "completion_time", "score", "final_error"):
             if float(getattr(self, name)) < 0:
                 raise ValueError(f"{name} must be non-negative")
         if (
@@ -163,6 +163,12 @@ class TrialMetricsPayload:
         ):
             if not isinstance(getattr(self, name), bool):
                 raise TypeError(f"{name} must be boolean")
+        if self.pass_flag and (
+            self.crash_flag or self.timeout_flag or self.instability_flag
+        ):
+            raise ValueError(
+                "pass_flag cannot be true for a crashed, timed-out, or unstable trial"
+            )
         if not isinstance(self.raw_metric_json, dict):
             raise TypeError("raw_metric_json must be an object")
         _validate_raw_metric_json(self.raw_metric_json)

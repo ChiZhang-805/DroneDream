@@ -25,13 +25,15 @@ from app.simulator.telemetry_evidence import (
 PX4_CORE_METRIC_EVIDENCE_V1 = "dronedream.px4-core-metric-evidence/v1"
 PX4_CORE_METRIC_VERIFIER_REVISION = "px4-core-metric-verifier-1.0"
 PX4_TRACK_PROJECTION_REVISION = "ordered-local-3d-segment-projection-1.0"
+PX4_STATIONARY_PROJECTION_REVISION = "stationary-point-3d-projection-1.0"
 PX4_RMSE_INTEGRATION_REVISION = "time_weighted_trapezoidal"
 PX4_EVALUATION_POLICY_V1 = "dronedream.px4-evaluation-policy/v1"
 PX4_EVALUATION_WINDOW_EVIDENCE_V1 = "dronedream.px4-evaluation-window-evidence/v1"
+PX4_TELEMETRY_TIMING_TIME_BASE = "telemetry_sample_seconds"
 PX4_EVALUATION_WINDOW_VERIFIER_REVISION = "px4-evaluation-window-verifier-1.0"
 PX4_OUTCOME_POLICY_V1 = "dronedream.px4-outcome-policy/v1"
 PX4_OUTCOME_EVIDENCE_V1 = "dronedream.px4-outcome-evidence/v1"
-PX4_OUTCOME_VERIFIER_REVISION = "px4-outcome-verifier-1.0"
+PX4_OUTCOME_VERIFIER_REVISION = "px4-outcome-verifier-1.1"
 PX4_PROGRESS_REVISION = "directed-continuous-arc-coverage-1.0"
 PX4_SCORE_REVISION = "rmse-plus-half-max-plus-duration-and-fixed-penalties-1.0"
 
@@ -59,6 +61,7 @@ _INSTABILITY_PENALTY = 80.0
 _PROGRESS_PENALTY = 20.0
 _MAX_ERROR_SCORE_WEIGHT = 0.5
 _DURATION_SCORE_WEIGHT = 0.05
+_HOVER_MIN_EVALUATION_DURATION_SECONDS = 10.0
 
 Sha256Id = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 NonnegativeInt = Annotated[int, Field(ge=0)]
@@ -211,7 +214,10 @@ class Px4OutcomeEvidenceV1(BaseModel):
 
     schema_id: Literal["dronedream.px4-outcome-evidence/v1"] = "dronedream.px4-outcome-evidence/v1"
     evidence_id: Sha256Id
-    verifier_revision: Literal["px4-outcome-verifier-1.0"] = "px4-outcome-verifier-1.0"
+    verifier_revision: Literal[
+        "px4-outcome-verifier-1.0",
+        "px4-outcome-verifier-1.1",
+    ] = "px4-outcome-verifier-1.1"
     outcome_policy_id: Sha256Id
     evaluation_policy_id: Sha256Id
     evaluation_window_evidence_id: Sha256Id
@@ -259,7 +265,7 @@ class Px4OutcomeEvidenceV1(BaseModel):
     evaluation_start_reached: bool
     evaluation_endpoint_reached: bool
     evaluation_progress_contract_ok: bool
-    track_length_3d_m: Annotated[float, Field(gt=0.0)]
+    track_length_3d_m: NonnegativeFloat
     track_is_closed: bool
     evaluation_min_z_m: float
     evaluation_max_z_m: float
@@ -339,9 +345,10 @@ class Px4CoreMetricEvidenceV1(BaseModel):
     verifier_revision: Literal["px4-core-metric-verifier-1.0"] = "px4-core-metric-verifier-1.0"
     telemetry_contract_id: Sha256Id
     reference_track_sha256: Sha256Id
-    projection_revision: Literal["ordered-local-3d-segment-projection-1.0"] = (
-        "ordered-local-3d-segment-projection-1.0"
-    )
+    projection_revision: Literal[
+        "ordered-local-3d-segment-projection-1.0",
+        "stationary-point-3d-projection-1.0",
+    ] = "ordered-local-3d-segment-projection-1.0"
     rmse_integration: Literal["time_weighted_trapezoidal"] = "time_weighted_trapezoidal"
     synthetic: bool
     evaluation_start_index: NonnegativeInt
@@ -362,7 +369,7 @@ class Px4CoreMetricEvidenceV1(BaseModel):
 
     @model_validator(mode="after")
     def _validate_window(self) -> Px4CoreMetricEvidenceV1:
-        if (
+        is_single_sample_synthetic = (
             self.synthetic
             and self.total_sample_count == 1
             and self.evaluation_start_index == 0
@@ -370,18 +377,22 @@ class Px4CoreMetricEvidenceV1(BaseModel):
             and self.evaluation_sample_count == 1
             and self.evaluation_start_time_s == self.evaluation_end_time_s
             and self.evaluation_duration_s == 0.0
-        ):
-            return self
-        if self.evaluation_end_index <= self.evaluation_start_index:
-            raise ValueError("evaluation end index must follow its start index")
-        if (
-            self.evaluation_end_index >= self.total_sample_count
-            or self.evaluation_sample_count
-            != self.evaluation_end_index - self.evaluation_start_index + 1
-        ):
-            raise ValueError("evaluation indices do not match sample counts")
-        if self.evaluation_end_time_s <= self.evaluation_start_time_s:
-            raise ValueError("evaluation end time must follow its start time")
+        )
+        if not is_single_sample_synthetic:
+            if self.evaluation_end_index <= self.evaluation_start_index:
+                raise ValueError("evaluation end index must follow its start index")
+            if (
+                self.evaluation_end_index >= self.total_sample_count
+                or self.evaluation_sample_count
+                != self.evaluation_end_index - self.evaluation_start_index + 1
+            ):
+                raise ValueError("evaluation indices do not match sample counts")
+            if self.evaluation_end_time_s <= self.evaluation_start_time_s:
+                raise ValueError("evaluation end time must follow its start time")
+        payload = self.model_dump(mode="json")
+        evidence_id = payload.pop("evidence_id")
+        if evidence_id != _sha256_id(payload):
+            raise ValueError("core metric evidence ID does not match its content")
         return self
 
 
@@ -398,6 +409,7 @@ class _TrackGeometry:
     segments: tuple[_TrackSegment, ...]
     total_length: float
     closed: bool
+    stationary: bool = False
 
 
 @dataclass(frozen=True)
@@ -536,9 +548,12 @@ def _environment_int(
     if raw is None or not raw.strip():
         return default
     try:
-        return max(1, int(raw))
+        value = int(raw)
     except ValueError as exc:
         raise Px4CoreMetricEvidenceError(f"{name} must be an integer") from exc
+    if value < 1:
+        raise Px4CoreMetricEvidenceError(f"{name} must be positive")
+    return value
 
 
 def px4_evaluation_policy_from_environment(
@@ -621,6 +636,13 @@ def _reference_points(payload: object) -> list[dict[str, float]]:
     return points
 
 
+def _reference_track_type(payload: object) -> str | None:
+    if not isinstance(payload, Mapping):
+        return None
+    raw = payload.get("track_type")
+    return raw if isinstance(raw, str) else None
+
+
 def _telemetry_samples(
     payload: object,
 ) -> tuple[list[dict[str, Any]], str, bool]:
@@ -651,6 +673,8 @@ def _telemetry_samples(
 
 def _build_track_geometry(
     ref_points: list[dict[str, float]],
+    *,
+    allow_stationary: bool = False,
 ) -> _TrackGeometry:
     segments: list[_TrackSegment] = []
     progress = 0.0
@@ -674,6 +698,22 @@ def _build_track_geometry(
         )
         progress += length
     if not segments or progress <= 1e-12:
+        if allow_stationary and ref_points:
+            anchor = ref_points[0]
+            anchor_start = (anchor["x"], anchor["y"], anchor["z"])
+            return _TrackGeometry(
+                segments=(
+                    _TrackSegment(
+                        start=anchor_start,
+                        delta=(0.0, 0.0, 0.0),
+                        length=0.0,
+                        start_progress=0.0,
+                    ),
+                ),
+                total_length=0.0,
+                closed=True,
+                stationary=True,
+            )
         raise Px4CoreMetricEvidenceError(
             "reference track must have non-zero three-dimensional length"
         )
@@ -687,6 +727,7 @@ def _build_track_geometry(
         segments=tuple(segments),
         total_length=progress,
         closed=endpoint_distance <= max(1e-6, progress * 1e-6),
+        stationary=False,
     )
 
 
@@ -701,12 +742,16 @@ def _project_sample_to_segment(
         float(sample["z"]) - segment.start[2],
     )
     length_squared = segment.length * segment.length
-    fraction = min(
-        1.0,
-        max(
-            0.0,
-            sum(offset[index] * segment.delta[index] for index in range(3)) / length_squared,
-        ),
+    fraction = (
+        0.0
+        if length_squared <= 1e-24
+        else min(
+            1.0,
+            max(
+                0.0,
+                sum(offset[index] * segment.delta[index] for index in range(3)) / length_squared,
+            ),
+        )
     )
     reference = tuple(segment.start[index] + fraction * segment.delta[index] for index in range(3))
     error = math.dist(
@@ -966,6 +1011,13 @@ def _window_from_timing(
     timing: Mapping[str, object],
     policy: Px4EvaluationPolicyV1,
 ) -> _EvaluationWindow | None:
+    # The offboard executor currently records its own process-relative clock,
+    # while PX4 ULog telemetry is expressed on the vehicle boot clock.  Numeric
+    # values from those clocks are not interchangeable.  Only consume timing
+    # evidence when the producer explicitly binds it to the telemetry sample
+    # clock; otherwise derive the window from the telemetry itself.
+    if timing.get("time_base") != PX4_TELEMETRY_TIMING_TIME_BASE:
+        return None
     start_time_raw = timing.get("track_start_t")
     end_time_raw = timing.get("track_end_t")
     if (
@@ -1087,7 +1139,10 @@ def compile_px4_evaluation_window_evidence(
 ) -> Px4EvaluationWindowEvidenceV1:
     samples, telemetry_contract_id, synthetic = _telemetry_samples(telemetry_payload)
     reference_points = _reference_points(reference_track_payload)
-    geometry = _build_track_geometry(reference_points)
+    geometry = _build_track_geometry(
+        reference_points,
+        allow_stationary=_reference_track_type(reference_track_payload) == "hover",
+    )
     projections = _project_samples_to_track(samples, geometry)
     timing = offboard_timing_payload if isinstance(offboard_timing_payload, Mapping) else None
     window = (
@@ -1244,7 +1299,10 @@ def compile_px4_core_metric_evidence(
         sample_count=len(samples),
         synthetic=synthetic,
     )
-    geometry = _build_track_geometry(reference_points)
+    geometry = _build_track_geometry(
+        reference_points,
+        allow_stationary=_reference_track_type(reference_track_payload) == "hover",
+    )
     projections = _project_samples_to_track(samples, geometry)
     evaluation_samples = samples[start_index : end_index + 1]
     evaluation_projections = projections[start_index : end_index + 1]
@@ -1281,7 +1339,11 @@ def compile_px4_core_metric_evidence(
         "verifier_revision": PX4_CORE_METRIC_VERIFIER_REVISION,
         "telemetry_contract_id": telemetry_contract_id,
         "reference_track_sha256": _sha256_id(reference_points),
-        "projection_revision": PX4_TRACK_PROJECTION_REVISION,
+        "projection_revision": (
+            PX4_STATIONARY_PROJECTION_REVISION
+            if geometry.stationary
+            else PX4_TRACK_PROJECTION_REVISION
+        ),
         "rmse_integration": PX4_RMSE_INTEGRATION_REVISION,
         "synthetic": synthetic,
         "evaluation_start_index": start_index,
@@ -1400,6 +1462,43 @@ def _evaluate_track_progress(
     max_track_error: float,
     policy: Px4OutcomePolicyV1,
 ) -> _TrackProgress:
+    if geometry.stationary:
+        in_tolerance = [projection.error <= max_track_error for projection in projections]
+        duration_seconds = (
+            max(0.0, float(samples[-1]["t"]) - float(samples[0]["t"])) if len(samples) >= 2 else 0.0
+        )
+        duration_fraction = min(
+            1.0,
+            duration_seconds / _HOVER_MIN_EVALUATION_DURATION_SECONDS,
+        )
+        in_tolerance_duration = 0.0
+        for index in range(1, len(samples)):
+            interval_seconds = float(samples[index]["t"]) - float(samples[index - 1]["t"])
+            if interval_seconds <= 0:
+                raise Px4CoreMetricEvidenceError(
+                    "stationary hover coverage requires increasing timestamps"
+                )
+            in_tolerance_duration += (
+                0.5
+                * (float(in_tolerance[index - 1]) + float(in_tolerance[index]))
+                * interval_seconds
+            )
+        in_tolerance_fraction = (
+            min(1.0, in_tolerance_duration / duration_seconds)
+            if duration_seconds > 0
+            else float(bool(in_tolerance and in_tolerance[0]))
+        )
+        coverage = in_tolerance_fraction * duration_fraction
+        reached = 0.0 if any(in_tolerance) else None
+        return _TrackProgress(
+            coverage=coverage,
+            directed_progress_fraction=coverage,
+            backward_distance=0.0,
+            discontinuity_count=0,
+            start_progress=reached,
+            end_progress=reached,
+        )
+
     intervals: list[tuple[float, float]] = []
     previous: tuple[dict[str, Any], _TrackProjection] | None = None
     first_progress: float | None = None
@@ -1599,7 +1698,10 @@ def compile_px4_outcome_evidence(
     ):
         raise Px4CoreMetricEvidenceError("core-metric evidence is not bound to outcome inputs")
     outcome_policy = compile_px4_outcome_policy(evaluation_policy)
-    geometry = _build_track_geometry(reference_points)
+    geometry = _build_track_geometry(
+        reference_points,
+        allow_stationary=_reference_track_type(reference_track_payload) == "hover",
+    )
     projections = _project_samples_to_track(samples, geometry)
     start_index = evaluation_window_evidence.start_index
     end_index = evaluation_window_evidence.end_index
@@ -1891,6 +1993,7 @@ def require_px4_outcome_binding(
         raise Px4CoreMetricEvidenceError(
             "PX4 top-level verdict does not match independent evidence"
         )
+    stationary_hover = evidence.track_length_3d_m == 0.0
     expected_raw = {
         "track_coverage": evidence.full_track_coverage,
         "evaluation_track_coverage": (evidence.evaluation_track_coverage),
@@ -1905,9 +2008,17 @@ def require_px4_outcome_binding(
         "evaluation_progress_contract_ok": (evidence.evaluation_progress_contract_ok),
         "track_length_3d_m": evidence.track_length_3d_m,
         "track_is_closed": evidence.track_is_closed,
-        "track_projection": ("ordered_local_3d_segment_projection"),
+        "track_projection": (
+            "stationary_point_3d_projection"
+            if stationary_hover
+            else "ordered_local_3d_segment_projection"
+        ),
         "track_projection_comparison_limit": (_MAX_PROJECTION_SEGMENT_COMPARISONS),
-        "coverage_basis": ("union_of_traversed_polyline_arc_length"),
+        "coverage_basis": (
+            "stationary_hover_time_weighted_trapezoidal_in_tolerance"
+            if stationary_hover
+            else "union_of_traversed_polyline_arc_length"
+        ),
         "evaluation_min_z": evidence.evaluation_min_z_m,
         "evaluation_max_z": evidence.evaluation_max_z_m,
         "crash_reason": evidence.crash_reason,
@@ -1918,6 +2029,13 @@ def require_px4_outcome_binding(
         "px4_outcome_policy": policy.model_dump(mode="json"),
         "px4_outcome_evidence": evidence.model_dump(mode="json"),
     }
+    if stationary_hover:
+        expected_raw.update(
+            {
+                "track_mode": "stationary_hover",
+                "hover_minimum_evaluation_duration_s": (_HOVER_MIN_EVALUATION_DURATION_SECONDS),
+            }
+        )
     if any(raw_metrics.get(field) != value for field, value in expected_raw.items()):
         raise Px4CoreMetricEvidenceError(
             "PX4 raw verdict does not match independent outcome evidence"

@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/edition-execution-authorization.v1.json",
+  "title": "DroneDream multi-layer edition execution authorization receipts",
+  "oneOf": [
+    {"$ref": "#/$defs/authorizationRequest"},
+    {"$ref": "#/$defs/layerDecisionReceipt"},
+    {"$ref": "#/$defs/quorumReceipt"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "dottedIdentifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?Z$"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accountId", "actorId"],
+      "properties": {
+        "accountId": {"$ref": "#/$defs/identifier"},
+        "actorId": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "deviceHardwareIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deviceId", "hardwareIdentityHash"],
+      "properties": {
+        "deviceId": {"$ref": "#/$defs/identifier"},
+        "hardwareIdentityHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "vehicle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicleId",
+        "packId",
+        "packManifestSha256",
+        "controllerId",
+        "firmwareFamily",
+        "firmwareVersion",
+        "firmwareIdentityHash",
+        "dynamicsConfigHash",
+        "sensorConfigHash",
+        "payloadConfigHash"
+      ],
+      "properties": {
+        "vehicleId": {"$ref": "#/$defs/identifier"},
+        "packId": {"$ref": "#/$defs/identifier"},
+        "packManifestSha256": {"$ref": "#/$defs/sha256"},
+        "controllerId": {"$ref": "#/$defs/identifier"},
+        "firmwareFamily": {"enum": ["px4", "ardupilot", "crazyflie"]},
+        "firmwareVersion": {"$ref": "#/$defs/identifier"},
+        "firmwareIdentityHash": {"$ref": "#/$defs/sha256"},
+        "dynamicsConfigHash": {"$ref": "#/$defs/sha256"},
+        "sensorConfigHash": {"$ref": "#/$defs/sha256"},
+        "payloadConfigHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "policyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityPolicyId",
+        "capabilityPolicyVersion",
+        "capabilityPolicySha256",
+        "executionGatePolicyId",
+        "executionGatePolicyVersion",
+        "executionGatePolicySha256",
+        "editionManifestSha256"
+      ],
+      "properties": {
+        "capabilityPolicyId": {"const": "core-capabilities"},
+        "capabilityPolicyVersion": {"const": "1.0.0"},
+        "capabilityPolicySha256": {"$ref": "#/$defs/sha256"},
+        "executionGatePolicyId": {"const": "edition-execution-gate"},
+        "executionGatePolicyVersion": {"const": "1.0.0"},
+        "executionGatePolicySha256": {"$ref": "#/$defs/sha256"},
+        "editionManifestSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repositoryCommit",
+        "enginePackManifestSha256",
+        "runtimeBaseManifestSha256"
+      ],
+      "properties": {
+        "repositoryCommit": {"$ref": "#/$defs/commit"},
+        "enginePackManifestSha256": {"$ref": "#/$defs/sha256"},
+        "runtimeBaseManifestSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "evidenceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": {
+          "enum": [
+            "parameterCandidateHash",
+            "scenarioContractHash",
+            "vehicleDynamicsConfigHash",
+            "sensorConfigHash",
+            "payloadConfigHash",
+            "holdoutContractHash",
+            "snapshotHash",
+            "rollbackTargetHash",
+            "challengeHash",
+            "preflightHash",
+            "safetyZoneHash",
+            "takeoverPathHash",
+            "emergencyStopPathHash"
+          ]
+        },
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "structuredEvidenceReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "receiptType",
+        "receiptId",
+        "authorizationRequestId",
+        "contextHash",
+        "issuer",
+        "issuerLayer",
+        "status",
+        "issuedAt",
+        "expiresAt",
+        "nonce",
+        "sequence",
+        "evidenceHash",
+        "qualificationLevel",
+        "bindings",
+        "oneTime",
+        "consumptionState"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-structured-safety-evidence-receipt"},
+        "receiptType": {
+          "enum": [
+            "trusted-qualification",
+            "parameter-snapshot",
+            "transaction-rollback",
+            "operator-confirmation",
+            "preflight",
+            "safety-zone",
+            "control-takeover",
+            "emergency-stop"
+          ]
+        },
+        "receiptId": {"$ref": "#/$defs/identifier"},
+        "authorizationRequestId": {"$ref": "#/$defs/identifier"},
+        "contextHash": {"$ref": "#/$defs/sha256"},
+        "issuer": {"$ref": "#/$defs/identifier"},
+        "issuerLayer": {"enum": ["native", "backend", "runtime", "operator"]},
+        "status": {"enum": ["pass", "failed", "indeterminate"]},
+        "issuedAt": {"$ref": "#/$defs/timestamp"},
+        "expiresAt": {"$ref": "#/$defs/timestamp"},
+        "nonce": {"$ref": "#/$defs/identifier"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "evidenceHash": {"$ref": "#/$defs/sha256"},
+        "qualificationLevel": {"enum": ["none", "sim", "hitl"]},
+        "bindings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/evidenceBinding"}
+        },
+        "oneTime": {"const": true},
+        "consumptionState": {"enum": ["unconsumed", "consumed", "revoked"]}
+      }
+    },
+    "authorizationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "authorizationRequestId",
+        "actor",
+        "deviceHardwareIdentity",
+        "vehicle",
+        "parameterCandidateHash",
+        "compositeInventoryHash",
+        "policy",
+        "source",
+        "editionId",
+        "action",
+        "targetKind",
+        "issuedAt",
+        "expiresAt",
+        "nonce",
+        "sequence",
+        "evidenceReceipts",
+        "issuer",
+        "testOnly"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-edition-authorization-request"},
+        "authorizationRequestId": {"$ref": "#/$defs/identifier"},
+        "actor": {"$ref": "#/$defs/actor"},
+        "deviceHardwareIdentity": {"$ref": "#/$defs/deviceHardwareIdentity"},
+        "vehicle": {"$ref": "#/$defs/vehicle"},
+        "parameterCandidateHash": {"$ref": "#/$defs/sha256"},
+        "compositeInventoryHash": {"$ref": "#/$defs/sha256"},
+        "policy": {"$ref": "#/$defs/policyBinding"},
+        "source": {"$ref": "#/$defs/sourceBinding"},
+        "editionId": {"enum": ["sim", "lab", "field", "autonomy"]},
+        "action": {"$ref": "#/$defs/dottedIdentifier"},
+        "targetKind": {"enum": ["installation", "simulation", "hitl", "real-hardware"]},
+        "issuedAt": {"$ref": "#/$defs/timestamp"},
+        "expiresAt": {"$ref": "#/$defs/timestamp"},
+        "nonce": {"$ref": "#/$defs/identifier"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "evidenceReceipts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/structuredEvidenceReceipt"}
+        },
+        "issuer": {"$ref": "#/$defs/identifier"},
+        "testOnly": {"type": "boolean"}
+      }
+    },
+    "layerDecisionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "authorizationRequestId",
+        "authorizationRequestHash",
+        "contextHash",
+        "layer",
+        "decision",
+        "reasonCodes",
+        "canonicalDecisionHash",
+        "issuedAt",
+        "expiresAt",
+        "nonce",
+        "sequence",
+        "issuer",
+        "testOnly",
+        "consumptionState"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-edition-layer-decision-receipt"},
+        "authorizationRequestId": {"$ref": "#/$defs/identifier"},
+        "authorizationRequestHash": {"$ref": "#/$defs/sha256"},
+        "contextHash": {"$ref": "#/$defs/sha256"},
+        "layer": {"enum": ["native", "backend", "runtime"]},
+        "decision": {"enum": ["allow", "deny", "failed", "indeterminate"]},
+        "reasonCodes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/dottedIdentifier"}
+        },
+        "canonicalDecisionHash": {"$ref": "#/$defs/sha256"},
+        "issuedAt": {"$ref": "#/$defs/timestamp"},
+        "expiresAt": {"$ref": "#/$defs/timestamp"},
+        "nonce": {"$ref": "#/$defs/identifier"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "issuer": {"$ref": "#/$defs/identifier"},
+        "testOnly": {"type": "boolean"},
+        "consumptionState": {"enum": ["unconsumed", "consumed", "revoked"]}
+      }
+    },
+    "layerDecisionHashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["native", "backend", "runtime"],
+      "properties": {
+        "native": {"$ref": "#/$defs/sha256"},
+        "backend": {"$ref": "#/$defs/sha256"},
+        "runtime": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "quorumReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "authorizationRequestId",
+        "authorizationRequestHash",
+        "contextHash",
+        "layerDecisionHashes",
+        "decision",
+        "reasonCodes",
+        "issuedAt",
+        "expiresAt",
+        "nonce",
+        "sequence",
+        "oneTime",
+        "consumptionState",
+        "appendOnlyAudit"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-edition-authorization-quorum-receipt"},
+        "authorizationRequestId": {"$ref": "#/$defs/identifier"},
+        "authorizationRequestHash": {"$ref": "#/$defs/sha256"},
+        "contextHash": {"$ref": "#/$defs/sha256"},
+        "layerDecisionHashes": {"$ref": "#/$defs/layerDecisionHashes"},
+        "decision": {"enum": ["allow", "deny", "failed", "indeterminate", "missing"]},
+        "reasonCodes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/dottedIdentifier"}
+        },
+        "issuedAt": {"$ref": "#/$defs/timestamp"},
+        "expiresAt": {"$ref": "#/$defs/timestamp"},
+        "nonce": {"$ref": "#/$defs/identifier"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "oneTime": {"const": true},
+        "consumptionState": {"enum": ["unconsumed", "consumed", "revoked"]},
+        "appendOnlyAudit": {"const": true}
+      }
+    }
+  }
+}
