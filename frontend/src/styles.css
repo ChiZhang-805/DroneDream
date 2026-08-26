@@ -224,6 +224,15 @@ body:has(.autonomy-platform-page),
   color: #211827;
 }
 
+.autonomy-platform-page.is-sidebar-routed {
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+
+.autonomy-platform-page.is-sidebar-routed .autonomy-platform-content > .agent-core-health-alert {
+  margin: 0 0 0.72rem;
+}
+
 .autonomy-platform-header {
   display: flex;
   min-width: 0;

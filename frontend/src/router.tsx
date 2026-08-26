@@ -13,6 +13,7 @@ import {
   BUILD_HAS_FIELD_WORKSPACE,
   BUILD_HAS_LAB_WORKSPACE,
   BUILD_HAS_SIM_WORKSPACE,
+  BUILD_EDITION,
   editionLandingPath,
 } from "./edition";
 
@@ -43,11 +44,15 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         }] : []),
         {
           path: "assistant",
-          lazy: async () => {
-            const { ExperimentAssistant } = await import("./pages/ExperimentAssistant");
-            return { Component: ExperimentAssistant };
-          },
-          loader: requireDesktopReadiness("experiment"),
+          ...(BUILD_EDITION === "autonomy"
+            ? { element: <Navigate to="/autonomy" replace /> }
+            : {
+                lazy: async () => {
+                  const { ExperimentAssistant } = await import("./pages/ExperimentAssistant");
+                  return { Component: ExperimentAssistant };
+                },
+                loader: requireDesktopReadiness("experiment"),
+              }),
         },
         {
           path: "dashboard",

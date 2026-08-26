@@ -291,11 +291,42 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
   { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
 ];
 
-const AUTONOMY_NAV_ITEMS: NavigationItem[] = [
-  { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
-  AUTONOMY_NAV_ITEM,
-  { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
-];
+const AUTONOMY_NAV_ITEMS: NavigationItem[] = BUILD_EDITION === "autonomy"
+  ? [
+      {
+        to: "/autonomy",
+        labelKey: "app.conversation",
+        end: true,
+        icon: BotMessageSquare,
+        sectionKey: "app.navSectionAutonomy",
+      },
+      {
+        to: "/autonomy/aircraft",
+        labelKey: "app.autonomyAircraft",
+        icon: Navigation2,
+      },
+      {
+        to: "/autonomy/maps",
+        labelKey: "app.autonomyMaps",
+        icon: MapPinned,
+      },
+      {
+        to: "/autonomy/plugins",
+        labelKey: "app.autonomyPlugins",
+        icon: Sparkles,
+      },
+      {
+        to: "/autonomy/live",
+        labelKey: "app.autonomyLive",
+        icon: Camera,
+      },
+      { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
+    ]
+  : [
+      { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
+      AUTONOMY_NAV_ITEM,
+      { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
+    ];
 
 const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
   universal: [

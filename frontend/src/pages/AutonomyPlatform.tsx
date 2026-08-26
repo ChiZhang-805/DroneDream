@@ -61,6 +61,7 @@ import {
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
 import { openAppSettings } from "../appSettings";
+import { BUILD_EDITION } from "../edition";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   defaultAutonomyWorkspace,
@@ -1525,47 +1526,52 @@ export function AutonomyPlatform() {
   ];
   const currentSectionPath = normalizedAutonomyPath(location.pathname);
   const currentSection = sections.find((section) => section.to === currentSectionPath)?.id ?? "overview";
+  const usesSidebarNavigation = BUILD_EDITION === "autonomy";
+  const healthAlert = agentCoreHealth === "unavailable" ? (
+    <div className="agent-core-health-alert" role="alert">
+      <ShieldCheck aria-hidden="true" />
+      <span>
+        {chinese
+          ? "AGENT Core 未能启动；规划、插件、资产认证与执行均已安全闭锁。"
+          : "AGENT Core could not start; planning, plugins, asset qualification, and execution are safely blocked."}
+      </span>
+      <button type="button" className="btn" disabled={agentCoreRestarting} onClick={() => void retryAgentCore()}>
+        {agentCoreRestarting
+          ? (chinese ? "正在重启" : "Restarting")
+          : (chinese ? "重启 Core" : "Restart Core")}
+      </button>
+    </div>
+  ) : null;
 
   return (
-    <div className="autonomy-platform-page">
-      <header className="autonomy-platform-header">
-        <h1>{copy[currentSection]}</h1>
-        <nav className="autonomy-section-switch" aria-label={copy.title}>
-          {sections.map(({ id, to }) => {
-            const Icon = SECTION_ICONS[id];
-            const selected = currentSectionPath === to;
-            return (
-              <NavLink
-                key={id}
-                to={to}
-                end={id === "overview"}
-                className={({ isActive }) => isActive || selected ? "active" : undefined}
-                aria-current={selected ? "page" : undefined}
-              >
-                <Icon aria-hidden="true" />
-                <span>{copy[id]}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
-        {agentCoreHealth === "unavailable" ? (
-          <div className="agent-core-health-alert" role="alert">
-            <ShieldCheck aria-hidden="true" />
-            <span>
-              {chinese
-                ? "AGENT Core 未能启动；规划、插件、资产认证与执行均已安全闭锁。"
-                : "AGENT Core could not start; planning, plugins, asset qualification, and execution are safely blocked."}
-            </span>
-            <button type="button" className="btn" disabled={agentCoreRestarting} onClick={() => void retryAgentCore()}>
-              {agentCoreRestarting
-                ? (chinese ? "正在重启" : "Restarting")
-                : (chinese ? "重启 Core" : "Restart Core")}
-            </button>
-          </div>
-        ) : null}
-      </header>
+    <div className={`autonomy-platform-page${usesSidebarNavigation ? " is-sidebar-routed" : ""}`}>
+      {!usesSidebarNavigation ? (
+        <header className="autonomy-platform-header">
+          <h1>{copy[currentSection]}</h1>
+          <nav className="autonomy-section-switch" aria-label={copy.title}>
+            {sections.map(({ id, to }) => {
+              const Icon = SECTION_ICONS[id];
+              const selected = currentSectionPath === to;
+              return (
+                <NavLink
+                  key={id}
+                  to={to}
+                  end={id === "overview"}
+                  className={({ isActive }) => isActive || selected ? "active" : undefined}
+                  aria-current={selected ? "page" : undefined}
+                >
+                  <Icon aria-hidden="true" />
+                  <span>{copy[id]}</span>
+                </NavLink>
+              );
+            })}
+          </nav>
+          {healthAlert}
+        </header>
+      ) : null}
 
       <main className="autonomy-platform-content">
+        {usesSidebarNavigation ? healthAlert : null}
         <Outlet context={{
           edition,
           chinese,
@@ -2456,7 +2462,7 @@ export function AutonomyMission() {
       </ol>
 
       <div className="autonomy-mission-stage">
-        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/assistant"><Sparkles aria-hidden="true" />{chinese ? "任务对话" : "Mission chat"}</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-mission-model"><Cpu aria-hidden="true" /><span>{chinese ? "规划模型" : "Planning model"}</span><strong>{workspace.mission.planningModel.provider} · {workspace.mission.planningModel.model}</strong></div>{workspace.mission.planningBrief ? <p className="autonomy-planning-brief">{localizedAutonomyError(workspace.mission.planningBrief, chinese, { zh: "任务规划已完成，请继续检查结构化合同。", en: "Mission planning is complete. Continue reviewing the structured contract." })}</p> : null}<div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
+        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/autonomy"><Sparkles aria-hidden="true" />{chinese ? "任务对话" : "Mission chat"}</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-mission-model"><Cpu aria-hidden="true" /><span>{chinese ? "规划模型" : "Planning model"}</span><strong>{workspace.mission.planningModel.provider} · {workspace.mission.planningModel.model}</strong></div>{workspace.mission.planningBrief ? <p className="autonomy-planning-brief">{localizedAutonomyError(workspace.mission.planningBrief, chinese, { zh: "任务规划已完成，请继续检查结构化合同。", en: "Mission planning is complete. Continue reviewing the structured contract." })}</p> : null}<div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
         {step === 1 ? <section><header><Navigation2 aria-hidden="true" /><h2>{workspace.aircraft.name}</h2><Link className="btn" to="/autonomy/aircraft">{chinese ? "无人机仓库" : "Aircraft repository"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Database />} label={chinese ? "资产标识" : "Asset ID"} value={workspace.aircraft.agentCoreAssetId ?? "—"} /><Metric icon={<ShieldCheck />} label={chinese ? "资格" : "Qualification"} value={readinessLabel(aircraftReady, chinese)} /><Metric icon={<FileClock />} label={chinese ? "内容哈希" : "Content hash"} value={workspace.aircraft.agentCoreContentSha256?.slice(0, 16) ?? "—"} /><Metric icon={<CircleCheck />} label={chinese ? "认证凭据" : "Receipt"} value={workspace.aircraft.qualificationReceiptId ?? "—"} /></div></section> : null}
         {step === 2 ? <section><header><Layers3 aria-hidden="true" /><h2>{workspace.mapPack.name}</h2><Link className="btn" to="/autonomy/maps">{chinese ? "地图仓库" : "Map repository"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Database />} label={chinese ? "表示" : "Representation"} value={mapRepresentationLabel(workspace.mapPack.representation, chinese)} /><Metric icon={<ScanLine />} label={chinese ? "分辨率" : "Resolution"} value={`${workspace.mapPack.resolutionM.toFixed(3)} m`} /><Metric icon={<HardDrive />} label={chinese ? "资产" : "Assets"} value={String(workspace.mapPack.sourceFiles.length)} /><Metric icon={<ShieldCheck />} label={chinese ? "资格" : "Qualification"} value={readinessLabel(mapReady, chinese)} /></div></section> : null}
         {step === 3 ? <section><header><Route aria-hidden="true" /><h2>{chinese ? "航迹目标" : "Trajectory objectives"}</h2></header><div className="autonomy-planner-choices"><button className="is-selected"><ShieldCheck />{chinese ? "安全优先" : "Safety first"}</button><button><Activity />{chinese ? "平滑飞行" : "Smooth flight"}</button><button><Gauge />{chinese ? "时间效率" : "Time efficient"}</button><button><Cpu />{chinese ? "能量效率" : "Energy efficient"}</button></div></section> : null}

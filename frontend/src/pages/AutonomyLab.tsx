@@ -1559,7 +1559,7 @@ export function AutonomyLab({
               ))}
             </div>
             <span className="autonomy-target-help">{copy.targetHelp[target]}</span>
-            <Link className="btn autonomy-edit-in-chat" to="/assistant">
+            <Link className="btn autonomy-edit-in-chat" to="/autonomy">
               <MessageSquareText aria-hidden="true" />{copy.editInChat}
             </Link>
             <button
