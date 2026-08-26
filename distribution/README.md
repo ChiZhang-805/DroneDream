@@ -1,5 +1,8 @@
 # DroneDream distribution contracts
 
+The synchronized desktop publishing and retention standard is documented in
+[`desktop/RELEASE_POLICY.md`](desktop/RELEASE_POLICY.md).
+
 This directory owns source-level contracts shared by the Sim, Lab, and Field
 editions and by versioned Vehicle Packs. It does not create separate product
 codebases. The three editions must continue to consume the same reviewed core,

@@ -7,6 +7,7 @@ param(
     [string]$EditionId,
     [string]$SourceCommit,
     [UInt64]$BuildNumber,
+    [string]$CombinedReleaseTag,
     [ValidateSet("recommended", "required")]
     [string]$UpdatePolicy = "recommended"
 )
@@ -81,7 +82,16 @@ if ([string]::IsNullOrWhiteSpace($signature)) {
 }
 
 $tag = "${releaseTagPrefix}${BuildNumber}"
-$downloadUrl = "https://github.com/$Repository/releases/download/$tag/$publicArtifactName"
+$downloadAssetName = $publicArtifactName
+if (-not [string]::IsNullOrWhiteSpace($CombinedReleaseTag)) {
+    $expectedCombinedReleaseTag = "five-edition-v${version}-build-${BuildNumber}"
+    if ($CombinedReleaseTag -cne $expectedCombinedReleaseTag) {
+        throw "Combined release tag must equal $expectedCombinedReleaseTag."
+    }
+    $tag = $CombinedReleaseTag
+    $downloadAssetName = $installerName
+}
+$downloadUrl = "https://github.com/$Repository/releases/download/$tag/$downloadAssetName"
 $manifest = [ordered]@{
     version = $version
     updatePolicy = $UpdatePolicy
