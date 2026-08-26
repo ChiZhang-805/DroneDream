@@ -14,30 +14,6 @@ on:
           - lab
           - field
           - autonomy
-  pull_request:
-    paths:
-      - ".gitattributes"
-      - ".github/CODEOWNERS"
-      - ".github/workflows/desktop-installer.yml"
-      - "CODE_SIGNING_POLICY.md"
-      - "PRIVACY.md"
-      - "README.md"
-      - "SECURITY.md"
-      - "VERSIONING.md"
-      - "desktop/**"
-      - "distribution/desktop/**"
-      - "distribution/tests/test_desktop_release_workflow_contract.py"
-      - "frontend/**"
-      - "backend/**"
-      - "docs/14-runtime-release.md"
-      - "docs/signpath-foundation-application.md"
-      - "LICENSE"
-      - "runtime/release-public-keys.json"
-      - "runtime/tests/fixtures/jcs-release-vector.input.json"
-      - "runtime/tests/fixtures/runtime-release.json"
-      - "runtime/tests/fixtures/runtime-release.json.sig"
-      - "runtime/THIRD_PARTY_NOTICES.md"
-      - "runtime/licenses/valkey-COPYING"
   push:
     tags:
       - "desktop-universal-v*-build-*"
@@ -115,6 +91,7 @@ jobs:
           $contract = ./desktop/scripts/resolve-desktop-edition-release.ps1 `
             -ReleaseTag $releaseTag `
             -ValidationEditionId "${{ inputs.edition || 'universal' }}" `
+            -PullRequestBaseBranch $env:GITHUB_BASE_REF `
             -GitHubOutputPath $env:GITHUB_OUTPUT
           $oauthName = "OAUTH_$($contract.editionId.ToUpperInvariant())"
           $oauthClientId = [Environment]::GetEnvironmentVariable($oauthName)

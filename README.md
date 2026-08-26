@@ -59,6 +59,13 @@ Feature branches are temporary: their reviewed work must be merged before the
 branch is removed. The five applications share one authoritative core while
 each product branch preserves its own capability boundary and release evidence.
 
+The promoted [`autonomy-core/`](autonomy-core/) component supplies the shared
+natural-language mission Harness: versioned structured contracts, multi-call
+planning and critique loops, plugin slots and isolated plugin processes, safe
+hold/interruption/replan logic, ROS 2 interfaces, and PX4/Gazebo evidence. The
+five product shells select different capabilities and authority policies from
+that shared core; the language model never receives direct actuation authority.
+
 ## 🧠 AURORA, the technical core
 
 **AURORA — Agentic UAV Refinement through Optimization, Reflection, and

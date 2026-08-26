@@ -1,0 +1,260 @@
+{
+  "$defs": {
+    "GraphRoute": {
+      "additionalProperties": false,
+      "properties": {
+        "all_edges_flight_verified": {
+          "title": "All Edges Flight Verified",
+          "type": "boolean"
+        },
+        "edge_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10000,
+          "title": "Edge Ids",
+          "type": "array"
+        },
+        "goal_node": {
+          "title": "Goal Node",
+          "type": "string"
+        },
+        "node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10000,
+          "minItems": 1,
+          "title": "Node Ids",
+          "type": "array"
+        },
+        "positions_m": {
+          "items": {
+            "$ref": "#/$defs/Vector3"
+          },
+          "maxItems": 10000,
+          "minItems": 1,
+          "title": "Positions M",
+          "type": "array"
+        },
+        "route_length_m": {
+          "minimum": 0.0,
+          "title": "Route Length M",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "dronedream.graph-route.v1",
+          "default": "dronedream.graph-route.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "start_node": {
+          "title": "Start Node",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start_node",
+        "goal_node",
+        "node_ids",
+        "edge_ids",
+        "positions_m",
+        "route_length_m",
+        "all_edges_flight_verified"
+      ],
+      "title": "GraphRoute",
+      "type": "object"
+    },
+    "RouteClearanceReport": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "collision_count": {
+          "minimum": 0,
+          "title": "Collision Count",
+          "type": "integer"
+        },
+        "collisions": {
+          "items": {
+            "$ref": "#/$defs/RouteCollision"
+          },
+          "maxItems": 100,
+          "title": "Collisions",
+          "type": "array"
+        },
+        "minimum_clearance_m": {
+          "title": "Minimum Clearance M",
+          "type": "number"
+        },
+        "minimum_clearance_point": {
+          "$ref": "#/$defs/Vector3"
+        },
+        "minimum_clearance_primitive": {
+          "title": "Minimum Clearance Primitive",
+          "type": "string"
+        },
+        "primitive_count": {
+          "minimum": 1,
+          "title": "Primitive Count",
+          "type": "integer"
+        },
+        "route_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Route Sha256",
+          "type": "string"
+        },
+        "sample_count": {
+          "minimum": 1,
+          "title": "Sample Count",
+          "type": "integer"
+        },
+        "sample_interval_m": {
+          "exclusiveMinimum": 0.0,
+          "title": "Sample Interval M",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "dronedream.route-clearance.v1",
+          "default": "dronedream.route-clearance.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "semantic_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Semantic Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "accepted",
+        "route_sha256",
+        "semantic_sha256",
+        "sample_interval_m",
+        "sample_count",
+        "primitive_count",
+        "collision_count",
+        "minimum_clearance_m",
+        "minimum_clearance_point",
+        "minimum_clearance_primitive"
+      ],
+      "title": "RouteClearanceReport",
+      "type": "object"
+    },
+    "RouteCollision": {
+      "additionalProperties": false,
+      "properties": {
+        "clearance_m": {
+          "title": "Clearance M",
+          "type": "number"
+        },
+        "position_m": {
+          "$ref": "#/$defs/Vector3"
+        },
+        "primitive_name": {
+          "title": "Primitive Name",
+          "type": "string"
+        },
+        "sample_index": {
+          "minimum": 0,
+          "title": "Sample Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sample_index",
+        "position_m",
+        "primitive_name",
+        "clearance_m"
+      ],
+      "title": "RouteCollision",
+      "type": "object"
+    },
+    "Vector3": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        },
+        "z": {
+          "title": "Z",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "title": "Vector3",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "alternative_id": {
+      "title": "Alternative Id",
+      "type": "string"
+    },
+    "clearance": {
+      "$ref": "#/$defs/RouteClearanceReport"
+    },
+    "feasible": {
+      "title": "Feasible",
+      "type": "boolean"
+    },
+    "hard_gates": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "title": "Hard Gates",
+      "type": "object"
+    },
+    "issue_codes": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Issue Codes",
+      "type": "array"
+    },
+    "objectives": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Objectives",
+      "type": "object"
+    },
+    "route": {
+      "$ref": "#/$defs/GraphRoute"
+    },
+    "schema_version": {
+      "const": "dronedream.route-alternative-candidate.v1",
+      "default": "dronedream.route-alternative-candidate.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "strategy_tool_id": {
+      "title": "Strategy Tool Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "alternative_id",
+    "strategy_tool_id",
+    "route",
+    "clearance",
+    "objectives",
+    "hard_gates",
+    "feasible"
+  ],
+  "title": "RouteAlternativeCandidate",
+  "type": "object"
+}

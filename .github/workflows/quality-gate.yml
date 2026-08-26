@@ -1,22 +1,6 @@
 name: Quality gate
 
 on:
-  pull_request:
-    branches:
-      - main
-      - codex/software
-      - codex/software-sim
-      - codex/software-lab
-      - codex/software-field
-      - codex/software-agent
-  push:
-    branches:
-      - main
-      - codex/software
-      - codex/software-sim
-      - codex/software-lab
-      - codex/software-field
-      - codex/software-agent
   workflow_dispatch:
 
 permissions:
@@ -75,6 +59,45 @@ jobs:
           python -m compileall -q app tests alembic scripts ../worker \
             ../scripts/check-repository.py ../scripts/simulators
           python -m pytest
+
+  autonomy-core:
+    name: AUTONOMY / Harness and plugins
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: autonomy-core/pyproject.toml
+
+      - name: Install AUTONOMY quality dependencies
+        working-directory: autonomy-core
+        run: |
+          python -m pip install --disable-pip-version-check \
+            --editable ".[dev]" \
+            "ruff==0.15.21" "pytest==9.1.1"
+
+      - name: Lint and test the promoted Harness
+        working-directory: autonomy-core
+        run: |
+          python -m ruff check src tests scripts
+          python -m ruff format --check src tests scripts
+          python -m compileall -q src tests scripts
+          python -m pytest
+
+      - name: Validate ROS 2 shell entrypoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          find autonomy-core/scripts -type f -name '*.sh' -print0 \
+            | xargs -0 -n1 bash -n
 
   frontend:
     name: Frontend / Node.js 22

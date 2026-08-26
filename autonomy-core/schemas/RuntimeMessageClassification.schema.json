@@ -1,0 +1,79 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "message_kind": {
+      "enum": [
+        "emergency_stop",
+        "mission_amendment",
+        "motion_adjustment",
+        "informational"
+      ],
+      "title": "Message Kind",
+      "type": "string"
+    },
+    "parameters": {
+      "additionalProperties": true,
+      "title": "Parameters",
+      "type": "object"
+    },
+    "requested_action": {
+      "enum": [
+        "land",
+        "replan",
+        "adjust_motion",
+        "resume",
+        "redirect",
+        "set_speed",
+        "pause",
+        "return_home",
+        "safe_land",
+        "set_return_point",
+        "set_coverage",
+        "camera_control",
+        "payload_control",
+        "set_avoidance",
+        "follow_target",
+        "operator_takeover"
+      ],
+      "title": "Requested Action",
+      "type": "string"
+    },
+    "requires_plan_revision": {
+      "title": "Requires Plan Revision",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "dronedream.runtime-message-classification.v1",
+      "default": "dronedream.runtime-message-classification.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "summary": {
+      "maxLength": 400,
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    },
+    "target_entity": {
+      "anyOf": [
+        {
+          "maxLength": 160,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Entity"
+    }
+  },
+  "required": [
+    "message_kind",
+    "requested_action",
+    "requires_plan_revision",
+    "summary"
+  ],
+  "title": "RuntimeMessageClassification",
+  "type": "object"
+}

@@ -10,6 +10,7 @@ from PIL import Image, ImageChops
 REPO = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = REPO / "brand" / "editions.json"
 ICON_DIR = REPO / "brand" / "icons"
+WEBSITE_FAVICON_PATH = ICON_DIR / "website-favicon-64.png"
 DEFAULT_DERIVATIVE_ROOT = REPO / "desktop" / "src-tauri" / "gen" / "brand"
 DEFAULT_FAVICON_PATH = REPO / "frontend" / "public" / "drone-favicon.png"
 EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
@@ -89,7 +90,9 @@ def validate_canonical_assets(
                 lockups[edition_id] = image
 
     actual_paths = {
-        path.resolve() for path in ICON_DIR.glob("*.png") if path.is_file()
+        path.resolve()
+        for path in ICON_DIR.glob("*.png")
+        if path.is_file() and path.resolve() != WEBSITE_FAVICON_PATH.resolve()
     }
     if actual_paths != expected_paths or len(actual_paths) != 10:
         unexpected = sorted(
@@ -102,6 +105,16 @@ def validate_canonical_assets(
             "canonical icon inventory must equal ten files; "
             f"unexpected={unexpected}, missing={missing}"
         )
+    favicon = validate_png(
+        WEBSITE_FAVICON_PATH,
+        {
+            "sha256": "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7",
+            "width": 64,
+            "height": 64,
+        },
+    )
+    if favicon.size != (64, 64):
+        raise BrandAssetError("approved website favicon dimensions drifted")
 
     reference_prefix: Image.Image | None = None
     label_ratios: list[float] = []
@@ -202,11 +215,8 @@ def generate_derivatives(
         )
         outputs.append(ico_path)
 
-    favicon_source = marks[edition_ids[-1]]
     favicon_path.parent.mkdir(parents=True, exist_ok=True)
-    favicon_source.resize((64, 64), Image.Resampling.LANCZOS).save(
-        favicon_path, format="PNG"
-    )
+    favicon_path.write_bytes(WEBSITE_FAVICON_PATH.read_bytes())
     outputs.append(favicon_path)
     return outputs
 

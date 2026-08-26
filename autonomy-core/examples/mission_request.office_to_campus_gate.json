@@ -1,0 +1,7 @@
+{
+  "schema_version": "dronedream.mission-request.v1",
+  "conversation_id": "school-map-campus-gate-001",
+  "message": "从办公室无人机起降坪起飞，飞到校园门口并在那里安全降落，不需要返航。",
+  "start_entity": "办公室无人机起降坪",
+  "locale": "zh-CN"
+}

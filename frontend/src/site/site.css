@@ -243,9 +243,11 @@ body:has(#site-root) a {
   background: linear-gradient(110deg, var(--site-cyan), #a6a0ff 55%, var(--site-magenta));
   box-shadow: 0 8px 28px rgba(105, 216, 255, 0.15);
   font-size: 1.04rem;
+  font-family: inherit;
   font-weight: 750;
   text-decoration: none;
   transition: transform 180ms ease, box-shadow 180ms ease;
+  cursor: pointer;
 }
 
 .site-header-download svg {
@@ -259,6 +261,61 @@ body:has(#site-root) a {
 }
 
 .site-header-download:hover { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(105, 216, 255, 0.24); }
+.site-download-picker { position: relative; flex: 0 0 auto; }
+.site-header-download-chevron {
+  width: 14px !important;
+  height: 14px !important;
+  transition: transform 180ms ease;
+}
+.site-download-picker.is-open .site-header-download-chevron { transform: rotate(180deg); }
+.site-download-menu {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 12px);
+  right: 0;
+  width: min(390px, calc(100vw - 36px));
+  overflow: hidden;
+  padding: 0.7rem;
+  border: 1px solid rgba(166, 227, 255, 0.2);
+  border-radius: 20px;
+  color: #f7f8ff;
+  background: rgba(9, 11, 27, 0.98);
+  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.5), 0 0 36px rgba(104, 232, 255, 0.09);
+  backdrop-filter: blur(24px);
+  animation: site-download-menu-in 160ms ease both;
+}
+.site-download-menu-heading { display: grid; gap: 0.2rem; padding: 0.55rem 0.65rem 0.75rem; }
+.site-download-menu-heading strong { font-size: 0.98rem; }
+.site-download-menu-heading span { color: rgba(226, 232, 250, 0.58); font-size: 0.72rem; }
+.site-download-menu-options { display: grid; gap: 0.35rem; }
+.site-download-option {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  min-height: 66px;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.site-download-option:hover,
+.site-download-option:focus-visible {
+  border-color: rgba(104, 232, 255, 0.22);
+  background: linear-gradient(110deg, rgba(104, 232, 255, 0.1), rgba(241, 102, 216, 0.07));
+  transform: translateX(2px);
+}
+.site-download-option > img { width: 42px; height: 42px; object-fit: contain; }
+.site-download-option-copy { display: grid; min-width: 0; gap: 0.16rem; }
+.site-download-option-copy strong { overflow: hidden; font-size: 0.86rem; text-overflow: ellipsis; white-space: nowrap; }
+.site-download-option-copy > span { overflow: hidden; color: rgba(226, 232, 250, 0.6); font-size: 0.68rem; text-overflow: ellipsis; white-space: nowrap; }
+.site-download-option-meta { display: grid; align-items: center; justify-items: end; gap: 0.22rem; color: rgba(226, 232, 250, 0.56); font-size: 0.64rem; }
+.site-download-option-meta svg { width: 16px; height: 16px; fill: none; stroke: var(--site-cyan); stroke-width: 1.8; }
+@keyframes site-download-menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+}
 .site-menu-button { display: none; width: 40px; height: 40px; flex-direction: column; gap: 6px; }
 .site-menu-button span { width: 20px; height: 1px; background: currentColor; transition: transform 180ms ease; }
 
@@ -3336,7 +3393,18 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-nav,
   .site-header.is-scrolled .site-nav { top: 66px; }
   .site-brand .brand-lockup { height: 34px; }
-  .site-header-download { display: none; }
+  .site-header-download { width: 42px; height: 42px; padding: 0; }
+  .site-header-download-label,
+  .site-header-download-chevron { display: none; }
+  .site-download-menu {
+    position: fixed;
+    top: 74px;
+    right: 18px;
+    left: 18px;
+    width: auto;
+    max-height: calc(100svh - 92px);
+    overflow-y: auto;
+  }
   .site-language { padding: .45rem; }
   .site-hero { min-height: 720px; height: 100svh; }
   .site-hero-scene {

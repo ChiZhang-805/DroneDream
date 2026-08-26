@@ -21,6 +21,14 @@ const DESKTOP_REDIRECTS = new Map([
   ],
 ] as const);
 
+export function authorizationIdFromLocation(): string | null {
+  const value = new URLSearchParams(window.location.search)
+    .get("authorization_id")
+    ?.trim();
+  if (!value || value.length < 8 || value.length > 512) return null;
+  return /^[A-Za-z0-9._~-]+$/u.test(value) ? value : null;
+}
+
 export function desktopEditionForRedirectUri(value: string) {
   return DESKTOP_REDIRECTS.get(value as never) ?? null;
 }

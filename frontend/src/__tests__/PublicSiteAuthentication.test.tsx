@@ -103,6 +103,28 @@ describe("public website account authentication", () => {
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
   });
 
+  it.each([
+    "/oauth/consent",
+    "/oauth/consent?authorization_id=bad%20id",
+  ])(
+    "shows the invalid-request state instead of locking signed-out users behind authentication at %s",
+    async (url) => {
+      window.history.replaceState(null, "", url);
+      const { container } = render(
+        <I18nProvider>
+          <SiteApp />
+        </I18nProvider>,
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "This desktop sign-in request is missing or invalid. Return to the app and try again.",
+      );
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(container.querySelector(".site-auth-backdrop")).not.toBeInTheDocument();
+      expect(container.querySelector(".site-oauth-consent")).toBeVisible();
+    },
+  );
+
   it("registers with email, password confirmation, and a verification code", async () => {
     renderOAuthPage();
     const signInDialog = await screen.findByRole("dialog", { name: "Sign in" });

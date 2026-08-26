@@ -107,7 +107,7 @@ EDITION_BRANCHES = {
     "sim": "codex/software-sim",
     "lab": "codex/software-lab",
     "field": "codex/software-field",
-    # The protocol/storage identity remains `autonomy`; the product channel is AGENT.
+    # Protocol and storage retain `autonomy`; the visible product channel is AGENT.
     "autonomy": "codex/software-agent",
 }
 ENFORCEMENT_LAYERS = {"backend", "runtime", "native"}

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,8 @@ import { createServer } from "vite";
 
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repoRoot = path.resolve(frontendRoot, "..");
+const dependencyRoot = await realpath(path.join(frontendRoot, "node_modules"))
+  .catch(() => path.join(frontendRoot, "node_modules"));
 const label = process.argv[2] || "current";
 const outputRoot = path.join(
   repoRoot,
@@ -127,7 +129,12 @@ const server = await createServer({
   configFile: path.join(frontendRoot, "vite.site.config.ts"),
   root: frontendRoot,
   logLevel: "warn",
-  server: { host, port, strictPort: true },
+  server: {
+    host,
+    port,
+    strictPort: true,
+    fs: { allow: [repoRoot, dependencyRoot] },
+  },
 });
 
 let browser;

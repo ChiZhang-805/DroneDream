@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/brand-editions.v1.json",
+  "title": "DroneDream edition brand system",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "brandVersion",
+    "masterName",
+    "separator",
+    "geometry",
+    "websiteFavicon",
+    "font",
+    "artifactContract",
+    "editions",
+    "safety",
+    "approval",
+    "approvedEditionAssets"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-edition-brand-system"},
+    "brandVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "masterName": {"const": "DroneDream"},
+    "separator": {"const": "·"},
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourcePath", "preserveWhiteFlightPath", "recolorMode"],
+      "properties": {
+        "sourcePath": {"const": "brand/source/drone-dream-mark-master.png"},
+        "preserveWhiteFlightPath": {"const": true},
+        "recolorMode": {"const": "shared-alpha-and-neutral-detail-mask-v1"}
+      }
+    },
+    "websiteFavicon": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourcePath",
+        "sourceSha256",
+        "dimensions",
+        "canonicalOutputPath",
+        "approvalBasis"
+      ],
+      "properties": {
+        "sourcePath": {"const": "brand/source/approved/website-favicon-64.png"},
+        "sourceSha256": {
+          "const": "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7"
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": {"const": 64},
+            "height": {"const": 64}
+          }
+        },
+        "canonicalOutputPath": {"const": "frontend/public/drone-favicon.png"},
+        "approvalBasis": {"const": "mainland-preview-approved-v1"}
+      }
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "sourcePath", "licensePath", "license"],
+      "properties": {
+        "family": {"const": "Space Grotesk"},
+        "sourcePath": {"const": "brand/source/space-grotesk-latin-wght-normal.woff2"},
+        "licensePath": {"const": "brand/source/Space-Grotesk-OFL-1.1.txt"},
+        "license": {"const": "OFL-1.1"}
+      }
+    },
+    "artifactContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "markRasterSizesPx",
+        "faviconPngSizePx",
+        "windowsPngSizesPx",
+        "windowsIcoFrameSizesPx",
+        "lockupVariants",
+        "transparentBackground"
+      ],
+      "properties": {
+        "markRasterSizesPx": {"const": [1024, 512, 256]},
+        "faviconPngSizePx": {"const": 64},
+        "windowsPngSizesPx": {"const": [32, 128, 256]},
+        "windowsIcoFrameSizesPx": {"const": [16, 20, 24, 32, 40, 48, 64, 128, 256]},
+        "lockupVariants": {"const": ["primary", "compact"]},
+        "transparentBackground": {"const": true}
+      }
+    },
+    "editions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["universal", "sim", "lab", "field", "autonomy"],
+      "patternProperties": {
+        "^(universal|sim|lab|field|autonomy)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["productName", "editionLabel", "gradientStops", "lightSurface", "darkSurface"],
+          "properties": {
+            "productName": {"type": "string", "minLength": 1},
+            "editionLabel": {"type": ["string", "null"]},
+            "gradientStops": {
+              "type": "array",
+              "prefixItems": [
+                {"type": "string", "pattern": "^#[0-9A-F]{6}$"},
+                {"type": "string", "pattern": "^#[0-9A-F]{6}$"},
+                {"type": "string", "pattern": "^#[0-9A-F]{6}$"}
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "lightSurface": {"type": "string", "pattern": "^#[0-9A-F]{6}$"},
+            "darkSurface": {"type": "string", "pattern": "^#[0-9A-F]{6}$"}
+          }
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["presentationOnly", "grantsHardwareAuthority"],
+      "properties": {
+        "presentationOnly": {"const": true},
+        "grantsHardwareAuthority": {"const": false}
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handoffSha256",
+        "conceptAssetsAreReleaseAssets",
+        "largeLabelLockupsAreCanonicalSources",
+        "largeLabelReviewPreviewPath",
+        "largeLabelReviewPreviewSha256",
+        "largeLabelReviewPreviewDimensions",
+        "largeLabelReviewStudySha256",
+        "editionLabelHeightRatio",
+        "preserveNaturalLabelWidth",
+        "separatorCentering"
+      ],
+      "properties": {
+        "handoffSha256": {"const": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"},
+        "conceptAssetsAreReleaseAssets": {"const": false},
+        "largeLabelLockupsAreCanonicalSources": {"const": true},
+        "largeLabelReviewPreviewPath": {
+          "const": "brand/source/approved/edition-brand-centered-separator-approved-preview.png"
+        },
+        "largeLabelReviewPreviewSha256": {
+          "const": "77d5326be1155528d9585a56de99c80364640ed7f4d488222c7f581ef70da02e"
+        },
+        "largeLabelReviewPreviewDimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": {"const": 5200},
+            "height": {"const": 1680}
+          }
+        },
+        "largeLabelReviewStudySha256": {
+          "const": "9b3e9a274ef51393ffbf8ba3cf5d41224a0cafc9990deddeafcef1a92122353a"
+        },
+        "editionLabelHeightRatio": {"const": 0.9},
+        "preserveNaturalLabelWidth": {"const": true},
+        "separatorCentering": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "tolerancePx"],
+          "properties": {
+            "method": {"const": "equal-alpha-edge-gaps"},
+            "tolerancePx": {"const": 0}
+          }
+        }
+      }
+    },
+    "approvedEditionAssets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sim", "lab", "field", "autonomy"],
+      "patternProperties": {
+        "^(sim|lab|field|autonomy)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "markPath",
+            "markSha256",
+            "dotLockupPath",
+            "dotLockupSha256",
+            "dotLockupDimensions",
+            "dotLockupStyle",
+            "separatorGeometry"
+          ],
+          "properties": {
+            "markPath": {
+              "type": "string",
+              "pattern": "^brand/source/approved/(sim|lab|field|autonomy)-mark-1024\\.png$"
+            },
+            "markSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "dotLockupPath": {
+              "type": "string",
+              "pattern": "^brand/source/approved/(sim|lab|field|autonomy)-large-label-centered-lockup\\.png$"
+            },
+            "dotLockupSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "dotLockupDimensions": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["width", "height"],
+              "properties": {
+                "width": {"type": "integer", "minimum": 2000, "maximum": 3200},
+                "height": {"type": "integer", "minimum": 200, "maximum": 360}
+              }
+            },
+            "dotLockupStyle": {
+              "enum": ["large-edition-label-centered-separator-v2", "autonomy-approved-lockup-v1"]
+            },
+            "separatorTolerancePx": {"type": "integer", "minimum": 0, "maximum": 12},
+            "separatorGeometry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "wordmarkEndX",
+                "separatorStartX",
+                "separatorEndX",
+                "editionLabelStartX",
+                "leftGapPx",
+                "rightGapPx"
+              ],
+              "properties": {
+                "wordmarkEndX": {"type": "integer", "minimum": 0},
+                "separatorStartX": {"type": "integer", "minimum": 0},
+                "separatorEndX": {"type": "integer", "minimum": 0},
+                "editionLabelStartX": {"type": "integer", "minimum": 0},
+                "leftGapPx": {"type": "integer", "minimum": 1},
+                "rightGapPx": {"type": "integer", "minimum": 1}
+              }
+            },
+            "supersededLargeLabelLockup": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256", "status"],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^brand/source/approved/(sim|lab|field)-large-label-lockup\\.png$"
+                },
+                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "status": {"const": "superseded-by-centered-separator-v2"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -221,16 +221,12 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert integrated_manifest["createsCrossEditionHarnessOrchestrator"] is False
     assert integrated_manifest["validatedVehiclePackCount"] == 0
     assert integrated_manifest["hardwareActionDecision"] == "deny"
-    integrated_capability = integrated_manifest["sharedCapability"]  # type: ignore[index]
-    assert integrated_capability["id"] == "external-asset-qualification"
-    assert integrated_capability["ownerEdition"] == "autonomy"
-    assert integrated_capability["routes"] == [
-        "/autonomy/maps",
-        "/autonomy/aircraft",
-    ]
-    assert integrated_capability["builtInModeling"] is False
-    assert integrated_capability["unqualifiedAssetCanExecute"] is False
-    assert integrated_capability["grantsHardwareAuthority"] is False
+    integrated_vehicle_studio = integrated_manifest["productScopedCapability"]
+    assert integrated_vehicle_studio["id"] == "vehicle-studio"
+    assert integrated_vehicle_studio["hostEditions"] == ["universal", "autonomy"]
+    assert integrated_vehicle_studio["editionBoundStorage"] is True
+    assert integrated_vehicle_studio["theme"] == "edition-bound"
+    assert "universalExclusiveCapability" not in integrated_manifest
     assert integrated_manifest["donors"]["lab"]["productSource"] == (  # type: ignore[index]
         "b3c5f90948f206472e3e12504d8205cb563ac9dc"
     )
@@ -260,30 +256,16 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
                 check=True,
             ).stdout.strip()
             assert actual_blob == source_file["donorBlob"]
-    qualification = profile["sharedCapabilities"]["externalAssetQualification"]
-    assert qualification["ownerEdition"] == "autonomy"
-    assert qualification["routes"] == ["/autonomy/maps", "/autonomy/aircraft"]
-    assert qualification["shareTargets"] == [
-        "universal",
-        "sim",
-        "lab",
-        "field",
-        "autonomy",
-    ]
-    assert qualification["sourceKinds"] == ["file", "directory", "direct_url", "git"]
-    assert qualification["qualificationTargets"] == [
-        "ROS 2 Jazzy",
-        "Gazebo Harmonic",
-        "PX4 SITL",
-    ]
-    assert qualification["builtInModeling"] is False
-    assert qualification["automaticReceiverInstallation"] is False
-    assert qualification["modelHarnessStartsOnImport"] is False
-    assert qualification["unqualifiedAssetCanExecute"] is False
-    assert qualification["grantsSimulationExecution"] is False
-    assert qualification["grantsHardwareAuthority"] is False
-    assert qualification["productSourceCommit"] == (
-        "7cf37d728211a92bbcbb411c3ce8cca904d4c38a"
+    vehicle_studio = profile["productScopedCapabilities"]["vehicleStudio"]
+    assert vehicle_studio["hostEditions"] == ["universal", "autonomy"]
+    assert vehicle_studio["editionBoundStorage"] is True
+    assert vehicle_studio["shareTargets"] == ["sim", "lab", "field", "autonomy"]
+    assert vehicle_studio["automaticReceiverInstallation"] is False
+    assert vehicle_studio["modelHarnessStartsOnExchange"] is False
+    assert vehicle_studio["grantsSimulationExecution"] is False
+    assert vehicle_studio["grantsHardwareAuthority"] is False
+    assert vehicle_studio["productSourceCommit"] == (
+        "b2fdade2afcfa20e1f117eafabb537aafa6f067f"
     )
     assert qualification["contract"] == str(
         EXTERNAL_ASSET_QUALIFICATION.relative_to(ROOT)
@@ -387,10 +369,12 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'Universal integrated workspace byte-exact donor drifted:',
         'createsCrossEditionHarnessOrchestrator = $false',
         'integratedWorkspaceUi = [ordered]@{',
-        'Shared external asset qualification identity or safety policy drifted.',
-        'Shared external asset qualification source binding drifted:',
-        'Shared external asset qualification contract must bind exactly ten source files.',
-        'externalAssetQualification = [ordered]@{',
+        'Product-scoped Vehicle Studio identity or safety policy drifted.',
+        'Product-scoped Vehicle Studio source binding drifted:',
+        'Product-scoped Vehicle Studio contract must bind exactly ten source files.',
+        '$vehicleStudioHosts -join ","',
+        'editionBoundStorage = $true',
+        'vehicleStudio = [ordered]@{',
         'dialogScrollHeight -gt $measurement.dialogClientHeight',
         'panelScrollHeight -gt $measurement.panelClientHeight',
         'runtimePanelHeadedValidationStatus',

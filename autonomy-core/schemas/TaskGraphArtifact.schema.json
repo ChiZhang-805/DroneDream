@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "TaskGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/TaskNode"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "title": "Nodes",
+          "type": "array"
+        },
+        "revision": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "dronedream.task-graph.v1",
+          "default": "dronedream.task-graph.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "nodes"
+      ],
+      "title": "TaskGraph",
+      "type": "object"
+    },
+    "TaskNode": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "maxLength": 120,
+          "minLength": 3,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Action",
+          "type": "string"
+        },
+        "depends_on": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "fallback": {
+          "enum": [
+            "continue",
+            "hold",
+            "return",
+            "land",
+            "abort"
+          ],
+          "title": "Fallback",
+          "type": "string"
+        },
+        "max_retries": {
+          "default": 1,
+          "maximum": 8,
+          "minimum": 0,
+          "title": "Max Retries",
+          "type": "integer"
+        },
+        "success_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Success Evidence",
+          "type": "array"
+        },
+        "target_node": {
+          "title": "Target Node",
+          "type": "string"
+        },
+        "task_id": {
+          "maxLength": 64,
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "action",
+        "target_node",
+        "success_evidence",
+        "fallback"
+      ],
+      "title": "TaskNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "graph": {
+      "$ref": "#/$defs/TaskGraph"
+    },
+    "schema_version": {
+      "const": "dronedream.task-graph-artifact.v1",
+      "default": "dronedream.task-graph-artifact.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "graph"
+  ],
+  "title": "TaskGraphArtifact",
+  "type": "object"
+}

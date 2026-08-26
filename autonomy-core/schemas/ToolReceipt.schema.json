@@ -1,0 +1,94 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "call_id": {
+      "pattern": "^tool-[0-9a-f]{24}$",
+      "title": "Call Id",
+      "type": "string"
+    },
+    "input_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Input Sha256",
+      "type": "string"
+    },
+    "issue_codes": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Issue Codes",
+      "type": "array"
+    },
+    "outcome": {
+      "enum": [
+        "accepted",
+        "rejected",
+        "failed"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "output": {
+      "additionalProperties": true,
+      "title": "Output",
+      "type": "object"
+    },
+    "output_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Output Sha256",
+      "type": "string"
+    },
+    "plugin_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z][a-z0-9._-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Plugin Id"
+    },
+    "plugin_package_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Plugin Package Sha256"
+    },
+    "schema_version": {
+      "const": "dronedream.tool-receipt.v1",
+      "default": "dronedream.tool-receipt.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "tool_id": {
+      "pattern": "^[a-z][a-z0-9._-]*$",
+      "title": "Tool Id",
+      "type": "string"
+    },
+    "tool_version": {
+      "title": "Tool Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "tool_id",
+    "tool_version",
+    "outcome",
+    "input_sha256",
+    "output_sha256",
+    "output"
+  ],
+  "title": "ToolReceipt",
+  "type": "object"
+}

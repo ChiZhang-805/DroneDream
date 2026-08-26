@@ -4,6 +4,7 @@ import type { DroneDreamAccount } from "../features/auth/AuthContext";
 import { supabaseClient } from "../features/auth/supabaseClient";
 import type { Locale } from "../i18n/I18nProvider";
 import {
+  authorizationIdFromLocation,
   desktopEditionForRedirectUri,
   isAllowedDesktopCallback,
   isDesktopCallbackForRedirectUri,
@@ -84,12 +85,6 @@ const copy = {
     working: "正在完成登录…",
   },
 } as const;
-
-function authorizationIdFromLocation(): string | null {
-  const value = new URLSearchParams(window.location.search).get("authorization_id")?.trim();
-  if (!value || value.length < 8 || value.length > 512) return null;
-  return /^[A-Za-z0-9._~-]+$/u.test(value) ? value : null;
-}
 
 function redirectToDesktop(value: string): void {
   if (!isAllowedDesktopCallback(value)) {

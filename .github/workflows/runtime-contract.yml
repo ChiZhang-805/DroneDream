@@ -1,26 +1,7 @@
 name: Runtime contract
 
 on:
-  pull_request:
-    paths:
-      - "runtime/**"
-      - ".github/workflows/runtime-contract.yml"
-      - ".github/workflows/runtime-release.yml"
-      - "desktop/src-tauri/src/runtime.rs"
-      - "backend/app/routers/health.py"
-      - "backend/pyproject.toml"
-      - "worker/pyproject.toml"
-      - "scripts/simulators/**"
-  push:
-    paths:
-      - "runtime/**"
-      - ".github/workflows/runtime-contract.yml"
-      - ".github/workflows/runtime-release.yml"
-      - "desktop/src-tauri/src/runtime.rs"
-      - "backend/app/routers/health.py"
-      - "backend/pyproject.toml"
-      - "worker/pyproject.toml"
-      - "scripts/simulators/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
