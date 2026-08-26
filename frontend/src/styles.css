@@ -22826,6 +22826,56 @@ body {
   color: #cbd3e6;
 }
 
+/* Runtime actions and health summaries must stay legible inside the themed
+   settings canvas. Earlier light-theme component rules were more specific
+   and could leave a white button/card behind in dark mode. */
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-check,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-action {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 42%, #4b5268);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 58%, var(--bg-elev-2));
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-check:hover,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-action:hover {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--dd-brand-start) 62%, #ffffff);
+  background: color-mix(in srgb, var(--dd-brand-middle) 24%, var(--bg-elev-2));
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-healthy {
+  color: #45efa0;
+  border-color: color-mix(in srgb, #45efa0 34%, var(--border));
+  background: color-mix(in srgb, #45efa0 8%, var(--bg-elev));
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-healthy small {
+  color: #b8efd4;
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-healthy .settings-runtime-status-icon {
+  color: #45efa0;
+  background: transparent;
+}
+
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-check,
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-update-action {
+  color: #241a28;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 28%, #d6ced9);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 72%, #ffffff);
+}
+
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-status-healthy {
+  color: #126246;
+  border-color: #a8dfcb;
+  background: #effaf6;
+}
+
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-status-healthy small {
+  color: #426f60;
+}
+
 :root[data-dd-appearance="dark"] .account-menu-popover {
   color: #ffffff;
   border-color: color-mix(in srgb, var(--dd-brand-middle) 36%, #3a3146);
