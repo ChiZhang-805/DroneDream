@@ -130,6 +130,9 @@ try {
         Assert-Contract (
             $manifest.platforms.'windows-x86_64'.url -ceq $expectedUrl
         ) "Updater metadata crossed an edition URL family."
+        Assert-Contract (
+            [UInt64]$manifest.platforms.'windows-x86_64'.size -eq 3
+        ) "Updater metadata omitted the exact installer byte length."
         $metadataPaths += $metadataPath
         $downloadUrls += $manifest.platforms.'windows-x86_64'.url
     }

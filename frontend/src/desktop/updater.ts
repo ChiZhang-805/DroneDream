@@ -9,6 +9,7 @@ import {
   installEmbeddedEnginePack,
   installComponentUpdate,
   isDesktopRuntime,
+  stopRuntimeForExit,
   type ComponentUpdateId,
   type ComponentUpdateCandidate,
   type ComponentUpdateReport,
@@ -118,6 +119,8 @@ function componentCatalogUrl(): string | undefined {
 }
 
 const NO_PUBLISHED_DESKTOP_UPDATE = "Could not fetch a valid release JSON from the remote";
+const LEGACY_RUNTIME_IDLE_PROBE_UNAVAILABLE =
+  "The Runtime Base must be upgraded before DroneDream can update safely.";
 
 export function isNoPublishedDesktopUpdate(error: unknown): boolean {
   return errorMessage(error).trim() === NO_PUBLISHED_DESKTOP_UPDATE;
@@ -143,6 +146,19 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+export function isLegacyRuntimeIdleProbeUnavailable(error: unknown): boolean {
+  return errorMessage(error).trim() === LEGACY_RUNTIME_IDLE_PROBE_UNAVAILABLE;
+}
+
+export function updaterDownloadSize(rawJson: Record<string, unknown>): number {
+  const platforms = rawJson.platforms;
+  if (!platforms || typeof platforms !== "object" || Array.isArray(platforms)) return 0;
+  const windows = (platforms as Record<string, unknown>)["windows-x86_64"];
+  if (!windows || typeof windows !== "object" || Array.isArray(windows)) return 0;
+  const size = (windows as Record<string, unknown>).size;
+  return typeof size === "number" && Number.isSafeInteger(size) && size > 0 ? size : 0;
+}
+
 function isActiveExperimentDeferral(message: string): boolean {
   return message.includes("waiting for active experiments to finish");
 }
@@ -150,6 +166,7 @@ function isActiveExperimentDeferral(message: string): boolean {
 export function useAppUpdater() {
   const desktopRuntime = isDesktopRuntime();
   const updateRef = useRef<Update | null>(null);
+  const updateDownloadedRef = useRef(false);
   const checkGenerationRef = useRef(0);
   const installInFlightRef = useRef(false);
   const [state, setState] = useState<AppUpdateState>(() => (
@@ -340,6 +357,7 @@ export function useAppUpdater() {
       if (!enginePack || generation !== checkGenerationRef.current) return;
       const previousUpdate = updateRef.current;
       updateRef.current = null;
+      updateDownloadedRef.current = false;
       await previousUpdate?.close();
       if (generation !== checkGenerationRef.current) return;
       const update = await check({
@@ -395,27 +413,40 @@ export function useAppUpdater() {
     ) return;
     installInFlightRef.current = true;
     let downloaded = 0;
-    let contentLength = 0;
+    let contentLength = updaterDownloadSize(update.rawJson);
     setState((current) => ({ ...current, status: "downloading", progress: 0, error: null }));
     try {
-      await ensureAppUpdateIdle();
-      await update.downloadAndInstall((event) => {
-        if (event.event === "Started") {
-          contentLength = event.data.contentLength ?? 0;
-          setState((current) => ({ ...current, progress: 0 }));
-          return;
-        }
-        if (event.event === "Progress") {
-          downloaded += event.data.chunkLength;
-          if (contentLength > 0) {
-            const progress = Math.min(99, Math.round((downloaded / contentLength) * 100));
-            setState((current) => ({ ...current, progress }));
+      if (!updateDownloadedRef.current) {
+        await update.download((event) => {
+          if (event.event === "Started") {
+            contentLength = event.data.contentLength ?? contentLength;
+            setState((current) => ({ ...current, progress: 0 }));
+            return;
           }
-          return;
-        }
-        setState((current) => ({ ...current, status: "installing", progress: 100 }));
-      });
+          if (event.event === "Progress") {
+            downloaded += event.data.chunkLength;
+            if (contentLength > 0) {
+              const progress = Math.min(99, Math.floor((downloaded / contentLength) * 100));
+              setState((current) => ({ ...current, progress }));
+            }
+            return;
+          }
+          setState((current) => ({ ...current, progress: 100 }));
+        });
+        updateDownloadedRef.current = true;
+      }
       setState((current) => ({ ...current, status: "installing", progress: 100 }));
+      try {
+        await ensureAppUpdateIdle();
+      } catch (error) {
+        // Runtime Base releases from before the Engine Pack manager cannot
+        // prove idleness. They must not block the desktop bootstrap forever:
+        // stop only DroneDreamRuntime after the package is fully downloaded,
+        // then continue with the signed desktop installer.
+        if (!isLegacyRuntimeIdleProbeUnavailable(error)) throw error;
+      }
+      await stopRuntimeForExit();
+      await update.install();
       await relaunch();
     } catch (error) {
       setState((current) => ({
@@ -478,6 +509,7 @@ export function useAppUpdater() {
       checkGenerationRef.current += 1;
       void updateRef.current?.close();
       updateRef.current = null;
+      updateDownloadedRef.current = false;
     };
   }, [checkForUpdates]);
 

@@ -80,6 +80,10 @@ $signature = (Get-Content -LiteralPath $signaturePath -Raw -Encoding UTF8).Trim(
 if ([string]::IsNullOrWhiteSpace($signature)) {
     throw "Updater signature is empty: $signaturePath"
 }
+$installerSize = (Get-Item -LiteralPath $installerPath).Length
+if ($installerSize -le 0) {
+    throw "Updater installer is empty: $installerPath"
+}
 
 $tag = "${releaseTagPrefix}${BuildNumber}"
 $downloadAssetName = $publicArtifactName
@@ -107,6 +111,7 @@ $manifest = [ordered]@{
         "windows-x86_64" = [ordered]@{
             signature = $signature
             url = $downloadUrl
+            size = [UInt64]$installerSize
         }
     }
 }
@@ -124,7 +129,8 @@ if ($roundTrip.version -cne $version -or
     $roundTrip.updatePolicy -cne $UpdatePolicy -or
     $roundTrip.notes -cne $manifest.notes -or
     $roundTrip.platforms.'windows-x86_64'.url -cne $downloadUrl -or
-    $roundTrip.platforms.'windows-x86_64'.signature -cne $signature) {
+    $roundTrip.platforms.'windows-x86_64'.signature -cne $signature -or
+    [UInt64]$roundTrip.platforms.'windows-x86_64'.size -ne [UInt64]$installerSize) {
     throw "Generated updater manifest did not survive round-trip validation."
 }
 

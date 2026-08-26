@@ -9,6 +9,7 @@ const {
   installEmbeddedEnginePackMock,
   installComponentUpdateMock,
   relaunchMock,
+  stopRuntimeForExitMock,
 } = vi.hoisted(() => ({
   checkMock: vi.fn(),
   checkComponentUpdatesMock: vi.fn(),
@@ -17,6 +18,7 @@ const {
   installEmbeddedEnginePackMock: vi.fn(),
   installComponentUpdateMock: vi.fn(),
   relaunchMock: vi.fn(),
+  stopRuntimeForExitMock: vi.fn(),
 }));
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
@@ -32,13 +34,16 @@ vi.mock("../desktop/bridge", () => ({
   getEnginePackStatus: getEnginePackStatusMock,
   installEmbeddedEnginePack: installEmbeddedEnginePackMock,
   installComponentUpdate: installComponentUpdateMock,
+  stopRuntimeForExit: stopRuntimeForExitMock,
 }));
 
 import {
   appUpdateIsRequired,
   isNoPublishedDesktopUpdate,
+  isLegacyRuntimeIdleProbeUnavailable,
   orderComponentUpdates,
   selectManualComponentUpdates,
+  updaterDownloadSize,
   useAppUpdater,
 } from "../desktop/updater";
 
@@ -56,7 +61,8 @@ function update(version: string, overrides: Record<string, unknown> = {}) {
     body: "update-policy: recommended",
     rawJson: {},
     close: vi.fn(async () => undefined),
-    downloadAndInstall: vi.fn(async () => undefined),
+    download: vi.fn(async () => undefined),
+    install: vi.fn(async () => undefined),
     ...overrides,
   };
 }
@@ -68,6 +74,8 @@ beforeEach(() => {
   ensureAppUpdateIdleMock.mockResolvedValue(undefined);
   relaunchMock.mockReset();
   relaunchMock.mockResolvedValue(undefined);
+  stopRuntimeForExitMock.mockReset();
+  stopRuntimeForExitMock.mockResolvedValue(undefined);
   getEnginePackStatusMock.mockReset();
   getEnginePackStatusMock.mockResolvedValue({
     supported: true,
@@ -108,6 +116,23 @@ describe("useAppUpdater", () => {
       body: "update-policy: recommended",
       rawJson: { updatePolicy: "required" },
     })).toBe(true);
+  });
+
+  it("reads the signed updater installer length without accepting malformed values", () => {
+    expect(updaterDownloadSize({
+      platforms: { "windows-x86_64": { size: 83_000_000 } },
+    })).toBe(83_000_000);
+    expect(updaterDownloadSize({ platforms: { "windows-x86_64": { size: -1 } } })).toBe(0);
+    expect(updaterDownloadSize({ platforms: { "windows-x86_64": { size: "83000000" } } })).toBe(0);
+  });
+
+  it("recognizes only the legacy Runtime idle-probe bootstrap failure", () => {
+    expect(isLegacyRuntimeIdleProbeUnavailable(new Error(
+      "The Runtime Base must be upgraded before DroneDream can update safely.",
+    ))).toBe(true);
+    expect(isLegacyRuntimeIdleProbeUnavailable(new Error(
+      "Engine Pack update is waiting for active experiments to finish (1 jobs, 0 trials)",
+    ))).toBe(false);
   });
 
   it("treats an unpublished desktop channel as current without hiding real updater errors", async () => {
@@ -164,7 +189,7 @@ describe("useAppUpdater", () => {
   it("starts only one installer when invoked twice before rerender", async () => {
     const installing = deferred<void>();
     const availableUpdate = update("1.0.2", {
-      downloadAndInstall: vi.fn(() => installing.promise),
+      install: vi.fn(() => installing.promise),
     });
     checkMock.mockResolvedValue(availableUpdate);
     const hook = renderHook(() => useAppUpdater());
@@ -176,7 +201,8 @@ describe("useAppUpdater", () => {
       firstInstall = hook.result.current.installAvailableUpdate();
       secondInstall = hook.result.current.installAvailableUpdate();
     });
-    await waitFor(() => expect(availableUpdate.downloadAndInstall).toHaveBeenCalledOnce());
+    await waitFor(() => expect(availableUpdate.download).toHaveBeenCalledOnce());
+    await waitFor(() => expect(availableUpdate.install).toHaveBeenCalledOnce());
 
     installing.resolve();
     await act(async () => Promise.all([firstInstall, secondInstall]));
@@ -184,7 +210,7 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
-  it("does not download or relaunch while a Runtime experiment is active", async () => {
+  it("finishes downloading but does not install or relaunch while a Runtime experiment is active", async () => {
     const availableUpdate = update("1.0.0");
     checkMock.mockResolvedValue(availableUpdate);
     ensureAppUpdateIdleMock.mockRejectedValue(
@@ -195,10 +221,46 @@ describe("useAppUpdater", () => {
 
     await act(async () => hook.result.current.installAvailableUpdate());
 
-    expect(availableUpdate.downloadAndInstall).not.toHaveBeenCalled();
+    expect(availableUpdate.download).toHaveBeenCalledOnce();
+    expect(availableUpdate.install).not.toHaveBeenCalled();
+    expect(stopRuntimeForExitMock).not.toHaveBeenCalled();
     expect(relaunchMock).not.toHaveBeenCalled();
     expect(hook.result.current.status).toBe("available");
     expect(hook.result.current.error).toContain("active experiments");
+    hook.unmount();
+  });
+
+  it("downloads through 100 percent and bootstraps an app update over a legacy Runtime", async () => {
+    const availableUpdate = update("1.0.2", {
+      rawJson: {
+        platforms: { "windows-x86_64": { size: 100 } },
+      },
+      download: vi.fn(async (onEvent: (event: unknown) => void) => {
+        onEvent({ event: "Started", data: {} });
+        onEvent({ event: "Progress", data: { chunkLength: 40 } });
+        onEvent({ event: "Progress", data: { chunkLength: 60 } });
+        onEvent({ event: "Finished" });
+      }),
+    });
+    checkMock.mockResolvedValue(availableUpdate);
+    ensureAppUpdateIdleMock.mockRejectedValue(
+      new Error("The Runtime Base must be upgraded before DroneDream can update safely."),
+    );
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+
+    await act(async () => hook.result.current.installAvailableUpdate());
+
+    expect(availableUpdate.download).toHaveBeenCalledOnce();
+    expect(stopRuntimeForExitMock).toHaveBeenCalledOnce();
+    expect(availableUpdate.install).toHaveBeenCalledOnce();
+    expect(relaunchMock).toHaveBeenCalledOnce();
+    expect(availableUpdate.download.mock.invocationCallOrder[0]).toBeLessThan(
+      ensureAppUpdateIdleMock.mock.invocationCallOrder[0],
+    );
+    expect(ensureAppUpdateIdleMock.mock.invocationCallOrder[0]).toBeLessThan(
+      availableUpdate.install.mock.invocationCallOrder[0],
+    );
     hook.unmount();
   });
 
