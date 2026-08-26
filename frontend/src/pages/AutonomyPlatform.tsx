@@ -7,7 +7,6 @@ import {
   Camera,
   Check,
   ChevronRight,
-  Circle,
   CircleCheck,
   CircleUserRound,
   Cpu,
@@ -62,7 +61,6 @@ import {
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
 import { openAppSettings } from "../appSettings";
-import { BUILD_EDITION } from "../edition";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   defaultAutonomyWorkspace,
@@ -1532,7 +1530,7 @@ export function AutonomyPlatform() {
   ];
   const currentSectionPath = normalizedAutonomyPath(location.pathname);
   const currentSection = sections.find((section) => section.to === currentSectionPath)?.id ?? "overview";
-  const usesSidebarNavigation = BUILD_EDITION === "autonomy";
+  const usesSidebarNavigation = edition === "autonomy";
   const healthAlert = agentCoreHealth === "unavailable" ? (
     <div className="agent-core-health-alert" role="alert">
       <ShieldCheck aria-hidden="true" />
@@ -2983,45 +2981,47 @@ export function AutonomyLive() {
 
   return (
     <section className="autonomy-live-viewer">
-      <div className="autonomy-live-screen" data-playing={playing}>
-        {playing && selectedSource?.transport === "agent-core-frame" ? <canvas ref={canvasRef} aria-label={selectedSource.label} /> : null}
-        {playing && selectedSource?.kind === "gps" ? (
-          <div className="autonomy-live-map" data-ready={Boolean(telemetry)}>
-            <div className="autonomy-live-map-grid" />
-            {telemetry ? <MapPin className="autonomy-live-map-marker" aria-hidden="true" /> : null}
-            <div className="autonomy-live-coordinates">
-              {geographicPosition
-                ? <><strong>{geographicPosition.latitude.toFixed(6)}, {geographicPosition.longitude.toFixed(6)}</strong><span>{geographicPosition.altitudeM?.toFixed(1) ?? "—"} m</span></>
-                : telemetry
-                  ? <><strong>E {(telemetry.east_m ?? 0).toFixed(1)} · N {(telemetry.north_m ?? 0).toFixed(1)}</strong><span>{(telemetry.up_m ?? 0).toFixed(1)} m</span></>
-                  : <span>{chinese ? "等待定位" : "Waiting for position"}</span>}
+      <div className="autonomy-live-player">
+        <div className="autonomy-live-screen" data-playing={playing}>
+          {playing && selectedSource?.transport === "agent-core-frame" ? <canvas ref={canvasRef} aria-label={selectedSource.label} /> : null}
+          {playing && selectedSource?.kind === "gps" ? (
+            <div className="autonomy-live-map" data-ready={Boolean(telemetry)}>
+              <div className="autonomy-live-map-grid" />
+              {telemetry ? <MapPin className="autonomy-live-map-marker" aria-hidden="true" /> : null}
+              <div className="autonomy-live-coordinates">
+                {geographicPosition
+                  ? <><strong>{geographicPosition.latitude.toFixed(6)}, {geographicPosition.longitude.toFixed(6)}</strong><span>{geographicPosition.altitudeM?.toFixed(1) ?? "—"} m</span></>
+                  : telemetry
+                    ? <><strong>E {(telemetry.east_m ?? 0).toFixed(1)} · N {(telemetry.north_m ?? 0).toFixed(1)}</strong><span>{(telemetry.up_m ?? 0).toFixed(1)} m</span></>
+                    : <span>{chinese ? "等待定位" : "Waiting for position"}</span>}
+              </div>
             </div>
-          </div>
-        ) : null}
-        {playing && selectedSource?.transport === "video" && selectedSource.url ? <video ref={videoRef} src={selectedSource.url} autoPlay playsInline muted controls={false} /> : null}
-        {playing && selectedSource?.transport === "image" && selectedSource.url ? <img src={selectedSource.url} alt={selectedSource.label} /> : null}
-        {playing && selectedSource?.transport === "media-device" ? <video ref={videoRef} autoPlay playsInline muted /> : null}
-        {!playing ? <div className="autonomy-live-off"><VideoOff aria-hidden="true" /><span>{chinese ? "无画面" : "No signal"}</span></div> : null}
-      </div>
-      <div className="autonomy-live-controls">
-        <button className="autonomy-live-play" type="button" onClick={() => playing ? stop() : void play()} disabled={!selectedSource} aria-label={playing ? (chinese ? "停止" : "Stop") : (chinese ? "播放" : "Play")}>
-          {playing ? <Square aria-hidden="true" /> : <Play aria-hidden="true" />}
-        </button>
-        <button className="autonomy-live-record" type="button" onClick={() => void toggleRecording()} disabled={!playing} data-recording={recording} aria-label={recording ? (chinese ? "停止录制" : "Stop recording") : (chinese ? "开始录制" : "Record")}>
-          {recording ? <Square aria-hidden="true" /> : <Circle aria-hidden="true" />}
-        </button>
-        <select
-          value={sourceId}
-          disabled={sources.length <= 1}
-          aria-label={chinese ? "画面来源" : "Video source"}
-          onChange={(event) => {
-            stop();
-            setSourceId(event.target.value);
-          }}
-        >
-          {!sources.length ? <option value="">{chinese ? "无可用画面" : "No source"}</option> : null}
-          {sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}
-        </select>
+          ) : null}
+          {playing && selectedSource?.transport === "video" && selectedSource.url ? <video ref={videoRef} src={selectedSource.url} autoPlay playsInline muted controls={false} /> : null}
+          {playing && selectedSource?.transport === "image" && selectedSource.url ? <img src={selectedSource.url} alt={selectedSource.label} /> : null}
+          {playing && selectedSource?.transport === "media-device" ? <video ref={videoRef} autoPlay playsInline muted /> : null}
+          {!playing ? <div className="autonomy-live-off"><VideoOff aria-hidden="true" /><span>{chinese ? "无画面" : "No signal"}</span></div> : null}
+        </div>
+        <div className="autonomy-live-controls">
+          <button className="autonomy-live-play" type="button" onClick={() => playing ? stop() : void play()} disabled={!selectedSource} aria-label={playing ? (chinese ? "停止" : "Stop") : (chinese ? "播放" : "Play")}>
+            {playing ? <Square aria-hidden="true" /> : <Play aria-hidden="true" />}
+          </button>
+          <button className="autonomy-live-record" type="button" onClick={() => void toggleRecording()} disabled={!playing} data-recording={recording} aria-label={recording ? (chinese ? "停止录制" : "Stop recording") : (chinese ? "开始录制" : "Record")}>
+            {recording ? <Square aria-hidden="true" /> : <span className="autonomy-live-record-dot" aria-hidden="true" />}
+          </button>
+          <select
+            value={sourceId}
+            disabled={sources.length <= 1}
+            aria-label={chinese ? "画面来源" : "Video source"}
+            onChange={(event) => {
+              stop();
+              setSourceId(event.target.value);
+            }}
+          >
+            {!sources.length ? <option value="">{chinese ? "无可用画面" : "No source"}</option> : null}
+            {sources.map((source) => <option key={source.id} value={source.id}>{source.label}</option>)}
+          </select>
+        </div>
       </div>
       {recordingStatus ? <p className="autonomy-live-recording-status" aria-live="polite">{recordingStatus}</p> : null}
     </section>

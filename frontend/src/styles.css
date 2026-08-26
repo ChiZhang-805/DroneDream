@@ -22199,13 +22199,25 @@ body {
   min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: 0.75rem;
-  padding: 0.15rem 0.2rem 0.4rem;
+  gap: 0.35rem;
+  padding: clamp(0.15rem, 0.45vw, 0.45rem);
+}
+
+.autonomy-live-player {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: clamp(0.45rem, 0.7vw, 0.7rem) solid #292a31;
+  border-radius: 14px;
+  background: #292a31;
+  box-shadow: 0 16px 34px rgba(28, 21, 31, 0.15);
 }
 
 .autonomy-live-screen {
   position: relative;
-  min-height: 360px;
+  min-height: 320px;
   overflow: hidden;
   background: #0d0e13;
 }
@@ -22240,7 +22252,10 @@ body {
   display: grid;
   grid-template-columns: minmax(3rem, 1fr) auto minmax(13rem, 1fr);
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.9rem;
+  min-height: clamp(3.9rem, 6.2vh, 4.7rem);
+  padding: 0 clamp(0.75rem, 1.15vw, 1.2rem);
+  background: linear-gradient(180deg, #33343b 0%, #292a31 100%);
 }
 
 .autonomy-live-controls button {
@@ -22249,7 +22264,7 @@ body {
   height: 2.6rem;
   place-items: center;
   padding: 0;
-  color: #3c2e42;
+  color: #f6f4f7;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -22258,9 +22273,30 @@ body {
 .autonomy-live-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
 .autonomy-live-controls button svg { width: 1.45rem; height: 1.45rem; }
 .autonomy-live-controls .autonomy-live-play { justify-self: start; }
-.autonomy-live-controls .autonomy-live-record { justify-self: center; color: #ef365a; }
-.autonomy-live-controls .autonomy-live-record[data-recording="true"] { color: #d20f3e; }
-.autonomy-live-controls select { min-width: 13rem; min-height: 2.45rem; justify-self: end; border-radius: 7px; }
+.autonomy-live-controls .autonomy-live-record {
+  justify-self: center;
+  border: 2px solid #858791;
+  border-radius: 50%;
+  color: #fff;
+}
+.autonomy-live-controls .autonomy-live-record[data-recording="true"] { border-color: #ef365a; color: #ef365a; }
+.autonomy-live-record-dot {
+  width: 0.92rem;
+  height: 0.92rem;
+  border-radius: 50%;
+  background: #ef365a;
+  box-shadow: 0 0 0 2px rgba(239, 54, 90, 0.16);
+}
+.autonomy-live-controls select {
+  min-width: 13rem;
+  min-height: 2.45rem;
+  justify-self: end;
+  border: 1px solid #4d4e57;
+  border-radius: 7px;
+  background: #3a3b43;
+  color: #f4f2f5;
+}
+.autonomy-live-controls select:disabled { opacity: 0.72; }
 
 .autonomy-live-recording-status {
   max-width: 100%;
@@ -22317,6 +22353,7 @@ body {
 .autonomy-live-coordinates strong { color: #fff; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 700px) {
+  .autonomy-live-player { border-width: 0.4rem; border-radius: 10px; }
   .autonomy-live-controls { grid-template-columns: auto auto minmax(0, 1fr); }
   .autonomy-live-controls select { width: 100%; min-width: 0; }
 }

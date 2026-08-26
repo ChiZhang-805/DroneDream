@@ -291,42 +291,35 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
   { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
 ];
 
-const AUTONOMY_NAV_ITEMS: NavigationItem[] = BUILD_EDITION === "autonomy"
-  ? [
-      {
-        to: "/autonomy",
-        labelKey: "app.conversation",
-        end: true,
-        icon: BotMessageSquare,
-        sectionKey: "app.navSectionAutonomy",
-      },
-      {
-        to: "/autonomy/aircraft",
-        labelKey: "app.autonomyAircraft",
-        icon: Navigation2,
-      },
-      {
-        to: "/autonomy/maps",
-        labelKey: "app.autonomyMaps",
-        icon: MapPinned,
-      },
-      {
-        to: "/autonomy/plugins",
-        labelKey: "app.autonomyPlugins",
-        icon: Sparkles,
-      },
-      {
-        to: "/autonomy/live",
-        labelKey: "app.autonomyLive",
-        icon: Camera,
-      },
-      { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
-    ]
-  : [
-      { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
-      AUTONOMY_NAV_ITEM,
-      { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
-    ];
+const AUTONOMY_NAV_ITEMS: NavigationItem[] = [
+  {
+    to: "/autonomy",
+    labelKey: "app.conversation",
+    end: true,
+    icon: BotMessageSquare,
+  },
+  {
+    to: "/autonomy/aircraft",
+    labelKey: "app.autonomyAircraft",
+    icon: Navigation2,
+  },
+  {
+    to: "/autonomy/maps",
+    labelKey: "app.autonomyMaps",
+    icon: MapPinned,
+  },
+  {
+    to: "/autonomy/plugins",
+    labelKey: "app.autonomyPlugins",
+    icon: Sparkles,
+  },
+  {
+    to: "/autonomy/live",
+    labelKey: "app.autonomyLive",
+    icon: Camera,
+  },
+  HISTORY_NAV_ITEM,
+];
 
 const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
   universal: [
@@ -2934,10 +2927,17 @@ function AccountAvatar({
   account: ReturnType<typeof useAuth>["account"];
   className: string;
 }) {
+  const avatarUrl = account?.avatarUrl ?? null;
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUrl]);
+
   return (
     <span className={className} aria-hidden="true">
-      {account?.avatarUrl ? (
-        <img src={account.avatarUrl} alt="" />
+      {avatarUrl && !avatarFailed ? (
+        <img src={avatarUrl} alt="" onError={() => setAvatarFailed(true)} />
       ) : account ? (
         account.displayName.slice(0, 1).toUpperCase()
       ) : (
@@ -3927,6 +3927,9 @@ function AppShellContent() {
           ? FIELD_NAV_ITEMS
           : AUTONOMY_NAV_ITEMS
     : MODE_NAV_ITEMS[universalMode];
+  const autonomySidebarActive = EDITION_IS_FIXED
+    ? BUILD_EDITION === "autonomy"
+    : universalMode === "autonomy";
   const sidebarUpdateLabel = sidebarUpdateBusy
     ? `${t("updater.sidebarProgress")} ${sidebarUpdateProgress}%`
     : updater.error
@@ -4658,11 +4661,13 @@ function AppShellContent() {
             </NavLink>
           ) : null}
           </nav>
-          <ExperimentWorkspaceSidebar
-            ownerId={auth.account?.id ?? "local"}
-            locale={locale}
-            edition={activeThemeEdition}
-          />
+          {!autonomySidebarActive ? (
+            <ExperimentWorkspaceSidebar
+              ownerId={auth.account?.id ?? "local"}
+              locale={locale}
+              edition={activeThemeEdition}
+            />
+          ) : null}
           <div className="app-sidebar-footer">
             {accountMenuOpen && auth.account ? (
               <AccountMenuPopover
