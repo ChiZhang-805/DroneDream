@@ -67,6 +67,17 @@
   Push $0
   Push $1
 
+  ; The updater installer can be launched by an older desktop build whose
+  ; RunEvent::Exit handler never gets a chance to stop AGENT Core.  In that
+  ; case the orphaned sidecar keeps its installed executable open and NSIS
+  ; cannot replace it.  Quiesce that current-user process here as a backward-
+  ; compatible installer responsibility before any packaged files are copied.
+  ; The ordinary desktop executable is still handled by Tauri's own running-
+  ; application check immediately after this hook.
+  IfFileExists "$INSTDIR\dronedream-autonomy-core.exe" 0 dronedream_agent_core_not_installed
+    !insertmacro CheckIfAppIsRunning "dronedream-autonomy-core.exe" "${DRONEDREAM_DISPLAYNAME}"
+  dronedream_agent_core_not_installed:
+
   !if "${DRONEDREAM_EDITION_ID}" != "field"
     ; Protocol 2 installers hold a durable native quiesce across running-process
     ; checks, old-version uninstall, executable replacement and receipt clearing.
