@@ -34,8 +34,15 @@ function Invoke-GitHubCli {
 
 function Get-ReleaseOrNull {
     param([Parameter(Mandatory = $true)][string]$Tag)
-    $output = (& gh release view $Tag --repo $Repository --json tagName,assets,isDraft,isPrerelease 2>$null | Out-String).Trim()
-    if ($LASTEXITCODE -ne 0) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "SilentlyContinue"
+        $output = (& gh release view $Tag --repo $Repository --json tagName,assets,isDraft,isPrerelease 2>$null | Out-String).Trim()
+        $releaseViewExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($releaseViewExitCode -ne 0) {
         return $null
     }
     return $output | ConvertFrom-Json
