@@ -243,6 +243,28 @@ foreach ($required in @(
         throw "DroneDream runtime-mode contract is missing: $required"
     }
 }
+
+$installerHook = Get-Content -LiteralPath $installerHookPath -Raw
+foreach ($required in @(
+    '${AndIf} $DroneDreamWasInstalled == 0',
+    '${AndIf} $PassiveMode == 0',
+    '${AndIf} $UpdateMode == 0',
+    'IfSilent dronedream_skip_runtime_handoff 0',
+    'dronedream_skip_runtime_handoff:'
+)) {
+    if (-not $installerHook.Contains($required)) {
+        throw "Installer Runtime handoff guard is missing: $required"
+    }
+}
+if ($installerHook.IndexOf(
+        'IfSilent dronedream_skip_runtime_handoff 0',
+        [StringComparison]::Ordinal
+    ) -gt $installerHook.IndexOf(
+        '--seal-installer-handoff',
+        [StringComparison]::Ordinal
+    )) {
+    throw "Silent/update Runtime handoff guard must run before the sealing command"
+}
 if ($runtimeMode -notmatch '(?ms)dronedream_revalidate_without_binary:\s+.*?Push "error"\s+FunctionEnd') {
     throw "Runtime quiesce revalidation must fail closed when the old binary disappears"
 }

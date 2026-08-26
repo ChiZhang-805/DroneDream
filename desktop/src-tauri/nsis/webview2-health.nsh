@@ -157,7 +157,15 @@
     WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode" "$DroneDreamInstallMode"
     WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive" "$DroneDreamRuntimeDrive"
 
+    ; A Runtime handoff is created only for the fresh interactive installer
+    ; where the user just selected that work. Updates, repairs, passive runs
+    ; and silent runs may retain the saved Runtime location, but must never
+    ; reinterpret it as a new Runtime installation request.
     ${If} $DroneDreamInstallMode != "install-app-only"
+    ${AndIf} $DroneDreamWasInstalled == 0
+    ${AndIf} $PassiveMode == 0
+    ${AndIf} $UpdateMode == 0
+      IfSilent dronedream_skip_runtime_handoff 0
       ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --seal-installer-handoff "$DroneDreamInstallMode" "$DroneDreamRuntimeDrive"' $0
       ${If} $0 != 0
         ; The old receipt is already gone, so failure is safe and cannot be
@@ -166,6 +174,7 @@
         Abort "$(DD_SaveRequestFailed)"
       ${EndIf}
     ${EndIf}
+    dronedream_skip_runtime_handoff:
 
     WriteRegDWORD SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol" 2
 
