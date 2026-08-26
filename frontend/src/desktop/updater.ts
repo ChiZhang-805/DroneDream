@@ -402,14 +402,15 @@ export function useAppUpdater() {
       await update.downloadAndInstall((event) => {
         if (event.event === "Started") {
           contentLength = event.data.contentLength ?? 0;
+          setState((current) => ({ ...current, progress: 0 }));
           return;
         }
         if (event.event === "Progress") {
           downloaded += event.data.chunkLength;
-          const progress = contentLength > 0
-            ? Math.min(99, Math.round((downloaded / contentLength) * 100))
-            : null;
-          setState((current) => ({ ...current, progress }));
+          if (contentLength > 0) {
+            const progress = Math.min(99, Math.round((downloaded / contentLength) * 100));
+            setState((current) => ({ ...current, progress }));
+          }
           return;
         }
         setState((current) => ({ ...current, status: "installing", progress: 100 }));

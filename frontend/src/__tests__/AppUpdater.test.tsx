@@ -109,7 +109,7 @@ async function openRuntimeSettings(locale: "en" | "zh-CN" = "en") {
     name: locale === "zh-CN" ? "设置" : "Settings",
   }));
   const quickSettings = screen.getByRole("dialog", {
-    name: locale === "zh-CN" ? "快捷设置" : "Quick settings",
+    name: locale === "zh-CN" ? "设置" : "Settings",
   });
   fireEvent.click(within(quickSettings).getByRole("button", {
     name: locale === "zh-CN" ? /Runtime 与更新/ : /Runtime & updates/,
@@ -177,8 +177,7 @@ describe("workspace sidebar version module", () => {
     router.dispose();
   });
 
-  it("uses the same account-adjacent action for signed workflow and asset updates", () => {
-    const installComponentUpdates = vi.fn(async () => undefined);
+  it("reserves the account-adjacent download action for application updates", () => {
     updaterState.current = {
       ...updaterState.current,
       status: "componentAvailable",
@@ -188,22 +187,17 @@ describe("workspace sidebar version module", () => {
         expiresAt: "2026-08-23T00:00:00Z",
         candidates: [],
       },
-      installComponentUpdates,
     };
     installReadyDesktopBridge();
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    const update = screen.getByRole("button", {
-      name: "Update DroneDream workflows and assets",
-    });
-    fireEvent.click(update);
-    expect(installComponentUpdates).toHaveBeenCalledOnce();
+    expect(document.querySelector(".app-update-button")).toBeNull();
 
     router.dispose();
   });
 
-  it("keeps generic update failures reachable from the account-adjacent retry action", async () => {
+  it("keeps generic update failures in settings without showing a download icon", async () => {
     const checkForUpdates = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -216,12 +210,46 @@ describe("workspace sidebar version module", () => {
     const { router } = renderDashboard();
 
     expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Retry DroneDream update" }));
-    expect(checkForUpdates).toHaveBeenCalledOnce();
+    expect(document.querySelector(".app-update-button")).toBeNull();
 
     const dialog = await openRuntimeSettings();
     fireEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
-    expect(checkForUpdates).toHaveBeenCalledTimes(2);
+    expect(checkForUpdates).toHaveBeenCalledOnce();
+
+    router.dispose();
+  });
+
+  it("replaces the download icon with live application download progress", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "downloading",
+      progress: 42,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const progress = screen.getByRole("button", { name: /42%/ });
+    expect(progress).toBeDisabled();
+    expect(progress).toHaveTextContent("42%");
+    expect(progress.querySelector("svg")).toBeNull();
+
+    router.dispose();
+  });
+
+  it("holds at 100% while the completed update exits and relaunches", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "installing",
+      progress: 100,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    const progress = screen.getByRole("button", { name: /100%/ });
+    expect(progress).toBeDisabled();
+    expect(progress).toHaveTextContent("100%");
 
     router.dispose();
   });

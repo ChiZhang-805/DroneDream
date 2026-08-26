@@ -3439,7 +3439,7 @@ body:has(.app-shell-public-demo),
 
 .app-update-button:disabled {
   cursor: wait;
-  opacity: 0.78;
+  opacity: 1;
 }
 
 .app-update-button svg {
@@ -3447,13 +3447,18 @@ body:has(.app-shell-public-demo),
   height: 0.86rem;
 }
 
-.app-update-button.is-busy svg {
-  animation: app-update-pulse 1.1s ease-in-out infinite alternate;
+.app-update-button.has-progress {
+  width: 2.55rem;
+  border-radius: 0.9rem;
+  box-shadow: none;
 }
 
-@keyframes app-update-pulse {
-  from { transform: translateY(-1px); opacity: 0.55; }
-  to { transform: translateY(1px); opacity: 1; }
+.app-update-progress {
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .app-account-button {

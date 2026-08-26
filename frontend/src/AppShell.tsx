@@ -3833,22 +3833,16 @@ function AppShellContent() {
     "available",
     "downloading",
     "installing",
-    "engineUpdateDeferred",
-    "reconcilingEngine",
-    "engineError",
-    "componentAvailable",
-    "installingComponents",
-    "componentUpdateDeferred",
-    "componentError",
-    "runtimeBaseRequired",
-    "error",
   ].includes(updater.status);
   const sidebarUpdateBusy = [
     "downloading",
     "installing",
-    "reconcilingEngine",
-    "installingComponents",
   ].includes(updater.status);
+  const sidebarUpdateProgress = sidebarUpdateBusy
+    ? Math.max(0, Math.min(100, Math.round(
+        updater.progress ?? (updater.status === "installing" ? 100 : 0),
+      )))
+    : null;
 
   useEffect(() => {
     if (!EDITION_IS_FIXED) persistUniversalMode(universalMode);
@@ -3878,51 +3872,16 @@ function AppShellContent() {
           ? FIELD_NAV_ITEMS
           : AUTONOMY_NAV_ITEMS
     : MODE_NAV_ITEMS[universalMode];
-  const sidebarUpdateLabel = updater.status === "available"
-    ? updater.error
+  const sidebarUpdateLabel = sidebarUpdateBusy
+    ? `${t("updater.sidebarProgress")} ${sidebarUpdateProgress}%`
+    : updater.error
       ? t("updater.sidebarDeferred")
-      : t("updater.sidebarAvailable")
-    : updater.status === "componentAvailable"
-      ? t("updater.sidebarComponents")
-    : updater.status === "installingComponents"
-      ? t("updater.components")
-    : updater.status === "runtimeBaseRequired"
-      ? t("updater.sidebarRuntimeBase")
-      : sidebarUpdateBusy
-        ? t("updater.sidebarProgress")
-        : t("updater.sidebarRetry");
+      : t("updater.sidebarAvailable");
   const handleSidebarUpdate = useCallback(() => {
     if (updater.status === "available") {
       void updater.installAvailableUpdate();
-      return;
     }
-    if (updater.status === "engineUpdateDeferred") {
-      void updater.reconcileEnginePack();
-      return;
-    }
-    if (updater.status === "componentAvailable") {
-      void updater.installComponentUpdates();
-      return;
-    }
-    if (
-      updater.status === "componentUpdateDeferred"
-      || updater.status === "componentError"
-    ) {
-      void updater.checkForUpdates();
-      return;
-    }
-    if (updater.status === "runtimeBaseRequired") {
-      navigate("/desktop/setup");
-      return;
-    }
-    if (updater.status === "engineError") {
-      void updater.reconcileEnginePack();
-      return;
-    }
-    if (updater.status === "error") {
-      void updater.checkForUpdates();
-    }
-  }, [navigate, updater]);
+  }, [updater]);
   const openExternalNavigation = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
     url: string,
@@ -4701,13 +4660,20 @@ function AppShellContent() {
             {sidebarUpdateVisible ? (
               <button
                 type="button"
-                className={`app-account-trailing-button app-update-button${sidebarUpdateBusy ? " is-busy" : ""}`}
+                className={`app-account-trailing-button app-update-button${sidebarUpdateBusy ? " is-busy has-progress" : ""}`}
                 aria-label={sidebarUpdateLabel}
                 title={sidebarUpdateLabel}
+                aria-live={sidebarUpdateBusy ? "polite" : undefined}
                 disabled={sidebarUpdateBusy}
                 onClick={handleSidebarUpdate}
               >
-                <Download aria-hidden="true" strokeWidth={2} />
+                {sidebarUpdateProgress === null ? (
+                  <Download aria-hidden="true" strokeWidth={2} />
+                ) : (
+                  <span className="app-update-progress" aria-hidden="true">
+                    {sidebarUpdateProgress}%
+                  </span>
+                )}
               </button>
             ) : null}
           </div>
