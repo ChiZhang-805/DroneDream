@@ -934,6 +934,7 @@ def test_reference_mission_starts_on_launch_pad_and_uses_open_office_door() -> N
     primitives = {primitive.name: primitive for primitive in school_map_collision_primitives()}
     west_frame = primitives["office-frame-west"]
     east_frame = primitives["office-frame-east"]
+    open_leaf = primitives["office-leaf-open"]
     vehicle_radius = 0.76 / 2
     office_crossings: list[float] = []
     for start, end in zip(scene.reference_path[:-1], scene.reference_path[1:], strict=True):
@@ -949,6 +950,8 @@ def test_reference_mission_starts_on_launch_pad_and_uses_open_office_door() -> N
     door_center = office_crossings[0]
     assert _bounds(west_frame, "x")[1] + vehicle_radius < door_center
     assert door_center < _bounds(east_frame, "x")[0] - vehicle_radius
+    assert door_center - _box_horizontal_bounds_x(open_leaf)[1] - vehicle_radius >= 0.45
+    assert _bounds(east_frame, "x")[0] - door_center - vehicle_radius >= 0.5
 
     cafeteria_entrance = next(
         item for item in scene.objects if item.id == "cafeteria-main-entrance"

@@ -22826,6 +22826,52 @@ body {
   color: #cbd3e6;
 }
 
+/* The maximized settings canvas must use its height instead of leaving an
+   artificial blank lower half. Compact windows keep the same minimum row
+   heights and scroll naturally; taller windows distribute the free space. */
+.settings-workspace-content .launcher-settings-panel {
+  min-height: 100%;
+}
+
+.settings-workspace-content .settings-general-panel {
+  min-height: 100%;
+}
+
+.settings-workspace-content .settings-notification-card {
+  flex: 1 1 auto;
+  grid-template-rows: repeat(8, minmax(3.15rem, 1fr));
+}
+
+.settings-workspace-content .settings-course-panel {
+  height: 100%;
+  min-height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-course-editions {
+  min-height: 0;
+  grid-auto-rows: minmax(5.25rem, 1fr);
+}
+
+/* Provider marks are meaningful icons, not decoration. In dark mode they
+   remain bright and readable without adding a tile or circular backdrop. */
+:root[data-dd-appearance="dark"] .app-shell .assistant-model-button {
+  color: #ffffff;
+}
+
+:root[data-dd-appearance="dark"] .app-shell .assistant-model-button:hover,
+:root[data-dd-appearance="dark"] .app-shell .assistant-model-button:focus-visible {
+  color: #ffffff;
+  background: color-mix(in srgb, var(--dd-brand-start) 9%, transparent);
+}
+
+:root[data-dd-appearance="dark"] .app-shell .model-provider-logo-openai {
+  --model-provider-color: #ffffff !important;
+}
+
 /* Runtime actions and health summaries must stay legible inside the themed
    settings canvas. Earlier light-theme component rules were more specific
    and could leave a white button/card behind in dark mode. */
@@ -22985,6 +23031,56 @@ body {
 :root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-example-heading small,
 :root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-copy small {
   color: #c5cde0;
+}
+
+/* Every product keeps its own surface in light mode as well: Universal pink,
+   SIM blue, LAB green, FIELD amber/orange, and AGENT red. Text remains dark
+   while accents use the edition's stronger canonical color. */
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) {
+  color-scheme: light;
+  --bg: color-mix(in srgb, var(--dd-brand-light-surface) 82%, #ffffff);
+  --bg-elev: #ffffff;
+  --bg-elev-2: color-mix(in srgb, var(--dd-brand-light-surface) 70%, #ffffff);
+  --bg-subtle: color-mix(in srgb, var(--dd-brand-light-surface) 88%, #f4f4f6);
+  --border: color-mix(in srgb, var(--dd-brand-middle) 18%, #d9d9df);
+  --border-strong: color-mix(in srgb, var(--dd-brand-middle) 32%, #c6c6ce);
+  --text: #1d1a22;
+  --text-muted: #66616d;
+  --text-dim: #39343f;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 90% 4%, color-mix(in srgb, var(--dd-brand-start) 12%, transparent), transparent 32rem),
+    radial-gradient(circle at 8% 94%, color-mix(in srgb, var(--dd-brand-middle) 8%, transparent), transparent 34rem),
+    var(--bg);
+}
+
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-sidebar {
+  color: var(--text);
+  border-right-color: var(--border);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 90%, #ffffff);
+  box-shadow: 12px 0 30px rgba(25, 20, 31, 0.06);
+}
+
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-header {
+  color: var(--text);
+  border-bottom-color: var(--border);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 68%, #ffffff);
+  box-shadow: 0 8px 22px rgba(25, 20, 31, 0.05);
+}
+
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-main,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-main:has(.experiment-assistant-page),
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-main:has(.autonomy-platform-page) {
+  color: var(--text);
+  background:
+    radial-gradient(circle at 76% 10%, color-mix(in srgb, var(--dd-brand-middle) 9%, transparent), transparent 30rem),
+    var(--bg);
+}
+
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-nav a:hover,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-nav a.active {
+  color: color-mix(in srgb, var(--dd-brand-end) 76%, #17131a);
+  background: color-mix(in srgb, var(--dd-brand-start) 13%, #ffffff);
 }
 
 @media (max-width: 980px) {

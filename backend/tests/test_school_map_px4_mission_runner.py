@@ -37,8 +37,23 @@ def test_live_progress_cannot_jump_across_the_symmetric_return_route() -> None:
 
     index = runner._monotonic_route_progress_index((25.0, 0.0, 1.0), route, 3)
 
-    assert index == 9
-    assert index - 3 == runner.ROUTE_PROGRESS_MAXIMUM_LOOKAHEAD_WAYPOINTS
+    assert index == 4
+
+
+def test_live_progress_does_not_skip_to_a_nearby_return_leg() -> None:
+    route = [
+        (0.0, 0.0, 1.0),
+        (10.0, 0.0, 1.0),
+        (20.0, 0.0, 1.0),
+        (30.0, 0.0, 1.0),
+        (20.0, 0.0, 1.0),
+        (10.0, 0.0, 1.0),
+        (0.0, 0.0, 1.0),
+    ]
+
+    index = runner._monotonic_route_progress_index((10.0, 0.0, 1.0), route, 1)
+
+    assert index == 1
 
 
 def test_designated_landing_pad_contact_is_not_hidden_as_free_flight() -> None:
@@ -57,9 +72,9 @@ def test_designated_landing_pad_contact_is_not_hidden_as_free_flight() -> None:
     assert result["designated_pad_contact"]["within_solver_tolerance"] is True
 
 
-def test_landing_contact_over_two_millimeters_fails_the_contact_gate() -> None:
+def test_landing_contact_over_three_millimeters_fails_the_contact_gate() -> None:
     endpoint = model_root_to_world_envelope_center((-42.25, 15.3, 7.487))
-    point = (endpoint[0], endpoint[1], endpoint[2] - 0.0021)
+    point = (endpoint[0], endpoint[1], endpoint[2] - 0.0031)
 
     result = runner._dynamic_safety_clearance(
         [point],

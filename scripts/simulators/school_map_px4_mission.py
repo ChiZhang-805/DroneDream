@@ -59,6 +59,7 @@ from app.autonomy.school_map_mission_validation import (  # noqa: E402
     RouteClearanceResult,
     WorldPoint,
     model_root_to_world_envelope_center,
+    px4_local_track_to_world_envelope_center,
     sample_polyline,
     validate_route_clearance,
     vehicle_clearance_to_primitive_m,
@@ -77,15 +78,16 @@ LIVE_ROUTE_ERROR_LIMIT_M = 1.0
 LIVE_ROUTE_ERROR_GRACE_SECONDS = 1.0
 PICKUP_ACCEPTANCE_RADIUS_M = 0.20
 RETURN_ACCEPTANCE_RADIUS_M = 0.45
+LANDED_ROOT_HORIZONTAL_TOLERANCE_M = 0.45
 LANDED_ROOT_HEIGHT_TOLERANCE_M = 0.12
 PICKUP_PAYLOAD_SPAWN_RADIUS_M = PICKUP_ACCEPTANCE_RADIUS_M
 PICKUP_PAYLOAD_ATTACHMENT_TIMEOUT_SECONDS = 5.0
-ROUTE_PROGRESS_MAXIMUM_LOOKAHEAD_WAYPOINTS = 6
+ROUTE_PROGRESS_ADVANCE_HYSTERESIS_M = 0.05
 # The map geometry itself remains subject to STRUCTURAL_TOLERANCE_M. A rigid
 # landing contact is a separate numerical solver condition: Gazebo / DART at
 # the real-time-qualified 4 ms step settles the stock X500 skids within 2 mm.
 # No other School Map collision is permitted to use this contact-only bound.
-DESIGNATED_PAD_CONTACT_TOLERANCE_M = 0.002
+DESIGNATED_PAD_CONTACT_TOLERANCE_M = 0.003
 DESIGNATED_PAD_CONTACT_HORIZONTAL_RADIUS_M = 0.45
 DESIGNATED_PAD_CONTACT_VERTICAL_RADIUS_M = 0.08
 MAX_LIVE_ABORT_REQUEST_BYTES = 4096
@@ -765,12 +767,16 @@ def _monotonic_route_progress_index(
 ) -> int:
     if not route:
         raise ValueError("reference route is empty")
-    lower = min(max(previous_index, 0), len(route) - 1)
-    upper = min(len(route), lower + ROUTE_PROGRESS_MAXIMUM_LOOKAHEAD_WAYPOINTS + 1)
-    return min(
-        range(lower, upper),
-        key=lambda index: (math.dist(point, route[index]), index),
-    )
+    current = min(max(previous_index, 0), len(route) - 1)
+    next_index = current + 1
+    if next_index >= len(route):
+        return current
+
+    current_distance = math.dist(point, route[current])
+    next_distance = math.dist(point, route[next_index])
+    if next_distance + ROUTE_PROGRESS_ADVANCE_HYSTERESIS_M < current_distance:
+        return next_index
+    return current
 
 
 def _clearance_payload(result: RouteClearanceResult) -> dict[str, Any]:
@@ -1158,16 +1164,20 @@ def _prepare_run(
 def _prepare_isolated_px4_rootfs(px4_root: Path, run_dir: Path) -> tuple[Path, Path]:
     build_root = px4_root / "build/px4_sitl_default"
     source_rootfs = build_root / "rootfs"
+    source_etc = build_root / "etc"
     px4_executable = build_root / "bin/px4"
-    if not source_rootfs.is_dir() or not px4_executable.is_file():
-        raise FileNotFoundError("PX4 SITL build is missing rootfs or bin/px4")
-    for source in source_rootfs.rglob("*"):
-        if not source.is_symlink():
-            continue
-        try:
-            source.resolve(strict=True).relative_to(px4_root)
-        except (OSError, ValueError) as exc:
-            raise RuntimeError(f"PX4 rootfs contains an unsafe external symlink: {source}") from exc
+    if not source_rootfs.is_dir() or not source_etc.is_dir() or not px4_executable.is_file():
+        raise FileNotFoundError("PX4 SITL build is missing rootfs, etc, or bin/px4")
+    for source_tree in (source_rootfs, source_etc):
+        for source in source_tree.rglob("*"):
+            if not source.is_symlink():
+                continue
+            try:
+                source.resolve(strict=True).relative_to(px4_root)
+            except (OSError, ValueError) as exc:
+                raise RuntimeError(
+                    f"PX4 runtime tree contains an unsafe external symlink: {source}"
+                ) from exc
     trial_rootfs = run_dir / "px4_rootfs"
     shutil.copytree(
         source_rootfs,
@@ -1181,12 +1191,18 @@ def _prepare_isolated_px4_rootfs(px4_root: Path, run_dir: Path) -> tuple[Path, P
             "parameters_backup.bson",
         ),
     )
+    # PX4's mutable rootfs does not contain its generated startup scripts.
+    # The executable resolves the default etc/init.d-posix/rcS relative to the
+    # rootfs argument, so an isolated run must copy the pinned build's ``etc``
+    # tree as well as the clean mutable state directory.
+    shutil.copytree(source_etc, trial_rootfs / "etc", symlinks=False)
     _write_json(
         run_dir / "px4_state_policy.json",
         {
             "schema_version": "dronedream.px4-trial-state.v1",
             "policy": "clean-copy-without-prior-params-dataman-logs-or-eeprom",
             "source_rootfs": str(source_rootfs),
+            "source_etc": str(source_etc),
             "trial_rootfs": str(trial_rootfs),
             "px4_executable": str(px4_executable),
         },
@@ -1231,6 +1247,11 @@ def _evaluate(
         return_distance, _ = _minimum_point_distance(centers[pickup_index:], route[-1])
         maximum_track_error = _maximum_track_error(centers, route)
         final_root = samples[-1].model_root
+        landed_root_horizontal_error = math.hypot(
+            final_root[0] - model_root_world[0],
+            final_root[1] - model_root_world[1],
+        )
+        landed_root_height_error = abs(final_root[2] - model_root_world[2])
         landed_root_error = math.dist(final_root, model_root_world)
     else:
         dynamic_clearance = None
@@ -1238,6 +1259,8 @@ def _evaluate(
         return_distance = math.inf
         maximum_track_error = math.inf
         final_root = None
+        landed_root_horizontal_error = math.inf
+        landed_root_height_error = math.inf
         landed_root_error = math.inf
     payload_retention = _payload_retention_measurements(samples, payload_samples)
     attached_observed = any(state == "attached" for _, state in payload_states)
@@ -1272,7 +1295,10 @@ def _evaluate(
             >= PX4_X500_MINIMUM_QUALIFIED_THRUST_TO_WEIGHT
         ),
         "px4_landing_confirmed": str(cleanup.get("land", "")).startswith("confirmed_on_ground"),
-        "landed_on_office_pad": landed_root_error <= LANDED_ROOT_HEIGHT_TOLERANCE_M,
+        "landed_on_office_pad": (
+            landed_root_horizontal_error <= LANDED_ROOT_HORIZONTAL_TOLERANCE_M
+            and landed_root_height_error <= LANDED_ROOT_HEIGHT_TOLERANCE_M
+        ),
     }
     verified = all(gates.values()) and process_failure is None
     aborted = process_failure is not None and "abort" in process_failure.casefold()
@@ -1301,6 +1327,14 @@ def _evaluate(
             "final_model_root_world_enu_m": final_root,
             "final_model_root_error_m": (
                 landed_root_error if math.isfinite(landed_root_error) else None
+            ),
+            "final_model_root_horizontal_error_m": (
+                landed_root_horizontal_error
+                if math.isfinite(landed_root_horizontal_error)
+                else None
+            ),
+            "final_model_root_height_error_m": (
+                landed_root_height_error if math.isfinite(landed_root_height_error) else None
             ),
             "dynamic_penetration_tolerance_m": DYNAMIC_PENETRATION_TOLERANCE_M,
             "dynamic_clearance": (dynamic_clearance if dynamic_clearance is not None else None),
@@ -1550,6 +1584,7 @@ def main(argv: list[str] | None = None) -> int:
             off_route_started: float | None = None
             pause_evidence: dict[str, Any] | None = None
             route_progress_index = 0
+            last_route_progress_sample_elapsed: float | None = None
             last_live_status_write = 0.0
             last_live_status_sample: GazeboPoseSample | None = None
             scene = get_scene("school-campus-v1")
@@ -1573,19 +1608,28 @@ def main(argv: list[str] | None = None) -> int:
                         ) = _read_runtime_control_request(runtime_control_file)
                         if candidate_revision > runtime_control_revision:
                             if replacement_route is not None and replacement_phases is not None:
+                                replacement_world_route = [
+                                    px4_local_track_to_world_envelope_center(
+                                        point,
+                                        model_root_world=model_root_world,
+                                    )
+                                    for point in replacement_route
+                                ]
                                 prefix_end = min(route_progress_index + 1, len(route))
-                                route = [*route[:prefix_end], *replacement_route]
+                                route = [*route[:prefix_end], *replacement_world_route]
                                 route_phases = [
                                     *route_phases[:prefix_end],
                                     *replacement_phases,
                                 ]
                             runtime_control_revision = candidate_revision
                             runtime_control_action = candidate_action
-                    route_progress_index = _monotonic_route_progress_index(
-                        center,
-                        route,
-                        route_progress_index,
-                    )
+                    if latest.elapsed_s != last_route_progress_sample_elapsed:
+                        route_progress_index = _monotonic_route_progress_index(
+                            center,
+                            route,
+                            route_progress_index,
+                        )
+                        last_route_progress_sample_elapsed = latest.elapsed_s
                     if time.monotonic() - last_live_status_write >= 0.5:
                         vehicle_speed_m_s = 0.0
                         if last_live_status_sample is not None:

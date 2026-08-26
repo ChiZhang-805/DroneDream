@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 const EXPECTED_ACCOUNT_URL = "https://yggabfynndpzymlqvnim.supabase.co";
 const url = (process.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/+$/u, "");
 const publishableKey = (
@@ -42,6 +45,18 @@ function decodedJwtRole(value) {
     return typeof payload.role === "string" ? payload.role : null;
   } catch {
     return null;
+  }
+}
+
+const tauriConfigUrl = new URL("../src-tauri/tauri.conf.json", import.meta.url);
+const tauriConfig = JSON.parse(readFileSync(fileURLToPath(tauriConfigUrl), "utf8"));
+for (const policyName of ["csp", "devCsp"]) {
+  const policy = tauriConfig?.app?.security?.[policyName];
+  if (
+    typeof policy !== "string"
+    || !policy.match(new RegExp(`img-src[^;]*${EXPECTED_ACCOUNT_URL.replaceAll(".", "\\.")}`, "u"))
+  ) {
+    fail(`${policyName} must allow the approved Supabase origin for profile avatars`);
   }
 }
 

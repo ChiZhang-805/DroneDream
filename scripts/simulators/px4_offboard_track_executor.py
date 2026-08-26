@@ -2550,9 +2550,11 @@ async def run_executor(
                 control = _read_runtime_control_request(runtime_control_file)
                 if control.revision > runtime_control_revision:
                     hold_started: float | None = None
+                    hold_control: RuntimeControlRequest | None = None
                     while control.action == "hold":
                         runtime_control_revision = control.revision
                         hold_started = hold_started or event_loop.time()
+                        hold_control = hold_control or control
                         if runtime_control_ack_path is not None:
                             _write_json_atomic(
                                 runtime_control_ack_path,
@@ -2582,6 +2584,18 @@ async def run_executor(
                         held_seconds = event_loop.time() - hold_started
                         start += held_seconds
                         track_deadline += held_seconds
+                        if hold_control is None:
+                            raise RuntimeError("runtime hold evidence identity is missing")
+                        timing["runtime_controls"].append(
+                            {
+                                "revision": hold_control.revision,
+                                "mission_revision": hold_control.mission_revision,
+                                "contract_id": hold_control.contract_id,
+                                "action": "hold",
+                                "held_seconds": held_seconds,
+                                "applied_t": hold_started - exec_start,
+                            }
+                        )
                     if control.action == "replace_route":
                         if control.route is None or controller_params is None:
                             raise RuntimeError(

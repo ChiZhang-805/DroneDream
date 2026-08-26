@@ -402,6 +402,7 @@ ROOM_FRONT_Y = 10.6
 ROOM_BACK_Y = 19.3
 ROOM_WALL_THICKNESS_M = 0.14
 ROOM_DOOR_WIDTH_M = 1.2
+OFFICE_DOOR_WIDTH_M = 1.8
 ROOM_DOOR_HEIGHT_M = 2.2
 ROOM_DOOR_FRAME_WIDTH_M = 0.08
 ROOM_DOOR_FRAME_DEPTH_M = 0.11
@@ -671,14 +672,14 @@ SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY: dict[str, object] = {
     "schema_version": "dronedream.autonomy.gazebo-artifact-summary.v1",
     "format": "sdf",
     "sdf_version": "1.9",
-    "model_sdf_sha256": "dc397b181a9f170ab571c69395f02427a32596b6674854f3cba97ad6016cc50f",
-    "semantic_sha256": "3a8e560a1974af6d17e8cb8146591982898d0b2cb4c2c0b9deba9b3c636bd8a7",
-    "world_sdf_sha256": "6cfb6d1716418529e28e06089278faa8701de809c78f11fa3ac9012dc111c903",
+    "model_sdf_sha256": "114f85f2465c37df5d87d001138f4f472e1ed1a7dcb89273e742397b6ac8a7f8",
+    "semantic_sha256": "7a57164f956a60bb68c90644bbe0a6585674bf33bbfb4d31147eb324b637d2df",
+    "world_sdf_sha256": "ef9d4e976dbd2b128f80aa2ff11f41a1cfffb8ccb58e763d206d9f9163ce7e8c",
     "physics_world_sdf_sha256": (
-        "5848b1d403f535fade24f4562f2cfc0162bf7560274767c6c97e7f8ac66e0121"
+        "8494319a9afaf6822ea3cd422d663e7d5c9a85e8167e419e2273a57c95a8d9f2"
     ),
     "physics_model_sdf_sha256": (
-        "c244e03f3e53d2ba64e798dc47e3486210ace25ef42ae35e64e294d24e47042a"
+        "82f46a355019f9d9e840e546b50626c6c19b567002d1bf3e8b9568922aaa4f6e"
     ),
     "model_config_sha256": "eb06bf2d09e16f6e7b4c5ca379b5aea4c16b7a082f3e8a6e41c020049646dcf5",
     "package_file_sha256": {
@@ -699,14 +700,14 @@ SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY: dict[str, object] = {
             "d443f8c87e66c7fd914bdc86b19aa5266ab6376b4f4416b6c2aa78595cb23cb0"
         ),
         "model.config": "eb06bf2d09e16f6e7b4c5ca379b5aea4c16b7a082f3e8a6e41c020049646dcf5",
-        "model.physics.sdf": ("c244e03f3e53d2ba64e798dc47e3486210ace25ef42ae35e64e294d24e47042a"),
-        "model.sdf": "dc397b181a9f170ab571c69395f02427a32596b6674854f3cba97ad6016cc50f",
+        "model.physics.sdf": ("82f46a355019f9d9e840e546b50626c6c19b567002d1bf3e8b9568922aaa4f6e"),
+        "model.sdf": "114f85f2465c37df5d87d001138f4f472e1ed1a7dcb89273e742397b6ac8a7f8",
         "ros_gz_bridge.yaml": ("89220ef78125348776575b1a14fa1727c9cb098d9c46d84a74e27e5e8715f0b1"),
-        "semantic.json": "3a8e560a1974af6d17e8cb8146591982898d0b2cb4c2c0b9deba9b3c636bd8a7",
-        "world.physics.sdf": ("5848b1d403f535fade24f4562f2cfc0162bf7560274767c6c97e7f8ac66e0121"),
-        "world.sdf": "6cfb6d1716418529e28e06089278faa8701de809c78f11fa3ac9012dc111c903",
+        "semantic.json": "7a57164f956a60bb68c90644bbe0a6585674bf33bbfb4d31147eb324b637d2df",
+        "world.physics.sdf": ("8494319a9afaf6822ea3cd422d663e7d5c9a85e8167e419e2273a57c95a8d9f2"),
+        "world.sdf": "ef9d4e976dbd2b128f80aa2ff11f41a1cfffb8ccb58e763d206d9f9163ce7e8c",
     },
-    "package_manifest_sha256": ("f7685a1009ace23b8cd8a64e7828e326f4fb04d66b3e5826c5169b92c571b3e2"),
+    "package_manifest_sha256": ("f99ce8f4c45c8fd69aa66671f4bb7159be24f6b453d48d3f014ff9929b3a9298"),
     "package_file_count": 13,
     "collision_primitive_count": 1535,
     "visual_primitive_count": 3930,
@@ -1259,10 +1260,11 @@ def _room_door_primitives(
     floor: int,
     *,
     open_door: bool,
+    door_width_m: float = ROOM_DOOR_WIDTH_M,
 ) -> list[BoxPrimitive]:
     floor_surface_z = (floor - 1) * STOREY_HEIGHT_M + FLOOR_SLAB_M
     door_center_z = floor_surface_z + ROOM_DOOR_HEIGHT_M / 2
-    frame_offset_x = ROOM_DOOR_WIDTH_M / 2 + ROOM_DOOR_FRAME_WIDTH_M / 2
+    frame_offset_x = door_width_m / 2 + ROOM_DOOR_FRAME_WIDTH_M / 2
     result = [
         _box(
             f"{prefix}-frame-west",
@@ -1283,7 +1285,7 @@ def _room_door_primitives(
                 ROOM_FRONT_Y,
                 floor_surface_z + ROOM_DOOR_HEIGHT_M + ROOM_DOOR_FRAME_WIDTH_M / 2,
             ),
-            (ROOM_DOOR_WIDTH_M, ROOM_DOOR_FRAME_DEPTH_M, ROOM_DOOR_FRAME_WIDTH_M),
+            (door_width_m, ROOM_DOOR_FRAME_DEPTH_M, ROOM_DOOR_FRAME_WIDTH_M),
             "door-frame",
         ),
     ]
@@ -1292,11 +1294,11 @@ def _room_door_primitives(
             _box(
                 f"{prefix}-leaf-open",
                 (
-                    door_center_x - ROOM_DOOR_WIDTH_M / 2 + ROOM_DOOR_LEAF_DEPTH_M / 2,
-                    ROOM_FRONT_Y - ROOM_DOOR_WIDTH_M / 2,
+                    door_center_x - door_width_m / 2 + ROOM_DOOR_LEAF_DEPTH_M / 2,
+                    ROOM_FRONT_Y - door_width_m / 2,
                     door_center_z,
                 ),
-                (ROOM_DOOR_WIDTH_M, ROOM_DOOR_LEAF_DEPTH_M, ROOM_DOOR_HEIGHT_M),
+                (door_width_m, ROOM_DOOR_LEAF_DEPTH_M, ROOM_DOOR_HEIGHT_M),
                 "open-door-leaf",
                 yaw_rad=math.pi / 2,
             )
@@ -1306,7 +1308,7 @@ def _room_door_primitives(
             _box(
                 f"{prefix}-leaf-closed",
                 (door_center_x, ROOM_FRONT_Y, door_center_z),
-                (ROOM_DOOR_WIDTH_M, ROOM_DOOR_LEAF_DEPTH_M, ROOM_DOOR_HEIGHT_M),
+                (door_width_m, ROOM_DOOR_LEAF_DEPTH_M, ROOM_DOOR_HEIGHT_M),
                 "closed-door-leaf",
             )
         )
@@ -1337,7 +1339,8 @@ def _teaching_room_primitives() -> list[BoxPrimitive]:
                 if east_stair_room
                 else CLASSROOM_DOOR_OFFSET_X_M
             )
-            door_opening_half = (ROOM_DOOR_WIDTH_M + ROOM_DOOR_FRAME_WIDTH_M * 2) / 2
+            door_width_m = OFFICE_DOOR_WIDTH_M if office else ROOM_DOOR_WIDTH_M
+            door_opening_half = (door_width_m + ROOM_DOOR_FRAME_WIDTH_M * 2) / 2
             west_wall_max_x = door_center_x - door_opening_half
             east_wall_min_x = door_center_x + door_opening_half
             door_header_bottom_z = floor_surface_z + ROOM_DOOR_HEIGHT_M + ROOM_DOOR_FRAME_WIDTH_M
@@ -1400,7 +1403,15 @@ def _teaching_room_primitives() -> list[BoxPrimitive]:
                     window_offsets_x_m,
                 )
             )
-            result.extend(_room_door_primitives(prefix, door_center_x, floor, open_door=office))
+            result.extend(
+                _room_door_primitives(
+                    prefix,
+                    door_center_x,
+                    floor,
+                    open_door=office,
+                    door_width_m=door_width_m,
+                )
+            )
     return result
 
 

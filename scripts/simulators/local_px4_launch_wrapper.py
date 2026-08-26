@@ -1201,11 +1201,13 @@ def _prepare_steady_wind_overlay(
 
     build_root = px4_root / "build" / "px4_sitl_default"
     source_rootfs = build_root / "rootfs"
+    source_etc = build_root / "etc"
     px4_executable = build_root / "bin" / "px4"
     px4_plugins = build_root / "src" / "modules" / "simulation" / "gz_plugins"
     px4_server_config = px4_root / "src" / "modules" / "simulation" / "gz_bridge" / "server.config"
     required_runtime_paths = (
         source_rootfs,
+        source_etc,
         px4_executable,
         px4_plugins,
         px4_server_config,
@@ -1213,7 +1215,7 @@ def _prepare_steady_wind_overlay(
     if any(not path.exists() for path in required_runtime_paths):
         raise ScenarioEffectUnsupportedError(
             "the pinned PX4 SITL build is incomplete; Trial-local wind launch "
-            "requires rootfs, px4, Gazebo plugins, and server config"
+            "requires rootfs, etc, px4, Gazebo plugins, and server config"
         )
 
     runtime_root = run_dir / "scenario_runtime"
@@ -1419,15 +1421,16 @@ def _prepare_steady_wind_overlay(
         overlay_paths.append(existing_resource_path)
     launch_env["GZ_SIM_RESOURCE_PATH"] = os.pathsep.join(overlay_paths)
 
-    for source in source_rootfs.rglob("*"):
-        if not source.is_symlink():
-            continue
-        try:
-            source.resolve(strict=True).relative_to(px4_root)
-        except (OSError, ValueError) as exc:
-            raise ScenarioEffectUnsupportedError(
-                f"PX4 rootfs contains an unsafe external symlink: {source}"
-            ) from exc
+    for source_tree in (source_rootfs, source_etc):
+        for source in source_tree.rglob("*"):
+            if not source.is_symlink():
+                continue
+            try:
+                source.resolve(strict=True).relative_to(px4_root)
+            except (OSError, ValueError) as exc:
+                raise ScenarioEffectUnsupportedError(
+                    f"PX4 runtime tree contains an unsafe external symlink: {source}"
+                ) from exc
 
     trial_rootfs = runtime_root / "px4_rootfs"
     shutil.copytree(
@@ -1442,6 +1445,7 @@ def _prepare_steady_wind_overlay(
             "parameters_backup.bson",
         ),
     )
+    shutil.copytree(source_etc, trial_rootfs / "etc", symlinks=False)
     resource_paths = [
         str(model_root),
         str(gazebo_root / "models"),

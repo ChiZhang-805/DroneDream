@@ -1377,7 +1377,14 @@ def test_executor_holds_the_current_setpoint_then_splices_a_runtime_route(
     assert acknowledgement["revision"] == 2
     assert acknowledgement["state"] == "route_replaced"
     timing = json.loads(timing_path.read_text(encoding="utf-8"))
-    assert [event["action"] for event in timing["runtime_controls"]] == ["replace_route"]
+    assert [event["action"] for event in timing["runtime_controls"]] == [
+        "hold",
+        "replace_route",
+    ]
+    hold_event = timing["runtime_controls"][0]
+    assert hold_event["revision"] == 1
+    assert hold_event["mission_revision"] == 1
+    assert hold_event["held_seconds"] > 0
 
 
 @pytest.mark.parametrize(
