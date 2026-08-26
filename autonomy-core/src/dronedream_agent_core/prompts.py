@@ -84,7 +84,12 @@ handled by their declared runtime adapters, so never demand fake zero-length fli
 segments for them.
 Treat supplied deterministic_gates as code-computed facts and reject a hash mismatch only
 when its corresponding gate is false. Return short issue codes and repair instructions
-for the next bounded planning iteration.
+for the next bounded planning iteration. The planning_evidence_scope object explicitly
+separates evidence that must exist now from runtime evidence that can only be collected
+after the user confirms and execution begins. Do not reject a prepared plan merely because
+future_runtime_evidence is not present yet; require that it is declared and hash-bound by
+accepted tool receipts. The semantic_plan_binding object is the authoritative code-computed
+hash linkage for the current semantic plan and flight plan.
 """.strip()
 
 COMPLETION_VERIFIER = """

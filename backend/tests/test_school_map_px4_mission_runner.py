@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from app.autonomy.school_map_artifact import (
+    BoxPrimitive,
     school_map_collision_primitives,
     school_map_runtime_collision_primitives,
 )
@@ -123,6 +124,47 @@ def test_runtime_safety_uses_the_same_conservative_geometry_exported_to_gazebo()
         "cafeteria-1-table-1-1-conservative-furniture-envelope"
     )
     assert result["minimum_clearance_m"] == pytest.approx(-0.01)
+
+
+def test_live_swept_clearance_cannot_skip_a_thin_wall_between_clear_endpoints() -> None:
+    launch_pad = BoxPrimitive(
+        name="office-drone-launch-pad",
+        center_x=100.0,
+        center_y=100.0,
+        center_z=0.0,
+        size_x=1.0,
+        size_y=1.0,
+        size_z=0.1,
+        semantic="launch-pad",
+    )
+    wall = BoxPrimitive(
+        name="thin-wall",
+        center_x=0.0,
+        center_y=0.0,
+        center_z=1.0,
+        size_x=0.10,
+        size_y=4.0,
+        size_z=4.0,
+        semantic="wall",
+    )
+    start = (-1.0, 0.0, 1.0)
+    end = (1.0, 0.0, 1.0)
+
+    endpoints_only = runner._dynamic_safety_clearance(
+        [start, end],
+        [launch_pad, wall],
+        (100.0, 100.0, 0.0),
+    )
+    swept = runner._swept_live_safety_clearance(
+        start,
+        end,
+        [launch_pad, wall],
+        (100.0, 100.0, 0.0),
+    )
+
+    assert endpoints_only["unsafe_collision_count"] == 0
+    assert swept["unsafe_collision_count"] > 0
+    assert swept["minimum_clearance_primitive"] == "thin-wall"
 
 
 def test_payload_retention_uses_model_root_relative_physical_pose() -> None:

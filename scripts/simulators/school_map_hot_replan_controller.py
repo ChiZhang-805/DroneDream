@@ -129,21 +129,39 @@ def run(run_dir: Path, *, timeout_seconds: float) -> dict[str, Any]:
         label="PX4 hold acknowledgement",
     )
     stable_samples: list[dict[str, Any]] = []
+    last_telemetry_sample_elapsed_s: float | None = None
     deadline = time.monotonic() + 30.0
     while time.monotonic() < deadline and len(stable_samples) < 3:
         current = _read_json(status_path)
-        if current is not None and float(current.get("vehicle_speed_m_s", math.inf)) <= 0.12:
+        telemetry_sample_elapsed_s = (
+            float(current.get("telemetry_sample_elapsed_s", math.nan))
+            if current is not None
+            else math.nan
+        )
+        if (
+            current is not None
+            and math.isfinite(telemetry_sample_elapsed_s)
+            and telemetry_sample_elapsed_s != last_telemetry_sample_elapsed_s
+            and float(current.get("vehicle_speed_m_s", math.inf)) <= 0.12
+        ):
             stable_samples.append(
                 {
                     "observed_at": time.time(),
+                    "telemetry_sample_elapsed_s": telemetry_sample_elapsed_s,
                     "vehicle_speed_m_s": float(current["vehicle_speed_m_s"]),
                     "vehicle_envelope_center_world_enu_m": current.get(
                         "vehicle_envelope_center_world_enu_m"
                     ),
                 }
             )
-        else:
+            last_telemetry_sample_elapsed_s = telemetry_sample_elapsed_s
+        elif (
+            current is not None
+            and math.isfinite(telemetry_sample_elapsed_s)
+            and telemetry_sample_elapsed_s != last_telemetry_sample_elapsed_s
+        ):
             stable_samples.clear()
+            last_telemetry_sample_elapsed_s = telemetry_sample_elapsed_s
         time.sleep(0.25)
     if len(stable_samples) < 3:
         raise TimeoutError("PX4 safe hold did not stabilize below 0.12 m/s")

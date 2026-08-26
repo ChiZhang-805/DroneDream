@@ -76,6 +76,10 @@ SCHOOL_MAP_WAYPOINT_HOLD_SECONDS = 0.4
 DYNAMIC_PENETRATION_TOLERANCE_M = 0.0005
 LIVE_ROUTE_ERROR_LIMIT_M = 1.0
 LIVE_ROUTE_ERROR_GRACE_SECONDS = 1.0
+LIVE_SAFETY_LOOP_INTERVAL_SECONDS = 0.05
+LIVE_STATUS_INTERVAL_SECONDS = 0.10
+LIVE_COLLISION_SWEEP_INTERVAL_M = 0.04
+LIVE_TELEMETRY_STALE_TIMEOUT_SECONDS = 0.75
 PICKUP_ACCEPTANCE_RADIUS_M = 0.20
 RETURN_ACCEPTANCE_RADIUS_M = 0.45
 LANDED_ROOT_HORIZONTAL_TOLERANCE_M = 0.45
@@ -901,6 +905,32 @@ def _dynamic_safety_clearance(
     }
 
 
+def _swept_live_safety_clearance(
+    previous_center: WorldPoint | None,
+    current_center: WorldPoint,
+    primitives: list[CollisionPrimitive],
+    launch_point: WorldPoint,
+) -> dict[str, Any]:
+    """Check the complete traveled chord so a thin wall cannot be skipped.
+
+    Gazebo pose messages and the Python safety loop are asynchronous. Checking
+    only the two received endpoints can therefore miss a collision whenever a
+    vehicle crosses a thin obstacle between samples. The same 40 mm geometric
+    interval used by final evidence is applied online before the next command
+    cycle is allowed to continue.
+    """
+
+    centers = (
+        [current_center]
+        if previous_center is None
+        else sample_polyline(
+            [previous_center, current_center],
+            LIVE_COLLISION_SWEEP_INTERVAL_M,
+        )
+    )
+    return _dynamic_safety_clearance(centers, primitives, launch_point)
+
+
 def _payload_retention_measurements(
     vehicle_samples: list[GazeboPoseSample],
     payload_samples: list[GazeboPoseSample],
@@ -1587,6 +1617,9 @@ def main(argv: list[str] | None = None) -> int:
             last_route_progress_sample_elapsed: float | None = None
             last_live_status_write = 0.0
             last_live_status_sample: GazeboPoseSample | None = None
+            last_pose_sample_elapsed: float | None = None
+            last_pose_observed_at = time.monotonic()
+            last_safety_center: WorldPoint | None = None
             scene = get_scene("school-campus-v1")
             if scene is None or len(scene.reference_path) != len(route):
                 raise RuntimeError("School Map live route metadata is unavailable")
@@ -1594,9 +1627,30 @@ def main(argv: list[str] | None = None) -> int:
             runtime_control_revision = 0
             runtime_control_action: str | None = None
             while executor_process.poll() is None:
-                if time.monotonic() >= executor_deadline:
+                loop_observed_at = time.monotonic()
+                if loop_observed_at >= executor_deadline:
                     live_abort_reason = "executor_wall_timeout"
                 latest = recorder.latest_sample
+                sample_is_new = (
+                    latest is not None
+                    and (
+                        last_pose_sample_elapsed is None
+                        or latest.elapsed_s > last_pose_sample_elapsed + 1e-9
+                    )
+                )
+                if sample_is_new and latest is not None:
+                    last_pose_sample_elapsed = latest.elapsed_s
+                    last_pose_observed_at = loop_observed_at
+                elif (
+                    live_abort_reason is None
+                    and loop_observed_at - last_pose_observed_at
+                    > LIVE_TELEMETRY_STALE_TIMEOUT_SECONDS
+                ):
+                    live_abort_reason = (
+                        "live_pose_telemetry_stale: "
+                        f"gap={loop_observed_at - last_pose_observed_at:.3f}s "
+                        f"limit={LIVE_TELEMETRY_STALE_TIMEOUT_SECONDS:.3f}s"
+                    )
                 if latest is not None and live_abort_reason is None:
                     center = latest.envelope_center
                     if runtime_control_file.is_file():
@@ -1623,14 +1677,18 @@ def main(argv: list[str] | None = None) -> int:
                                 ]
                             runtime_control_revision = candidate_revision
                             runtime_control_action = candidate_action
-                    if latest.elapsed_s != last_route_progress_sample_elapsed:
+                    if sample_is_new and latest.elapsed_s != last_route_progress_sample_elapsed:
                         route_progress_index = _monotonic_route_progress_index(
                             center,
                             route,
                             route_progress_index,
                         )
                         last_route_progress_sample_elapsed = latest.elapsed_s
-                    if time.monotonic() - last_live_status_write >= 0.5:
+                    if (
+                        sample_is_new
+                        and loop_observed_at - last_live_status_write
+                        >= LIVE_STATUS_INTERVAL_SECONDS
+                    ):
                         vehicle_speed_m_s = 0.0
                         if last_live_status_sample is not None:
                             elapsed = latest.elapsed_s - last_live_status_sample.elapsed_s
@@ -1658,6 +1716,7 @@ def main(argv: list[str] | None = None) -> int:
                                 "vehicle_model_root_world_enu_m": latest.model_root,
                                 "vehicle_envelope_center_world_enu_m": center,
                                 "vehicle_speed_m_s": vehicle_speed_m_s,
+                                "telemetry_sample_elapsed_s": latest.elapsed_s,
                                 "payload_spawned": payload_spawn_evidence is not None,
                                 "payload_attached": (
                                     payload_state_recorder.attached_observed
@@ -1669,7 +1728,7 @@ def main(argv: list[str] | None = None) -> int:
                                 "runtime_control_action": runtime_control_action,
                             },
                         )
-                        last_live_status_write = time.monotonic()
+                        last_live_status_write = loop_observed_at
                         last_live_status_sample = latest
                     pickup_index = next(
                         (index for index, phase in enumerate(route_phases) if phase == "pickup"),
@@ -1725,25 +1784,31 @@ def main(argv: list[str] | None = None) -> int:
                             )
                     else:
                         off_route_started = None
-                    live_clearance = _dynamic_safety_clearance(
-                        [center],
-                        primitives,
-                        designated_landing_contact_center,
-                    )
-                    if live_clearance["unsafe_collision_count"]:
-                        live_abort_reason = (
-                            f"live_collision_penetration: {live_clearance['unsafe_collisions'][0]}"
+                    if sample_is_new:
+                        live_clearance = _swept_live_safety_clearance(
+                            last_safety_center,
+                            center,
+                            primitives,
+                            designated_landing_contact_center,
                         )
-                    elif (
-                        live_clearance["designated_contact_sample_count"]
-                        and not live_clearance["designated_pad_contact"]["within_solver_tolerance"]
-                    ):
-                        pad_contact = live_clearance["designated_pad_contact"]
-                        live_abort_reason = (
-                            "live_designated_pad_penetration: "
-                            f"clearance={pad_contact['minimum_clearance_m']:.9f}m "
-                            f"limit={pad_contact['solver_tolerance_m']:.9f}m"
-                        )
+                        last_safety_center = center
+                        if live_clearance["unsafe_collision_count"]:
+                            live_abort_reason = (
+                                "live_collision_penetration: "
+                                f"{live_clearance['unsafe_collisions'][0]}"
+                            )
+                        elif (
+                            live_clearance["designated_contact_sample_count"]
+                            and not live_clearance["designated_pad_contact"][
+                                "within_solver_tolerance"
+                            ]
+                        ):
+                            pad_contact = live_clearance["designated_pad_contact"]
+                            live_abort_reason = (
+                                "live_designated_pad_penetration: "
+                                f"clearance={pad_contact['minimum_clearance_m']:.9f}m "
+                                f"limit={pad_contact['solver_tolerance_m']:.9f}m"
+                            )
                 if live_abort_reason is not None:
                     pause_evidence = _set_world_paused(gz_binary, env, paused=True)
                     _write_json(
@@ -1759,7 +1824,7 @@ def main(argv: list[str] | None = None) -> int:
                     except subprocess.TimeoutExpired:
                         _terminate_process_group(executor_process)
                     break
-                time.sleep(0.2)
+                time.sleep(LIVE_SAFETY_LOOP_INTERVAL_SECONDS)
             executor_return_code = executor_process.wait(timeout=10)
             time.sleep(args.post_flight_observation_seconds)
             if live_abort_reason is None and abort_file.is_file():
@@ -1778,6 +1843,9 @@ def main(argv: list[str] | None = None) -> int:
                     "route_error_limit_m": LIVE_ROUTE_ERROR_LIMIT_M,
                     "route_error_grace_seconds": LIVE_ROUTE_ERROR_GRACE_SECONDS,
                     "penetration_tolerance_m": DYNAMIC_PENETRATION_TOLERANCE_M,
+                    "loop_interval_seconds": LIVE_SAFETY_LOOP_INTERVAL_SECONDS,
+                    "collision_sweep_interval_m": LIVE_COLLISION_SWEEP_INTERVAL_M,
+                    "telemetry_stale_timeout_seconds": LIVE_TELEMETRY_STALE_TIMEOUT_SECONDS,
                     "designated_pad_contact_tolerance_m": (DESIGNATED_PAD_CONTACT_TOLERANCE_M),
                     "abort_reason": live_abort_reason,
                     "world_pause": pause_evidence,
@@ -1833,6 +1901,7 @@ def main(argv: list[str] | None = None) -> int:
                 samples[-1].envelope_center if samples else None
             ),
             "vehicle_speed_m_s": 0.0,
+            "telemetry_sample_elapsed_s": samples[-1].elapsed_s if samples else None,
             "payload_spawned": payload_spawn_evidence is not None,
             "payload_attached": any(state == "attached" for _, state in payload_states),
             "abort_reason": process_failure,

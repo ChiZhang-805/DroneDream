@@ -1985,6 +1985,13 @@ class MissionOrchestrator:
                         for segment in flight_plan.segments
                     ],
                 },
+                "semantic_plan_binding": {
+                    "semantic_plan_sha256": sha256_json(semantic_plan),
+                    "flight_plan_semantic_plan_sha256": flight_plan.semantic_plan_sha256,
+                    "hash_matches": (
+                        flight_plan.semantic_plan_sha256 == sha256_json(semantic_plan)
+                    ),
+                },
                 "execution_route_summary": {
                     "start_node": execution_route.start_node,
                     "goal_node": execution_route.goal_node,
@@ -2031,6 +2038,23 @@ class MissionOrchestrator:
                     }
                     for item in attempt_receipts
                 ],
+                "planning_evidence_scope": {
+                    "phase": "pre_execution_planning",
+                    "present_evidence_must_be_hash_bound": True,
+                    "future_runtime_evidence_is_expected_after_confirmation": True,
+                    "future_runtime_evidence": [
+                        "telemetry-continuity",
+                        "payload-identity",
+                        "payload-mass-and-attachment",
+                        "runtime-checkpoints",
+                        "execution-confirmation",
+                        "landing-confirmation",
+                        "completion-assessment",
+                    ],
+                    "future_runtime_evidence_declared_by_accepted_tool_receipts": all(
+                        item.outcome == "accepted" for item in attempt_receipts
+                    ),
+                },
                 "optional_plugin_advice": plugin_advice,
                 "plugin_plan_scores": plan_scores,
                 "plugin_validation_results": validation_results,
