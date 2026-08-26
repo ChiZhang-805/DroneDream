@@ -8,6 +8,8 @@ export type HeaderDownloadId = "universal" | "sim" | "lab" | "field" | "autonomy
 
 const RELEASE_BASE =
   "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1732";
+const AGENT_RELEASE_BASE =
+  "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-1736";
 
 export const headerDownloadCatalog = [
   {
@@ -46,13 +48,13 @@ export const headerDownloadCatalog = [
     id: "autonomy",
     label: "DroneDream AGENT",
     fileName: "DroneDream-Agent_1.0.0_x64-setup.exe",
-    sizeBytes: 82_992_131,
-    sha256: "735c8d3f4d398b2ad5234d1d44e34fa1d8fe45b562a6b0dbde0da873d843c714",
+    sizeBytes: 82_979_305,
+    sha256: "16dcfe61ded90b1d54e791f681a2f5d9fe1504b8cdf9cc38e4d1a3616fe53dc6",
     mark: autonomyMark,
   },
 ].map((download) => ({
   ...download,
-  downloadUrl: `${RELEASE_BASE}/${download.fileName}`,
+  downloadUrl: `${download.id === "autonomy" ? AGENT_RELEASE_BASE : RELEASE_BASE}/${download.fileName}`,
 })) as readonly {
   id: HeaderDownloadId;
   label: string;

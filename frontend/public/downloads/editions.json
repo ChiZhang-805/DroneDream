@@ -49,13 +49,13 @@
       "status": "published",
       "version": "1.0.0",
       "fileName": "DroneDream-Agent_1.0.0_x64-setup.exe",
-      "downloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1732/DroneDream-Agent_1.0.0_x64-setup.exe",
-      "checksumUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1732/DroneDream-Agent_1.0.0_x64-setup.exe.sha256",
-      "signatureUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1732/DroneDream-Agent_1.0.0_x64-setup.exe.sig",
-      "receiptUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1732/DroneDream-Agent_1.0.0_x64-setup.exe.receipt.json",
-      "sizeBytes": 82992131,
-      "sha256": "735c8d3f4d398b2ad5234d1d44e34fa1d8fe45b562a6b0dbde0da873d843c714",
-      "sourceCommit": "73785debae9c0fc221e49667327c30bf9ab4f1d8",
+      "downloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-1736/DroneDream-Agent_1.0.0_x64-setup.exe",
+      "checksumUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-1736/DroneDream-Agent_1.0.0_x64-setup.exe.sha256",
+      "signatureUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-1736/DroneDream-Agent_1.0.0_x64-setup.exe.sig",
+      "receiptUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-autonomy-v1.0.0-build-1736/build-receipt.json",
+      "sizeBytes": 82979305,
+      "sha256": "16dcfe61ded90b1d54e791f681a2f5d9fe1504b8cdf9cc38e4d1a3616fe53dc6",
+      "sourceCommit": "a5911a8260cdcc8948379f07dbdd24c78894d7cd",
       "publishedAt": "2026-08-26"
     }
   ]
