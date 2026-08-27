@@ -27,6 +27,8 @@ import {
   categoryLabel, flowCertainty, harnessCategoryColors, layoutHarnessItems,
   puzzlePath, type FlowCertainty, type HarnessVisualPlacement,
 } from "../features/autonomy/harnessVisualLayout";
+import { createHarnessPreview } from "../features/autonomy/harnessPreview";
+import { isDesktopRuntime } from "../desktop/bridge";
 import { useI18n } from "../i18n/I18nProvider";
 import "./AutonomyHarness.css";
 
@@ -107,7 +109,9 @@ function HarnessPuzzleNode({ data, selected }: NodeProps<HarnessFlowNode>) {
     : item.kind === "stage"
       ? node?.node_kind === "model_call"
         ? chinese ? "结构化模型调用" : "Structured model call"
-        : node?.handler_id ?? ""
+        : node?.handler_id.startsWith("preview.")
+          ? chinese ? item.description_zh : item.description
+          : node?.handler_id ?? ""
       : plugin ? catalogLabel(chinese, plugin.name, plugin.plugin_id)
         : value ?? (chinese ? "选择插件" : "Choose plugin");
   const color = harnessCategoryColors[item.category_id] ?? "#6552c7";
@@ -292,6 +296,7 @@ export function AutonomyHarness() {
   const [orderByParent, setOrderByParent] = useState<Record<string, string[]>>({});
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dryRun, setDryRun] = useState<AgentCoreHarnessDryRun | null>(null);
   const [receipts, setReceipts] = useState<Array<Record<string, unknown>> | null>(null);
@@ -327,8 +332,17 @@ export function AutonomyHarness() {
       ]);
       setCatalog(nextCatalog);
       setHarness(nextHarness);
+      setPreviewMode(false);
       setError(null);
     } catch (value) {
+      if (value instanceof AgentCoreUnavailableError && !isDesktopRuntime()) {
+        const preview = createHarnessPreview();
+        setCatalog(preview.catalog);
+        setHarness(preview.harness);
+        setPreviewMode(true);
+        setError(null);
+        return;
+      }
       setError(apiError(value, chinese));
     }
   }, [chinese]);
@@ -338,7 +352,7 @@ export function AutonomyHarness() {
   const edit = useCallback(async (
     action: AgentCoreHarnessOperation["operation"], payload: Record<string, unknown>,
   ) => {
-    if (!harness) return;
+    if (!harness || previewMode) return;
     setBusy(action);
     setError(null);
     try {
@@ -350,11 +364,11 @@ export function AutonomyHarness() {
     } finally {
       setBusy(null);
     }
-  }, [chinese, harness, load]);
+  }, [chinese, harness, load, previewMode]);
 
   const activatePlugin = useCallback(async (pluginId: string, slotId: string) => {
     const plugin = catalog?.plugins.find((value) => value.plugin_id === pluginId && value.slot_id === slotId);
-    if (!plugin) return;
+    if (!plugin || previewMode) return;
     setBusy(`plugin:${pluginId}`);
     setError(null);
     try {
@@ -365,7 +379,7 @@ export function AutonomyHarness() {
     } finally {
       setBusy(null);
     }
-  }, [catalog, chinese, load]);
+  }, [catalog, chinese, load, previewMode]);
 
   const itemMap = useMemo(
     () => new Map((catalog?.composition_items ?? []).map((item) => [item.item_id, item])), [catalog],
@@ -515,7 +529,7 @@ export function AutonomyHarness() {
   }, [edges, edit]);
 
   const connect = useCallback((connection: Connection) => {
-    if (level !== 2 || !connection.source || !connection.target) return;
+    if (previewMode || level !== 2 || !connection.source || !connection.target) return;
     const sourceItem = itemMap.get(connection.source);
     const targetItem = itemMap.get(connection.target);
     const source = sourceItem ? nodeMap.get(sourceItem.member_node_ids[0]) : null;
@@ -532,7 +546,7 @@ export function AutonomyHarness() {
       binding_mode: sourcePort.cardinality === "event" ? "control" : "direct",
     };
     void edit("connect", { edge: binding });
-  }, [edit, itemMap, level, nodeMap]);
+  }, [edit, itemMap, level, nodeMap, previewMode]);
 
   const beginGameDrag = (flowNode: HarnessFlowNode) => {
     if (flowNode.id.startsWith("focus:")) return;
@@ -581,7 +595,7 @@ export function AutonomyHarness() {
     }, 460);
     setOrderByParent((current) => ({ ...current, [parentKey]: reordered.map((item) => item.item_id) }));
     setNodes(buildNodes(reordered));
-    if (level === 2) {
+    if (level === 2 && !previewMode) {
       const placements = layoutHarnessItems(reordered, { maxWidth: 1140, startX: 54, startY: 86, rowGap: 166 });
       const positions = Object.fromEntries(reordered.flatMap((item, index) => {
         const runtimeId = item.member_node_ids.length === 1 ? item.member_node_ids[0] : null;
@@ -592,6 +606,7 @@ export function AutonomyHarness() {
   };
 
   const runDry = async () => {
+    if (previewMode) return;
     setBusy("dry-run");
     try {
       setDryRun(await dryRunAgentCoreHarness(harness?.current.candidate));
@@ -600,13 +615,14 @@ export function AutonomyHarness() {
     finally { setBusy(null); }
   };
   const openReceipts = async () => {
+    if (previewMode) return;
     setBusy("receipts");
     try { setReceipts(await listAgentCoreHarnessReceipts(60)); setDryRun(null); }
     catch (value) { setError(apiError(value, chinese)); }
     finally { setBusy(null); }
   };
   const history = async (direction: "undo" | "redo") => {
-    if (!harness) return;
+    if (!harness || previewMode) return;
     setBusy(direction);
     try {
       if (direction === "undo") await undoAgentCoreHarness(harness.current.revision);
@@ -632,32 +648,33 @@ export function AutonomyHarness() {
           </nav>
         </div>
         <div className="harness-editor-status">
-          <span className={`is-${currentState}`}>
-            {currentState === "rejected" ? (chinese ? "需要修正" : "Needs repair")
+          <span className={previewMode ? "is-preview" : `is-${currentState}`} title={previewMode ? (chinese ? "网页端结构预览；桌面端登录后载入实时 Harness" : "Web structure preview; sign in on desktop for the live Harness") : undefined}>
+            {previewMode ? (chinese ? "只读预览" : "Read-only preview")
+              : currentState === "rejected" ? (chinese ? "需要修正" : "Needs repair")
               : activeIsCurrent ? (chinese ? "已激活" : "Active")
                 : (chinese ? "下一任务生效" : "Next task")}
           </span>
-          {harness ? <code>R{harness.current.revision}</code> : null}
+          {harness && !previewMode ? <code>R{harness.current.revision}</code> : null}
           <button type="button" onClick={() => void load()} aria-label={chinese ? "刷新" : "Refresh"}><RefreshCw /></button>
         </div>
       </header>
 
       <div className="harness-editor-toolbar">
         <label><span>{chinese ? "配置" : "Profile"}</span>
-          <select value={harness?.current.candidate.profile_id ?? ""} disabled={!catalog || busy !== null}
+          <select value={harness?.current.candidate.profile_id ?? ""} disabled={!catalog || previewMode || busy !== null}
             onChange={(event) => void edit("apply_profile", { profile_id: event.target.value })}>
             {(catalog?.profiles ?? []).map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{catalogLabel(chinese, profile.name, profile.profile_id)}</option>)}
           </select><ChevronDown /></label>
         <label><span>{chinese ? "拓扑" : "Topology"}</span>
-          <select value={harness?.current.candidate.topology_id ?? ""} disabled={!catalog || busy !== null}
+          <select value={harness?.current.candidate.topology_id ?? ""} disabled={!catalog || previewMode || busy !== null}
             onChange={(event) => void edit("apply_template", { topology_id: event.target.value })}>
             {(catalog?.topology_templates ?? []).map((template) => <option key={template.topology_id} value={template.topology_id}>{catalogLabel(chinese, template.name, template.topology_id)}</option>)}
           </select><ChevronDown /></label>
         <span className="harness-toolbar-separator" />
         <button type="button" disabled={!harness?.can_undo || busy !== null} onClick={() => void history("undo")}><Undo2 />{chinese ? "撤销" : "Undo"}</button>
         <button type="button" disabled={!harness?.can_redo || busy !== null} onClick={() => void history("redo")}><Redo2 />{chinese ? "重做" : "Redo"}</button>
-        <button type="button" disabled={busy !== null} onClick={() => void openReceipts()}><ScrollText />{chinese ? "记录" : "Receipts"}</button>
-        <button type="button" className="is-primary" disabled={!harness || busy !== null} onClick={() => void runDry()}><Play />{chinese ? "试运行" : "Dry run"}</button>
+        <button type="button" disabled={previewMode || busy !== null} onClick={() => void openReceipts()}><ScrollText />{chinese ? "记录" : "Receipts"}</button>
+        <button type="button" className="is-primary" disabled={previewMode || !harness || busy !== null} onClick={() => void runDry()}><Play />{chinese ? "试运行" : "Dry run"}</button>
       </div>
 
       <div className="harness-level-bar">
@@ -742,15 +759,15 @@ export function AutonomyHarness() {
               if (!detailNode) return null;
               return <div className="harness-policy-setting" key={detail.item_id}>
                 <strong>{chinese ? detail.title_zh : detail.title}</strong>
-                {detail.item_id.endsWith(".timeout") ? <label><span>{chinese ? "秒" : "Seconds"}</span><input type="number" min={0.1} max={600} value={detailNode.policy.timeout_seconds}
+                {detail.item_id.endsWith(".timeout") ? <label><span>{chinese ? "秒" : "Seconds"}</span><input type="number" min={0.1} max={600} value={detailNode.policy.timeout_seconds} disabled={previewMode}
                   onChange={(event) => void edit("update_node", { node_id: detailNode.node_id, policy: { timeout_seconds: Number(event.target.value) } })} /></label> : null}
-                {detail.item_id.endsWith(".retry") ? <label><span>{chinese ? "次数" : "Attempts"}</span><input type="number" min={0} max={5} value={detailNode.policy.retry_limit}
+                {detail.item_id.endsWith(".retry") ? <label><span>{chinese ? "次数" : "Attempts"}</span><input type="number" min={0} max={5} value={detailNode.policy.retry_limit} disabled={previewMode}
                   onChange={(event) => void edit("update_node", { node_id: detailNode.node_id, policy: { retry_limit: Number(event.target.value) } })} /></label> : null}
-                {detail.item_id.endsWith(".failure") ? <label><span>{chinese ? "处理方式" : "Mode"}</span><select value={detailNode.policy.failure_mode} disabled={detail.protected}
+                {detail.item_id.endsWith(".failure") ? <label><span>{chinese ? "处理方式" : "Mode"}</span><select value={detailNode.policy.failure_mode} disabled={previewMode || detail.protected}
                   onChange={(event) => void edit("update_node", { node_id: detailNode.node_id, policy: { failure_mode: event.target.value } })}>
                   <option value="fail-closed">{chinese ? "失败即关闭" : "Fail closed"}</option><option value="isolate">{chinese ? "隔离" : "Isolate"}</option><option value="fallback">{chinese ? "回退" : "Fallback"}</option>
                 </select></label> : null}
-                {detail.item_id.endsWith(".cache") ? <label className="harness-check-label"><input type="checkbox" checked={detailNode.policy.cacheable}
+                {detail.item_id.endsWith(".cache") ? <label className="harness-check-label"><input type="checkbox" checked={detailNode.policy.cacheable} disabled={previewMode}
                   onChange={(event) => void edit("update_node", { node_id: detailNode.node_id, policy: { cacheable: event.target.checked } })} /><span>{chinese ? "允许缓存" : "Allow cache"}</span></label> : null}
               </div>;
             })}
@@ -759,7 +776,7 @@ export function AutonomyHarness() {
               if (!slotPlugins.length) return null;
               return <section className="harness-slot-options" key={slotId}><h3>{slotTitle(slotId, chinese)}</h3>
                 {slotPlugins.map((plugin) => <button type="button" className={plugin.enabled ? "is-active" : ""} key={plugin.plugin_id}
-                  onClick={() => void activatePlugin(plugin.plugin_id, slotId)} disabled={busy !== null}>
+                  onClick={() => void activatePlugin(plugin.plugin_id, slotId)} disabled={previewMode || busy !== null}>
                   <span /><strong>{catalogLabel(chinese, plugin.name, plugin.plugin_id)}</strong>{plugin.enabled ? <Check /> : <PlugZap />}
                 </button>)}
               </section>;
@@ -791,10 +808,10 @@ export function AutonomyHarness() {
       {contextMenu && selectedItem ? <div className="harness-context-menu" role="menu" aria-label={chinese ? "拼图操作" : "Puzzle actions"} style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}>
         {selectedItem.enterable && selectedItem.level === 1 ? <button role="menuitem" type="button" onClick={() => enterItem(selectedItem)}><Settings2 /><span>{chinese ? "展开二级插件" : "Open level two"}</span><ChevronRight className="is-trailing" /></button> : null}
         <button role="menuitem" type="button" onClick={() => { setSelectedItemId(selectedItem.item_id); setContextMenu(null); }}><Eye /><span>{chinese ? "查看详情" : "Inspect"}</span></button>
-        {selectedItem.level === 2 ? (selectedItem.kind === "plugin-slot" ? <NavLink role="menuitem" to="/autonomy/plugins"><PlugZap /><span>{chinese ? "更换插件" : "Replace plug-in"}</span></NavLink>
+        {previewMode ? <NavLink role="menuitem" to="/autonomy/plugins"><PlugZap /><span>{chinese ? "查看插件库" : "Open plugin library"}</span></NavLink> : selectedItem.level === 2 ? (selectedItem.kind === "plugin-slot" ? <NavLink role="menuitem" to="/autonomy/plugins"><PlugZap /><span>{chinese ? "更换插件" : "Replace plug-in"}</span></NavLink>
           : selectedNode?.capabilities.removable ? <button role="menuitem" type="button" className="is-danger" onClick={() => void edit("remove_node", { node_id: selectedNode.node_id })}><Trash2 /><span>{chinese ? "移除拼图" : "Remove piece"}</span></button>
             : <button role="menuitem" type="button" onClick={() => void runDry()}><Play /><span>{chinese ? "试运行 Harness" : "Dry run Harness"}</span></button>) : null}
-        {selectedItem.level === 1 ? <button role="menuitem" type="button" onClick={() => void runDry()}><Play /><span>{chinese ? "试运行 Harness" : "Dry run Harness"}</span></button> : null}
+        {selectedItem.level === 1 && !previewMode ? <button role="menuitem" type="button" onClick={() => void runDry()}><Play /><span>{chinese ? "试运行 Harness" : "Dry run Harness"}</span></button> : null}
       </div> : null}
     </section>
   );

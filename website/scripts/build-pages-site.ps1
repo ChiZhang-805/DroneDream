@@ -122,6 +122,8 @@ $consoleRoutes = @(
     "autonomy\mission",
     "autonomy\live",
     "autonomy\evidence",
+    "autonomy\plugins",
+    "autonomy\plugins\harness",
     "vehicle-studio",
     "admin",
     "compare",

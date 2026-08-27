@@ -43,6 +43,7 @@ vi.mock("../features/autonomy/agentCore", () => ({
 }));
 
 import { AutonomyHarness } from "../pages/AutonomyHarness";
+import { AgentCoreUnavailableError } from "../features/autonomy/agentCore";
 
 const node = {
   node_id: "mission.request-ingest",
@@ -184,5 +185,24 @@ describe("visual Harness composer", () => {
     expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
     fireEvent.click(within(menu).getByRole("menuitem", { name: /展开二级插件/ }));
     expect(await screen.findByRole("button", { name: "接收任务" })).toBeVisible();
+  });
+
+  it("renders a read-only two-level puzzle preview on the web", async () => {
+    harnessMocks.catalog.mockRejectedValue(new AgentCoreUnavailableError());
+    harnessMocks.state.mockRejectedValue(new AgentCoreUnavailableError());
+
+    render(<MemoryRouter initialEntries={["/autonomy/plugins/harness"]}><AutonomyHarness /></MemoryRouter>);
+
+    expect(await screen.findByText("只读预览")).toBeVisible();
+    expect(screen.getByRole("button", { name: "任务接入" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "规划与决策" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "飞行执行" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "验证与交付" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "试运行" })).toBeDisabled();
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: "任务接入" }));
+    const menu = screen.getByRole("menu", { name: "拼图操作" });
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
+    expect(within(menu).getByRole("menuitem", { name: "查看插件库" })).toHaveAttribute("href", "/autonomy/plugins");
   });
 });

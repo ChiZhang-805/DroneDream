@@ -115,6 +115,12 @@
   color: #b41a3e;
 }
 
+.harness-editor-status > span.is-preview {
+  border: 1px solid #d9d0fa;
+  background: #f4f1ff;
+  color: #6552c7;
+}
+
 .harness-editor-status code {
   color: var(--harness-muted);
   font: 650 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;

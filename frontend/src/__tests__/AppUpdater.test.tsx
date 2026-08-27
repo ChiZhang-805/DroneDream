@@ -112,7 +112,7 @@ async function openRuntimeSettings(locale: "en" | "zh-CN" = "en") {
     name: locale === "zh-CN" ? "设置" : "Settings",
   });
   fireEvent.click(within(quickSettings).getByRole("button", {
-    name: locale === "zh-CN" ? /Runtime 与更新/ : /Runtime & updates/,
+    name: /Runtime/,
   }));
   return screen.findByRole("region", {
     name: locale === "zh-CN" ? "设置" : "Settings",
