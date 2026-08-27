@@ -8321,6 +8321,63 @@ a {
   }
 }
 
+/* Keep desktop navigation and account controls in one full-height column.
+   `display: contents` did not reliably pass flex growth through the wrapper in
+   the desktop webview, which let the account block sit directly below the
+   navigation instead of at the bottom of the sidebar. */
+@media (min-width: 521px) {
+  .app-shell:not(.app-shell-launcher) .app-sidebar {
+    min-height: 100vh;
+  }
+
+  .app-shell:not(.app-shell-launcher) .app-mobile-menu-panel {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .app-shell:not(.app-shell-launcher) .app-mobile-menu-panel .app-nav {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .app-shell:not(.app-shell-launcher) .app-mobile-menu-panel .app-sidebar-footer {
+    flex: 0 0 auto;
+    margin-top: auto;
+  }
+}
+
+/* ECE498BH is a five-row directory. Every row shares the same three columns:
+   product mark, one-line description, and the action. */
+.settings-workspace-content .settings-course-editions {
+  grid-template-rows: repeat(5, minmax(5.5rem, 1fr));
+}
+
+.settings-workspace-content .settings-course-editions article,
+.settings-workspace-content .settings-course-editions article:nth-child(4),
+.settings-workspace-content .settings-course-editions article:nth-child(5) {
+  grid-template-columns: minmax(310px, 0.46fr) minmax(0, 1fr) minmax(150px, auto);
+  column-gap: clamp(1.25rem, 2.4vw, 2.5rem);
+  row-gap: 0;
+  padding: 0.9rem 0.25rem;
+}
+
+.settings-workspace-content .settings-course-editions .brand-lockup {
+  justify-self: start;
+  object-position: left center;
+}
+
+.settings-workspace-content .settings-course-editions p {
+  justify-self: start;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.settings-workspace-content .settings-course-edition-link {
+  justify-self: end;
+}
+
 @media (max-width: 620px) {
   .fixed-scenarios-header,
   .fixed-scenario-card-heading {

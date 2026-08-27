@@ -33,6 +33,44 @@ const MAX_AIRCRAFT = 50;
 const MAX_MAPS = 50;
 const MAX_EXTERNAL_ASSETS = 100;
 
+function aircraftAssetKey(aircraft: AutonomyAircraftProfile): string {
+  return aircraft.agentCoreAssetId?.trim() || aircraft.id;
+}
+
+function mapAssetKey(mapPack: AutonomyMapPack): string {
+  return mapPack.agentCoreAssetId?.trim() || mapPack.id;
+}
+
+function externalAssetKey(asset: AutonomyExternalAssetReference): string {
+  const kind = asset.kind === "vehicle" ? "vehicle" : "map";
+  return `${kind}:${asset.id}`;
+}
+
+function uniqueByKey<T>(items: T[], keyFor: (item: T) => string, maximum: number): T[] {
+  const keys = new Set<string>();
+  return items.filter((item) => {
+    const key = keyFor(item);
+    if (keys.has(key)) return false;
+    keys.add(key);
+    return true;
+  }).slice(0, maximum);
+}
+
+function normalizeLibrary(library: AutonomyAssetLibrary): AutonomyAssetLibrary {
+  const aircraft = uniqueByKey(library.aircraft, aircraftAssetKey, MAX_AIRCRAFT);
+  const maps = uniqueByKey(library.maps, mapAssetKey, MAX_MAPS);
+  const representedAssetIds = new Set([
+    ...aircraft.map(aircraftAssetKey),
+    ...maps.map(mapAssetKey),
+  ]);
+  const externalAssets = uniqueByKey(
+    library.externalAssets.filter((asset) => !representedAssetIds.has(asset.id)),
+    externalAssetKey,
+    MAX_EXTERNAL_ASSETS,
+  );
+  return { schemaVersion: 2, aircraft, maps, externalAssets };
+}
+
 function storageKey(ownerId: string, edition: BrandEditionId): string {
   return `${STORAGE_PREFIX}:${encodeURIComponent(ownerId || "local")}:${edition}`;
 }
@@ -105,15 +143,15 @@ export function withExternalAutonomyAsset(
 ): AutonomyAssetLibrary {
   const normalized = normalizeExternalAsset(asset);
   if (!normalized) return library;
-  return {
+  return normalizeLibrary({
     ...library,
     externalAssets: [
       normalized,
       ...library.externalAssets.filter((candidate) => (
-        candidate.id !== normalized.id || candidate.contentSha256 !== normalized.contentSha256
+        externalAssetKey(candidate) !== externalAssetKey(normalized)
       )),
     ].slice(0, MAX_EXTERNAL_ASSETS),
-  };
+  });
 }
 
 export function withCurrentAutonomyAssets(
@@ -121,7 +159,7 @@ export function withCurrentAutonomyAssets(
   workspace: AutonomyWorkspaceState,
 ): AutonomyAssetLibrary {
   const publicAssets = defaultAutonomyWorkspace();
-  return {
+  return normalizeLibrary({
     schemaVersion: 2,
     aircraft: replaceById(
       replaceById(library.aircraft, publicAssets.aircraft, MAX_AIRCRAFT),
@@ -134,7 +172,7 @@ export function withCurrentAutonomyAssets(
       MAX_MAPS,
     ),
     externalAssets: library.externalAssets,
-  };
+  });
 }
 
 export function loadAutonomyAssetLibrary(
@@ -154,7 +192,7 @@ export function loadAutonomyAssetLibrary(
     const externalAssets = Array.isArray(raw?.externalAssets)
       ? raw.externalAssets.map(normalizeExternalAsset).filter((item): item is AutonomyExternalAssetReference => Boolean(item))
       : [];
-    return withCurrentAutonomyAssets({ schemaVersion: 2, aircraft, maps, externalAssets }, workspace);
+    return withCurrentAutonomyAssets(normalizeLibrary({ schemaVersion: 2, aircraft, maps, externalAssets }), workspace);
   } catch {
     return withCurrentAutonomyAssets({ schemaVersion: 2, aircraft: [], maps: [], externalAssets: [] }, workspace);
   }
@@ -166,7 +204,7 @@ export function saveAutonomyAssetLibrary(
   library: AutonomyAssetLibrary,
   storage: Pick<Storage, "setItem"> = window.localStorage,
 ): AutonomyAssetLibrary {
-  const normalized: AutonomyAssetLibrary = {
+  const normalized = normalizeLibrary({
     schemaVersion: 2,
     aircraft: library.aircraft.map(normalizeAircraft).filter((item): item is AutonomyAircraftProfile => Boolean(item)).slice(0, MAX_AIRCRAFT),
     maps: library.maps.map(normalizeMap).filter((item): item is AutonomyMapPack => Boolean(item)).slice(0, MAX_MAPS),
@@ -174,7 +212,7 @@ export function saveAutonomyAssetLibrary(
       .map(normalizeExternalAsset)
       .filter((item): item is AutonomyExternalAssetReference => Boolean(item))
       .slice(0, MAX_EXTERNAL_ASSETS),
-  };
+  });
   storage.setItem(storageKey(ownerId, edition), JSON.stringify(normalized));
   return normalized;
 }
