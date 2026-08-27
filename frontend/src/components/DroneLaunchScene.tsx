@@ -18,6 +18,12 @@ import {
   renderGapBudget,
   shouldRunDroneRenderLoop,
 } from "./droneRenderPerformance";
+import {
+  advanceCityTraffic,
+  createCityTrafficVehicles,
+  getCityTrafficWorldPosition,
+  type CityTrafficVehicleState,
+} from "./cityTraffic";
 
 type DroneLaunchSceneProps = {
   active?: boolean;
@@ -41,13 +47,8 @@ export type DroneLaunchSceneLabels = {
   cruise: string;
 };
 
-type MovingCityVehicle = {
+type MovingCityVehicle = CityTrafficVehicleState & {
   object: THREE.Group;
-  axis: "x" | "z";
-  direction: 1 | -1;
-  offset: number;
-  speed: number;
-  lane: number;
 };
 
 type NightCity = {
@@ -1022,10 +1023,10 @@ function buildNightCity(
   }
 
   const movingVehicles: MovingCityVehicle[] = [];
+  const trafficVehicles = createCityTrafficVehicles();
   const vehicleColors = [theme.primary, theme.tertiary, 0xffc55c, 0xe7f5ff];
-  for (let index = 0; index < 14; index += 1) {
-    const axis: "x" | "z" = index < 9 ? "x" : "z";
-    const direction: 1 | -1 = index % 2 === 0 ? 1 : -1;
+  trafficVehicles.forEach((trafficVehicle, index) => {
+    const { axis, direction } = trafficVehicle;
     const vehicle = new THREE.Group();
     const bodyMaterial = new THREE.MeshPhysicalMaterial({
         color: vehicleColors[index % vehicleColors.length],
@@ -1078,15 +1079,8 @@ function buildNightCity(
     vehicle.add(tailLight);
     if (axis === "z") vehicle.rotation.y = Math.PI / 2;
     group.add(vehicle);
-    movingVehicles.push({
-      object: vehicle,
-      axis,
-      direction,
-      offset: random() * 27,
-      speed: 0.75 + random() * 0.9,
-      lane: axis === "x" ? (index % 2 === 0 ? 1.3 : 1.9) : (index % 2 === 0 ? -0.28 : 0.28),
-    });
-  }
+    movingVehicles.push({ object: vehicle, ...trafficVehicle });
+  });
 
   return { group, movingVehicles, waterMaterial, beaconMaterials };
 }
@@ -1435,6 +1429,7 @@ export function DroneLaunchSceneCore({
     let awaitingPostRenderSample = false;
     let lastShadowUpdateAt = Number.NEGATIVE_INFINITY;
     let renderMode: "idle" | "interactive" = "idle";
+    let trafficElapsedSeconds = 0;
 
     const updateRenderState = (state: "stopped" | "idle" | "interactive" | "static") => {
       host.dataset.renderState = state;
@@ -1584,13 +1579,14 @@ export function DroneLaunchSceneCore({
       nightCity.beaconMaterials.forEach((material, index) => {
         material.opacity = 0.42 + (Math.sin(elapsed * 2.4 + index * 0.73) + 1) * 0.27;
       });
+      trafficElapsedSeconds = advanceCityTraffic(
+        nightCity.movingVehicles,
+        trafficElapsedSeconds,
+        deltaSeconds * motion,
+      );
       nightCity.movingVehicles.forEach((vehicle) => {
-        const travel = ((elapsed * vehicle.speed + vehicle.offset) % 28) - 14;
-        if (vehicle.axis === "x") {
-          vehicle.object.position.set(travel * vehicle.direction, 0, vehicle.lane);
-        } else {
-          vehicle.object.position.set(vehicle.lane, 0, travel * vehicle.direction);
-        }
+        const position = getCityTrafficWorldPosition(vehicle);
+        vehicle.object.position.set(position.x, 0, position.z);
       });
       camera.position.x = (5.3 + pointer.x * 0.28) * cameraDistanceScale;
       camera.position.y = (3.35 - pointer.y * 0.16) * Math.min(cameraDistanceScale, 1.28);
