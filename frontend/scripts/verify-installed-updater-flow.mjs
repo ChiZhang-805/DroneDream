@@ -37,15 +37,16 @@ async function atomicJson(filePath, value) {
 async function waitForCdp(expectedAvailable, timeoutMilliseconds) {
   const deadline = Date.now() + timeoutMilliseconds;
   while (Date.now() < deadline) {
-    let available = false;
-    try {
-      const response = await fetch(`${cdpEndpoint}/json/version`, {
-        signal: AbortSignal.timeout(1_000),
-      });
-      available = response.ok;
-    } catch {
-      available = false;
-    }
+    const available = await (async () => {
+      try {
+        const response = await fetch(`${cdpEndpoint}/json/version`, {
+          signal: AbortSignal.timeout(1_000),
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    })();
     if (available === expectedAvailable) return;
     await sleep(250);
   }

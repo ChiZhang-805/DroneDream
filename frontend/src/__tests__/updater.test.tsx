@@ -8,6 +8,8 @@ const {
   getEnginePackStatusMock,
   installEmbeddedEnginePackMock,
   installComponentUpdateMock,
+  listJobsMock,
+  probeRuntimeStatusMock,
   relaunchMock,
   stopRuntimeForExitMock,
 } = vi.hoisted(() => ({
@@ -17,6 +19,8 @@ const {
   getEnginePackStatusMock: vi.fn(),
   installEmbeddedEnginePackMock: vi.fn(),
   installComponentUpdateMock: vi.fn(),
+  listJobsMock: vi.fn(),
+  probeRuntimeStatusMock: vi.fn(),
   relaunchMock: vi.fn(),
   stopRuntimeForExitMock: vi.fn(),
 }));
@@ -34,11 +38,16 @@ vi.mock("../desktop/bridge", () => ({
   getEnginePackStatus: getEnginePackStatusMock,
   installEmbeddedEnginePack: installEmbeddedEnginePackMock,
   installComponentUpdate: installComponentUpdateMock,
+  probeRuntimeStatus: probeRuntimeStatusMock,
   stopRuntimeForExit: stopRuntimeForExitMock,
+}));
+vi.mock("../api/client", () => ({
+  apiClient: { listJobs: listJobsMock },
 }));
 
 import {
   appUpdateIsRequired,
+  detectRunningUpdateBlock,
   isNoPublishedDesktopUpdate,
   isLegacyRuntimeIdleProbeUnavailable,
   orderComponentUpdates,
@@ -76,6 +85,19 @@ beforeEach(() => {
   relaunchMock.mockResolvedValue(undefined);
   stopRuntimeForExitMock.mockReset();
   stopRuntimeForExitMock.mockResolvedValue(undefined);
+  probeRuntimeStatusMock.mockReset();
+  probeRuntimeStatusMock.mockResolvedValue({
+    runtimeName: "DroneDream Runtime",
+    installed: true,
+    running: false,
+    ready: false,
+    version: "1.0.0",
+    dataRoot: "Q:\\DroneDreamRuntime",
+    components: [],
+    diagnostics: [],
+  });
+  listJobsMock.mockReset();
+  listJobsMock.mockResolvedValue({ items: [], page: 1, page_size: 100, total: 0 });
   getEnginePackStatusMock.mockReset();
   getEnginePackStatusMock.mockResolvedValue({
     supported: true,
@@ -143,6 +165,7 @@ describe("useAppUpdater", () => {
     checkMock.mockRejectedValue(unpublished);
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("current"));
 
     expect(hook.result.current.error).toBeNull();
@@ -153,6 +176,8 @@ describe("useAppUpdater", () => {
   it("keeps genuine desktop updater failures visible", async () => {
     checkMock.mockRejectedValue(new Error("network unavailable"));
     const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("error"));
 
     expect(hook.result.current.error).toBe("network unavailable");
@@ -210,23 +235,39 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
-  it("finishes downloading but does not install or relaunch while a Runtime experiment is active", async () => {
+  it("does not download, install, or relaunch while a Runtime experiment is active", async () => {
     const availableUpdate = update("1.0.0");
     checkMock.mockResolvedValue(availableUpdate);
-    ensureAppUpdateIdleMock.mockRejectedValue(
-      new Error("Engine Pack update is waiting for active experiments to finish (1 jobs, 0 trials)"),
-    );
+    probeRuntimeStatusMock.mockResolvedValue({
+      runtimeName: "DroneDream Runtime",
+      installed: true,
+      running: true,
+      ready: true,
+      version: "1.0.0",
+      dataRoot: "Q:\\DroneDreamRuntime",
+      components: [],
+      diagnostics: [],
+    });
+    listJobsMock.mockResolvedValue({
+      items: [{ id: "job-running", display_name: "Office delivery" }],
+      page: 1,
+      page_size: 100,
+      total: 1,
+    });
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(hook.result.current.status).toBe("available"));
 
     await act(async () => hook.result.current.installAvailableUpdate());
 
-    expect(availableUpdate.download).toHaveBeenCalledOnce();
+    expect(availableUpdate.download).not.toHaveBeenCalled();
     expect(availableUpdate.install).not.toHaveBeenCalled();
     expect(stopRuntimeForExitMock).not.toHaveBeenCalled();
     expect(relaunchMock).not.toHaveBeenCalled();
     expect(hook.result.current.status).toBe("available");
-    expect(hook.result.current.error).toContain("active experiments");
+    expect(hook.result.current.blockedActivity).toMatchObject({
+      kind: "running",
+      runningJobs: [{ id: "job-running", name: "Office delivery" }],
+    });
     hook.unmount();
   });
 
@@ -243,9 +284,6 @@ describe("useAppUpdater", () => {
       }),
     });
     checkMock.mockResolvedValue(availableUpdate);
-    ensureAppUpdateIdleMock.mockRejectedValue(
-      new Error("The Runtime Base must be upgraded before DroneDream can update safely."),
-    );
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(hook.result.current.status).toBe("available"));
 
@@ -255,13 +293,32 @@ describe("useAppUpdater", () => {
     expect(stopRuntimeForExitMock).toHaveBeenCalledOnce();
     expect(availableUpdate.install).toHaveBeenCalledOnce();
     expect(relaunchMock).toHaveBeenCalledOnce();
+    expect(probeRuntimeStatusMock).toHaveBeenCalledTimes(2);
     expect(availableUpdate.download.mock.invocationCallOrder[0]).toBeLessThan(
-      ensureAppUpdateIdleMock.mock.invocationCallOrder[0],
-    );
-    expect(ensureAppUpdateIdleMock.mock.invocationCallOrder[0]).toBeLessThan(
       availableUpdate.install.mock.invocationCallOrder[0],
     );
     hook.unmount();
+  });
+
+  it("queries only exact RUNNING jobs when a ready Runtime is active", async () => {
+    probeRuntimeStatusMock.mockResolvedValue({
+      runtimeName: "DroneDream Runtime",
+      installed: true,
+      running: true,
+      ready: true,
+      version: "1.0.0",
+      dataRoot: "Q:\\DroneDreamRuntime",
+      components: [],
+      diagnostics: [],
+    });
+
+    await expect(detectRunningUpdateBlock()).resolves.toBeNull();
+
+    expect(listJobsMock).toHaveBeenCalledWith({
+      status: "RUNNING",
+      page: 1,
+      page_size: 100,
+    });
   });
 
   it("reconciles the embedded Engine Pack after confirming the app is current", async () => {
@@ -280,11 +337,13 @@ describe("useAppUpdater", () => {
     installEmbeddedEnginePackMock.mockResolvedValue(installedPack);
 
     const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("current"));
 
     expect(getEnginePackStatusMock).toHaveBeenCalledOnce();
     expect(installEmbeddedEnginePackMock).toHaveBeenCalledOnce();
-    expect(checkMock.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(checkMock.mock.invocationCallOrder[1]).toBeLessThan(
       getEnginePackStatusMock.mock.invocationCallOrder[0],
     );
     expect(hook.result.current.enginePack).toEqual(installedPack);
@@ -320,6 +379,8 @@ describe("useAppUpdater", () => {
     );
 
     const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("engineUpdateDeferred"));
 
     expect(hook.result.current.error).toContain("active experiments");
@@ -341,6 +402,8 @@ describe("useAppUpdater", () => {
     });
 
     const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("runtimeBaseRequired"));
 
     expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
@@ -362,6 +425,8 @@ describe("useAppUpdater", () => {
     });
 
     const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("current"));
 
     expect(hook.result.current.updateRequired).toBe(false);
@@ -372,7 +437,7 @@ describe("useAppUpdater", () => {
       runtimeBaseUpgradeAvailable: false,
     });
     expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
-    expect(checkMock).toHaveBeenCalledOnce();
+    expect(checkMock).toHaveBeenCalledTimes(2);
     expect(checkComponentUpdatesMock).not.toHaveBeenCalled();
     hook.unmount();
   });
@@ -399,6 +464,8 @@ describe("useAppUpdater", () => {
     });
 
     const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("componentAvailable"));
 
     expect(getEnginePackStatusMock).toHaveBeenCalledOnce();
@@ -456,6 +523,8 @@ describe("useAppUpdater", () => {
     }));
 
     const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("componentAvailable"));
     await act(async () => hook.result.current.installComponentUpdates());
 
@@ -501,6 +570,8 @@ describe("useAppUpdater", () => {
     });
 
     const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("current"));
 
     expect(installComponentUpdateMock).toHaveBeenCalledWith(

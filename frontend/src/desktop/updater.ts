@@ -9,12 +9,14 @@ import {
   installEmbeddedEnginePack,
   installComponentUpdate,
   isDesktopRuntime,
+  probeRuntimeStatus,
   stopRuntimeForExit,
   type ComponentUpdateId,
   type ComponentUpdateCandidate,
   type ComponentUpdateReport,
   type EnginePackStatus,
 } from "./bridge";
+import { apiClient } from "../api/client";
 
 export type AppUpdateStatus =
   | "checking"
@@ -32,6 +34,12 @@ export type AppUpdateStatus =
   | "runtimeBaseRequired"
   | "error";
 
+export interface AppUpdateBlock {
+  kind: "running" | "verification-failed";
+  runningJobs: Array<{ id: string; name: string }>;
+  message: string;
+}
+
 interface AppUpdateState {
   status: AppUpdateStatus;
   availableVersion: string | null;
@@ -40,6 +48,7 @@ interface AppUpdateState {
   error: string | null;
   enginePack: EnginePackStatus | null;
   componentUpdates: ComponentUpdateReport | null;
+  blockedActivity?: AppUpdateBlock | null;
 }
 
 const CURRENT_STATE: AppUpdateState = {
@@ -50,7 +59,10 @@ const CURRENT_STATE: AppUpdateState = {
   error: null,
   enginePack: null,
   componentUpdates: null,
+  blockedActivity: null,
 };
+
+export const AUTOMATIC_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const COMPONENT_INSTALL_ORDER: ComponentUpdateId[] = [
   "capability-pack",
@@ -163,7 +175,41 @@ function isActiveExperimentDeferral(message: string): boolean {
   return message.includes("waiting for active experiments to finish");
 }
 
-export function useAppUpdater() {
+export async function detectRunningUpdateBlock(): Promise<AppUpdateBlock | null> {
+  try {
+    const runtime = await probeRuntimeStatus();
+    if (!runtime.installed || !runtime.running) return null;
+    if (!runtime.ready) {
+      return {
+        kind: "verification-failed",
+        runningJobs: [],
+        message: "DroneDream could not verify whether the running Runtime has an active experiment. Stop the Runtime or try again after it becomes ready.",
+      };
+    }
+    const jobs = await apiClient.listJobs({ status: "RUNNING", page: 1, page_size: 100 });
+    if (jobs.items.length === 0) return null;
+    const runningJobs = jobs.items.map((job) => ({
+      id: job.id,
+      name: job.display_name?.trim() || job.id,
+    }));
+    return {
+      kind: "running",
+      runningJobs,
+      message: runningJobs.length === 1
+        ? `“${runningJobs[0].name}” is currently running. Finish or stop it before updating DroneDream.`
+        : `${runningJobs.length} experiments are currently running. Finish or stop them before updating DroneDream.`,
+    };
+  } catch (error) {
+    return {
+      kind: "verification-failed",
+      runningJobs: [],
+      message: `DroneDream could not safely verify active experiments: ${errorMessage(error)}`,
+    };
+  }
+}
+
+export function useAppUpdater(options: { enabled?: boolean } = {}) {
+  const enabled = options.enabled ?? true;
   const desktopRuntime = isDesktopRuntime();
   const updateRef = useRef<Update | null>(null);
   const updateDownloadedRef = useRef(false);
@@ -171,7 +217,7 @@ export function useAppUpdater() {
   const installInFlightRef = useRef(false);
   const [state, setState] = useState<AppUpdateState>(() => (
     desktopRuntime && import.meta.env.MODE !== "test"
-      ? { ...CURRENT_STATE, status: "checking" }
+      ? CURRENT_STATE
       : CURRENT_STATE
   ));
 
@@ -348,7 +394,6 @@ export function useAppUpdater() {
     if (installInFlightRef.current) return;
     const generation = ++checkGenerationRef.current;
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
-    let enginePack: EnginePackStatus | null = null;
     try {
       const previousUpdate = updateRef.current;
       updateRef.current = null;
@@ -380,7 +425,7 @@ export function useAppUpdater() {
         });
         return;
       }
-      enginePack = await ensureEnginePackCurrent(generation);
+      const enginePack = await ensureEnginePackCurrent(generation);
       if (!enginePack || generation !== checkGenerationRef.current) return;
       await reconcileComponentPacks(generation, enginePack);
     } catch (error) {
@@ -390,7 +435,7 @@ export function useAppUpdater() {
       // launcher failure. Network, parsing, signature and platform errors keep
       // their explicit error state below.
       if (isNoPublishedDesktopUpdate(error)) {
-        enginePack = await ensureEnginePackCurrent(generation);
+        const enginePack = await ensureEnginePackCurrent(generation);
         if (!enginePack || generation !== checkGenerationRef.current) return;
         await reconcileComponentPacks(generation, enginePack);
         return;
@@ -407,6 +452,40 @@ export function useAppUpdater() {
     }
   }, [desktopRuntime, ensureEnginePackCurrent, reconcileComponentPacks]);
 
+  const checkForAppUpdateSilently = useCallback(async () => {
+    if (
+      !enabled
+      || !desktopRuntime
+      || import.meta.env.MODE === "test"
+      || installInFlightRef.current
+      || updateRef.current
+    ) return;
+    const generation = ++checkGenerationRef.current;
+    try {
+      const update = await check({ timeout: 15_000, allowDowngrades: false });
+      if (generation !== checkGenerationRef.current || !enabled) {
+        await update?.close();
+        return;
+      }
+      if (!update) return;
+      updateRef.current = update;
+      updateDownloadedRef.current = false;
+      setState({
+        status: "available",
+        availableVersion: update.version,
+        updateRequired: appUpdateIsRequired(update),
+        progress: null,
+        error: null,
+        enginePack: null,
+        componentUpdates: null,
+        blockedActivity: null,
+      });
+    } catch {
+      // Scheduled checks are deliberately invisible. The next six-hour poll,
+      // an explicit settings check, or the next authenticated launch retries.
+    }
+  }, [desktopRuntime, enabled]);
+
   const installAvailableUpdate = useCallback(async () => {
     const update = updateRef.current;
     if (
@@ -417,19 +496,39 @@ export function useAppUpdater() {
     installInFlightRef.current = true;
     let downloaded = 0;
     let contentLength = updaterDownloadSize(update.rawJson);
-    setState((current) => ({ ...current, status: "downloading", progress: 0, error: null }));
+    setState((current) => ({
+      ...current,
+      status: "downloading",
+      progress: 0,
+      error: null,
+      blockedActivity: null,
+    }));
     try {
+      const initialBlock = await detectRunningUpdateBlock();
+      if (initialBlock) {
+        setState((current) => ({
+          ...current,
+          status: "available",
+          progress: null,
+          blockedActivity: initialBlock,
+        }));
+        return;
+      }
+      setState((current) => ({ ...current, progress: 5 }));
       if (!updateDownloadedRef.current) {
         await update.download((event) => {
           if (event.event === "Started") {
             contentLength = event.data.contentLength ?? contentLength;
-            setState((current) => ({ ...current, progress: 0 }));
+            setState((current) => ({ ...current, progress: 5 }));
             return;
           }
           if (event.event === "Progress") {
             downloaded += event.data.chunkLength;
             if (contentLength > 0) {
-              const progress = Math.min(99, Math.floor((downloaded / contentLength) * 100));
+              const progress = Math.min(
+                99,
+                5 + Math.floor((downloaded / contentLength) * 94),
+              );
               setState((current) => ({ ...current, progress }));
             }
             return;
@@ -438,16 +537,17 @@ export function useAppUpdater() {
         });
         updateDownloadedRef.current = true;
       }
-      setState((current) => ({ ...current, status: "installing", progress: 100 }));
-      try {
-        await ensureAppUpdateIdle();
-      } catch (error) {
-        // Runtime Base releases from before the Engine Pack manager cannot
-        // prove idleness. They must not block the desktop bootstrap forever:
-        // stop only DroneDreamRuntime after the package is fully downloaded,
-        // then continue with the signed desktop installer.
-        if (!isLegacyRuntimeIdleProbeUnavailable(error)) throw error;
+      const finalBlock = await detectRunningUpdateBlock();
+      if (finalBlock) {
+        setState((current) => ({
+          ...current,
+          status: "available",
+          progress: null,
+          blockedActivity: finalBlock,
+        }));
+        return;
       }
+      setState((current) => ({ ...current, status: "installing", progress: 100 }));
       await stopRuntimeForExit();
       await update.install();
       await relaunch();
@@ -462,6 +562,10 @@ export function useAppUpdater() {
       installInFlightRef.current = false;
     }
   }, [state.status]);
+
+  const dismissBlockedActivity = useCallback(() => {
+    setState((current) => ({ ...current, blockedActivity: null }));
+  }, []);
 
   const installComponentUpdates = useCallback(async () => {
     const report = state.componentUpdates;
@@ -507,20 +611,42 @@ export function useAppUpdater() {
   }, [reconcileComponentPacks, state.componentUpdates, state.enginePack, state.status]);
 
   useEffect(() => {
-    void checkForUpdates();
+    if (!enabled) {
+      checkGenerationRef.current += 1;
+      void updateRef.current?.close();
+      updateRef.current = null;
+      updateDownloadedRef.current = false;
+      setState(CURRENT_STATE);
+      return;
+    }
+    if (import.meta.env.MODE === "test") {
+      void checkForUpdates();
+      return () => {
+        checkGenerationRef.current += 1;
+        void updateRef.current?.close();
+        updateRef.current = null;
+        updateDownloadedRef.current = false;
+      };
+    }
+    void checkForAppUpdateSilently();
+    const timer = window.setInterval(() => {
+      void checkForAppUpdateSilently();
+    }, AUTOMATIC_UPDATE_CHECK_INTERVAL_MS);
     return () => {
+      window.clearInterval(timer);
       checkGenerationRef.current += 1;
       void updateRef.current?.close();
       updateRef.current = null;
       updateDownloadedRef.current = false;
     };
-  }, [checkForUpdates]);
+  }, [checkForAppUpdateSilently, checkForUpdates, enabled]);
 
   return {
     ...state,
     desktopRuntime,
     checkForUpdates,
     installAvailableUpdate,
+    dismissBlockedActivity,
     installComponentUpdates,
     reconcileEnginePack,
     reconcileComponentPacks,

@@ -4099,3 +4099,24 @@ body:has(.field-app),
   font-size: 0.7rem;
   font-weight: 600;
 }
+
+.field-sidebar-update {
+  position: absolute;
+  right: 12px;
+  bottom: 16px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(135deg, var(--field-accent), var(--field-accent-strong));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--field-accent) 28%, transparent);
+  place-items: center;
+  cursor: pointer;
+}
+
+.field-sidebar-update svg { width: 17px; height: 17px; }
+.field-sidebar-update span { font-size: 0.62rem; font-weight: 800; }
+.field-sidebar-update:disabled { cursor: default; }

@@ -56,6 +56,7 @@ describe("desktop browser sign-in transaction", () => {
     vi.mocked(beginBrowserAuth).mockReset();
     vi.mocked(cancelBrowserAuth).mockReset();
     vi.mocked(clearBrowserAuthVault).mockReset();
+    vi.mocked(clearBrowserAuthVault).mockResolvedValue(true);
     vi.mocked(restoreBrowserAuthVault).mockReset();
     vi.mocked(adoptBrowserAuthSession).mockReset();
     vi.mocked(shouldClearBrowserAuthVaultAfterAdoptionError).mockReset();
@@ -63,18 +64,19 @@ describe("desktop browser sign-in transaction", () => {
     vi.mocked(activateDesktopAuthSession).mockReset();
   });
 
-  it("adopts the exact edition session restored from the credential vault", async () => {
-    vi.mocked(restoreBrowserAuthVault).mockResolvedValue(SESSION);
+  it("requires a fresh browser transaction by default after every app launch", async () => {
+    vi.mocked(beginBrowserAuth).mockResolvedValue(SESSION);
     vi.mocked(adoptBrowserAuthSession).mockResolvedValue(undefined);
 
     await completeDesktopBrowserSignIn("en");
 
     expect(activateDesktopAuthSession).toHaveBeenCalledOnce();
-    expect(beginBrowserAuth).not.toHaveBeenCalled();
+    expect(clearBrowserAuthVault).toHaveBeenCalledOnce();
+    expect(restoreBrowserAuthVault).not.toHaveBeenCalled();
+    expect(beginBrowserAuth).toHaveBeenCalledWith({ locale: "en" });
     expect(adoptBrowserAuthSession).toHaveBeenCalledWith(SESSION, {
       signal: undefined,
     });
-    expect(clearBrowserAuthVault).not.toHaveBeenCalled();
   });
 
   it("silently restores a saved session without opening the browser", async () => {
@@ -120,7 +122,7 @@ describe("desktop browser sign-in transaction", () => {
     vi.mocked(clearBrowserAuthVault).mockResolvedValue(true);
 
     await expect(completeDesktopBrowserSignIn("en")).rejects.toThrow("invalid session");
-    expect(clearBrowserAuthVault).toHaveBeenCalledOnce();
+    expect(clearBrowserAuthVault).toHaveBeenCalledTimes(2);
   });
 
   it("preserves a fresh browser grant when adoption fails transiently", async () => {
@@ -133,7 +135,7 @@ describe("desktop browser sign-in transaction", () => {
 
     expect(shouldClearBrowserAuthVaultAfterAdoptionError)
       .toHaveBeenCalledWith(transientError);
-    expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+    expect(clearBrowserAuthVault).toHaveBeenCalledOnce();
   });
 
   it("clears a deterministically unusable session during silent restoration", async () => {
@@ -170,6 +172,7 @@ describe("desktop browser sign-in transaction", () => {
 
     const transaction = completeDesktopBrowserSignIn("en", {
       signal: controller.signal,
+      restoreFromVault: true,
     });
     await cancelDesktopBrowserSignIn(controller);
 
@@ -191,6 +194,7 @@ describe("desktop browser sign-in transaction", () => {
 
     const transaction = completeDesktopBrowserSignIn("en", {
       signal: controller.signal,
+      restoreFromVault: true,
     });
     await vi.waitFor(() => expect(adoptBrowserAuthSession).toHaveBeenCalledOnce());
     await cancelDesktopBrowserSignIn(controller);
@@ -228,6 +232,7 @@ describe("desktop browser sign-in transaction", () => {
     await completeDesktopBrowserSignIn("en", { restoreFromVault: false });
 
     expect(restoreBrowserAuthVault).not.toHaveBeenCalled();
+    expect(clearBrowserAuthVault).toHaveBeenCalledOnce();
     expect(beginBrowserAuth).toHaveBeenCalledOnce();
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
@@ -889,10 +889,14 @@ export function SiteApp() {
          : path === "/oauth/consent"
            ? "oauth-consent"
          : "home";
-  const hasValidOAuthAuthorizationId = sitePage === "oauth-consent"
-    && authorizationIdFromLocation() !== null;
+  const oauthAuthorizationId = sitePage === "oauth-consent"
+    ? authorizationIdFromLocation()
+    : null;
+  const hasValidOAuthAuthorizationId = oauthAuthorizationId !== null;
+  const [desktopOAuthFreshAuthReady, setDesktopOAuthFreshAuthReady] = useState(false);
+  const desktopOAuthPreparedRef = useRef<string | null>(null);
   const oauthAuthPage = hasValidOAuthAuthorizationId && (
-    !auth.account || authPending || Boolean(authError)
+    !desktopOAuthFreshAuthReady || !auth.account || authPending || Boolean(authError)
   );
 
   useEffect(() => {
@@ -1153,7 +1157,7 @@ export function SiteApp() {
     setMenuOpen(false);
     setDownloadMenuOpen(false);
   };
-  const openAccount = (mode: AuthMode = "sign-in") => {
+  const openAccount = useCallback((mode: AuthMode = "sign-in") => {
     setAuthMode(mode);
     setAuthCode("");
     setAuthCodeSent(false);
@@ -1166,9 +1170,9 @@ export function SiteApp() {
     setMenuOpen(false);
     setDownloadMenuOpen(false);
     setAuthOpen(true);
-  };
+  }, []);
 
-  const localizedAuthError = (reason: unknown): string => {
+  const localizedAuthError = useCallback((reason: unknown): string => {
     const message = reason instanceof Error ? reason.message : "";
     const localizedValidationMessages: string[] = [
       copy.passwordTooShort,
@@ -1180,7 +1184,14 @@ export function SiteApp() {
     return localizedValidationMessages.includes(message)
       ? message
       : copy.accountRequestFailed;
-  };
+  }, [
+    copy.accountRequestFailed,
+    copy.codeRequired,
+    copy.completeCaptcha,
+    copy.passwordMismatch,
+    copy.passwordTooShort,
+    copy.recoveryCodeRequired,
+  ]);
 
   useEffect(() => {
     if (!auth.passwordRecovery) return;
@@ -1194,7 +1205,26 @@ export function SiteApp() {
 
   useEffect(() => {
     if (sitePage !== "oauth-consent" || !hasValidOAuthAuthorizationId) return;
+    if (auth.loading) return;
+    if (desktopOAuthPreparedRef.current !== oauthAuthorizationId) {
+      desktopOAuthPreparedRef.current = oauthAuthorizationId;
+      setDesktopOAuthFreshAuthReady(false);
+      if (auth.account) {
+        setAuthPending(true);
+        void auth.signOut()
+          .catch((reason: unknown) => setAuthError(localizedAuthError(reason)))
+          .finally(() => {
+            setAuthPending(false);
+            openAccount("sign-in");
+          });
+      } else {
+        openAccount("sign-in");
+      }
+      return;
+    }
     if (
+      desktopOAuthFreshAuthReady
+      &&
       auth.account
       && authOpen
       && !auth.passwordRecovery
@@ -1211,6 +1241,7 @@ export function SiteApp() {
       openAccount("sign-in");
     }
   }, [
+    auth,
     auth.account,
     auth.configured,
     auth.loading,
@@ -1218,7 +1249,11 @@ export function SiteApp() {
     authError,
     authOpen,
     authPending,
+    desktopOAuthFreshAuthReady,
     hasValidOAuthAuthorizationId,
+    localizedAuthError,
+    oauthAuthorizationId,
+    openAccount,
     sitePage,
   ]);
 
@@ -1299,6 +1334,9 @@ export function SiteApp() {
         } else {
           await auth.verifyRecoveryCode(authEmail, authCode);
         }
+      }
+      if (hasValidOAuthAuthorizationId) {
+        setDesktopOAuthFreshAuthReady(true);
       }
     } catch (reason) {
       setAuthError(localizedAuthError(reason));
@@ -1543,7 +1581,7 @@ export function SiteApp() {
         ) : sitePage === "oauth-consent" && (
           !hasValidOAuthAuthorizationId
           ||
-          (auth.account && !authPending && !authError)
+          (desktopOAuthFreshAuthReady && auth.account && !authPending && !authError)
           || (!auth.configured && !auth.loading)
         ) ? (
           <OAuthConsentPage
@@ -1565,7 +1603,7 @@ export function SiteApp() {
                 .finally(() => setAuthPending(false));
             }}
           />
-        ) : sitePage === "oauth-consent" ? (
+        ) : sitePage === "oauth-consent" && desktopOAuthFreshAuthReady ? (
           <div className="site-oauth-auth-stage" aria-hidden="true" />
         ) : (
           <>
@@ -1861,7 +1899,9 @@ export function SiteApp() {
               </div>
             </header>
             <h2 id="site-auth-title">{authTitle}</h2>
-            {auth.account && authMode !== "reset-update" ? (
+            {auth.account
+              && authMode !== "reset-update"
+              && (!hasValidOAuthAuthorizationId || desktopOAuthFreshAuthReady) ? (
               <div className="site-auth-account">
                 <AccountIcon />
                 <strong>{auth.account.displayName}</strong>

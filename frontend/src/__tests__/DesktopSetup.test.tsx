@@ -666,7 +666,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return runtime;
-          if (command === "restore_browser_auth_vault") return null;
+          if (command === "clear_browser_auth_vault") return true;
           if (command === "begin_browser_auth") return new Promise(() => undefined);
           throw new Error(`Unexpected command: ${command}`);
         }),
@@ -702,14 +702,14 @@ describe("DesktopSetup", () => {
     expect(await screen.findByRole("button", {
       name: "Sign in and enter DroneDream",
     })).toBeEnabled();
-    expect(invoke).toHaveBeenCalledTimes(3);
+    expect(invoke).toHaveBeenCalledTimes(2);
 
     await act(async () => {
       window.dispatchEvent(new Event("focus"));
       await Promise.resolve();
     });
 
-    expect(invoke).toHaveBeenCalledTimes(3);
+    expect(invoke).toHaveBeenCalledTimes(2);
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
   });
@@ -760,7 +760,7 @@ describe("DesktopSetup", () => {
     ) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
-      if (command === "restore_browser_auth_vault") return null;
+      if (command === "clear_browser_auth_vault") return true;
       if (command === "begin_browser_auth") return browserSession;
       throw new Error(`Unexpected command: ${command} ${JSON.stringify(args)}`);
     });
@@ -783,9 +783,14 @@ describe("DesktopSetup", () => {
         locale: "en",
       },
     });
+    expect(invoke.mock.calls.findIndex(([command]) => (
+      command === "clear_browser_auth_vault"
+    ))).toBeLessThan(invoke.mock.calls.findIndex(([command]) => (
+      command === "begin_browser_auth"
+    )));
   });
 
-  it("silently restores only this edition vault before offering a new browser transaction", async () => {
+  it("never restores a saved desktop session before offering a fresh sign-in", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
@@ -794,25 +799,21 @@ describe("DesktopSetup", () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
-      if (command === "restore_browser_auth_vault") return validBrowserSession;
-      if (command === "begin_browser_auth") {
-        throw new Error("A restored session must not start another browser transaction.");
-      }
+      if (command === "restore_browser_auth_vault") throw new Error("Saved sessions must not be read.");
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
 
     renderPage();
-    await waitFor(() => {
-      expect(browserAuthMocks.adoptSession).toHaveBeenCalledWith(validBrowserSession, {
-        signal: expect.any(AbortSignal),
-      });
-    });
-    expect(invoke).toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
+    expect(await screen.findByRole("button", {
+      name: "Sign in and enter DroneDream",
+    })).toBeEnabled();
+    expect(invoke).not.toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
     expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+    expect(browserAuthMocks.adoptSession).not.toHaveBeenCalled();
   });
 
-  it("still restores a valid edition vault when React StrictMode replays effects", async () => {
+  it("still requires explicit fresh sign-in when React StrictMode replays effects", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
@@ -821,11 +822,7 @@ describe("DesktopSetup", () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
-      if (command === "restore_browser_auth_vault") return validBrowserSession;
-      if (command === "cancel_browser_auth") return true;
-      if (command === "begin_browser_auth") {
-        throw new Error("A restored session must not start another browser transaction.");
-      }
+      if (command === "restore_browser_auth_vault") throw new Error("Saved sessions must not be read.");
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
@@ -837,49 +834,37 @@ describe("DesktopSetup", () => {
       true,
     );
 
-    await waitFor(() => {
-      const completedAdoption = browserAuthMocks.adoptSession.mock.calls.find(
-        ([session, options]) =>
-          session.editionId === validBrowserSession.editionId
-          && session.attemptIdHash === validBrowserSession.attemptIdHash
-          && options?.signal?.aborted === false,
-      );
-      expect(completedAdoption).toBeDefined();
-    });
+    expect(await screen.findByRole("button", {
+      name: "Sign in and enter DroneDream",
+    })).toBeEnabled();
+    expect(invoke).not.toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
     expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+    expect(browserAuthMocks.adoptSession).not.toHaveBeenCalled();
   });
 
-  it("clears an unusable edition vault quietly and leaves explicit sign-in available", async () => {
+  it("clears any saved edition vault only when explicit fresh sign-in begins", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
       account: null,
     };
-    browserAuthMocks.adoptSession.mockRejectedValueOnce(
-      new Error("session binding mismatch"),
-    );
-    browserAuthMocks.shouldClearVault.mockReturnValueOnce(true);
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
-      if (command === "restore_browser_auth_vault") return validBrowserSession;
       if (command === "clear_browser_auth_vault") return true;
+      if (command === "begin_browser_auth") return new Promise(() => undefined);
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
 
     renderPage();
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("clear_browser_auth_vault", undefined);
-    });
-    expect(await screen.findByRole("button", {
+    const signIn = await screen.findByRole("button", {
       name: "Sign in and enter DroneDream",
-    })).toBeEnabled();
-    expect(screen.queryByText(
-      "The browser sign-in did not complete. Start it again when you are ready.",
-    )).not.toBeInTheDocument();
-    expect(screen.queryByText("Workspace ready"))
-      .not.toBeInTheDocument();
+    });
+    expect(invoke).not.toHaveBeenCalledWith("clear_browser_auth_vault", undefined);
+    await userEvent.click(signIn);
+    expect(invoke).toHaveBeenCalledWith("clear_browser_auth_vault", undefined);
+    expect(invoke).not.toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
   });
 
   it("enters after browser authentication and local checks are ready", async () => {
@@ -906,7 +891,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return runtime;
-          if (command === "restore_browser_auth_vault") return null;
+          if (command === "clear_browser_auth_vault") return true;
           if (command === "begin_browser_auth") return browserSession;
           throw new Error(`Unexpected command: ${command}`);
         }),

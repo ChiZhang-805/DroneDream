@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 import { useAppUpdater } from "./updater";
+import { useAuth } from "../features/auth/AuthContext";
 
 type AppUpdaterState = ReturnType<typeof useAppUpdater>;
 
@@ -12,9 +13,11 @@ const FALLBACK: AppUpdaterState = {
   error: null,
   enginePack: null,
   componentUpdates: null,
+  blockedActivity: null,
   desktopRuntime: false,
   checkForUpdates: async () => undefined,
   installAvailableUpdate: async () => undefined,
+  dismissBlockedActivity: () => undefined,
   installComponentUpdates: async () => undefined,
   reconcileEnginePack: async () => undefined,
   reconcileComponentPacks: async () => undefined,
@@ -23,7 +26,10 @@ const FALLBACK: AppUpdaterState = {
 const AppUpdaterContext = createContext<AppUpdaterState>(FALLBACK);
 
 export function AppUpdaterProvider({ children }: { children: ReactNode }) {
-  const updater = useAppUpdater();
+  const auth = useAuth();
+  const updater = useAppUpdater({
+    enabled: !auth.loading && Boolean(auth.account),
+  });
   return (
     <AppUpdaterContext.Provider value={updater}>
       {children}

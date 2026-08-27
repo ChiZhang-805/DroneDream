@@ -66,6 +66,7 @@ import { BrandLockup } from "./components/BrandLockup";
 import { AssistantModelPicker } from "./components/AssistantModelPicker";
 import { CustomModelSettingsPanel } from "./components/CustomModelSettingsPanel";
 import { SettingsUpdateCenter } from "./components/SettingsUpdateCenter";
+import { UpdateBlockedDialog } from "./components/UpdateBlockedDialog";
 import {
   EditionSettingsPanel,
   EditionSettingsSurface,
@@ -4944,6 +4945,11 @@ function AppShellContent() {
       </div>
       {settingsWorkspace}
       {exitGuard}
+      <UpdateBlockedDialog
+        block={updater.blockedActivity}
+        locale={locale}
+        onClose={updater.dismissBlockedActivity}
+      />
       </div>
     </EditionThemeProvider>
   );

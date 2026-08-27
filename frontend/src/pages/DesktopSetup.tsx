@@ -44,7 +44,6 @@ import { useOptionalAuth } from "../features/auth/AuthContext";
 import {
   cancelDesktopBrowserSignIn,
   completeDesktopBrowserSignIn,
-  restoreDesktopBrowserSession,
 } from "../features/auth/desktopBrowserSignIn";
 import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
@@ -351,7 +350,6 @@ export function DesktopSetup() {
   const [browserAuthCompletedForLaunch, setBrowserAuthCompletedForLaunch] =
     useState(false);
   const [browserAuthError, setBrowserAuthError] = useState<string | null>(null);
-  const vaultRestoreAttempted = useRef(false);
   const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
   const installActive = isActiveInstall(installState.snapshot);
   const receiptCleanupPending =
@@ -536,92 +534,6 @@ export function DesktopSetup() {
       if (controller) void cancelDesktopBrowserSignIn(controller);
     };
   }, []);
-
-  useEffect(() => {
-    if (
-      !desktopAvailable ||
-      !launcherEnvironmentReady ||
-      !auth?.configured ||
-      auth.loading ||
-      auth.account ||
-      vaultRestoreAttempted.current ||
-      browserAuthController.current
-    ) {
-      return;
-    }
-    let disposed = false;
-    let controller: AbortController | null = null;
-    let settled = false;
-    // React StrictMode replays passive effects before the next timer turn.
-    // Deferring the native vault read until that turn lets the discarded
-    // replay clean up before it can consume or invalidate a valid session.
-    let restoreStartTimer: number | null = window.setTimeout(() => {
-      restoreStartTimer = null;
-      if (
-        disposed
-        || !componentMounted.current
-        || vaultRestoreAttempted.current
-        || browserAuthController.current
-      ) return;
-      vaultRestoreAttempted.current = true;
-      setBrowserAuthStatus("restoring");
-      setBrowserAuthError(null);
-      controller = new AbortController();
-      browserAuthController.current = controller;
-      const activeController = controller;
-      void restoreDesktopBrowserSession({
-        signal: activeController.signal,
-        onAdopting: () => {
-          if (
-            componentMounted.current
-            && browserAuthController.current === activeController
-          ) {
-            setBrowserAuthStatus("adopting");
-          }
-        },
-      }).then((restored) => {
-        if (
-          !componentMounted.current
-          || browserAuthController.current !== activeController
-        ) return;
-        setBrowserAuthCompletedForLaunch(restored);
-      }).catch(() => {
-        // A missing, expired, or superseded vault entry is not a launcher error.
-        // The explicit browser sign-in action remains available at 100%.
-        if (
-          componentMounted.current
-          && browserAuthController.current === activeController
-        ) {
-          setBrowserAuthCompletedForLaunch(false);
-        }
-      }).finally(() => {
-        settled = true;
-        if (
-          !componentMounted.current
-          || browserAuthController.current !== activeController
-        ) return;
-        browserAuthController.current = null;
-        setBrowserAuthStatus("idle");
-      });
-    }, 0);
-    return () => {
-      disposed = true;
-      if (restoreStartTimer !== null) {
-        window.clearTimeout(restoreStartTimer);
-        restoreStartTimer = null;
-      }
-      if (!controller || settled || browserAuthController.current !== controller) return;
-      controller.abort();
-      browserAuthController.current = null;
-      vaultRestoreAttempted.current = false;
-    };
-  }, [
-    auth?.account,
-    auth?.configured,
-    auth?.loading,
-    desktopAvailable,
-    launcherEnvironmentReady,
-  ]);
 
   useEffect(() => {
     if (!desktopAvailable || !runtimeAccess.snapshot) return;

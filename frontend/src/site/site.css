@@ -2725,16 +2725,13 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-auth-backdrop.is-oauth-page {
   padding: clamp(28px, 5vh, 72px) 32px;
-  background:
-    radial-gradient(circle at 50% 18%, rgba(122, 88, 235, 0.18), transparent 38%),
-    radial-gradient(circle at 50% 100%, rgba(241, 102, 216, 0.09), transparent 36%),
-    #070913;
+  background: #fff;
   backdrop-filter: none;
 }
 
 .site-oauth-auth-stage {
   min-height: calc(100svh - var(--site-header-height, 76px));
-  background: #070913;
+  background: #fff;
 }
 
 .site-auth-dialog {
@@ -2758,6 +2755,55 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-auth-dialog.is-oauth-page {
   max-height: calc(100svh - clamp(56px, 10vh, 144px));
+  border: 0;
+  color: #17131e;
+  background: #fff;
+  box-shadow: none;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-header {
+  align-items: center;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-brand {
+  height: 52px;
+}
+
+.site-auth-dialog.is-oauth-page h2 {
+  color: #17131e;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-mode-switch {
+  border-color: #ddd7e5;
+  color: #4c4058;
+  background: #fff;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-form label,
+.site-auth-dialog.is-oauth-page .site-auth-guidance {
+  color: #51475c;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-form input {
+  border-color: #dcd6e3;
+  color: #17131e;
+  background: #fff;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-code-button {
+  border-color: #cfc5dc;
+  color: #3e3150;
+  background: #faf8fc;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-text-button {
+  color: #6a4d81;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-recovery-options button {
+  border-color: #ddd7e5;
+  color: #241d2c;
+  background: #fff;
 }
 
 .site-auth-header {

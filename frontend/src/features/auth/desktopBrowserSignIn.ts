@@ -70,9 +70,14 @@ export async function completeDesktopBrowserSignIn(
   locale: "en" | "zh-CN",
   options: DesktopBrowserSignInOptions = {},
 ): Promise<void> {
-  const { signal, restoreFromVault = true, onAdopting } = options;
+  const { signal, restoreFromVault = false, onAdopting } = options;
   throwIfCancelled(signal);
   activateDesktopAuthSession();
+  if (!restoreFromVault) {
+    // A desktop launch is intentionally a fresh authentication ceremony.
+    // Never let an edition vault silently turn a reopened app into a session.
+    await abortable(Promise.resolve(clearBrowserAuthVault()), signal);
+  }
   const restored = restoreFromVault
     ? await abortable(restoreBrowserAuthVault(), signal)
     : null;

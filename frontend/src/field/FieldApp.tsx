@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   ChevronUp,
+  Download,
   Gauge,
   History,
   LogOut,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
+import { UpdateBlockedDialog } from "../components/UpdateBlockedDialog";
 import {
   discoverFieldDevices,
   isDesktopRuntime,
@@ -22,6 +24,7 @@ import {
   type FieldParameterSnapshot,
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
+import { useAppUpdaterState } from "../desktop/updaterContext";
 import {
   getManagedModelUsage,
   remainingAllowanceRatio,
@@ -70,6 +73,8 @@ const COPY = {
     openAccountMenu: "Open account menu",
     signOut: "Sign out",
     signOutFailed: "Sign out failed. Try again.",
+    updateAvailable: "Download update",
+    updateProgress: "Updating",
     page: {
       device: "Device & adapters",
       compatibility: "Compatibility",
@@ -132,6 +137,8 @@ const COPY = {
     openAccountMenu: "打开账户菜单",
     signOut: "退出登录",
     signOutFailed: "退出登录失败，请重试。",
+    updateAvailable: "下载更新",
+    updateProgress: "正在更新",
     page: {
       device: "设备与适配器",
       compatibility: "兼容性",
@@ -271,6 +278,7 @@ function FieldWorkspace({
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const settingsCloseRef = useRef<HTMLButtonElement>(null);
   const auth = useOptionalAuth();
+  const updater = useAppUpdaterState();
   const copy = COPY[locale];
   const navigationLabel = embeddedInLab ? copy.navLab : copy.navField;
   const scanUnavailable = embeddedInLab
@@ -290,6 +298,15 @@ function FieldWorkspace({
       ))
     : null;
   const accountPlan = fieldPlanName(managedUsage?.plan.name);
+  const updateVisible = isDesktopRuntime() && [
+    "available",
+    "downloading",
+    "installing",
+  ].includes(updater.status);
+  const updateBusy = updater.status === "downloading" || updater.status === "installing";
+  const updateProgress = updateBusy
+    ? Math.max(0, Math.min(100, Math.round(updater.progress ?? 0)))
+    : null;
 
   useEffect(() => {
     if (!auth?.account) {
@@ -305,7 +322,7 @@ function FieldWorkspace({
     return () => {
       active = false;
     };
-  }, [auth?.account?.id]);
+  }, [auth?.account]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -551,6 +568,24 @@ function FieldWorkspace({
                     </span>
                     <ChevronUp aria-hidden="true" />
                   </button>
+                  {updateVisible ? (
+                    <button
+                      type="button"
+                      className={`field-sidebar-update${updateBusy ? " is-busy" : ""}`}
+                      aria-label={updateProgress === null
+                        ? copy.updateAvailable
+                        : `${copy.updateProgress} ${updateProgress}%`}
+                      title={updateProgress === null
+                        ? copy.updateAvailable
+                        : `${copy.updateProgress} ${updateProgress}%`}
+                      disabled={updateBusy}
+                      onClick={() => void updater.installAvailableUpdate()}
+                    >
+                      {updateProgress === null
+                        ? <Download aria-hidden="true" />
+                        : <span>{updateProgress}%</span>}
+                    </button>
+                  ) : null}
                   {accountMenuOpen ? (
                     <div
                       ref={accountMenuRef}
@@ -616,6 +651,11 @@ function FieldWorkspace({
           </div>
         </div>
       ) : null}
+      <UpdateBlockedDialog
+        block={updater.blockedActivity}
+        locale={locale}
+        onClose={updater.dismissBlockedActivity}
+      />
     </div>
   );
 }
