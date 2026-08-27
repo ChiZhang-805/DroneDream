@@ -41,6 +41,22 @@ export type DroneLaunchSceneLabels = {
   cruise: string;
 };
 
+type MovingCityVehicle = {
+  object: THREE.Group;
+  axis: "x" | "z";
+  direction: 1 | -1;
+  offset: number;
+  speed: number;
+  lane: number;
+};
+
+type NightCity = {
+  group: THREE.Group;
+  movingVehicles: MovingCityVehicle[];
+  waterMaterial: THREE.MeshStandardMaterial;
+  beaconMaterials: THREE.MeshBasicMaterial[];
+};
+
 type DroneLaunchSceneCoreProps = Omit<
   DroneLaunchSceneProps,
   "telemetryActiveLabel" | "telemetryStandbyLabel" | "telemetrySystemLabel"
@@ -546,6 +562,253 @@ function buildGalacticDust(
   return { dust, material };
 }
 
+function buildNightCity(
+  random: () => number,
+  theme: EditionTheme3D,
+): NightCity {
+  const group = new THREE.Group();
+  group.name = "night-city";
+  group.position.y = -1.25;
+
+  const asphalt = new THREE.MeshStandardMaterial({
+    color: 0x080b17,
+    roughness: 0.94,
+    metalness: 0.08,
+  });
+  const road = new THREE.MeshStandardMaterial({
+    color: 0x101526,
+    roughness: 0.82,
+    metalness: 0.18,
+  });
+  const roadLine = new THREE.MeshBasicMaterial({
+    color: 0xffd976,
+    transparent: true,
+    opacity: 0.72,
+    toneMapped: false,
+  });
+  const pavement = new THREE.MeshStandardMaterial({
+    color: 0x171a2b,
+    roughness: 0.9,
+    metalness: 0.12,
+  });
+  const waterMaterial = new THREE.MeshStandardMaterial({
+    color: 0x071d36,
+    emissive: theme.primary,
+    emissiveIntensity: 0.12,
+    roughness: 0.18,
+    metalness: 0.38,
+    transparent: true,
+    opacity: 0.92,
+  });
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(34, 34), asphalt);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  group.add(ground);
+
+  const addFlatBox = (
+    width: number,
+    depth: number,
+    x: number,
+    z: number,
+    material: THREE.Material,
+    y = 0.018,
+  ) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, 0.035, depth), material);
+    mesh.position.set(x, y, z);
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    return mesh;
+  };
+
+  addFlatBox(31, 1.3, 0, 1.6, road);
+  addFlatBox(1.35, 31, 0, 0, road);
+  addFlatBox(31, 1.05, 0, -6.2, road);
+
+  for (let x = -14; x <= 14; x += 1.7) {
+    addFlatBox(0.76, 0.055, x, 1.6, roadLine, 0.052);
+    addFlatBox(0.76, 0.05, x, -6.2, roadLine, 0.052);
+  }
+  for (let z = -14; z <= 14; z += 1.7) {
+    addFlatBox(0.05, 0.76, 0, z, roadLine, 0.052);
+  }
+
+  const river = addFlatBox(3.1, 32, 6.15, 0, waterMaterial, 0.025);
+  river.rotation.y = -0.08;
+  const riverGlowMaterial = new THREE.MeshBasicMaterial({
+    color: theme.primary,
+    transparent: true,
+    opacity: 0.22,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  for (let z = -13; z <= 13; z += 1.4) {
+    const ripple = addFlatBox(1.7 + random() * 0.8, 0.026, 6.15, z, riverGlowMaterial, 0.065);
+    ripple.rotation.y = -0.08 + (random() - 0.5) * 0.12;
+  }
+
+  const bridgeDeck = addFlatBox(5.4, 1.22, 6.15, 1.6, pavement, 0.16);
+  bridgeDeck.castShadow = true;
+  const bridgeRail = new THREE.MeshBasicMaterial({
+    color: theme.tertiary,
+    transparent: true,
+    opacity: 0.68,
+    toneMapped: false,
+  });
+  for (const z of [1.05, 2.15]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.12, 0.05), bridgeRail);
+    rail.position.set(6.15, 0.34, z);
+    group.add(rail);
+  }
+
+  const buildingMaterials = [
+    new THREE.MeshStandardMaterial({ color: 0x12162a, roughness: 0.7, metalness: 0.32 }),
+    new THREE.MeshStandardMaterial({ color: 0x17152d, roughness: 0.66, metalness: 0.38 }),
+    new THREE.MeshStandardMaterial({ color: 0x0c1b2c, roughness: 0.68, metalness: 0.34 }),
+  ];
+  const windowMaterials = [
+    new THREE.MeshBasicMaterial({ color: theme.primary, transparent: true, opacity: 0.82, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: theme.tertiary, transparent: true, opacity: 0.78, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: 0xffd981, transparent: true, opacity: 0.78, toneMapped: false }),
+  ];
+  const beaconMaterials: THREE.MeshBasicMaterial[] = [];
+  const buildingPositions: Array<[number, number]> = [];
+  for (const x of [-12.6, -10.2, -7.8, -5.4, -2.8, 2.4, 4.1, 8.5, 11, 13]) {
+    for (const z of [-11.8, -9.1, -3.9, -1.1, 4.5, 7.3, 10.2, 12.6]) {
+      const stadiumZone = x < -6.1 && z > -5.7 && z < -0.3;
+      const riverZone = x > 4.45 && x < 7.9;
+      const roadZone = Math.abs(z - 1.6) < 1.15 || Math.abs(z + 6.2) < 1.0;
+      if (stadiumZone || riverZone || roadZone) continue;
+      buildingPositions.push([x + (random() - 0.5) * 0.65, z + (random() - 0.5) * 0.55]);
+    }
+  }
+
+  for (const [index, [x, z]] of buildingPositions.entries()) {
+    const width = 1.05 + random() * 1.05;
+    const depth = 0.9 + random() * 1.15;
+    const height = 0.55 + random() * (Math.abs(x) > 9 ? 1.2 : 2.45);
+    const building = new THREE.Mesh(
+      new THREE.BoxGeometry(width, height, depth),
+      buildingMaterials[index % buildingMaterials.length],
+    );
+    building.position.set(x, height / 2, z);
+    building.castShadow = true;
+    building.receiveShadow = true;
+    group.add(building);
+
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(width * 0.42, 0.08, depth * 0.42),
+      pavement,
+    );
+    roof.position.set(x, height + 0.04, z);
+    group.add(roof);
+
+    const windowMaterial = windowMaterials[index % windowMaterials.length];
+    const windowBand = new THREE.Mesh(
+      new THREE.BoxGeometry(width + 0.014, Math.min(0.14, height * 0.15), depth * 0.66),
+      windowMaterial,
+    );
+    windowBand.position.set(x, Math.max(0.28, height * 0.58), z);
+    group.add(windowBand);
+
+    if (height > 1.6 && index % 3 === 0) {
+      const beaconMaterial = new THREE.MeshBasicMaterial({
+        color: index % 2 === 0 ? theme.primary : theme.tertiary,
+        transparent: true,
+        opacity: 0.88,
+        toneMapped: false,
+      });
+      beaconMaterials.push(beaconMaterial);
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), beaconMaterial);
+      beacon.position.set(x, height + 0.18, z);
+      group.add(beacon);
+    }
+  }
+
+  const stadium = new THREE.Group();
+  stadium.position.set(-8.9, 0.045, -3.1);
+  const field = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.4, 1.65),
+    new THREE.MeshStandardMaterial({ color: 0x0a392d, roughness: 0.92, metalness: 0.04 }),
+  );
+  field.rotation.x = -Math.PI / 2;
+  stadium.add(field);
+  const track = new THREE.Mesh(
+    new THREE.RingGeometry(1.18, 1.48, 64),
+    new THREE.MeshBasicMaterial({ color: 0xb74365, transparent: true, opacity: 0.86, side: THREE.DoubleSide }),
+  );
+  track.rotation.x = -Math.PI / 2;
+  track.scale.set(1.32, 0.72, 1);
+  track.position.y = 0.018;
+  stadium.add(track);
+  const centreLine = new THREE.Mesh(
+    new THREE.BoxGeometry(0.035, 0.03, 1.36),
+    new THREE.MeshBasicMaterial({ color: 0xd9f8e8, transparent: true, opacity: 0.52 }),
+  );
+  centreLine.position.y = 0.035;
+  stadium.add(centreLine);
+  group.add(stadium);
+
+  const parkMaterial = new THREE.MeshStandardMaterial({ color: 0x102e25, roughness: 0.94 });
+  addFlatBox(4.1, 3.1, 9.9, -3.1, parkMaterial, 0.04);
+  const treeMaterial = new THREE.MeshStandardMaterial({ color: 0x17634c, roughness: 0.86 });
+  for (let index = 0; index < 18; index += 1) {
+    const tree = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.52, 8), treeMaterial);
+    tree.position.set(8.3 + random() * 3.2, 0.28, -4.25 + random() * 2.3);
+    group.add(tree);
+  }
+
+  const lampMaterial = new THREE.MeshBasicMaterial({ color: 0xcffaff, toneMapped: false });
+  for (let index = 0; index < 22; index += 1) {
+    const eastWest = index < 12;
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.045, 9, 7), lampMaterial);
+    lamp.position.set(
+      eastWest ? -13 + index * 2.35 : index % 2 === 0 ? -0.82 : 0.82,
+      0.22,
+      eastWest ? 0.77 : -12 + (index - 12) * 2.5,
+    );
+    group.add(lamp);
+  }
+
+  const movingVehicles: MovingCityVehicle[] = [];
+  const vehicleColors = [theme.primary, theme.tertiary, 0xffc55c, 0xe7f5ff];
+  for (let index = 0; index < 14; index += 1) {
+    const axis: "x" | "z" = index < 9 ? "x" : "z";
+    const direction: 1 | -1 = index % 2 === 0 ? 1 : -1;
+    const vehicle = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.12, 0.19),
+      new THREE.MeshStandardMaterial({
+        color: vehicleColors[index % vehicleColors.length],
+        emissive: vehicleColors[index % vehicleColors.length],
+        emissiveIntensity: 0.24,
+        roughness: 0.34,
+        metalness: 0.42,
+      }),
+    );
+    body.position.y = 0.12;
+    vehicle.add(body);
+    const headlight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.025, 0.045, 0.11),
+      new THREE.MeshBasicMaterial({ color: 0xeaffff, toneMapped: false }),
+    );
+    headlight.position.set(direction * 0.18, 0.13, 0);
+    vehicle.add(headlight);
+    if (axis === "z") vehicle.rotation.y = Math.PI / 2;
+    group.add(vehicle);
+    movingVehicles.push({
+      object: vehicle,
+      axis,
+      direction,
+      offset: random() * 27,
+      speed: 0.75 + random() * 0.9,
+      lane: axis === "x" ? (index % 2 === 0 ? 1.3 : 1.9) : (index % 2 === 0 ? -0.28 : 0.28),
+    });
+  }
+
+  return { group, movingVehicles, waterMaterial, beaconMaterials };
+}
+
 export function DroneLaunchSceneCore({
   active = false,
   progress = null,
@@ -555,7 +818,6 @@ export function DroneLaunchSceneCore({
   visualOffsetX = 0,
 }: DroneLaunchSceneCoreProps) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const attitudeValueRef = useRef<HTMLSpanElement>(null);
   const activeRef = useRef(active);
   const [fallback, setFallback] = useState(false);
   const [starflightActive, setStarflightActive] = useState(false);
@@ -599,7 +861,7 @@ export function DroneLaunchSceneCore({
     renderer.shadowMap.autoUpdate = false;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = lightAppearance ? 1.05 : 1.25;
+    renderer.toneMappingExposure = 1.22;
     renderer.domElement.className = "drone-launch-canvas";
     renderer.domElement.setAttribute("aria-hidden", "true");
     renderer.domElement.style.cursor = reducedMotion ? "default" : "crosshair";
@@ -631,8 +893,8 @@ export function DroneLaunchSceneCore({
     renderer.domElement.addEventListener("webglcontextrestored", onContextRestored);
 
     const scene = new THREE.Scene();
-    scene.background = lightAppearance ? new THREE.Color(0xffffff) : null;
-    scene.fog = new THREE.FogExp2(lightAppearance ? 0xffffff : sceneTheme.fog, 0.042);
+    scene.background = new THREE.Color(0x050611);
+    scene.fog = new THREE.FogExp2(0x08091a, 0.036);
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
     camera.position.set(5.3, 3.35, 7.5);
     camera.lookAt(0, 0.05, 0);
@@ -729,15 +991,15 @@ export function DroneLaunchSceneCore({
     magentaNebula.position.set(6.4, 1.8, -13.5);
     magentaNebula.scale.set(11.5, 7.8, 1);
     celestialBackdrop.add(magentaNebula);
-    celestialBackdrop.visible = !lightAppearance;
+    celestialBackdrop.visible = true;
     scene.add(celestialBackdrop);
 
     scene.add(new THREE.HemisphereLight(
-      lightAppearance ? 0xffffff : 0xb9d8ff,
-      lightAppearance ? 0xdcefff : 0x15051e,
-      lightAppearance ? 2.45 : 2.1,
+      0xb9d8ff,
+      0x15051e,
+      2.05,
     ));
-    const key = new THREE.DirectionalLight(0xf5eaff, lightAppearance ? 4.1 : 5.2);
+    const key = new THREE.DirectionalLight(0xf5eaff, 4.8);
     key.position.set(4.5, 7, 5.5);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
@@ -756,51 +1018,8 @@ export function DroneLaunchSceneCore({
     drone.position.y = 0.35;
     scene.add(drone);
 
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(36, 36),
-      new THREE.MeshStandardMaterial({
-        color: lightAppearance ? 0xffffff : sceneTheme.darkSurface,
-        roughness: 0.86,
-        metalness: 0.15,
-        transparent: true,
-        opacity: lightAppearance ? 0.96 : 0.44,
-      }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -1.25;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    const grid = new THREE.GridHelper(28, 56, sceneTheme.tertiary, sceneTheme.gridMinor);
-    grid.position.y = -1.23;
-    const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
-    gridMaterials.forEach((material) => {
-      material.transparent = true;
-      material.opacity = lightAppearance ? 0.42 : 0.28;
-      material.depthWrite = false;
-    });
-    scene.add(grid);
-
-    const telemetryRing = new THREE.Group();
-    for (const [radius, color, opacity] of [
-      [2.5, sceneTheme.primary, 0.34],
-      [3.25, sceneTheme.tertiary, 0.22],
-      [4.05, sceneTheme.secondary, 0.14],
-    ] as const) {
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(radius, 0.012, 8, 120),
-        new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: lightAppearance ? Math.min(0.62, opacity * 1.7) : opacity,
-          depthWrite: false,
-        }),
-      );
-      ring.rotation.x = Math.PI / 2;
-      telemetryRing.add(ring);
-    }
-    telemetryRing.position.y = -0.88;
-    scene.add(telemetryRing);
+    const nightCity = buildNightCity(random, sceneTheme);
+    scene.add(nightCity.group);
 
     const particleCount = 240;
     const particlePositions = new Float32Array(particleCount * 3);
@@ -824,7 +1043,7 @@ export function DroneLaunchSceneCore({
         sizeAttenuation: true,
       }),
     );
-    particles.visible = !lightAppearance;
+    particles.visible = true;
     scene.add(particles);
 
     const pointer = new THREE.Vector2();
@@ -835,7 +1054,6 @@ export function DroneLaunchSceneCore({
     const refreshIntervals: number[] = [];
     let sceneElapsedSeconds = 0;
     let starflightStartedAt: number | null = null;
-    let lastAttitudeUpdate = -1;
     let pendingPointerX = 0;
     let pendingPointerY = 0;
     let pointerDirty = false;
@@ -906,8 +1124,6 @@ export function DroneLaunchSceneCore({
       cameraDistanceScale = THREE.MathUtils.clamp(1.18 / camera.aspect, 1, 1.65);
       const wideLayoutFactor = THREE.MathUtils.clamp((camera.aspect - 1.05) / 0.5, 0, 1);
       visualOffset.copy(visualOffsetDirection).multiplyScalar(visualOffsetX * wideLayoutFactor);
-      telemetryRing.position.x = visualOffset.x;
-      telemetryRing.position.z = visualOffset.z;
       particles.position.x = visualOffset.x;
       particles.position.z = visualOffset.z;
       camera.updateProjectionMatrix();
@@ -1072,7 +1288,6 @@ export function DroneLaunchSceneCore({
         const rotorSpeed = activeRef.current || starflightStartedAt !== null ? 43.2 : 20.4;
         rotor.rotation.y += rotorSpeed * deltaSeconds * (index % 2 === 0 ? 1 : -1) * motion;
       });
-      telemetryRing.rotation.y = elapsed * 0.055 * motion;
       particles.rotation.y = elapsed * 0.012 * motion;
       particles.position.y = Math.sin(elapsed * 0.3) * 0.08 * motion;
       celestialBackdrop.rotation.y = Math.sin(elapsed * 0.025) * 0.025 * motion;
@@ -1083,16 +1298,22 @@ export function DroneLaunchSceneCore({
       galacticDust.material.opacity = 0.36 + Math.sin(elapsed * 0.2) * 0.04 * motion;
       cyanNebulaMaterial.opacity = 0.31 + Math.sin(elapsed * 0.12) * 0.035 * motion;
       magentaNebulaMaterial.opacity = 0.27 + Math.sin(elapsed * 0.1 + 2.2) * 0.04 * motion;
+      nightCity.waterMaterial.emissiveIntensity = 0.1 + Math.sin(elapsed * 0.55) * 0.035 * motion;
+      nightCity.beaconMaterials.forEach((material, index) => {
+        material.opacity = 0.42 + (Math.sin(elapsed * 2.4 + index * 0.73) + 1) * 0.27;
+      });
+      nightCity.movingVehicles.forEach((vehicle) => {
+        const travel = ((elapsed * vehicle.speed + vehicle.offset) % 28) - 14;
+        if (vehicle.axis === "x") {
+          vehicle.object.position.set(travel * vehicle.direction, 0, vehicle.lane);
+        } else {
+          vehicle.object.position.set(vehicle.lane, 0, travel * vehicle.direction);
+        }
+      });
       camera.position.x = (5.3 + pointer.x * 0.28) * cameraDistanceScale;
       camera.position.y = (3.35 - pointer.y * 0.16) * Math.min(cameraDistanceScale, 1.28);
       camera.position.z = 7.5 * cameraDistanceScale;
       camera.lookAt(0, 0.02, 0);
-      if (elapsed - lastAttitudeUpdate >= 0.1 && attitudeValueRef.current) {
-        const rollDegrees = THREE.MathUtils.radToDeg(drone.rotation.z);
-        attitudeValueRef.current.textContent = `${rollDegrees >= 0 ? "+" : ""}${rollDegrees.toFixed(1)}°`;
-        lastAttitudeUpdate = elapsed;
-      }
-
       const shadowInterval = interactive ? 1000 / 30 : 1000 / 15;
       if (forceShadowUpdate || now - lastShadowUpdateAt >= shadowInterval) {
         renderer.shadowMap.needsUpdate = true;
@@ -1193,8 +1414,8 @@ export function DroneLaunchSceneCore({
       data-flight-state={starflightActive ? "starflight" : "hover"}
       data-theme-edition={editionTheme.id}
       data-theme-appearance={editionTheme.appearance}
-      data-scene-stars={lightAppearance ? "false" : "true"}
-      data-scene-particles={lightAppearance ? "false" : "true"}
+      data-scene-stars="true"
+      data-scene-particles="true"
       data-reduced-motion={reducedMotion ? "true" : "false"}
       data-theme-primary={`#${sceneTheme.primary.toString(16).padStart(6, "0")}`}
       data-theme-secondary={`#${sceneTheme.secondary.toString(16).padStart(6, "0")}`}
@@ -1213,17 +1434,6 @@ export function DroneLaunchSceneCore({
           </span>
         ))}
       </h1>
-      <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">
-        <span>{labels.system}</span>
-        <strong>{active ? labels.active : labels.standby}</strong>
-      </div>
-      <div className="drone-launch-hud drone-launch-hud-right" aria-hidden="true">
-        <span>{labels.attitude}</span>
-        <strong>
-          {starflightActive ? labels.cruise : labels.hold} ·{" "}
-          <span ref={attitudeValueRef}>+0.0°</span>
-        </strong>
-      </div>
       {fallback ? (
         <div className="drone-launch-fallback" aria-hidden="true">
           <span className="drone-launch-fallback-body" />

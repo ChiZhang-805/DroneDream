@@ -34,33 +34,43 @@ describe("DroneLaunchScene localization", () => {
     expect(scene).toHaveAttribute("data-theme-grants-hardware-authority", "false");
   });
 
-  it("renders an English-only telemetry overlay in English", () => {
+  it("keeps the night-city scene enabled in light appearance", () => {
+    window.localStorage.setItem("dronedream:appearance", "light");
+    const { container } = renderScene("en");
+    const scene = container.querySelector(".drone-launch-scene");
+
+    expect(scene).toHaveAttribute("data-theme-appearance", "light");
+    expect(scene).toHaveAttribute("data-scene-stars", "true");
+    expect(scene).toHaveAttribute("data-scene-particles", "true");
+  });
+
+  it("renders the English launch message without telemetry clutter", () => {
     renderScene("en");
 
-    expect(screen.getByText("PX4 / SITL")).toBeInTheDocument();
     const heading = screen.getByRole("heading", {
       name: "Let Every Flight Flow Like a Dream",
     });
     expect(heading).toHaveAttribute("data-line-count", "2");
     expect(heading.querySelectorAll(".drone-launch-tagline-line")).toHaveLength(2);
     expect(heading).toHaveTextContent("Let Every Flight Flow Like a Dream");
-    expect(screen.getByText("LINK ACTIVE")).toBeInTheDocument();
-    expect(screen.getByText("ATTITUDE")).toBeInTheDocument();
-    expect(screen.getByText(/HOLD/)).toBeInTheDocument();
+    expect(screen.queryByText("PX4 / SITL")).not.toBeInTheDocument();
+    expect(screen.queryByText("LINK ACTIVE")).not.toBeInTheDocument();
+    expect(screen.queryByText("ATTITUDE")).not.toBeInTheDocument();
+    expect(screen.queryByText(/HOLD/)).not.toBeInTheDocument();
     expect(screen.queryByText("链路已连接")).not.toBeInTheDocument();
     expect(screen.queryByText("飞行姿态")).not.toBeInTheDocument();
   });
 
-  it("renders a Chinese-only telemetry overlay in Chinese", () => {
+  it("renders the Chinese launch message without telemetry clutter", () => {
     renderScene("zh-CN");
 
-    expect(screen.getByText("PX4 / 软件在环")).toBeInTheDocument();
     const heading = screen.getByRole("heading", { name: "蝶 梦 水 云 乡" });
     expect(heading).toHaveAttribute("data-line-count", "1");
     expect(heading.querySelectorAll(".drone-launch-tagline-line")).toHaveLength(1);
-    expect(screen.getByText("链路已连接")).toBeInTheDocument();
-    expect(screen.getByText("飞行姿态")).toBeInTheDocument();
-    expect(screen.getByText(/悬停/)).toBeInTheDocument();
+    expect(screen.queryByText("PX4 / 软件在环")).not.toBeInTheDocument();
+    expect(screen.queryByText("链路已连接")).not.toBeInTheDocument();
+    expect(screen.queryByText("飞行姿态")).not.toBeInTheDocument();
+    expect(screen.queryByText(/悬停/)).not.toBeInTheDocument();
     expect(screen.queryByText("LINK ACTIVE")).not.toBeInTheDocument();
     expect(screen.queryByText("ATTITUDE")).not.toBeInTheDocument();
     expect(screen.queryByText(/HOLD/)).not.toBeInTheDocument();
@@ -80,52 +90,50 @@ describe("drone starflight trajectory", () => {
     }
   });
 
-  it("flies into the starfield, completes an orbit, and returns smoothly", () => {
-    const rightRear = getDroneStarflightPose(0.22);
-    const deepCentre = getDroneStarflightPose(0.5);
-    const leftRear = getDroneStarflightPose(0.78);
-    const returningFromLeft = getDroneStarflightPose(0.9);
+  it("flies out over the city, completes one orbit, and returns smoothly", () => {
+    const orbitEntry = getDroneStarflightPose(0.2);
+    const farSide = getDroneStarflightPose(0.51);
+    const orbitExit = getDroneStarflightPose(0.82);
+    const returning = getDroneStarflightPose(0.91);
 
-    expect(rightRear.x).toBeCloseTo(0.5, 5);
-    expect(rightRear.y).toBeCloseTo(0.2, 5);
-    expect(rightRear.z).toBeCloseTo(-5.5, 5);
-    expect(deepCentre.x).toBeGreaterThan(-5.5);
-    expect(deepCentre.x).toBeLessThan(-3.5);
-    expect(deepCentre.y).toBeGreaterThan(-0.1);
-    expect(deepCentre.y).toBeLessThan(0.2);
-    expect(deepCentre.z).toBeLessThan(-6.8);
-    expect(leftRear.x).toBeCloseTo(-8, 5);
-    expect(leftRear.y).toBeCloseTo(-0.6, 5);
-    expect(leftRear.z).toBeCloseTo(-4.5, 5);
-    expect(returningFromLeft.x).toBeGreaterThan(-8);
-    expect(returningFromLeft.x).toBeLessThan(0);
-    expect(returningFromLeft.z).toBeGreaterThan(-4.5);
+    expect(orbitEntry.x).toBeCloseTo(3.9, 5);
+    expect(orbitEntry.y).toBeCloseTo(0.95, 5);
+    expect(orbitEntry.z).toBeCloseTo(-3.5, 5);
+    expect(farSide.x).toBeCloseTo(-3.9, 5);
+    expect(farSide.y).toBeCloseTo(0.95, 5);
+    expect(farSide.z).toBeCloseTo(-3.5, 5);
+    expect(orbitExit.x).toBeCloseTo(orbitEntry.x, 5);
+    expect(orbitExit.y).toBeCloseTo(orbitEntry.y, 5);
+    expect(orbitExit.z).toBeCloseTo(orbitEntry.z, 5);
+    expect(returning.x).toBeGreaterThan(0);
+    expect(returning.x).toBeLessThan(orbitExit.x);
+    expect(returning.z).toBeGreaterThan(orbitExit.z);
   });
 
-  it("eases into and out of the distance-normalized remote arc", () => {
+  it("eases into and out of the city orbit", () => {
     const entryFirst = poseDistance(
-      getDroneStarflightPose(0.22),
-      getDroneStarflightPose(0.225),
+      getDroneStarflightPose(0.2),
+      getDroneStarflightPose(0.205),
     );
     const entrySecond = poseDistance(
-      getDroneStarflightPose(0.225),
-      getDroneStarflightPose(0.23),
+      getDroneStarflightPose(0.205),
+      getDroneStarflightPose(0.21),
     );
     const middleBefore = poseDistance(
-      getDroneStarflightPose(0.45),
-      getDroneStarflightPose(0.5),
+      getDroneStarflightPose(0.46),
+      getDroneStarflightPose(0.51),
     );
     const middleAfter = poseDistance(
-      getDroneStarflightPose(0.5),
-      getDroneStarflightPose(0.55),
+      getDroneStarflightPose(0.51),
+      getDroneStarflightPose(0.56),
     );
     const exitBefore = poseDistance(
-      getDroneStarflightPose(0.77),
-      getDroneStarflightPose(0.775),
+      getDroneStarflightPose(0.81),
+      getDroneStarflightPose(0.815),
     );
     const exitLast = poseDistance(
-      getDroneStarflightPose(0.775),
-      getDroneStarflightPose(0.78),
+      getDroneStarflightPose(0.815),
+      getDroneStarflightPose(0.82),
     );
 
     expect(entryFirst).toBeLessThan(entrySecond);
