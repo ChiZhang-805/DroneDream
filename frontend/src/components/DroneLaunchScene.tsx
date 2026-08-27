@@ -754,7 +754,8 @@ function buildNightCity(
       const stadiumZone = x < -6.1 && z > -5.7 && z < -0.3;
       const riverZone = x > 4.45 && x < 7.9;
       const roadZone = Math.abs(z - 1.6) < 1.15 || Math.abs(z + 6.2) < 1.0;
-      if (stadiumZone || riverZone || roadZone) continue;
+      const launchClearance = Math.hypot(x, z) < 4.45;
+      if (stadiumZone || riverZone || roadZone || launchClearance) continue;
       buildingPositions.push([x + (random() - 0.5) * 0.65, z + (random() - 0.5) * 0.55]);
     }
   }
