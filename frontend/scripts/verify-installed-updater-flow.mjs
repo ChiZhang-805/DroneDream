@@ -19,6 +19,9 @@ function required(name) {
 const cdpEndpoint = required("--cdp-endpoint");
 const outputPath = path.resolve(required("--output"));
 const screenshotRoot = path.resolve(required("--screenshot-root"));
+const clickedSignalPath = args.get("--clicked-signal")
+  ? path.resolve(String(args.get("--clicked-signal")))
+  : null;
 assert(/^http:\/\/127\.0\.0\.1:\d+$/u.test(cdpEndpoint), "CDP must remain loopback-only");
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -138,6 +141,10 @@ try {
   });
 
   await updateButton.click();
+  if (clickedSignalPath) {
+    await mkdir(path.dirname(clickedSignalPath), { recursive: true });
+    await writeFile(clickedSignalPath, `${new Date().toISOString()}\n`, "utf8");
+  }
   const downloadDeadline = Date.now() + 10 * 60_000;
   let sawOneHundred = false;
   while (Date.now() < downloadDeadline) {
