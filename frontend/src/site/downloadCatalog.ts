@@ -7,7 +7,7 @@ import universalMark from "../../../brand/icons/universal-mark.png";
 export type HeaderDownloadId = "universal" | "sim" | "lab" | "field" | "autonomy";
 
 const RELEASE_BASE =
-  "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1807";
+  "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-1809";
 
 export const headerDownloadCatalog = [
   {
