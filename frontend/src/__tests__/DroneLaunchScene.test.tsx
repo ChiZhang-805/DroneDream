@@ -90,56 +90,41 @@ describe("drone starflight trajectory", () => {
     }
   });
 
-  it("flies out over the city, completes one orbit, and returns smoothly", () => {
-    const orbitEntry = getDroneStarflightPose(0.2);
-    const farSide = getDroneStarflightPose(0.51);
-    const orbitExit = getDroneStarflightPose(0.82);
-    const returning = getDroneStarflightPose(0.91);
+  it("flies the open avenues, stadium apron, river corridor, and returns", () => {
+    const westAvenue = getDroneStarflightPose(0.24);
+    const stadiumApron = getDroneStarflightPose(0.32);
+    const distantAvenue = getDroneStarflightPose(0.48);
+    const riverCorridor = getDroneStarflightPose(0.56);
+    const nearAvenue = getDroneStarflightPose(0.89);
 
-    expect(orbitEntry.x).toBeCloseTo(3.9, 5);
-    expect(orbitEntry.y).toBeCloseTo(0.95, 5);
-    expect(orbitEntry.z).toBeCloseTo(-3.5, 5);
-    expect(farSide.x).toBeCloseTo(-3.9, 5);
-    expect(farSide.y).toBeCloseTo(0.95, 5);
-    expect(farSide.z).toBeCloseTo(-3.5, 5);
-    expect(orbitExit.x).toBeCloseTo(orbitEntry.x, 5);
-    expect(orbitExit.y).toBeCloseTo(orbitEntry.y, 5);
-    expect(orbitExit.z).toBeCloseTo(orbitEntry.z, 5);
-    expect(returning.x).toBeGreaterThan(0);
-    expect(returning.x).toBeLessThan(orbitExit.x);
-    expect(returning.z).toBeGreaterThan(orbitExit.z);
+    expect(westAvenue).toMatchObject({ x: -10.2, z: 1.6, scale: 0.25 });
+    expect(stadiumApron).toMatchObject({ x: -10.2, z: -3.1, scale: 0.22 });
+    expect(distantAvenue).toMatchObject({ x: 0, z: -6.2, scale: 0.2 });
+    expect(riverCorridor).toMatchObject({ x: 6.15, z: -6.2, scale: 0.18 });
+    expect(nearAvenue).toMatchObject({ x: 0, z: 8.2, scale: 0.4 });
+    expect(riverCorridor.scale).toBeLessThan(nearAvenue.scale);
   });
 
-  it("eases into and out of the city orbit", () => {
-    const entryFirst = poseDistance(
-      getDroneStarflightPose(0.2),
-      getDroneStarflightPose(0.205),
+  it("eases into and out of each protected turn", () => {
+    const arrivalFast = poseDistance(
+      getDroneStarflightPose(0.22),
+      getDroneStarflightPose(0.23),
     );
-    const entrySecond = poseDistance(
-      getDroneStarflightPose(0.205),
-      getDroneStarflightPose(0.21),
+    const arrivalSlow = poseDistance(
+      getDroneStarflightPose(0.23),
+      getDroneStarflightPose(0.24),
     );
-    const middleBefore = poseDistance(
-      getDroneStarflightPose(0.46),
-      getDroneStarflightPose(0.51),
+    const departureSlow = poseDistance(
+      getDroneStarflightPose(0.24),
+      getDroneStarflightPose(0.25),
     );
-    const middleAfter = poseDistance(
-      getDroneStarflightPose(0.51),
-      getDroneStarflightPose(0.56),
-    );
-    const exitBefore = poseDistance(
-      getDroneStarflightPose(0.81),
-      getDroneStarflightPose(0.815),
-    );
-    const exitLast = poseDistance(
-      getDroneStarflightPose(0.815),
-      getDroneStarflightPose(0.82),
+    const departureFast = poseDistance(
+      getDroneStarflightPose(0.25),
+      getDroneStarflightPose(0.26),
     );
 
-    expect(entryFirst).toBeLessThan(entrySecond);
-    expect(exitLast).toBeLessThan(exitBefore);
-    expect(middleBefore / middleAfter).toBeGreaterThan(0.9);
-    expect(middleBefore / middleAfter).toBeLessThan(1.1);
+    expect(arrivalSlow).toBeLessThan(arrivalFast);
+    expect(departureSlow).toBeLessThan(departureFast);
   });
 
   it("keeps every sampled pose finite and physically scaled", () => {

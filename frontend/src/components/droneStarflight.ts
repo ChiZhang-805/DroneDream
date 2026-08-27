@@ -1,4 +1,4 @@
-export const DRONE_STARFLIGHT_DURATION_SECONDS = 12;
+export const DRONE_STARFLIGHT_DURATION_SECONDS = 18;
 
 export type DroneStarflightPose = {
   x: number;
@@ -10,9 +10,34 @@ export type DroneStarflightPose = {
   roll: number;
 };
 
-const CITY_ORBIT_ENTRY = { x: 3.9, y: 0.95, z: -3.5 };
-const CITY_ORBIT_RADIUS_X = 3.9;
-const CITY_ORBIT_RADIUS_Z = 2.7;
+type CityFlightWaypoint = {
+  at: number;
+  x: number;
+  y: number;
+  z: number;
+  scale: number;
+};
+
+/* The path follows known open corridors in buildNightCity: the two east-west
+   avenues, the central north-south avenue, the stadium apron, and the river.
+   It therefore reads as a low city flight without clipping through a tower. */
+const CITY_FLIGHT_PATH: CityFlightWaypoint[] = [
+  { at: 0, x: 0, y: 0, z: 0, scale: 1 },
+  { at: 0.08, x: 0, y: 0.48, z: 1.6, scale: 0.52 },
+  { at: 0.16, x: -4.4, y: 0.4, z: 1.6, scale: 0.32 },
+  { at: 0.24, x: -10.2, y: 0.36, z: 1.6, scale: 0.25 },
+  { at: 0.32, x: -10.2, y: 0.56, z: -3.1, scale: 0.22 },
+  { at: 0.4, x: -6.2, y: 0.42, z: -6.2, scale: 0.24 },
+  { at: 0.48, x: 0, y: 0.36, z: -6.2, scale: 0.2 },
+  { at: 0.56, x: 6.15, y: 0.62, z: -6.2, scale: 0.18 },
+  { at: 0.64, x: 6.15, y: 0.48, z: 1.6, scale: 0.27 },
+  { at: 0.71, x: 11, y: 0.42, z: 1.6, scale: 0.31 },
+  { at: 0.78, x: 6.15, y: 0.5, z: 1.6, scale: 0.27 },
+  { at: 0.83, x: 0, y: 0.5, z: 1.6, scale: 0.34 },
+  { at: 0.89, x: 0, y: 0.58, z: 8.2, scale: 0.4 },
+  { at: 0.94, x: 0, y: 0.52, z: 1.6, scale: 0.52 },
+  { at: 1, x: 0, y: 0, z: 0, scale: 1 },
+];
 
 function clamp(value: number) {
   if (!Number.isFinite(value)) return value === Number.POSITIVE_INFINITY ? 1 : 0;
@@ -24,46 +49,48 @@ function smoothStep(value: number) {
   return clamped * clamped * (3 - 2 * clamped);
 }
 
+function interpolate(progress: number) {
+  const clamped = clamp(progress);
+  let index = 0;
+  while (
+    index < CITY_FLIGHT_PATH.length - 2 &&
+    clamped > CITY_FLIGHT_PATH[index + 1].at
+  ) {
+    index += 1;
+  }
+  const start = CITY_FLIGHT_PATH[index];
+  const finish = CITY_FLIGHT_PATH[index + 1];
+  const local = smoothStep((clamped - start.at) / Math.max(finish.at - start.at, 0.0001));
+  const mix = (from: number, to: number) => from + (to - from) * local;
+  return {
+    x: mix(start.x, finish.x),
+    y: mix(start.y, finish.y),
+    z: mix(start.z, finish.z),
+    scale: mix(start.scale, finish.scale),
+  };
+}
+
 export function getDroneStarflightPose(rawProgress: number): DroneStarflightPose {
   const progress = clamp(rawProgress);
-  const outboundEnd = 0.2;
-  const returnStart = 0.82;
-
-  if (progress <= outboundEnd) {
-    const phase = smoothStep(progress / outboundEnd);
-    return {
-      x: CITY_ORBIT_ENTRY.x * phase,
-      y: CITY_ORBIT_ENTRY.y * phase,
-      z: CITY_ORBIT_ENTRY.z * phase,
-      scale: 1 - phase * 0.38,
-      yaw: phase * -Math.PI / 2,
-      pitch: Math.sin(phase * Math.PI) * -0.1,
-      roll: -0.16 * Math.sin(phase * Math.PI / 2),
-    };
+  const position = interpolate(progress);
+  if (progress === 0 || progress === 1) {
+    return { ...position, yaw: 0, pitch: 0, roll: 0 };
   }
 
-  if (progress <= returnStart) {
-    const orbitProgress = (progress - outboundEnd) / (returnStart - outboundEnd);
-    const angle = smoothStep(orbitProgress) * Math.PI * 2;
-    return {
-      x: Math.cos(angle) * CITY_ORBIT_RADIUS_X,
-      y: CITY_ORBIT_ENTRY.y + Math.sin(angle * 2) * 0.2,
-      z: CITY_ORBIT_ENTRY.z + Math.sin(angle) * CITY_ORBIT_RADIUS_Z,
-      scale: 0.62 - Math.sin(angle) * 0.055,
-      yaw: -Math.PI / 2 - angle,
-      pitch: Math.sin(angle * 2) * 0.055,
-      roll: -0.16 * Math.cos(angle),
-    };
-  }
+  const before = interpolate(progress - 0.004);
+  const after = interpolate(progress + 0.004);
+  const deltaX = after.x - before.x;
+  const deltaY = after.y - before.y;
+  const deltaZ = after.z - before.z;
+  const heading = Math.atan2(deltaX, deltaZ);
+  const takeoffBlend = smoothStep(progress / 0.06);
+  const landingBlend = smoothStep((1 - progress) / 0.06);
+  const flightBlend = takeoffBlend * landingBlend;
 
-  const phase = smoothStep((progress - returnStart) / (1 - returnStart));
   return {
-    x: CITY_ORBIT_ENTRY.x * (1 - phase),
-    y: CITY_ORBIT_ENTRY.y * (1 - phase),
-    z: CITY_ORBIT_ENTRY.z * (1 - phase),
-    scale: 0.62 + phase * 0.38,
-    yaw: -Math.PI * 2.5 * (1 - phase),
-    pitch: Math.sin(phase * Math.PI) * 0.1,
-    roll: -0.16 * Math.cos(phase * Math.PI / 2),
+    ...position,
+    yaw: heading * flightBlend,
+    pitch: Math.max(-0.13, Math.min(0.13, -deltaY * 1.8)) * flightBlend,
+    roll: -Math.sin(progress * Math.PI * 9) * 0.1 * flightBlend,
   };
 }

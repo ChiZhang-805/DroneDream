@@ -10879,7 +10879,7 @@ a {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: var(--launcher-chrome-height) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   width: 100%;
   height: 100vh;
   height: 100dvh;
@@ -10893,9 +10893,11 @@ a {
 }
 
 .launcher-chrome {
-  position: relative;
+  position: absolute;
   z-index: 20;
-  grid-row: 1;
+  top: 0;
+  right: 0;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -10903,12 +10905,10 @@ a {
   height: var(--launcher-chrome-height);
   min-height: var(--launcher-chrome-height);
   padding: 0 2rem;
-  border-bottom: 1px solid rgba(175, 119, 255, 0.12);
-  background:
-    radial-gradient(circle at 50% 120%, rgba(130, 65, 255, 0.14), transparent 48%),
-    rgba(7, 2, 18, 0.96);
-  box-shadow: 0 12px 32px rgba(4, 0, 12, 0.2);
-  backdrop-filter: blur(24px) saturate(140%);
+  border-bottom: 0;
+  background: linear-gradient(180deg, rgba(4, 5, 16, 0.72), rgba(4, 5, 16, 0.22) 74%, transparent);
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .launcher-brand {
@@ -11048,6 +11048,29 @@ a {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.45;
+}
+
+/* The launcher chrome is a transparent overlay inside the night-city scene.
+   Appearance changes may affect dialogs, but never turn this layer white. */
+:root[data-dd-appearance="light"] .app-shell-launcher .launcher-chrome,
+:root[data-dd-appearance="dark"] .app-shell-launcher .launcher-chrome {
+  color: #f8f4ff;
+  border-bottom: 0;
+  background: linear-gradient(180deg, rgba(4, 5, 16, 0.72), rgba(4, 5, 16, 0.22) 74%, transparent);
+  box-shadow: none;
+}
+
+:root[data-dd-appearance="light"] .app-shell-launcher .launcher-runtime-indicator,
+:root[data-dd-appearance="light"] .app-shell-launcher .launcher-runtime-indicator.is-checked {
+  color: #effcff;
+  border-color: rgba(185, 236, 255, 0.3);
+  background: rgba(5, 9, 24, 0.5);
+}
+
+:root[data-dd-appearance="light"] .app-shell-launcher .launcher-settings-button {
+  color: #f2efff;
+  border-color: rgba(202, 214, 255, 0.3);
+  background: rgba(5, 9, 24, 0.5);
 }
 
 .launcher-settings-backdrop {
@@ -14341,7 +14364,7 @@ a {
 .launcher-main {
   position: relative;
   z-index: 1;
-  grid-row: 2;
+  grid-row: 1;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -14475,7 +14498,7 @@ a {
 .drone-launch-tagline {
   position: absolute;
   z-index: 4;
-  top: clamp(1.6rem, calc(5.4vh - 8px), 3.2rem);
+  top: calc(var(--launcher-chrome-height) + clamp(1rem, 2.4vh, 2.25rem));
   left: 50%;
   max-width: 92vw;
   margin: 0;
@@ -15136,7 +15159,7 @@ a {
   .drone-launch-hud-left { left: 1rem; }
   .drone-launch-hud-right { right: 1rem; }
   .drone-launch-tagline {
-    top: 1.75rem;
+    top: calc(var(--launcher-chrome-height) + 0.8rem);
     max-width: 92vw;
   }
   .drone-launch-tagline-zh { font-size: clamp(2.7rem, 12vw, 4.2rem); }

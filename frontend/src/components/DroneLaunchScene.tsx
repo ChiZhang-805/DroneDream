@@ -460,6 +460,52 @@ function makeRadialTexture(stops: Array<[number, string]>, size = 128) {
   return texture;
 }
 
+function makeBuildingFacadeTexture(
+  windowColor: string,
+  random: () => number,
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 192;
+  canvas.height = 384;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  const facade = context.createLinearGradient(0, 0, canvas.width, 0);
+  facade.addColorStop(0, "#090d1b");
+  facade.addColorStop(0.46, "#171c31");
+  facade.addColorStop(1, "#080c19");
+  context.fillStyle = facade;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  context.fillStyle = "rgba(210,225,255,0.08)";
+  for (let x = 0; x <= canvas.width; x += 24) context.fillRect(x, 0, 2, canvas.height);
+  for (let y = 7; y <= canvas.height; y += 24) context.fillRect(0, y, canvas.width, 2);
+
+  for (let y = 12; y < canvas.height - 10; y += 24) {
+    for (let x = 6; x < canvas.width - 8; x += 24) {
+      const lit = random() > 0.34;
+      context.fillStyle = lit
+        ? windowColor
+        : random() > 0.5
+          ? "rgba(36,46,72,0.72)"
+          : "rgba(12,18,34,0.84)";
+      context.fillRect(x, y, 13, 10);
+      if (lit) {
+        context.fillStyle = "rgba(255,255,255,0.34)";
+        context.fillRect(x + 1, y + 1, 2, 8);
+      }
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function buildStarLayer({
   count,
   size,
@@ -587,9 +633,9 @@ function buildNightCity(
     toneMapped: false,
   });
   const pavement = new THREE.MeshStandardMaterial({
-    color: 0x171a2b,
-    roughness: 0.9,
-    metalness: 0.12,
+    color: 0x202438,
+    roughness: 0.82,
+    metalness: 0.18,
   });
   const waterMaterial = new THREE.MeshStandardMaterial({
     color: 0x071d36,
@@ -624,12 +670,32 @@ function buildNightCity(
   addFlatBox(1.35, 31, 0, 0, road);
   addFlatBox(31, 1.05, 0, -6.2, road);
 
+  const sidewalk = new THREE.MeshStandardMaterial({
+    color: 0x2b2e3d,
+    roughness: 0.88,
+    metalness: 0.08,
+  });
+  for (const z of [0.8, 2.4, -6.86, -5.55]) addFlatBox(31, 0.23, 0, z, sidewalk, 0.07);
+  for (const x of [-0.82, 0.82]) addFlatBox(0.23, 31, x, 0, sidewalk, 0.07);
+
   for (let x = -14; x <= 14; x += 1.7) {
     addFlatBox(0.76, 0.055, x, 1.6, roadLine, 0.052);
     addFlatBox(0.76, 0.05, x, -6.2, roadLine, 0.052);
   }
   for (let z = -14; z <= 14; z += 1.7) {
     addFlatBox(0.05, 0.76, 0, z, roadLine, 0.052);
+  }
+
+  const crosswalkMaterial = new THREE.MeshBasicMaterial({
+    color: 0xeaf1ff,
+    transparent: true,
+    opacity: 0.68,
+    toneMapped: false,
+  });
+  for (const crossingZ of [1.6, -6.2]) {
+    for (let stripe = -3; stripe <= 3; stripe += 1) {
+      addFlatBox(0.13, 0.62, stripe * 0.22, crossingZ, crosswalkMaterial, 0.061);
+    }
   }
 
   const river = addFlatBox(3.1, 32, 6.15, 0, waterMaterial, 0.025);
@@ -661,15 +727,25 @@ function buildNightCity(
     group.add(rail);
   }
 
-  const buildingMaterials = [
-    new THREE.MeshStandardMaterial({ color: 0x12162a, roughness: 0.7, metalness: 0.32 }),
-    new THREE.MeshStandardMaterial({ color: 0x17152d, roughness: 0.66, metalness: 0.38 }),
-    new THREE.MeshStandardMaterial({ color: 0x0c1b2c, roughness: 0.68, metalness: 0.34 }),
+  const facadeTextures = [
+    makeBuildingFacadeTexture(rgba(theme.primary, 0.92), random),
+    makeBuildingFacadeTexture(rgba(theme.tertiary, 0.9), random),
+    makeBuildingFacadeTexture("rgba(255,218,132,0.92)", random),
   ];
-  const windowMaterials = [
-    new THREE.MeshBasicMaterial({ color: theme.primary, transparent: true, opacity: 0.82, toneMapped: false }),
-    new THREE.MeshBasicMaterial({ color: theme.tertiary, transparent: true, opacity: 0.78, toneMapped: false }),
-    new THREE.MeshBasicMaterial({ color: 0xffd981, transparent: true, opacity: 0.78, toneMapped: false }),
+  const buildingMaterials = facadeTextures.map((texture, index) => new THREE.MeshPhysicalMaterial({
+    color: index === 0 ? 0x27304a : index === 1 ? 0x302542 : 0x27303b,
+    map: texture ?? undefined,
+    emissiveMap: texture ?? undefined,
+    emissive: index === 0 ? theme.primary : index === 1 ? theme.tertiary : 0xffc866,
+    emissiveIntensity: 0.3,
+    roughness: 0.54,
+    metalness: 0.42,
+    clearcoat: 0.18,
+  }));
+  const buildingEdgeMaterials = [
+    new THREE.MeshBasicMaterial({ color: theme.primary, transparent: true, opacity: 0.42, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: theme.tertiary, transparent: true, opacity: 0.38, toneMapped: false }),
+    new THREE.MeshBasicMaterial({ color: 0xffd981, transparent: true, opacity: 0.34, toneMapped: false }),
   ];
   const beaconMaterials: THREE.MeshBasicMaterial[] = [];
   const buildingPositions: Array<[number, number]> = [];
@@ -684,32 +760,78 @@ function buildNightCity(
   }
 
   for (const [index, [x, z]] of buildingPositions.entries()) {
-    const width = 1.05 + random() * 1.05;
-    const depth = 0.9 + random() * 1.15;
-    const height = 0.55 + random() * (Math.abs(x) > 9 ? 1.2 : 2.45);
+    const width = 0.92 + random() * 1.15;
+    const depth = 0.82 + random() * 1.2;
+    const height = 0.72 + random() * (Math.abs(x) > 9 ? 1.35 : 2.7);
+    const facadeMaterial = buildingMaterials[index % buildingMaterials.length];
+    const edgeMaterial = buildingEdgeMaterials[index % buildingEdgeMaterials.length];
+    const lot = new THREE.Mesh(
+      new THREE.BoxGeometry(width + 0.3, 0.06, depth + 0.3),
+      pavement,
+    );
+    lot.position.set(x, 0.065, z);
+    lot.receiveShadow = true;
+    group.add(lot);
+
+    const podiumHeight = index % 4 === 0 ? Math.min(0.34, height * 0.24) : 0;
+    if (podiumHeight > 0) {
+      const podium = new THREE.Mesh(
+        new THREE.BoxGeometry(width * 1.12, podiumHeight, depth * 1.12),
+        facadeMaterial,
+      );
+      podium.position.set(x, podiumHeight / 2 + 0.08, z);
+      podium.castShadow = true;
+      group.add(podium);
+    }
     const building = new THREE.Mesh(
       new THREE.BoxGeometry(width, height, depth),
-      buildingMaterials[index % buildingMaterials.length],
+      facadeMaterial,
     );
-    building.position.set(x, height / 2, z);
+    building.position.set(x, height / 2 + podiumHeight, z);
     building.castShadow = true;
     building.receiveShadow = true;
     group.add(building);
 
     const roof = new THREE.Mesh(
-      new THREE.BoxGeometry(width * 0.42, 0.08, depth * 0.42),
+      new THREE.BoxGeometry(width * 0.5, 0.1, depth * 0.46),
       pavement,
     );
-    roof.position.set(x, height + 0.04, z);
+    roof.position.set(x, height + podiumHeight + 0.05, z);
     group.add(roof);
 
-    const windowMaterial = windowMaterials[index % windowMaterials.length];
-    const windowBand = new THREE.Mesh(
-      new THREE.BoxGeometry(width + 0.014, Math.min(0.14, height * 0.15), depth * 0.66),
-      windowMaterial,
-    );
-    windowBand.position.set(x, Math.max(0.28, height * 0.58), z);
-    group.add(windowBand);
+    for (const cornerX of [-1, 1]) {
+      for (const cornerZ of [-1, 1]) {
+        const edge = new THREE.Mesh(
+          new THREE.BoxGeometry(0.025, height * 0.96, 0.025),
+          edgeMaterial,
+        );
+        edge.position.set(
+          x + cornerX * width * 0.498,
+          podiumHeight + height * 0.51,
+          z + cornerZ * depth * 0.498,
+        );
+        group.add(edge);
+      }
+    }
+
+    if (index % 3 === 1) {
+      const crown = new THREE.Mesh(
+        new THREE.CylinderGeometry(width * 0.19, width * 0.3, 0.2, 8),
+        facadeMaterial,
+      );
+      crown.position.set(x, height + podiumHeight + 0.16, z);
+      crown.castShadow = true;
+      group.add(crown);
+    }
+
+    if (index % 4 === 2) {
+      const antenna = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.018, 0.024, 0.52, 8),
+        buildingEdgeMaterials[index % buildingEdgeMaterials.length],
+      );
+      antenna.position.set(x, height + podiumHeight + 0.34, z);
+      group.add(antenna);
+    }
 
     if (height > 1.6 && index % 3 === 0) {
       const beaconMaterial = new THREE.MeshBasicMaterial({
@@ -720,15 +842,22 @@ function buildNightCity(
       });
       beaconMaterials.push(beaconMaterial);
       const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), beaconMaterial);
-      beacon.position.set(x, height + 0.18, z);
+      beacon.position.set(x, height + podiumHeight + 0.2, z);
       group.add(beacon);
     }
   }
 
   const stadium = new THREE.Group();
   stadium.position.set(-8.9, 0.045, -3.1);
+  const stadiumBase = new THREE.Mesh(
+    new THREE.BoxGeometry(4.35, 0.1, 2.65),
+    pavement,
+  );
+  stadiumBase.position.y = -0.035;
+  stadiumBase.receiveShadow = true;
+  stadium.add(stadiumBase);
   const field = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.4, 1.65),
+    new THREE.PlaneGeometry(3.55, 1.7),
     new THREE.MeshStandardMaterial({ color: 0x0a392d, roughness: 0.92, metalness: 0.04 }),
   );
   field.rotation.x = -Math.PI / 2;
@@ -741,12 +870,55 @@ function buildNightCity(
   track.scale.set(1.32, 0.72, 1);
   track.position.y = 0.018;
   stadium.add(track);
+  const laneMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffecf2,
+    transparent: true,
+    opacity: 0.62,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+  for (const radius of [1.24, 1.34, 1.44]) {
+    const lane = new THREE.Mesh(new THREE.RingGeometry(radius, radius + 0.012, 72), laneMaterial);
+    lane.rotation.x = -Math.PI / 2;
+    lane.scale.set(1.32, 0.72, 1);
+    lane.position.y = 0.026;
+    stadium.add(lane);
+  }
   const centreLine = new THREE.Mesh(
     new THREE.BoxGeometry(0.035, 0.03, 1.36),
     new THREE.MeshBasicMaterial({ color: 0xd9f8e8, transparent: true, opacity: 0.52 }),
   );
   centreLine.position.y = 0.035;
   stadium.add(centreLine);
+  const fieldLineMaterial = new THREE.MeshBasicMaterial({
+    color: 0xe7fff3,
+    transparent: true,
+    opacity: 0.72,
+    toneMapped: false,
+  });
+  for (const z of [-0.78, 0.78]) {
+    const goalLine = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.018, 0.025), fieldLineMaterial);
+    goalLine.position.set(0, 0.04, z);
+    stadium.add(goalLine);
+  }
+  const standsMaterial = new THREE.MeshStandardMaterial({ color: 0x35334d, roughness: 0.74, metalness: 0.24 });
+  for (const x of [-1.95, 1.95]) {
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 2.1), standsMaterial);
+    stand.position.set(x, 0.14, 0);
+    stand.rotation.z = x < 0 ? -0.12 : 0.12;
+    stadium.add(stand);
+  }
+  for (const x of [-2.08, 2.08]) {
+    for (const z of [-1.2, 1.2]) {
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.035, 1.3, 8), pavement);
+      mast.position.set(x, 0.62, z);
+      stadium.add(mast);
+      const floodlight = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.08), new THREE.MeshBasicMaterial({ color: 0xeafcff, toneMapped: false }));
+      floodlight.position.set(x, 1.24, z);
+      floodlight.rotation.y = x < 0 ? -0.2 : 0.2;
+      stadium.add(floodlight);
+    }
+  }
   group.add(stadium);
 
   const parkMaterial = new THREE.MeshStandardMaterial({ color: 0x102e25, roughness: 0.94 });
@@ -759,14 +931,16 @@ function buildNightCity(
   }
 
   const lampMaterial = new THREE.MeshBasicMaterial({ color: 0xcffaff, toneMapped: false });
+  const lampPoleMaterial = new THREE.MeshStandardMaterial({ color: 0x576178, roughness: 0.48, metalness: 0.7 });
   for (let index = 0; index < 22; index += 1) {
     const eastWest = index < 12;
+    const lampX = eastWest ? -13 + index * 2.35 : index % 2 === 0 ? -0.82 : 0.82;
+    const lampZ = eastWest ? 0.77 : -12 + (index - 12) * 2.5;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.024, 0.46, 8), lampPoleMaterial);
+    pole.position.set(lampX, 0.23, lampZ);
+    group.add(pole);
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.045, 9, 7), lampMaterial);
-    lamp.position.set(
-      eastWest ? -13 + index * 2.35 : index % 2 === 0 ? -0.82 : 0.82,
-      0.22,
-      eastWest ? 0.77 : -12 + (index - 12) * 2.5,
-    );
+    lamp.position.set(lampX, 0.48, lampZ);
     group.add(lamp);
   }
 
@@ -776,24 +950,55 @@ function buildNightCity(
     const axis: "x" | "z" = index < 9 ? "x" : "z";
     const direction: 1 | -1 = index % 2 === 0 ? 1 : -1;
     const vehicle = new THREE.Group();
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(0.34, 0.12, 0.19),
-      new THREE.MeshStandardMaterial({
+    const bodyMaterial = new THREE.MeshPhysicalMaterial({
         color: vehicleColors[index % vehicleColors.length],
         emissive: vehicleColors[index % vehicleColors.length],
-        emissiveIntensity: 0.24,
-        roughness: 0.34,
-        metalness: 0.42,
-      }),
+        emissiveIntensity: 0.12,
+        roughness: 0.28,
+        metalness: 0.58,
+        clearcoat: 0.72,
+        clearcoatRoughness: 0.2,
+      });
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 0.12, 0.21),
+      bodyMaterial,
     );
     body.position.y = 0.12;
     vehicle.add(body);
+    const cabin = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, 0.1, 0.18),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x18253d,
+        roughness: 0.12,
+        metalness: 0.45,
+        transmission: 0.16,
+        transparent: true,
+        opacity: 0.88,
+      }),
+    );
+    cabin.position.set(-direction * 0.025, 0.22, 0);
+    vehicle.add(cabin);
+    const wheelMaterial = new THREE.MeshStandardMaterial({ color: 0x030407, roughness: 0.84 });
+    for (const wheelX of [-0.12, 0.12]) {
+      for (const wheelZ of [-0.115, 0.115]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.043, 0.043, 0.035, 12), wheelMaterial);
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(wheelX, 0.075, wheelZ);
+        vehicle.add(wheel);
+      }
+    }
     const headlight = new THREE.Mesh(
       new THREE.BoxGeometry(0.025, 0.045, 0.11),
       new THREE.MeshBasicMaterial({ color: 0xeaffff, toneMapped: false }),
     );
     headlight.position.set(direction * 0.18, 0.13, 0);
     vehicle.add(headlight);
+    const tailLight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.018, 0.042, 0.12),
+      new THREE.MeshBasicMaterial({ color: 0xff335d, toneMapped: false }),
+    );
+    tailLight.position.set(-direction * 0.205, 0.13, 0);
+    vehicle.add(tailLight);
     if (axis === "z") vehicle.rotation.y = Math.PI / 2;
     group.add(vehicle);
     movingVehicles.push({
