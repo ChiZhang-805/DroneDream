@@ -4,7 +4,6 @@ import {
   Bot,
   BrainCircuit,
   ChevronRight,
-  GraduationCap,
   MapPinned,
   MonitorCog,
   Moon,
@@ -520,6 +519,16 @@ export function FieldSettingsDialog({
       consumerProfile="field"
       presentation="workspace"
       backLabel={copy.back}
+      headerAction={activeTab === "course" ? (
+        <a
+          className="settings-course-header-action"
+          href={ECE498BH_COURSE_URL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {copy.openCourse}<ArrowRight aria-hidden="true" />
+        </a>
+      ) : null}
     >
       <EditionSettingsPanel active={activeTab === "general"} id="general">
         <section className="settings-general-panel">
@@ -658,17 +667,7 @@ export function FieldSettingsDialog({
       </EditionSettingsPanel>
 
       <EditionSettingsPanel active={activeTab === "course"} id="course">
-        <section className="settings-course-panel" aria-labelledby="field-settings-course-title">
-          <div className="settings-course-overview">
-            <div className="settings-course-mark" aria-hidden="true"><GraduationCap /></div>
-            <div>
-              <h3 id="field-settings-course-title">ECE498BH</h3>
-              <p>{copy.courseOverview}</p>
-            </div>
-            <a href={ECE498BH_COURSE_URL} target="_blank" rel="noreferrer">
-              {copy.openCourse}<ArrowRight aria-hidden="true" />
-            </a>
-          </div>
+        <section className="settings-course-panel" aria-labelledby="settings-workspace-active-title">
           <div className="settings-course-editions">
             {(["universal", "sim", "lab", "field", "autonomy"] as const).map((edition, index) => (
               <article key={edition}>

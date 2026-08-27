@@ -47,6 +47,7 @@ export function EditionSettingsSurface({
   consumerProfile = "shared",
   presentation = "dialog",
   backLabel,
+  headerAction,
 }: {
   activeTab: SettingsSurfaceTabId;
   closeLabel: string;
@@ -60,6 +61,7 @@ export function EditionSettingsSurface({
   consumerProfile?: "shared" | BrandEditionId;
   presentation?: "dialog" | "workspace";
   backLabel?: string;
+  headerAction?: ReactNode;
 }) {
   const tabRefs = useRef(new Map<SettingsSurfaceTabId, HTMLButtonElement>());
   useEffect(() => {
@@ -178,13 +180,13 @@ export function EditionSettingsSurface({
       <div className={presentation === "workspace" ? "settings-workspace-content" : undefined}>
         <div className="launcher-settings-heading">
           <div className="launcher-settings-title-lockup">
-            <h2 id={presentation === "workspace" ? undefined : "launcher-settings-title"}>
+            <h2 id={presentation === "workspace" ? "settings-workspace-active-title" : "launcher-settings-title"}>
               {presentation === "workspace"
                 ? tabs.find((tab) => tab.id === activeTab)?.label ?? title
                 : title}
             </h2>
           </div>
-          {presentation === "workspace" ? null : (
+          {presentation === "workspace" ? headerAction ?? null : (
             <button
               ref={closeRef}
               type="button"

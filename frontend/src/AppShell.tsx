@@ -1900,6 +1900,18 @@ function SettingsDialog({
       consumerProfile={edition}
       presentation="workspace"
       backLabel={interfaceLocale === "zh-CN" ? "返回应用" : "Back to app"}
+      headerAction={activeSettingsTab === "course" ? (
+        <a
+          className="settings-course-header-action"
+          href={ECE498BH_COURSE_URL}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(event) => onOpenExternal(event, ECE498BH_COURSE_URL)}
+        >
+          {settingsCopy.courseOpen}
+          <ArrowRight aria-hidden="true" />
+        </a>
+      ) : null}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
         <section className="settings-general-panel">
@@ -2043,19 +2055,7 @@ function SettingsDialog({
         </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "course"} id="course">
-        <section className="settings-course-panel" aria-labelledby="settings-course-title">
-          <h3 id="settings-course-title" className="sr-only">ECE498BH</h3>
-          <div className="settings-course-toolbar">
-            <a
-              href={ECE498BH_COURSE_URL}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(event) => onOpenExternal(event, ECE498BH_COURSE_URL)}
-            >
-              {settingsCopy.courseOpen}
-              <ArrowRight aria-hidden="true" />
-            </a>
-          </div>
+        <section className="settings-course-panel" aria-labelledby="settings-workspace-active-title">
           <div className="settings-course-editions" aria-label={locale === "zh-CN" ? "DroneDream 五款软件" : "DroneDream editions"}>
             {([
               ["universal", settingsCopy.courseEditions[0]],
@@ -2392,25 +2392,8 @@ function SettingsDialog({
       <EditionSettingsPanel active={activeSettingsTab === "model"} id="model">
         <section
           className={`settings-model-panel${modelAccess.accessMode === "byok" ? " settings-model-panel-byok" : ""}`}
-          aria-labelledby="settings-model-title"
+          aria-label={t("settings.model.title")}
         >
-        <div className="settings-model-heading">
-          <h3 id="settings-model-title">{t("settings.model.title")}</h3>
-          <span className={
-            modelAccess.accessMode === "platform" || modelAccess.apiKey
-              ? "configured"
-              : undefined
-          }>
-            <i aria-hidden="true" />
-            {t(
-              modelAccess.accessMode === "platform"
-                ? "settings.model.managed"
-                : modelAccess.apiKey
-                  ? "settings.model.configured"
-                  : "settings.model.notConfigured",
-            )}
-          </span>
-        </div>
         <div className="settings-model-mode-row">
           <strong>{t("settings.model.accessMode")}</strong>
           <div className="settings-model-access-mode" role="group" aria-label={t("settings.model.accessMode")}>

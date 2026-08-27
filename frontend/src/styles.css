@@ -23016,6 +23016,32 @@ body {
   font-size: clamp(1.65rem, 2vw, 2rem);
 }
 
+.settings-workspace-content > .launcher-settings-heading .settings-course-header-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-left: auto;
+  padding: 0.65rem 1.05rem;
+  color: #ffffff;
+  border-radius: 0.72rem;
+  background: linear-gradient(135deg, var(--dd-brand-start), var(--dd-brand-end));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--dd-brand-start) 18%, transparent);
+  font-size: 0.88rem;
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.settings-workspace-content > .launcher-settings-heading .settings-course-header-action:is(:visited, :hover, :focus-visible) {
+  color: #ffffff;
+}
+
+.settings-workspace-content > .launcher-settings-heading .settings-course-header-action svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 .settings-workspace-content > .launcher-settings-panels {
   padding: 0 clamp(1.75rem, 3.6vw, 4rem) 2.5rem;
 }
@@ -23072,7 +23098,7 @@ body {
 
 .settings-workspace-content .settings-memory-grid label {
   min-height: 3.75rem;
-  grid-template-columns: minmax(220px, 1fr) minmax(320px, 56%);
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 38%);
   align-items: center;
 }
 
