@@ -755,7 +755,11 @@ function buildNightCity(
       const riverZone = x > 4.45 && x < 7.9;
       const roadZone = Math.abs(z - 1.6) < 1.15 || Math.abs(z + 6.2) < 1.0;
       const launchClearance = Math.hypot(x, z) < 4.45;
-      if (stadiumZone || riverZone || roadZone || launchClearance) continue;
+      // The camera approaches the launch pad from positive Z. Keep the whole
+      // foreground band low and open so no tower can sit between the viewer
+      // and the idle drone, including at the widest supported aspect ratios.
+      const cameraViewClearance = z > 2.2 && z < 9.1;
+      if (stadiumZone || riverZone || roadZone || launchClearance || cameraViewClearance) continue;
       buildingPositions.push([x + (random() - 0.5) * 0.65, z + (random() - 0.5) * 0.55]);
     }
   }
