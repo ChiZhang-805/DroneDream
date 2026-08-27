@@ -735,6 +735,10 @@ function buildNightCity(
     // Two crossings across the east-west road, one on each side of the
     // junction. The bars run in the walking direction and stop at the curbs.
     for (const crossingX of [-1.12, 1.12]) {
+      // Mask the centre-line below the complete pedestrian zone. Individual
+      // white bars intentionally leave asphalt gaps, but a road marking must
+      // never remain visible through those gaps at an intersection.
+      addRoadSurface(0.92, horizontalRoadDepth * 0.82, crossingX, junctionZ, road, 0.013);
       for (let stripe = -2; stripe <= 2; stripe += 1) {
         addRoadSurface(
           0.12,
@@ -750,6 +754,7 @@ function buildNightCity(
     // the turning box prevents the unrealistic white grid seen at the centre.
     const crossingOffset = horizontalRoadDepth / 2 + 0.34;
     for (const crossingZ of [junctionZ - crossingOffset, junctionZ + crossingOffset]) {
+      addRoadSurface(1.06, 0.86, 0, crossingZ, road, 0.013);
       for (let stripe = -2; stripe <= 2; stripe += 1) {
         addRoadSurface(
           1.02,
